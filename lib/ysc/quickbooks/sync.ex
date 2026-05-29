@@ -287,7 +287,7 @@ defmodule Ysc.Quickbooks.Sync do
         error
 
       {:error, reason} = error ->
-        Ysc.Logging.error(
+        log_qb_sync_failure(
           "[QB Sync] do_sync_payment: Sync failed in pipeline - Error: #{inspect(reason)}, Payment ID: #{payment.id}, Reference ID: #{payment.reference_id}, User ID: #{payment.user_id}",
           payment_id: payment.id,
           payment_reference_id: payment.reference_id,
@@ -390,7 +390,7 @@ defmodule Ysc.Quickbooks.Sync do
         error
 
       {:error, reason} = error ->
-        Ysc.Logging.error(
+        log_qb_sync_failure(
           "[QB Sync] do_sync_refund: Sync failed in pipeline - Error: #{inspect(reason)}, Refund ID: #{refund.id}, Reference ID: #{refund.reference_id}, Payment ID: #{refund.payment_id}",
           refund_id: refund.id,
           refund_reference_id: refund.reference_id,
@@ -507,7 +507,7 @@ defmodule Ysc.Quickbooks.Sync do
         qb_bank_account_id =
           Application.get_env(:ysc, :quickbooks)[:bank_account_id]
 
-        Ysc.Logging.error(
+        log_qb_sync_failure(
           "[QB Sync] do_sync_payout: Sync failed in pipeline - Error: #{inspect(reason)}, Payout ID: #{payout.id}, Stripe Payout ID: #{inspect(payout.stripe_payout_id)}, Payments: #{length(payout.payments)}, Refunds: #{length(payout.refunds)}",
           payout_id: payout.id,
           stripe_payout_id: payout.stripe_payout_id,
@@ -642,7 +642,7 @@ defmodule Ysc.Quickbooks.Sync do
         {:ok, customer_id}
 
       {:error, reason} = error ->
-        Ysc.Logging.error(
+        log_qb_sync_failure(
           "[QB Sync] get_or_create_customer: Failed to get or create customer - Error: #{inspect(reason)}, User ID: #{user.id}, Email: #{user.email}, Existing QB Customer ID: #{inspect(user.quickbooks_customer_id)}",
           user_id: user.id,
           user_email: user.email,
@@ -1210,7 +1210,7 @@ defmodule Ysc.Quickbooks.Sync do
     income_account_ref = query_income_account(income_account_name)
 
     if is_nil(income_account_ref) do
-      Ysc.Logging.error(
+      Ysc.Logging.warning(
         "[QB Sync] get_quickbooks_item_id: Cannot create item - no revenue account found in QuickBooks. Create a revenue-type account (e.g. General Revenue) to fix error 2390."
       )
 
@@ -3355,4 +3355,34 @@ defmodule Ysc.Quickbooks.Sync do
 
     result
   end
+
+  defp log_qb_sync_failure(message, opts) do
+    reason = Keyword.get(opts, :error_reason)
+
+    if known_qb_sync_failure?(reason) do
+      Ysc.Logging.warning(message, opts)
+    else
+      Ysc.Logging.error(message, opts)
+    end
+  end
+
+  defp known_qb_sync_failure?(reason)
+       when reason in [
+              :no_income_account_for_item,
+              :item_creation_failed,
+              :user_not_found,
+              :transactions_not_fully_synced,
+              :rate_limited
+            ],
+       do: true
+
+  defp known_qb_sync_failure?(<<"DUPLICATE_VENDOR_ID:", _::binary>>), do: true
+
+  defp known_qb_sync_failure?(reason) when is_binary(reason) do
+    String.contains?(reason, "income account") or
+      String.contains?(reason, "2390") or
+      String.contains?(reason, "Attachable ID")
+  end
+
+  defp known_qb_sync_failure?(_), do: false
 end

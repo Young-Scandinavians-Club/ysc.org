@@ -131,7 +131,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Ysc.Logging.error(
+          Ysc.Logging.warning(
             "Failed to schedule conduct violation confirmation email",
             report_id: report.id,
             email: report.email,
@@ -179,7 +179,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Ysc.Logging.error(
+          Ysc.Logging.warning(
             "Failed to schedule conduct violation board notification email",
             report_id: report.id,
             error: reason
@@ -240,7 +240,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Ysc.Logging.error("Failed to schedule volunteer confirmation email",
+          Ysc.Logging.warning("Failed to schedule volunteer confirmation email",
             volunteer_id: volunteer.id,
             email: volunteer.email,
             error: reason
@@ -280,7 +280,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Ysc.Logging.error(
+          Ysc.Logging.warning(
             "Failed to schedule volunteer board notification email",
             volunteer_id: volunteer.id,
             error: reason
@@ -344,7 +344,7 @@ defmodule Ysc.Forms do
           )
 
         {:error, reason} ->
-          Ysc.Logging.error(
+          Ysc.Logging.warning(
             "Failed to schedule contact form board notification email",
             contact_form_id: contact_form.id,
             error: reason

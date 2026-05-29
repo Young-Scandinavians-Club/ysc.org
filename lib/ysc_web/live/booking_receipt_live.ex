@@ -1517,7 +1517,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   def handle_async(:load_receipt_data, {:exit, reason}, socket) do
-    Ysc.Logging.error("Failed to load receipt data async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to load receipt data async: #{inspect(reason)}")
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 

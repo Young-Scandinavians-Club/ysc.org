@@ -1,6 +1,8 @@
 defmodule YscWeb.HomeLive do
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
@@ -265,8 +267,7 @@ defmodule YscWeb.HomeLive do
   end
 
   def handle_async(:load_home_data, {:exit, reason}, socket) do
-    require Ysc.Logging
-    Ysc.Logging.error("Failed to load home data async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to load home data async: #{inspect(reason)}")
     # Mark as loaded to avoid infinite loading state
     {:noreply, assign(socket, :async_data_loaded, true)}
   end

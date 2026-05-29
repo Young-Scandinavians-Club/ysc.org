@@ -8,15 +8,17 @@ defmodule YscWeb.TestLogFilter do
   test output.
   """
 
-  require Ysc.Logging
-
   @doc """
-  Filters out expected database connection cleanup errors during tests.
+  Primary logger filter callback (`filter/2`) for the test environment.
 
-  Returns :stop to prevent the log from being written, or the log_event unchanged
-  to allow it through.
+  Returns `:stop` to suppress expected noise, or the log event unchanged.
   """
-  def filter_db_connection_errors(log_event, _state) do
+  def filter(log_event, config) do
+    filter_db_connection_errors(log_event, config)
+  end
+
+  @doc false
+  def filter_db_connection_errors(log_event, _config) do
     case log_event do
       %{
         level: :error,

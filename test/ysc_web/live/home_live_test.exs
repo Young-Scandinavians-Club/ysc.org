@@ -833,9 +833,8 @@ defmodule YscWeb.HomeLiveTest do
     test "subscribe_newsletter shows error for domain with no MX records", %{
       conn: conn
     } do
-      stub_mx_no_records()
-
       {:ok, view, _html} = live(conn, ~p"/")
+      stub_mx_no_records(view)
 
       domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
 

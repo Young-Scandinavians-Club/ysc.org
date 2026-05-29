@@ -985,7 +985,7 @@ defmodule Ysc.Scanning do
     else
       users = Accounts.search_users(trimmed, limit: 20)
       user_ids = Enum.map(users, & &1.id)
-      checked_in_user_ids = checked_in_user_ids(session_id, user_ids)
+      checked_in_ids = checked_in_user_ids(session_id, user_ids)
 
       Enum.map(users, fn user ->
         membership = MembershipCache.get_active_membership(user)
@@ -996,13 +996,13 @@ defmodule Ysc.Scanning do
           user: user,
           membership_status: if(active?, do: :active, else: :inactive),
           membership_type: plan_type,
-          checked_in?: MapSet.member?(checked_in_user_ids, user.id)
+          checked_in?: user.id in checked_in_ids
         }
       end)
     end
   end
 
-  defp checked_in_user_ids(_session_id, []), do: MapSet.new()
+  defp checked_in_user_ids(_session_id, []), do: []
 
   defp checked_in_user_ids(session_id, user_ids) do
     SessionCheckIn
@@ -1012,7 +1012,6 @@ defmodule Ysc.Scanning do
     )
     |> select([sc], sc.user_id)
     |> Repo.all()
-    |> MapSet.new()
   end
 
   @doc """

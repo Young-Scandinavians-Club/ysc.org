@@ -112,7 +112,7 @@ defmodule YscWeb.Workers.EmailNotifier do
   end
 
   defp perform_with_args(params) do
-    Ysc.Logging.info("EmailNotifier job started",
+    Ysc.Logging.debug("EmailNotifier job started",
       job_id: params.job.id,
       recipient: params.recipient,
       idempotency_key: params.idempotency_key,
@@ -137,7 +137,9 @@ defmodule YscWeb.Workers.EmailNotifier do
           YscWeb.Emails.Notifier.get_template_module(params.template)
 
         if template_module do
-          Ysc.Logging.info("Template module found: #{inspect(template_module)}")
+          Ysc.Logging.debug(
+            "Template module found: #{inspect(template_module)}"
+          )
         else
           error_message =
             "Template module not found for template: #{params.template}"
@@ -150,7 +152,7 @@ defmodule YscWeb.Workers.EmailNotifier do
         end
 
         atomized_params = atomize_keys(params.params)
-        Ysc.Logging.info("Atomized params: #{inspect(atomized_params)}")
+        Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
 
         # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
         normalized_recipient = normalize_recipient(params.recipient)
@@ -276,25 +278,47 @@ defmodule YscWeb.Workers.EmailNotifier do
   defp normalize_recipient(recipient) do
     # Fallback: use inspect to safely convert any format to string
     # This handles edge cases where recipient might be in an unexpected format
-    require Ysc.Logging
-
     Ysc.Logging.warning("Unexpected recipient format, normalizing",
       recipient: inspect(recipient),
-      recipient_type: inspect(recipient.__struct__ || :no_struct)
+      recipient_type: recipient_log_type(recipient)
     )
 
-    # Try to extract email from various formats
     case recipient do
       list when is_list(list) ->
-        # Try to extract email from list
-        case List.first(list) do
-          {_name, email} when is_binary(email) -> email
-          email when is_binary(email) -> email
-          _ -> inspect(recipient)
+        case email_from_list(list) do
+          nil -> inspect(recipient)
+          email -> email
         end
 
       _ ->
         inspect(recipient)
+    end
+  end
+
+  defp email_from_list(list) do
+    Enum.find_value(list, fn
+      {_name, email} when is_binary(email) -> email
+      email when is_binary(email) -> email
+      _ -> nil
+    end)
+  end
+
+  defp recipient_log_type(recipient) do
+    cond do
+      is_list(recipient) ->
+        :list
+
+      is_tuple(recipient) ->
+        :tuple
+
+      is_map(recipient) and Map.has_key?(recipient, :__struct__) ->
+        recipient.__struct__
+
+      is_map(recipient) ->
+        :map
+
+      true ->
+        :other
     end
   end
 

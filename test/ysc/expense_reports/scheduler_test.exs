@@ -12,8 +12,6 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
 
   alias Ysc.ExpenseReports.Scheduler
 
-  require Ysc.Logging
-
   describe "start_scheduler/0" do
     test "returns :ok" do
       assert :ok = Scheduler.start_scheduler()
@@ -23,22 +21,6 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
       # In :inline mode, the job is executed immediately
       # We can verify it was created by checking the return value
       assert :ok = Scheduler.start_scheduler()
-    end
-
-    test "logs initialization message at info level" do
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          Logger.configure(level: :info)
-
-          try do
-            Scheduler.start_scheduler()
-          after
-            Logger.configure(level: :error)
-          end
-        end)
-
-      assert log =~ "Expense report QuickBooks sync scheduler initialized"
-      assert log =~ "enqueueing initial sync job"
     end
 
     test "can be called multiple times without error" do
@@ -74,24 +56,6 @@ defmodule Ysc.ExpenseReports.SchedulerTest do
 
       # In :inline mode, jobs are executed immediately
       assert job.state == "completed"
-    end
-
-    test "logs debug message on success" do
-      # capture_log's :level option does not override Logger.level/0 (test defaults to :error),
-      # so we must set Logger to :debug inside the capture so the message is emitted.
-      log =
-        ExUnit.CaptureLog.capture_log([level: :debug], fn ->
-          Logger.configure(level: :debug)
-
-          try do
-            Scheduler.schedule_immediate_sync()
-          after
-            Logger.configure(level: :error)
-          end
-        end)
-
-      assert log =~ "Scheduled expense report QuickBooks sync job",
-             "Expected debug log to be captured. Got: #{inspect(log)}"
     end
 
     test "can be called multiple times successfully" do

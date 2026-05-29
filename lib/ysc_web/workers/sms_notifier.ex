@@ -147,7 +147,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     phone_number_type = get_type_string(phone_number)
     params_type = get_type_string(params)
 
-    Ysc.Logging.info("SmsNotifier.perform_with_args called",
+    Ysc.Logging.debug("SmsNotifier.perform_with_args called",
       job_id: job.id,
       phone_number: phone_number,
       phone_number_type: phone_number_type,
@@ -292,7 +292,7 @@ defmodule YscWeb.Workers.SmsNotifier do
        ) do
     final_phone_number_type = get_phone_number_type_string(final_phone_number)
 
-    Ysc.Logging.info("Using final phone number for SMS",
+    Ysc.Logging.debug("Using final phone number for SMS",
       job_id: job.id,
       provided_phone_number: provided_phone_number,
       user_phone_number: user_phone_number,
@@ -361,7 +361,7 @@ defmodule YscWeb.Workers.SmsNotifier do
     phone_number_type = get_phone_number_type_string(phone_number)
     params_type = get_params_type_string(params)
 
-    Ysc.Logging.info("SmsNotifier.send_sms called",
+    Ysc.Logging.debug("SmsNotifier.send_sms called",
       job_id: job.id,
       phone_number: phone_number,
       phone_number_type: phone_number_type,
@@ -390,7 +390,7 @@ defmodule YscWeb.Workers.SmsNotifier do
   defp prepare_and_atomize_params(job, params) do
     params_type_before = get_params_type_string(params)
 
-    Ysc.Logging.info("About to atomize params",
+    Ysc.Logging.debug("About to atomize params",
       job_id: job.id,
       params_before: inspect(params, limit: :infinity),
       params_type: params_type_before
@@ -400,7 +400,7 @@ defmodule YscWeb.Workers.SmsNotifier do
 
     atomized_params_type = get_params_type_string(atomized_params)
 
-    Ysc.Logging.info("Atomized params completed",
+    Ysc.Logging.debug("Atomized params completed",
       job_id: job.id,
       atomized_params: inspect(atomized_params, limit: :infinity),
       atomized_params_type: atomized_params_type
@@ -420,7 +420,7 @@ defmodule YscWeb.Workers.SmsNotifier do
        ) do
     phone_number_type_before_call = get_phone_number_type_string(phone_number)
 
-    Ysc.Logging.info("About to call send_sms_idempotent",
+    Ysc.Logging.debug("About to call send_sms_idempotent",
       job_id: job.id,
       phone_number: phone_number,
       phone_number_type: phone_number_type_before_call,
@@ -439,7 +439,7 @@ defmodule YscWeb.Workers.SmsNotifier do
         user_id
       )
 
-    Ysc.Logging.info("send_sms_idempotent returned",
+    Ysc.Logging.debug("send_sms_idempotent returned",
       job_id: job.id,
       result: inspect(result, limit: :infinity)
     )

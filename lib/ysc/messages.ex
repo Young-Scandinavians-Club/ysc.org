@@ -134,7 +134,9 @@ defmodule Ysc.Messages do
   end
 
   defp handle_mailer_deliver_error(error, email, attrs) do
-    Ysc.Logging.error("Mailer.deliver failed",
+    log_email_failure(
+      mailer_deliver_failure_level(error),
+      "Mailer.deliver failed",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       error: inspect(error),
@@ -187,7 +189,9 @@ defmodule Ysc.Messages do
   end
 
   defp handle_email_transaction_error(email, attrs, operation, reason) do
-    Ysc.Logging.error("Email transaction failed",
+    log_email_failure(
+      email_transaction_failure_level(reason),
+      "Email transaction failed",
       recipient: email.to,
       idempotency_key: attrs[:idempotency_key],
       operation: operation,
@@ -609,7 +613,9 @@ defmodule Ysc.Messages do
   end
 
   defp handle_send_sms_error(error, phone_number, attrs, body) do
-    Ysc.Logging.error("FlowRoute Client.send_sms failed",
+    log_sms_failure(
+      flowroute_send_failure_level(error),
+      "FlowRoute Client.send_sms failed",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       error: inspect(error),
@@ -677,7 +683,9 @@ defmodule Ysc.Messages do
   end
 
   defp handle_transaction_error(phone_number, attrs, operation, reason) do
-    Ysc.Logging.error("SMS transaction failed",
+    log_sms_failure(
+      sms_transaction_failure_level(reason),
+      "SMS transaction failed",
       recipient: phone_number,
       idempotency_key: attrs[:idempotency_key],
       operation: operation,
@@ -851,4 +859,44 @@ defmodule Ysc.Messages do
       build_telemetry_metadata(phone_number, attrs, additional)
     )
   end
+
+  defp log_email_failure(:warning, message, opts),
+    do: Ysc.Logging.warning(message, opts)
+
+  defp log_email_failure(:error, message, opts),
+    do: Ysc.Logging.error(message, opts)
+
+  defp log_sms_failure(:warning, message, opts),
+    do: Ysc.Logging.warning(message, opts)
+
+  defp log_sms_failure(:error, message, opts),
+    do: Ysc.Logging.error(message, opts)
+
+  defp mailer_deliver_failure_level({:error, :smtp_unavailable}), do: :warning
+
+  defp mailer_deliver_failure_level({:error, reason}) when is_atom(reason),
+    do: :warning
+
+  defp mailer_deliver_failure_level(_), do: :error
+
+  defp email_transaction_failure_level("failed to send email"), do: :warning
+
+  defp email_transaction_failure_level(reason) when is_binary(reason),
+    do: :warning
+
+  defp email_transaction_failure_level(_), do: :error
+
+  defp flowroute_send_failure_level({:error, reason}) when is_atom(reason),
+    do: :warning
+
+  defp flowroute_send_failure_level({:error, reason}) when is_binary(reason) do
+    if String.contains?(reason, "Rate limit"), do: :warning, else: :error
+  end
+
+  defp sms_transaction_failure_level("failed to send SMS"), do: :warning
+
+  defp sms_transaction_failure_level(reason) when is_binary(reason),
+    do: :warning
+
+  defp sms_transaction_failure_level(_), do: :error
 end

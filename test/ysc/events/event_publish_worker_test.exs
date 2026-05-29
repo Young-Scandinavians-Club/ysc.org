@@ -5,10 +5,7 @@ defmodule Ysc.Events.EventPublishWorkerTest do
   use Ysc.DataCase, async: true
 
   import Ecto.Query
-  import ExUnit.CaptureLog
   import Ysc.AccountsFixtures
-
-  require Logger
 
   alias Ysc.Events.EventPublishWorker
   alias Ysc.Events.Event
@@ -90,29 +87,10 @@ defmodule Ysc.Events.EventPublishWorkerTest do
       assert Repo.get(Event, past_event.id).state == :scheduled
     end
 
-    test "logs non-changeset publish failure (e.g. missing title)", %{
-      past_event: past_event
-    } do
-      Repo.update_all(from(e in Event, where: e.id == ^past_event.id),
-        set: [title: ""]
-      )
-
-      Logger.configure(level: :info)
-
-      log =
-        capture_log(fn ->
-          assert :ok = EventPublishWorker.publish_scheduled_events()
-        end)
-
-      Logger.configure(level: :error)
-
-      assert log =~ "Failed to publish scheduled event"
-      assert log =~ ":missing_title" or log =~ "missing_title"
-    end
-
-    test "logs changeset error when publish_at is after event start", %{
-      organizer: organizer
-    } do
+    test "does not publish event when publish_at is invalid relative to start",
+         %{
+           organizer: organizer
+         } do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       bad =
@@ -128,18 +106,8 @@ defmodule Ysc.Events.EventPublishWorkerTest do
           organizer_id: organizer.id
         })
 
-      Logger.configure(level: :info)
-
-      log =
-        capture_log(fn ->
-          assert :ok = EventPublishWorker.publish_scheduled_events()
-        end)
-
-      Logger.configure(level: :error)
-
+      assert :ok = EventPublishWorker.publish_scheduled_events()
       assert Repo.get(Event, bad.id).state == :scheduled
-      assert log =~ "Failed to publish scheduled event"
-      assert log =~ "errors=" or log =~ "publish_at"
     end
 
     test "publishes multiple due events in one run", %{

@@ -1,6 +1,5 @@
 defmodule Ysc.Alerts.DiscordTest do
   use ExUnit.Case, async: false
-  import ExUnit.CaptureLog
   import Mox
 
   alias Ysc.Alerts.Discord
@@ -369,28 +368,19 @@ defmodule Ysc.Alerts.DiscordTest do
     end
   end
 
-  describe "error handling and logging" do
-    test "logs warning when alert fails to send" do
+  describe "error handling" do
+    test "returns error when alert fails to send" do
       stub(Ysc.Alerts.DiscordHttpMock, :send_webhook, fn _url,
                                                          _body,
                                                          _headers ->
         {:error, :network_failure}
       end)
 
-      log =
-        capture_log(fn ->
-          Discord.send_critical("Test")
-        end)
-
-      assert is_binary(log)
+      assert {:error, :network_failure} = Discord.send_critical("Test")
     end
 
-    test "send_info logs attempt to send" do
-      capture_log(fn ->
-        Discord.send_info("Test message")
-      end)
-
-      assert true
+    test "send_info returns ok when webhook succeeds" do
+      assert {:ok, :sent} = Discord.send_info("Test message")
     end
   end
 

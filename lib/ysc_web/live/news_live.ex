@@ -1,6 +1,8 @@
 defmodule YscWeb.NewsLive do
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
   import YscWeb.Live.AsyncHelpers
 
   alias HtmlSanitizeEx.Scrubber
@@ -355,8 +357,7 @@ defmodule YscWeb.NewsLive do
   end
 
   def handle_async(:load_news_data, {:exit, reason}, socket) do
-    require Ysc.Logging
-    Ysc.Logging.error("Failed to load news data async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to load news data async: #{inspect(reason)}")
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 

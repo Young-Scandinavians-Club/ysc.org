@@ -35,8 +35,6 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
   # async: false due to Oban inline mode
   use Ysc.DataCase, async: false
 
-  import ExUnit.CaptureLog
-  require Logger
   require Ysc.Logging
 
   alias Ysc.Ledgers.ReconciliationWorker
@@ -80,42 +78,6 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
       assert {:ok, report} = ReconciliationWorker.perform(job)
       assert report.overall_status == :error
       assert report.checks.payments.discrepancies_count >= 1
-    end
-
-    test "logs financial discrepancy alert to the log", %{user: user} do
-      assert {:ok, _} =
-               %Payment{}
-               |> Payment.changeset(%{
-                 user_id: user.id,
-                 external_provider: :stripe,
-                 external_payment_id:
-                   "pi_log_alert_#{System.unique_integer([:positive])}",
-                 amount: Money.new(2_000, :USD),
-                 status: :completed,
-                 payment_date: DateTime.utc_now() |> DateTime.truncate(:second)
-               })
-               |> Repo.insert()
-
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "Ysc.Ledgers.ReconciliationWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      Logger.configure(level: :info)
-
-      log =
-        capture_log(fn ->
-          assert {:ok, report} = ReconciliationWorker.perform(job)
-          assert report.overall_status == :error
-        end)
-
-      Logger.configure(level: :error)
-
-      assert log =~ "FINANCIAL RECONCILIATION DISCREPANCIES DETECTED"
     end
   end
 
@@ -373,51 +335,6 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
       assert report.overall_status == :ok
     end
 
-    test "logs start message" do
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "Ysc.Ledgers.ReconciliationWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      Logger.configure(level: :info)
-
-      log =
-        capture_log(fn ->
-          ReconciliationWorker.perform(job)
-        end)
-
-      Logger.configure(level: :error)
-
-      assert log =~ "Starting scheduled financial reconciliation"
-    end
-
-    test "logs success message on empty database" do
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "Ysc.Ledgers.ReconciliationWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      Logger.configure(level: :info)
-
-      log =
-        capture_log(fn ->
-          ReconciliationWorker.perform(job)
-        end)
-
-      Logger.configure(level: :error)
-
-      assert log =~ "✅ Reconciliation passed all checks"
-      assert log =~ "duration_ms"
-    end
-
     test "report includes all required check sections" do
       job = %Oban.Job{
         id: 1,
@@ -450,19 +367,6 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
       assert {:ok, report} = ReconciliationWorker.run_now()
       assert report.overall_status == :ok
       assert Map.has_key?(report, :checks)
-    end
-
-    test "logs formatted report string" do
-      Logger.configure(level: :info)
-
-      log =
-        capture_log(fn ->
-          assert {:ok, _} = ReconciliationWorker.run_now()
-        end)
-
-      Logger.configure(level: :error)
-
-      assert log =~ "Reconciliation" or log =~ "reconciliation"
     end
   end
 

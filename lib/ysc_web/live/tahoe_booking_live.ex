@@ -680,7 +680,10 @@ defmodule YscWeb.TahoeBookingLive do
 
   def handle_async(:load_date_tooltips, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to load date tooltips async: #{inspect(reason)}")
+
+    Ysc.Logging.warning(
+      "Failed to load date tooltips async: #{inspect(reason)}"
+    )
 
     socket =
       socket

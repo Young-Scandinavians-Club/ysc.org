@@ -154,17 +154,14 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
     ```
     """
 
-    Ysc.Logging.error(alert_message)
+    Ysc.Logging.warning(alert_message)
 
-    # NOTE: Integrate with your alerting system
+    # NOTE: Integrate with your alerting system (alerts are logged at WARNING above).
     # Examples:
     # - send_slack_alert(alert_message)
     # - send_pagerduty_alert(alert_message)
     # - send_email_alert(alert_message)
-    # - Sentry.capture_message(alert_message, level: :error)
-
-    # For now, just ensure it's logged at ERROR level
-    # which should be picked up by your log aggregation system
+    # - Sentry.capture_message(alert_message, level: :warning)
     :ok
   end
 
