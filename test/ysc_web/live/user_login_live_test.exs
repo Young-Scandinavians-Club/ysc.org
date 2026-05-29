@@ -36,7 +36,9 @@ defmodule YscWeb.UserLoginLiveTest do
       |> render_hook("passkey_support_detected", %{"supported" => true})
 
       html = render(lv)
-      assert html =~ "Sign in with Passkey" || html =~ "passkey"
+
+      assert html =~ "Sign in with passkey" ||
+               html =~ "Sign in with Face ID"
     end
 
     test "hides passkey button when not supported", %{conn: conn} do

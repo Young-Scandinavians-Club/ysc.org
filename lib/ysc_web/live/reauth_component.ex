@@ -276,7 +276,7 @@ defmodule YscWeb.ReauthComponent do
               </.form_notice>
               <:actions>
                 <.button phx-disable-with="Verifying..." class="w-full">
-                  Continue
+                  Verify with password
                 </.button>
               </:actions>
             </.simple_form>

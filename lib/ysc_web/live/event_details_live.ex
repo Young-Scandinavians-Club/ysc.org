@@ -4210,7 +4210,7 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "Failed to restore payment: #{reason}",
+              "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
               title: "Payment"
             )
             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
