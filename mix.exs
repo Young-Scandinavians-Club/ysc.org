@@ -219,7 +219,7 @@ defmodule Ysc.MixProject do
       {:mjml_eex, "~> 0.13"},
       {:mogrify, "~> 0.8"},
       {:mox, "~> 1.2", only: :test},
-      {:oban, "~> 2.22"},
+      {:oban, "~> 2.23"},
       {:passbook, "~> 0.1"},
       {:phoenix_bakery, "~> 1.0", runtime: false},
       {:phoenix_ecto, "~> 4.7"},

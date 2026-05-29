@@ -12,7 +12,7 @@ defmodule YscWeb.Workers.EmailNotifier do
     unique: [
       fields: [:args],
       keys: [:idempotency_key, :template],
-      states: [:available, :scheduled, :executing, :retryable],
+      states: :incomplete,
       period: :infinity
     ]
 

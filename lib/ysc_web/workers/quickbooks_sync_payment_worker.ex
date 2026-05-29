@@ -17,7 +17,7 @@ defmodule YscWeb.Workers.QuickbooksSyncPaymentWorker do
     unique: [
       period: 300,
       fields: [:args, :queue],
-      states: [:available, :scheduled, :executing, :retryable]
+      states: :incomplete
     ]
 
   alias Ysc.Repo

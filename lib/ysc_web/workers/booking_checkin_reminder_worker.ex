@@ -13,7 +13,7 @@ defmodule YscWeb.Workers.BookingCheckinReminderWorker do
     unique: [
       fields: [:args],
       keys: [:booking_id],
-      states: [:available, :scheduled, :executing, :retryable],
+      states: :incomplete,
       period: :infinity
     ]
 
