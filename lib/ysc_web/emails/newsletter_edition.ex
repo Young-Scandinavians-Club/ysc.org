@@ -3,6 +3,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
   Email template for newsletter editions (curated: cover, intro, posts, events).
   """
   alias Ysc.Events
+  alias Ysc.Media.Image
   alias HtmlSanitizeEx
 
   use MjmlEEx,
@@ -256,10 +257,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
   defp cover_image_url(nil), do: nil
   defp cover_image_url(%{cover_image: nil}), do: nil
-
-  defp cover_image_url(%{cover_image: img}) do
-    img.optimized_image_path || img.raw_image_path
-  end
+  defp cover_image_url(%{cover_image: img}), do: Image.display_path(img)
 
   defp post_render_map(post) do
     %{
@@ -281,10 +279,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
     |> String.slice(0, 200)
   end
 
-  defp post_image_url(nil), do: nil
-  defp post_image_url(%{optimized_image_path: url}) when is_binary(url), do: url
-  defp post_image_url(%{raw_image_path: url}), do: url
-  defp post_image_url(_), do: nil
+  defp post_image_url(image), do: Image.display_path(image)
 
   defp event_render_map(event) do
     %{
@@ -325,10 +320,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
     end
   end
 
-  defp event_image_url(%{cover_image: nil}), do: nil
-
-  defp event_image_url(%{cover_image: img}),
-    do: img.optimized_image_path || img.raw_image_path
+  defp event_image_url(%{cover_image: cover_image}),
+    do: Image.display_path(cover_image)
 
   defp event_image_url(_), do: nil
 

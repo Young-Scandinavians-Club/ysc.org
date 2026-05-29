@@ -5,8 +5,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
   require Ysc.Logging
 
-  alias Ysc.Events.Event
   alias Ysc.Events
+  alias Ysc.Events.Event
+  alias Ysc.Media.Image
 
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
@@ -1791,7 +1792,7 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
-    url = image.optimized_image_path || image.raw_image_path
+    url = Image.display_path(image)
 
     {:noreply,
      push_event(socket, "insert-trix-image", %{

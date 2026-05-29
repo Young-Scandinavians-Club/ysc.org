@@ -9,9 +9,10 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
 
   import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
 
-  alias Ysc.Repo
   alias Ysc.Events.Event
   alias HtmlSanitizeEx
+  alias Ysc.Media.Image
+  alias Ysc.Repo
 
   def get_template_name(), do: "save_the_date_available"
 
@@ -69,13 +70,10 @@ defmodule YscWeb.Emails.SaveTheDateAvailable do
     }
 
     event_image_url =
-      cond do
-        Ecto.assoc_loaded?(event.cover_image) && event.cover_image ->
-          event.cover_image.optimized_image_path ||
-            event.cover_image.raw_image_path
-
-        true ->
-          nil
+      if Ecto.assoc_loaded?(event.cover_image) && event.cover_image do
+        Image.display_path(event.cover_image)
+      else
+        nil
       end
 
     %{

@@ -6,8 +6,9 @@ defmodule YscWeb.AdminPostEditorLive do
 
   alias HtmlSanitizeEx.Scrubber
 
-  alias Ysc.Posts.Post
+  alias Ysc.Media.Image
   alias Ysc.Posts
+  alias Ysc.Posts.Post
 
   @save_debounce_timeout 2000
 
@@ -616,7 +617,7 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
-    url = image.optimized_image_path || image.raw_image_path
+    url = Image.display_path(image)
 
     {:noreply,
      push_event(socket, "insert-trix-image", %{

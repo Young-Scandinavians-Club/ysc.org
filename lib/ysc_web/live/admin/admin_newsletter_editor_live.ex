@@ -243,7 +243,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         nil
 
       img ->
-        path = img.optimized_image_path || img.raw_image_path
+        path = Media.Image.display_path(img)
 
         if path && String.starts_with?(path, "/"),
           do: YscWeb.Endpoint.url() <> path,
@@ -1548,7 +1548,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
-    url = image.optimized_image_path || image.raw_image_path
+    url = Media.Image.display_path(image)
 
     {:noreply,
      push_event(socket, "insert-trix-image", %{
