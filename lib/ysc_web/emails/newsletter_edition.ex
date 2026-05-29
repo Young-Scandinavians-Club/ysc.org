@@ -320,7 +320,9 @@ defmodule YscWeb.Emails.NewsletterEdition do
     end
   end
 
-  defp event_image_url(%{cover_image: cover_image}), do: Image.display_path(cover_image)
+  defp event_image_url(%{cover_image: cover_image}),
+    do: Image.display_path(cover_image)
+
   defp event_image_url(_), do: nil
 
   defp format_event_date(event) do

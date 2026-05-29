@@ -55,13 +55,19 @@ defmodule Ysc.MediaTest do
     end
 
     test "falls back to raw path when optimized is nil" do
-      image = %Image{raw_image_path: "/media/raw.jpg", optimized_image_path: nil}
+      image = %Image{
+        raw_image_path: "/media/raw.jpg",
+        optimized_image_path: nil
+      }
 
       assert Image.display_path(image) == "/media/raw.jpg"
     end
 
     test "works with map-like image assigns" do
-      image = %{raw_image_path: "/media/raw.jpg", optimized_image_path: "/media/opt.webp"}
+      image = %{
+        raw_image_path: "/media/raw.jpg",
+        optimized_image_path: "/media/opt.webp"
+      }
 
       assert Image.display_path(image) == "/media/opt.webp"
     end
