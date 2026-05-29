@@ -132,6 +132,16 @@ defmodule Ysc.Events do
   defp staff_content_preview?(_), do: false
 
   @doc """
+  Loads an event with pricing, ticket tiers, and cover image for TV/Roku poster rendering.
+  """
+  def get_event_for_tv_poster(id) do
+    case Repo.get(Event, id) do
+      nil -> nil
+      %Event{} = event -> Ysc.Events.EventPricingCache.enrich_event(event)
+    end
+  end
+
+  @doc """
   List all events, optionally with filters.
   """
   def list_events(filters \\ %{}) do

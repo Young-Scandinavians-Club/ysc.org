@@ -1,0 +1,38 @@
+defmodule YscWeb.EventTvPosterControllerTest do
+  use YscWeb.ConnCase
+
+  import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
+
+  describe "GET /admin/events/:id/tv-poster" do
+    setup %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{title: "Tahoe Cabin Social"})
+      %{conn: log_in_user(conn, admin), event: event}
+    end
+
+    test "renders the TV poster preview for admins", %{conn: conn, event: event} do
+      conn = get(conn, ~p"/admin/events/#{event.id}/tv-poster")
+
+      html = html_response(conn, 200)
+      assert html =~ "event-tv-poster"
+      assert html =~ "Tahoe Cabin Social"
+      assert html =~ "TV poster preview"
+    end
+
+    test "returns 404 when the event does not exist", %{conn: conn} do
+      missing_id = Ecto.ULID.generate()
+
+      conn = get(conn, ~p"/admin/events/#{missing_id}/tv-poster")
+      assert html_response(conn, 404)
+    end
+
+    test "redirects unauthenticated users", %{event: event} do
+      conn =
+        build_conn()
+        |> get(~p"/admin/events/#{event.id}/tv-poster")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+  end
+end
