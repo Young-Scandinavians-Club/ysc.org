@@ -70,4 +70,66 @@ defmodule YscWeb.PaymentMethodFormatterTest do
              ) == "Test Bank Account ending in 6789"
     end
   end
+
+  describe "extract_payment_method_details_from_charge/1" do
+    test "extracts native Link charge payment_method_details using email or country" do
+      charge = %{
+        payment_method_details: %{type: "link", link: %{country: "US"}}
+      }
+
+      assert PaymentMethodFormatter.extract_payment_method_details_from_charge(
+               charge
+             ) == {"link", nil, "US"}
+    end
+
+    test "extracts Link wallet card from charge payment_method_details" do
+      charge = %{
+        payment_method_details: %{
+          card: %{
+            brand: "visa",
+            last4: "1111",
+            wallet: %{type: "link", dynamic_last4: "4242"}
+          }
+        }
+      }
+
+      assert PaymentMethodFormatter.extract_payment_method_details_from_charge(
+               charge
+             ) == {"link", "4242", "visa"}
+    end
+  end
+
+  describe "format_payment_method_for_receipt/3" do
+    test "formats card with PAN mask only (brand shown via logo)" do
+      assert PaymentMethodFormatter.format_payment_method_for_receipt(
+               :card,
+               "4242",
+               "visa"
+             ) == "**** **** **** 4242"
+    end
+
+    test "formats Link wallet with card brand and PAN mask" do
+      assert PaymentMethodFormatter.format_payment_method_for_receipt(
+               :link,
+               "4242",
+               "visa"
+             ) == "Link · Visa **** **** **** 4242"
+    end
+
+    test "formats Link with PAN mask when card brand is missing" do
+      assert PaymentMethodFormatter.format_payment_method_for_receipt(
+               :link,
+               "4242",
+               "Link"
+             ) == "Link **** **** **** 4242"
+    end
+
+    test "formats native Link with account email when no card is exposed" do
+      assert PaymentMethodFormatter.format_payment_method_for_receipt(
+               :link,
+               nil,
+               "member@ysc.org"
+             ) == "Link · member@ysc.org"
+    end
+  end
 end

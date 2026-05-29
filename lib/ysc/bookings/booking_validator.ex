@@ -5,7 +5,7 @@ defmodule Ysc.Bookings.BookingValidator do
   ## Tahoe Rules:
   - Winter: Only individual rooms
   - Summer: Individual rooms OR full buyout
-  - If booking contains Saturday, must also reserve Sunday (full weekend)
+  - If check-in or check-out falls on Saturday, the reservation must include Sunday (full weekend)
   - Only one active booking per user at a time (all seasons)
   - Exception: Family/Lifetime members can have up to 2 bookings in the same time period (overlapping dates)
   - Maximum 4 nights per booking
@@ -116,26 +116,24 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp validate_advance_booking_limit(changeset, _property), do: changeset
 
-  # If booking contains Saturday, must also reserve Sunday
+  # If check-in or check-out falls on Saturday, the reservation must include Sunday
   defp validate_weekend_requirement(changeset) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
     property = Ecto.Changeset.get_field(changeset, :property)
 
-    if checkin_date && checkout_date && property == :tahoe do
-      # The range of nights stayed is from checkin to the day before checkout
-      # (checkout date is when you leave, not a night you stay)
-      last_night = Date.add(checkout_date, -1)
-      stay_nights = Date.range(checkin_date, last_night) |> Enum.to_list()
+    if checkin_date && checkout_date && property == :tahoe &&
+         Date.compare(checkout_date, checkin_date) != :lt do
+      reservation_dates =
+        Date.range(checkin_date, checkout_date) |> Enum.to_list()
 
       has_saturday =
-        Enum.any?(stay_nights, fn date ->
+        Enum.any?(reservation_dates, fn date ->
           day_of_week(date) == 6
         end)
 
       if has_saturday do
-        # Check if Sunday is included as a stay night
-        validate_sunday_included(changeset, stay_nights)
+        validate_sunday_included(changeset, reservation_dates)
       else
         changeset
       end
@@ -271,6 +269,7 @@ defmodule Ysc.Bookings.BookingValidator do
   # Prevent buyout bookings if user has any active or future bookings
   defp validate_buyout_no_active_bookings(changeset, user, :tahoe) do
     booking_mode = Ecto.Changeset.get_field(changeset, :booking_mode)
+    booking_id = Ecto.Changeset.get_field(changeset, :id)
     user_id = Ecto.Changeset.get_field(changeset, :user_id) || (user && user.id)
 
     if booking_mode == :buyout && user_id && not is_nil(user) do
@@ -279,15 +278,21 @@ defmodule Ysc.Bookings.BookingValidator do
       family_user_ids = Ysc.Accounts.get_family_group_user_ids(primary_user)
       today = Date.utc_today()
 
-      # Check for any active bookings (status = :complete) with checkout_date >= today
-      has_active_booking =
-        Repo.exists?(
-          from b in Booking,
-            where: b.user_id in ^family_user_ids,
-            where: b.property == :tahoe,
-            where: b.status == :complete,
-            where: b.checkout_date >= ^today
-        )
+      active_bookings_query =
+        from b in Booking,
+          where: b.user_id in ^family_user_ids,
+          where: b.property == :tahoe,
+          where: b.status == :complete,
+          where: b.checkout_date >= ^today
+
+      active_bookings_query =
+        if booking_id do
+          from b in active_bookings_query, where: b.id != ^booking_id
+        else
+          active_bookings_query
+        end
+
+      has_active_booking = Repo.exists?(active_bookings_query)
 
       if has_active_booking do
         Ecto.Changeset.add_error(
@@ -417,10 +422,11 @@ defmodule Ysc.Bookings.BookingValidator do
   # Clear Lake: A la carte (day) bookings have no guest cap — pass through unchanged.
   defp validate_clear_lake_guest_limits(changeset, _property), do: changeset
 
-  # Validate room capacity (guests_count <= sum of room capacities for all rooms)
+  # Validate room capacity (adults + children <= sum of room capacities for all rooms)
   defp validate_room_capacity(changeset) do
     rooms = Ecto.Changeset.get_field(changeset, :rooms) || []
     guests_count = Ecto.Changeset.get_field(changeset, :guests_count)
+    children_count = Ecto.Changeset.get_field(changeset, :children_count) || 0
 
     if rooms != [] && guests_count do
       # For multiple rooms, sum the capacities
@@ -430,17 +436,27 @@ defmodule Ysc.Bookings.BookingValidator do
           acc + room_capacity
         end)
 
-      if total_capacity > 0 && guests_count > total_capacity do
+      total_people = guests_count + children_count
+
+      if total_capacity > 0 && total_people > total_capacity do
         room_names =
           Enum.map_join(rooms, ", ", fn room ->
             if is_struct(room), do: room.name, else: "Unknown"
           end)
 
-        Ecto.Changeset.add_error(
-          changeset,
-          :guests_count,
-          "Total room capacity is #{total_capacity} guests, but #{guests_count} guests requested (#{room_names})"
-        )
+        error_field =
+          if guests_count > total_capacity,
+            do: :guests_count,
+            else: :children_count
+
+        error_message =
+          if children_count > 0 do
+            "Total room capacity is #{total_capacity} guests, but #{total_people} requested (#{guests_count} adults, #{children_count} children) (#{room_names})"
+          else
+            "Total room capacity is #{total_capacity} guests, but #{total_people} guests requested (#{room_names})"
+          end
+
+        Ecto.Changeset.add_error(changeset, error_field, error_message)
       else
         changeset
       end

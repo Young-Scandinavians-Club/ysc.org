@@ -11,6 +11,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker}
   alias Ysc.Bookings.Entitlements
+  alias Ysc.Payments
   alias Ysc.Repo
 
   @async_timeout_ms 5_000
@@ -228,6 +229,221 @@ defmodule YscWeb.BookingReceiptLiveTest do
       html = render(view)
       assert html =~ "Payment Summary" or html =~ "$100.00"
     end
+
+    test "payment summary shows Link with card PAN mask", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, payment_method} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_link_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_#{System.unique_integer([:positive])}",
+          type: :link,
+          provider_type: "card",
+          display_brand: "visa",
+          last_four: "4242",
+          is_default: false
+        })
+
+      create_payment_for_booking(booking, Money.new(27_000, :USD),
+        payment_method_id: payment_method.id
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      assert html =~ "Link · Visa **** **** **** 4242"
+    end
+
+    test "payment summary enriches Link from Stripe when last four is missing",
+         %{
+           conn: conn
+         } do
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
+      payment_intent_id = "pi_link_mask_#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        defmodule :"ReceiptLinkMaskStripe#{System.unique_integer([:positive])}" do
+          @behaviour Ysc.StripeBehaviour
+
+          def create_payment_intent(_params, _opts),
+            do: {:error, :not_implemented}
+
+          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+          def create_customer(_params), do: {:error, :not_implemented}
+          def update_customer(_id, _params), do: {:error, :not_implemented}
+          def list_events(_params, _opts), do: {:error, :not_implemented}
+          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+          def list_balance_transactions(_params, _opts),
+            do: {:error, :not_implemented}
+
+          def retrieve_payment_method(id) do
+            {:ok,
+             %Stripe.PaymentMethod{
+               id: id,
+               type: "link",
+               link: %{email: "user@example.com"}
+             }}
+          end
+
+          def retrieve_charge(charge_id, _opts) do
+            {:ok,
+             %Stripe.Charge{
+               id: charge_id,
+               payment_method_details: %{
+                 card: %{
+                   brand: "visa",
+                   last4: "1111",
+                   wallet: %{type: "link", dynamic_last4: "4242"}
+                 }
+               }
+             }}
+          end
+
+          def retrieve_payment_intent(id, _opts) do
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: id,
+               status: "succeeded",
+               amount: 27_000,
+               customer: nil,
+               payment_method: "pm_link_wallet",
+               latest_charge: "ch_link_wallet_test"
+             }}
+          end
+        end
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
+
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, payment_method} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_link_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_#{System.unique_integer([:positive])}",
+          type: :link,
+          provider_type: "link",
+          display_brand: "Link",
+          is_default: false
+        })
+
+      create_payment_for_booking(booking, Money.new(27_000, :USD),
+        payment_method_id: payment_method.id,
+        external_payment_id: payment_intent_id
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      assert html =~ "Link · Visa **** **** **** 4242"
+    end
+
+    test "shows reservation updated notice when updated query param is set", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+      create_payment_for_booking(booking, Money.new(27_000, :USD))
+
+      {:ok, view, html} =
+        live(conn, ~p"/bookings/#{booking.id}/receipt?updated=true")
+
+      assert html =~ "Reservation Updated"
+
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      assert has_element?(view, "#reservation-updated-notice")
+      assert html =~ "Reservation updated"
+      assert html =~ "Your changes are saved"
+    end
+
+    test "shows cumulative total paid when booking has multiple payments", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete
+        })
+        |> Ecto.Changeset.change(
+          total_price: Money.new(150, :USD),
+          refund_forfeited_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      {:ok, card_payment_method} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_card_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_#{System.unique_integer([:positive])}",
+          type: :card,
+          provider_type: "card",
+          display_brand: "visa",
+          last_four: "4242",
+          is_default: false
+        })
+
+      {:ok, link_payment_method} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_link_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_#{System.unique_integer([:positive])}",
+          type: :link,
+          provider_type: "link",
+          display_brand: "visa",
+          last_four: "9999",
+          is_default: false
+        })
+
+      create_payment_for_booking(booking, Money.new(50, :USD),
+        payment_method_id: card_payment_method.id
+      )
+
+      create_payment_for_booking(booking, Money.new(100, :USD),
+        payment_method_id: link_payment_method.id
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      html = render(view)
+      assert has_element?(view, "#booking-payment-history")
+      refute has_element?(view, "#payment-method-summary")
+      refute has_element?(view, "#payment-date-summary")
+      assert html =~ "Reservation total"
+      assert html =~ "$150.00"
+      assert html =~ "$50.00"
+      assert html =~ "$100.00"
+      assert html =~ "Link"
+      assert html =~ "4242"
+    end
   end
 
   describe "event handlers - navigation" do
@@ -423,6 +639,60 @@ defmodule YscWeb.BookingReceiptLiveTest do
       render_async(view, @async_timeout_ms)
 
       assert has_element?(view, ~s(button), "Cancel Reservation")
+    end
+
+    test "shows change reservation link for future complete bookings", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      today = Date.utc_today()
+      checkin_date = Date.add(today, 30)
+      checkout_date = Date.add(checkin_date, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          checkin_date: checkin_date,
+          checkout_date: checkout_date
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+
+      render_async(view, @async_timeout_ms)
+
+      assert has_element?(view, "#change-reservation-button")
+    end
+
+    test "cancel modal shows modified no-refund copy for forfeited bookings", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      today = Date.utc_today()
+      checkin_date = Date.add(today, 30)
+      checkout_date = Date.add(checkin_date, 3)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          checkin_date: checkin_date,
+          checkout_date: checkout_date,
+          refund_forfeited_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      view |> element(~s(button), "Cancel Reservation") |> render_click()
+
+      html = render(view)
+      assert html =~ "reservation was modified"
+      assert html =~ "will not receive a refund"
     end
 
     test "does not show cancel button for past bookings", %{conn: conn} do
@@ -1255,7 +1525,16 @@ defmodule YscWeb.BookingReceiptLiveTest do
   end
 
   # Helper function to create a payment for a booking
-  defp create_payment_for_booking(booking, amount) do
+  defp create_payment_for_booking(booking, amount, opts \\ []) do
+    payment_method_id = Keyword.get(opts, :payment_method_id)
+
+    external_payment_id =
+      Keyword.get(
+        opts,
+        :external_payment_id,
+        "pi_test_#{System.unique_integer()}"
+      )
+
     # Get or create the stripe account
     stripe_account =
       case Ysc.Ledgers.get_account_by_name("stripe_account") do
@@ -1281,12 +1560,13 @@ defmodule YscWeb.BookingReceiptLiveTest do
         entity_type: :booking,
         entity_id: booking.id,
         external_provider: :stripe,
-        external_payment_id: "pi_test_#{System.unique_integer()}",
+        external_payment_id: external_payment_id,
         status: :completed,
         stripe_fee: Money.new(300, :USD),
         description: "Test booking payment",
         property: booking.property,
-        payment_date: DateTime.utc_now()
+        payment_date: DateTime.utc_now(),
+        payment_method_id: payment_method_id
       })
 
     # Create ledger transaction and entries

@@ -1834,6 +1834,379 @@ defmodule Ysc.Bookings.BookingLocker do
   end
 
   @doc """
+  Modifies a complete booking's dates and guest counts with inventory reconciliation.
+
+  Releases inventory for the old stay, books inventory for the new stay, recalculates
+  pricing, and sets `refund_forfeited_at` on first modification.
+
+  ## Parameters
+  - `booking`: The booking to modify (must be `:complete`)
+  - `attrs`: Map with `:checkin_date`, `:checkout_date`, `:guests_count`, optional `:children_count`
+  - `opts`: Optional `:previous_details` map for modification email
+
+  ## Returns
+  - `{:ok, %Booking{}}` on success
+  - `{:error, reason}` on failure
+  """
+  def modify_complete_booking(booking, attrs, opts \\ []) do
+    previous_details = Keyword.get(opts, :previous_details)
+
+    previous_details =
+      previous_details ||
+        %{
+          checkin_date: booking.checkin_date,
+          checkout_date: booking.checkout_date,
+          guests_count: booking.guests_count,
+          children_count: booking.children_count || 0,
+          total_price: booking.total_price
+        }
+
+    result =
+      Repo.transaction(fn ->
+        booking =
+          Repo.get!(Booking, booking.id)
+          |> Repo.preload([:rooms, :user])
+
+        if booking.status != :complete do
+          Repo.rollback({:error, :invalid_status})
+        end
+
+        new_checkin = Map.get(attrs, :checkin_date, booking.checkin_date)
+        new_checkout = Map.get(attrs, :checkout_date, booking.checkout_date)
+        new_guests = Map.get(attrs, :guests_count, booking.guests_count)
+
+        new_children =
+          Map.get(attrs, :children_count, booking.children_count || 0)
+
+        if modification_unchanged?(
+             booking,
+             new_checkin,
+             new_checkout,
+             new_guests,
+             new_children
+           ) do
+          Repo.rollback({:error, :no_changes})
+        end
+
+        if Bookings.has_blackout?(booking.property, new_checkin, new_checkout) do
+          Repo.rollback({:error, :blackout_conflict})
+        end
+
+        case Bookings.validate_modification_availability(booking, %{
+               checkin_date: new_checkin,
+               checkout_date: new_checkout,
+               guests_count: new_guests,
+               children_count: new_children
+             }) do
+          :ok -> :ok
+          {:error, reason} -> Repo.rollback({:error, reason})
+        end
+
+        user = booking.user || Repo.get!(Ysc.Accounts.User, booking.user_id)
+
+        changeset =
+          booking
+          |> Booking.changeset(
+            %{
+              checkin_date: new_checkin,
+              checkout_date: new_checkout,
+              guests_count: new_guests,
+              children_count: new_children
+            },
+            rooms: booking.rooms,
+            user: user
+          )
+
+        if not changeset.valid? do
+          Repo.rollback({:error, changeset})
+        end
+
+        release_booked_inventory!(booking)
+
+        updated_for_inventory = %{
+          booking
+          | checkin_date: new_checkin,
+            checkout_date: new_checkout,
+            guests_count: new_guests,
+            children_count: new_children
+        }
+
+        book_inventory_for_complete!(updated_for_inventory)
+
+        case Bookings.calculate_modification_pricing(updated_for_inventory) do
+          {:ok, priced} ->
+            refund_forfeited_at =
+              booking.refund_forfeited_at ||
+                DateTime.utc_now() |> DateTime.truncate(:second)
+
+            update_attrs = %{
+              checkin_date: new_checkin,
+              checkout_date: new_checkout,
+              guests_count: new_guests,
+              children_count: new_children,
+              total_price: priced.total,
+              subtotal_price: priced.subtotal,
+              discount_total: priced.discount,
+              pricing_items: priced.pricing_items,
+              refund_forfeited_at: refund_forfeited_at
+            }
+
+            case booking
+                 |> Booking.changeset(update_attrs,
+                   rooms: booking.rooms,
+                   skip_validation: true
+                 )
+                 |> Repo.update() do
+              {:ok, updated_booking} ->
+                Repo.preload(updated_booking, [:rooms, :user])
+
+              {:error, changeset} ->
+                Repo.rollback({:error, changeset})
+            end
+
+          {:error, reason} ->
+            Repo.rollback({:error, reason})
+        end
+      end)
+
+    case result do
+      {:ok, updated_booking} ->
+        reschedule_booking_reminders(updated_booking)
+        send_booking_modification_email(updated_booking, previous_details)
+        invalidate_availability_cache({:ok, updated_booking})
+        {:ok, updated_booking}
+
+      error ->
+        invalidate_availability_cache(error)
+    end
+  end
+
+  defp modification_unchanged?(booking, checkin, checkout, guests, children) do
+    booking.checkin_date == checkin and booking.checkout_date == checkout and
+      booking.guests_count == guests and
+      (booking.children_count || 0) == children
+  end
+
+  defp release_booked_inventory!(booking) do
+    case booking.booking_mode do
+      :buyout ->
+        {count, _} =
+          Repo.update_all(
+            from(pi in PropertyInventory,
+              where:
+                pi.property == ^booking.property and
+                  pi.day >= ^booking.checkin_date and
+                  pi.day < ^booking.checkout_date
+            ),
+            set: [
+              buyout_booked: false,
+              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+            ]
+          )
+
+        if count == 0 do
+          Repo.rollback({:error, :inventory_update_failed})
+        end
+
+      :room ->
+        room_ids = Enum.map(booking.rooms, & &1.id)
+
+        if room_ids != [] do
+          {count, _} =
+            Repo.update_all(
+              from(ri in RoomInventory,
+                where:
+                  ri.room_id in ^room_ids and
+                    ri.day >= ^booking.checkin_date and
+                    ri.day < ^booking.checkout_date
+              ),
+              set: [
+                booked: false,
+                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              ]
+            )
+
+          if count == 0 do
+            Repo.rollback({:error, :inventory_update_failed})
+          end
+        end
+
+      :day ->
+        {count, _} =
+          Repo.update_all(
+            from(pi in PropertyInventory,
+              where:
+                pi.property == ^booking.property and
+                  pi.day >= ^booking.checkin_date and
+                  pi.day < ^booking.checkout_date
+            ),
+            inc: [capacity_booked: -booking.guests_count],
+            set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
+          )
+
+        if count == 0 do
+          Repo.rollback({:error, :inventory_update_failed})
+        end
+    end
+  end
+
+  defp book_inventory_for_complete!(booking) do
+    case booking.booking_mode do
+      :buyout ->
+        {count, _} =
+          Repo.update_all(
+            from(pi in PropertyInventory,
+              where:
+                pi.property == ^booking.property and
+                  pi.day >= ^booking.checkin_date and
+                  pi.day < ^booking.checkout_date
+            ),
+            set: [
+              buyout_booked: true,
+              buyout_held: false,
+              updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+            ]
+          )
+
+        if count == 0 do
+          ensure_inventory_exists_and_book(booking)
+        else
+          :ok
+        end
+
+      :room ->
+        room_ids = Enum.map(booking.rooms, & &1.id)
+
+        if room_ids != [] do
+          {count, _} =
+            Repo.update_all(
+              from(ri in RoomInventory,
+                where:
+                  ri.room_id in ^room_ids and
+                    ri.day >= ^booking.checkin_date and
+                    ri.day < ^booking.checkout_date
+              ),
+              set: [
+                booked: true,
+                held: false,
+                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+              ]
+            )
+
+          if count == 0 do
+            ensure_room_inventory_exists_and_book(booking, room_ids)
+          else
+            :ok
+          end
+        else
+          :ok
+        end
+
+      :day ->
+        {count, _} =
+          Repo.update_all(
+            from(pi in PropertyInventory,
+              where:
+                pi.property == ^booking.property and
+                  pi.day >= ^booking.checkin_date and
+                  pi.day < ^booking.checkout_date
+            ),
+            inc: [capacity_booked: booking.guests_count],
+            set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
+          )
+
+        if count == 0 do
+          Repo.rollback({:error, :inventory_update_failed})
+        end
+    end
+  end
+
+  defp reschedule_booking_reminders(booking) do
+    import Ecto.Query
+
+    reminder_workers = [
+      "YscWeb.Workers.BookingCheckinReminderWorker",
+      "YscWeb.Workers.BookingCheckoutReminderWorker"
+    ]
+
+    _ =
+      from(j in Oban.Job,
+        where: j.worker in ^reminder_workers,
+        where: fragment("?->>'booking_id' = ?", j.args, ^booking.id),
+        where: j.state in ["available", "scheduled", "retryable"]
+      )
+      |> Repo.update_all(
+        set: [
+          state: "cancelled",
+          cancelled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        ]
+      )
+
+    schedule_checkin_reminder(booking)
+    schedule_checkout_reminder(booking)
+  end
+
+  defp send_booking_modification_email(booking, previous_details) do
+    require Ysc.Logging
+
+    try do
+      booking =
+        Repo.get(Booking, booking.id)
+        |> Repo.preload([:user, :rooms])
+
+      if booking && booking.user do
+        email_data =
+          YscWeb.Emails.BookingModificationConfirmation.prepare_email_data(
+            booking,
+            previous_details
+          )
+
+        modified_at_unix =
+          (booking.refund_forfeited_at || DateTime.utc_now())
+          |> DateTime.to_unix()
+
+        idempotency_key =
+          "booking_modification_#{booking.id}_#{modified_at_unix}"
+
+        result =
+          YscWeb.Emails.Notifier.schedule_email(
+            booking.user.email,
+            idempotency_key,
+            YscWeb.Emails.BookingModificationConfirmation.get_subject(),
+            "booking_modification_confirmation",
+            email_data,
+            "",
+            booking.user_id,
+            Ysc.EmailConfig.booking_reply_to(booking.property)
+          )
+
+        case result do
+          %Oban.Job{} = job ->
+            Ysc.Logging.info(
+              "Booking modification email scheduled successfully",
+              booking_id: booking.id,
+              job_id: job.id
+            )
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Failed to schedule booking modification email",
+              booking_id: booking.id,
+              error: reason
+            )
+        end
+      end
+    rescue
+      error ->
+        Ysc.Logging.error(
+          "Failed to send booking modification email",
+          booking_id: booking.id,
+          error: Exception.message(error)
+        )
+    end
+  end
+
+  @doc """
   Cancels a complete booking and frees up inventory.
 
   This is the reverse of confirm_booking - it releases booked inventory

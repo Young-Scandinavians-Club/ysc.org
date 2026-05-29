@@ -181,6 +181,7 @@ defmodule YscWeb.Router do
 
       live "/bookings/clear-lake", ClearLakeBookingLive, :index
       live "/bookings/checkout/:booking_id", BookingCheckoutLive, :index
+      live "/bookings/:booking_id/change", BookingChangeLive, :index
       live "/bookings/:booking_id/receipt", BookingReceiptLive, :index
     end
   end

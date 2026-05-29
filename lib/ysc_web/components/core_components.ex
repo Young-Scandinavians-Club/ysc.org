@@ -1171,6 +1171,16 @@ defmodule YscWeb.CoreComponents do
     doc: "Allow Saturday selection (default: false for booking restrictions)"
   )
 
+  attr(:max_nights, :integer,
+    default: 4,
+    doc: "Maximum nights allowed for the selected date range"
+  )
+
+  attr(:checkout_date_tooltips, :map,
+    default: %{},
+    doc: "Unavailable checkout dates keyed by ISO date when selecting check-out"
+  )
+
   def date_range_picker(assigns) do
     ~H"""
     <.live_component
@@ -1187,10 +1197,12 @@ defmodule YscWeb.CoreComponents do
       min={@min}
       max={@max}
       date_tooltips={@date_tooltips}
+      checkout_date_tooltips={@checkout_date_tooltips}
       property={@property}
       today={@today}
       seasons={@seasons}
       allow_saturdays={@allow_saturdays}
+      max_nights={@max_nights}
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
@@ -3429,6 +3441,59 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <div class={["inline-block", @class]}>
       {Phoenix.HTML.raw(@svg)}
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a skeleton placeholder while the Stripe Payment Element loads.
+
+  Mimics the layout of card tabs and input fields with a shimmer animation.
+
+  ## Examples
+
+      <.payment_element_loading />
+      <.payment_element_loading id="custom-loading-id" class="mt-4" />
+  """
+  attr :id, :string, default: "payment-element-loading"
+  attr :class, :string, default: ""
+
+  def payment_element_loading(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      aria-busy="true"
+      aria-label="Loading secure payment form"
+      class={[
+        "mb-6 min-h-[12rem] rounded-lg border border-zinc-200 bg-white p-4 space-y-4",
+        @class
+      ]}
+    >
+      <div class="flex gap-2">
+        <div class="skeleton-shimmer h-10 flex-1 rounded-md bg-zinc-100" />
+        <div class="skeleton-shimmer h-10 flex-1 rounded-md bg-zinc-50 opacity-70" />
+      </div>
+
+      <div class="space-y-2">
+        <div class="skeleton-shimmer h-3 w-24 rounded bg-zinc-100" />
+        <div class="skeleton-shimmer h-11 w-full rounded-md bg-zinc-100" />
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="space-y-2">
+          <div class="skeleton-shimmer h-3 w-16 rounded bg-zinc-100" />
+          <div class="skeleton-shimmer h-11 w-full rounded-md bg-zinc-100" />
+        </div>
+        <div class="space-y-2">
+          <div class="skeleton-shimmer h-3 w-10 rounded bg-zinc-100" />
+          <div class="skeleton-shimmer h-11 w-full rounded-md bg-zinc-100" />
+        </div>
+      </div>
+
+      <p class="flex items-center gap-1.5 pt-1 text-xs text-zinc-400">
+        <.icon name="hero-lock-closed" class="w-3 h-3" />
+        Loading secure payment form…
+      </p>
     </div>
     """
   end

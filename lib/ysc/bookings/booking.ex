@@ -73,6 +73,7 @@ defmodule Ysc.Bookings.Booking do
     field :discount_total, Money.Ecto.Composite.Type, default_currency: :USD
     field :pricing_items, :map
     field :checked_in, :boolean, default: false
+    field :refund_forfeited_at, :utc_datetime
 
     belongs_to :applied_booking_entitlement, Ysc.Bookings.BookingEntitlement,
       foreign_key: :applied_booking_entitlement_id,
@@ -135,7 +136,8 @@ defmodule Ysc.Bookings.Booking do
         :total_price,
         :pricing_items,
         :user_id,
-        :checked_in
+        :checked_in,
+        :refund_forfeited_at
       ])
 
     # Only update rooms association if explicitly provided in opts

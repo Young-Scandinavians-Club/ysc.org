@@ -628,4 +628,40 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
       assert pending_refund.cancellation_reason == cancellation_reason
     end
   end
+
+  describe "refund_forfeited_at" do
+    test "calculate_refund returns zero when booking was modified", %{
+      user: user
+    } do
+      checkin_date = Date.utc_today() |> Date.add(90)
+      checkout_date = Date.add(checkin_date, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :tahoe,
+                   checkin_date: checkin_date,
+                   checkout_date: checkout_date,
+                   booking_mode: :buyout,
+                   guests_count: 2,
+                   total_price: Money.new(:USD, "500.00")
+                 },
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      forfeited =
+        booking
+        |> Ecto.Changeset.change(
+          refund_forfeited_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
+      assert {:ok, refund, nil} =
+               Bookings.calculate_refund(forfeited, Date.utc_today())
+
+      assert Money.equal?(refund, Money.new(0, :USD))
+    end
+  end
 end

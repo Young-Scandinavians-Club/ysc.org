@@ -9,7 +9,6 @@ defmodule YscWeb.OrderConfirmationLive do
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
-  alias Ysc.Stripe.PaymentIntentHelpers
   import Ecto.Query
   alias HtmlSanitizeEx
 
@@ -654,7 +653,7 @@ defmodule YscWeb.OrderConfirmationLive do
                     <img
                       src={@payment_method_logo}
                       alt=""
-                      class="h-6 w-auto max-w-[4rem] object-contain shrink-0"
+                      class="h-5 w-auto max-w-[3rem] object-contain shrink-0"
                       loading="lazy"
                       decoding="async"
                     />
@@ -861,56 +860,10 @@ defmodule YscWeb.OrderConfirmationLive do
          }) do
       {:ok, payment_intent} ->
         {payment_method_type, last_four, display_brand} =
-          cond do
-            is_map(payment_intent.payment_method) &&
-                (Map.has_key?(payment_intent.payment_method, :type) ||
-                   Map.has_key?(payment_intent.payment_method, "type")) ->
-              PaymentMethodFormatter.extract_payment_method_details(
-                payment_intent.payment_method
-              )
-
-            is_binary(payment_intent.payment_method) ->
-              case stripe_client.retrieve_payment_method(
-                     payment_intent.payment_method
-                   ) do
-                {:ok, pm} ->
-                  PaymentMethodFormatter.extract_payment_method_details(pm)
-
-                _ ->
-                  {nil, nil, nil}
-              end
-
-            (first_charge =
-               PaymentIntentHelpers.first_expanded_charge(payment_intent)) !=
-                nil ->
-              pm_on_charge =
-                Map.get(first_charge, :payment_method) ||
-                  Map.get(first_charge, "payment_method")
-
-              cond do
-                is_map(pm_on_charge) &&
-                    (Map.has_key?(pm_on_charge, :type) ||
-                       Map.has_key?(pm_on_charge, "type")) ->
-                  PaymentMethodFormatter.extract_payment_method_details(
-                    pm_on_charge
-                  )
-
-                is_binary(pm_on_charge) ->
-                  case stripe_client.retrieve_payment_method(pm_on_charge) do
-                    {:ok, pm} ->
-                      PaymentMethodFormatter.extract_payment_method_details(pm)
-
-                    _ ->
-                      {nil, nil, nil}
-                  end
-
-                true ->
-                  {nil, nil, nil}
-              end
-
-            true ->
-              {nil, nil, nil}
-          end
+          PaymentMethodFormatter.payment_details_from_payment_intent(
+            payment_intent,
+            stripe_client
+          )
 
         case payment_method_type do
           nil ->
