@@ -249,8 +249,10 @@ defmodule YscWeb.ContactLive do
                 <div>
                   <p class="font-semibold text-zinc-900 mb-1">Mailing Address</p>
                   <p class="text-zinc-600 leading-relaxed">
-                    <span class="font-semibold">Young Scandinavians Club</span>
-                    <br /> PO Box 640610<br /> San Francisco, CA 94112
+                    <span class="font-semibold">{Ysc.Organization.name()}</span>
+                    <%= for line <- Ysc.Organization.mailing_address_street_lines() do %>
+                      <br /> {line}
+                    <% end %>
                   </p>
                 </div>
               </div>

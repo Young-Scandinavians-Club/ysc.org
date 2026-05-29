@@ -189,8 +189,11 @@
     </p>
 
     <p>
-      <span class="font-bold uppercase">Young Scandinavians Club</span>
-      <br />PO Box 640610<br />San Francisco, CA 94112<br />USA<br /> Email:
+      <span class="font-bold uppercase">{Ysc.Organization.name()}</span>
+      <%= for line <- Ysc.Organization.mailing_address_street_lines() do %>
+        <br />{line}
+      <% end %>
+      <br />USA<br /> Email:
       <.link href="mailto:info@ysc.org">info@ysc.org</.link>
     </p>
   </div>

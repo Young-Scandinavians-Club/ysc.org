@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.FooterBlock do
 
   import YscWeb.Emails.Helpers, only: [absolute_url: 1, origin: 0]
 
-  alias Ysc.Settings
+  alias Ysc.{Organization, Settings}
 
   @impl MjmlEEx.Component
   def render(_assigns) do
@@ -18,8 +18,9 @@ defmodule YscWeb.Emails.FooterBlock do
     #{social_section}
     <mj-section padding="48px">
       <mj-column padding="0">
-        <mj-text align="center" font-size="16px" font-weight="400" color="#71717b">Young Scandinavians Club</mj-text>
-        <mj-text align="center" font-size="12px" color="#71717b">
+        <mj-text align="center" font-size="16px" font-weight="400" color="#71717b">#{Organization.name()}</mj-text>
+        <mj-text align="center" font-size="12px" color="#71717b" line-height="1.5">
+          #{Organization.mailing_address_single_line()}<br />
           <a href="#{origin()}" class="link-nostyle">YSC.org</a>
         </mj-text>
       </mj-column>

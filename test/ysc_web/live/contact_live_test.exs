@@ -348,8 +348,9 @@ defmodule YscWeb.ContactLiveTest do
       {:ok, view, _html} = live(conn, ~p"/contact")
 
       assert has_element?(view, "p", "Mailing Address")
-      assert has_element?(view, "p", "PO Box 640610")
-      assert has_element?(view, "p", "San Francisco, CA 94112")
+      assert has_element?(view, "p", "28 Geary St")
+      assert has_element?(view, "p", "Ste 650 #304")
+      assert has_element?(view, "p", "San Francisco, CA 94108")
     end
 
     test "displays Other Ways to Connect section", %{conn: conn} do
