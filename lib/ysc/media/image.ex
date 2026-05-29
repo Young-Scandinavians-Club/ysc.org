@@ -109,4 +109,8 @@ defmodule Ysc.Media.Image do
   def display_path(%__MODULE__{} = image) do
     image.optimized_image_path || image.raw_image_path
   end
+
+  def display_path(%{raw_image_path: _} = image) do
+    Map.get(image, :optimized_image_path) || Map.get(image, :raw_image_path)
+  end
 end

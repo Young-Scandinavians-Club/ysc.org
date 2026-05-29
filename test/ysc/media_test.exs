@@ -59,6 +59,12 @@ defmodule Ysc.MediaTest do
 
       assert Image.display_path(image) == "/media/raw.jpg"
     end
+
+    test "works with map-like image assigns" do
+      image = %{raw_image_path: "/media/raw.jpg", optimized_image_path: "/media/opt.webp"}
+
+      assert Image.display_path(image) == "/media/opt.webp"
+    end
   end
 
   describe "fetch_image/1" do
