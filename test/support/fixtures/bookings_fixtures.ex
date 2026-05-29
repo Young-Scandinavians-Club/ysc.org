@@ -96,6 +96,7 @@ defmodule Ysc.BookingsFixtures do
   end
 
   def booking_fixture(attrs \\ %{}) do
+    attrs = Map.new(attrs)
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
     {checkin, checkout} = tahoe_booking_dates(7)
 
