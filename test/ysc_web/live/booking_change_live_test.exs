@@ -251,6 +251,38 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "Total room capacity is 4"
   end
 
+  test "shows downgrade notice when shortening stay reduces total", %{
+    conn: conn
+  } do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/change")
+
+    shorter_checkout = Date.add(booking.checkout_date, -1)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, shorter_checkout)}
+    )
+
+    _html = render(view)
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => date_to_datetime_string(booking.checkin_date),
+        "checkout_date" => date_to_datetime_string(shorter_checkout)
+      }
+    })
+    |> render_change()
+
+    html = render(view)
+    assert html =~ "modification-downgrade-notice"
+    assert html =~ "do not refund the difference"
+  end
+
   defp complete_room_booking!(user, room, checkin, checkout) do
     assert {:ok, total, _} =
              Bookings.calculate_booking_price(

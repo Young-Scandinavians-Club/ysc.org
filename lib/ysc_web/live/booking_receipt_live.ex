@@ -807,7 +807,9 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-300"
                             )
                           }>
-                            {MoneyHelper.format_money!(@payment.amount)}
+                            {MoneyHelper.format_money!(
+                              @booking.subtotal_price || @payment.amount
+                            )}
                           </span>
                         </div>
                       <% end %>
@@ -1087,11 +1089,16 @@ defmodule YscWeb.BookingReceiptLive do
                       <span class="font-semibold text-zinc-900">Net Amount</span>
                       <span class="font-bold text-red-600 text-xl">
                         {case Money.sub(
-                                @payment.amount,
+                                receipt_total_paid_amount(assigns),
                                 @refund_data.total_refunded
                               ) do
-                          {:ok, net} -> MoneyHelper.format_money!(net)
-                          _ -> MoneyHelper.format_money!(@payment.amount)
+                          {:ok, net} ->
+                            MoneyHelper.format_money!(net)
+
+                          _ ->
+                            MoneyHelper.format_money!(
+                              receipt_total_paid_amount(assigns)
+                            )
                         end}
                       </span>
                     </div>
@@ -1216,8 +1223,10 @@ defmodule YscWeb.BookingReceiptLive do
                     <div class="flex justify-between items-baseline">
                       <span class="text-sm text-blue-700">Original Payment:</span>
                       <span class="text-sm font-medium text-blue-900">
-                        <%= if @payment do %>
-                          {MoneyHelper.format_money!(@payment.amount)}
+                        <%= if receipt_total_paid_amount(assigns) do %>
+                          {MoneyHelper.format_money!(
+                            receipt_total_paid_amount(assigns)
+                          )}
                         <% else %>
                           —
                         <% end %>
@@ -1686,13 +1695,13 @@ defmodule YscWeb.BookingReceiptLive do
         where: e.debit_credit == "debit",
         where: a.name == "stripe_account",
         where: not is_nil(e.payment_id),
-        distinct: e.payment_id,
         preload: [payment: :payment_method],
         order_by: [asc: e.inserted_at]
       )
       |> Repo.all()
       |> Enum.map(& &1.payment)
       |> Enum.reject(&is_nil/1)
+      |> dedupe_payments_chronologically()
 
     total_paid =
       case Bookings.get_booking_total_paid_amount(booking) do
@@ -1711,6 +1720,20 @@ defmodule YscWeb.BookingReceiptLive do
       total_paid: total_paid,
       multiple_payments?: length(payments) > 1
     }
+  end
+
+  defp dedupe_payments_chronologically(payments) do
+    payments
+    |> Enum.reduce(%{}, fn payment, acc ->
+      Map.put(acc, payment.id, payment)
+    end)
+    |> Map.values()
+    |> Enum.sort_by(
+      fn payment ->
+        payment.payment_date || payment.inserted_at || ~U[1970-01-01 00:00:00Z]
+      end,
+      DateTime
+    )
   end
 
   defp build_payment_entries(payments) do

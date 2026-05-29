@@ -616,7 +616,11 @@ defmodule YscWeb.UserBookingDetailLive do
             []
           end
 
-        case Bookings.calculate_refund(booking, Date.utc_today(), refund_opts) do
+        case Bookings.calculate_refund(
+               booking,
+               YscWeb.BookingActions.get_today_pst(),
+               refund_opts
+             ) do
           {:ok, refund_amount, applied_rule} ->
             estimated_refund =
               if is_nil(refund_amount) and payment do

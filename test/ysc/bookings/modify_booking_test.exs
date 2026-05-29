@@ -363,6 +363,103 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                  "children_count" => "0"
                })
     end
+
+    test "returns error when check-in date is in the past", %{user: user} do
+      {checkin, checkout} = tahoe_booking_dates(95)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+      past_checkin = Date.add(YscWeb.BookingActions.get_today_pst(), -1)
+
+      assert {:error, :checkin_in_past} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => Date.to_string(past_checkin),
+                 "checkout_date" => Date.to_string(checkout),
+                 "guests_count" => "4",
+                 "children_count" => "0"
+               })
+    end
+  end
+
+  describe "modification holds" do
+    test "place_modification_hold reserves newly added calendar days", %{
+      user: user
+    } do
+      {checkin, checkout} = tahoe_booking_dates(110)
+      extended_checkout = Date.add(checkout, 2)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs)
+
+      assert held_booking.modification_hold_expires_at
+      assert held_booking.modification_hold_attrs
+
+      new_days =
+        checkout
+        |> Date.range(Date.add(extended_checkout, -1))
+        |> Enum.to_list()
+
+      for day <- new_days do
+        pi =
+          Repo.get_by!(Ysc.Bookings.PropertyInventory,
+            property: :tahoe,
+            day: day
+          )
+
+        assert pi.buyout_held
+      end
+
+      assert {:ok, _} = Bookings.release_modification_hold(booking.id)
+
+      for day <- new_days do
+        pi =
+          Repo.get_by!(Ysc.Bookings.PropertyInventory,
+            property: :tahoe,
+            day: day
+          )
+
+        refute pi.buyout_held
+      end
+    end
+
+    test "apply_modification with payment requires an active matching hold", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(120)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} = Bookings.prepare_modification(booking, attrs)
+      assert Money.positive?(preview.delta)
+
+      assert {:error, :modification_hold_expired} =
+               Bookings.apply_modification(booking, attrs,
+                 payment_intent_id: "pi_missing_hold"
+               )
+    end
   end
 
   defp first_friday_on_or_after(date) do

@@ -84,7 +84,11 @@ defmodule YscWeb.PaymentMethodFormatter do
 
     if pmd_type == "link" do
       link = Map.get(pmd, :link) || Map.get(pmd, "link")
-      {"link", nil, link && link_display_identifier(link)}
+
+      last4 =
+        if link, do: Map.get(link, :last4) || Map.get(link, "last4"), else: nil
+
+      {"link", last4, link && link_contact_display(link)}
     else
       {nil, nil, nil}
     end
@@ -142,8 +146,6 @@ defmodule YscWeb.PaymentMethodFormatter do
   defp payment_details_display_rank({_, _, display}) do
     link_display_rank(display)
   end
-
-  defp payment_details_display_rank(_), do: 0
 
   defp payment_details_from_intent_payment_method(payment_intent, stripe_client) do
     pm =
@@ -544,8 +546,12 @@ defmodule YscWeb.PaymentMethodFormatter do
   def non_link_brand(brand), do: brand
 
   defp link_display_identifier(link) when is_map(link) do
+    link_contact_display(link) ||
+      Map.get(link, :last4) || Map.get(link, "last4")
+  end
+
+  defp link_contact_display(link) when is_map(link) do
     Map.get(link, :email) || Map.get(link, "email") ||
-      Map.get(link, :last4) || Map.get(link, "last4") ||
       Map.get(link, :country) || Map.get(link, "country")
   end
 

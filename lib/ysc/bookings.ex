@@ -680,6 +680,7 @@ defmodule Ysc.Bookings do
 
     with :ok <- validate_modification_eligible(booking),
          {:ok, parsed} <- parse_modification_attrs(booking, attrs),
+         :ok <- validate_modification_checkin_not_past(parsed),
          :ok <- ensure_modification_changed(booking, parsed),
          {:ok, user} <- fetch_modification_user(booking),
          {:ok, _} <- validate_modification_changeset(booking, parsed, user),
@@ -722,7 +723,8 @@ defmodule Ysc.Bookings do
     with :ok <- validate_modification_eligible(booking),
          {:ok, parsed} <- parse_modification_attrs(booking, attrs),
          {:ok, preview} <- prepare_modification(booking, attrs),
-         :ok <- verify_modification_payment(preview, opts) do
+         :ok <- verify_modification_hold(booking, parsed, preview),
+         :ok <- verify_modification_payment(preview, booking, opts) do
       previous_details = %{
         checkin_date: booking.checkin_date,
         checkout_date: booking.checkout_date,
@@ -744,8 +746,19 @@ defmodule Ysc.Bookings do
                  preview,
                  opts
                ) do
-            :ok -> result
-            {:error, reason} -> {:error, reason}
+            :ok ->
+              result
+
+            {:error, reason} ->
+              require Ysc.Logging
+
+              Ysc.Logging.error(
+                "Booking modification applied but payment ledger write failed",
+                booking_id: updated_booking.id,
+                error: reason
+              )
+
+              result
           end
 
         other ->
@@ -807,6 +820,30 @@ defmodule Ysc.Bookings do
       :ok
     else
       {:error, :invalid_status}
+    end
+  end
+
+  @doc """
+  Places a short-lived inventory hold while the member completes modification payment.
+  """
+  def place_modification_hold(%Booking{} = booking, attrs, opts \\ []) do
+    Ysc.Bookings.BookingLocker.place_modification_hold(booking, attrs, opts)
+  end
+
+  @doc """
+  Releases a modification payment hold without applying the modification.
+  """
+  def release_modification_hold(booking_id) do
+    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id)
+  end
+
+  defp validate_modification_checkin_not_past(parsed) do
+    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+    if Date.compare(parsed.checkin_date, today_pst) == :lt do
+      {:error, :checkin_in_past}
+    else
+      :ok
     end
   end
 
@@ -911,6 +948,7 @@ defmodule Ysc.Bookings do
   """
   def validate_modification_availability(%Booking{} = booking, parsed) do
     booking = Repo.preload(booking, :rooms)
+    hold = Ysc.Bookings.BookingLocker.modification_hold_context(booking)
 
     new_checkin = parsed.checkin_date
     new_checkout = parsed.checkout_date
@@ -923,13 +961,19 @@ defmodule Ysc.Bookings do
 
     case booking.booking_mode do
       :buyout ->
-        validate_buyout_modification_availability(booking, old_days, new_days)
+        validate_buyout_modification_availability(
+          booking,
+          old_days,
+          new_days,
+          hold
+        )
 
       :room ->
         validate_room_modification_availability(
           booking,
           new_checkin,
-          new_checkout
+          new_checkout,
+          hold
         )
 
       :day ->
@@ -937,7 +981,8 @@ defmodule Ysc.Bookings do
           booking,
           old_days,
           new_days,
-          new_guests
+          new_guests,
+          hold
         )
 
       _ ->
@@ -982,7 +1027,15 @@ defmodule Ysc.Bookings do
     |> MapSet.new()
   end
 
-  defp validate_buyout_modification_availability(booking, old_days, new_days) do
+  @dialyzer {:nowarn_function, validate_buyout_modification_availability: 4}
+  defp validate_buyout_modification_availability(
+         booking,
+         old_days,
+         new_days,
+         hold
+       ) do
+    held_days = modification_hold_held_days(hold)
+
     prop_inv =
       Repo.all(
         from pi in PropertyInventory,
@@ -994,14 +1047,17 @@ defmodule Ysc.Bookings do
     unavailable? =
       Enum.any?(prop_inv, fn pi ->
         day_in_old = MapSet.member?(old_days, pi.day)
+        our_hold = MapSet.member?(held_days, pi.day)
 
         blocked_buyout =
           not day_in_old and
-            (pi.buyout_held == true or pi.buyout_booked == true)
+            (pi.buyout_held == true or pi.buyout_booked == true) and
+            not (our_hold and pi.buyout_held == true)
 
         blocked_capacity =
           booking.property == :clear_lake and not day_in_old and
-            (pi.capacity_held > 0 or pi.capacity_booked > 0)
+            (pi.capacity_held > 0 or pi.capacity_booked > 0) and
+            not our_hold
 
         blocked_buyout or blocked_capacity
       end)
@@ -1024,7 +1080,8 @@ defmodule Ysc.Bookings do
         blocked_rooms =
           Enum.any?(room_inv, fn ri ->
             not MapSet.member?(old_days, ri.day) and
-              (ri.held == true or ri.booked == true)
+              (ri.held == true or ri.booked == true) and
+              not MapSet.member?(held_days, ri.day)
           end)
 
         if blocked_rooms, do: {:error, :rooms_already_booked}, else: :ok
@@ -1034,11 +1091,15 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @dialyzer {:nowarn_function, validate_room_modification_availability: 4}
   defp validate_room_modification_availability(
          booking,
          new_checkin,
-         new_checkout
+         new_checkout,
+         hold
        ) do
+    held_days = modification_hold_held_days(hold)
+
     cond do
       has_blackout?(booking.property, new_checkin, new_checkout) ->
         {:error, :blackout_conflict}
@@ -1046,7 +1107,7 @@ defmodule Ysc.Bookings do
       buyout_active?(booking.property, new_checkin, new_checkout) ->
         {:error, :property_buyout_active}
 
-      room_unavailable?(booking, new_checkin, new_checkout) ->
+      room_unavailable?(booking, new_checkin, new_checkout, held_days) ->
         {:error, :room_unavailable}
 
       true ->
@@ -1063,20 +1124,38 @@ defmodule Ysc.Bookings do
     )
   end
 
-  defp room_unavailable?(booking, checkin, checkout) do
+  @dialyzer {:nowarn_function, room_unavailable?: 4}
+  defp room_unavailable?(booking, checkin, checkout, held_days) do
+    old_days =
+      modification_date_range(booking.checkin_date, booking.checkout_date)
+
     booking.rooms
     |> Enum.map(& &1.id)
     |> Enum.any?(fn room_id ->
-      not room_available?(room_id, checkin, checkout, booking.id)
+      dates =
+        checkin
+        |> Date.range(Date.add(checkout, -1))
+        |> Enum.to_list()
+
+      Enum.any?(dates, fn day ->
+        not MapSet.member?(old_days, day) and
+          not MapSet.member?(held_days, day) and
+          not room_available?(room_id, day, Date.add(day, 1), booking.id)
+      end)
     end)
   end
 
+  @dialyzer {:nowarn_function, validate_day_modification_availability: 5}
   defp validate_day_modification_availability(
          booking,
          old_days,
          new_days,
-         new_guests
+         new_guests,
+         hold
        ) do
+    held_days = modification_hold_held_days(hold)
+    overlap_extra = modification_hold_overlap_extra(hold)
+
     prop_inv =
       Repo.all(
         from pi in PropertyInventory,
@@ -1090,9 +1169,14 @@ defmodule Ysc.Bookings do
         released_guests =
           if MapSet.member?(old_days, pi.day), do: booking.guests_count, else: 0
 
+        our_overlap_extra = Map.get(overlap_extra, pi.day, 0)
+
+        our_new_day_hold =
+          if MapSet.member?(held_days, pi.day), do: new_guests, else: 0
+
         available =
           pi.capacity_total - pi.capacity_booked - pi.capacity_held +
-            released_guests
+            released_guests + our_overlap_extra + our_new_day_hold
 
         new_guests > available
       end)
@@ -1100,31 +1184,98 @@ defmodule Ysc.Bookings do
     if unavailable?, do: {:error, :property_unavailable}, else: :ok
   end
 
-  defp verify_modification_payment(%{delta: delta}, opts) do
+  defp modification_hold_held_days(%{active: true, held_days: held_days}) do
+    held_days |> MapSet.to_list() |> MapSet.new()
+  end
+
+  defp modification_hold_held_days(_), do: MapSet.new()
+
+  defp modification_hold_overlap_extra(%{
+         active: true,
+         overlap_extra_guests: overlap
+       }),
+       do: overlap
+
+  defp modification_hold_overlap_extra(_), do: %{}
+
+  defp verify_modification_payment(%{delta: delta}, booking, opts) do
     if Money.positive?(delta) do
       case Keyword.get(opts, :payment_intent_id) do
         nil ->
           {:error, :payment_required}
 
         payment_intent_id ->
-          verify_modification_payment_intent(payment_intent_id, delta)
+          verify_modification_payment_intent(
+            payment_intent_id,
+            delta,
+            booking.id,
+            booking.user_id
+          )
       end
     else
       :ok
     end
   end
 
-  defp verify_modification_payment_intent(payment_intent_id, expected_delta) do
+  defp verify_modification_hold(booking, parsed, %{delta: delta}) do
+    if Money.positive?(delta) do
+      booking = Repo.get!(Booking, booking.id)
+
+      cond do
+        not Ysc.Bookings.BookingLocker.modification_hold_active?(booking) ->
+          {:error, :modification_hold_expired}
+
+        not Ysc.Bookings.BookingLocker.modification_hold_matches?(
+          booking,
+          parsed
+        ) ->
+          {:error, :modification_hold_mismatch}
+
+        true ->
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp verify_modification_payment_intent(
+         payment_intent_id,
+         expected_delta,
+         booking_id,
+         user_id
+       ) do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
       {:ok, %{status: "succeeded"} = payment_intent} ->
         expected_cents = Ysc.MoneyHelper.money_to_cents(expected_delta)
+        metadata = payment_intent.metadata || %{}
 
-        if payment_intent.amount == expected_cents do
-          :ok
-        else
-          {:error, :payment_amount_mismatch}
+        metadata_booking_id =
+          Map.get(metadata, "booking_id") || Map.get(metadata, :booking_id)
+
+        metadata_user_id =
+          Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
+        modification_flag =
+          Map.get(metadata, "modification") || Map.get(metadata, :modification)
+
+        cond do
+          modification_flag not in ["true", true] ->
+            {:error, :payment_metadata_mismatch}
+
+          to_string(metadata_booking_id || "") != to_string(booking_id) ->
+            {:error, :payment_metadata_mismatch}
+
+          to_string(metadata_user_id || "") != to_string(user_id) ->
+            {:error, :payment_metadata_mismatch}
+
+          payment_intent.amount != expected_cents ->
+            {:error, :payment_amount_mismatch}
+
+          true ->
+            :ok
         end
 
       {:ok, _} ->

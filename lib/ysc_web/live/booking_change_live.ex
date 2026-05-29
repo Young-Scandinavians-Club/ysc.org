@@ -172,6 +172,10 @@ defmodule YscWeb.BookingChangeLive do
     socket =
       socket
       |> assign(:form, form)
+      |> assign(
+        :checkout_date_tooltips,
+        checkout_tooltips_for_params(socket, params)
+      )
       |> run_preview(params)
 
     {:noreply, socket}
@@ -273,12 +277,17 @@ defmodule YscWeb.BookingChangeLive do
 
   @impl true
   def handle_event("back-to-modification", _params, socket) do
+    if socket.assigns.show_payment_form do
+      Bookings.release_modification_hold(socket.assigns.booking.id)
+    end
+
     {:noreply,
      socket
      |> assign(:step, :edit)
      |> assign(:guest_info_form, nil)
      |> assign(:guest_info_errors, %{})
-     |> assign(:show_payment_form, false)}
+     |> assign(:show_payment_form, false)
+     |> assign(:payment_intent, nil)}
   end
 
   @impl true
@@ -539,6 +548,14 @@ defmodule YscWeb.BookingChangeLive do
                   </dd>
                 </div>
               </dl>
+              <%= if modification_is_downgrade?(@preview) do %>
+                <div
+                  id="modification-downgrade-notice"
+                  class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm"
+                >
+                  Shortening your stay reduces the reservation total, but we do not refund the difference.
+                </div>
+              <% end %>
             </div>
           <% end %>
         </.form>
@@ -793,6 +810,9 @@ defmodule YscWeb.BookingChangeLive do
                :error,
                "Reservation was updated but guest details could not be saved. Please contact support.",
                title: "Guest details"
+             )
+             |> push_navigate(
+               to: ~p"/bookings/#{booking.id}/receipt?updated=true"
              )}
         end
 
@@ -818,22 +838,28 @@ defmodule YscWeb.BookingChangeLive do
 
   defp proceed_after_modification_details(socket, params, preview) do
     if Money.positive?(preview.delta) do
-      case create_delta_payment_intent(
-             socket.assigns.booking,
-             preview.delta,
-             socket.assigns.current_user
-           ) do
-        {:ok, payment_intent} ->
-          {:payment,
-           socket
-           |> assign(:step, :edit)
-           |> assign(:pending_modification_params, params)
-           |> assign(:payment_intent, payment_intent)
-           |> assign(:show_payment_form, true)
-           |> assign(:stripe_payment_element_ready, false)
-           |> assign(:payment_error, nil)}
+      booking = socket.assigns.booking
 
+      with {:ok, _booking} <-
+             Bookings.place_modification_hold(booking, preview.attrs),
+           {:ok, payment_intent} <-
+             create_delta_payment_intent(
+               booking,
+               preview.delta,
+               socket.assigns.current_user
+             ) do
+        {:payment,
+         socket
+         |> assign(:step, :edit)
+         |> assign(:pending_modification_params, params)
+         |> assign(:payment_intent, payment_intent)
+         |> assign(:show_payment_form, true)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_error, nil)}
+      else
         {:error, _reason} ->
+          Bookings.release_modification_hold(booking.id)
+
           {:error,
            YscWeb.Flash.put_toast(
              socket,
@@ -989,7 +1015,10 @@ defmodule YscWeb.BookingChangeLive do
       end
 
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
-    idempotency_key = "booking_modification_#{booking.id}_#{amount_cents}"
+    attempt_id = System.unique_integer([:positive])
+
+    idempotency_key =
+      "booking_modification_#{booking.id}_#{amount_cents}_#{attempt_id}"
 
     stripe_client.create_payment_intent(payment_intent_params,
       idempotency_key: idempotency_key
@@ -1032,9 +1061,23 @@ defmodule YscWeb.BookingChangeLive do
   defp modification_error_message(:payment_amount_mismatch),
     do: "Payment amount does not match the required balance."
 
+  defp modification_error_message(:payment_metadata_mismatch),
+    do: "Payment could not be verified for this modification. Please try again."
+
   defp modification_error_message(:inventory_update_failed),
     do:
       "Availability changed while updating your reservation. Please try again."
+
+  defp modification_error_message(:checkin_in_past),
+    do: "Check-in date cannot be in the past."
+
+  defp modification_error_message(:modification_hold_expired),
+    do:
+      "Your reservation hold expired before payment completed. Please start again."
+
+  defp modification_error_message(:modification_hold_mismatch),
+    do:
+      "Your reservation details changed while payment was in progress. Please start again."
 
   defp modification_error_message(reason) when is_atom(reason),
     do:
@@ -1054,6 +1097,18 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp submit_button_label(_), do: "Save changes"
+
+  defp modification_is_downgrade?(%{
+         new_total: new_total,
+         previous_total: previous_total
+       }) do
+    case Money.sub(new_total, previous_total) do
+      {:ok, delta} -> Money.negative?(delta)
+      _ -> false
+    end
+  end
+
+  defp modification_is_downgrade?(_), do: false
 
   defp room_total_capacity(%Booking{rooms: rooms}) when is_list(rooms) do
     Enum.reduce(rooms, 0, fn room, acc -> acc + (room.capacity_max || 0) end)
@@ -1099,4 +1154,23 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp max_children_for_modification(_booking, _form), do: nil
+
+  defp checkout_tooltips_for_params(socket, params) do
+    checkin =
+      params
+      |> Map.get("checkin_date", "")
+      |> parse_date_param()
+
+    if checkin do
+      ModificationDateAvailability.checkout_date_tooltips(
+        socket.assigns.booking,
+        checkin,
+        socket.assigns.calendar_max_date,
+        socket.assigns.today,
+        socket.assigns.seasons
+      )
+    else
+      %{}
+    end
+  end
 end

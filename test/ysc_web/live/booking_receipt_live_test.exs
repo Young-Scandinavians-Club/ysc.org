@@ -126,11 +126,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       conn = log_in_user(conn, user)
 
       today = Date.utc_today()
-      # Use Monday check-in, Thursday checkout to avoid weekend validation rules
-      # Find next Monday
-      days_until_monday = rem(8 - Date.day_of_week(today), 7)
-      checkin_date = Date.add(today, 30 + days_until_monday)
-      # Check out on Thursday (3 days later)
+      # Monday check-in, Thursday checkout (no Saturday in range)
+      base = Date.add(today, 30)
+      dow = Date.day_of_week(base, :monday)
+      checkin_date = Date.add(base, rem(8 - dow, 7))
       checkout_date = Date.add(checkin_date, 3)
 
       booking =

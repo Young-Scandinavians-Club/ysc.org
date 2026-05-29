@@ -5,7 +5,7 @@ defmodule Ysc.Bookings.BookingValidator do
   ## Tahoe Rules:
   - Winter: Only individual rooms
   - Summer: Individual rooms OR full buyout
-  - If check-in or check-out falls on Saturday, the reservation must include Sunday (full weekend)
+  - If any day in the inclusive reservation span falls on Saturday, the reservation must include Sunday (full weekend)
   - Only one active booking per user at a time (all seasons)
   - Exception: Family/Lifetime members can have up to 2 bookings in the same time period (overlapping dates)
   - Maximum 4 nights per booking
@@ -116,7 +116,7 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp validate_advance_booking_limit(changeset, _property), do: changeset
 
-  # If check-in or check-out falls on Saturday, the reservation must include Sunday
+  # If any day in the inclusive reservation span is Saturday, Sunday must be included
   defp validate_weekend_requirement(changeset) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)

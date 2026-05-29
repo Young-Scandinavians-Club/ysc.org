@@ -100,7 +100,8 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
         <p class="text-sm text-red-800">{@guest_info_errors[:general]}</p>
       </div>
 
-      <form
+      <.form
+        for={@guest_info_form}
         phx-change="validate-guest-info"
         phx-submit="save-guest-info"
         phx-debounce="300"
@@ -313,7 +314,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
             {render_slot(@actions)}
           </div>
         </div>
-      </form>
+      </.form>
     </div>
     """
   end

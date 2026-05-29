@@ -21,6 +21,10 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
   Prepares booking modification confirmation email data.
   """
   def prepare_email_data(booking, previous_details) do
+    if is_nil(booking) do
+      raise ArgumentError, "Booking with user is required"
+    end
+
     booking =
       if Ecto.assoc_loaded?(booking.user) && Ecto.assoc_loaded?(booking.rooms) do
         booking
@@ -29,7 +33,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
         |> Repo.preload([:user, :rooms])
       end
 
-    if is_nil(booking) or is_nil(booking.user) do
+    if is_nil(booking.user) do
       raise ArgumentError, "Booking with user is required"
     end
 

@@ -131,6 +131,9 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
     booking = complete_room_booking!(user, room, checkin, checkout)
     calendar = ModificationDateAvailability.calendar_context(booking)
+    checkin = first_monday_on_or_after(calendar.min_date)
+    assert Date.compare(checkin, calendar.min_date) != :lt
+    assert Date.compare(checkin, calendar.max_date) != :gt
 
     tooltips =
       ModificationDateAvailability.checkin_date_tooltips(

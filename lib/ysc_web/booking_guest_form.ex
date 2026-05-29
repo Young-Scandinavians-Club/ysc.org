@@ -5,7 +5,6 @@ defmodule YscWeb.BookingGuestForm do
   """
 
   alias Ysc.Accounts.User
-  alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingGuest}
 
   @doc """
@@ -400,9 +399,11 @@ defmodule YscWeb.BookingGuestForm do
           end)
 
         invalid =
-          Enum.filter(changesets, fn changeset -> not changeset.valid? end)
+          Enum.map(changesets, fn changeset ->
+            if changeset.valid?, do: nil, else: changeset
+          end)
 
-        if invalid == [] do
+        if Enum.all?(invalid, &is_nil/1) do
           {:ok, changesets}
         else
           {:error, invalid}
@@ -410,8 +411,13 @@ defmodule YscWeb.BookingGuestForm do
     end
   end
 
+  @dialyzer {:nowarn_function, persist_guest_changesets: 2}
   defp persist_guest_changesets(booking_id, changesets) do
-    Bookings.delete_booking_guests(booking_id)
+    import Ecto.Query
+
+    alias Ecto.Multi
+    alias Ysc.Bookings.BookingGuest
+    alias Ysc.Repo
 
     guests_attrs =
       Enum.map(changesets, fn changeset ->
@@ -427,9 +433,40 @@ defmodule YscWeb.BookingGuestForm do
         {order_index, attrs_map}
       end)
 
-    case Bookings.create_booking_guests(booking_id, guests_attrs) do
-      {:ok, _guests} -> :ok
-      {:error, changeset} -> {:error, changeset}
+    insert_multi =
+      Enum.reduce(guests_attrs, Multi.new(), fn {index, guest_attrs}, acc ->
+        guest_attrs_with_booking =
+          Map.merge(guest_attrs, %{
+            "booking_id" => booking_id,
+            "order_index" => index
+          })
+
+        changeset =
+          BookingGuest.changeset(%BookingGuest{}, guest_attrs_with_booking)
+
+        Multi.insert(acc, {:guest, index}, changeset)
+      end)
+
+    multi =
+      Multi.new()
+      |> Multi.run(:delete, fn repo, _changes ->
+        {count, _} =
+          from(bg in BookingGuest, where: bg.booking_id == ^booking_id)
+          |> repo.delete_all()
+
+        {:ok, count}
+      end)
+      |> Multi.merge(fn _changes -> insert_multi end)
+
+    case Repo.transaction(multi) do
+      {:ok, _results} ->
+        :ok
+
+      {:error, _step, %Ecto.Changeset{} = changeset, _changes} ->
+        {:error, changeset}
+
+      {:error, _step, reason, _changes} ->
+        {:error, reason}
     end
   end
 
@@ -476,7 +513,8 @@ defmodule YscWeb.BookingGuestForm do
     |> Map.new()
   end
 
-  defp errors_from_changesets(guest_params, invalid_changesets) do
+  defp errors_from_changesets(guest_params, invalid_by_index)
+       when is_list(invalid_by_index) do
     sorted_params =
       guest_params
       |> Enum.map(fn {index_str, guest_attrs} ->
@@ -486,22 +524,21 @@ defmodule YscWeb.BookingGuestForm do
 
     sorted_params
     |> Enum.with_index()
-    |> Enum.reduce(%{}, fn {{_original_index, {index_str, _guest_attrs}},
-                            changeset_index},
+    |> Enum.reduce(%{}, fn {{_original_index, {index_str, _guest_attrs}}, idx},
                            acc ->
-      changeset = Enum.at(invalid_changesets, changeset_index)
-
-      if changeset && not changeset.valid? do
-        changeset_errors =
-          Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-            Enum.reduce(opts, msg, fn {key, value}, error ->
-              String.replace(error, "%{#{key}}", to_string(value))
+      case Enum.at(invalid_by_index, idx) do
+        %Ecto.Changeset{} = changeset ->
+          changeset_errors =
+            Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+              Enum.reduce(opts, msg, fn {key, value}, error ->
+                String.replace(error, "%{#{key}}", to_string(value))
+              end)
             end)
-          end)
 
-        Map.put(acc, index_str, changeset_errors)
-      else
-        acc
+          Map.put(acc, index_str, changeset_errors)
+
+        _ ->
+          acc
       end
     end)
   end
