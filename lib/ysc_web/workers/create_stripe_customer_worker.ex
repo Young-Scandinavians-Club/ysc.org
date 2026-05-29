@@ -14,7 +14,7 @@ defmodule YscWeb.Workers.CreateStripeCustomerWorker do
     unique: [
       fields: [:args],
       keys: [:user_id],
-      states: [:available, :scheduled, :executing, :retryable],
+      states: :incomplete,
       period: 60
     ]
 

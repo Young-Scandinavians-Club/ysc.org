@@ -13,7 +13,7 @@ defmodule YscWeb.Workers.NewsletterSender do
     max_attempts: 3,
     unique: [
       keys: [:edition_id],
-      states: [:available, :scheduled, :executing, :retryable],
+      states: :incomplete,
       period: :infinity
     ]
 
