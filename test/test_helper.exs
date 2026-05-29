@@ -1,4 +1,4 @@
-ExUnit.start()
+ExUnit.start(capture_log: true)
 {:ok, _} = Ysc.HttpTestServer.start_link()
 
 # Host .env may define QUICKBOOKS_*; never use those in tests (avoids Intuit HTTP).
@@ -20,9 +20,15 @@ Application.put_env(
 
 Ecto.Adapters.SQL.Sandbox.mode(Ysc.Repo, :manual)
 
-# Suppress DBConnection "owner/client exited" logs in test. These are normal when
-# each test's sandbox owner process exits; they are not failures.
-Ysc.Logging.put_application_level(:db_connection, :none)
+# Per-process MX resolver overrides for async-safe newsletter tests (see EmailValidatorTestHelper).
+:ets.new(:ysc_mx_test_overrides, [
+  :named_table,
+  :public,
+  :set,
+  read_concurrency: true
+])
 
-# Note: Application logging uses Ysc.Logging which skips Sentry integration in test
-# but still emits logs for test verification purposes.
+# Suppress noisy application loggers during tests.
+for app <- [:db_connection, :phoenix, :phoenix_live_view, :ecto, :oban] do
+  Ysc.Logging.put_application_level(app, :none)
+end

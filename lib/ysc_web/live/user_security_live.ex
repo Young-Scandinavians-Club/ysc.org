@@ -68,7 +68,7 @@ defmodule YscWeb.UserSecurityLive do
 
   def handle_async(:load_passkeys, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to load passkeys async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to load passkeys async: #{inspect(reason)}")
 
     {:noreply,
      socket
@@ -86,7 +86,10 @@ defmodule YscWeb.UserSecurityLive do
 
   def handle_async(:load_login_history, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to load login history async: #{inspect(reason)}")
+
+    Ysc.Logging.warning(
+      "Failed to load login history async: #{inspect(reason)}"
+    )
 
     {:noreply,
      socket

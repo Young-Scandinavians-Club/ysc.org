@@ -433,7 +433,7 @@ defmodule YscWeb.TicketQrLive do
   end
 
   def handle_async(:load_ticket_data, {:exit, reason}, socket) do
-    Ysc.Logging.error("Failed to load ticket QR data", error: reason)
+    Ysc.Logging.warning("Failed to load ticket QR data", error: reason)
 
     {:noreply,
      socket

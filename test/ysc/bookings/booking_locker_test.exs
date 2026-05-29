@@ -1503,10 +1503,10 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "confirm_booking/1 other holds" do
-    test "second confirm_booking logs idempotent skip (same process, coverage for logging branch)",
-         %{user: user} do
-      import ExUnit.CaptureLog
-
+    test "second confirm_booking is idempotent when booking is already complete",
+         %{
+           user: user
+         } do
       checkin = Date.utc_today() |> Date.add(411)
       checkout = Date.add(checkin, 2)
 
@@ -1522,17 +1522,9 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
       assert confirmed.status == :complete
 
-      prev_level = Logger.level()
-
-      log =
-        capture_log(fn ->
-          Logger.configure(level: :info)
-          assert {:ok, _} = BookingLocker.confirm_booking(booking.id)
-        end)
-
-      Logger.configure(level: prev_level)
-
-      assert log =~ "confirm_booking: booking was already confirmed"
+      assert {:ok, confirmed_again} = BookingLocker.confirm_booking(booking.id)
+      assert confirmed_again.status == :complete
+      assert confirmed_again.id == confirmed.id
     end
 
     test "releases other hold bookings for the same property and user", %{

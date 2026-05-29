@@ -6,7 +6,7 @@ This document describes the custom logging module (`Ysc.Logging`) that automatic
 
 The `Ysc.Logging` module is a wrapper around Elixir's standard `Logger` that automatically captures errors and exceptions to Sentry when logging at the error level. This eliminates the need to write separate `Logger.error` and `Sentry.capture_exception` calls throughout the codebase.
 
-**Important:** All logging calls are **silent (noop)** when running in the test environment to keep test output clean and focused.
+**Test environment:** Console logging is disabled (`config :logger, level: :none`). ExUnit captures logs per test and prints them only when that test fails (`ExUnit.start(capture_log: true)` in `test/test_helper.exs`). Do not write tests that assert on log message text—test return values, database state, and public structs instead.
 
 ## Usage
 
@@ -164,10 +164,10 @@ The macro is compile-time safe and has minimal runtime overhead when no error is
 
 In the test environment (`MIX_ENV=test`):
 
-- Logs are still emitted to Logger (so tests can capture and verify them)
+- Default console output is silent; failed tests show captured logs in the ExUnit failure report
 - Sentry integration code is not compiled into the test build (compile-time optimization)
 - No external API calls are made during tests
-- Tests can use `ExUnit.CaptureLog` to verify logging behavior
+- Use `:warning` for expected/handled failures (validation errors, mocked API failures) and `:error` for unexpected exceptions
 
 The test/non-test check is done at **compile-time** using `Mix.env()`, so:
 - In production releases, Sentry code is included and functional

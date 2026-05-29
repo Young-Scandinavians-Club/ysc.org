@@ -2894,14 +2894,11 @@ defmodule Ysc.Ledgers.ReconciliationTest do
     end
   end
 
-  describe "run_full_reconciliation/0 discrepancy logging" do
-    test "logs payment, refund, ledger balance, and orphaned entry warnings when checks fail",
+  describe "run_full_reconciliation/0 discrepancies" do
+    test "reports payment, refund, ledger balance, and orphaned entry failures when checks fail",
          %{
            user: user
          } do
-      import ExUnit.CaptureLog
-      require Logger
-
       uid = System.unique_integer([:positive])
 
       Repo.insert!(%Payment{
@@ -2989,26 +2986,12 @@ defmodule Ysc.Ledgers.ReconciliationTest do
         []
       )
 
-      prev_level = Logger.level()
-
-      log =
-        capture_log(fn ->
-          Logger.configure(level: :warning)
-
-          assert {:ok, report} = Reconciliation.run_full_reconciliation()
-          assert report.overall_status == :error
-          assert report.checks.payments.discrepancies_count > 0
-          assert report.checks.refunds.discrepancies_count > 0
-          assert report.checks.ledger_balance.balanced == false
-          assert report.checks.orphaned_entries.orphaned_entries_count > 0
-        end)
-
-      Logger.configure(level: prev_level)
-
-      assert log =~ "Payment discrepancies found"
-      assert log =~ "Refund discrepancies found"
-      assert log =~ "Ledger is imbalanced"
-      assert log =~ "Orphaned ledger entries found"
+      assert {:ok, report} = Reconciliation.run_full_reconciliation()
+      assert report.overall_status == :error
+      assert report.checks.payments.discrepancies_count > 0
+      assert report.checks.refunds.discrepancies_count > 0
+      assert report.checks.ledger_balance.balanced == false
+      assert report.checks.orphaned_entries.orphaned_entries_count > 0
     end
   end
 end

@@ -112,7 +112,7 @@ defmodule YscWeb.Workers.EmailNotifier do
   end
 
   defp perform_with_args(params) do
-    Ysc.Logging.info("EmailNotifier job started",
+    Ysc.Logging.debug("EmailNotifier job started",
       job_id: params.job.id,
       recipient: params.recipient,
       idempotency_key: params.idempotency_key,
@@ -137,7 +137,9 @@ defmodule YscWeb.Workers.EmailNotifier do
           YscWeb.Emails.Notifier.get_template_module(params.template)
 
         if template_module do
-          Ysc.Logging.info("Template module found: #{inspect(template_module)}")
+          Ysc.Logging.debug(
+            "Template module found: #{inspect(template_module)}"
+          )
         else
           error_message =
             "Template module not found for template: #{params.template}"
@@ -150,7 +152,7 @@ defmodule YscWeb.Workers.EmailNotifier do
         end
 
         atomized_params = atomize_keys(params.params)
-        Ysc.Logging.info("Atomized params: #{inspect(atomized_params)}")
+        Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
 
         # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
         normalized_recipient = normalize_recipient(params.recipient)

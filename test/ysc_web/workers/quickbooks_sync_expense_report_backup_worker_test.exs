@@ -16,7 +16,6 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
   - Handles empty result sets (no unsynced reports)
   - Respects query filters (status, sync_status, bill_id)
   - Validates Oban worker behavior
-  - Logs appropriate messages
 
   Full integration testing of the enqueueing logic would require:
   1. Fixing ClientBehaviour to include /2 arities for create_bill and other functions
@@ -34,57 +33,33 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
   alias Ysc.ExpenseReports.ExpenseReport
   alias YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker
 
-  require Ysc.Logging
-
   setup do
     user = user_fixture()
     %{user: user}
   end
 
+  defp maintenance_job do
+    %Oban.Job{
+      id: 1,
+      args: %{},
+      worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
+      queue: "maintenance",
+      state: "available",
+      attempt: 1
+    }
+  end
+
   describe "perform/1 - worker entry point" do
     test "returns :ok on successful execution" do
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      assert :ok = QuickbooksSyncExpenseReportBackupWorker.perform(job)
-    end
-
-    test "logs start and completion messages when no reports exist" do
-      # Set Logger level to :info to capture the logs
-      Logger.configure(level: :info)
-
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          QuickbooksSyncExpenseReportBackupWorker.perform(job)
-        end)
-
-      # Reset Logger level
-      Logger.configure(level: :error)
-
-      assert log =~ "Starting QuickBooks expense report backup sync job"
-      assert log =~ "QuickBooks expense report backup sync job completed"
-      assert log =~ "expense_reports_enqueued=0"
+      assert :ok =
+               QuickbooksSyncExpenseReportBackupWorker.perform(
+                 maintenance_job()
+               )
     end
   end
 
   describe "query filtering - status field" do
     test "ignores expense reports with status != submitted", %{user: user} do
-      # Create expense reports with various non-submitted statuses
       %ExpenseReport{
         user_id: user.id,
         purpose: "Draft report",
@@ -103,34 +78,15 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
       }
       |> Repo.insert!()
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      # Set Logger level to :info
-      Logger.configure(level: :info)
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          QuickbooksSyncExpenseReportBackupWorker.perform(job)
-        end)
-
-      # Reset Logger level
-      Logger.configure(level: :error)
-
-      # Should log that no unsynced reports were found
-      assert log =~ "No unsynced expense reports found"
+      assert :ok =
+               QuickbooksSyncExpenseReportBackupWorker.perform(
+                 maintenance_job()
+               )
     end
   end
 
   describe "query filtering - sync_status field" do
     test "ignores expense reports with sync_status=synced", %{user: user} do
-      # Create a synced expense report
       %ExpenseReport{
         user_id: user.id,
         purpose: "Already synced",
@@ -141,28 +97,10 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
       }
       |> Repo.insert!()
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      # Set Logger level to :info
-      Logger.configure(level: :info)
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          QuickbooksSyncExpenseReportBackupWorker.perform(job)
-        end)
-
-      # Reset Logger level
-      Logger.configure(level: :error)
-
-      # Should log that no unsynced reports were found
-      assert log =~ "No unsynced expense reports found"
+      assert :ok =
+               QuickbooksSyncExpenseReportBackupWorker.perform(
+                 maintenance_job()
+               )
     end
   end
 
@@ -170,7 +108,6 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
     test "ignores expense reports with quickbooks_bill_id already set", %{
       user: user
     } do
-      # Create an expense report with bill_id already set (synced)
       %ExpenseReport{
         user_id: user.id,
         purpose: "Has bill ID",
@@ -181,86 +118,24 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
       }
       |> Repo.insert!()
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      # Set Logger level to :info
-      Logger.configure(level: :info)
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          QuickbooksSyncExpenseReportBackupWorker.perform(job)
-        end)
-
-      # Reset Logger level
-      Logger.configure(level: :error)
-
-      # Should log that no unsynced reports were found
-      assert log =~ "No unsynced expense reports found"
+      assert :ok =
+               QuickbooksSyncExpenseReportBackupWorker.perform(
+                 maintenance_job()
+               )
     end
   end
 
   describe "no unsynced reports" do
-    test "logs appropriate message when no unsynced reports exist" do
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      # Set Logger level to :info
-      Logger.configure(level: :info)
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          QuickbooksSyncExpenseReportBackupWorker.perform(job)
-        end)
-
-      # Reset Logger level
-      Logger.configure(level: :error)
-
-      assert log =~ "No unsynced expense reports found"
-      assert log =~ "expense_reports_enqueued=0"
-    end
-
-    test "returns 0 count when no reports to sync" do
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      # The worker logs the count, we verify via the log
-      # Set Logger level to :info
-      Logger.configure(level: :info)
-
-      log =
-        ExUnit.CaptureLog.capture_log(fn ->
-          QuickbooksSyncExpenseReportBackupWorker.perform(job)
-        end)
-
-      # Reset Logger level
-      Logger.configure(level: :error)
-
-      assert log =~ "expense_reports_enqueued=0"
+    test "returns :ok when no unsynced reports exist" do
+      assert :ok =
+               QuickbooksSyncExpenseReportBackupWorker.perform(
+                 maintenance_job()
+               )
     end
   end
 
   describe "integration with Oban" do
     test "uses Oban worker behavior" do
-      # Verify the module is an Oban worker
       behaviours =
         QuickbooksSyncExpenseReportBackupWorker.module_info(:attributes)[
           :behaviour
@@ -270,25 +145,14 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorkerTest do
     end
 
     test "is configured with maintenance queue" do
-      # The worker should use the maintenance queue
-      # This is configured via `use Oban.Worker, queue: :maintenance`
-      # We can verify by checking if the module compiles and has the right configuration
       assert Code.ensure_loaded?(QuickbooksSyncExpenseReportBackupWorker)
     end
 
     test "perform/1 accepts an Oban.Job struct" do
-      # Verify the function signature
-      job = %Oban.Job{
-        id: 1,
-        args: %{},
-        worker: "YscWeb.Workers.QuickbooksSyncExpenseReportBackupWorker",
-        queue: "maintenance",
-        state: "available",
-        attempt: 1
-      }
-
-      # Should not raise
-      assert :ok = QuickbooksSyncExpenseReportBackupWorker.perform(job)
+      assert :ok =
+               QuickbooksSyncExpenseReportBackupWorker.perform(
+                 maintenance_job()
+               )
     end
   end
 

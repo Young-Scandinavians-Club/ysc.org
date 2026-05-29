@@ -3350,7 +3350,6 @@ defmodule Ysc.Quickbooks.SyncTest do
   end
 
   describe "booking refund class assignment" do
-    @tag :capture_log
     test "Tahoe booking refund uses correct QuickBooks class (Tahoe)", %{
       user: user
     } do

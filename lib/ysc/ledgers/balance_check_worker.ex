@@ -154,7 +154,7 @@ defmodule Ysc.Ledgers.BalanceCheckWorker do
     ```
     """
 
-    Ysc.Logging.error(alert_message)
+    Ysc.Logging.warning(alert_message)
 
     # NOTE: Integrate with your alerting system
     # Examples:

@@ -3793,7 +3793,7 @@ defmodule YscWeb.EventDetailsLive do
 
   def handle_async(:load_event_data, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to load event data async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to load event data async: #{inspect(reason)}")
 
     # Keep showing the page with minimal data, mark as loaded to avoid infinite loading
     {:noreply, assign(socket, :async_data_loaded, true)}
@@ -3816,7 +3816,7 @@ defmodule YscWeb.EventDetailsLive do
 
   def handle_async(:reload_attendees, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to reload attendees async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to reload attendees async: #{inspect(reason)}")
     {:noreply, socket}
   end
 

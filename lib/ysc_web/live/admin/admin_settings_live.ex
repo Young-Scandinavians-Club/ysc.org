@@ -479,7 +479,7 @@ defmodule YscWeb.AdminSettingsLive do
 
   def handle_async(:load_oban_data, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to load Oban data async", error: reason)
+    Ysc.Logging.warning("Failed to load Oban data async", error: reason)
 
     {:noreply,
      socket

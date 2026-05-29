@@ -124,18 +124,35 @@ defmodule Ysc.Newsletter.EmailValidator do
   end
 
   defp perform_mx_lookup(domain) do
+    case mx_resolver_fun() do
+      fun when is_function(fun, 1) -> fun.(domain)
+      nil -> perform_inet_mx_lookup(domain)
+    end
+  end
+
+  defp mx_resolver_fun do
     case Process.get(@process_mx_override_key, :absent) do
       fun when is_function(fun, 1) ->
-        fun.(domain)
+        fun
 
       :absent ->
-        case Application.get_env(:ysc, __MODULE__, [])[:mx_resolver] do
-          fun when is_function(fun, 1) ->
-            fun.(domain)
+        case :ets.whereis(:ysc_mx_test_overrides) do
+          :undefined ->
+            application_mx_resolver()
 
-          _ ->
-            perform_inet_mx_lookup(domain)
+          _table ->
+            case :ets.lookup(:ysc_mx_test_overrides, self()) do
+              [{_pid, fun}] when is_function(fun, 1) -> fun
+              [] -> application_mx_resolver()
+            end
         end
+    end
+  end
+
+  defp application_mx_resolver do
+    case Application.get_env(:ysc, __MODULE__, [])[:mx_resolver] do
+      fun when is_function(fun, 1) -> fun
+      _ -> nil
     end
   end
 

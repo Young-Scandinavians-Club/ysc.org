@@ -316,7 +316,7 @@ defmodule YscWeb.PostLive do
 
   def handle_async(:load_comments, {:exit, reason}, socket) do
     require Ysc.Logging
-    Ysc.Logging.error("Failed to load comments async: #{inspect(reason)}")
+    Ysc.Logging.warning("Failed to load comments async: #{inspect(reason)}")
     # Still need to provide a form even on error
     new_comment_changeset =
       Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})

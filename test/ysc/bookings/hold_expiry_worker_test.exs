@@ -38,13 +38,10 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
   end
 
   describe "expire_expired_holds/0" do
-    test "logs error when release_hold fails due to missing inventory", %{
-      user: user
-    } do
-      import ExUnit.CaptureLog
-
-      Logger.configure(level: :info)
-
+    test "keeps booking on hold when release_hold fails due to missing inventory",
+         %{
+           user: user
+         } do
       checkin_date = Date.add(Date.utc_today(), 205)
       checkout_date = Date.add(checkin_date, 2)
 
@@ -72,14 +69,8 @@ defmodule Ysc.Bookings.HoldExpiryWorkerTest do
         )
         |> Repo.insert!()
 
-      log =
-        capture_log(fn ->
-          HoldExpiryWorker.expire_expired_holds()
-        end)
+      HoldExpiryWorker.expire_expired_holds()
 
-      Logger.configure(level: :error)
-
-      assert log =~ "Failed to expire booking hold"
       reloaded = Repo.get!(Booking, booking.id)
       assert reloaded.status == :hold
     end

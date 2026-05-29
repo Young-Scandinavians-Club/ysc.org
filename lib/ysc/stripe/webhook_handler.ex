@@ -1845,7 +1845,11 @@ defmodule Ysc.Stripe.WebhookHandler do
         {:ok, balance_transactions}
 
       {:error, reason} ->
-        IO.puts("Error fetching balance transactions: #{inspect(reason)}")
+        log_stripe_fetch_failure("Error fetching balance transactions",
+          stripe_payout_id: stripe_payout_id,
+          error: inspect(reason)
+        )
+
         {:error, reason}
     end
   end
@@ -2058,7 +2062,7 @@ defmodule Ysc.Stripe.WebhookHandler do
           calculate_estimated_fee_from_charge_amount(charge_id)
 
         {:error, reason} ->
-          Ysc.Logging.error("Failed to fetch charge for fee calculation",
+          log_stripe_fetch_failure("Failed to fetch charge for fee calculation",
             charge_id: charge_id,
             error: reason
           )
@@ -2108,7 +2112,8 @@ defmodule Ysc.Stripe.WebhookHandler do
           calculate_estimated_fee(amount_dollars)
 
         {:error, reason} ->
-          Ysc.Logging.error("Failed to fetch charge amount for fee estimation",
+          log_stripe_fetch_failure(
+            "Failed to fetch charge amount for fee estimation",
             charge_id: charge_id,
             error: reason
           )
@@ -2973,7 +2978,7 @@ defmodule Ysc.Stripe.WebhookHandler do
         {:ok, acc ++ data}
 
       {:error, reason} ->
-        Ysc.Logging.error("Failed to fetch balance transactions",
+        log_stripe_fetch_failure("Failed to fetch balance transactions",
           payout_id: payout_id,
           error: inspect(reason),
           error_type: if(is_struct(reason), do: reason.__struct__, else: nil)
@@ -4078,4 +4083,20 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     :ok
   end
+
+  defp log_stripe_fetch_failure(message, opts) do
+    if expected_stripe_fetch_failure?(Keyword.get(opts, :error)) do
+      Ysc.Logging.warning(message, opts)
+    else
+      Ysc.Logging.error(message, opts)
+    end
+  end
+
+  defp expected_stripe_fetch_failure?(:not_implemented), do: true
+
+  defp expected_stripe_fetch_failure?(error) when is_binary(error) do
+    String.contains?(to_string(error), "not_implemented")
+  end
+
+  defp expected_stripe_fetch_failure?(_), do: false
 end

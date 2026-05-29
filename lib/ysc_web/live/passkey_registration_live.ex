@@ -259,7 +259,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
             end
 
           {:error, reason} ->
-            Ysc.Logging.error("[PasskeyRegistrationLive] Wax.register failed",
+            Ysc.Logging.warning("[PasskeyRegistrationLive] Wax.register failed",
               error: reason,
               user_id: user.id
             )
@@ -274,7 +274,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
         end
       rescue
         e in ArgumentError ->
-          Ysc.Logging.error(
+          Ysc.Logging.warning(
             "[PasskeyRegistrationLive] Failed to decode base64 data",
             error: Exception.message(e),
             stacktrace: __STACKTRACE__,
@@ -346,7 +346,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
     error_message_raw = params["message"] || "Registration failed"
 
     # Log the error with context
-    Ysc.Logging.error(
+    Ysc.Logging.warning(
       "[PasskeyRegistrationLive] Passkey registration error from client (fallback handler)",
       error: error_name,
       message: error_message_raw,

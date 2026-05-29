@@ -88,7 +88,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
   end
 
   defp alert_on_discrepancies(report) do
-    Ysc.Logging.error("🚨 FINANCIAL RECONCILIATION DISCREPANCIES DETECTED")
+    Ysc.Logging.warning("🚨 FINANCIAL RECONCILIATION DISCREPANCIES DETECTED")
 
     # Build detailed alert message
     alert_sections = build_alert_sections(report)
@@ -114,7 +114,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
     ```
     """
 
-    Ysc.Logging.error(full_alert)
+    Ysc.Logging.warning(full_alert)
 
     # Send Discord alert
     send_discord_alert(report)

@@ -46,9 +46,6 @@ defmodule YscWeb.FamilyManagementLive do
     {:ok, socket}
   end
 
-  # Swoosh mailbox preview delivers {:email, %Swoosh.Email{}} in dev/test.
-  def handle_info({:email, _email}, socket), do: {:noreply, socket}
-
   @impl true
   def handle_info(:load_family_management_data, socket) do
     user = socket.assigns.current_user

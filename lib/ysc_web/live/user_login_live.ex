@@ -754,7 +754,7 @@ defmodule YscWeb.UserLoginLive do
         error: error
       )
     else
-      Ysc.Logging.error(
+      Ysc.Logging.warning(
         "[UserLoginLive] Passkey authentication error from client",
         error: error,
         message: message,
@@ -793,7 +793,8 @@ defmodule YscWeb.UserLoginLive do
     require Ysc.Logging
 
     # Log fallback error handler
-    Ysc.Logging.error("[UserLoginLive] Passkey authentication error (fallback)",
+    Ysc.Logging.warning(
+      "[UserLoginLive] Passkey authentication error (fallback)",
       params: params,
       user_agent: socket.assigns[:user_agent],
       has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
@@ -992,7 +993,7 @@ defmodule YscWeb.UserLoginLive do
         # Log the error with full context
         error_string = inspect(reason, pretty: true, limit: :infinity)
 
-        Ysc.Logging.error("[UserLoginLive] Wax.authenticate failed",
+        Ysc.Logging.warning("[UserLoginLive] Wax.authenticate failed",
           error: error_string,
           error_type: :exception,
           passkey_id: passkey.id,

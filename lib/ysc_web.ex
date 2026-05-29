@@ -60,9 +60,16 @@ defmodule YscWeb do
 
       # Global event: "clear" is sent by the client-error flash in the layout when dismissed.
       # No-op on the server; the UI is updated via JS. Prevents FunctionClauseError in any LiveView.
+      @impl true
       def handle_event("clear", _params, socket) do
         {:noreply, socket}
       end
+
+      # Swoosh.Adapters.Test delivers to processes in the $callers chain (see adapter docs).
+      @impl true
+      def handle_info({:email, _email}, socket), do: {:noreply, socket}
+
+      def handle_info({:emails, _emails}, socket), do: {:noreply, socket}
     end
   end
 
@@ -76,9 +83,16 @@ defmodule YscWeb do
 
       # Global event: "clear" is sent by the client-error flash in the layout when dismissed.
       # No-op on the server; the UI is updated via JS. Prevents FunctionClauseError in any LiveView.
+      @impl true
       def handle_event("clear", _params, socket) do
         {:noreply, socket}
       end
+
+      # Swoosh.Adapters.Test delivers to processes in the $callers chain (see adapter docs).
+      @impl true
+      def handle_info({:email, _email}, socket), do: {:noreply, socket}
+
+      def handle_info({:emails, _emails}, socket), do: {:noreply, socket}
     end
   end
 

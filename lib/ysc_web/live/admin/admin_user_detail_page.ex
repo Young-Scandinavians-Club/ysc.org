@@ -2549,7 +2549,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   end
 
   def handle_async(:load_booking_entitlements, {:exit, reason}, socket) do
-    Ysc.Logging.error("Failed to load booking entitlements",
+    Ysc.Logging.warning("Failed to load booking entitlements",
       error: inspect(reason)
     )
 
@@ -2561,7 +2561,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   end
 
   def handle_async(:load_notifications, {:exit, reason}, socket) do
-    Ysc.Logging.error("Failed to load notifications", error: inspect(reason))
+    Ysc.Logging.warning("Failed to load notifications", error: inspect(reason))
     {:noreply, socket}
   end
 
