@@ -68,15 +68,25 @@ defmodule Ysc.EmailValidatorTestHelper do
 
   @doc """
   Runs `fun` with real `:inet_res` MX lookups (no Application or process overrides).
-  """
-  def with_real_mx_lookup(fun) when is_function(fun, 0) do
-    prev_app = Application.get_env(:ysc, EmailValidator)
-    prev_proc = Process.get(@process_mx_override_key)
-    test_pid = self()
-    prev_ets = :ets.lookup(@mx_overrides_table, test_pid)
 
-    Process.delete(@process_mx_override_key)
-    :ets.delete(@mx_overrides_table, test_pid)
+  Pass the same target pid/view used by `stub_mx_no_records/1` when clearing a
+  LiveView ETS override.
+  """
+  def with_real_mx_lookup(fun, target \\ self()) when is_function(fun, 0) do
+    target_pid = resolve_mx_override_pid(target)
+    test_pid = self()
+    prev_app = Application.get_env(:ysc, EmailValidator)
+
+    prev_proc =
+      if target_pid == test_pid, do: Process.get(@process_mx_override_key)
+
+    prev_ets = :ets.lookup(@mx_overrides_table, target_pid)
+
+    if target_pid == test_pid do
+      Process.delete(@process_mx_override_key)
+    end
+
+    :ets.delete(@mx_overrides_table, target_pid)
 
     case prev_app do
       nil ->
@@ -95,14 +105,19 @@ defmodule Ysc.EmailValidatorTestHelper do
     try do
       fun.()
     after
-      case prev_proc do
-        nil -> Process.delete(@process_mx_override_key)
-        val -> Process.put(@process_mx_override_key, val)
+      if target_pid == test_pid do
+        case prev_proc do
+          nil -> Process.delete(@process_mx_override_key)
+          val -> Process.put(@process_mx_override_key, val)
+        end
       end
 
       case prev_ets do
-        [] -> :ok
-        [{^test_pid, fun}] -> :ets.insert(@mx_overrides_table, {test_pid, fun})
+        [] ->
+          :ok
+
+        [{^target_pid, override_fun}] ->
+          :ets.insert(@mx_overrides_table, {target_pid, override_fun})
       end
 
       case prev_app do

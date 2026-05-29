@@ -2,6 +2,8 @@ defmodule YscWeb.PostLive do
   alias Ysc.Media.Image
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Posts
@@ -315,7 +317,6 @@ defmodule YscWeb.PostLive do
   end
 
   def handle_async(:load_comments, {:exit, reason}, socket) do
-    require Ysc.Logging
     Ysc.Logging.warning("Failed to load comments async: #{inspect(reason)}")
     # Still need to provide a form even on error
     new_comment_changeset =

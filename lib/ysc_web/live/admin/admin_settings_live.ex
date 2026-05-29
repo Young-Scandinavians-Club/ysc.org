@@ -6,6 +6,8 @@ defmodule YscWeb.AdminSettingsLive do
 
   use YscWeb, :admin_live_view
 
+  require Ysc.Logging
+
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   import YscWeb.CoreComponents
@@ -478,7 +480,6 @@ defmodule YscWeb.AdminSettingsLive do
   end
 
   def handle_async(:load_oban_data, {:exit, reason}, socket) do
-    require Ysc.Logging
     Ysc.Logging.warning("Failed to load Oban data async", error: reason)
 
     {:noreply,

@@ -3376,6 +3376,13 @@ defmodule Ysc.Quickbooks.Sync do
             ],
        do: true
 
-  defp known_qb_sync_failure?(reason) when is_binary(reason), do: true
+  defp known_qb_sync_failure?(<<"DUPLICATE_VENDOR_ID:", _::binary>>), do: true
+
+  defp known_qb_sync_failure?(reason) when is_binary(reason) do
+    String.contains?(reason, "income account") or
+      String.contains?(reason, "2390") or
+      String.contains?(reason, "Attachable ID")
+  end
+
   defp known_qb_sync_failure?(_), do: false
 end

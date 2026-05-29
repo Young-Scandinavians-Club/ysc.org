@@ -100,8 +100,8 @@ config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
 
-# Silence console logging during tests; ExUnit captures logs and prints them only on failure.
-config :logger, level: :none
+# Keep console quiet but above :none so ExUnit capture_log can surface logs on failure.
+config :logger, level: :warning
 
 # Note: You may see some Postgrex disconnection errors during test runs.
 # These are expected and occur when async database operations are still running

@@ -1,6 +1,8 @@
 defmodule YscWeb.OrderConfirmationLive do
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias Ysc.Tickets.TicketOrder
@@ -1014,7 +1016,6 @@ defmodule YscWeb.OrderConfirmationLive do
   end
 
   def handle_async(:load_order_data, {:exit, reason}, socket) do
-    require Ysc.Logging
     Ysc.Logging.warning("Failed to load order data async: #{inspect(reason)}")
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
