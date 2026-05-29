@@ -10,9 +10,10 @@ defmodule YscWeb.Emails.EventNotification do
 
   import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
 
-  alias Ysc.Repo
   alias Ysc.Events.Event
   alias HtmlSanitizeEx
+  alias Ysc.Media.Image
+  alias Ysc.Repo
 
   def get_template_name() do
     "event_notification"
@@ -170,16 +171,10 @@ defmodule YscWeb.Emails.EventNotification do
   end
 
   defp get_event_image_url(event) do
-    cond do
-      # If cover_image association is loaded and exists
-      Ecto.assoc_loaded?(event.cover_image) && event.cover_image ->
-        # Prefer optimized image, fall back to raw image
-        event.cover_image.optimized_image_path ||
-          event.cover_image.raw_image_path
-
-      # No image available
-      true ->
-        nil
+    if Ecto.assoc_loaded?(event.cover_image) && event.cover_image do
+      Image.display_path(event.cover_image)
+    else
+      nil
     end
   end
 end

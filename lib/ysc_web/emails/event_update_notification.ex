@@ -8,8 +8,9 @@ defmodule YscWeb.Emails.EventUpdateNotification do
 
   import YscWeb.Emails.Helpers, only: [absolute_url: 1]
 
-  alias Ysc.Repo
   alias Ysc.Events.Event
+  alias Ysc.Media.Image
+  alias Ysc.Repo
 
   def raw(content) when is_binary(content), do: {:safe, content}
   def raw(nil), do: {:safe, ""}
@@ -121,7 +122,7 @@ defmodule YscWeb.Emails.EventUpdateNotification do
 
   defp get_event_image_url(event) do
     if Ecto.assoc_loaded?(event.cover_image) && event.cover_image do
-      event.cover_image.optimized_image_path || event.cover_image.raw_image_path
+      Image.display_path(event.cover_image)
     else
       nil
     end

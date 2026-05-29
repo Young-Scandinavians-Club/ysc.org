@@ -40,6 +40,27 @@ defmodule Ysc.MediaTest do
     end
   end
 
+  describe "Image.display_path/1" do
+    test "returns nil for nil image" do
+      assert Image.display_path(nil) == nil
+    end
+
+    test "prefers optimized path when both are set" do
+      image = %Image{
+        raw_image_path: "/media/raw.jpg",
+        optimized_image_path: "/media/optimized.webp"
+      }
+
+      assert Image.display_path(image) == "/media/optimized.webp"
+    end
+
+    test "falls back to raw path when optimized is nil" do
+      image = %Image{raw_image_path: "/media/raw.jpg", optimized_image_path: nil}
+
+      assert Image.display_path(image) == "/media/raw.jpg"
+    end
+  end
+
   describe "fetch_image/1" do
     test "returns image when found" do
       # Create an image

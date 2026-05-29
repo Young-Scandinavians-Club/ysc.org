@@ -98,4 +98,15 @@ defmodule Ysc.Media.Image do
   def image_processing_state_changeset(image, state) do
     change(image, processing_state: state)
   end
+
+  @doc """
+  Returns the best path for displaying an image: optimized when present, otherwise raw.
+
+  Returns `nil` when the image is `nil`.
+  """
+  def display_path(nil), do: nil
+
+  def display_path(%__MODULE__{} = image) do
+    image.optimized_image_path || image.raw_image_path
+  end
 end
