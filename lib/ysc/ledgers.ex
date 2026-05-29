@@ -2415,6 +2415,8 @@ defmodule Ysc.Ledgers do
       end)
       |> Map.new()
 
+    refund_data_map = refund_data_map_for_payments(payment_ids)
+
     # Enrich each payment using the preloaded data
     Enum.map(payments, fn payment ->
       revenue_entry = Map.get(revenue_entries_map, payment.id)
@@ -2434,13 +2436,14 @@ defmodule Ysc.Ledgers do
           do: Map.get(subscriptions_map, subscription_id),
           else: nil
 
-      payment_info = %{
+      %{
         payment: payment,
         type: determine_payment_type(entity_type),
         ticket_order: ticket_order,
         event: if(ticket_order, do: ticket_order.event, else: nil),
         booking: booking,
         subscription: subscription,
+        refund_data: Map.get(refund_data_map, payment.id),
         description:
           build_payment_description(%{
             entity_type: entity_type,
@@ -2450,9 +2453,39 @@ defmodule Ysc.Ledgers do
             revenue_entry: revenue_entry
           })
       }
-
-      payment_info
     end)
+  end
+
+  defp refund_data_map_for_payments([]), do: %{}
+
+  defp refund_data_map_for_payments(payment_ids) do
+    from(r in Refund,
+      where: r.payment_id in ^payment_ids,
+      order_by: [desc: r.inserted_at]
+    )
+    |> Repo.all()
+    |> Enum.group_by(& &1.payment_id)
+    |> Enum.map(fn {payment_id, refunds} ->
+      {payment_id, build_refund_data_from_refunds(refunds)}
+    end)
+    |> Map.new()
+  end
+
+  defp build_refund_data_from_refunds(refunds) do
+    processed_total =
+      Enum.reduce(refunds, Money.new(0, :USD), fn refund, acc ->
+        case Money.add(acc, refund.amount) do
+          {:ok, sum} -> sum
+          _ -> acc
+        end
+      end)
+
+    if Money.positive?(processed_total) do
+      %{
+        processed_refunds: refunds,
+        total_refunded: processed_total
+      }
+    end
   end
 
   defp enrich_payment_with_details(payment) do
@@ -2547,6 +2580,7 @@ defmodule Ysc.Ledgers do
 
     %{
       payment: nil,
+      refund_data: nil,
       type: :ticket,
       ticket_order: ticket_order,
       event: ticket_order.event,
