@@ -96,8 +96,11 @@ defmodule Ysc.BookingsFixtures do
   end
 
   def booking_fixture(attrs \\ %{}) do
+    attrs = Map.new(attrs)
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
     {checkin, checkout} = tahoe_booking_dates(7)
+
+    {refund_forfeited_at, attrs} = Map.pop(attrs, :refund_forfeited_at)
 
     {:ok, booking} =
       attrs
@@ -113,6 +116,12 @@ defmodule Ysc.BookingsFixtures do
       })
       |> Bookings.create_booking()
 
-    booking
+    if refund_forfeited_at do
+      booking
+      |> Ecto.Changeset.change(refund_forfeited_at: refund_forfeited_at)
+      |> Ysc.Repo.update!()
+    else
+      booking
+    end
   end
 end

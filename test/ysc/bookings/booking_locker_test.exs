@@ -1122,7 +1122,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end
     end
 
-    test "returns inventory_update_failed when property inventory rows are missing after per-guest hold",
+    test "re-seeds property inventory and confirms when rows were missing after per-guest hold",
          %{user: user} do
       ensure_clear_lake_day_pricing_rule()
 
@@ -1147,8 +1147,18 @@ defmodule Ysc.Bookings.BookingLockerTest do
       )
       |> Repo.delete_all()
 
-      assert {:error, {:error, :inventory_update_failed}} =
-               BookingLocker.confirm_booking(booking.id)
+      assert {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+      assert confirmed.status == :complete
+
+      prop_inv =
+        Repo.all(
+          from pi in PropertyInventory,
+            where:
+              pi.property == :clear_lake and pi.day >= ^checkin and
+                pi.day < ^checkout
+        )
+
+      assert length(prop_inv) == Date.diff(checkout, checkin)
     end
   end
 

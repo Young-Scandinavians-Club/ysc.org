@@ -344,8 +344,11 @@ const StripeElements = {
 
             // Build return URL based on what we have
             let returnUrl;
+            const isModification = this.el.dataset.modification === 'true';
+
             if (bookingId) {
-                returnUrl = `${window.location.origin}/bookings/${bookingId}/receipt?confetti=true`;
+                const updatedParam = isModification ? '&updated=true' : '';
+                returnUrl = `${window.location.origin}/bookings/${bookingId}/receipt?confetti=true${updatedParam}`;
             } else if (ticketOrderId) {
                 // For ticket orders, use payment success page which will redirect to order confirmation
                 returnUrl = `${window.location.origin}/payment/success`;

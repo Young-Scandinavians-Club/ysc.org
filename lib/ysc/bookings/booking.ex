@@ -68,11 +68,14 @@ defmodule Ysc.Bookings.Booking do
     field :booking_mode, Ysc.Bookings.BookingMode
     field :status, Ysc.Bookings.BookingStatus, default: :draft
     field :hold_expires_at, :utc_datetime
+    field :modification_hold_expires_at, :utc_datetime
+    field :modification_hold_attrs, :map
     field :total_price, Money.Ecto.Composite.Type, default_currency: :USD
     field :subtotal_price, Money.Ecto.Composite.Type, default_currency: :USD
     field :discount_total, Money.Ecto.Composite.Type, default_currency: :USD
     field :pricing_items, :map
     field :checked_in, :boolean, default: false
+    field :refund_forfeited_at, :utc_datetime
 
     belongs_to :applied_booking_entitlement, Ysc.Bookings.BookingEntitlement,
       foreign_key: :applied_booking_entitlement_id,
@@ -132,6 +135,8 @@ defmodule Ysc.Bookings.Booking do
         :booking_mode,
         :status,
         :hold_expires_at,
+        :modification_hold_expires_at,
+        :modification_hold_attrs,
         :total_price,
         :pricing_items,
         :user_id,

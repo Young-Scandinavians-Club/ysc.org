@@ -269,15 +269,16 @@ defmodule Ysc.Bookings.BookingValidatorTest do
   end
 
   describe "Weekend requirement validation (Saturday must include Sunday)" do
-    test "rejects Saturday booking without Sunday", %{user: user, rooms: rooms} do
-      # Saturday July 13, 2024 checkout on Sunday without staying
+    test "rejects checkout on Saturday without Sunday in reservation", %{
+      user: user,
+      rooms: rooms
+    } do
+      # Friday check-in, Saturday checkout (Saturday in range but not Sunday)
       attrs = %{
         user_id: user.id,
         property: :tahoe,
-        checkin_date: ~D[2024-07-13],
-        # Saturday
-        checkout_date: ~D[2024-07-14],
-        # Sunday checkout (not staying Sunday)
+        checkin_date: ~D[2024-07-12],
+        checkout_date: ~D[2024-07-13],
         booking_mode: :room,
         guests_count: 2,
         total_price: Money.new(200, :USD)
@@ -293,18 +294,18 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert Keyword.has_key?(changeset.errors, :checkout_date)
     end
 
-    test "accepts Saturday-Sunday booking", %{user: user, rooms: rooms} do
-      # Saturday July 13 to Monday July 15 (includes Sunday)
+    test "accepts Saturday check-in with Sunday checkout", %{
+      user: user,
+      rooms: rooms
+    } do
       attrs = %{
         user_id: user.id,
         property: :tahoe,
         checkin_date: ~D[2024-07-13],
-        # Saturday
-        checkout_date: ~D[2024-07-15],
-        # Monday (stayed Sunday night)
+        checkout_date: ~D[2024-07-14],
         booking_mode: :room,
         guests_count: 2,
-        total_price: Money.new(400, :USD)
+        total_price: Money.new(200, :USD)
       }
 
       changeset =
@@ -316,7 +317,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert changeset.valid?
     end
 
-    test "accepts booking with multiple Saturdays if Sundays included", %{
+    test "accepts Saturday-Sunday booking through Monday checkout", %{
       user: user,
       rooms: rooms
     } do
@@ -886,6 +887,57 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :guests_count)
+    end
+
+    test "rejects booking where adults plus children exceed room capacity", %{
+      user: user,
+      rooms: rooms
+    } do
+      # tahoe_room1 has capacity 4, 2 adults + 3 children = 5 total
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2024-07-10],
+        checkout_date: ~D[2024-07-12],
+        booking_mode: :room,
+        guests_count: 2,
+        children_count: 3,
+        total_price: Money.new(1000, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :children_count)
+    end
+
+    test "accepts booking where adults plus children fit in room capacity", %{
+      user: user,
+      rooms: rooms
+    } do
+      # tahoe_room1 has capacity 4, 2 adults + 2 children = 4 total
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2024-07-10],
+        checkout_date: ~D[2024-07-12],
+        booking_mode: :room,
+        guests_count: 2,
+        children_count: 2,
+        total_price: Money.new(1000, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      assert changeset.valid?
     end
 
     test "accepts booking where guests fit in combined room capacity", %{

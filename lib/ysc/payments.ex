@@ -595,7 +595,10 @@ defmodule Ysc.Payments do
   defp get_display_brand(%{us_bank_account: %{bank_name: bank_name}}),
     do: bank_name
 
-  defp get_display_brand(%{link: link}) when not is_nil(link), do: "Link"
+  defp get_display_brand(%{link: link}) when is_map(link) do
+    Map.get(link, :email) || Map.get(link, "email") ||
+      Map.get(link, :country) || Map.get(link, "country") || "Link"
+  end
 
   defp get_display_brand(%{cashapp: cashapp}) when not is_nil(cashapp),
     do: "Cash App"

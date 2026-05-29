@@ -3,6 +3,7 @@ defmodule YscWeb.BookingReceiptLive do
 
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
+  alias YscWeb.BookingActions
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
   alias Ysc.Ledgers.Refund
@@ -51,8 +52,12 @@ defmodule YscWeb.BookingReceiptLive do
         booking ->
           # Handle Stripe redirect parameters (may update booking status)
           # Track if booking was actually updated to avoid unnecessary reload
-          {socket, booking_updated} =
+          {socket, booking_updated, reservation_updated_from_redirect} =
             handle_stripe_redirect(params, booking, socket)
+
+          show_reservation_updated =
+            Map.get(params, "updated") == "true" or
+              reservation_updated_from_redirect
 
           # PERFORMANCE: Only reload booking if redirect handling actually changed it
           booking =
@@ -83,7 +88,8 @@ defmodule YscWeb.BookingReceiptLive do
           price_breakdown = parse_pricing_items(booking.pricing_items)
 
           # Check if booking can be cancelled - no query needed
-          can_cancel = can_cancel_booking?(booking)
+          can_cancel = BookingActions.can_cancel_booking?(booking)
+          can_change = BookingActions.can_change_booking?(booking)
 
           # Check if confetti should be shown (only when coming from payment)
           show_confetti =
@@ -106,9 +112,11 @@ defmodule YscWeb.BookingReceiptLive do
             |> assign(:user_first_name, user.first_name || "Member")
             |> assign(:booking_in_past, booking_checkout_in_past?(booking))
             |> assign(:can_cancel, can_cancel)
+            |> assign(:can_change, can_change)
             |> assign(:show_cancel_modal, false)
             |> assign(:cancel_reason, "")
             |> assign(:show_confetti, show_confetti)
+            |> assign(:show_reservation_updated, show_reservation_updated)
             |> assign(:page_title, "Booking Confirmation")
             |> assign(
               :meta_description,
@@ -116,6 +124,10 @@ defmodule YscWeb.BookingReceiptLive do
             )
             # Placeholders for async-loaded data
             |> assign(:payment, nil)
+            |> assign(:booking_payments, [])
+            |> assign(:booking_payment_entries, [])
+            |> assign(:total_paid_amount, nil)
+            |> assign(:multiple_payments?, false)
             |> assign(:refund_info, nil)
             |> assign(:door_code, nil)
             |> assign(:show_door_code, false)
@@ -287,25 +299,35 @@ defmodule YscWeb.BookingReceiptLive do
             <div class="flex items-center gap-2 text-green-600 mb-2">
               <.icon name="hero-check-circle-solid" class="w-6 h-6" />
               <span class="font-bold uppercase tracking-wider text-sm">
-                Reservation Confirmed
+                {if @show_reservation_updated,
+                  do: "Reservation Updated",
+                  else: "Reservation Confirmed"}
               </span>
             </div>
             <h1 class="text-4xl font-bold text-zinc-900">
-              <%= if @booking_in_past do %>
-                What a stay, {@user_first_name}!
-              <% else %>
-                See you at the Cabin, {@user_first_name}!
+              <%= cond do %>
+                <% @show_reservation_updated -> %>
+                  Your reservation has been updated, {@user_first_name}!
+                <% @booking_in_past -> %>
+                  What a stay, {@user_first_name}!
+                <% true -> %>
+                  See you at the Cabin, {@user_first_name}!
               <% end %>
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
-              <%= if @booking_in_past do %>
-                Hope you had an amazing time at <strong>{format_property_name(@booking.property)}</strong>.
-                See you next time!
-              <% else %>
-                Your stay at
-                <strong>{format_property_name(@booking.property)}</strong>
-                is all set.
-                We've sent a copy of these details to your email.
+              <%= cond do %>
+                <% @show_reservation_updated -> %>
+                  Your updated stay at
+                  <strong>{format_property_name(@booking.property)}</strong>
+                  is confirmed. We've sent an email with your new reservation details.
+                <% @booking_in_past -> %>
+                  Hope you had an amazing time at <strong>{format_property_name(@booking.property)}</strong>.
+                  See you next time!
+                <% true -> %>
+                  Your stay at
+                  <strong>{format_property_name(@booking.property)}</strong>
+                  is all set.
+                  We've sent a copy of these details to your email.
               <% end %>
             </p>
           <% end %>
@@ -734,6 +756,27 @@ defmodule YscWeb.BookingReceiptLive do
                   do: "Payment & Refund Summary",
                   else: "Payment Summary"}
               </h3>
+              <%= if @show_reservation_updated && @booking.status != :canceled do %>
+                <div
+                  id="reservation-updated-notice"
+                  class="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4"
+                >
+                  <div class="flex items-start gap-3">
+                    <.icon
+                      name="hero-check-circle"
+                      class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5"
+                    />
+                    <div>
+                      <p class="font-semibold text-emerald-300">
+                        Reservation updated
+                      </p>
+                      <p class="text-sm text-zinc-400 mt-1">
+                        Your changes are saved. The details below reflect your updated reservation.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
               <div class={[
                 "space-y-4 text-sm",
                 if(@booking.status == :canceled, do: "text-zinc-900", else: "")
@@ -764,7 +807,9 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-300"
                             )
                           }>
-                            {MoneyHelper.format_money!(@payment.amount)}
+                            {MoneyHelper.format_money!(
+                              @booking.subtotal_price || @payment.amount
+                            )}
                           </span>
                         </div>
                       <% end %>
@@ -877,32 +922,8 @@ defmodule YscWeb.BookingReceiptLive do
                         <% end %>
                       <% end %>
                   <% end %>
-                  <div class={[
-                    "flex justify-between",
-                    if(@booking.status == :canceled,
-                      do: "border-t border-red-200 pt-4",
-                      else: "border-t border-zinc-800 pt-4"
-                    )
-                  ]}>
-                    <span class={
-                      if(@booking.status == :canceled,
-                        do: "text-zinc-600",
-                        else: "text-zinc-400"
-                      )
-                    }>
-                      Total Paid
-                    </span>
-                    <span class={[
-                      "font-bold text-xl",
-                      if(@booking.status == :canceled,
-                        do: "text-zinc-900",
-                        else: "text-blue-400"
-                      )
-                    ]}>
-                      {MoneyHelper.format_money!(@payment.amount)}
-                    </span>
-                  </div>
-                <% else %>
+                <% end %>
+                <%= if @multiple_payments? && @booking.total_price do %>
                   <div class="flex justify-between">
                     <span class={
                       if(@booking.status == :canceled,
@@ -910,19 +931,102 @@ defmodule YscWeb.BookingReceiptLive do
                         else: "text-zinc-400"
                       )
                     }>
-                      Total Paid
+                      Reservation total
                     </span>
-                    <span class={[
-                      "font-bold text-xl",
+                    <span class={
                       if(@booking.status == :canceled,
-                        do: "text-zinc-900",
-                        else: "text-blue-400"
+                        do: "text-zinc-700",
+                        else: "text-zinc-300"
                       )
-                    ]}>
-                      {MoneyHelper.format_money!(@payment.amount)}
+                    }>
+                      {MoneyHelper.format_money!(@booking.total_price)}
                     </span>
                   </div>
+                  <div
+                    id="booking-payment-history"
+                    class="space-y-2 border-t border-zinc-800 pt-4"
+                  >
+                    <p class={
+                      if(@booking.status == :canceled,
+                        do:
+                          "text-xs font-semibold text-zinc-600 uppercase tracking-wider",
+                        else:
+                          "text-xs font-semibold text-zinc-500 uppercase tracking-wider"
+                      )
+                    }>
+                      Payments
+                    </p>
+                    <%= for entry <- @booking_payment_entries do %>
+                      <div
+                        id={"payment-history-#{entry.payment.id}"}
+                        class="flex justify-between gap-3 text-xs"
+                      >
+                        <div class="min-w-0">
+                          <p class={
+                            if(@booking.status == :canceled,
+                              do: "text-zinc-500",
+                              else: "text-zinc-400"
+                            )
+                          }>
+                            {format_payment_date(
+                              entry.payment.payment_date,
+                              @timezone
+                            )}
+                          </p>
+                          <%= if entry.method_description do %>
+                            <p class="inline-flex items-center gap-1.5 text-zinc-300 mt-0.5 min-w-0">
+                              <%= if entry.method_logo do %>
+                                <img
+                                  src={entry.method_logo}
+                                  alt=""
+                                  class="h-4 w-auto max-w-[2.5rem] object-contain shrink-0"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              <% end %>
+                              <span class="min-w-0">
+                                {entry.method_description}
+                              </span>
+                            </p>
+                          <% end %>
+                        </div>
+                        <span class={
+                          if(@booking.status == :canceled,
+                            do: "text-zinc-700 shrink-0",
+                            else: "text-zinc-300 shrink-0"
+                          )
+                        }>
+                          {MoneyHelper.format_money!(entry.payment.amount)}
+                        </span>
+                      </div>
+                    <% end %>
+                  </div>
                 <% end %>
+                <div class={[
+                  "flex justify-between",
+                  if(@booking.status == :canceled,
+                    do: "border-t border-red-200 pt-4",
+                    else: "border-t border-zinc-800 pt-4"
+                  )
+                ]}>
+                  <span class={
+                    if(@booking.status == :canceled,
+                      do: "text-zinc-600",
+                      else: "text-zinc-400"
+                    )
+                  }>
+                    Total Paid
+                  </span>
+                  <span class={[
+                    "font-bold text-xl",
+                    if(@booking.status == :canceled,
+                      do: "text-zinc-900",
+                      else: "text-blue-400"
+                    )
+                  ]}>
+                    {MoneyHelper.format_money!(receipt_total_paid_amount(assigns))}
+                  </span>
+                </div>
                 <%= if @booking.status == :canceled && @refund_data do %>
                   <%= if @refund_data.total_refunded do %>
                     <div class="flex justify-between border-t border-red-200 pt-4">
@@ -985,11 +1089,16 @@ defmodule YscWeb.BookingReceiptLive do
                       <span class="font-semibold text-zinc-900">Net Amount</span>
                       <span class="font-bold text-red-600 text-xl">
                         {case Money.sub(
-                                @payment.amount,
+                                receipt_total_paid_amount(assigns),
                                 @refund_data.total_refunded
                               ) do
-                          {:ok, net} -> MoneyHelper.format_money!(net)
-                          _ -> MoneyHelper.format_money!(@payment.amount)
+                          {:ok, net} ->
+                            MoneyHelper.format_money!(net)
+
+                          _ ->
+                            MoneyHelper.format_money!(
+                              receipt_total_paid_amount(assigns)
+                            )
                         end}
                       </span>
                     </div>
@@ -1001,55 +1110,66 @@ defmodule YscWeb.BookingReceiptLive do
                     </div>
                   <% end %>
                 <% end %>
-                <div class={[
-                  "flex justify-between items-center gap-2",
-                  if(@booking.status == :canceled,
-                    do: "border-t border-red-200 pt-4",
-                    else: "border-t border-zinc-800 pt-4"
-                  )
-                ]}>
-                  <span class={
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-600",
-                      else: "text-zinc-400"
-                    )
-                  }>
-                    Method
-                  </span>
-                  <span class="inline-flex items-center gap-2 justify-end text-right min-w-0">
-                    <%= if @payment_method_logo do %>
-                      <img
-                        src={@payment_method_logo}
-                        alt=""
-                        class="h-6 w-auto max-w-[4rem] object-contain shrink-0"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    <% end %>
-                    <span class="min-w-0">{@payment_method_description}</span>
-                  </span>
-                </div>
-                <div class="flex justify-between">
-                  <span class={
-                    if(@booking.status == :canceled,
-                      do: "text-zinc-600",
-                      else: "text-zinc-400"
-                    )
-                  }>
-                    Date
-                  </span>
-                  <span>
-                    {format_payment_date(@payment.payment_date, @timezone)}
-                  </span>
-                </div>
+                <%= unless @multiple_payments? do %>
+                  <div
+                    id="payment-method-summary"
+                    class={[
+                      "flex justify-between items-center gap-2",
+                      if(@booking.status == :canceled,
+                        do: "border-t border-red-200 pt-4",
+                        else: "border-t border-zinc-800 pt-4"
+                      )
+                    ]}
+                  >
+                    <span class={
+                      if(@booking.status == :canceled,
+                        do: "text-zinc-600",
+                        else: "text-zinc-400"
+                      )
+                    }>
+                      Method
+                    </span>
+                    <span class="inline-flex items-center gap-2 justify-end text-right min-w-0">
+                      <%= if @payment_method_logo do %>
+                        <img
+                          src={@payment_method_logo}
+                          alt=""
+                          class="h-5 w-auto max-w-[3rem] object-contain shrink-0"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      <% end %>
+                      <span class="min-w-0">{@payment_method_description}</span>
+                    </span>
+                  </div>
+                  <div id="payment-date-summary" class="flex justify-between">
+                    <span class={
+                      if(@booking.status == :canceled,
+                        do: "text-zinc-600",
+                        else: "text-zinc-400"
+                      )
+                    }>
+                      Date
+                    </span>
+                    <span>
+                      {format_payment_date(@payment.payment_date, @timezone)}
+                    </span>
+                  </div>
+                <% end %>
               </div>
             </div>
           <% end %>
           <!-- Action Buttons -->
           <div class="space-y-3">
-            <.button phx-click="view-bookings" class="w-full py-3">
-              <.icon name="hero-document-text" class="w-5 h-5 -mt-0.5 me-2" />Manage All My Bookings
-            </.button>
+            <%= if @booking.status == :complete && @can_change do %>
+              <.button
+                navigate={~p"/bookings/#{@booking.id}/change"}
+                class="w-full py-3"
+                id="change-reservation-button"
+              >
+                <.icon name="hero-pencil-square" class="w-5 h-5 -mt-0.5 me-2" />Change Reservation
+              </.button>
+            <% end %>
             <%= if @booking.status != :canceled && @can_cancel do %>
               <.button phx-click="show-cancel-modal" class="w-full py-3" color="red">
                 <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 me-2" />Cancel Reservation
@@ -1082,54 +1202,70 @@ defmodule YscWeb.BookingReceiptLive do
               Are you sure you want to cancel this booking? This action cannot be undone.
             </p>
             <!-- Refund Information -->
-            <%= if @refund_info && @refund_info.estimated_refund do %>
-              <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
-                <div class="flex items-center gap-2 text-blue-800">
-                  <.icon name="hero-information-circle" class="w-5 h-5" />
-                  <p class="font-semibold">Estimated Refund</p>
-                </div>
-                <div class="pl-7 space-y-2">
-                  <div class="flex justify-between items-baseline">
-                    <span class="text-sm text-blue-700">Original Payment:</span>
-                    <span class="text-sm font-medium text-blue-900">
-                      <%= if @payment do %>
-                        {MoneyHelper.format_money!(@payment.amount)}
-                      <% else %>
-                        —
-                      <% end %>
-                    </span>
-                  </div>
-                  <div class="flex justify-between items-baseline">
-                    <span class="text-sm text-blue-700">Estimated Refund:</span>
-                    <span class="text-lg font-bold text-blue-900">
-                      {MoneyHelper.format_money!(@refund_info.estimated_refund)}
-                    </span>
-                  </div>
-                  <%= if @refund_info.applied_rule do %>
-                    <% refund_percent =
-                      Decimal.to_float(@refund_info.applied_rule.refund_percentage)
-                      |> Float.round(0)
-                      |> trunc() %>
-                    <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                      Based on cancellation policy: {refund_percent}% refund if cancelled {@refund_info.applied_rule.days_before_checkin} days or more before check-in.
-                    </p>
-                  <% else %>
-                    <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                      Full refund based on cancellation policy.
-                    </p>
-                  <% end %>
-                </div>
-              </div>
-            <% else %>
+            <%= if @refund_info && Map.get(@refund_info, :modified) do %>
               <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
                 <div class="flex items-center gap-2 text-amber-800">
                   <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
                   <p class="font-semibold">No Refund Available</p>
                 </div>
                 <p class="text-sm text-amber-700 mt-2 pl-7">
-                  Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
+                  This reservation was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
                 </p>
               </div>
+            <% else %>
+              <%= if @refund_info && @refund_info.estimated_refund do %>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+                  <div class="flex items-center gap-2 text-blue-800">
+                    <.icon name="hero-information-circle" class="w-5 h-5" />
+                    <p class="font-semibold">Estimated Refund</p>
+                  </div>
+                  <div class="pl-7 space-y-2">
+                    <div class="flex justify-between items-baseline">
+                      <span class="text-sm text-blue-700">Original Payment:</span>
+                      <span class="text-sm font-medium text-blue-900">
+                        <%= if receipt_total_paid_amount(assigns) do %>
+                          {MoneyHelper.format_money!(
+                            receipt_total_paid_amount(assigns)
+                          )}
+                        <% else %>
+                          —
+                        <% end %>
+                      </span>
+                    </div>
+                    <div class="flex justify-between items-baseline">
+                      <span class="text-sm text-blue-700">Estimated Refund:</span>
+                      <span class="text-lg font-bold text-blue-900">
+                        {MoneyHelper.format_money!(@refund_info.estimated_refund)}
+                      </span>
+                    </div>
+                    <%= if @refund_info.applied_rule do %>
+                      <% refund_percent =
+                        Decimal.to_float(
+                          @refund_info.applied_rule.refund_percentage
+                        )
+                        |> Float.round(0)
+                        |> trunc() %>
+                      <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
+                        Based on cancellation policy: {refund_percent}% refund if cancelled {@refund_info.applied_rule.days_before_checkin} days or more before check-in.
+                      </p>
+                    <% else %>
+                      <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
+                        Full refund based on cancellation policy.
+                      </p>
+                    <% end %>
+                  </div>
+                </div>
+              <% else %>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div class="flex items-center gap-2 text-amber-800">
+                    <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
+                    <p class="font-semibold">No Refund Available</p>
+                  </div>
+                  <p class="text-sm text-amber-700 mt-2 pl-7">
+                    Based on the cancellation policy and timing of your cancellation, no refund is available for this booking.
+                  </p>
+                </div>
+              <% end %>
             <% end %>
 
             <.simple_form
@@ -1193,12 +1329,26 @@ defmodule YscWeb.BookingReceiptLive do
       {"succeeded", payment_intent_id} when not is_nil(payment_intent_id) ->
         # Payment succeeded via redirect - process it
         case process_payment_from_redirect(booking, payment_intent_id) do
-          {:ok, _confirmed_booking} ->
-            {socket
-             |> YscWeb.Flash.put_toast(
-               :info,
-               "Payment successful! Your booking is confirmed."
-             ), true}
+          {:ok, _confirmed_booking, payment_intent} ->
+            reservation_updated = modification_payment_intent?(payment_intent)
+
+            socket =
+              if reservation_updated do
+                YscWeb.Flash.put_toast(
+                  socket,
+                  :info,
+                  "Your reservation has been updated.",
+                  title: "Reservation updated"
+                )
+              else
+                YscWeb.Flash.put_toast(
+                  socket,
+                  :info,
+                  "Payment successful! Your booking is confirmed."
+                )
+              end
+
+            {socket, true, reservation_updated}
 
           {:error, reason} ->
             Ysc.Logging.error("Failed to process payment from redirect",
@@ -1211,7 +1361,7 @@ defmodule YscWeb.BookingReceiptLive do
              |> YscWeb.Flash.put_toast(
                :error,
                "Payment was successful, but there was an issue confirming your booking. Please contact support."
-             ), false}
+             ), false, false}
         end
 
       {"failed", _payment_intent_id} ->
@@ -1219,11 +1369,11 @@ defmodule YscWeb.BookingReceiptLive do
          |> YscWeb.Flash.put_toast(
            :error,
            "Payment failed. Please try again or contact support if the problem persists."
-         ), false}
+         ), false, false}
 
       _ ->
         # No redirect parameters or unknown status
-        {socket, false}
+        {socket, false, false}
     end
   end
 
@@ -1255,13 +1405,17 @@ defmodule YscWeb.BookingReceiptLive do
             Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
 
           if reloaded_booking.status == :complete do
-            finalize_paid_ledger_payment(reloaded_booking, payment_intent)
+            if modification_payment_intent?(payment_intent) do
+              {:ok, reloaded_booking, payment_intent}
+            else
+              finalize_paid_ledger_payment(reloaded_booking, payment_intent)
+            end
           else
             case BookingLocker.confirm_booking(reloaded_booking.id) do
               {:ok, confirmed_booking} ->
                 case process_ledger_payment(confirmed_booking, payment_intent) do
                   {:ok, _payment} ->
-                    {:ok, confirmed_booking}
+                    {:ok, confirmed_booking, payment_intent}
 
                   {:error, reason} ->
                     Ysc.Logging.error(
@@ -1320,11 +1474,18 @@ defmodule YscWeb.BookingReceiptLive do
   defp finalize_paid_ledger_payment(booking, payment_intent) do
     case process_ledger_payment(booking, payment_intent) do
       {:ok, _payment} ->
-        {:ok, booking}
+        {:ok, booking, payment_intent}
 
       {:error, reason} ->
         {:error, {:ledger_payment_failed, reason}}
     end
+  end
+
+  defp modification_payment_intent?(payment_intent) do
+    metadata = payment_intent.metadata || %{}
+
+    Map.get(metadata, "modification") == "true" ||
+      Map.get(metadata, :modification) == "true"
   end
 
   defp process_ledger_payment(booking, payment_intent) do
@@ -1467,8 +1628,8 @@ defmodule YscWeb.BookingReceiptLive do
 
   # Load all secondary receipt data in one function to minimize context switches
   defp load_receipt_data(booking) do
-    # Get payment information (single query)
-    payment = get_booking_payment(booking)
+    payment_summary = get_booking_payment_summary(booking)
+    payment = payment_summary.latest
 
     # Get refund info - pass payment to avoid duplicate query
     refund_info = get_refund_info_with_payment(booking, payment)
@@ -1484,29 +1645,32 @@ defmodule YscWeb.BookingReceiptLive do
     # Get refund data for cancelled bookings
     refund_data = get_refund_data_for_booking(booking, payment)
 
-    payment_summary =
+    payment_method_summary =
       if payment do
         build_payment_method_summary(payment)
       else
         %{description: nil, logo_path: nil}
       end
 
-    %{
-      payment: payment,
+    Map.merge(payment_summary, %{
       refund_info: refund_info,
       door_code: door_code,
       show_door_code: show_door_code,
       refund_data: refund_data,
-      payment_method_description: payment_summary.description,
-      payment_method_logo: payment_summary.logo_path
-    }
+      payment_method_description: payment_method_summary.description,
+      payment_method_logo: payment_method_summary.logo_path
+    })
   end
 
   @impl true
   def handle_async(:load_receipt_data, {:ok, results}, socket) do
     {:noreply,
      socket
-     |> assign(:payment, results.payment)
+     |> assign(:payment, results.latest)
+     |> assign(:booking_payments, results.payments)
+     |> assign(:booking_payment_entries, results.payment_entries)
+     |> assign(:total_paid_amount, results.total_paid)
+     |> assign(:multiple_payments?, results.multiple_payments?)
      |> assign(:refund_info, results.refund_info)
      |> assign(:door_code, results.door_code)
      |> assign(:show_door_code, results.show_door_code)
@@ -1521,11 +1685,8 @@ defmodule YscWeb.BookingReceiptLive do
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 
-  defp get_booking_payment(booking) do
-    # PERFORMANCE: Find the payment via ledger entries with payment_method preloaded
-    # Payment entries are debit entries to stripe_account
-    # Preload payment_method in the same query to avoid N+1
-    entry =
+  defp get_booking_payment_summary(booking) do
+    payments =
       from(e in Ysc.Ledgers.LedgerEntry,
         join: a in Ysc.Ledgers.LedgerAccount,
         on: e.account_id == a.id,
@@ -1533,16 +1694,70 @@ defmodule YscWeb.BookingReceiptLive do
         where: e.related_entity_id == ^booking.id,
         where: e.debit_credit == "debit",
         where: a.name == "stripe_account",
+        where: not is_nil(e.payment_id),
         preload: [payment: :payment_method],
-        order_by: [desc: e.inserted_at],
-        limit: 1
+        order_by: [asc: e.inserted_at]
       )
-      |> Repo.one()
+      |> Repo.all()
+      |> Enum.map(& &1.payment)
+      |> Enum.reject(&is_nil/1)
+      |> dedupe_payments_chronologically()
 
-    if entry && entry.payment do
-      entry.payment
-    else
-      nil
+    total_paid =
+      case Bookings.get_booking_total_paid_amount(booking) do
+        {:ok, amount} -> amount
+        _ -> nil
+      end
+
+    latest = List.last(payments)
+
+    payment_entries = build_payment_entries(payments)
+
+    %{
+      payments: payments,
+      payment_entries: payment_entries,
+      latest: latest,
+      total_paid: total_paid,
+      multiple_payments?: length(payments) > 1
+    }
+  end
+
+  defp dedupe_payments_chronologically(payments) do
+    payments
+    |> Enum.reduce(%{}, fn payment, acc ->
+      Map.put(acc, payment.id, payment)
+    end)
+    |> Map.values()
+    |> Enum.sort_by(
+      fn payment ->
+        payment.payment_date || payment.inserted_at || ~U[1970-01-01 00:00:00Z]
+      end,
+      DateTime
+    )
+  end
+
+  defp build_payment_entries(payments) do
+    Enum.map(payments, fn payment ->
+      summary = build_payment_method_summary(payment)
+
+      %{
+        payment: payment,
+        method_description: summary.description,
+        method_logo: summary.logo_path
+      }
+    end)
+  end
+
+  defp receipt_total_paid_amount(assigns) do
+    cond do
+      assigns.multiple_payments? && assigns.total_paid_amount ->
+        assigns.total_paid_amount
+
+      assigns.payment ->
+        assigns.payment.amount
+
+      true ->
+        nil
     end
   end
 
@@ -1657,11 +1872,60 @@ defmodule YscWeb.BookingReceiptLive do
   defp parse_money_from_map(_), do: nil
 
   defp build_payment_method_summary(payment) do
+    summary = payment_method_summary_from_db(payment)
+
+    if payment_method_summary_needs_stripe_enrichment?(summary, payment) do
+      payment
+      |> get_payment_method_from_stripe()
+      |> merge_stripe_payment_summary(summary)
+    else
+      summary
+    end
+  end
+
+  @dialyzer {:nowarn_function, merge_stripe_payment_summary: 2}
+  defp merge_stripe_payment_summary(
+         %{description: stripe_desc} = stripe_summary,
+         summary
+       ) do
+    cond do
+      stripe_desc in [nil, "Credit Card (Stripe)", "Credit Card"] ->
+        summary
+
+      payment_method_description_blank?(summary.description) ->
+        apply_stripe_payment_summary(summary, stripe_summary)
+
+      stripe_desc_has_card_mask?(stripe_desc) and
+          not stripe_desc_has_card_mask?(summary.description) ->
+        apply_stripe_payment_summary(summary, stripe_summary)
+
+      true ->
+        summary
+    end
+  end
+
+  defp apply_stripe_payment_summary(summary, stripe_summary) do
+    %{
+      summary
+      | description: stripe_summary.description,
+        logo_path: stripe_summary.logo_path || summary.logo_path
+    }
+  end
+
+  defp payment_method_description_blank?(desc),
+    do: desc in [nil, ""]
+
+  defp stripe_desc_has_card_mask?(desc) when is_binary(desc),
+    do: String.contains?(desc, "****")
+
+  defp stripe_desc_has_card_mask?(_), do: false
+
+  defp payment_method_summary_from_db(payment) do
     local_logo = PaymentMethodLogo.path_for_payment(payment)
 
     case payment.payment_method do
       nil ->
-        get_payment_method_from_stripe(payment)
+        %{description: nil, logo_path: local_logo}
 
       payment_method ->
         payment_type =
@@ -1670,115 +1934,96 @@ defmodule YscWeb.BookingReceiptLive do
             type -> PaymentMethodFormatter.normalize_payment_type(type)
           end
 
-        case payment_type do
-          :card ->
-            desc =
-              if payment_method.last_four do
-                brand =
-                  PaymentMethodFormatter.payment_brand_label(
-                    payment_method.display_brand || "Card"
-                  )
-
-                "#{brand} ending in #{payment_method.last_four}"
-              else
-                "Credit Card"
-              end
-
-            %{description: desc, logo_path: local_logo}
-
-          :bank_account ->
-            desc =
-              if payment_method.last_four do
-                bank_name = payment_method.bank_name || "Bank"
-                "#{bank_name} Account ending in #{payment_method.last_four}"
-              else
-                "Bank Account"
-              end
-
-            %{description: desc, logo_path: local_logo}
-
-          :link ->
-            desc =
-              PaymentMethodFormatter.format_link_payment_method(
+        desc =
+          case payment_type do
+            type when type in [:card, :link] ->
+              PaymentMethodFormatter.format_payment_method_for_receipt(
+                type,
                 payment_method.last_four,
                 payment_method.display_brand
               )
 
-            %{description: desc, logo_path: local_logo}
-
-          type when not is_nil(type) ->
-            desc =
+            type when not is_nil(type) ->
               PaymentMethodFormatter.format_alternative_payment_method(
                 type,
                 payment_method
               )
 
-            %{description: desc, logo_path: local_logo}
+            _ ->
+              nil
+          end
 
-          _ ->
-            get_payment_method_from_stripe(payment)
-        end
+        %{description: desc, logo_path: local_logo}
+    end
+  end
+
+  defp payment_method_summary_needs_stripe_enrichment?(
+         %{description: desc},
+         payment
+       ) do
+    pm = payment.payment_method
+
+    cond do
+      is_nil(pm) ->
+        not is_nil(payment.external_payment_id)
+
+      pm.type in [:link, :card] and is_nil(pm.last_four) ->
+        true
+
+      desc in ["Link", "Credit Card", "Bank Account", "Payment Method", nil] ->
+        not is_nil(payment.external_payment_id)
+
+      true ->
+        false
     end
   end
 
   defp get_payment_method_from_stripe(payment) do
+    get_payment_method_from_stripe_id(payment.external_payment_id)
+  end
+
+  defp get_payment_method_from_stripe_id(nil),
+    do: %{description: "Credit Card (Stripe)", logo_path: nil}
+
+  defp get_payment_method_from_stripe_id(payment_intent_id) do
     stripe_fallback = %{description: "Credit Card (Stripe)", logo_path: nil}
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
-    if payment.external_payment_id do
-      case stripe_client.retrieve_payment_intent(payment.external_payment_id, %{
-             expand: ["payment_method"]
-           }) do
-        {:ok, payment_intent} ->
-          payment_method_summary_from_intent(payment_intent, stripe_client)
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["payment_method", "latest_charge"]
+         }) do
+      {:ok, payment_intent} ->
+        {payment_method_type, last_four, display_brand} =
+          PaymentMethodFormatter.payment_details_from_payment_intent(
+            payment_intent,
+            stripe_client
+          )
 
-        {:error, _} ->
-          stripe_fallback
-      end
-    else
-      stripe_fallback
-    end
-  end
+        case payment_method_type do
+          nil ->
+            stripe_fallback
 
-  defp payment_method_summary_from_intent(payment_intent, stripe_client) do
-    stripe_fallback = %{description: "Credit Card (Stripe)", logo_path: nil}
+          type ->
+            normalized = PaymentMethodFormatter.normalize_payment_type(type)
 
-    cond do
-      is_map(payment_intent.payment_method) &&
-          (Map.has_key?(payment_intent.payment_method, :type) ||
-             Map.has_key?(payment_intent.payment_method, "type")) ->
-        summary_from_stripe_payment_method(payment_intent.payment_method)
-
-      is_binary(payment_intent.payment_method) ->
-        case stripe_client.retrieve_payment_method(
-               payment_intent.payment_method
-             ) do
-          {:ok, stripe_pm} -> summary_from_stripe_payment_method(stripe_pm)
-          _ -> stripe_fallback
+            %{
+              description:
+                PaymentMethodFormatter.format_payment_method_for_receipt(
+                  normalized,
+                  last_four,
+                  display_brand
+                ),
+              logo_path:
+                PaymentMethodLogo.path_for_stripe_summary(
+                  normalized,
+                  display_brand
+                )
+            }
         end
 
-      true ->
+      {:error, _} ->
         stripe_fallback
     end
-  end
-
-  defp summary_from_stripe_payment_method(stripe_pm) do
-    {payment_method_type, last_four, display_brand} =
-      PaymentMethodFormatter.extract_payment_method_details(stripe_pm)
-
-    actual_type =
-      PaymentMethodFormatter.normalize_payment_type(payment_method_type)
-
-    %{
-      description:
-        PaymentMethodFormatter.format_payment_method_with_details(
-          actual_type,
-          last_four,
-          display_brand
-        ),
-      logo_path:
-        PaymentMethodLogo.path_for_stripe_summary(actual_type, display_brand)
-    }
   end
 
   defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
@@ -1848,73 +2093,71 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp can_cancel_booking?(booking) do
-    # Can cancel if booking is complete or hold, and check-in is in the future
-    # OR if check-in is today (in PST) and it's before 3PM PST
-    today_pst = get_today_pst()
-
-    booking.status in [:complete, :hold] &&
-      (Date.compare(booking.checkin_date, today_pst) == :gt ||
-         (Date.compare(booking.checkin_date, today_pst) == :eq &&
-            before_checkin_time_today?()))
+    BookingActions.can_cancel_booking?(booking)
   end
 
   defp get_today_pst do
-    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-  end
-
-  defp before_checkin_time_today? do
-    # Check if current time (in PST) is before 3PM (15:00)
-    now_pst = DateTime.now!("America/Los_Angeles")
-    today_pst = DateTime.to_date(now_pst)
-    checkin_time = ~T[15:00:00]
-
-    checkin_datetime_today =
-      DateTime.new!(today_pst, checkin_time, "America/Los_Angeles")
-
-    DateTime.compare(now_pst, checkin_datetime_today) == :lt
+    BookingActions.get_today_pst()
   end
 
   # Accepts pre-fetched payment to avoid duplicate query
   defp get_refund_info_with_payment(booking, payment) do
-    if can_cancel_booking?(booking) do
-      case Bookings.calculate_refund(booking, get_today_pst()) do
-        {:ok, refund_amount, applied_rule} ->
-          policy =
-            Bookings.get_active_refund_policy(
-              booking.property,
-              booking.booking_mode
-            )
-
-          rules = if policy, do: policy.rules || [], else: []
-
-          # If refund_amount is nil, it means full refund (no policy)
-          # Use pre-fetched payment to get amount (avoiding duplicate query)
-          estimated_refund =
-            if is_nil(refund_amount) do
-              if payment, do: payment.amount, else: nil
-            else
-              refund_amount
-            end
-
-          %{
-            estimated_refund: estimated_refund,
-            applied_rule: applied_rule,
-            policy_rules: rules
-          }
-
-        _ ->
-          %{estimated_refund: nil, applied_rule: nil, policy_rules: []}
+    if BookingActions.can_cancel_booking?(booking) do
+      if BookingActions.refund_forfeited?(booking) do
+        %{
+          estimated_refund: Money.new(0, :USD),
+          applied_rule: nil,
+          policy_rules: [],
+          modified: true
+        }
+      else
+        get_refund_info_from_policy(booking, payment)
       end
     else
       nil
     end
   end
 
+  defp get_refund_info_from_policy(booking, payment) do
+    case Bookings.calculate_refund(booking, BookingActions.get_today_pst()) do
+      {:ok, refund_amount, applied_rule} ->
+        policy =
+          Bookings.get_active_refund_policy(
+            booking.property,
+            booking.booking_mode
+          )
+
+        rules = if policy, do: policy.rules || [], else: []
+
+        # If refund_amount is nil, it means full refund (no policy)
+        # Use pre-fetched payment to get amount (avoiding duplicate query)
+        estimated_refund =
+          if is_nil(refund_amount) do
+            if payment, do: payment.amount, else: nil
+          else
+            refund_amount
+          end
+
+        %{
+          estimated_refund: estimated_refund,
+          applied_rule: applied_rule,
+          policy_rules: rules,
+          modified: false
+        }
+
+      _ ->
+        %{
+          estimated_refund: nil,
+          applied_rule: nil,
+          policy_rules: [],
+          modified: false
+        }
+    end
+  end
+
   defp get_door_code_for_booking(booking) do
-    # Check if booking is currently active (today is between check-in and check-out)
     is_active = booking_is_active?(booking)
 
-    # Check if booking is within 48 hours of check-in
     hours_until_checkin =
       if booking.checkin_date do
         checkin_datetime =

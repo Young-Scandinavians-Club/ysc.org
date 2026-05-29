@@ -7,6 +7,7 @@ defmodule YscWeb.UserBookingDetailLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias YscWeb.Authorization.Policy
+  alias YscWeb.BookingActions
   import Ecto.Query
 
   @impl true
@@ -54,7 +55,8 @@ defmodule YscWeb.UserBookingDetailLive do
                 Map.get(connect_params, "timezone", "America/Los_Angeles")
 
               price_breakdown = calculate_price_breakdown(booking)
-              can_cancel = can_cancel_booking?(booking)
+              can_cancel = BookingActions.can_cancel_booking?(booking)
+              can_change = BookingActions.can_change_booking?(booking)
 
               socket =
                 socket
@@ -63,6 +65,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 |> assign(:timezone, timezone)
                 |> assign(:price_breakdown, price_breakdown)
                 |> assign(:can_cancel, can_cancel)
+                |> assign(:can_change, can_change)
                 |> assign(:refund_info, nil)
                 |> assign(:loading_booking_payment_details, !connected?(socket))
                 |> assign(:show_cancel_modal, false)
@@ -205,6 +208,16 @@ defmodule YscWeb.UserBookingDetailLive do
             <h1>Booking Details</h1>
             <div class="flex gap-2">
               <.button
+                :if={@can_change}
+                navigate={~p"/bookings/#{@booking.id}/change"}
+                variant="outline"
+                color="zinc"
+                id="change-reservation-button"
+              >
+                <.icon name="hero-pencil-square" class="w-5 h-5 me-1 -mt-0.5" />
+                Change Reservation
+              </.button>
+              <.button
                 :if={@can_cancel}
                 phx-click="show-cancel-modal"
                 color="red"
@@ -225,59 +238,65 @@ defmodule YscWeb.UserBookingDetailLive do
                 Cancellation Policy
               </h2>
               <div class="text-sm text-blue-800 space-y-3">
-                <%= if @refund_info.estimated_refund do %>
-                  <p class="font-medium">
-                    If you cancel today, you may be eligible for a refund of approximately <strong class="text-blue-900"><%= MoneyHelper.format_money!(@refund_info.estimated_refund) %></strong>.
+                <%= if Map.get(@refund_info, :modified) do %>
+                  <p class="font-medium text-amber-900">
+                    This reservation was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
                   </p>
                 <% else %>
-                  <p>
-                    Cancellation refunds are calculated based on how many days before check-in you cancel.
-                  </p>
-                <% end %>
-                <%= if @refund_info.policy_rules && length(@refund_info.policy_rules) > 0 do %>
-                  <div class="pt-3 border-t border-blue-200">
-                    <p class="font-semibold mb-2">Cancellation Policy:</p>
-                    <div class="text-sm text-blue-800 space-y-2">
-                      {# Sort rules by days_before_checkin ascending (most restrictive first)
-                      sorted_rules =
-                        Enum.sort_by(
-                          @refund_info.policy_rules,
-                          fn rule -> rule.days_before_checkin end,
-                          :asc
-                        )
+                  <%= if @refund_info.estimated_refund do %>
+                    <p class="font-medium">
+                      If you cancel today, you may be eligible for a refund of approximately <strong class="text-blue-900"><%= MoneyHelper.format_money!(@refund_info.estimated_refund) %></strong>.
+                    </p>
+                  <% else %>
+                    <p>
+                      Cancellation refunds are calculated based on how many days before check-in you cancel.
+                    </p>
+                  <% end %>
+                  <%= if @refund_info.policy_rules && length(@refund_info.policy_rules) > 0 do %>
+                    <div class="pt-3 border-t border-blue-200">
+                      <p class="font-semibold mb-2">Cancellation Policy:</p>
+                      <div class="text-sm text-blue-800 space-y-2">
+                        {# Sort rules by days_before_checkin ascending (most restrictive first)
+                        sorted_rules =
+                          Enum.sort_by(
+                            @refund_info.policy_rules,
+                            fn rule -> rule.days_before_checkin end,
+                            :asc
+                          )
 
-                      # Calculate forfeiture percentage (100 - refund_percentage)
-                      for rule <- sorted_rules do
-                        forfeiture_percentage =
-                          Decimal.sub(Decimal.new(100), rule.refund_percentage)
-                          |> Decimal.to_float()
+                        # Calculate forfeiture percentage (100 - refund_percentage)
+                        for rule <- sorted_rules do
+                          forfeiture_percentage =
+                            Decimal.sub(Decimal.new(100), rule.refund_percentage)
+                            |> Decimal.to_float()
 
-                        cond do
-                          forfeiture_percentage == 100.0 ->
-                            # 100% forfeiture (0% refund)
-                            "Any reservation cancelled less than #{rule.days_before_checkin} days prior to date of arrival will result in forfeiture of 100% of the cost."
+                          cond do
+                            forfeiture_percentage == 100.0 ->
+                              # 100% forfeiture (0% refund)
+                              "Any reservation cancelled less than #{rule.days_before_checkin} days prior to date of arrival will result in forfeiture of 100% of the cost."
 
-                          forfeiture_percentage > 0 ->
-                            # Partial forfeiture
-                            "Reservations cancelled less than #{rule.days_before_checkin} days prior to date of arrival are subject to forfeiture of #{forfeiture_percentage |> Float.round(0) |> trunc()}% of the cost."
+                            forfeiture_percentage > 0 ->
+                              # Partial forfeiture
+                              "Reservations cancelled less than #{rule.days_before_checkin} days prior to date of arrival are subject to forfeiture of #{forfeiture_percentage |> Float.round(0) |> trunc()}% of the cost."
 
-                          true ->
-                            # 0% forfeiture (100% refund) - shouldn't happen but handle it
-                            "Reservations cancelled #{rule.days_before_checkin} or more days prior to date of arrival are eligible for a full refund."
+                            true ->
+                              # 0% forfeiture (100% refund) - shouldn't happen but handle it
+                              "Reservations cancelled #{rule.days_before_checkin} or more days prior to date of arrival are eligible for a full refund."
+                          end
                         end
-                      end
-                      |> Enum.map(fn text -> "<p>#{text}</p>" end)
-                      |> Enum.join("")
-                      |> raw()}
+                        |> Enum.map(fn text -> "<p>#{text}</p>" end)
+                        |> Enum.join("")
+                        |> raw()}
+                      </div>
                     </div>
-                  </div>
-                <% else %>
-                  <div class="pt-3 border-t border-blue-200">
-                    <p class="font-semibold mb-2">Cancellation Policy:</p>
-                    <div class="text-sm text-blue-800">
-                      <p>Full refund available for cancellations.</p>
+                  <% else %>
+                    <div class="pt-3 border-t border-blue-200">
+                      <p class="font-semibold mb-2">Cancellation Policy:</p>
+                      <div class="text-sm text-blue-800">
+                        <p>Full refund available for cancellations.</p>
+                      </div>
                     </div>
-                  </div>
+                  <% end %>
                 <% end %>
 
                 <div class="pt-3 border-t border-blue-200 space-y-2">
@@ -484,13 +503,22 @@ defmodule YscWeb.UserBookingDetailLive do
                 Are you sure you want to cancel this booking? This action cannot be undone.
               </p>
 
-              <%= if @refund_info && @refund_info.estimated_refund do %>
-                <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
-                  <p class="text-sm text-blue-800">
-                    <strong>Estimated Refund:</strong>
-                    {MoneyHelper.format_money!(@refund_info.estimated_refund)}
+              <%= if Map.get(@refund_info, :modified) do %>
+                <div class="bg-amber-50 border border-amber-200 rounded-md p-3">
+                  <p class="text-sm text-amber-800">
+                    This reservation was modified. You may cancel, but you will not receive a refund.
                   </p>
                 </div>
+              <% else %>
+                <%= if @refund_info && @refund_info.estimated_refund &&
+                       Money.positive?(@refund_info.estimated_refund) do %>
+                  <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <p class="text-sm text-blue-800">
+                      <strong>Estimated Refund:</strong>
+                      {MoneyHelper.format_money!(@refund_info.estimated_refund)}
+                    </p>
+                  </div>
+                <% end %>
               <% end %>
 
               <.simple_form
@@ -563,60 +591,59 @@ defmodule YscWeb.UserBookingDetailLive do
     end
   end
 
-  defp can_cancel_booking?(booking) do
-    # Can cancel if booking is complete or hold, and check-in is in the future
-    # OR if check-in is today (in PST) and it's before 3PM PST
-    today_pst = get_today_pst()
-
-    booking.status in [:complete, :hold] &&
-      (Date.compare(booking.checkin_date, today_pst) == :gt ||
-         (Date.compare(booking.checkin_date, today_pst) == :eq &&
-            before_checkin_time_today?()))
-  end
-
-  defp get_today_pst do
-    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-  end
-
-  defp before_checkin_time_today? do
-    # Check if current time (in PST) is before 3PM (15:00)
-    now_pst = DateTime.now!("America/Los_Angeles")
-    today_pst = DateTime.to_date(now_pst)
-    checkin_time = ~T[15:00:00]
-
-    checkin_datetime_today =
-      DateTime.new!(today_pst, checkin_time, "America/Los_Angeles")
-
-    DateTime.compare(now_pst, checkin_datetime_today) == :lt
-  end
-
   defp get_refund_info(booking, payment) do
-    if can_cancel_booking?(booking) do
-      policy =
-        Bookings.get_active_refund_policy(
-          booking.property,
-          booking.booking_mode
-        )
+    if BookingActions.can_cancel_booking?(booking) do
+      if BookingActions.refund_forfeited?(booking) do
+        %{
+          estimated_refund: Money.new(0, :USD),
+          applied_rule: nil,
+          policy_rules: [],
+          modified: true
+        }
+      else
+        policy =
+          Bookings.get_active_refund_policy(
+            booking.property,
+            booking.booking_mode
+          )
 
-      rules = if policy, do: policy.rules || [], else: []
+        rules = if policy, do: policy.rules || [], else: []
 
-      refund_opts =
-        if payment && payment.amount do
-          [original_amount: payment.amount]
-        else
-          []
+        refund_opts =
+          if payment && payment.amount do
+            [original_amount: payment.amount]
+          else
+            []
+          end
+
+        case Bookings.calculate_refund(
+               booking,
+               YscWeb.BookingActions.get_today_pst(),
+               refund_opts
+             ) do
+          {:ok, refund_amount, applied_rule} ->
+            estimated_refund =
+              if is_nil(refund_amount) and payment do
+                payment.amount
+              else
+                refund_amount
+              end
+
+            %{
+              estimated_refund: estimated_refund,
+              applied_rule: applied_rule,
+              policy_rules: rules,
+              modified: false
+            }
+
+          _ ->
+            %{
+              estimated_refund: nil,
+              applied_rule: nil,
+              policy_rules: [],
+              modified: false
+            }
         end
-
-      case Bookings.calculate_refund(booking, Date.utc_today(), refund_opts) do
-        {:ok, refund_amount, applied_rule} ->
-          %{
-            estimated_refund: refund_amount,
-            applied_rule: applied_rule,
-            policy_rules: rules
-          }
-
-        _ ->
-          %{estimated_refund: nil, applied_rule: nil, policy_rules: []}
       end
     else
       nil

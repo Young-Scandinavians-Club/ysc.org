@@ -33,11 +33,13 @@ defmodule Ysc.Bookings do
     Blackout,
     Booking,
     BookingGuest,
+    BookingLocker,
     DoorCode,
     RefundPolicy,
     RefundPolicyRule,
     PendingRefund,
     PropertyInventory,
+    RoomInventory,
     CheckIn,
     CheckInVehicle,
     CheckInBooking
@@ -630,6 +632,800 @@ defmodule Ysc.Bookings do
     invalidate_availability_caches(result)
     result
   end
+
+  @doc """
+  Returns the total amount paid for a booking across all recorded Stripe payments.
+  """
+  def get_booking_total_paid_amount(booking) do
+    import Ecto.Query
+
+    entries =
+      from(e in Ysc.Ledgers.LedgerEntry,
+        join: a in Ysc.Ledgers.LedgerAccount,
+        on: e.account_id == a.id,
+        where: e.related_entity_type == ^:booking,
+        where: e.related_entity_id == ^booking.id,
+        where: e.debit_credit == "debit",
+        where: a.name == "stripe_account",
+        select: e.amount
+      )
+      |> Repo.all()
+
+    case entries do
+      [] ->
+        if booking.total_price do
+          {:ok, booking.total_price}
+        else
+          {:error, :payment_not_found}
+        end
+
+      amounts ->
+        total =
+          Enum.reduce(amounts, Money.new(0, :USD), fn amount, acc ->
+            case Money.add(acc, amount) do
+              {:ok, sum} -> sum
+              {:error, _} -> acc
+            end
+          end)
+
+        {:ok, total}
+    end
+  end
+
+  @doc """
+  Validates a proposed booking modification and returns pricing preview without persisting.
+  """
+  def prepare_modification(%Booking{} = booking, attrs) do
+    booking = Repo.preload(booking, [:rooms, :user])
+
+    with :ok <- validate_modification_eligible(booking),
+         {:ok, parsed} <- parse_modification_attrs(booking, attrs),
+         :ok <- validate_modification_checkin_not_past(parsed),
+         :ok <- ensure_modification_changed(booking, parsed),
+         {:ok, user} <- fetch_modification_user(booking),
+         {:ok, _} <- validate_modification_changeset(booking, parsed, user),
+         :ok <- validate_modification_availability(booking, parsed),
+         {:ok, priced} <-
+           calculate_modification_pricing(
+             build_preview_booking(booking, parsed)
+           ),
+         {:ok, amount_paid} <- get_booking_total_paid_amount(booking) do
+      previous_total = booking.total_price || Money.new(0, :USD)
+
+      {:ok,
+       %{
+         new_total: priced.total,
+         previous_total: previous_total,
+         amount_paid: amount_paid,
+         delta: modification_delta(previous_total, priced.total),
+         breakdown: priced.breakdown,
+         attrs: parsed
+       }}
+    end
+  end
+
+  defp modification_delta(previous_total, new_total) do
+    case Money.sub(new_total, previous_total) do
+      {:ok, delta} ->
+        if Money.negative?(delta), do: Money.new(0, :USD), else: delta
+
+      {:error, _} ->
+        Money.new(0, :USD)
+    end
+  end
+
+  @doc """
+  Applies a booking modification after optional payment verification.
+  """
+  def apply_modification(%Booking{} = booking, attrs, opts \\ []) do
+    booking = Repo.preload(booking, [:rooms, :user])
+
+    with :ok <- validate_modification_eligible(booking),
+         {:ok, parsed} <- parse_modification_attrs(booking, attrs),
+         {:ok, preview} <- prepare_modification(booking, attrs),
+         :ok <- verify_modification_hold(booking, parsed, preview),
+         :ok <- verify_modification_payment(preview, booking, opts) do
+      previous_details = %{
+        checkin_date: booking.checkin_date,
+        checkout_date: booking.checkout_date,
+        guests_count: booking.guests_count,
+        children_count: booking.children_count || 0,
+        total_price: booking.total_price,
+        additional_payment:
+          if(Money.positive?(preview.delta), do: preview.delta, else: nil)
+      }
+
+      case BookingLocker.modify_complete_booking(
+             booking,
+             parsed,
+             previous_details: previous_details
+           ) do
+        {:ok, updated_booking} = result ->
+          case record_modification_payment_if_needed(
+                 updated_booking,
+                 preview,
+                 opts
+               ) do
+            :ok ->
+              result
+
+            {:error, reason} ->
+              require Ysc.Logging
+
+              Ysc.Logging.error(
+                "Booking modification applied but payment ledger write failed",
+                booking_id: updated_booking.id,
+                error: reason
+              )
+
+              result
+          end
+
+        other ->
+          other
+      end
+    end
+  end
+
+  defp record_modification_payment_if_needed(booking, %{delta: delta}, opts) do
+    if Money.positive?(delta) do
+      case Keyword.get(opts, :payment_intent_id) do
+        nil ->
+          {:error, :payment_required}
+
+        payment_intent_id ->
+          record_modification_ledger_payment(booking, payment_intent_id, delta)
+      end
+    else
+      :ok
+    end
+  end
+
+  defp record_modification_ledger_payment(booking, payment_intent_id, amount) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["payment_method", "latest_charge"]
+         }) do
+      {:ok, payment_intent} ->
+        stripe_fee =
+          payment_intent
+          |> Ysc.Stripe.WebhookHandler.extract_stripe_fee_from_payment_intent()
+          |> normalize_stripe_fee()
+
+        attrs = %{
+          user_id: booking.user_id,
+          amount: amount,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id: payment_intent.id,
+          stripe_fee: stripe_fee,
+          description: "Booking modification - #{booking.reference_id}",
+          property: booking.property,
+          payment_method_id: nil
+        }
+
+        case Ledgers.process_payment(attrs) do
+          {:ok, _} -> :ok
+          {:error, reason} -> {:error, {:ledger_payment_failed, reason}}
+        end
+
+      {:error, reason} ->
+        {:error, {:payment_verification_failed, reason}}
+    end
+  end
+
+  defp validate_modification_eligible(booking) do
+    if booking.status == :complete do
+      :ok
+    else
+      {:error, :invalid_status}
+    end
+  end
+
+  @doc """
+  Places a short-lived inventory hold while the member completes modification payment.
+  """
+  def place_modification_hold(%Booking{} = booking, attrs, opts \\ []) do
+    Ysc.Bookings.BookingLocker.place_modification_hold(booking, attrs, opts)
+  end
+
+  @doc """
+  Releases a modification payment hold without applying the modification.
+  """
+  def release_modification_hold(booking_id) do
+    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id)
+  end
+
+  defp validate_modification_checkin_not_past(parsed) do
+    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+    if Date.compare(parsed.checkin_date, today_pst) == :lt do
+      {:error, :checkin_in_past}
+    else
+      :ok
+    end
+  end
+
+  defp parse_modification_attrs(booking, attrs) do
+    with {:ok, checkin} <-
+           parse_modification_date(attrs, :checkin_date, booking.checkin_date),
+         {:ok, checkout} <-
+           parse_modification_date(attrs, :checkout_date, booking.checkout_date),
+         {:ok, guests} <-
+           parse_modification_integer(
+             attrs,
+             "guests_count",
+             booking.guests_count
+           ),
+         {:ok, children} <-
+           parse_modification_integer(
+             attrs,
+             "children_count",
+             booking.children_count || 0
+           ) do
+      {:ok,
+       %{
+         checkin_date: checkin,
+         checkout_date: checkout,
+         guests_count: guests,
+         children_count: children
+       }}
+    end
+  end
+
+  defp parse_modification_date(attrs, key, default) do
+    string_key = Atom.to_string(key)
+
+    value =
+      Map.get(attrs, key) ||
+        Map.get(attrs, string_key) ||
+        default
+
+    case value do
+      %Date{} = date ->
+        {:ok, date}
+
+      date when is_binary(date) ->
+        case Date.from_iso8601(date) do
+          {:ok, parsed} ->
+            {:ok, parsed}
+
+          {:error, _} ->
+            case DateTime.from_iso8601(date) do
+              {:ok, datetime, _} -> {:ok, DateTime.to_date(datetime)}
+              _ -> {:error, :invalid_date}
+            end
+        end
+
+      _ ->
+        {:error, :invalid_date}
+    end
+  end
+
+  defp parse_modification_integer(attrs, key, default) do
+    value =
+      Map.get(attrs, key) ||
+        Map.get(attrs, String.to_existing_atom(key), default)
+
+    case value do
+      n when is_integer(n) and n >= 0 ->
+        {:ok, n}
+
+      n when is_binary(n) ->
+        case Integer.parse(n) do
+          {parsed, _} when parsed >= 0 -> {:ok, parsed}
+          _ -> {:error, :invalid_guest_count}
+        end
+
+      _ ->
+        {:error, :invalid_guest_count}
+    end
+  rescue
+    ArgumentError -> {:error, :invalid_guest_count}
+  end
+
+  defp ensure_modification_changed(booking, parsed) do
+    if booking.checkin_date == parsed.checkin_date and
+         booking.checkout_date == parsed.checkout_date and
+         booking.guests_count == parsed.guests_count and
+         (booking.children_count || 0) == parsed.children_count do
+      {:error, :no_changes}
+    else
+      :ok
+    end
+  end
+
+  defp fetch_modification_user(booking) do
+    case booking.user || Repo.get(Ysc.Accounts.User, booking.user_id) do
+      nil -> {:error, :user_not_found}
+      user -> {:ok, user}
+    end
+  end
+
+  @doc """
+  Validates that proposed modification dates and guest counts are available.
+  """
+  def validate_modification_availability(%Booking{} = booking, parsed) do
+    booking = Repo.preload(booking, :rooms)
+    hold = Ysc.Bookings.BookingLocker.modification_hold_context(booking)
+
+    new_checkin = parsed.checkin_date
+    new_checkout = parsed.checkout_date
+    new_guests = parsed.guests_count
+
+    old_days =
+      modification_date_range(booking.checkin_date, booking.checkout_date)
+
+    new_days = modification_date_range(new_checkin, new_checkout)
+
+    case booking.booking_mode do
+      :buyout ->
+        validate_buyout_modification_availability(
+          booking,
+          old_days,
+          new_days,
+          hold
+        )
+
+      :room ->
+        validate_room_modification_availability(
+          booking,
+          new_checkin,
+          new_checkout,
+          hold
+        )
+
+      :day ->
+        validate_day_modification_availability(
+          booking,
+          old_days,
+          new_days,
+          new_guests,
+          hold
+        )
+
+      _ ->
+        {:error, :invalid_booking_mode}
+    end
+  end
+
+  defp validate_modification_changeset(booking, parsed, user) do
+    changeset =
+      booking
+      |> Booking.changeset(
+        %{
+          checkin_date: parsed.checkin_date,
+          checkout_date: parsed.checkout_date,
+          guests_count: parsed.guests_count,
+          children_count: parsed.children_count
+        },
+        rooms: booking.rooms,
+        user: user
+      )
+
+    if changeset.valid? do
+      {:ok, changeset}
+    else
+      {:error, changeset}
+    end
+  end
+
+  defp build_preview_booking(booking, parsed) do
+    %{
+      booking
+      | checkin_date: parsed.checkin_date,
+        checkout_date: parsed.checkout_date,
+        guests_count: parsed.guests_count,
+        children_count: parsed.children_count
+    }
+  end
+
+  defp modification_date_range(checkin, checkout) do
+    checkin
+    |> Date.range(Date.add(checkout, -1))
+    |> MapSet.new()
+  end
+
+  @dialyzer {:nowarn_function, validate_buyout_modification_availability: 4}
+  defp validate_buyout_modification_availability(
+         booking,
+         old_days,
+         new_days,
+         hold
+       ) do
+    held_days = modification_hold_held_days(hold)
+
+    prop_inv =
+      Repo.all(
+        from pi in PropertyInventory,
+          where:
+            pi.property == ^booking.property and
+              pi.day in ^MapSet.to_list(new_days)
+      )
+
+    unavailable? =
+      Enum.any?(prop_inv, fn pi ->
+        day_in_old = MapSet.member?(old_days, pi.day)
+        our_hold = MapSet.member?(held_days, pi.day)
+
+        blocked_buyout =
+          not day_in_old and
+            (pi.buyout_held == true or pi.buyout_booked == true) and
+            not (our_hold and pi.buyout_held == true)
+
+        blocked_capacity =
+          booking.property == :clear_lake and not day_in_old and
+            (pi.capacity_held > 0 or pi.capacity_booked > 0) and
+            not our_hold
+
+        blocked_buyout or blocked_capacity
+      end)
+
+    cond do
+      unavailable? ->
+        {:error, :property_unavailable}
+
+      booking.property == :tahoe ->
+        room_inv =
+          Repo.all(
+            from ri in RoomInventory,
+              join: r in Room,
+              on: ri.room_id == r.id,
+              where:
+                r.property == ^booking.property and
+                  ri.day in ^MapSet.to_list(new_days)
+          )
+
+        blocked_rooms =
+          Enum.any?(room_inv, fn ri ->
+            not MapSet.member?(old_days, ri.day) and
+              (ri.held == true or ri.booked == true) and
+              not MapSet.member?(held_days, ri.day)
+          end)
+
+        if blocked_rooms, do: {:error, :rooms_already_booked}, else: :ok
+
+      true ->
+        :ok
+    end
+  end
+
+  @dialyzer {:nowarn_function, validate_room_modification_availability: 4}
+  defp validate_room_modification_availability(
+         booking,
+         new_checkin,
+         new_checkout,
+         hold
+       ) do
+    held_days = modification_hold_held_days(hold)
+
+    cond do
+      has_blackout?(booking.property, new_checkin, new_checkout) ->
+        {:error, :blackout_conflict}
+
+      buyout_active?(booking.property, new_checkin, new_checkout) ->
+        {:error, :property_buyout_active}
+
+      room_unavailable?(booking, new_checkin, new_checkout, held_days) ->
+        {:error, :room_unavailable}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp buyout_active?(property, checkin, checkout) do
+    Repo.exists?(
+      from pi in PropertyInventory,
+        where: pi.property == ^property,
+        where: pi.day >= ^checkin and pi.day < ^checkout,
+        where: pi.buyout_held == true or pi.buyout_booked == true
+    )
+  end
+
+  @dialyzer {:nowarn_function, room_unavailable?: 4}
+  defp room_unavailable?(booking, checkin, checkout, held_days) do
+    old_days =
+      modification_date_range(booking.checkin_date, booking.checkout_date)
+
+    booking.rooms
+    |> Enum.map(& &1.id)
+    |> Enum.any?(fn room_id ->
+      dates =
+        checkin
+        |> Date.range(Date.add(checkout, -1))
+        |> Enum.to_list()
+
+      Enum.any?(dates, fn day ->
+        not MapSet.member?(old_days, day) and
+          not MapSet.member?(held_days, day) and
+          not room_available?(room_id, day, Date.add(day, 1), booking.id)
+      end)
+    end)
+  end
+
+  @dialyzer {:nowarn_function, validate_day_modification_availability: 5}
+  defp validate_day_modification_availability(
+         booking,
+         old_days,
+         new_days,
+         new_guests,
+         hold
+       ) do
+    held_days = modification_hold_held_days(hold)
+    overlap_extra = modification_hold_overlap_extra(hold)
+
+    prop_inv =
+      Repo.all(
+        from pi in PropertyInventory,
+          where:
+            pi.property == ^booking.property and
+              pi.day in ^MapSet.to_list(new_days)
+      )
+
+    unavailable? =
+      Enum.any?(prop_inv, fn pi ->
+        released_guests =
+          if MapSet.member?(old_days, pi.day), do: booking.guests_count, else: 0
+
+        our_overlap_extra = Map.get(overlap_extra, pi.day, 0)
+
+        our_new_day_hold =
+          if MapSet.member?(held_days, pi.day), do: new_guests, else: 0
+
+        available =
+          pi.capacity_total - pi.capacity_booked - pi.capacity_held +
+            released_guests + our_overlap_extra + our_new_day_hold
+
+        new_guests > available
+      end)
+
+    if unavailable?, do: {:error, :property_unavailable}, else: :ok
+  end
+
+  defp modification_hold_held_days(%{active: true, held_days: held_days}) do
+    held_days |> MapSet.to_list() |> MapSet.new()
+  end
+
+  defp modification_hold_held_days(_), do: MapSet.new()
+
+  defp modification_hold_overlap_extra(%{
+         active: true,
+         overlap_extra_guests: overlap
+       }),
+       do: overlap
+
+  defp modification_hold_overlap_extra(_), do: %{}
+
+  defp verify_modification_payment(%{delta: delta}, booking, opts) do
+    if Money.positive?(delta) do
+      case Keyword.get(opts, :payment_intent_id) do
+        nil ->
+          {:error, :payment_required}
+
+        payment_intent_id ->
+          verify_modification_payment_intent(
+            payment_intent_id,
+            delta,
+            booking.id,
+            booking.user_id
+          )
+      end
+    else
+      :ok
+    end
+  end
+
+  defp verify_modification_hold(booking, parsed, %{delta: delta}) do
+    if Money.positive?(delta) do
+      booking = Repo.get!(Booking, booking.id)
+
+      cond do
+        not Ysc.Bookings.BookingLocker.modification_hold_active?(booking) ->
+          {:error, :modification_hold_expired}
+
+        not Ysc.Bookings.BookingLocker.modification_hold_matches?(
+          booking,
+          parsed
+        ) ->
+          {:error, :modification_hold_mismatch}
+
+        true ->
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp verify_modification_payment_intent(
+         payment_intent_id,
+         expected_delta,
+         booking_id,
+         user_id
+       ) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
+      {:ok, %{status: "succeeded"} = payment_intent} ->
+        expected_cents = Ysc.MoneyHelper.money_to_cents(expected_delta)
+        metadata = payment_intent.metadata || %{}
+
+        metadata_booking_id =
+          Map.get(metadata, "booking_id") || Map.get(metadata, :booking_id)
+
+        metadata_user_id =
+          Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
+        modification_flag =
+          Map.get(metadata, "modification") || Map.get(metadata, :modification)
+
+        cond do
+          modification_flag not in ["true", true] ->
+            {:error, :payment_metadata_mismatch}
+
+          to_string(metadata_booking_id || "") != to_string(booking_id) ->
+            {:error, :payment_metadata_mismatch}
+
+          to_string(metadata_user_id || "") != to_string(user_id) ->
+            {:error, :payment_metadata_mismatch}
+
+          payment_intent.amount != expected_cents ->
+            {:error, :payment_amount_mismatch}
+
+          true ->
+            :ok
+        end
+
+      {:ok, _} ->
+        {:error, :payment_not_succeeded}
+
+      {:error, reason} ->
+        {:error, {:payment_verification_failed, reason}}
+    end
+  end
+
+  @doc """
+  Calculates pricing for a booking modification using locked entitlements.
+  """
+  def calculate_modification_pricing(%Booking{} = booking) do
+    alias Ysc.Bookings.Entitlements
+
+    booking = Repo.preload(booking, :rooms)
+    nights = Date.diff(booking.checkout_date, booking.checkin_date)
+
+    room_opts = fn ->
+      room_ids =
+        if Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [] do
+          Enum.map(booking.rooms, & &1.id)
+        else
+          []
+        end
+
+      [
+        guests_count: booking.guests_count,
+        children_count: booking.children_count || 0,
+        room_ids: room_ids
+      ]
+    end
+
+    base_result =
+      case booking.booking_mode do
+        :buyout ->
+          calculate_booking_price(
+            booking.property,
+            booking.checkin_date,
+            booking.checkout_date,
+            :buyout,
+            guests_count: booking.guests_count,
+            children_count: 0
+          )
+
+        :room ->
+          room_ids =
+            if booking.rooms != [],
+              do: Enum.map(booking.rooms, & &1.id),
+              else: []
+
+          if room_ids == [] do
+            {:error, :rooms_required}
+          else
+            calculate_booking_price(
+              booking.property,
+              booking.checkin_date,
+              booking.checkout_date,
+              :room,
+              room_id: List.first(room_ids),
+              guests_count: booking.guests_count,
+              children_count: booking.children_count || 0,
+              use_actual_guests: true
+            )
+          end
+
+        :day ->
+          calculate_booking_price(
+            booking.property,
+            booking.checkin_date,
+            booking.checkout_date,
+            :day,
+            guests_count: booking.guests_count,
+            children_count: 0
+          )
+
+        _ ->
+          {:error, :invalid_booking_mode}
+      end
+
+    with {:ok, base_total, breakdown} <- base_result,
+         {:ok, priced} <-
+           Entitlements.price_with_locked_entitlement(
+             booking,
+             base_total,
+             booking.booking_mode,
+             room_opts.()
+           ) do
+      pricing_items =
+        build_modification_pricing_items(booking, priced, breakdown, nights)
+
+      {:ok,
+       %{
+         total: priced.total,
+         subtotal: priced.subtotal,
+         discount: priced.discount,
+         pricing_items: pricing_items,
+         breakdown: Map.merge(breakdown, %{nights: nights})
+       }}
+    end
+  end
+
+  defp build_modification_pricing_items(booking, priced, breakdown, nights) do
+    total_map = %{
+      "amount" => Decimal.to_string(priced.total.amount),
+      "currency" => to_string(priced.total.currency)
+    }
+
+    case booking.booking_mode do
+      :room ->
+        %{
+          "type" => "room",
+          "nights" => nights,
+          "guests_count" => booking.guests_count,
+          "children_count" => booking.children_count || 0,
+          "total" => total_map,
+          "entitlement_discount" => money_map(priced.discount),
+          "entitlement_subtotal" => money_map(priced.subtotal)
+        }
+
+      :day ->
+        %{
+          "type" => "per_guest",
+          "nights" => nights,
+          "guests_count" => booking.guests_count,
+          "total" => total_map
+        }
+
+      :buyout ->
+        Map.merge(breakdown, %{
+          "type" => "buyout",
+          "nights" => nights,
+          "guests_count" => booking.guests_count,
+          "total" => total_map
+        })
+    end
+  end
+
+  defp money_map(%Money{} = money) do
+    %{
+      "amount" => Decimal.to_string(money.amount),
+      "currency" => to_string(money.currency)
+    }
+  end
+
+  defp money_map(_), do: nil
+
+  defp normalize_stripe_fee(%Money{} = fee), do: fee
+  defp normalize_stripe_fee(_), do: Money.new(0, :USD)
 
   @doc """
   Deletes a booking.
@@ -2288,6 +3084,18 @@ defmodule Ysc.Bookings do
         cancellation_date \\ Date.utc_today(),
         opts \\ []
       ) do
+    if booking.refund_forfeited_at do
+      {:ok, Money.new(0, :USD), nil}
+    else
+      calculate_refund_from_policy(booking, cancellation_date, opts)
+    end
+  end
+
+  defp calculate_refund_from_policy(
+         booking,
+         cancellation_date,
+         opts
+       ) do
     policy = get_active_refund_policy(booking.property, booking.booking_mode)
 
     days_before_checkin = Date.diff(booking.checkin_date, cancellation_date)

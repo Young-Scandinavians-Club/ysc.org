@@ -343,6 +343,10 @@ defmodule YscWeb.EventsLive do
     refresh_events_list_for_reservation(socket, reservation)
   end
 
+  # Catch-all for event messages that do not affect the events index (e.g.
+  # EventUpdateCreated from parallel tests or future message types).
+  def handle_info({Ysc.Events, _msg}, socket), do: {:noreply, socket}
+
   defp upcoming_events_list_id, do: "upcoming_events"
 
   defp refresh_events_from_cache(socket) do
