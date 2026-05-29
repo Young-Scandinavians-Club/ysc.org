@@ -1676,10 +1676,6 @@ defmodule YscWeb.BookingReceiptLive do
     {:noreply, assign(socket, :async_data_loaded, true)}
   end
 
-  defp get_booking_payment(booking) do
-    get_booking_payment_summary(booking).latest
-  end
-
   defp get_booking_payment_summary(booking) do
     payments =
       from(e in Ysc.Ledgers.LedgerEntry,
