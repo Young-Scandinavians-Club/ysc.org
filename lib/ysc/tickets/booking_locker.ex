@@ -353,26 +353,32 @@ defmodule Ysc.Tickets.BookingLocker do
         {remaining, fulfilled ++ fulfilled_for_tier}
       end)
 
-    # Update all fulfilled reservations
+    # Fulfill each hold with a conditional UPDATE so a concurrent expiry job cannot
+    # be overwritten from cancelled back to fulfilled (and vice versa).
     fulfilled_reservations = elem(fulfillments, 1)
 
-    Enum.each(fulfilled_reservations, fn reservation ->
-      reservation
-      |> TicketReservation.changeset(%{
-        status: "fulfilled",
-        fulfilled_at: DateTime.utc_now(),
-        ticket_order_id: ticket_order_id
-      })
-      |> Repo.update!()
+    case fulfill_reservations_in_transaction(
+           fulfilled_reservations,
+           ticket_order_id
+         ) do
+      {:ok, fulfilled} ->
+        {:ok, Enum.group_by(fulfilled, & &1.ticket_tier_id)}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp fulfill_reservations_in_transaction(reservations, ticket_order_id) do
+    Enum.reduce_while(reservations, {:ok, []}, fn reservation, {:ok, acc} ->
+      case Events.fulfill_ticket_reservation(reservation, ticket_order_id) do
+        {:ok, updated} ->
+          {:cont, {:ok, [updated | acc]}}
+
+        {:error, _} ->
+          {:halt, {:error, :reservation_lapsed}}
+      end
     end)
-
-    # Return fulfilled reservations grouped by tier for use in ticket creation
-    # This includes the reservation details so we can store discount amounts on tickets
-    fulfilled_reservations_by_tier =
-      fulfilled_reservations
-      |> Enum.group_by(& &1.ticket_tier_id)
-
-    {:ok, fulfilled_reservations_by_tier}
   end
 
   defp fulfill_reservations_for_tier(
