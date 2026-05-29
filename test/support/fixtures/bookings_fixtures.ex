@@ -26,8 +26,12 @@ defmodule Ysc.BookingsFixtures do
 
   defp clamp_date(date, min_date, max_date) do
     date
-    |> then(fn d -> if Date.compare(d, min_date) == :lt, do: min_date, else: d end)
-    |> then(fn d -> if Date.compare(d, max_date) == :gt, do: max_date, else: d end)
+    |> then(fn d ->
+      if Date.compare(d, min_date) == :lt, do: min_date, else: d
+    end)
+    |> then(fn d ->
+      if Date.compare(d, max_date) == :gt, do: max_date, else: d
+    end)
   end
 
   @doc """
