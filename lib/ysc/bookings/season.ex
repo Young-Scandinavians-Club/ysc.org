@@ -166,7 +166,12 @@ defmodule Ysc.Bookings.Season do
   """
   def for_date(property, date) when is_atom(property) do
     alias Ysc.Bookings.SeasonCache
-    SeasonCache.get(property, date)
+
+    if Application.get_env(:ysc, :season_cache_enabled, true) do
+      SeasonCache.get(property, date)
+    else
+      for_date_db(property, date)
+    end
   end
 
   # Internal function that actually queries the database (called by cache on miss)
