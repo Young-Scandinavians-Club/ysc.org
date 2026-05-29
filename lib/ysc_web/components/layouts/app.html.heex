@@ -634,7 +634,7 @@
   >
     <div class="mx-auto max-w-screen-xl px-4 py-8">
       <div class="space-y-8 lg:flex lg:justify-between lg:space-y-4">
-        <div class="lg:flex-shrink-0 lg:max-w-xs">
+        <div class="lg:flex-shrink-0">
           <.link
             navigate={~p"/"}
             class="flex items-center font-semibold"
@@ -644,22 +644,8 @@
               width={40}
               height={40}
             />
-            <span class="text-lg sm:text-2xl">{Ysc.Organization.name()}</span>
+            <span class="text-lg sm:text-2xl">Young Scandinavians Club</span>
           </.link>
-          <address class="not-italic mt-4 text-sm text-zinc-600 leading-relaxed">
-            <p class="text-xs font-semibold text-zinc-900 uppercase tracking-wide mb-2">
-              Mailing Address
-            </p>
-            <%= for line <- Ysc.Organization.mailing_address_street_lines() do %>
-              <div>{line}</div>
-            <% end %>
-            <.link
-              navigate={~p"/contact"}
-              class="inline-block mt-3 underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-            >
-              Contact us
-            </.link>
-          </address>
         </div>
         <div class="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:justify-end pb-8 lg:mt-0">
           <div :if={
