@@ -1198,8 +1198,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "You already have an active subscription.",
-              title: "Subscription Error"
+              "Your membership renewal is already set up. Tap Continue to finish updating your profile.",
+              title: "Membership renewal"
             )
 
             {:noreply, socket}
@@ -1212,8 +1212,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "Could not activate subscription. Please contact support.",
-              title: "Subscription Error"
+              "We couldn't turn on automatic renewal. Your payment method was saved — please try again, or email info@ysc.org for help.",
+              title: "Payment setup"
             )
 
             {:noreply, socket}

@@ -72,8 +72,11 @@ defmodule YscWeb.UserTicketsLive do
               <div class="p-8">
                 <div class="flex justify-between items-start mb-6">
                   <.status_badge status={ticket_order.status} />
-                  <p class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] leading-none">
-                    {ticket_order.reference_id}
+                  <p
+                    class="text-xs font-bold text-zinc-400 uppercase tracking-[0.2em] leading-none text-right"
+                    title="Use this order number if you contact us about this purchase"
+                  >
+                    Order {ticket_order.reference_id}
                   </p>
                 </div>
 
