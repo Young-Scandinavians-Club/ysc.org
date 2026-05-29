@@ -2,7 +2,7 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
   # async: false — concurrent Task tests share the SQL sandbox with the test process
   use Ysc.DataCase, async: false
 
-  alias Ysc.Tickets.TicketReservationExpiryWorker
+  alias Ysc.Tickets.{BookingLocker, TicketReservationExpiryWorker}
   alias Ysc.TicketsFixtures
   alias Ysc.Events
   alias Ysc.Events.TicketReservation
@@ -102,6 +102,92 @@ defmodule Ysc.Tickets.TicketReservationExpiryWorkerTest do
         refute updated.status == "cancelled" && updated.ticket_order_id,
                "reservation #{updated.id} must not be cancelled once linked to order #{inspect(updated.ticket_order_id)}"
       end
+    end
+
+    test "atomic_booking does not resurrect a hold cancelled before fulfill" do
+      organizer = user_fixture() |> with_lifetime_membership()
+      buyer = user_fixture() |> with_lifetime_membership()
+      event = event_fixture(%{organizer_id: organizer.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 50})
+      parent = self()
+
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
+      for _ <- 1..10 do
+        {:ok, reservation} =
+          %TicketReservation{}
+          |> TicketReservation.changeset(%{
+            ticket_tier_id: tier.id,
+            user_id: buyer.id,
+            quantity: 1,
+            created_by_id: organizer.id,
+            status: "active",
+            expires_at: future
+          })
+          |> Repo.insert()
+
+        booking_task =
+          Task.async(fn ->
+            Ysc.DataCase.allow_sandbox(self(), parent)
+            BookingLocker.atomic_booking(buyer.id, event.id, %{tier.id => 1})
+          end)
+
+        cancel_task =
+          Task.async(fn ->
+            Ysc.DataCase.allow_sandbox(self(), parent)
+            Events.cancel_ticket_reservation(reservation)
+          end)
+
+        booking_result = Task.await(booking_task, 10_000)
+        Task.await(cancel_task, 10_000)
+
+        updated = Repo.get!(TicketReservation, reservation.id)
+
+        case booking_result do
+          {:ok, order} when updated.status == "fulfilled" ->
+            assert updated.ticket_order_id == order.id
+
+          {:error, :reservation_lapsed} ->
+            assert updated.status == "cancelled"
+            refute updated.ticket_order_id
+
+          {:ok, _order} ->
+            :ok
+
+          other ->
+            flunk("unexpected booking result: #{inspect(other)}")
+        end
+
+        refute updated.status == "cancelled" && updated.ticket_order_id,
+               "hold must not be cancelled while linked to order #{inspect(updated.ticket_order_id)}"
+      end
+    end
+
+    test "fulfill after expiry cancellation leaves reservation cancelled" do
+      organizer = user_fixture() |> with_lifetime_membership()
+      buyer = user_fixture() |> with_lifetime_membership()
+      event = event_fixture(%{organizer_id: organizer.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+      reservation = insert_reservation_past_expiry!(tier, buyer, organizer)
+
+      assert {:ok, %{cancelled: 1}} = Events.expire_passed_ticket_reservations()
+
+      order =
+        TicketsFixtures.ticket_order_fixture(%{
+          user: buyer,
+          event: event,
+          tier: tier
+        })
+
+      assert {:error, :reservation_not_active} =
+               Events.fulfill_ticket_reservation(reservation, order.id)
+
+      updated = Repo.get!(TicketReservation, reservation.id)
+      assert updated.status == "cancelled"
+      refute updated.ticket_order_id
     end
 
     test "does not cancel active reservations with no expires_at" do

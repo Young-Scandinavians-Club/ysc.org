@@ -2428,15 +2428,22 @@ defmodule Ysc.Events do
         %TicketReservation{} = reservation,
         ticket_order_id
       ) do
-    reservation
-    |> TicketReservation.changeset(%{
-      status: "fulfilled",
-      fulfilled_at: DateTime.utc_now(),
-      ticket_order_id: ticket_order_id
-    })
-    |> Repo.update()
-    |> case do
-      {:ok, reservation} ->
+    now = DateTime.utc_now()
+
+    case Repo.update_all(
+           from(tr in TicketReservation,
+             where: tr.id == ^reservation.id,
+             where: tr.status == "active",
+             where: is_nil(tr.expires_at) or tr.expires_at > ^now
+           ),
+           set: [
+             status: "fulfilled",
+             fulfilled_at: now,
+             ticket_order_id: ticket_order_id
+           ]
+         ) do
+      {1, _} ->
+        reservation = Repo.get!(TicketReservation, reservation.id)
         invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationFulfilled{
@@ -2445,8 +2452,8 @@ defmodule Ysc.Events do
 
         {:ok, reservation}
 
-      {:error, changeset} ->
-        {:error, changeset}
+      {0, _} ->
+        {:error, :reservation_not_active}
     end
   end
 
