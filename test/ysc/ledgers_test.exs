@@ -4805,6 +4805,48 @@ defmodule Ysc.LedgersTest do
                  row.subscription.id
              end)
     end
+
+    test "batch-loads refund_data for payments (no per-row refund queries)", %{
+      user: user
+    } do
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      assert {:ok, {payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: Money.new(10_000, :USD),
+                 entity_type: :booking,
+                 entity_id: booking.id,
+                 external_payment_id:
+                   "pi_refund_batch_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(320, :USD),
+                 description: "Refundable booking",
+                 property: :tahoe,
+                 payment_method_id: nil
+               })
+
+      refund_amount = Money.new(5_000, :USD)
+
+      assert {:ok, {_refund, _, _}} =
+               Ledgers.process_refund(%{
+                 payment_id: payment.id,
+                 refund_amount: refund_amount,
+                 reason: "Cancelled booking",
+                 external_refund_id:
+                   "re_refund_batch_#{System.unique_integer([:positive])}"
+               })
+
+      {items, _total} = Ledgers.list_user_payments_paginated(user.id, 1, 50)
+
+      refunded_row =
+        Enum.find(items, fn row ->
+          row.payment && row.payment.id == payment.id
+        end)
+
+      assert refunded_row.refund_data
+      assert Money.equal?(refunded_row.refund_data.total_refunded, refund_amount)
+      assert length(refunded_row.refund_data.processed_refunds) == 1
+    end
   end
 
   describe "coverage: add_payment_type_info/1 and add_payment_type_info_batch/1" do

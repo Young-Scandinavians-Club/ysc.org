@@ -5540,37 +5540,6 @@ defmodule YscWeb.UserSettingsLive do
 
   # Helper function to safely fetch user invoices
 
-  # Helper function to get refund data for a payment
-  defp get_refund_data_for_payment(payment) do
-    alias Ysc.Ledgers.Refund
-
-    # Get processed refunds for this payment
-    processed_refunds =
-      from(r in Refund,
-        where: r.payment_id == ^payment.id,
-        order_by: [desc: r.inserted_at]
-      )
-      |> Repo.all()
-
-    # Calculate total refunded amount
-    processed_total =
-      Enum.reduce(processed_refunds, Money.new(0, :USD), fn refund, acc ->
-        case Money.add(acc, refund.amount) do
-          {:ok, sum} -> sum
-          _ -> acc
-        end
-      end)
-
-    if Money.positive?(processed_total) do
-      %{
-        processed_refunds: processed_refunds,
-        total_refunded: processed_total
-      }
-    else
-      nil
-    end
-  end
-
   # Render payment card for mobile view
   defp render_payment_card(payment_info) do
     row_navigate = payment_row_navigate_js(payment_info)
@@ -5644,10 +5613,8 @@ defmodule YscWeb.UserSettingsLive do
       <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
         <strong>Booking Cancelled:</strong>
         This booking has been cancelled. {if @payment_info.payment do
-          refund_data = get_refund_data_for_payment(@payment_info.payment)
-
-          if refund_data && refund_data.total_refunded do
-            " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+          if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
+            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
           else
             " Refund information is available in the booking details."
           end
@@ -5659,10 +5626,8 @@ defmodule YscWeb.UserSettingsLive do
       <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
         <strong>Order Cancelled:</strong>
         This ticket order has been cancelled. {if @payment_info.payment do
-          refund_data = get_refund_data_for_payment(@payment_info.payment)
-
-          if refund_data && refund_data.total_refunded do
-            " A refund of #{Ysc.MoneyHelper.format_money!(refund_data.total_refunded)} has been processed."
+          if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
+            " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
           else
             " Refund information is available in the order details."
           end
