@@ -51,7 +51,8 @@ defmodule Ysc.Accounts.FamilyMembers do
       "first_name" => String.trim(params["first_name"] || ""),
       "last_name" => String.trim(params["last_name"] || ""),
       "type" => type,
-      "birth_date" => if(birth_date in [nil, ""], do: nil, else: birth_date)
+      "birth_date" => if(birth_date in [nil, ""], do: nil, else: birth_date),
+      "email" => String.trim(params["email"] || "")
     }
   end
 

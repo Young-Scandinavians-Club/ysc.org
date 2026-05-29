@@ -1851,8 +1851,37 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   defp family_member_params_from_form(form) do
     case form.source do
-      %{} = params -> params
-      _ -> family_member_form_params()
+      %Ecto.Changeset{} = changeset ->
+        type = Ecto.Changeset.get_field(changeset, :type)
+
+        relationship =
+          case type do
+            :spouse -> "spouse"
+            "spouse" -> "spouse"
+            _ -> "child"
+          end
+
+        birth_date =
+          case Ecto.Changeset.get_field(changeset, :birth_date) do
+            %Date{} = date -> Date.to_iso8601(date)
+            _ -> changeset.params["birth_date"] || ""
+          end
+
+        family_member_form_params(%{
+          "id" => family_member_form_id_from_changeset(changeset),
+          "first_name" =>
+            Ecto.Changeset.get_field(changeset, :first_name) || "",
+          "last_name" => Ecto.Changeset.get_field(changeset, :last_name) || "",
+          "email" => Ecto.Changeset.get_field(changeset, :email) || "",
+          "birth_date" => birth_date,
+          "relationship" => relationship
+        })
+
+      %{} = params ->
+        family_member_form_params(params)
+
+      _ ->
+        family_member_form_params()
     end
   end
 
@@ -1899,8 +1928,27 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   defp family_member_form_id(form) do
     case form[:id] do
-      %{value: value} when is_binary(value) -> value
-      _ -> get_in(form.source, ["id"]) || ""
+      %{value: value} when is_binary(value) and value != "" ->
+        value
+
+      _ ->
+        case form.source do
+          %Ecto.Changeset{} = changeset ->
+            family_member_form_id_from_changeset(changeset)
+
+          %{} = params ->
+            params["id"] || ""
+
+          _ ->
+            ""
+        end
+    end
+  end
+
+  defp family_member_form_id_from_changeset(changeset) do
+    case Ecto.Changeset.get_field(changeset, :id) do
+      nil -> changeset.params["id"] || ""
+      id -> to_string(id)
     end
   end
 
@@ -2040,21 +2088,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     changeset =
       user
       |> FamilyMembers.changeset_for_params(params)
+      |> Map.put(:action, :validate)
 
-    errors =
-      Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
-
-    form_params =
-      family_member_form_params(%{
-        "id" => family_member_form_id_from_params(user, params),
-        "first_name" => params["first_name"] || "",
-        "last_name" => params["last_name"] || "",
-        "email" => params["email"] || "",
-        "birth_date" => params["birth_date"] || "",
-        "relationship" => params["relationship"] || "child"
-      })
-
-    indexed_family_member_form(form_params, idx, errors: errors)
+    to_form(changeset,
+      as: family_member_form_name(idx),
+      id: family_member_form_dom_id(idx)
+    )
   end
 
   defp family_member_form_params_from_record(%FamilyMember{} = member, params) do
@@ -2079,13 +2118,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       "birth_date" => birth_date,
       "relationship" => relationship
     })
-  end
-
-  defp family_member_form_id_from_params(user, params) do
-    case FamilyMembers.find_by_id(user, params["id"]) do
-      %FamilyMember{id: id} -> to_string(id)
-      _ -> params["id"] || ""
-    end
   end
 
   defp delete_family_member_if_saved(socket, id) when id in [nil, ""],

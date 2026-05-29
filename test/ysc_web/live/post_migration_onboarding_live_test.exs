@@ -4,6 +4,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts
+  alias Ysc.Accounts.FamilyMember
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -188,6 +190,156 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       refute html =~ "Membership Type"
       refute html =~ ">Family</span>"
       refute html =~ "Add Family Members"
+    end
+  end
+
+  describe "family members step" do
+    defp family_onboarding_user!(attrs \\ %{}) do
+      user = user_needing_post_migration_onboarding(attrs)
+      signup_application_fixture(user, %{membership_type: "family"})
+      user
+    end
+
+    defp go_to_family_step!(view) do
+      assert has_element?(view, "#onboarding-profile-form")
+
+      # Profile, Address, Membership, Family
+      render_click(view, "set-step", %{"step" => "3"})
+      assert has_element?(view, "#family-member-entries")
+    end
+
+    defp family_member_change_params(idx, overrides \\ %{}) do
+      base = %{
+        "first_name" => "Family#{idx}",
+        "last_name" => "Member",
+        "email" => "",
+        "birth_date" => "2015-06-01",
+        "relationship" => "child"
+      }
+
+      %{
+        "index" => to_string(idx),
+        "family_members" => %{to_string(idx) => Map.merge(base, overrides)}
+      }
+    end
+
+    test "shows family step for family membership onboarding", %{conn: conn} do
+      user = family_onboarding_user!()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      go_to_family_step!(view)
+
+      assert render(view) =~ "Add Family Members"
+      assert has_element?(view, "#family-member-form-0")
+    end
+
+    test "complete_family_step rejects invalid birth dates", %{conn: conn} do
+      user = family_onboarding_user!()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      go_to_family_step!(view)
+
+      tomorrow =
+        Date.utc_today()
+        |> Date.add(1)
+        |> Date.to_iso8601()
+
+      render_change(
+        view,
+        "validate_family_member",
+        family_member_change_params(0, %{"birth_date" => tomorrow})
+      )
+
+      html = render_click(view, "complete_family_step")
+
+      assert html =~ "cannot be in the future"
+
+      assert Accounts.needs_post_migration_onboarding?(
+               Accounts.get_user!(user.id)
+             )
+    end
+
+    test "add_family_member appends another entry form", %{conn: conn} do
+      user = family_onboarding_user!()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      go_to_family_step!(view)
+
+      render_click(view, "add_family_member")
+
+      assert has_element?(view, "#family-member-form-1")
+    end
+
+    test "complete_family_step persists members and completes onboarding",
+         %{conn: conn} do
+      user = family_onboarding_user!()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      go_to_family_step!(view)
+
+      render_change(
+        view,
+        "validate_family_member",
+        family_member_change_params(0)
+      )
+
+      render_click(view, "complete_family_step")
+
+      user = Accounts.get_user!(user.id, [:family_members])
+
+      assert length(user.family_members) == 1
+      assert user.family_members |> hd() |> Map.get(:first_name) == "Family0"
+      refute Accounts.needs_post_migration_onboarding?(user)
+      assert render(view) =~ "all set"
+    end
+
+    test "complete_family_step requires at least one family member", %{
+      conn: conn
+    } do
+      user = family_onboarding_user!()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      go_to_family_step!(view)
+
+      render_click(view, "complete_family_step")
+
+      user = Accounts.get_user!(user.id, [:family_members])
+      assert user.family_members == []
+      assert Accounts.needs_post_migration_onboarding?(user)
+      assert render(view) =~ "Add Family Members"
+    end
+
+    test "remove_family_member deletes a saved member when multiple rows exist",
+         %{conn: conn} do
+      user = family_onboarding_user!()
+
+      saved =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "Remove",
+          last_name: "Me",
+          type: :child
+        })
+        |> Ecto.Changeset.put_change(:user_id, user.id)
+        |> Repo.insert!()
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      go_to_family_step!(view)
+
+      render_click(view, "add_family_member")
+      assert has_element?(view, "#family-member-form-1")
+
+      render_click(view, "remove_family_member", %{"index" => "0"})
+
+      refute Repo.get(FamilyMember, saved.id)
+      assert has_element?(view, "#family-member-form-0")
+      refute has_element?(view, "#family-member-form-1")
     end
   end
 end
