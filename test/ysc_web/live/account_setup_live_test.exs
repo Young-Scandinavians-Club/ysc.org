@@ -1,5 +1,7 @@
 defmodule YscWeb.AccountSetupLiveTest do
-  use YscWeb.ConnCase, async: true
+  # Email verification shares Hammer rate-limit state (ETS) and OTP assigns are
+  # sensitive to parallel LiveView tests in this module.
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -260,12 +262,18 @@ defmodule YscWeb.AccountSetupLiveTest do
       |> form("#email_form", %{"verification_code" => @valid_otp})
       |> render_change()
 
+      assert has_element?(
+               view,
+               "#email_form button[type=submit]:not([disabled])"
+             )
+
       view
       |> form("#email_form", %{"verification_code" => @valid_otp})
       |> render_submit()
 
       {path, _flash} = assert_redirect(view)
-      assert String.starts_with?(path, "/users/log-in/auto")
+      decoded = URI.decode(path)
+      assert String.starts_with?(decoded, "/users/log-in/auto")
     end
 
     test "OTP entered in two parts (partial merge) verifies correctly", %{

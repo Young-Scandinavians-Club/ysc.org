@@ -880,17 +880,12 @@ defmodule YscWeb.AccountSetupLive do
         %{"verification_code" => code},
         socket
       ) do
-    # Accumulate digits in a dedicated assign (phx-input may send only the changed
-    # field, or paste can send as map; merge so we normalize the full code)
-    current_code = socket.assigns[:email_verification_code_state] || %{}
-    current_code = if is_map(current_code), do: current_code, else: %{}
-
     merged_code =
-      if is_map(code) do
-        Map.merge(current_code, code)
-      else
+      merge_verification_code_input(
+        socket,
+        :email_verification_code_state,
         code
-      end
+      )
 
     normalized_code = normalize_verification_code(merged_code)
     # Basic validation - ensure it's 6 digits
@@ -1180,17 +1175,12 @@ defmodule YscWeb.AccountSetupLive do
     user_needs = socket.assigns.user_needs
 
     if setup_owner?(socket) && user_needs.phone_verification do
-      # Accumulate digits in a dedicated assign (phx-input may send only the changed
-      # field, or paste can send as map; merge so we normalize the full code)
-      current_code = socket.assigns[:phone_verification_code_state] || %{}
-      current_code = if is_map(current_code), do: current_code, else: %{}
-
       merged_code =
-        if is_map(code) do
-          Map.merge(current_code, code)
-        else
+        merge_verification_code_input(
+          socket,
+          :phone_verification_code_state,
           code
-        end
+        )
 
       normalized_code = normalize_verification_code(merged_code)
       # Basic validation - ensure it's 6 digits
@@ -1225,8 +1215,13 @@ defmodule YscWeb.AccountSetupLive do
       # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
 
-      # Handle both OTP array format and single string format
-      code = normalize_verification_code(entered_code)
+      code =
+        socket
+        |> merge_verification_code_input(
+          :phone_verification_code_state,
+          entered_code
+        )
+        |> normalize_verification_code()
 
       case Accounts.verify_phone_verification_code(user, code) do
         {:ok, :verified} ->
@@ -1475,8 +1470,13 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   defp do_handle_verify_code(socket, entered_code) do
-    # Handle both OTP array format and single string format
-    code = normalize_verification_code(entered_code)
+    code =
+      socket
+      |> merge_verification_code_input(
+        :email_verification_code_state,
+        entered_code
+      )
+      |> normalize_verification_code()
 
     user_id = socket.assigns.user.id
 
@@ -1620,6 +1620,19 @@ defmodule YscWeb.AccountSetupLive do
         )
 
         {:noreply, socket}
+    end
+  end
+
+  # phx-change may send one digit or a paste map; phx-submit can omit unchanged fields.
+  # Merge with the accumulated assign so verify uses the full code the user entered.
+  defp merge_verification_code_input(socket, state_key, code) do
+    current_code = socket.assigns[state_key] || %{}
+    current_code = if is_map(current_code), do: current_code, else: %{}
+
+    if is_map(code) do
+      Map.merge(current_code, code)
+    else
+      code
     end
   end
 
