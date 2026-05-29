@@ -74,6 +74,87 @@ defmodule Ysc.Accounts.FamilyMembersTest do
     end
   end
 
+  describe "list_for_user/1 and find_by_id/2" do
+    test "list_for_user returns preloaded members" do
+      user = user_fixture()
+
+      member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "A",
+          last_name: "One",
+          type: :child
+        })
+        |> Ecto.Changeset.put_change(:user_id, user.id)
+        |> Repo.insert!()
+
+      user = Repo.preload(user, :family_members)
+
+      assert [found] = FamilyMembers.list_for_user(user)
+      assert found.id == member.id
+    end
+
+    test "find_by_id returns nil for blank ids" do
+      user = user_fixture()
+      refute FamilyMembers.find_by_id(user, nil)
+      refute FamilyMembers.find_by_id(user, "")
+    end
+
+    test "find_by_id matches member id as string" do
+      user = user_fixture()
+
+      member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "Find",
+          last_name: "Me",
+          type: :child
+        })
+        |> Ecto.Changeset.put_change(:user_id, user.id)
+        |> Repo.insert!()
+
+      assert %FamilyMember{id: found_id} =
+               FamilyMembers.find_by_id(user, to_string(member.id))
+
+      assert found_id == member.id
+    end
+  end
+
+  describe "record_attrs/1 and validate_params/2" do
+    test "record_attrs maps spouse relationship and trims names" do
+      attrs =
+        FamilyMembers.record_attrs(%{
+          "first_name" => "  Pat  ",
+          "last_name" => " Lee ",
+          "relationship" => "spouse",
+          "birth_date" => "2010-01-15"
+        })
+
+      assert attrs == %{
+               "first_name" => "Pat",
+               "last_name" => "Lee",
+               "type" => :spouse,
+               "birth_date" => "2010-01-15",
+               "email" => ""
+             }
+    end
+
+    test "validate_params rejects future birth dates" do
+      user = user_fixture()
+      tomorrow = Date.utc_today() |> Date.add(1) |> Date.to_iso8601()
+
+      assert {:error, changeset} =
+               FamilyMembers.validate_params(user, %{
+                 "first_name" => "Kid",
+                 "last_name" => "Future",
+                 "relationship" => "child",
+                 "birth_date" => tomorrow
+               })
+
+      assert "cannot be in the future" in errors_on(changeset).birth_date
+    end
+  end
+
   describe "delete_removed_members/2" do
     test "deletes members not in kept_ids" do
       user = user_fixture()
