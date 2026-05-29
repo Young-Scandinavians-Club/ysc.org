@@ -889,13 +889,9 @@ defmodule Ysc.Messages do
   defp flowroute_send_failure_level({:error, reason}) when is_atom(reason),
     do: :warning
 
-  defp flowroute_send_failure_level({:error, {_, _}}), do: :warning
-
-  defp flowroute_send_failure_level(error) when is_binary(error) do
-    if String.contains?(error, "Rate limit"), do: :warning, else: :error
+  defp flowroute_send_failure_level({:error, reason}) when is_binary(reason) do
+    if String.contains?(reason, "Rate limit"), do: :warning, else: :error
   end
-
-  defp flowroute_send_failure_level(_), do: :error
 
   defp sms_transaction_failure_level("failed to send SMS"), do: :warning
 
