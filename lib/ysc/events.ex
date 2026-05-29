@@ -2459,16 +2459,23 @@ defmodule Ysc.Events do
 
   @doc """
   Cancel a ticket reservation.
+
+  Only rows still `active` are cancelled. A conditional update prevents a race
+  where checkout fulfills the hold concurrently — a plain changeset update could
+  overwrite `fulfilled` with `cancelled` while leaving `ticket_order_id` set.
   """
   def cancel_ticket_reservation(%TicketReservation{} = reservation) do
-    reservation
-    |> TicketReservation.changeset(%{
-      status: "cancelled",
-      cancelled_at: DateTime.utc_now()
-    })
-    |> Repo.update()
-    |> case do
-      {:ok, reservation} ->
+    now = DateTime.utc_now()
+
+    case Repo.update_all(
+           from(tr in TicketReservation,
+             where: tr.id == ^reservation.id,
+             where: tr.status == "active"
+           ),
+           set: [status: "cancelled", cancelled_at: now]
+         ) do
+      {1, _} ->
+        reservation = Repo.get!(TicketReservation, reservation.id)
         invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
@@ -2477,8 +2484,8 @@ defmodule Ysc.Events do
 
         {:ok, reservation}
 
-      {:error, changeset} ->
-        {:error, changeset}
+      {0, _} ->
+        {:error, :reservation_not_active}
     end
   end
 

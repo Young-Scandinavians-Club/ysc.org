@@ -770,7 +770,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
          |> assign(:reservations_by_tier, reservations_by_tier)
          |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)}
 
-      {:error, _changeset} ->
+      {:error, _} ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, "Failed to cancel reservation",
            title: "Reservation"
