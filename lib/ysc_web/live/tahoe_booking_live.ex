@@ -850,7 +850,7 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[40vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
       >
         <div class="absolute inset-0 h-full w-full z-[2]">
           <img
@@ -884,7 +884,7 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[60vh] md:min-h-[75vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
       >
         <div class="absolute inset-0 h-full w-full z-[2]">
           <img

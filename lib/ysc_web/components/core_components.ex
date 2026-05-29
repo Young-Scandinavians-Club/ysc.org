@@ -3275,8 +3275,7 @@ defmodule YscWeb.CoreComponents do
       id="hero-section"
       phx-hook={@video && "HeroVideoControls"}
       class={[
-        "relative w-full flex items-center justify-center overflow-x-hidden overflow-y-auto " <>
-          "-mt-28 pt-28 md:-mt-[88px] md:pt-[88px]",
+        "relative w-full flex items-center justify-center overflow-x-hidden overflow-y-auto hero-nav-overlap",
         @video && "group",
         !@video && "bg-cover bg-center bg-no-repeat",
         @class

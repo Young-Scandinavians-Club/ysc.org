@@ -23,10 +23,12 @@
       is_hero_mode && "hero-mode"
     ]}
   >
+    <%!-- Reserves document-flow space while the bar is position:fixed (non-hero only). --%>
+    <div :if={!is_hero_mode} class="nav-height-spacer" aria-hidden="true"></div>
     <nav
       id="rootNavbar"
       phx-hook="StickyNavbar"
-      data-hero-mode={is_hero_mode}
+      data-hero-mode={if(is_hero_mode, do: "true", else: "false")}
       class={[
         "top-0 z-[100] w-full start-0",
         if(is_hero_mode,

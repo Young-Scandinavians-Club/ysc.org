@@ -6,15 +6,12 @@ export default StickyNavbar = {
         this.lastScrollY = window.scrollY;
 
         this.initState();
+        this.bindNavHeightObserver();
+        this.syncNavHeight();
 
-        // Apply sticky immediately if already scrolled (e.g. hook re-mounted
-        // mid-scroll after a LiveView reconnect). Accessing offsetHeight forces
-        // a synchronous layout so the measurement is accurate even though the
-        // element was just inserted.
-        if (window.scrollY >= this.stickyThreshold) {
-            if (!this.isHeroMode) {
-                document.body.style.paddingTop = this.el.offsetHeight + "px";
-            }
+        if (this.isHeroMode) {
+            this.applyHeroNavProgress(window.scrollY);
+        } else if (window.scrollY >= this.stickyThreshold) {
             this.el.classList.add("nav-sticky");
             this.isSticky = true;
         }
@@ -31,33 +28,35 @@ export default StickyNavbar = {
         requestAnimationFrame(() => this.update());
     },
 
-    // Called by LiveView after DOM-patching this element's attributes.
-    // The patch overwrites the class attribute with the server-rendered value,
-    // which strips any classes we added client-side (nav-sticky, nav-mobile-hidden).
-    // We must restore them synchronously — before the browser paints — to avoid
-    // a flash of the unsticky nav.
     updated() {
-        const newHeroMode = this.el.dataset.heroMode === "true";
+        const newHeroMode = this.readHeroMode();
         if (newHeroMode !== this.isHeroMode) {
             this.el.classList.remove("nav-sticky", "nav-mobile-hidden");
-            document.body.style.paddingTop = "0px";
+            this.clearHeroNavVars();
             this.isSticky = false;
             this.isMobileHidden = false;
 
             requestAnimationFrame(() => {
                 this.initState();
+                this.syncNavHeight();
                 this.update();
             });
+        } else if (this.isHeroMode) {
+            this.syncNavHeight();
+            this.applyHeroNavProgress(window.scrollY);
+            if (this.isMobileHidden && !this.el.classList.contains("nav-mobile-hidden")) {
+                this.el.classList.add("nav-mobile-hidden");
+            }
         } else if (this.isSticky) {
+            this.syncNavHeight();
             if (!this.el.classList.contains("nav-sticky")) {
                 this.el.classList.add("nav-sticky");
             }
             if (this.isMobileHidden && !this.el.classList.contains("nav-mobile-hidden")) {
                 this.el.classList.add("nav-mobile-hidden");
             }
-            if (!this.isHeroMode) {
-                document.body.style.paddingTop = this.el.offsetHeight + "px";
-            }
+        } else {
+            this.syncNavHeight();
         }
     },
 
@@ -65,47 +64,98 @@ export default StickyNavbar = {
         if (this.scrollHandler) {
             window.removeEventListener("scroll", this.scrollHandler);
         }
-        document.body.style.paddingTop = "0px";
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
+        this.clearHeroNavVars();
     },
 
-    // ---- helpers ----
+    bindNavHeightObserver() {
+        this.resizeObserver = new ResizeObserver(() => this.syncNavHeight());
+        this.resizeObserver.observe(this.el);
+    },
+
+    syncNavHeight() {
+        const height = Math.ceil(this.el.getBoundingClientRect().height);
+        document.documentElement.style.setProperty("--nav-height", `${height}px`);
+    },
 
     initState() {
-        this.isHeroMode = this.el.dataset.heroMode === "true";
+        this.isHeroMode = this.readHeroMode();
+        this.stickyThreshold = 1;
+        this.heroBgFadeEnd = 110;
+        this.heroChromeFadeStart = 45;
+        this.heroChromeFadeEnd = 145;
+    },
 
-        // Both modes use a small positive threshold so the nav appears in its
-        // natural, non-elevated state when the user is exactly at the top
-        // (scrollY = 0).
-        //
-        // Hero pages  – header is position:absolute, no flow offset; 10 px gives
-        //               a grace zone while the hero is still in view.
-        // Normal pages – nav is at the top of the document (flow offset ~= 0);
-        //               1 px is enough to trigger sticky without a perceptible
-        //               content jump, and lets scrollY = 0 show the plain header.
-        this.stickyThreshold = this.isHeroMode ? 10 : 1;
+    readHeroMode() {
+        return (
+            this.el.closest("#site-header")?.classList.contains("hero-mode") ===
+            true
+        );
+    },
+
+    clearHeroNavVars() {
+        this.el.style.removeProperty("--hero-nav-progress");
+        this.el.style.removeProperty("--hero-nav-chrome-progress");
+    },
+
+    smoothstep(t) {
+        return t * t * (3 - 2 * t);
+    },
+
+    progressInRange(scrollY, start, end) {
+        const t = Math.min(1, Math.max(0, (scrollY - start) / (end - start)));
+        return this.smoothstep(t);
+    },
+
+    applyHeroNavProgress(scrollY) {
+        const bg = this.progressInRange(scrollY, 0, this.heroBgFadeEnd);
+        const chrome = this.progressInRange(
+            scrollY,
+            this.heroChromeFadeStart,
+            this.heroChromeFadeEnd,
+        );
+
+        this.el.style.setProperty("--hero-nav-progress", bg.toFixed(4));
+        this.el.style.setProperty("--hero-nav-chrome-progress", chrome.toFixed(4));
+    },
+
+    updateHeroNav(currentScrollY, delta) {
+        this.applyHeroNavProgress(currentScrollY);
+
+        if (window.innerWidth < 1024) {
+            if (delta > 4 && currentScrollY > 80) {
+                if (!this.isMobileHidden) {
+                    this.el.classList.add("nav-mobile-hidden");
+                    this.isMobileHidden = true;
+                }
+            } else if (delta < -4) {
+                if (this.isMobileHidden) {
+                    this.el.classList.remove("nav-mobile-hidden");
+                    this.isMobileHidden = false;
+                }
+            }
+        }
     },
 
     update() {
         const currentScrollY = window.scrollY;
         const delta = currentScrollY - this.lastScrollY;
 
-        if (currentScrollY >= this.stickyThreshold) {
-            // ---- make sticky ----
-            if (!this.isSticky) {
-                // Set body padding BEFORE fixing the nav so content doesn't jump.
-                // Hero pages skip this: their header is position:absolute and
-                // doesn't occupy space in the normal flow.
-                if (!this.isHeroMode) {
-                    document.body.style.paddingTop = this.el.offsetHeight + "px";
-                }
+        if (this.isHeroMode) {
+            this.updateHeroNav(currentScrollY, delta);
+            this.lastScrollY = Math.max(0, currentScrollY);
+            this.rafPending = false;
+            return;
+        }
 
+        if (currentScrollY >= this.stickyThreshold) {
+            if (!this.isSticky) {
                 this.el.classList.add("nav-sticky");
                 this.isSticky = true;
             }
 
-            // ---- mobile: hide on scroll-down, reveal on scroll-up ----
-            // Require a minimum delta to avoid toggling on tiny/bouncy scrolls.
-            // Skip hiding until past 80 px so the hero→sticky transition settles.
             if (window.innerWidth < 1024) {
                 if (delta > 4 && currentScrollY > 80) {
                     if (!this.isMobileHidden) {
@@ -119,14 +169,10 @@ export default StickyNavbar = {
                     }
                 }
             }
-        } else {
-            // ---- make unsticky ----
-            if (this.isSticky) {
-                this.el.classList.remove("nav-sticky", "nav-mobile-hidden");
-                document.body.style.paddingTop = "0px";
-                this.isSticky = false;
-                this.isMobileHidden = false;
-            }
+        } else if (this.isSticky) {
+            this.el.classList.remove("nav-sticky", "nav-mobile-hidden");
+            this.isSticky = false;
+            this.isMobileHidden = false;
         }
 
         this.lastScrollY = Math.max(0, currentScrollY);
