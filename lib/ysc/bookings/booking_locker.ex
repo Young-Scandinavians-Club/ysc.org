@@ -217,6 +217,82 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
+  defp day_property_inventory_stay_days(booking) do
+    booking.checkin_date
+    |> Date.range(Date.add(booking.checkout_date, -1))
+    |> Enum.to_list()
+  end
+
+  defp day_property_inventory_query(booking) do
+    from(pi in PropertyInventory,
+      where:
+        pi.property == ^booking.property and
+          pi.day >= ^booking.checkin_date and
+          pi.day < ^booking.checkout_date
+    )
+  end
+
+  defp update_all_day_property_inventory!(booking, updates, opts) do
+    query = day_property_inventory_query(booking)
+    retry_updates = Keyword.fetch!(opts, :retry_updates)
+
+    {count, _} = Repo.update_all(query, updates)
+
+    if count == 0 do
+      ensure_property_inventory_for_days(
+        booking.property,
+        day_property_inventory_stay_days(booking)
+      )
+
+      {count, _} = Repo.update_all(query, retry_updates)
+
+      if count == 0 do
+        Repo.rollback({:error, :inventory_update_failed})
+      end
+    end
+  end
+
+  defp release_day_held_capacity_for_stay!(booking) do
+    ensure_property_inventory_for_days(
+      booking.property,
+      day_property_inventory_stay_days(booking)
+    )
+
+    updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+    {count, _} =
+      from(pi in day_property_inventory_query(booking),
+        where: pi.capacity_held >= ^booking.guests_count
+      )
+      |> Repo.update_all(
+        inc: [capacity_held: -booking.guests_count],
+        set: [updated_at: updated_at]
+      )
+
+    if count == 0 do
+      Repo.rollback({:error, :inventory_update_failed})
+    end
+  end
+
+  defp release_day_booked_capacity_for_stay!(booking) do
+    ensure_property_inventory_for_days(
+      booking.property,
+      day_property_inventory_stay_days(booking)
+    )
+
+    updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+    from(pi in day_property_inventory_query(booking),
+      where: pi.capacity_booked >= ^booking.guests_count
+    )
+    |> Repo.update_all(
+      inc: [capacity_booked: -booking.guests_count],
+      set: [updated_at: updated_at]
+    )
+
+    :ok
+  end
+
   defp fetch_property_inventory(property, checkin_date, checkout_date) do
     Repo.all(
       from pi in PropertyInventory,
@@ -1217,24 +1293,25 @@ defmodule Ysc.Bookings.BookingLocker do
 
         :day ->
           # Decrement held, increment booked
-          {count, _} =
-            Repo.update_all(
-              from(pi in PropertyInventory,
-                where:
-                  pi.property == ^booking.property and
-                    pi.day >= ^booking.checkin_date and
-                    pi.day < ^booking.checkout_date
-              ),
+          updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+          update_all_day_property_inventory!(
+            booking,
+            [
               inc: [
                 capacity_booked: booking.guests_count,
                 capacity_held: -booking.guests_count
               ],
-              set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
-            )
-
-          if count == 0 do
-            Repo.rollback({:error, :inventory_update_failed})
-          end
+              set: [updated_at: updated_at]
+            ],
+            retry_updates: [
+              set: [
+                capacity_booked: booking.guests_count,
+                capacity_held: 0,
+                updated_at: updated_at
+              ]
+            ]
+          )
       end
 
       # Update booking status
@@ -1448,9 +1525,48 @@ defmodule Ysc.Bookings.BookingLocker do
           :ok
         end
 
+      :day ->
+        {count, _} =
+          Repo.update_all(
+            day_property_inventory_query(booking),
+            inc: [capacity_booked: booking.guests_count],
+            set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
+          )
+
+        if count == 0 do
+          ensure_day_inventory_exists_and_book(booking)
+        else
+          :ok
+        end
+
       _ ->
         :ok
     end
+  end
+
+  defp ensure_day_inventory_exists_and_book(booking) do
+    dates =
+      Date.range(booking.checkin_date, Date.add(booking.checkout_date, -1))
+
+    Enum.each(dates, fn date ->
+      capacity_total = get_property_capacity_for_date(booking.property, date)
+
+      Repo.insert(
+        %PropertyInventory{
+          property: booking.property,
+          day: date,
+          buyout_booked: false,
+          buyout_held: false,
+          capacity_total: capacity_total,
+          capacity_held: 0,
+          capacity_booked: booking.guests_count
+        },
+        on_conflict: {:replace, [:capacity_booked, :updated_at]},
+        conflict_target: [:property, :day]
+      )
+    end)
+
+    :ok
   end
 
   # Ensures property inventory rows exist for the date range and marks as booked
@@ -1709,21 +1825,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
         :day ->
           # Decrement held
-          {count, _} =
-            Repo.update_all(
-              from(pi in PropertyInventory,
-                where:
-                  pi.property == ^booking.property and
-                    pi.day >= ^booking.checkin_date and
-                    pi.day < ^booking.checkout_date
-              ),
-              inc: [capacity_held: -booking.guests_count],
-              set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
-            )
-
-          if count == 0 do
-            Repo.rollback({:error, :inventory_update_failed})
-          end
+          release_day_held_capacity_for_stay!(booking)
       end
 
       # Update booking status to canceled
@@ -2604,6 +2706,11 @@ defmodule Ysc.Bookings.BookingLocker do
         end
 
       :day ->
+        if length(days) !=
+             length(fetch_property_inventory_days(booking.property, days)) do
+          ensure_property_inventory_for_days(booking.property, days)
+        end
+
         prop_inv =
           Repo.all(
             from pi in PropertyInventory,
@@ -3100,22 +3207,7 @@ defmodule Ysc.Bookings.BookingLocker do
           end
 
         :day ->
-          # Decrement booked
-          {count, _} =
-            Repo.update_all(
-              from(pi in PropertyInventory,
-                where:
-                  pi.property == ^booking.property and
-                    pi.day >= ^booking.checkin_date and
-                    pi.day < ^booking.checkout_date
-              ),
-              inc: [capacity_booked: -booking.guests_count],
-              set: [updated_at: DateTime.truncate(DateTime.utc_now(), :second)]
-            )
-
-          if count == 0 do
-            Repo.rollback({:error, :inventory_update_failed})
-          end
+          release_day_booked_capacity_for_stay!(booking)
       end
 
       # Update booking status to canceled
@@ -3206,24 +3298,7 @@ defmodule Ysc.Bookings.BookingLocker do
             end
 
           :day ->
-            # Decrement booked
-            {count, _} =
-              Repo.update_all(
-                from(pi in PropertyInventory,
-                  where:
-                    pi.property == ^booking.property and
-                      pi.day >= ^booking.checkin_date and
-                      pi.day < ^booking.checkout_date
-                ),
-                inc: [capacity_booked: -booking.guests_count],
-                set: [
-                  updated_at: DateTime.truncate(DateTime.utc_now(), :second)
-                ]
-              )
-
-            if count == 0 do
-              Repo.rollback({:error, :inventory_update_failed})
-            end
+            release_day_booked_capacity_for_stay!(booking)
         end
       end
 

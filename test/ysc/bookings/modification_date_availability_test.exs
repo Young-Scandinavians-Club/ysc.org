@@ -108,13 +108,23 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
     calendar = ModificationDateAvailability.calendar_context(booking)
 
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
     tooltips =
       ModificationDateAvailability.checkout_date_tooltips(
         booking,
         checkin,
         calendar.max_date,
         calendar.today,
-        calendar.seasons
+        calendar.seasons,
+        snapshot
       )
 
     extended_checkout = Date.add(checkout, 1)
@@ -135,7 +145,59 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     assert Date.compare(checkin, calendar.min_date) != :lt
     assert Date.compare(checkin, calendar.max_date) != :gt
 
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
     tooltips =
+      ModificationDateAvailability.checkin_date_tooltips(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    refute Map.has_key?(tooltips, Date.to_iso8601(checkin))
+  end
+
+  test "checkin and checkout tooltips with snapshot match without snapshot", %{
+    user: user
+  } do
+    room = create_room!()
+    base = Date.utc_today() |> Date.add(140) |> first_monday_on_or_after()
+    checkin = base
+    checkout = Date.add(checkin, 2)
+
+    booking = complete_room_booking!(user, room, checkin, checkout)
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    checkin_with =
+      ModificationDateAvailability.checkin_date_tooltips(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    checkin_without =
       ModificationDateAvailability.checkin_date_tooltips(
         booking,
         calendar.min_date,
@@ -144,7 +206,27 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
         calendar.seasons
       )
 
-    refute Map.has_key?(tooltips, Date.to_iso8601(checkin))
+    checkout_with =
+      ModificationDateAvailability.checkout_date_tooltips(
+        booking,
+        checkin,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    checkout_without =
+      ModificationDateAvailability.checkout_date_tooltips(
+        booking,
+        checkin,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    assert checkin_with == checkin_without
+    assert checkout_with == checkout_without
   end
 
   defp first_monday_on_or_after(date) do

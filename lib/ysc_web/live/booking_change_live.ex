@@ -30,13 +30,23 @@ defmodule YscWeb.BookingChangeLive do
             calendar = ModificationDateAvailability.calendar_context(booking)
             form = modification_form(booking)
 
+            availability_snapshot =
+              ModificationDateAvailability.build_availability_snapshot(
+                booking,
+                calendar.min_date,
+                calendar.max_date,
+                calendar.today,
+                calendar.seasons
+              )
+
             checkout_tooltips =
               ModificationDateAvailability.checkout_date_tooltips(
                 booking,
                 booking.checkin_date,
                 calendar.max_date,
                 calendar.today,
-                calendar.seasons
+                calendar.seasons,
+                availability_snapshot
               )
 
             socket =
@@ -44,6 +54,7 @@ defmodule YscWeb.BookingChangeLive do
               |> assign(:page_title, "Change Reservation")
               |> assign(:booking, booking)
               |> assign(:form, form)
+              |> assign(:availability_snapshot, availability_snapshot)
               |> assign(:preview, nil)
               |> assign(:preview_error, nil)
               |> assign(:acknowledged, false)
@@ -77,7 +88,8 @@ defmodule YscWeb.BookingChangeLive do
                   calendar.min_date,
                   calendar.max_date,
                   calendar.today,
-                  calendar.seasons
+                  calendar.seasons,
+                  availability_snapshot
                 )
               end)
 
@@ -129,7 +141,8 @@ defmodule YscWeb.BookingChangeLive do
             checkin_date,
             socket.assigns.calendar_max_date,
             socket.assigns.today,
-            socket.assigns.seasons
+            socket.assigns.seasons,
+            socket.assigns.availability_snapshot
           )
         else
           %{}
@@ -1167,7 +1180,8 @@ defmodule YscWeb.BookingChangeLive do
         checkin,
         socket.assigns.calendar_max_date,
         socket.assigns.today,
-        socket.assigns.seasons
+        socket.assigns.seasons,
+        socket.assigns.availability_snapshot
       )
     else
       %{}
