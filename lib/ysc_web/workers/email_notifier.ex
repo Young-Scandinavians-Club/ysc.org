@@ -278,25 +278,47 @@ defmodule YscWeb.Workers.EmailNotifier do
   defp normalize_recipient(recipient) do
     # Fallback: use inspect to safely convert any format to string
     # This handles edge cases where recipient might be in an unexpected format
-    require Ysc.Logging
-
     Ysc.Logging.warning("Unexpected recipient format, normalizing",
       recipient: inspect(recipient),
-      recipient_type: inspect(recipient.__struct__ || :no_struct)
+      recipient_type: recipient_log_type(recipient)
     )
 
-    # Try to extract email from various formats
     case recipient do
       list when is_list(list) ->
-        # Try to extract email from list
-        case List.first(list) do
-          {_name, email} when is_binary(email) -> email
-          email when is_binary(email) -> email
-          _ -> inspect(recipient)
+        case email_from_list(list) do
+          nil -> inspect(recipient)
+          email -> email
         end
 
       _ ->
         inspect(recipient)
+    end
+  end
+
+  defp email_from_list(list) do
+    Enum.find_value(list, fn
+      {_name, email} when is_binary(email) -> email
+      email when is_binary(email) -> email
+      _ -> nil
+    end)
+  end
+
+  defp recipient_log_type(recipient) do
+    cond do
+      is_list(recipient) ->
+        :list
+
+      is_tuple(recipient) ->
+        :tuple
+
+      is_map(recipient) and Map.has_key?(recipient, :__struct__) ->
+        recipient.__struct__
+
+      is_map(recipient) ->
+        :map
+
+      true ->
+        :other
     end
   end
 
