@@ -110,6 +110,8 @@
 
 html {
     scroll-behavior: smooth;
+    /* Measured by StickyNavbar hook; fallback until first paint. */
+    --nav-height: 5.5rem;
 }
 
 
@@ -118,12 +120,16 @@ html {
 #key-events,
 #presidents,
 [id^="presidents-"] {
-    scroll-margin-top: 6rem;
+    scroll-margin-top: var(--nav-height);
 }
 
 
-/* No transition on body padding — it must snap in sync with the nav
-   becoming fixed so there is zero layout shift. */
+/* Hero / booking pages: pull media under the fixed nav, pad content by exact bar height. */
+
+.hero-nav-overlap {
+    margin-top: calc(-1 * var(--nav-height));
+    padding-top: var(--nav-height);
+}
 
 
 /* Archival Artifact Styling for History Page */
@@ -254,6 +260,8 @@ html {
 /* Transitions for the navbar */
 
 #rootNavbar {
+    /* Reserve border space so .nav-sticky does not change layout height. */
+    border-bottom: 1px solid transparent;
     /* Shadow animates smoothly so the nav "lifts up" on scroll and
        "sits down" when the user returns to the top.
        Transform handles the mobile slide-in/out. */
@@ -261,14 +269,29 @@ html {
 }
 
 
-/* ---- Sticky state ---- */
+/*
+ * Non-hero: nav is always fixed; .nav-height-spacer (in layout) holds its height
+ * in the document flow so content does not jump. Sticky inside <header> alone cannot
+ * work because the header is only as tall as the nav.
+ */
 
-#rootNavbar.nav-sticky {
+#site-header:not(.hero-mode) .nav-height-spacer {
+    height: var(--nav-height);
+    pointer-events: none;
+}
+
+#site-header:not(.hero-mode) #rootNavbar {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     z-index: 100;
+}
+
+
+/* ---- Scrolled state (visual only on non-hero) ---- */
+
+#rootNavbar.nav-sticky {
     background-color: white;
     border-bottom: 1px solid #f4f4f5;
     /* zinc-100 */
@@ -284,94 +307,6 @@ html {
     }
 }
 
-
-/* =============================================
-   HERO MODE — override transparent styles when sticky
-   ============================================= */
-
-
-/*
- * The nav is already position:fixed in hero mode so nav-sticky only needs to
- * trigger the pseudo-element cross-fade.  Override the generic nav-sticky
- * background/shadow rules here — those are handled by ::after instead.
- */
-
-#site-header.hero-mode #rootNavbar.nav-sticky {
-    background-color: transparent;
-    background-image: none;
-    border-color: transparent;
-    box-shadow: none;
-}
-
-
-/* Gradient fades out */
-
-#site-header.hero-mode #rootNavbar.nav-sticky::before {
-    opacity: 0;
-}
-
-
-/* White background fades in */
-
-#site-header.hero-mode #rootNavbar.nav-sticky::after {
-    opacity: 1;
-}
-
-
-/* Nav links back to dark */
-
-#site-header.hero-mode #rootNavbar.nav-sticky .nav-link,
-#site-header.hero-mode #rootNavbar.nav-sticky button.nav-link {
-    color: #18181b;
-    /* zinc-900 */
-    text-shadow: none;
-}
-
-#site-header.hero-mode #rootNavbar.nav-sticky .nav-link:hover,
-#site-header.hero-mode #rootNavbar.nav-sticky button.nav-link:hover {
-    background-color: #f4f4f5;
-    color: #18181b;
-}
-
-
-/* Hamburger icon back to dark */
-
-#site-header.hero-mode #rootNavbar.nav-sticky .nav-icon span {
-    background: #18181b;
-}
-
-
-/* Hamburger button label back to dark */
-
-#site-header.hero-mode #rootNavbar.nav-sticky .menu-label,
-#site-header.hero-mode #rootNavbar.nav-sticky .hamburger-btn {
-    color: #18181b;
-    text-shadow: none;
-}
-
-#site-header.hero-mode #rootNavbar.nav-sticky .hamburger-btn:hover {
-    background-color: #f4f4f5;
-}
-
-
-/* Avatar back to dark */
-
-#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link {
-    color: #18181b;
-    text-shadow: none;
-}
-
-#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link:hover {
-    background-color: #f4f4f5 !important;
-}
-
-#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link .text-zinc-800 {
-    color: #27272a !important;
-}
-
-#site-header.hero-mode #rootNavbar.nav-sticky #avatar-menu-link .text-zinc-500 {
-    color: #71717a !important;
-}
 
 .tmp-element {
     visibility: hidden;
@@ -456,41 +391,39 @@ html {
 
 
 /*
- * In hero mode, keep the navbar always position:fixed so there is no discrete
- * position change (static → fixed) when the scroll threshold is crossed.
- * That position jump was the root cause of the layout shift.
- *
- * Backgrounds are handled entirely by ::before (gradient) and ::after (white)
- * pseudo-elements whose opacity is cross-faded.  This lets us smoothly
- * transition between the two because opacity animates perfectly, while a
- * direct transition between background-image and background-color does not.
+ * Hero nav stays position:fixed so there is never a static→fixed jump.
+ * --hero-nav-progress (0–1, set from scroll in sticky_navbar.js) drives a
+ * scroll-synced cross-fade — no binary class toggle at a tiny threshold.
  */
 
 #site-header.hero-mode #rootNavbar {
+    --hero-nav-progress: 0;
+    --hero-nav-chrome-progress: 0;
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     background: transparent;
     border-color: transparent;
+    /* Only animate transform (mobile hide); scroll drives the cross-fade. */
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 
-/* Gradient layer — visible by default, fades out when sticky */
+/* Gradient layer — fades out as the user scrolls */
 
 #site-header.hero-mode #rootNavbar::before {
     content: "";
     position: absolute;
     inset: 0;
     background: linear-gradient( to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.12) 60%, transparent 100%);
-    opacity: 1;
-    transition: opacity 0.2s ease-out;
+    opacity: calc(1 - var(--hero-nav-progress));
     pointer-events: none;
-    z-index: -1;
+    z-index: 0;
 }
 
 
-/* White solid background — hidden by default, fades in when sticky */
+/* White solid background — fades in with scroll */
 
 #site-header.hero-mode #rootNavbar::after {
     content: "";
@@ -499,72 +432,68 @@ html {
     background: white;
     border-bottom: 1px solid #f4f4f5;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
-    opacity: 0;
-    transition: opacity 0.2s ease-out;
+    opacity: var(--hero-nav-progress);
     pointer-events: none;
-    z-index: -1;
+    z-index: 0;
 }
 
 
-/* Text shadow for hero nav text so it stays readable over varied hero backgrounds */
+/* Keep links/menus above the ::before/::after layers */
+
+#site-header.hero-mode #rootNavbar > * {
+    position: relative;
+    z-index: 1;
+}
+
+
+/*
+ * Nav chrome follows scroll via --hero-nav-chrome-progress (later window than the bar).
+ * No color transitions here — Tailwind "transition" on links and JS lerp both caused
+ * stuck mid-tone states when combined with per-frame scroll updates.
+ */
 
 #site-header.hero-mode .nav-link,
 #site-header.hero-mode button.nav-link,
 #site-header.hero-mode .menu-label,
 #site-header.hero-mode .hamburger-btn,
 #site-header.hero-mode #avatar-menu-link {
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.5);
-    transition: color 0.2s ease-out, text-shadow 0.2s ease-out, background-color 0.15s ease-out;
+    color: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.4)), 0 0 1px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.5));
+    transition: none !important;
 }
 
-#site-header.hero-mode .nav-link {
-    color: white;
-}
-
-#site-header.hero-mode .nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: white;
+#site-header.hero-mode .nav-link:hover,
+#site-header.hero-mode button.nav-link:hover {
+    background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2));
+    color: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
 }
 
 #site-header.hero-mode .nav-icon span {
-    background: white;
-    transition: background-color 0.35s ease-out;
-}
-
-#site-header.hero-mode button.nav-link {
-    color: white;
-}
-
-#site-header.hero-mode button.nav-link:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-#site-header.hero-mode .menu-label {
-    color: white;
-}
-
-#site-header.hero-mode .hamburger-btn {
-    color: white;
+    background: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
+    transition:
+        transform 0.25s ease-in-out,
+        opacity 0.25s ease-in-out,
+        top 0.25s ease-in-out,
+        left 0.25s ease-in-out,
+        width 0.25s ease-in-out !important;
 }
 
 #site-header.hero-mode .hamburger-btn:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-#site-header.hero-mode #avatar-menu-link {
-    color: white;
+    background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2));
 }
 
 #site-header.hero-mode #avatar-menu-link:hover {
-    background-color: rgba(255, 255, 255, 0.2) !important;
+    background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2)) !important;
 }
 
 #site-header.hero-mode #avatar-menu-link .text-zinc-800 {
-    color: white !important;
+    color: color-mix(in srgb, #27272a calc(var(--hero-nav-chrome-progress) * 100%), white) !important;
+    transition: none !important;
 }
 
 #site-header.hero-mode #avatar-menu-link .text-zinc-500 {
-    color: rgba(255, 255, 255, 0.8) !important;
+    color: color-mix(in srgb, #71717a calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.8)) !important;
+    transition: none !important;
 }
 
 

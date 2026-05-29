@@ -461,7 +461,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[40vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
       >
         <div
           id="clear-lake-carousel-wrapper"
@@ -2427,7 +2427,7 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden -mt-[88px] pt-[88px] min-h-[60vh] md:min-h-[75vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
       >
         <div
           id="clear-lake-carousel-wrapper-nonuser"
