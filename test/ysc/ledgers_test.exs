@@ -4844,7 +4844,12 @@ defmodule Ysc.LedgersTest do
         end)
 
       assert refunded_row.refund_data
-      assert Money.equal?(refunded_row.refund_data.total_refunded, refund_amount)
+
+      assert Money.equal?(
+               refunded_row.refund_data.total_refunded,
+               refund_amount
+             )
+
       assert length(refunded_row.refund_data.processed_refunds) == 1
     end
   end
