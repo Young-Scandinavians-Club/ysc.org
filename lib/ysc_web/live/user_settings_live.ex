@@ -27,8 +27,6 @@ defmodule YscWeb.UserSettingsLive do
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.S3.SimpleS3Upload
 
-  import Ecto.Query
-
   @impl true
   def render(assigns) do
     ~H"""
