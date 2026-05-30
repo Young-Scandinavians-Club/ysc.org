@@ -67,7 +67,9 @@ defmodule YscWeb.BookingCheckoutLive do
         {:error,
          {:redirect, ~p"/",
           "We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help."}}
-      booking -> {:ok, booking}
+
+      booking ->
+        {:ok, booking}
     end
   end
 
@@ -967,7 +969,9 @@ defmodule YscWeb.BookingCheckoutLive do
                   <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
                     1
                   </span>
-                  <span>Enter the name of every guest who will stay in your room(s)</span>
+                  <span>
+                    Enter the name of every guest who will stay in your room(s)
+                  </span>
                 </li>
                 <li class="flex items-start gap-3">
                   <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
@@ -985,7 +989,9 @@ defmodule YscWeb.BookingCheckoutLive do
                   <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
                     3
                   </span>
-                  <span>Receive instant confirmation email with booking details</span>
+                  <span>
+                    Receive instant confirmation email with booking details
+                  </span>
                 </li>
                 <li class="flex items-start gap-3">
                   <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
@@ -1012,7 +1018,9 @@ defmodule YscWeb.BookingCheckoutLive do
                   <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
                     2
                   </span>
-                  <span>Receive instant confirmation email with booking details</span>
+                  <span>
+                    Receive instant confirmation email with booking details
+                  </span>
                 </li>
                 <li class="flex items-start gap-3">
                   <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">

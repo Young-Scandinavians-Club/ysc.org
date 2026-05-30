@@ -454,7 +454,9 @@ defmodule YscWeb.BookingChangeLive do
         id="refund-forfeiture-notice"
         class="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950"
       >
-        <p class="font-semibold mb-2">Important: changing your dates affects refunds</p>
+        <p class="font-semibold mb-2">
+          Important: changing your dates affects refunds
+        </p>
         <p class="text-sm leading-relaxed">
           By changing this reservation, you forfeit all refund eligibility — even if you would normally receive a full refund under our cancellation policy. This cannot be undone. You may still cancel later, but you will not receive a refund.
         </p>
