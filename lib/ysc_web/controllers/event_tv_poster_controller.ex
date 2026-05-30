@@ -7,6 +7,7 @@ defmodule YscWeb.EventTvPosterController do
   use YscWeb, :controller
 
   alias Ysc.Events
+  alias YscWeb.Emails.Helpers
 
   def show(conn, %{"id" => id}) do
     case Events.get_event_for_tv_poster(id) do
@@ -26,6 +27,7 @@ defmodule YscWeb.EventTvPosterController do
         |> assign(:page_title, "#{event.title} · TV Poster")
         |> render(:show,
           event: event,
+          event_url: Helpers.absolute_url("/events/#{event.id}"),
           sold_out: sold_out,
           selling_fast: selling_fast
         )

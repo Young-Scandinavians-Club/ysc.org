@@ -11,6 +11,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
   alias Ysc.Media.Image
 
   attr :event, :map, required: true
+  attr :event_url, :string, required: true
   attr :sold_out, :boolean, default: false
   attr :selling_fast, :boolean, default: false
 
@@ -40,7 +41,19 @@ defmodule YscWeb.Components.Events.EventTvPoster do
         </div>
       </div>
 
-      <div class="absolute top-12 left-12 z-10 flex flex-wrap gap-3">
+      <div
+        id="event-tv-poster-qr"
+        class="absolute top-12 right-12 z-10 flex flex-col items-center gap-3"
+      >
+        <div class="bg-white p-4 rounded-2xl shadow-xl">
+          <.qr_code data={@event_url} size={168} />
+        </div>
+        <span class="text-sm font-bold uppercase tracking-[0.2em] text-white/90 drop-shadow">
+          Scan for details
+        </span>
+      </div>
+
+      <div class="absolute top-12 left-12 z-10 flex flex-wrap gap-3 max-w-[calc(100%-280px)]">
         <%= for badge <- @badges do %>
           <span class={[
             "px-4 py-2 rounded text-sm font-black uppercase tracking-widest",

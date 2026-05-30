@@ -16,6 +16,9 @@ defmodule YscWeb.EventTvPosterControllerTest do
 
       html = html_response(conn, 200)
       assert html =~ "event-tv-poster"
+      assert html =~ "event-tv-poster-qr"
+      assert html =~ "Scan for details"
+      assert html =~ "<svg"
       assert html =~ "Tahoe Cabin Social"
       assert html =~ "TV poster preview"
     end
