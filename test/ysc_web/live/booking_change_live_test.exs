@@ -79,8 +79,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/change")
 
     assert html =~ "Change Reservation"
-    assert html =~ "refund forfeiture"
     assert html =~ "forfeit all refund eligibility"
+    assert html =~ "cannot be undone"
     assert html =~ "Check-in &amp; Check-out Dates"
     assert has_element?(view, "#modification-dates")
     assert has_element?(view, "#refund-forfeiture-notice")
@@ -114,7 +114,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     })
     |> render_submit()
     |> then(fn html ->
-      assert html =~ "acknowledge the refund forfeiture"
+      assert html =~ "forfeits all refund eligibility"
     end)
 
     view |> element("#acknowledge-forfeiture") |> render_click()
