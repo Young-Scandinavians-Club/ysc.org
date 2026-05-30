@@ -950,12 +950,10 @@ defmodule YscWeb.AdminBookingsLive do
                 </div>
               <% end %>
             </div>
-            <.admin_empty_panel
-              :if={
-                !Ecto.assoc_loaded?(@booking.check_ins) ||
-                  length(@booking.check_ins) == 0
-              }
-            >
+            <.admin_empty_panel :if={
+              !Ecto.assoc_loaded?(@booking.check_ins) ||
+                length(@booking.check_ins) == 0
+            }>
               No check-in recorded for this booking.
             </.admin_empty_panel>
           </div>
