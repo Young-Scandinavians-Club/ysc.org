@@ -35,7 +35,11 @@ defmodule Ysc.Events.CancelTicketReservationTest do
       %{organizer: organizer, buyer: buyer, event: event, tier: tier}
     end
 
-    test "cancels an active reservation", %{tier: tier, buyer: buyer, organizer: organizer} do
+    test "cancels an active reservation", %{
+      tier: tier,
+      buyer: buyer,
+      organizer: organizer
+    } do
       reservation = insert_active_reservation!(tier, buyer, organizer)
 
       assert {:ok, cancelled} = Events.cancel_ticket_reservation(reservation)
@@ -46,12 +50,13 @@ defmodule Ysc.Events.CancelTicketReservationTest do
       assert reloaded.status == "cancelled"
     end
 
-    test "returns reservation_not_active for fulfilled holds without corrupting order link", %{
-      tier: tier,
-      buyer: buyer,
-      organizer: organizer,
-      event: event
-    } do
+    test "returns reservation_not_active for fulfilled holds without corrupting order link",
+         %{
+           tier: tier,
+           buyer: buyer,
+           organizer: organizer,
+           event: event
+         } do
       reservation = insert_active_reservation!(tier, buyer, organizer)
 
       order =
@@ -79,11 +84,12 @@ defmodule Ysc.Events.CancelTicketReservationTest do
       refute reloaded.cancelled_at
     end
 
-    test "returns reservation_not_active when reservation is already cancelled", %{
-      tier: tier,
-      buyer: buyer,
-      organizer: organizer
-    } do
+    test "returns reservation_not_active when reservation is already cancelled",
+         %{
+           tier: tier,
+           buyer: buyer,
+           organizer: organizer
+         } do
       reservation = insert_active_reservation!(tier, buyer, organizer)
       assert {:ok, _} = Events.cancel_ticket_reservation(reservation)
 

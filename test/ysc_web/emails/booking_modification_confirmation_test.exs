@@ -25,7 +25,8 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
         total_price: Money.new(150_00, :USD)
       }
 
-      data = BookingModificationConfirmation.prepare_email_data(booking, previous)
+      data =
+        BookingModificationConfirmation.prepare_email_data(booking, previous)
 
       assert data.first_name == booking.user.first_name
       assert data.dates_changed
@@ -33,7 +34,10 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
       assert data.additional_payment == nil
       assert data.booking.reference_id == booking.reference_id
       assert data.booking.property == "Tahoe"
-      assert data.previous.checkin_date == Calendar.strftime(previous_checkin, "%B %d, %Y")
+
+      assert data.previous.checkin_date ==
+               Calendar.strftime(previous_checkin, "%B %d, %Y")
+
       assert data.booking_url =~ "/bookings/#{booking.id}/receipt"
     end
 
@@ -48,7 +52,8 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
         total_price: booking.total_price
       }
 
-      data = BookingModificationConfirmation.prepare_email_data(booking, previous)
+      data =
+        BookingModificationConfirmation.prepare_email_data(booking, previous)
 
       refute data.dates_changed
       refute data.guests_changed
@@ -74,7 +79,9 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
         total_price: booking.total_price
       }
 
-      data = BookingModificationConfirmation.prepare_email_data(booking, previous)
+      data =
+        BookingModificationConfirmation.prepare_email_data(booking, previous)
+
       html = BookingModificationConfirmation.render(data)
 
       assert html =~ "Reservation Updated"
