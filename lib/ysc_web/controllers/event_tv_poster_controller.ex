@@ -19,6 +19,8 @@ defmodule YscWeb.EventTvPosterController do
     end)
   end
 
+  # Poster bytes and MIME type come from TvPosterImage (validated format), not request input.
+  # sobelow_skip ["XSS.SendResp", "XSS.ContentType"]
   def image(conn, %{"id" => id} = params) do
     format = TvPosterImage.normalize_format(params["format"])
 
