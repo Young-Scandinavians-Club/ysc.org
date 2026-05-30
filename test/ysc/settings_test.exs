@@ -174,6 +174,8 @@ defmodule Ysc.SettingsTest do
     end
 
     test "succeeds when aggregate settings cache is malformed (non-list)" do
+      on_exit(fn -> Settings.warm_cache() end)
+
       %SiteSetting{name: "malformed_agg", value: "x"} |> Repo.insert!()
       Settings.clear_cache()
 
