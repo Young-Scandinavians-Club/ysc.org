@@ -723,8 +723,9 @@ defmodule Ysc.Bookings do
     with :ok <- validate_modification_eligible(booking),
          {:ok, parsed} <- parse_modification_attrs(booking, attrs),
          {:ok, preview} <- prepare_modification(booking, attrs),
-         :ok <- verify_modification_hold(booking, parsed, preview),
-         :ok <- verify_modification_payment(preview, booking, opts) do
+         :ok <- verify_modification_payment(preview, booking, opts),
+         :ok <-
+           ensure_modification_hold_for_apply(booking, parsed, preview, opts) do
       previous_details = %{
         checkin_date: booking.checkin_date,
         checkout_date: booking.checkout_date,
@@ -1217,22 +1218,31 @@ defmodule Ysc.Bookings do
     end
   end
 
-  defp verify_modification_hold(booking, parsed, %{delta: delta}) do
+  defp ensure_modification_hold_for_apply(
+         booking,
+         parsed,
+         %{delta: delta},
+         opts
+       ) do
     if Money.positive?(delta) do
       booking = Repo.get!(Booking, booking.id)
 
-      cond do
-        not Ysc.Bookings.BookingLocker.modification_hold_active?(booking) ->
-          {:error, :modification_hold_expired}
+      hold_ok? =
+        Ysc.Bookings.BookingLocker.modification_hold_active?(booking) and
+          Ysc.Bookings.BookingLocker.modification_hold_matches?(booking, parsed)
 
-        not Ysc.Bookings.BookingLocker.modification_hold_matches?(
-          booking,
-          parsed
-        ) ->
-          {:error, :modification_hold_mismatch}
+      cond do
+        hold_ok? ->
+          :ok
+
+        Keyword.get(opts, :payment_intent_id) ->
+          case place_modification_hold(booking, parsed) do
+            {:ok, _} -> :ok
+            {:error, reason} -> {:error, reason}
+          end
 
         true ->
-          :ok
+          {:error, :modification_hold_expired}
       end
     else
       :ok
