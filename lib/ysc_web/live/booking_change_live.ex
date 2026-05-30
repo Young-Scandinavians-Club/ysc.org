@@ -108,7 +108,9 @@ defmodule YscWeb.BookingChangeLive do
         {:error, :not_found} ->
           {:ok,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Booking not found.",
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.",
              title: "Booking"
            )
            |> redirect(to: ~p"/")}
@@ -283,7 +285,7 @@ defmodule YscWeb.BookingChangeLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "Please acknowledge the refund forfeiture notice before continuing."
+         "Please check the box at the bottom of the form confirming you understand that changing this reservation means you won't receive a refund, even if our usual cancellation policy would allow one."
        )}
     end
   end
@@ -452,7 +454,7 @@ defmodule YscWeb.BookingChangeLive do
         id="refund-forfeiture-notice"
         class="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950"
       >
-        <p class="font-semibold mb-2">Important: refund forfeiture</p>
+        <p class="font-semibold mb-2">Important: changing your dates affects refunds</p>
         <p class="text-sm leading-relaxed">
           By changing this reservation, you forfeit all refund eligibility — even if you would normally receive a full refund under our cancellation policy. This cannot be undone. You may still cancel later, but you will not receive a refund.
         </p>

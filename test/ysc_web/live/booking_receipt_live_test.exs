@@ -45,7 +45,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
                live(conn, ~p"/bookings/#{Ecto.ULID.generate()}/receipt")
 
       assert path == "/"
-      assert flash["error"] =~ "Booking not found"
+      assert flash["error"] =~ "couldn't find this reservation"
     end
 
     test "prevents accessing another user's booking", %{conn: conn} do
@@ -60,7 +60,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
                live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert path == "/"
-      assert flash["error"] =~ "Booking not found"
+      assert flash["error"] =~ "couldn't find this reservation"
     end
 
     test "loads booking receipt successfully for own booking", %{conn: conn} do
