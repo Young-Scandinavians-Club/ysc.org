@@ -5,6 +5,29 @@ defmodule Ysc.Events.TvPosterImage.Chromic do
 
   alias Ysc.Events.TvPosterImage
 
+  # ChromicPDF runs this before capture; a returned Promise is awaited.
+  @wait_for_poster_ready """
+  (async () => {
+    const poster = document.querySelector("#event-tv-poster");
+    if (!poster) throw new Error("TV poster element not found");
+
+    const images = poster.querySelectorAll("img");
+    await Promise.all(
+      Array.from(images).map((img) => {
+        if (img.complete) return;
+        return new Promise((resolve) => {
+          img.addEventListener("load", resolve, { once: true });
+          img.addEventListener("error", resolve, { once: true });
+        });
+      })
+    );
+
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+  })()
+  """
+
   @behaviour Ysc.Events.TvPosterImage.Capture
 
   @impl true
@@ -18,11 +41,14 @@ defmodule Ysc.Events.TvPosterImage.Chromic do
   defp capture(format, width, height, html) do
     case ChromicPDF.capture_screenshot(
            {:html, html},
+           # Match viewport to the 1920×1080 poster; clip alone leaves most of the frame black.
+           full_page: true,
            capture_screenshot: %{
              format: format,
-             clip: %{x: 0, y: 0, width: width, height: height, scale: 1}
+             clip: %{x: 0, y: 0, width: width, height: height, scale: 1},
+             captureBeyondViewport: true
            },
-           wait_for: %{selector: "#event-tv-poster"},
+           evaluate: %{expression: @wait_for_poster_ready},
            timeout: 30_000
          ) do
       {:ok, base64} when is_binary(base64) ->
