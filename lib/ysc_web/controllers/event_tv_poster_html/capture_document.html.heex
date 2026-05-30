@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <base href={@asset_base_url} />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body class="m-0 p-0 overflow-hidden bg-zinc-900">
+    <.event_tv_poster
+      event={@event}
+      event_url={@event_url}
+      sold_out={@sold_out}
+      selling_fast={@selling_fast}
+    />
+  </body>
+</html>

@@ -320,6 +320,13 @@ config :mime, :types, %{
   "text/styles" => ["styles"]
 }
 
+# Headless Chrome for TV poster image capture (ChromicPDF)
+config :ysc, ChromicPDF,
+  no_sandbox: true,
+  chrome_args: ["--disable-dev-shm-usage"]
+
+config :ysc, :tv_poster_image_module, Ysc.Events.TvPosterImage.Chromic
+
 # Ueberauth configuration
 # Provider credentials are configured at runtime in config/runtime.exs
 config :ueberauth, Ueberauth,

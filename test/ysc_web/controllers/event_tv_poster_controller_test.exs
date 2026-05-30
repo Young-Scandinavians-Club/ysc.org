@@ -21,6 +21,8 @@ defmodule YscWeb.EventTvPosterControllerTest do
       assert html =~ "<svg"
       assert html =~ "Tahoe Cabin Social"
       assert html =~ "TV poster preview"
+      assert html =~ "View as PNG image"
+      assert html =~ "/tv-poster/image"
     end
 
     test "returns 404 when the event does not exist", %{conn: conn} do
@@ -28,6 +30,29 @@ defmodule YscWeb.EventTvPosterControllerTest do
 
       conn = get(conn, ~p"/admin/events/#{missing_id}/tv-poster")
       assert html_response(conn, 404)
+    end
+
+    test "renders PNG image at /tv-poster/image", %{conn: conn, event: event} do
+      conn = get(conn, ~p"/admin/events/#{event.id}/tv-poster/image")
+
+      assert response(conn, 200)
+
+      assert get_resp_header(conn, "content-type") == [
+               "image/png; charset=utf-8"
+             ]
+
+      assert conn.resp_body |> binary_part(0, 4) == <<137, 80, 78, 71>>
+    end
+
+    test "supports format=jpeg query param", %{conn: conn, event: event} do
+      conn =
+        get(conn, ~p"/admin/events/#{event.id}/tv-poster/image?format=jpeg")
+
+      assert response(conn, 200)
+
+      assert get_resp_header(conn, "content-type") == [
+               "image/jpeg; charset=utf-8"
+             ]
     end
 
     test "redirects unauthenticated users", %{event: event} do
