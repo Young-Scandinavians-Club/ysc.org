@@ -55,6 +55,25 @@ defmodule YscWeb.EventTvPosterControllerTest do
              ]
     end
 
+    test "returns 503 when image capture fails", %{conn: conn, event: event} do
+      previous_module = Application.get_env(:ysc, :tv_poster_image_module)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :tv_poster_image_module, previous_module)
+      end)
+
+      Application.put_env(
+        :ysc,
+        :tv_poster_image_module,
+        Ysc.Events.TvPosterImage.ErrorStub
+      )
+
+      conn = get(conn, ~p"/admin/events/#{event.id}/tv-poster/image")
+
+      assert response(conn, 503)
+      assert conn.resp_body =~ "Could not generate poster image"
+    end
+
     test "redirects unauthenticated users", %{event: event} do
       conn =
         build_conn()
