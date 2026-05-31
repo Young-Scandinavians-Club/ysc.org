@@ -632,7 +632,7 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       try do
         Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
-        assert {:error, {:error, :blackout_conflict}} =
+        assert {:error, :blackout_conflict} =
                  Bookings.apply_modification(booking, string_attrs,
                    payment_intent_id: payment_intent_id
                  )
