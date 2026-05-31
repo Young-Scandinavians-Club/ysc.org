@@ -1509,24 +1509,6 @@ defmodule YscWeb.AdminScannerLive do
     {:noreply, socket}
   end
 
-  defp resume_session_socket(socket, session_id) do
-    session = Scanning.get_session!(session_id)
-
-    if is_nil(session.closed_at) do
-      scan_count = Scanning.get_session_scan_count(session_id)
-
-      socket
-      |> assign(:phase, :scanning)
-      |> assign(:active_session, session)
-      |> assign(:scan_count, scan_count)
-      |> assign(:scan_result, nil)
-      |> assign(:camera_error, nil)
-      |> assign(:group_prompt, nil)
-    else
-      put_flash(socket, :error, "That session is already closed.")
-    end
-  end
-
   def handle_event("end_session", _params, socket) do
     if socket.assigns.active_session do
       Scanning.close_session(socket.assigns.active_session.id)
@@ -1581,6 +1563,24 @@ defmodule YscWeb.AdminScannerLive do
   end
 
   # --- Private ---
+
+  defp resume_session_socket(socket, session_id) do
+    session = Scanning.get_session!(session_id)
+
+    if is_nil(session.closed_at) do
+      scan_count = Scanning.get_session_scan_count(session_id)
+
+      socket
+      |> assign(:phase, :scanning)
+      |> assign(:active_session, session)
+      |> assign(:scan_count, scan_count)
+      |> assign(:scan_result, nil)
+      |> assign(:camera_error, nil)
+      |> assign(:group_prompt, nil)
+    else
+      put_flash(socket, :error, "That session is already closed.")
+    end
+  end
 
   defp handle_scan(socket, data) do
     session = socket.assigns.active_session

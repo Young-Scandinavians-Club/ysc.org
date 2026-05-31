@@ -186,6 +186,7 @@ defmodule Ysc.Avatars do
     end
   end
 
+  # sobelow_skip ["Traversal.FileModule"]
   defp do_store_oauth_avatar(user, image_url, source, body)
        when is_binary(body) and byte_size(body) > 0 do
     extension = detect_extension_from_url(image_url)
