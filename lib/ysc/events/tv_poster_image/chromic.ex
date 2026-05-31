@@ -52,7 +52,18 @@ defmodule Ysc.Events.TvPosterImage.Chromic do
            timeout: 30_000
          ) do
       {:ok, base64} when is_binary(base64) ->
-        {:ok, Base.decode64!(base64)}
+        case Base.decode64(base64) do
+          {:ok, binary} ->
+            {:ok, binary}
+
+          :error ->
+            Ysc.Logging.error(
+              "TV poster ChromicPDF capture returned invalid base64",
+              extra: %{format: format}
+            )
+
+            {:error, :invalid_base64}
+        end
 
       other ->
         Ysc.Logging.error("TV poster ChromicPDF capture failed",

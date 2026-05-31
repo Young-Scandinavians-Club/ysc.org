@@ -123,17 +123,21 @@ defmodule YscWeb.Components.Events.EventTvPoster do
 
     cond do
       start_date && start_time ->
-        date_str = Timex.format!(start_date, "{Mshort} {D}, {YYYY}")
-        time_str = Timex.format!(start_time, "{h12}:{m} {AM}")
+        date_str = Calendar.strftime(start_date, "%b %-d, %Y")
+        time_str = Calendar.strftime(event_time(start_time), "%-I:%M %p")
         "#{date_str} · #{time_str}"
 
       start_date ->
-        Timex.format!(start_date, "{Mshort} {D}, {YYYY}")
+        Calendar.strftime(start_date, "%b %-d, %Y")
 
       true ->
         "Date TBD"
     end
   end
+
+  defp event_time(%Time{} = time), do: time
+  defp event_time(%NaiveDateTime{} = dt), do: NaiveDateTime.to_time(dt)
+  defp event_time(%DateTime{} = dt), do: DateTime.to_time(dt)
 
   defp event_image_url(nil), do: "/images/ysc_logo.webp"
 

@@ -64,4 +64,30 @@ defmodule YscWeb.Components.EventTvPosterTest do
 
     assert html =~ "Sold Out"
   end
+
+  test "formats event date and time with Calendar" do
+    assigns = %{
+      event:
+        poster_event(%{
+          start_date: ~D[2026-07-28],
+          start_time: ~T[19:00:00]
+        }),
+      event_url: "https://ysc.org/events/abc",
+      sold_out: false,
+      selling_fast: false
+    }
+
+    html =
+      rendered_to_string(~H"""
+      <.event_tv_poster
+        event={@event}
+        event_url={@event_url}
+        sold_out={@sold_out}
+        selling_fast={@selling_fast}
+      />
+      """)
+
+    assert html =~ "Jul 28, 2026"
+    assert html =~ "7:00 PM"
+  end
 end
