@@ -12,7 +12,8 @@ defmodule YscWeb.Components.EventTvPosterTest do
         image: nil,
         state: :published,
         start_date: ~U[2026-07-01 18:00:00Z],
-        location: "Tahoe"
+        location: "Tahoe",
+        location_name: "Tahoe"
       },
       event_url: "https://ysc.org/events/abc",
       sold_out: false,
@@ -42,7 +43,8 @@ defmodule YscWeb.Components.EventTvPosterTest do
         image: nil,
         state: :published,
         start_date: ~U[2026-07-01 18:00:00Z],
-        location: "Tahoe"
+        location: "Tahoe",
+        location_name: "Tahoe"
       },
       event_url: "https://ysc.org/events/abc",
       sold_out: true,
