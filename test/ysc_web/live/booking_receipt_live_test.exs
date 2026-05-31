@@ -891,7 +891,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "See you at the Cabin, Member"
     end
 
-    test "buyout booking shows Full Buyout when no rooms linked", %{conn: conn} do
+    test "buyout booking shows Entire cabin when no rooms linked", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
@@ -904,7 +904,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Full Buyout"
+      assert html =~ "Entire cabin"
+      assert html =~ "Reservation type"
     end
 
     test "displays Clear Lake in copy", %{conn: conn} do
@@ -1487,7 +1488,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert has_element?(view, ~s([data-show-confetti="false"]))
     end
 
-    test "room mode without preloaded rooms shows Per Guest label", %{
+    test "room mode without preloaded rooms shows Individual room(s) label", %{
       conn: conn
     } do
       user = user_fixture()
@@ -1502,7 +1503,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Per Guest"
+      assert html =~ "Individual room(s)"
+      assert html =~ "Reservation type"
     end
   end
 
@@ -1538,7 +1540,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       render_async(view, @async_timeout_ms)
       html = render(view)
 
-      assert html =~ "Full Buyout"
+      assert html =~ "Entire cabin"
       assert html =~ "× 3"
     end
 
