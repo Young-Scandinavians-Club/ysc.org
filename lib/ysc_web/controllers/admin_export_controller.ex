@@ -20,7 +20,7 @@ defmodule YscWeb.AdminExportController do
       not AdminExportFiles.valid_filename?(filename) ->
         YscWeb.ErrorHTML.render_page(conn, :"404")
 
-      AdminExportFiles.export_owner_id(filename) != to_string(user.id) ->
+      not AdminExportFiles.owned_by_user?(filename, user) ->
         YscWeb.ErrorHTML.render_page(conn, :"403")
 
       true ->

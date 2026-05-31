@@ -3,13 +3,14 @@ defmodule YscWeb.AdminExportFiles do
 
   alias YscWeb.SafeSendFile
 
-  @exports_root Path.join([:code.priv_dir(:ysc), "static", "exports"])
-
   @export_filename_regex ~r/^ysc-user-export-(\d{4}-\d{2}-\d{2})-([0-9A-HJKMNP-TV-Z]{26})-([0-9A-HJKMNP-TV-Z]{26})\.csv$/u
 
   @export_unavailable "Export file is no longer available. Please run the export again."
 
-  def exports_root, do: @exports_root
+  @spec exports_root() :: String.t()
+  def exports_root do
+    Path.join([:code.priv_dir(:ysc), "static", "exports"])
+  end
 
   @spec valid_filename?(String.t()) :: boolean()
   def valid_filename?(filename) when is_binary(filename) do
@@ -26,6 +27,16 @@ defmodule YscWeb.AdminExportFiles do
     end
   end
 
+  @spec owned_by_user?(String.t(), map()) :: boolean()
+  def owned_by_user?(filename, user) when is_binary(filename) do
+    case export_owner_id(filename) do
+      owner_id when is_binary(owner_id) -> ulid_match?(owner_id, user.id)
+      _ -> false
+    end
+  end
+
+  def owned_by_user?(_, _), do: false
+
   @spec filename_from_path(String.t()) :: String.t() | nil
   def filename_from_path(path) when is_binary(path) do
     path
@@ -41,7 +52,7 @@ defmodule YscWeb.AdminExportFiles do
           {:ok, binary(), String.t()} | {:error, :invalid | :missing}
   def read(filename) when is_binary(filename) do
     with true <- valid_filename?(filename),
-         {:ok, content} <- SafeSendFile.read_within(@exports_root, filename) do
+         {:ok, content} <- SafeSendFile.read_within(exports_root(), filename) do
       {:ok, content, filename}
     else
       false -> {:error, :invalid}
@@ -57,7 +68,7 @@ defmodule YscWeb.AdminExportFiles do
 
     with true <- valid_filename?(filename),
          true <- is_binary(owner_id),
-         true <- owner_id == to_string(user.id),
+         true <- ulid_match?(owner_id, user.id),
          {:ok, content, ^filename} <- read(filename) do
       {:ok, content, filename}
     else
@@ -80,4 +91,11 @@ defmodule YscWeb.AdminExportFiles do
         end
     end
   end
+
+  defp ulid_match?(left, right) do
+    normalize_ulid(left) == normalize_ulid(right)
+  end
+
+  defp normalize_ulid(id) when is_binary(id), do: String.upcase(id)
+  defp normalize_ulid(id), do: id |> to_string() |> String.upcase()
 end

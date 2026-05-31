@@ -14,7 +14,6 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Payments
   alias Ysc.Subscriptions
   alias YscWeb.AdminBadgeHelpers
-  alias YscWeb.AdminExportFiles
 
   def render(assigns) do
     ~H"""
@@ -463,18 +462,17 @@ defmodule YscWeb.AdminUsersLive do
                 {@export_error}
               </p>
 
-              <button
+              <a
                 :if={@export_status == :complete}
                 id="download-user-export-button"
-                type="button"
-                phx-click="download-export"
+                href={@file_export_path}
                 class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
               >
                 <.icon
                   name="hero-document-check"
                   class="mt-0.5 w-5 h-5 flex-none text-green-600"
                 /> Download file
-              </button>
+              </a>
             </form>
           </div>
         </.dropdown>
@@ -973,7 +971,7 @@ defmodule YscWeb.AdminUsersLive do
       channel: topic,
       fields: reduced_fields,
       only_subscribed: only_subscribed?,
-      created_by_user_id: exporting_user.id
+      created_by_user_id: to_string(exporting_user.id)
     }
     |> YscWeb.Workers.UserExporter.new()
     |> Oban.insert()
@@ -1213,10 +1211,6 @@ defmodule YscWeb.AdminUsersLive do
     {:noreply, assign_form(socket, form_data)}
   end
 
-  def handle_event("download-export", _params, socket) do
-    {:noreply, push_user_export_download(socket)}
-  end
-
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     form = to_form(changeset, as: "user")
 
@@ -1243,13 +1237,11 @@ defmodule YscWeb.AdminUsersLive do
       ) do
     unsubscribe_exporter(socket)
 
-    socket =
-      socket
-      |> assign(:export_progress, 100)
-      |> assign(:export_status, :complete)
-      |> assign(:file_export_path, path)
-
-    {:noreply, push_user_export_download(socket)}
+    {:noreply,
+     socket
+     |> assign(:export_progress, 100)
+     |> assign(:export_status, :complete)
+     |> assign(:file_export_path, path)}
   end
 
   def handle_info(
@@ -1272,24 +1264,6 @@ defmodule YscWeb.AdminUsersLive do
 
   defp unsubscribe_exporter(socket) do
     YscWeb.Endpoint.unsubscribe(exporter_topic(exporting_admin_user(socket)))
-  end
-
-  defp push_user_export_download(socket) do
-    case AdminExportFiles.read_from_path(
-           socket.assigns[:file_export_path],
-           exporting_admin_user(socket)
-         ) do
-      {:ok, content, filename} ->
-        push_event(socket, "download-csv", %{
-          content: Base.encode64(content),
-          filename: filename
-        })
-
-      {:error, message} ->
-        socket
-        |> assign(:export_status, :failed)
-        |> assign(:export_error, message)
-    end
   end
 
   defp maybe_update_filter(%{"value" => [""]} = filter),

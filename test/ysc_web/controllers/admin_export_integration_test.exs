@@ -46,32 +46,57 @@ defmodule YscWeb.AdminExportIntegrationTest do
            )
   end
 
-  test "LiveView download-export reads CSV from disk after export completes", %{
-    conn: conn
-  } do
+  test "LiveView shows authenticated export download link after export completes",
+       %{
+         conn: conn
+       } do
     admin = user_fixture(%{state: :active, role: :admin})
     conn = log_in_user(conn, admin)
     _user = user_fixture(%{first_name: "Export", last_name: "Row"})
 
     {:ok, view, _html} = live(conn, ~p"/admin/users")
 
-    view
-    |> form("form[phx-submit=export-csv]", %{
-      "csv_export" => %{
-        "id" => "true",
-        "email" => "true",
-        "first_name" => "false",
-        "last_name" => "false",
-        "phone_number" => "false",
-        "state" => "false",
-        "address" => "false",
-        "only_subscribers" => "false"
-      }
-    })
-    |> render_submit()
+    html =
+      view
+      |> form("form[phx-submit=export-csv]", %{
+        "csv_export" => %{
+          "id" => "true",
+          "email" => "true",
+          "first_name" => "false",
+          "last_name" => "false",
+          "phone_number" => "false",
+          "state" => "false",
+          "address" => "false",
+          "only_subscribers" => "false"
+        }
+      })
+      |> render_submit()
 
-    assert has_element?(view, "#download-user-export-button")
-    assert render_click(view, "download-export") =~ "Download file"
+    refute html =~ "Export file is no longer available"
+
+    assert has_element?(
+             view,
+             "#download-user-export-button[href*='/admin/exports/']"
+           )
+
+    href =
+      view
+      |> element("#download-user-export-button")
+      |> render()
+      |> extract_href!()
+
+    filename = href |> String.replace_prefix("/admin/exports/", "")
+
+    assert YscWeb.AdminExportFiles.owned_by_user?(filename, admin)
+
+    download_conn = get(conn, href)
+    assert download_conn.status == 200
+    assert hd(get_resp_header(download_conn, "content-type")) =~ "text/csv"
+  end
+
+  defp extract_href!(html) do
+    [_, href] = Regex.run(~r/href="([^"]+)"/, html)
+    href
   end
 
   test "missing export file returns 404 not 406", %{conn: conn} do
