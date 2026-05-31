@@ -25,8 +25,8 @@ defmodule YscWeb.ErrorHTML do
       when template in [:"400", :"403", :"404", :"500"] do
     conn
     |> put_status(template_to_status(template))
-    |> put_root_layout(html: false)
-    |> put_layout(html: {YscWeb.Layouts, :error})
+    |> put_root_layout(html: {YscWeb.Layouts, :error})
+    |> put_layout(html: false)
     |> put_view(html: __MODULE__)
     |> Phoenix.Controller.render(template)
   end
