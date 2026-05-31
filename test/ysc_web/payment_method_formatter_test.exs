@@ -99,6 +99,110 @@ defmodule YscWeb.PaymentMethodFormatterTest do
     end
   end
 
+  describe "payment_details_from_payment_intent/2" do
+    defmodule StripeClientStub do
+      def retrieve_payment_method("pm_plain_card") do
+        {:ok,
+         %{
+           type: "card",
+           card: %{brand: "visa", last4: "1111"}
+         }}
+      end
+
+      def retrieve_payment_method(_id), do: {:error, :not_found}
+
+      def retrieve_charge("ch_link_wallet", _opts) do
+        {:ok,
+         %{
+           payment_method_details: %{
+             card: %{
+               brand: "visa",
+               last4: "9999",
+               wallet: %{type: "link", dynamic_last4: "4242"}
+             }
+           }
+         }}
+      end
+
+      def retrieve_charge(_id, _opts), do: {:error, :not_found}
+    end
+
+    test "uses embedded payment method when it includes last four" do
+      payment_intent = %{
+        payment_method: %{
+          type: "card",
+          card: %{brand: "visa", last4: "4242"}
+        }
+      }
+
+      assert PaymentMethodFormatter.payment_details_from_payment_intent(
+               payment_intent,
+               StripeClientStub
+             ) == {"card", "4242", "visa"}
+    end
+
+    test "prefers charge last four when payment method omits wallet dynamic_last4" do
+      payment_intent = %{
+        payment_method: %{
+          type: "card",
+          card: %{
+            brand: "visa",
+            wallet: %{type: "link"}
+          }
+        },
+        latest_charge: %{
+          payment_method_details: %{
+            card: %{
+              brand: "visa",
+              last4: "1111",
+              wallet: %{type: "link", dynamic_last4: "4242"}
+            }
+          }
+        }
+      }
+
+      assert PaymentMethodFormatter.payment_details_from_payment_intent(
+               payment_intent,
+               StripeClientStub
+             ) == {"link", "4242", "visa"}
+    end
+
+    test "retrieves payment method by id when intent only stores the id string" do
+      payment_intent = %{payment_method: "pm_plain_card"}
+
+      assert PaymentMethodFormatter.payment_details_from_payment_intent(
+               payment_intent,
+               StripeClientStub
+             ) == {"card", "1111", "visa"}
+    end
+
+    test "retrieves charge by id when latest_charge is not expanded" do
+      payment_intent = %{payment_method: nil, latest_charge: "ch_link_wallet"}
+
+      assert PaymentMethodFormatter.payment_details_from_payment_intent(
+               payment_intent,
+               StripeClientStub
+             ) == {"link", "4242", "visa"}
+    end
+
+    test "prefers native Link charge details when payment method is empty" do
+      payment_intent = %{
+        payment_method: nil,
+        latest_charge: %{
+          payment_method_details: %{
+            type: "link",
+            link: %{email: "member@ysc.org"}
+          }
+        }
+      }
+
+      assert PaymentMethodFormatter.payment_details_from_payment_intent(
+               payment_intent,
+               StripeClientStub
+             ) == {"link", nil, "member@ysc.org"}
+    end
+  end
+
   describe "format_payment_method_for_receipt/3" do
     test "formats card with PAN mask only (brand shown via logo)" do
       assert PaymentMethodFormatter.format_payment_method_for_receipt(
