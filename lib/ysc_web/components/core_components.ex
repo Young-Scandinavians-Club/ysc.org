@@ -1665,7 +1665,7 @@ defmodule YscWeb.CoreComponents do
           !@mobile && "absolute shadow",
           @wide && "wide"
         ]}
-        phx-click-away={toggle_dropdown("##{@id}")}
+        phx-click-away={close_dropdown("##{@id}")}
       >
         {render_slot(@inner_block)}
       </div>
@@ -2841,6 +2841,26 @@ defmodule YscWeb.CoreComponents do
     )
     |> JS.remove_attribute("aria-expanded", to: to)
     |> JS.remove_class("dropdown-open", to: "##{id}Link")
+  end
+
+  @doc """
+  Closes a dropdown opened via `toggle_dropdown/1` without toggling.
+
+  Idempotent: safe to call when the menu is already closed (e.g. click-away).
+  """
+  def close_dropdown(to) do
+    id = String.replace(to, "#", "")
+    button_id = "##{id}Link"
+
+    JS.add_class("hidden", to: to)
+    |> JS.remove_class("dropdown-open", to: button_id)
+    |> JS.remove_attribute("aria-expanded", to: button_id)
+    |> JS.hide(
+      to: to,
+      transition:
+        {"transition ease-in duration-75", "transform opacity-100 scale-100",
+         "transform opacity-0 scale-95"}
+    )
   end
 
   @spec translate_error({binary(), keyword() | map()}) :: binary()
