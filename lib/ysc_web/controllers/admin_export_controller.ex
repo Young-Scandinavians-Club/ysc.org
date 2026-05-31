@@ -11,7 +11,7 @@ defmodule YscWeb.AdminExportController do
 
   @exports_root Path.join([:code.priv_dir(:ysc), "static", "exports"])
 
-  @export_filename_regex ~r/^ysc-user-export-\d{4}-\d{2}-\d{2}-[0-9A-HJKMNP-TV-Z]{26}\.csv$/u
+  @export_filename_regex ~r/^ysc-user-export-(\d{4}-\d{2}-\d{2})-([0-9A-HJKMNP-TV-Z]{26})-([0-9A-HJKMNP-TV-Z]{26})\.csv$/u
 
   def show(conn, %{"filename" => filename}) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
@@ -29,8 +29,21 @@ defmodule YscWeb.AdminExportController do
         |> put_view(html: YscWeb.ErrorHTML)
         |> render(:"404")
 
+      export_owner_id(filename) != user.id ->
+        conn
+        |> put_status(:forbidden)
+        |> put_view(html: YscWeb.ErrorHTML)
+        |> render(:"403")
+
       true ->
         serve_export(conn, filename, user)
+    end
+  end
+
+  defp export_owner_id(filename) do
+    case Regex.run(@export_filename_regex, filename) do
+      [_full, _date, owner_id, _file_ulid] -> owner_id
+      _ -> nil
     end
   end
 

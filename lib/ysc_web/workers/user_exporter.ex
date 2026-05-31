@@ -22,7 +22,8 @@ defmodule YscWeb.Workers.UserExporter do
         args: %{
           "channel" => channel,
           "fields" => fields,
-          "only_subscribed" => only_subscribed
+          "only_subscribed" => only_subscribed,
+          "created_by_user_id" => created_by_user_id
         }
       }) do
     Ysc.Logging.info(
@@ -30,7 +31,7 @@ defmodule YscWeb.Workers.UserExporter do
     )
 
     try do
-      build_csv(fields, only_subscribed)
+      build_csv(fields, only_subscribed, created_by_user_id)
       await_csv(channel)
       :ok
     rescue
@@ -49,7 +50,7 @@ defmodule YscWeb.Workers.UserExporter do
   end
 
   # sobelow_skip ["Traversal.FileModule"]
-  defp build_csv(fields, only_subscribed) do
+  defp build_csv(fields, only_subscribed, created_by_user_id) do
     job_pid = self()
     Ysc.Logging.info("UserExporter: Starting build_csv")
 
@@ -95,7 +96,7 @@ defmodule YscWeb.Workers.UserExporter do
 
       Ysc.Logging.info("UserExporter: Total count: #{total_count}")
 
-      output_path = generate_output_path()
+      output_path = generate_output_path(created_by_user_id)
       Ysc.Logging.info("UserExporter: Output path: #{output_path}")
       file = File.open!(output_path, [:write, :utf8])
 
@@ -386,12 +387,13 @@ defmodule YscWeb.Workers.UserExporter do
   end
 
   # sobelow_skip ["Traversal.FileModule"]
-  defp generate_output_path() do
+  defp generate_output_path(created_by_user_id) do
     ulid = Ecto.ULID.generate()
     time_now = Timex.now()
     formatted_now = Timex.format!(time_now, "%F", :strftime)
     export_directory = "#{:code.priv_dir(:ysc)}/static/exports"
     File.mkdir_p(export_directory)
-    "#{export_directory}/ysc-user-export-#{formatted_now}-#{ulid}.csv"
+
+    "#{export_directory}/ysc-user-export-#{formatted_now}-#{created_by_user_id}-#{ulid}.csv"
   end
 end

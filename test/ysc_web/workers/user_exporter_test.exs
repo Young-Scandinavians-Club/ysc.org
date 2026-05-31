@@ -19,13 +19,17 @@ defmodule YscWeb.Workers.UserExporterTest do
   @expected_renewal_time "12:30 PM"
   @expected_renewal_tz "PST"
 
-  defp oban_job(channel, fields, only_subscribed) do
+  defp oban_job(channel, fields, only_subscribed, created_by_user_id \\ nil) do
+    created_by_user_id =
+      created_by_user_id || Ecto.ULID.generate()
+
     %Oban.Job{
       id: System.unique_integer([:positive]),
       args: %{
         "channel" => channel,
         "fields" => fields,
-        "only_subscribed" => only_subscribed
+        "only_subscribed" => only_subscribed,
+        "created_by_user_id" => created_by_user_id
       },
       worker: "YscWeb.Workers.UserExporter",
       queue: "exports",

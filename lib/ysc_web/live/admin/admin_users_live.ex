@@ -979,7 +979,8 @@ defmodule YscWeb.AdminUsersLive do
     %{
       channel: topic,
       fields: reduced_fields,
-      only_subscribed: only_subscribed?
+      only_subscribed: only_subscribed?,
+      created_by_user_id: current_user.id
     }
     |> YscWeb.Workers.UserExporter.new()
     |> Oban.insert()

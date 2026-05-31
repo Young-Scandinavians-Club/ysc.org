@@ -1488,24 +1488,43 @@ defmodule YscWeb.AdminScannerLive do
   end
 
   def handle_event("resume_session", %{"session-id" => session_id}, socket) do
-    session = Scanning.get_session!(session_id)
+    current_user_id = socket.assigns.current_user.id
 
     socket =
-      if is_nil(session.closed_at) do
-        scan_count = Scanning.get_session_scan_count(session_id)
+      case Scanning.authorize_session_owner!(session_id, current_user_id) do
+        :ok ->
+          resume_session_socket(socket, session_id)
 
-        socket
-        |> assign(:phase, :scanning)
-        |> assign(:active_session, session)
-        |> assign(:scan_count, scan_count)
-        |> assign(:scan_result, nil)
-        |> assign(:camera_error, nil)
-        |> assign(:group_prompt, nil)
-      else
-        put_flash(socket, :error, "That session is already closed.")
+        {:error, :unauthorized} ->
+          put_flash(
+            socket,
+            :error,
+            "You can only resume scan sessions you created."
+          )
+
+        {:error, :not_found} ->
+          put_flash(socket, :error, "Scan session not found.")
       end
 
     {:noreply, socket}
+  end
+
+  defp resume_session_socket(socket, session_id) do
+    session = Scanning.get_session!(session_id)
+
+    if is_nil(session.closed_at) do
+      scan_count = Scanning.get_session_scan_count(session_id)
+
+      socket
+      |> assign(:phase, :scanning)
+      |> assign(:active_session, session)
+      |> assign(:scan_count, scan_count)
+      |> assign(:scan_result, nil)
+      |> assign(:camera_error, nil)
+      |> assign(:group_prompt, nil)
+    else
+      put_flash(socket, :error, "That session is already closed.")
+    end
   end
 
   def handle_event("end_session", _params, socket) do
@@ -1532,14 +1551,33 @@ defmodule YscWeb.AdminScannerLive do
   end
 
   def handle_event("export-csv", %{"session-id" => session_id}, socket) do
-    csv_content = Scanning.export_session_csv(session_id)
-    encoded = Base.encode64(csv_content)
+    current_user_id = socket.assigns.current_user.id
 
-    filename =
-      "scan_session_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+    case Scanning.authorize_session_owner!(session_id, current_user_id) do
+      :ok ->
+        csv_content = Scanning.export_session_csv(session_id)
+        encoded = Base.encode64(csv_content)
 
-    {:noreply,
-     push_event(socket, "download-csv", %{content: encoded, filename: filename})}
+        filename =
+          "scan_session_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+
+        {:noreply,
+         push_event(socket, "download-csv", %{
+           content: encoded,
+           filename: filename
+         })}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "You can only export scan sessions you created."
+         )}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Scan session not found.")}
+    end
   end
 
   # --- Private ---

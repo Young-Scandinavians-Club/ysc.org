@@ -154,43 +154,19 @@ defmodule Ysc.Avatars do
 
   # sobelow_skip ["Traversal.FileModule"]
   defp download_and_create_avatar(user, image_url, source) do
-    case Req.get(image_url, max_redirects: 5, receive_timeout: 15_000) do
-      {:ok, %Req.Response{status: 200, body: body}}
-      when is_binary(body) and byte_size(body) > 0 ->
-        extension = detect_extension_from_url(image_url)
-        avatar_id = Ecto.ULID.generate()
-        key = "#{user.id}/#{avatar_id}/original#{extension}"
+    with :ok <- Ysc.Http.UrlFetchGuard.validate_url_for_server_fetch(image_url),
+         {:ok, %Req.Response{status: 200, body: body}} <-
+           Req.get(image_url, max_redirects: 0, receive_timeout: 15_000) do
+      do_store_oauth_avatar(user, image_url, source, body)
+    else
+      {:error, reason}
+      when reason in [:blocked_host, :blocked_ip, :blocked_resolved_ip] ->
+        Ysc.Logging.warning(
+          "OAuth avatar URL rejected by UrlFetchGuard",
+          extra: %{user_id: user.id, source: source, reason: reason}
+        )
 
-        tmp_path =
-          Path.join(System.tmp_dir!(), "avatar_oauth_#{avatar_id}#{extension}")
-
-        try do
-          File.write!(tmp_path, body)
-
-          {:ok, location} =
-            upload_to_s3(tmp_path, key, content_type: mime_for_ext(extension))
-
-          {:ok, avatar} =
-            create_avatar(user, %{
-              source: source,
-              original_path: location,
-              source_url: image_url
-            })
-
-          case Oban.insert(YscWeb.Workers.AvatarProcessor.new(%{id: avatar.id})) do
-            {:ok, _job} ->
-              {:ok, avatar}
-
-            {:error, reason} ->
-              Ysc.Logging.warning("Failed to enqueue avatar processing job",
-                extra: %{avatar_id: avatar.id, reason: inspect(reason)}
-              )
-
-              {:error, reason}
-          end
-        after
-          File.rm(tmp_path)
-        end
+        {:error, :download_failed}
 
       {:ok, %Req.Response{status: status}} ->
         Ysc.Logging.warning(
@@ -207,6 +183,44 @@ defmodule Ysc.Avatars do
         )
 
         {:error, :download_failed}
+    end
+  end
+
+  defp do_store_oauth_avatar(user, image_url, source, body)
+       when is_binary(body) and byte_size(body) > 0 do
+    extension = detect_extension_from_url(image_url)
+    avatar_id = Ecto.ULID.generate()
+    key = "#{user.id}/#{avatar_id}/original#{extension}"
+
+    tmp_path =
+      Path.join(System.tmp_dir!(), "avatar_oauth_#{avatar_id}#{extension}")
+
+    try do
+      File.write!(tmp_path, body)
+
+      {:ok, location} =
+        upload_to_s3(tmp_path, key, content_type: mime_for_ext(extension))
+
+      {:ok, avatar} =
+        create_avatar(user, %{
+          source: source,
+          original_path: location,
+          source_url: image_url
+        })
+
+      case Oban.insert(YscWeb.Workers.AvatarProcessor.new(%{id: avatar.id})) do
+        {:ok, _job} ->
+          {:ok, avatar}
+
+        {:error, reason} ->
+          Ysc.Logging.warning("Failed to enqueue avatar processing job",
+            extra: %{avatar_id: avatar.id, reason: inspect(reason)}
+          )
+
+          {:error, reason}
+      end
+    after
+      File.rm(tmp_path)
     end
   end
 

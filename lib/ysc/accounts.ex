@@ -520,6 +520,8 @@ defmodule Ysc.Accounts do
               user
             end
 
+          user = link_family_invite_to_signup_application(user, attrs)
+
           # Create billing address from signup application
           # This happens within the same transaction, so registration_form is guaranteed to be available
           case create_billing_address_from_signup(user) do
@@ -597,6 +599,33 @@ defmodule Ysc.Accounts do
       {:error, reason} ->
         # If reason is not a changeset (shouldn't happen, but handle it)
         {:error, reason}
+    end
+  end
+
+  # Links a family invite to the signup application only when the invite email matches
+  # the registering user. Ignores forged `family_invite_id` values from client params.
+  defp link_family_invite_to_signup_application(user, attrs) do
+    invite_id =
+      attrs
+      |> Map.get("registration_form", %{})
+      |> Map.get("family_invite_id")
+
+    with invite_id when is_binary(invite_id) and invite_id != "" <- invite_id,
+         %SignupApplication{} = application <- user.registration_form,
+         %FamilyInvite{} = invite <- Repo.get(FamilyInvite, invite_id),
+         true <-
+           String.downcase(invite.email) == String.downcase(user.email) do
+      case application
+           |> Ecto.Changeset.change(family_invite_id: invite.id)
+           |> Repo.update() do
+        {:ok, _} ->
+          Repo.preload(user, :registration_form, force: true)
+
+        {:error, _} ->
+          user
+      end
+    else
+      _ -> user
     end
   end
 
