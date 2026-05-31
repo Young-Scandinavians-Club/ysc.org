@@ -206,7 +206,7 @@ defmodule Ysc.MixProject do
       {:goth, "~> 1.4"},
       {:hammer, "~> 7.3"},
       {:html_sanitize_ex, "~> 1.5"},
-      {:image, "~> 0.67"},
+      {:image, "~> 0.68"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
       # Pin below 1.11.11: jose 1.11.11+ uses OTP 26+ `dynamic()` in Erlang specs and fails on OTP 25.
