@@ -124,7 +124,8 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert html =~ "Change Reservation"
     assert html =~ "Loading availability and price preview"
-    assert html =~ "refund forfeiture"
+    assert html =~ "changing your dates affects refunds"
+    assert html =~ "forfeit all refund eligibility"
     refute html =~ "Price preview"
   end
 
