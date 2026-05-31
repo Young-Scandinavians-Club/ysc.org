@@ -1,18 +1,17 @@
 defmodule YscWeb.BookingUserMessages do
   @moduledoc false
 
-  @reservation_not_found """
-  We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.
-  """
-  |> String.trim()
+  def reservation_not_found do
+    trim("""
+    We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.
+    """)
+  end
 
-  @checkout_not_found """
-  We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help.
-  """
-  |> String.trim()
-
-  def reservation_not_found, do: @reservation_not_found
-  def checkout_not_found, do: @checkout_not_found
+  def checkout_not_found do
+    trim("""
+    We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help.
+    """)
+  end
 
   def modification_acknowledgment_required do
     "Please check the box at the bottom of the form confirming you understand that changing this reservation means you won't receive a refund, even if our usual cancellation policy would allow one."
@@ -45,4 +44,6 @@ defmodule YscWeb.BookingUserMessages do
   def checkout_payment_step_confirm_complimentary do
     "Confirm your booking above"
   end
+
+  defp trim(string), do: String.trim(string)
 end
