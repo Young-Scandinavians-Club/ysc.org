@@ -554,7 +554,11 @@ defmodule YscWeb.BookingReceiptLive do
                     else: "text-zinc-400"
                   )
                 ]}>
-                  Room Assignment
+                  <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
+                    {if length(@booking.rooms) == 1, do: "Room", else: "Rooms"}
+                  <% else %>
+                    Reservation type
+                  <% end %>
                 </p>
                 <p class={[
                   "text-xl font-bold",
@@ -567,9 +571,9 @@ defmodule YscWeb.BookingReceiptLive do
                     {Enum.map_join(@booking.rooms, ", ", fn room -> room.name end)}
                   <% else %>
                     <%= if @booking.booking_mode == :buyout do %>
-                      Full Buyout
+                      Entire cabin
                     <% else %>
-                      Per Guest
+                      Individual room(s)
                     <% end %>
                   <% end %>
                 </p>
@@ -795,7 +799,7 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-400"
                             )
                           }>
-                            Full Buyout
+                            Entire cabin
                             ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
                             )} × {@price_breakdown.nights} {if @price_breakdown.nights ==

@@ -1002,7 +1002,7 @@ defmodule YscWeb.TahoeBookingLive do
                     {booking.guests_count} {if booking.guests_count == 1,
                       do: "Guest",
                       else: "Guests"} • {if booking.booking_mode == :buyout do
-                      "Full Buyout"
+                      "Entire cabin"
                     else
                       if Ecto.assoc_loaded?(booking.rooms) &&
                            length(booking.rooms) > 0 do
@@ -1157,7 +1157,7 @@ defmodule YscWeb.TahoeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Full Cabin Buyout
+                            Rent the entire cabin
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
@@ -1167,7 +1167,7 @@ defmodule YscWeb.TahoeBookingLive do
                           :if={not can_select_booking_mode?(@seasons, @today)}
                           class="text-xs text-amber-600 mt-2 ml-9 font-medium"
                         >
-                          Full buyout is only available May–November.
+                          Renting the entire cabin is only available May–November.
                         </p>
                       </label>
                     </div>
@@ -1192,10 +1192,10 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <div class="flex-1">
                       <p class="text-sm font-semibold text-red-900">
-                        ⚠️ Action Required
+                        Weekend stay rule
                       </p>
                       <p class="text-xs text-red-800">
-                        You've selected Saturday. Please select Sunday as your checkout date to complete your booking.
+                        Check-ins on Saturday must be for one night only, with departure on Sunday. Choose Sunday as your check-out date, or pick different arrival dates if you need a longer stay.
                       </p>
                     </div>
                   </div>
@@ -1211,9 +1211,9 @@ defmodule YscWeb.TahoeBookingLive do
                       month = @checkin_date.month
 
                       if month >= 12 or month <= 4 do
-                        "December–April: Individual rooms only. Full buyouts available May–Nov."
+                        "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
                       else
-                        "May–November: Full buyouts available. Individual rooms also available."
+                        "May–November: you can rent the entire cabin or book individual rooms."
                       end
                     end}
                   </p>
@@ -1584,7 +1584,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <p class="text-sm font-medium text-zinc-800 mb-2">
                       The calendar shows which dates are available for exclusive full cabin rental.
                       <span class="font-semibold text-blue-700">
-                        Dates with any room bookings are not available for buyout.
+                        Some dates are unavailable for whole-cabin rental because other members have already booked rooms on those dates.
                       </span>
                     </p>
                     <p class="text-xs text-zinc-600">
@@ -2341,7 +2341,7 @@ defmodule YscWeb.TahoeBookingLive do
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
-                      Full Cabin Buyout
+                      Entire cabin
                     </div>
                   </div>
                   <!-- Price Breakdown -->
@@ -2357,7 +2357,7 @@ defmodule YscWeb.TahoeBookingLive do
                         class="flex justify-between text-sm"
                       >
                         <span class="text-zinc-600">
-                          Full Buyout
+                          Entire cabin
                           <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
                             ({MoneyHelper.format_money!(
                               @price_breakdown.price_per_night
@@ -2833,7 +2833,7 @@ defmodule YscWeb.TahoeBookingLive do
                             <li>
                               Family Members: Max 2 rooms (must be same dates).
                             </li>
-                            <li>No full cabin buyouts during winter.</li>
+                            <li>You cannot rent the entire cabin during winter (December–April).</li>
                           </ul>
                         </div>
                         <div>
@@ -2966,7 +2966,7 @@ defmodule YscWeb.TahoeBookingLive do
                       </h4>
                       <div class="space-y-1 ml-4">
                         <p>
-                          <strong>Full Cabin:</strong>
+                          <strong>Entire cabin:</strong>
                           50% forfeiture &lt; 21 days; 100% forfeiture &lt; 14 days.
                         </p>
                         <p>
@@ -3242,7 +3242,7 @@ defmodule YscWeb.TahoeBookingLive do
                     <ul class="space-y-2 text-zinc-700">
                       <li>
                         <strong>Step 1:</strong>
-                        Choose your booking mode (individual rooms or full cabin buyout).
+                        Choose your booking mode (individual rooms or rent the entire cabin).
                       </li>
                       <li>
                         <strong>Step 2:</strong>
@@ -4100,7 +4100,7 @@ defmodule YscWeb.TahoeBookingLive do
                             <p class="font-semibold mb-2">
                               {if @buyout_refund_policy.name,
                                 do: @buyout_refund_policy.name,
-                                else: "Full Cabin Buyout"}:
+                                else: "Entire cabin"}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- Enum.sort_by(@buyout_refund_policy.rules, & &1.days_before_checkin, :desc) do %>
@@ -6434,7 +6434,7 @@ defmodule YscWeb.TahoeBookingLive do
         Map.put(
           errors,
           :season_booking_mode,
-          "Full buyout is not available for the selected dates"
+          "Renting the entire cabin is not available for the selected dates"
         )
       end
     else
@@ -6469,7 +6469,7 @@ defmodule YscWeb.TahoeBookingLive do
           Map.put(
             errors,
             :availability,
-            "You cannot book a full buyout while you have an active or future reservation. Please complete or cancel your existing reservation first."
+            "You cannot rent the entire cabin while you have an active or future reservation. Please complete or cancel your existing reservation first."
           )
         else
           # 2. Check for blackouts
@@ -7515,7 +7515,7 @@ defmodule YscWeb.TahoeBookingLive do
 
       # Buyout
       MapSet.member?(context.buyout_dates, context.date) ->
-        "Full cabin buyout is already reserved on this date"
+        "The entire cabin is already reserved on this date"
 
       # Check if all rooms are booked (for room booking mode)
       true ->
