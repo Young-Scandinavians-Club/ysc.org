@@ -229,6 +229,22 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     assert checkout_with == checkout_without
   end
 
+  test "calendar_placeholder returns bounds without loading seasons from the database" do
+    booking = %Booking{
+      property: :tahoe,
+      checkin_date: ~D[2026-06-01],
+      checkout_date: ~D[2026-06-05],
+      booking_mode: :buyout
+    }
+
+    calendar = ModificationDateAvailability.calendar_placeholder(booking)
+
+    assert calendar.seasons == []
+    assert calendar.min_date == calendar.today
+    assert Date.compare(calendar.max_date, calendar.today) == :gt
+    assert calendar.max_nights == 365
+  end
+
   defp first_monday_on_or_after(date) do
     days_until_monday = rem(8 - Date.day_of_week(date, :monday), 7)
     Date.add(date, days_until_monday)

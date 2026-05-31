@@ -143,8 +143,6 @@ defmodule YscWeb.ExpenseReportLive do
     )
     |> assign(:expense_report, expense_report)
     |> assign(:totals, totals)
-    |> assign(:bank_accounts, ExpenseReports.list_bank_accounts(user))
-    |> assign(:billing_address, Accounts.get_billing_address(user))
     |> assign(:show_confetti, show_confetti)
   end
 
