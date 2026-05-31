@@ -462,6 +462,54 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                )
     end
 
+    test "apply_modification without payment intent requires an active hold", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(122)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} = Bookings.prepare_modification(booking, attrs)
+      assert Money.positive?(preview.delta)
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, %{
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 guests_count: 2,
+                 children_count: 0
+               })
+
+      expired_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :minute)
+        |> DateTime.truncate(:second)
+
+      held_booking
+      |> Ecto.Changeset.change(modification_hold_expires_at: expired_at)
+      |> Repo.update!()
+
+      assert {:error, :modification_hold_expired} =
+               Bookings.apply_modification(booking, attrs)
+    end
+
     test "apply_modification refreshes an expired hold after payment succeeds",
          %{
            user: user
