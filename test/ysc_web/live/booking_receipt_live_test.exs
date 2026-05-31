@@ -1290,7 +1290,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
         "modification" => "true"
       }
 
-      module_name = :"ReceiptModificationRedirectStripe#{System.unique_integer([:positive])}"
+      module_name =
+        :"ReceiptModificationRedirectStripe#{System.unique_integer([:positive])}"
 
       {:module, test_stripe_client, _, _} =
         Module.create(
@@ -1301,7 +1302,9 @@ defmodule YscWeb.BookingReceiptLiveTest do
             def create_payment_intent(_params, _opts),
               do: {:error, :not_implemented}
 
-            def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
             def create_customer(_params), do: {:error, :not_implemented}
             def update_customer(_id, _params), do: {:error, :not_implemented}
             def retrieve_payment_method(_id), do: {:error, :not_implemented}
