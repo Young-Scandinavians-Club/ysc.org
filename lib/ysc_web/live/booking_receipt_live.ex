@@ -1634,7 +1634,8 @@ defmodule YscWeb.BookingReceiptLive do
     payment = payment_summary.latest
 
     # Get refund info - pass payment to avoid duplicate query
-    refund_info = get_refund_info_with_payment(booking, payment, payment_summary.total_paid)
+    refund_info =
+      get_refund_info_with_payment(booking, payment, payment_summary.total_paid)
 
     # Get door code if booking is within 48 hours of check-in or currently active
     {door_code, show_door_code} =
@@ -2141,7 +2142,11 @@ defmodule YscWeb.BookingReceiptLive do
         _ -> []
       end
 
-    case Bookings.calculate_refund(booking, BookingActions.get_today_pst(), refund_opts) do
+    case Bookings.calculate_refund(
+           booking,
+           BookingActions.get_today_pst(),
+           refund_opts
+         ) do
       {:ok, refund_amount, applied_rule} ->
         policy =
           Bookings.get_active_refund_policy(

@@ -70,7 +70,11 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
   defp calendar_bounds(booking, today, seasons, opts \\ []) do
     max_date =
       Keyword.get_lazy(opts, :max_date, fn ->
-        SeasonHelpers.calculate_max_booking_date(booking.property, today, seasons)
+        SeasonHelpers.calculate_max_booking_date(
+          booking.property,
+          today,
+          seasons
+        )
       end)
 
     max_nights =

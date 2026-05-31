@@ -27,7 +27,9 @@ defmodule YscWeb.BookingChangeLive do
       case load_booking(booking_id, user) do
         {:ok, booking} ->
           if BookingActions.can_change_booking?(booking) do
-            calendar = ModificationDateAvailability.calendar_placeholder(booking)
+            calendar =
+              ModificationDateAvailability.calendar_placeholder(booking)
+
             form = modification_form(booking)
 
             socket =
