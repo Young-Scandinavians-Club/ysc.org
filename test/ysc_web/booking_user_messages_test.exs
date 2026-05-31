@@ -4,12 +4,15 @@ defmodule YscWeb.BookingUserMessagesTest do
   alias YscWeb.BookingUserMessages
 
   test "reservation not found message" do
-    assert BookingUserMessages.reservation_not_found() =~ "couldn't find this reservation"
+    assert BookingUserMessages.reservation_not_found() =~
+             "couldn't find this reservation"
+
     assert BookingUserMessages.reservation_not_found() =~ "info@ysc.org"
   end
 
   test "checkout not found message" do
-    assert BookingUserMessages.checkout_not_found() =~ "start a new booking from the cabin page"
+    assert BookingUserMessages.checkout_not_found() =~
+             "start a new booking from the cabin page"
   end
 
   test "modification messages" do
@@ -26,8 +29,12 @@ defmodule YscWeb.BookingUserMessagesTest do
   end
 
   test "checkout step copy" do
-    assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~ "every guest"
-    assert BookingUserMessages.checkout_guest_info_step_continue_payment() =~ "payment"
+    assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
+             "every guest"
+
+    assert BookingUserMessages.checkout_guest_info_step_continue_payment() =~
+             "payment"
+
     assert BookingUserMessages.checkout_payment_step_pay() =~ "secure payment"
   end
 end
