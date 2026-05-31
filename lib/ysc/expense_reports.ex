@@ -6,7 +6,7 @@ defmodule Ysc.ExpenseReports do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
-  alias Ysc.Accounts.User
+  alias Ysc.Accounts.{Address, User}
 
   alias Ysc.ExpenseReports.{
     ExpenseReport,
@@ -85,12 +85,9 @@ defmodule Ysc.ExpenseReports do
 
     changeset =
       %ExpenseReport{}
-      |> ExpenseReport.changeset(
-        Map.put(attrs, "user_id", user.id),
-        validate_address_ownership: true,
-        validate_bank_account_ownership: true
-      )
+      |> ExpenseReport.submission_changeset(Map.put(attrs, "user_id", user.id))
       |> validate_reimbursement_setup(user)
+      |> validate_reimbursement_ownership(user)
       |> validate_all_expense_items_have_receipts_for_submission()
 
     Ysc.Logging.debug(
@@ -245,9 +242,49 @@ defmodule Ysc.ExpenseReports do
     end
   end
 
+  defp validate_reimbursement_ownership(changeset, %User{} = user) do
+    changeset
+    |> validate_bank_account_owned_by_user(user)
+    |> validate_address_owned_by_user(user)
+  end
+
+  defp validate_bank_account_owned_by_user(changeset, %User{} = user) do
+    case Ecto.Changeset.get_field(changeset, :bank_account_id) do
+      nil ->
+        changeset
+
+      bank_account_id ->
+        if Repo.exists?(
+             from ba in BankAccount,
+               where: ba.id == ^bank_account_id and ba.user_id == ^user.id
+           ) do
+          changeset
+        else
+          Ecto.Changeset.add_error(changeset, :bank_account_id, "is invalid")
+        end
+    end
+  end
+
+  defp validate_address_owned_by_user(changeset, %User{} = user) do
+    case Ecto.Changeset.get_field(changeset, :address_id) do
+      nil ->
+        changeset
+
+      address_id ->
+        if Repo.exists?(
+             from a in Address,
+               where: a.id == ^address_id and a.user_id == ^user.id
+           ) do
+          changeset
+        else
+          Ecto.Changeset.add_error(changeset, :address_id, "is invalid")
+        end
+    end
+  end
+
   def update_expense_report(%ExpenseReport{} = expense_report, attrs) do
     expense_report
-    |> ExpenseReport.changeset(attrs)
+    |> ExpenseReport.status_changeset(attrs)
     |> Repo.update()
   end
 

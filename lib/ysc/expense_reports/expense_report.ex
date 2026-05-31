@@ -52,39 +52,70 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
     timestamps()
   end
 
+  @user_submittable_fields [
+    :user_id,
+    :purpose,
+    :reimbursement_method,
+    :status,
+    :address_id,
+    :bank_account_id,
+    :event_id,
+    :certification_accepted
+  ]
+
+  @internal_fields [
+    :quickbooks_bill_id,
+    :quickbooks_vendor_id,
+    :quickbooks_sync_status,
+    :quickbooks_sync_error,
+    :quickbooks_synced_at,
+    :quickbooks_last_sync_attempt_at
+  ]
+
+  @all_statuses ["draft", "submitted", "approved", "rejected", "paid"]
+  @user_submittable_statuses ["draft", "submitted"]
+
   @doc """
-  Creates a changeset for an expense report.
+  Changeset for member-submitted expense reports (create / resubmit).
+
+  Does not accept QuickBooks sync fields or privileged status values.
   """
-  def changeset(expense_report, attrs, opts \\ []) do
-    # Normalize empty string to nil for event_id before casting
+  def submission_changeset(expense_report, attrs, opts \\ []) do
     attrs = normalize_event_id_in_attrs(attrs)
 
     expense_report
-    |> cast(attrs, [
-      :user_id,
-      :purpose,
-      :reimbursement_method,
-      :status,
-      :address_id,
-      :bank_account_id,
-      :event_id,
-      :certification_accepted,
-      :quickbooks_bill_id,
-      :quickbooks_vendor_id,
-      :quickbooks_sync_status,
-      :quickbooks_sync_error,
-      :quickbooks_synced_at,
-      :quickbooks_last_sync_attempt_at
-    ])
+    |> cast(attrs, @user_submittable_fields)
     |> validate_required([:user_id, :purpose, :reimbursement_method])
     |> validate_inclusion(:reimbursement_method, ["check", "bank_transfer"])
-    |> validate_inclusion(:status, [
-      "draft",
-      "submitted",
-      "approved",
-      "rejected",
-      "paid"
-    ])
+    |> validate_inclusion(:status, @user_submittable_statuses)
+    |> validate_reimbursement_method(opts)
+    |> cast_assoc(:expense_items, with: &ExpenseReportItem.changeset/2)
+    |> cast_assoc(:income_items, with: &ExpenseReportIncomeItem.changeset/2)
+    |> validate_all_expense_items_have_receipts()
+    |> validate_certification_accepted()
+  end
+
+  @doc """
+  Changeset for admin status updates only.
+  """
+  def status_changeset(expense_report, attrs) do
+    expense_report
+    |> cast(attrs, [:status])
+    |> validate_required([:status])
+    |> validate_inclusion(:status, @all_statuses)
+  end
+
+  @doc """
+  Internal changeset for QuickBooks sync and other system updates.
+  """
+  def changeset(expense_report, attrs, opts \\ []) do
+    attrs = normalize_event_id_in_attrs(attrs)
+
+    expense_report
+    |> cast(attrs, @user_submittable_fields ++ @internal_fields)
+    |> validate_required([:user_id, :purpose, :reimbursement_method])
+    |> validate_inclusion(:reimbursement_method, ["check", "bank_transfer"])
+    |> validate_inclusion(:status, @all_statuses)
     |> validate_reimbursement_method(opts)
     |> cast_assoc(:expense_items, with: &ExpenseReportItem.changeset/2)
     |> cast_assoc(:income_items, with: &ExpenseReportIncomeItem.changeset/2)
