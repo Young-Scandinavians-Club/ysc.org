@@ -3744,7 +3744,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
       cond do
         day_availability && day_availability.is_blacked_out ->
-          "The date #{date_str} is blacked out and cannot be booked."
+          YscWeb.BookingUserMessages.clear_lake_blackout_date(date_str)
 
         day_availability && assigns[:selected_booking_mode] == :day ->
           "The date #{date_str} isn't available for shared stays — the cabin may be reserved for a private group that day."

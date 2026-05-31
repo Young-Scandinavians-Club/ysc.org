@@ -63,8 +63,12 @@ defmodule YscWeb.BookingCheckoutLive do
       )
 
     case Repo.one(booking_query) do
-      nil -> {:error, {:redirect, ~p"/", "Booking not found."}}
-      booking -> {:ok, booking}
+      nil ->
+        {:error,
+         {:redirect, ~p"/", YscWeb.BookingUserMessages.checkout_not_found()}}
+
+      booking ->
+        {:ok, booking}
     end
   end
 
@@ -959,34 +963,81 @@ defmodule YscWeb.BookingCheckoutLive do
           <div class="bg-white rounded-lg border border-zinc-200 p-6">
             <h3 class="text-lg font-bold text-zinc-900 mb-4">What Happens Next?</h3>
             <ol class="space-y-3 text-sm text-zinc-600">
-              <li class="flex items-start gap-3">
-                <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                  1
-                </span>
-                <span>Complete your secure payment above</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                  2
-                </span>
-                <span>Receive instant confirmation email with booking details</span>
-              </li>
-              <li class="flex items-start gap-3">
-                <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                  3
-                </span>
-                <span>
-                  Get cabin access information (door code or key instructions) via email before check-in
-                </span>
-              </li>
-              <li class="flex items-start gap-3">
-                <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
-                  4
-                </span>
-                <span>
-                  Access your booking details and manage your reservation anytime
-                </span>
-              </li>
+              <%= if @checkout_step == :guest_info do %>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    1
+                  </span>
+                  <span>
+                    {YscWeb.BookingUserMessages.checkout_guest_info_step_enter_guests()}
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    2
+                  </span>
+                  <span>
+                    <%= if @complimentary_checkout do %>
+                      {YscWeb.BookingUserMessages.checkout_guest_info_step_continue_complimentary()}
+                    <% else %>
+                      {YscWeb.BookingUserMessages.checkout_guest_info_step_continue_payment()}
+                    <% end %>
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    3
+                  </span>
+                  <span>
+                    Receive instant confirmation email with booking details
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    4
+                  </span>
+                  <span>
+                    Get cabin access information (door code or key instructions) via email before check-in
+                  </span>
+                </li>
+              <% else %>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    1
+                  </span>
+                  <span>
+                    <%= if @complimentary_checkout do %>
+                      {YscWeb.BookingUserMessages.checkout_payment_step_confirm_complimentary()}
+                    <% else %>
+                      {YscWeb.BookingUserMessages.checkout_payment_step_pay()}
+                    <% end %>
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    2
+                  </span>
+                  <span>
+                    Receive instant confirmation email with booking details
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    3
+                  </span>
+                  <span>
+                    Get cabin access information (door code or key instructions) via email before check-in
+                  </span>
+                </li>
+                <li class="flex items-start gap-3">
+                  <span class="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs">
+                    4
+                  </span>
+                  <span>
+                    Access your booking details and manage your reservation anytime
+                  </span>
+                </li>
+              <% end %>
             </ol>
           </div>
         </aside>

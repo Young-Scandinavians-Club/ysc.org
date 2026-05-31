@@ -36,7 +36,9 @@ defmodule YscWeb.UserBookingDetailLive do
         nil ->
           {:ok,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Booking not found.",
+           |> YscWeb.Flash.put_toast(
+             :error,
+             YscWeb.BookingUserMessages.reservation_not_found(),
              title: "Booking"
            )
            |> redirect(to: ~p"/")}
