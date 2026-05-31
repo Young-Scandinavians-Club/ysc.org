@@ -807,14 +807,9 @@ defmodule YscWeb.AdminBookingsLive do
                 </div>
               <% end %>
             </div>
-            <div
-              :if={length(@booking_payments) == 0}
-              class="rounded-lg border-2 border-dashed border-zinc-300 p-4 text-center"
-            >
-              <p class="text-sm text-zinc-500">
-                No payments found for this booking.
-              </p>
-            </div>
+            <.admin_empty_panel :if={length(@booking_payments) == 0}>
+              No payments found for this booking.
+            </.admin_empty_panel>
           </div>
           <!-- Refunds Section -->
           <div class="pt-4 border-t border-zinc-200">
@@ -898,14 +893,9 @@ defmodule YscWeb.AdminBookingsLive do
                 </div>
               <% end %>
             </div>
-            <div
-              :if={length(@booking_refunds) == 0}
-              class="rounded-lg border-2 border-dashed border-zinc-300 p-4 text-center"
-            >
-              <p class="text-sm text-zinc-500">
-                No refunds found for this booking.
-              </p>
-            </div>
+            <.admin_empty_panel :if={length(@booking_refunds) == 0}>
+              No refunds found for this booking.
+            </.admin_empty_panel>
           </div>
           <!-- Check-in Section -->
           <div class="pt-4 border-t border-zinc-200">
@@ -960,17 +950,12 @@ defmodule YscWeb.AdminBookingsLive do
                 </div>
               <% end %>
             </div>
-            <div
-              :if={
-                !Ecto.assoc_loaded?(@booking.check_ins) ||
-                  length(@booking.check_ins) == 0
-              }
-              class="rounded-lg border-2 border-dashed border-zinc-300 p-4 text-center"
-            >
-              <p class="text-sm text-zinc-500">
-                No check-in recorded for this booking.
-              </p>
-            </div>
+            <.admin_empty_panel :if={
+              !Ecto.assoc_loaded?(@booking.check_ins) ||
+                length(@booking.check_ins) == 0
+            }>
+              No check-in recorded for this booking.
+            </.admin_empty_panel>
           </div>
         </div>
 
