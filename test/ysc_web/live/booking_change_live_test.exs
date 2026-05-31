@@ -25,6 +25,14 @@ defmodule YscWeb.BookingChangeLiveTest do
     :ok
   end
 
+  @change_async_timeout 5_000
+
+  defp live_change(conn, booking) do
+    {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    html = render_async(view, @change_async_timeout) || html
+    {view, html}
+  end
+
   defp complete_booking!(user) do
     {checkin, checkout} = tahoe_booking_dates(35)
 
@@ -76,7 +84,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
 
-    {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    {view, html} = live_change(conn, booking)
 
     assert html =~ "Change Reservation"
     assert html =~ "refund forfeiture"
@@ -86,7 +94,26 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert has_element?(view, "#refund-forfeiture-notice")
     assert has_element?(view, "#acknowledge-forfeiture")
     assert has_element?(view, "#submit-modification-button")
+
+    refute html =~ "Loading availability and price preview"
     refute html =~ "Number of guests"
+  end
+
+  test "dead render serves change page shell without loading availability data",
+       %{
+         conn: conn
+       } do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    conn = get(conn, ~p"/bookings/#{booking.id}/change")
+    html = html_response(conn, 200)
+
+    assert html =~ "Change Reservation"
+    assert html =~ "Loading availability and price preview"
+    assert html =~ "refund forfeiture"
+    refute html =~ "Price preview"
   end
 
   test "submit is blocked until acknowledgment is checked", %{conn: conn} do
@@ -94,7 +121,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
 
-    {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    {view, _html} = live_change(conn, booking)
 
     new_checkin = Date.add(booking.checkin_date, 7)
     new_checkout = Date.add(booking.checkout_date, 7)
@@ -127,7 +154,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
 
-    {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    {view, html} = live_change(conn, booking)
 
     assert html =~ "Change Reservation"
 
@@ -175,7 +202,7 @@ defmodule YscWeb.BookingChangeLiveTest do
                 }}
              ])
 
-    {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    {view, _html} = live_change(conn, booking)
 
     checkin_str = date_to_datetime_string(booking.checkin_date)
     checkout_str = date_to_datetime_string(booking.checkout_date)
@@ -230,7 +257,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     {checkin, checkout} = tahoe_booking_dates(35)
     booking = complete_room_booking!(user, room, checkin, checkout)
 
-    {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    {view, _html} = live_change(conn, booking)
 
     checkin_str = date_to_datetime_string(booking.checkin_date)
     checkout_str = date_to_datetime_string(booking.checkout_date)
@@ -258,7 +285,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
 
-    {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/change")
+    {view, _html} = live_change(conn, booking)
 
     shorter_checkout = Date.add(booking.checkout_date, -1)
 

@@ -597,6 +597,45 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_empty_panel
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Dashed-outline panel for empty admin detail sections (booking payments, refunds, etc.).
+
+  Pass the message in the default slot. Use `:if` on the component to show only when a list is empty.
+
+  ## Examples
+
+      <.admin_empty_panel :if={@payments == []}>
+        No payments found for this booking.
+      </.admin_empty_panel>
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the panel container"
+
+  slot :inner_block, required: true
+
+  def admin_empty_panel(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "rounded-lg border-2 border-dashed border-zinc-300 p-4 text-center",
+        @class
+      ]}
+    >
+      <p class="text-sm text-zinc-500">
+        {render_slot(@inner_block)}
+      </p>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_tabs / admin_tab
   # ---------------------------------------------------------------------------
 
