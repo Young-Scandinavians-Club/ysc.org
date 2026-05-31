@@ -2833,7 +2833,9 @@ defmodule YscWeb.TahoeBookingLive do
                             <li>
                               Family Members: Max 2 rooms (must be same dates).
                             </li>
-                            <li>You cannot rent the entire cabin during winter (December–April).</li>
+                            <li>
+                              You cannot rent the entire cabin during winter (December–April).
+                            </li>
                           </ul>
                         </div>
                         <div>
