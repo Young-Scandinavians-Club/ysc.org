@@ -586,7 +586,8 @@ defmodule Ysc.Bookings.ModifyBookingTest do
 
       assert Money.positive?(preview.delta)
 
-      assert {:ok, held_booking} = Bookings.place_modification_hold(booking, attrs)
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs)
 
       expired_at =
         DateTime.utc_now()
