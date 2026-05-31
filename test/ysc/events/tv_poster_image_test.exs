@@ -3,6 +3,7 @@ defmodule Ysc.Events.TvPosterImageTest do
 
   import Ysc.EventsFixtures
 
+  alias Ysc.Events
   alias Ysc.Events.TvPosterImage
 
   describe "normalize_format/1" do
@@ -25,6 +26,7 @@ defmodule Ysc.Events.TvPosterImageTest do
   describe "build_html/1 and capture/2" do
     test "renders capture document with event details" do
       event = event_fixture(%{title: "Poster Night"})
+      event = Events.get_event_for_tv_poster(event.id)
 
       html =
         TvPosterImage.build_html(%{
@@ -39,7 +41,7 @@ defmodule Ysc.Events.TvPosterImageTest do
     end
 
     test "capture returns stub image bytes in test" do
-      event = event_fixture()
+      event = event_fixture() |> then(&Events.get_event_for_tv_poster(&1.id))
 
       assert {:ok, binary} =
                TvPosterImage.capture(%{
@@ -51,7 +53,7 @@ defmodule Ysc.Events.TvPosterImageTest do
     end
 
     test "capture respects format option" do
-      event = event_fixture()
+      event = event_fixture() |> then(&Events.get_event_for_tv_poster(&1.id))
 
       assert {:ok, _binary} =
                TvPosterImage.capture(
