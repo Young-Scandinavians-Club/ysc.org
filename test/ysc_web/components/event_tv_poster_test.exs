@@ -5,16 +5,24 @@ defmodule YscWeb.Components.EventTvPosterTest do
   import Phoenix.LiveViewTest
   import YscWeb.Components.Events.EventTvPoster
 
-  test "renders poster layout with title and QR section" do
-    assigns = %{
-      event: %{
+  defp poster_event(overrides \\ %{}) do
+    Map.merge(
+      %{
         title: "Summer Dance",
         image: nil,
+        description: nil,
         state: :published,
         start_date: ~U[2026-07-01 18:00:00Z],
         location: "Tahoe",
         location_name: "Tahoe"
       },
+      overrides
+    )
+  end
+
+  test "renders poster layout with title and QR section" do
+    assigns = %{
+      event: poster_event(%{title: "Summer Dance"}),
       event_url: "https://ysc.org/events/abc",
       sold_out: false,
       selling_fast: true
@@ -38,14 +46,7 @@ defmodule YscWeb.Components.EventTvPosterTest do
 
   test "shows sold out badge when sold_out is true" do
     assigns = %{
-      event: %{
-        title: "Sold Out Show",
-        image: nil,
-        state: :published,
-        start_date: ~U[2026-07-01 18:00:00Z],
-        location: "Tahoe",
-        location_name: "Tahoe"
-      },
+      event: poster_event(%{title: "Sold Out Show"}),
       event_url: "https://ysc.org/events/abc",
       sold_out: true,
       selling_fast: false
