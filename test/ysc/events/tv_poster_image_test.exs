@@ -55,7 +55,10 @@ defmodule Ysc.Events.TvPosterImageTest do
 
       assert {:ok, _binary} =
                TvPosterImage.capture(
-                 %{event: event, event_url: "https://ysc.org/events/#{event.id}"},
+                 %{
+                   event: event,
+                   event_url: "https://ysc.org/events/#{event.id}"
+                 },
                  format: "jpeg"
                )
     end
