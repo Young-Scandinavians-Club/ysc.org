@@ -14,6 +14,7 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Payments
   alias Ysc.Subscriptions
   alias YscWeb.AdminBadgeHelpers
+  alias YscWeb.AdminExportFiles
 
   def render(assigns) do
     ~H"""
@@ -1274,7 +1275,10 @@ defmodule YscWeb.AdminUsersLive do
   end
 
   defp push_user_export_download(socket) do
-    case read_user_export_file(socket.assigns[:file_export_path]) do
+    case AdminExportFiles.read_from_path(
+           socket.assigns[:file_export_path],
+           exporting_admin_user(socket)
+         ) do
       {:ok, content, filename} ->
         push_event(socket, "download-csv", %{
           content: Base.encode64(content),
@@ -1287,24 +1291,6 @@ defmodule YscWeb.AdminUsersLive do
         |> assign(:export_error, message)
     end
   end
-
-  defp read_user_export_file(path) when is_binary(path) do
-    filename =
-      path |> String.replace_prefix("/admin/exports/", "") |> Path.basename()
-
-    exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
-    absolute_path = Path.join(exports_root, filename)
-
-    if File.regular?(absolute_path) do
-      {:ok, File.read!(absolute_path), filename}
-    else
-      {:error,
-       "Export file is no longer available. Please run the export again."}
-    end
-  end
-
-  defp read_user_export_file(_),
-    do: {:error, "Export file is no longer available."}
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")
