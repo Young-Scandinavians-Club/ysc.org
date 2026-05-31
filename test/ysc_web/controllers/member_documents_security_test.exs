@@ -48,7 +48,7 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
       conn =
         get(
           conn,
-          "/admin/exports/ysc-user-export-2026-05-26-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
+          "/admin/exports/ysc-user-export-2026-05-26-01ARZ3NDEKTSV4RRFFQ69G5FAV-01ARZ3NDEKTSV4RRFFQ69G5FAVB.csv"
         )
 
       assert redirected_to(conn) == ~p"/users/log-in"
@@ -61,15 +61,39 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
         conn
         |> log_in_user(user)
         |> get(
-          "/admin/exports/ysc-user-export-2026-05-26-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
+          "/admin/exports/ysc-user-export-2026-05-26-01ARZ3NDEKTSV4RRFFQ69G5FAV-01ARZ3NDEKTSV4RRFFQ69G5FAVB.csv"
         )
 
       assert redirected_to(conn) == ~p"/"
     end
 
+    test "admin cannot download another admin's export file", %{conn: conn} do
+      owner = user_fixture(%{state: :active, role: :admin})
+      other_admin = user_fixture(%{state: :active, role: :admin})
+
+      filename =
+        "ysc-user-export-2026-05-26-#{owner.id}-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
+
+      exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
+      File.mkdir_p!(exports_root)
+      file_path = Path.join(exports_root, filename)
+      File.write!(file_path, "id,email\n1,secret@example.com")
+      on_exit(fn -> File.rm(file_path) end)
+
+      conn =
+        conn
+        |> log_in_user(other_admin)
+        |> get("/admin/exports/#{filename}")
+
+      assert conn.status == 403
+    end
+
     test "admin can download export with csv content type", %{conn: conn} do
       user = user_fixture(%{state: :active, role: :admin})
-      filename = "ysc-user-export-2026-05-26-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
+
+      filename =
+        "ysc-user-export-2026-05-26-#{user.id}-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
+
       exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
       File.mkdir_p!(exports_root)
       file_path = Path.join(exports_root, filename)

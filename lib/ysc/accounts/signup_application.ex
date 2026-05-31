@@ -87,6 +87,63 @@ defmodule Ysc.Accounts.SignupApplication do
     timestamps()
   end
 
+  @registration_fields [
+    :membership_type,
+    :membership_eligibility,
+    :occupation,
+    :birth_date,
+    :address,
+    :country,
+    :city,
+    :region,
+    :postal_code,
+    :place_of_birth,
+    :citizenship,
+    :most_connected_nordic_country,
+    :link_to_scandinavia,
+    :lived_in_scandinavia,
+    :spoken_languages,
+    :hear_about_the_club,
+    :agreed_to_bylaws,
+    :started,
+    :completed,
+    :browser_timezone
+  ]
+
+  @privileged_fields [
+    :user_id,
+    :family_invite_id,
+    :reviewed_at,
+    :review_outcome,
+    :reviewed_by_user_id
+  ]
+
+  @doc """
+  Changeset for public membership registration (LiveView / `register_user/1`).
+
+  Does not cast admin review fields, `user_id`, or `family_invite_id` — those must
+  be set only by trusted server code after insert.
+  """
+  def registration_application_changeset(application, attrs, opts \\ []) do
+    application
+    |> cast(attrs, @registration_fields)
+    |> validate_required([
+      :membership_type,
+      :birth_date,
+      :address,
+      :country,
+      :city,
+      :postal_code,
+      :place_of_birth,
+      :citizenship,
+      :most_connected_nordic_country
+    ])
+    |> validate_birth_date()
+    |> validate_agreed_to_bylaws()
+    |> validate_membership_eligibility()
+    |> validate_user_email(opts)
+  end
+
   @spec application_changeset(
           {map(), map()}
           | %{
@@ -103,33 +160,7 @@ defmodule Ysc.Accounts.SignupApplication do
         ) :: Ecto.Changeset.t()
   def application_changeset(application, attrs, opts \\ []) do
     application
-    |> cast(attrs, [
-      :user_id,
-      :family_invite_id,
-      :membership_type,
-      :membership_eligibility,
-      :occupation,
-      :birth_date,
-      :address,
-      :country,
-      :city,
-      :region,
-      :postal_code,
-      :place_of_birth,
-      :citizenship,
-      :most_connected_nordic_country,
-      :link_to_scandinavia,
-      :lived_in_scandinavia,
-      :spoken_languages,
-      :hear_about_the_club,
-      :agreed_to_bylaws,
-      :started,
-      :completed,
-      :browser_timezone,
-      :reviewed_at,
-      :review_outcome,
-      :reviewed_by_user_id
-    ])
+    |> cast(attrs, @registration_fields ++ @privileged_fields)
     |> validate_required([
       :membership_type,
       :birth_date,

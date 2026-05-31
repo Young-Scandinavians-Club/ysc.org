@@ -58,6 +58,17 @@ defmodule Ysc.Scanning do
     |> Repo.preload([:event, :created_by])
   end
 
+  @doc """
+  Returns `:ok` when `user_id` created the scan session, else `{:error, :unauthorized}`.
+  """
+  def authorize_session_owner!(session_id, user_id) do
+    case Repo.get(ScanSession, session_id) do
+      %{created_by_id: ^user_id} -> :ok
+      %ScanSession{} -> {:error, :unauthorized}
+      nil -> {:error, :not_found}
+    end
+  end
+
   def list_sessions(opts \\ []) do
     type_filter = Keyword.get(opts, :type)
 
