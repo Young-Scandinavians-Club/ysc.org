@@ -1634,7 +1634,7 @@ defmodule YscWeb.BookingReceiptLive do
     payment = payment_summary.latest
 
     # Get refund info - pass payment to avoid duplicate query
-    refund_info = get_refund_info_with_payment(booking, payment)
+    refund_info = get_refund_info_with_payment(booking, payment, payment_summary.total_paid)
 
     # Get door code if booking is within 48 hours of check-in or currently active
     {door_code, show_door_code} =
@@ -1688,7 +1688,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp get_booking_payment_summary(booking) do
-    payments =
+    entries =
       from(e in Ysc.Ledgers.LedgerEntry,
         join: a in Ysc.Ledgers.LedgerAccount,
         on: e.account_id == a.id,
@@ -1701,15 +1701,14 @@ defmodule YscWeb.BookingReceiptLive do
         order_by: [asc: e.inserted_at]
       )
       |> Repo.all()
+
+    payments =
+      entries
       |> Enum.map(& &1.payment)
       |> Enum.reject(&is_nil/1)
       |> dedupe_payments_chronologically()
 
-    total_paid =
-      case Bookings.get_booking_total_paid_amount(booking) do
-        {:ok, amount} -> amount
-        _ -> nil
-      end
+    total_paid = sum_ledger_entry_amounts(entries, booking)
 
     latest = List.last(payments)
 
@@ -1722,6 +1721,21 @@ defmodule YscWeb.BookingReceiptLive do
       total_paid: total_paid,
       multiple_payments?: length(payments) > 1
     }
+  end
+
+  defp sum_ledger_entry_amounts(entries, booking) do
+    case entries do
+      [] ->
+        booking.total_price
+
+      entries ->
+        Enum.reduce(entries, Money.new(0, :USD), fn entry, acc ->
+          case Money.add(acc, entry.amount) do
+            {:ok, sum} -> sum
+            {:error, _} -> acc
+          end
+        end)
+    end
   end
 
   defp dedupe_payments_chronologically(payments) do
@@ -2102,8 +2116,8 @@ defmodule YscWeb.BookingReceiptLive do
     BookingActions.get_today_pst()
   end
 
-  # Accepts pre-fetched payment to avoid duplicate query
-  defp get_refund_info_with_payment(booking, payment) do
+  # Accepts pre-fetched payment and total paid to avoid duplicate ledger queries
+  defp get_refund_info_with_payment(booking, payment, total_paid) do
     if BookingActions.can_cancel_booking?(booking) do
       if BookingActions.refund_forfeited?(booking) do
         %{
@@ -2113,15 +2127,21 @@ defmodule YscWeb.BookingReceiptLive do
           modified: true
         }
       else
-        get_refund_info_from_policy(booking, payment)
+        get_refund_info_from_policy(booking, payment, total_paid)
       end
     else
       nil
     end
   end
 
-  defp get_refund_info_from_policy(booking, payment) do
-    case Bookings.calculate_refund(booking, BookingActions.get_today_pst()) do
+  defp get_refund_info_from_policy(booking, payment, total_paid) do
+    refund_opts =
+      case total_paid do
+        %Money{} = amount -> [original_amount: amount]
+        _ -> []
+      end
+
+    case Bookings.calculate_refund(booking, BookingActions.get_today_pst(), refund_opts) do
       {:ok, refund_amount, applied_rule} ->
         policy =
           Bookings.get_active_refund_policy(

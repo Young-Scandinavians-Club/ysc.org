@@ -27,7 +27,7 @@ defmodule YscWeb.BookingChangeLive do
       case load_booking(booking_id, user) do
         {:ok, booking} ->
           if BookingActions.can_change_booking?(booking) do
-            calendar = ModificationDateAvailability.calendar_context(booking)
+            calendar = ModificationDateAvailability.calendar_placeholder(booking)
             form = modification_form(booking)
 
             socket =
@@ -35,7 +35,7 @@ defmodule YscWeb.BookingChangeLive do
               |> assign_change_page_shell(booking, calendar, form)
 
             if connected?(socket) do
-              {:ok, load_change_data_async(socket, booking, calendar, form)}
+              {:ok, load_change_data_async(socket, booking, form)}
             else
               {:ok, socket}
             end
@@ -112,8 +112,15 @@ defmodule YscWeb.BookingChangeLive do
 
   @impl true
   def handle_async(:load_change_data, {:ok, data}, socket) do
+    calendar = data.calendar
+
     socket =
       socket
+      |> assign(:today, calendar.today)
+      |> assign(:seasons, calendar.seasons)
+      |> assign(:calendar_min_date, calendar.min_date)
+      |> assign(:calendar_max_date, calendar.max_date)
+      |> assign(:max_nights, calendar.max_nights)
       |> assign(:availability_snapshot, data.availability_snapshot)
       |> assign(:checkout_date_tooltips, data.checkout_tooltips)
       |> assign(:checkin_date_tooltips, data.checkin_tooltips)
@@ -687,10 +694,12 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:other_family_members, [])
   end
 
-  defp load_change_data_async(socket, booking, calendar, form) do
+  defp load_change_data_async(socket, booking, form) do
     params = form_params(form)
 
     start_async(socket, :load_change_data, fn ->
+      calendar = ModificationDateAvailability.calendar_context(booking)
+
       availability_snapshot =
         ModificationDateAvailability.build_availability_snapshot(
           booking,
@@ -723,6 +732,7 @@ defmodule YscWeb.BookingChangeLive do
       preview_result = Bookings.prepare_modification(booking, params)
 
       %{
+        calendar: calendar,
         availability_snapshot: availability_snapshot,
         checkout_tooltips: checkout_tooltips,
         checkin_tooltips: checkin_tooltips,
