@@ -597,6 +597,89 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_list_empty_state
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Centered Viking empty state for admin Flop list pages (mobile + desktop table views).
+
+  Wraps `<.empty_viking_state>` in the standard `py-16` container. Optionally renders a
+  "Clear filters" action below the illustration.
+
+  ## Examples
+
+      <.admin_list_empty_state
+        :if={@empty}
+        title="No results found"
+        suggestion="Try adjusting your search term and filters."
+        clear_id="admin-users-clear-filters-empty"
+        clear_patch={~p"/admin/users"}
+      />
+
+      <.admin_list_empty_state
+        :if={@reservation_empty}
+        title="No reservations found"
+        suggestion="Try adjusting your search term and filters."
+        clear_event="clear-reservation-filters"
+      />
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, required: true
+  attr :suggestion, :string, default: nil
+  attr :viking, :integer, default: 4
+
+  attr :clear_id, :string,
+    default: nil,
+    doc: "DOM id for the clear-filters control (required when using clear_patch)"
+
+  attr :clear_patch, :any,
+    default: nil,
+    doc: "LiveView patch path; renders outline `<.button>` clear filters"
+
+  attr :clear_event, :string,
+    default: nil,
+    doc: "phx-click event name; renders legacy text button clear filters (bookings)"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes on the outer py-16 container"
+
+  def admin_list_empty_state(assigns) do
+    ~H"""
+    <div id={@id} class={["py-16", @class]}>
+      <.empty_viking_state title={@title} suggestion={@suggestion} viking={@viking} />
+      <div
+        :if={@clear_patch || @clear_event}
+        class="px-4 py-4 flex items-center align-center justify-center"
+      >
+        <.button
+          :if={@clear_patch}
+          id={@clear_id}
+          patch={@clear_patch}
+          variant="outline"
+          color="zinc"
+          class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
+        >
+          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+          Clear filters
+        </.button>
+        <button
+          :if={@clear_event}
+          id={@clear_id}
+          type="button"
+          class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
+          phx-click={@clear_event}
+          phx-disable-with="Clearing..."
+        >
+          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" />
+          Clear filters
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_empty_panel
   # ---------------------------------------------------------------------------
 

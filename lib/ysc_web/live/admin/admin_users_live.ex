@@ -635,26 +635,13 @@ defmodule YscWeb.AdminUsersLive do
                 </div>
               </div>
             <% end %>
-            <!-- Mobile Empty State -->
-            <div :if={@empty} class="py-16">
-              <.empty_viking_state
-                title="No results found"
-                suggestion="Try adjusting your search term and filters."
-              />
-
-              <div class="px-4 py-4 flex items-center align-center justify-center">
-                <.button
-                  id="admin-users-clear-filters-empty-mobile"
-                  patch={~p"/admin/users"}
-                  variant="outline"
-                  color="zinc"
-                  class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
-                >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                  Clear filters
-                </.button>
-              </div>
-            </div>
+            <.admin_list_empty_state
+              :if={@empty}
+              title="No results found"
+              suggestion="Try adjusting your search term and filters."
+              clear_id="admin-users-clear-filters-empty-mobile"
+              clear_patch={~p"/admin/users"}
+            />
             <!-- Mobile Pagination -->
             <div :if={@meta && !@empty} class="pt-4">
               <.admin_flop_pagination
@@ -724,25 +711,13 @@ defmodule YscWeb.AdminUsersLive do
               </:action>
             </Flop.Phoenix.table>
 
-            <div :if={@empty} class="py-16">
-              <.empty_viking_state
-                title="No results found"
-                suggestion="Try adjusting your search term and filters."
-              />
-
-              <div class="px-4 py-4 flex items-center align-center justify-center">
-                <.button
-                  id="admin-users-clear-filters-empty-desktop"
-                  patch={~p"/admin/users"}
-                  variant="outline"
-                  color="zinc"
-                  class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
-                >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                  Clear filters
-                </.button>
-              </div>
-            </div>
+            <.admin_list_empty_state
+              :if={@empty}
+              title="No results found"
+              suggestion="Try adjusting your search term and filters."
+              clear_id="admin-users-clear-filters-empty-desktop"
+              clear_patch={~p"/admin/users"}
+            />
 
             <.admin_flop_pagination
               meta={@meta}

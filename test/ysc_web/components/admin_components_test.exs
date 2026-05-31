@@ -136,6 +136,59 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_list_empty_state/1" do
+    test "renders viking empty state with title and suggestion" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_list_empty_state
+          title="No results found"
+          suggestion="Try adjusting your search term and filters."
+        />
+        """)
+
+      assert html =~ "No results found"
+      assert html =~ "Try adjusting your search term and filters."
+      assert html =~ "viking_4.png"
+      refute html =~ "Clear filters"
+    end
+
+    test "renders patch-based clear filters button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_list_empty_state
+          title="No results found"
+          clear_id="clear-empty"
+          clear_patch="/admin/users"
+        />
+        """)
+
+      assert html =~ ~s(id="clear-empty")
+      assert html =~ "Clear filters"
+      assert html =~ ~s(data-phx-link="patch")
+      assert html =~ "/admin/users"
+    end
+
+    test "renders event-based clear filters button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_list_empty_state
+          title="No reservations found"
+          clear_event="clear-reservation-filters"
+        />
+        """)
+
+      assert html =~ ~s(phx-click="clear-reservation-filters")
+      assert html =~ "Clear filters"
+      refute html =~ ~s(data-phx-link="patch")
+    end
+  end
+
   describe "admin_dashed_more_button/1" do
     test "renders a dashed full-width button with label and phx-click" do
       assigns = %{}
