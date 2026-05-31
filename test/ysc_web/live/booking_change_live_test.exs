@@ -69,6 +69,17 @@ defmodule YscWeb.BookingChangeLiveTest do
     Repo.preload(booking, [:rooms, :user])
   end
 
+  test "redirects when booking is not found", %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+
+    assert {:error, {:redirect, %{to: path, flash: flash}}} =
+             live(conn, ~p"/bookings/#{Ecto.ULID.generate()}/change")
+
+    assert path == ~p"/"
+    assert flash["error"] =~ "couldn't find this reservation"
+  end
+
   test "shows forfeiture notice and change form for eligible booking", %{
     conn: conn
   } do
@@ -79,6 +90,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/change")
 
     assert html =~ "Change Reservation"
+    assert html =~ "Important: changing your dates affects refunds"
     assert html =~ "forfeit all refund eligibility"
     assert html =~ "cannot be undone"
     assert html =~ "Check-in &amp; Check-out Dates"
@@ -113,9 +125,9 @@ defmodule YscWeb.BookingChangeLiveTest do
       }
     })
     |> render_submit()
-    |> then(fn html ->
-      assert html =~ "forfeits all refund eligibility"
-    end)
+
+    assert render(view) =~
+             "Please check the box at the bottom of the form confirming you understand"
 
     view |> element("#acknowledge-forfeiture") |> render_click()
 
