@@ -44,6 +44,17 @@ defmodule YscWeb.EventTvPosterControllerTest do
       assert conn.resp_body |> binary_part(0, 4) == <<137, 80, 78, 71>>
     end
 
+    test "supports format=webp query param", %{conn: conn, event: event} do
+      conn =
+        get(conn, ~p"/admin/events/#{event.id}/tv-poster/image?format=webp")
+
+      assert response(conn, 200)
+
+      assert get_resp_header(conn, "content-type") == [
+               "image/webp; charset=utf-8"
+             ]
+    end
+
     test "supports format=jpeg query param", %{conn: conn, event: event} do
       conn =
         get(conn, ~p"/admin/events/#{event.id}/tv-poster/image?format=jpeg")
