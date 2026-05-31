@@ -1096,7 +1096,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking_b.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
         )
 
-      assert html =~ "issue confirming your booking"
+      assert html =~ "issue updating your reservation"
 
       reloaded = Repo.get!(Booking, booking_b.id)
       assert reloaded.status == :hold
@@ -1174,6 +1174,176 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert html =~ "Payment successful"
       assert receipt_ledger_payment_count(booking.id) == 1
+    end
+
+    test "applies paid modification after redirect-based Stripe payment", %{
+      conn: conn
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(state: :active)
+        |> Repo.update!()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Receipt modify category"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Receipt modify room #{System.unique_integer([:positive])}",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(140)
+      short_checkout = Date.add(checkin, 1)
+
+      assert {:ok, total, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 checkin,
+                 short_checkout,
+                 :room,
+                 room_id: room.id,
+                 guests_count: 2
+               )
+
+      assert {:ok, booking} =
+               BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: short_checkout,
+                   booking_mode: :room,
+                   guests_count: 2,
+                   total_price: total
+                 },
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert {:ok, _} =
+               Ysc.Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: total,
+                 entity_type: :booking,
+                 entity_id: booking.id,
+                 external_payment_id:
+                   "pi_receipt_modify_base_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(100, :USD),
+                 description: "Booking payment",
+                 property: booking.property,
+                 payment_method_id: nil
+               })
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 2,
+        children_count: 0
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => Date.to_string(checkin),
+                 "checkout_date" => Date.to_string(checkout),
+                 "guests_count" => "2",
+                 "children_count" => "0"
+               })
+
+      assert Money.positive?(preview.delta)
+
+      assert {:ok, _} = Bookings.place_modification_hold(booking, attrs)
+
+      payment_intent_id =
+        "pi_receipt_modify_redirect_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stripe_metadata = %{
+        "booking_id" => to_string(booking.id),
+        "user_id" => to_string(user.id),
+        "modification" => "true"
+      }
+
+      module_name =
+        :"ReceiptModificationRedirectStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: unquote(amount_cents),
+                 metadata: unquote(Macro.escape(stripe_metadata)),
+                 latest_charge: %Stripe.Charge{id: "ch_#{id}"}
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
+        )
+
+      assert html =~ "Reservation updated"
+
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.checkout_date == checkout
+      assert reloaded.refund_forfeited_at
+
+      assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
     end
   end
 
