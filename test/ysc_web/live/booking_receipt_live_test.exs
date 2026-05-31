@@ -1096,7 +1096,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking_b.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
         )
 
-      assert html =~ "issue confirming your booking"
+      assert html =~ "issue updating your reservation"
 
       reloaded = Repo.get!(Booking, booking_b.id)
       assert reloaded.status == :hold
@@ -1284,65 +1284,63 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
 
-      {:module, test_stripe_client, _, _} =
-        defmodule :"ReceiptModificationRedirectStripe#{System.unique_integer([:positive])}" do
-          @behaviour Ysc.StripeBehaviour
-
-          def create_payment_intent(_params, _opts),
-            do: {:error, :not_implemented}
-
-          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
-          def create_customer(_params), do: {:error, :not_implemented}
-          def update_customer(_id, _params), do: {:error, :not_implemented}
-          def retrieve_payment_method(_id), do: {:error, :not_implemented}
-          def list_events(_params, _opts), do: {:error, :not_implemented}
-          def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
-          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
-
-          def list_balance_transactions(_params, _opts),
-            do: {:error, :not_implemented}
-
-          def retrieve_payment_intent(id, _opts) do
-            {:ok,
-             %Stripe.PaymentIntent{
-               id: id,
-               status: Process.get(:receipt_modify_pi_status, "succeeded"),
-               amount: Process.get(:receipt_modify_pi_amount),
-               metadata: Process.get(:receipt_modify_pi_metadata, %{}),
-               latest_charge: %Stripe.Charge{id: "ch_#{id}"}
-             }}
-          end
-        end
-
-      Process.put(:receipt_modify_pi_amount, amount_cents)
-
-      Process.put(:receipt_modify_pi_metadata, %{
+      stripe_metadata = %{
         "booking_id" => to_string(booking.id),
         "user_id" => to_string(user.id),
         "modification" => "true"
-      })
+      }
+
+      module_name = :"ReceiptModificationRedirectStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: unquote(amount_cents),
+                 metadata: unquote(Macro.escape(stripe_metadata)),
+                 latest_charge: %Stripe.Charge{id: "ch_#{id}"}
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
 
       Application.put_env(:ysc, :stripe_client, test_stripe_client)
 
-      try do
-        {:ok, _view, html} =
-          live(
-            conn,
-            ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
-          )
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
+        )
 
-        assert html =~ "Reservation updated"
+      assert html =~ "Reservation updated"
 
-        reloaded = Repo.get!(Booking, booking.id)
-        assert reloaded.checkout_date == checkout
-        assert reloaded.refund_forfeited_at
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.checkout_date == checkout
+      assert reloaded.refund_forfeited_at
 
-        assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
-      after
-        Process.delete(:receipt_modify_pi_amount)
-        Process.delete(:receipt_modify_pi_metadata)
-        Process.delete(:receipt_modify_pi_status)
-      end
+      assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
     end
   end
 
