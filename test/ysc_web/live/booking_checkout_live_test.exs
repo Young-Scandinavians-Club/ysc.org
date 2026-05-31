@@ -704,8 +704,12 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Guest Information"
       assert html =~ "What Happens Next?"
-      assert html =~ "Enter the name of every guest who will stay in your room(s)"
-      assert html =~ "Continue to payment and complete checkout before the timer runs out"
+
+      assert html =~
+               "Enter the name of every guest who will stay in your room(s)"
+
+      assert html =~
+               "Continue to payment and complete checkout before the timer runs out"
     end
 
     test "validate-guest-info with invalid guest data collects errors", %{
