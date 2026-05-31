@@ -18,22 +18,13 @@ defmodule YscWeb.AdminExportController do
 
     cond do
       is_nil(user) or user.role not in [:admin, :volunteer] ->
-        conn
-        |> put_status(:forbidden)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"403")
+        YscWeb.ErrorHTML.render_page(conn, :"403")
 
       not valid_export_filename?(filename) ->
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
 
       export_owner_id(filename) != user.id ->
-        conn
-        |> put_status(:forbidden)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"403")
+        YscWeb.ErrorHTML.render_page(conn, :"403")
 
       true ->
         serve_export(conn, filename, user)
@@ -74,10 +65,7 @@ defmodule YscWeb.AdminExportController do
           filename: filename
         )
 
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 end

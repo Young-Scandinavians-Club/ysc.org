@@ -176,7 +176,8 @@ if config_env() == :prod do
     secret_key_base: secret_key_base,
     render_errors: [
       formats: [html: YscWeb.ErrorHTML, json: YscWeb.ErrorJSON],
-      layout: {YscWeb.Layouts, :error}
+      root_layout: {YscWeb.Layouts, :error},
+      layout: false
     ]
 
   config :ysc, dns_cluster_query: System.get_env("DNS_CLUSTER_QUERY")

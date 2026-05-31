@@ -462,26 +462,18 @@ defmodule YscWeb.AdminUsersLive do
                 {@export_error}
               </p>
 
-              <a
+              <button
                 :if={@export_status == :complete}
-                class="flex gap-1 mt-1 text-sm leading-6"
-                href={@file_export_path}
-                target="_blank"
-                rel="noopener noreferrer"
+                id="download-user-export-button"
+                type="button"
+                phx-click="download-export"
+                class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
               >
                 <.icon
                   name="hero-document-check"
                   class="mt-0.5 w-5 h-5 flex-none text-green-600"
-                />
-                <span
-                  href={@file_export_path}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-blue-800 hover:underline"
-                >
-                  Download file
-                </span>
-              </a>
+                /> Download file
+              </button>
             </form>
           </div>
         </.dropdown>
@@ -971,8 +963,8 @@ defmodule YscWeb.AdminUsersLive do
         field == "only_subscribers" && active == "true"
       end)
 
-    current_user = socket.assigns[:current_user]
-    topic = "exporter:#{current_user.id}"
+    exporting_user = exporting_admin_user(socket)
+    topic = exporter_topic(exporting_user)
     YscWeb.Endpoint.subscribe(topic)
 
     # Async exporter
@@ -980,7 +972,7 @@ defmodule YscWeb.AdminUsersLive do
       channel: topic,
       fields: reduced_fields,
       only_subscribed: only_subscribed?,
-      created_by_user_id: current_user.id
+      created_by_user_id: exporting_user.id
     }
     |> YscWeb.Workers.UserExporter.new()
     |> Oban.insert()
@@ -1220,6 +1212,10 @@ defmodule YscWeb.AdminUsersLive do
     {:noreply, assign_form(socket, form_data)}
   end
 
+  def handle_event("download-export", _params, socket) do
+    {:noreply, push_user_export_download(socket)}
+  end
+
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     form = to_form(changeset, as: "user")
 
@@ -1244,30 +1240,71 @@ defmodule YscWeb.AdminUsersLive do
         %Phoenix.Socket.Broadcast{event: "user_export:complete", payload: path},
         socket
       ) do
-    current_user = socket.assigns[:current_user]
-    topic = "exporter:#{current_user.id}"
-    YscWeb.Endpoint.unsubscribe(topic)
+    unsubscribe_exporter(socket)
 
-    {:noreply,
-     socket
-     |> assign(:export_progress, 100)
-     |> assign(:export_status, :complete)
-     |> assign(:file_export_path, path)}
+    socket =
+      socket
+      |> assign(:export_progress, 100)
+      |> assign(:export_status, :complete)
+      |> assign(:file_export_path, path)
+
+    {:noreply, push_user_export_download(socket)}
   end
 
   def handle_info(
         %Phoenix.Socket.Broadcast{event: "user_export:failed", payload: msg},
         socket
       ) do
-    current_user = socket.assigns[:current_user]
-    topic = "exporter:#{current_user.id}"
-    YscWeb.Endpoint.unsubscribe(topic)
+    unsubscribe_exporter(socket)
 
     {:noreply,
      socket |> assign(:export_status, :failed) |> assign(:export_error, msg)}
   end
 
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  defp exporting_admin_user(socket) do
+    socket.assigns[:real_current_user] || socket.assigns[:current_user]
+  end
+
+  defp exporter_topic(user), do: "exporter:#{user.id}"
+
+  defp unsubscribe_exporter(socket) do
+    YscWeb.Endpoint.unsubscribe(exporter_topic(exporting_admin_user(socket)))
+  end
+
+  defp push_user_export_download(socket) do
+    case read_user_export_file(socket.assigns[:file_export_path]) do
+      {:ok, content, filename} ->
+        push_event(socket, "download-csv", %{
+          content: Base.encode64(content),
+          filename: filename
+        })
+
+      {:error, message} ->
+        socket
+        |> assign(:export_status, :failed)
+        |> assign(:export_error, message)
+    end
+  end
+
+  defp read_user_export_file(path) when is_binary(path) do
+    filename =
+      path |> String.replace_prefix("/admin/exports/", "") |> Path.basename()
+
+    exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
+    absolute_path = Path.join(exports_root, filename)
+
+    if File.regular?(absolute_path) do
+      {:ok, File.read!(absolute_path), filename}
+    else
+      {:error,
+       "Export file is no longer available. Please run the export again."}
+    end
+  end
+
+  defp read_user_export_file(_),
+    do: {:error, "Export file is no longer available."}
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")

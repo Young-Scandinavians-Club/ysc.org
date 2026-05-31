@@ -28,7 +28,8 @@ config :ysc, YscWeb.Endpoint,
   url: [host: "localhost"],
   render_errors: [
     formats: [html: YscWeb.ErrorHTML, json: YscWeb.ErrorJSON],
-    layout: {YscWeb.Layouts, :error}
+    root_layout: {YscWeb.Layouts, :error},
+    layout: false
   ],
   pubsub_server: Ysc.PubSub,
   live_view: [signing_salt: "CTGAp6Hk"]

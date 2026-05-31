@@ -19,10 +19,7 @@ defmodule YscWeb.ExpenseReportFileController do
     if is_nil(user) do
       Ysc.Logging.debug("No current_user in ExpenseReportFileController")
 
-      conn
-      |> put_status(:forbidden)
-      |> put_view(html: YscWeb.ErrorHTML)
-      |> render(:"403")
+      YscWeb.ErrorHTML.render_page(conn, :"403")
     else
       handle_expense_report_file_request(conn, user, encoded_path)
     end
@@ -39,10 +36,7 @@ defmodule YscWeb.ExpenseReportFileController do
           user_id: user.id
         )
 
-        conn
-        |> put_status(:bad_request)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"400")
+        YscWeb.ErrorHTML.render_page(conn, :"400")
     end
   end
 
@@ -63,10 +57,7 @@ defmodule YscWeb.ExpenseReportFileController do
           s3_path: s3_path
         )
 
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
 
       {:error, :unauthorized} ->
         Ysc.Logging.warning(
@@ -75,10 +66,7 @@ defmodule YscWeb.ExpenseReportFileController do
           s3_path: s3_path
         )
 
-        conn
-        |> put_status(:forbidden)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"403")
+        YscWeb.ErrorHTML.render_page(conn, :"403")
     end
   end
 
@@ -123,10 +111,7 @@ defmodule YscWeb.ExpenseReportFileController do
           error: inspect(reason)
         )
 
-        conn
-        |> put_status(:internal_server_error)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"500")
+        YscWeb.ErrorHTML.render_page(conn, :"500")
     end
   end
 
