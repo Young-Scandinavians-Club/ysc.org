@@ -64,7 +64,8 @@ defmodule YscWeb.BookingCheckoutLive do
 
     case Repo.one(booking_query) do
       nil ->
-        {:error, {:redirect, ~p"/", YscWeb.BookingUserMessages.checkout_not_found()}}
+        {:error,
+         {:redirect, ~p"/", YscWeb.BookingUserMessages.checkout_not_found()}}
 
       booking ->
         {:ok, booking}
