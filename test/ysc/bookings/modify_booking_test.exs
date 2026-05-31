@@ -428,9 +428,10 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       end
     end
 
-    test "apply_modification with payment requires an active matching hold", %{
-      user: user
-    } do
+    test "apply_modification with payment requires a succeeded payment intent",
+         %{
+           user: user
+         } do
       {:ok, _} =
         Bookings.create_pricing_rule(%{
           amount: Money.new(100, :USD),
@@ -455,10 +456,189 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       assert {:ok, preview} = Bookings.prepare_modification(booking, attrs)
       assert Money.positive?(preview.delta)
 
-      assert {:error, :modification_hold_expired} =
+      assert {:error, :payment_not_succeeded} =
                Bookings.apply_modification(booking, attrs,
                  payment_intent_id: "pi_missing_hold"
                )
+    end
+
+    test "apply_modification refreshes an expired hold after payment succeeds",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(125)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 2,
+        children_count: 0
+      }
+
+      string_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
+      assert Money.positive?(preview.delta)
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs)
+
+      expired_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :minute)
+        |> DateTime.truncate(:second)
+
+      held_booking
+      |> Ecto.Changeset.change(modification_hold_expires_at: expired_at)
+      |> Repo.update!()
+
+      payment_intent_id =
+        "pi_mod_hold_refresh_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, updated} =
+                 Bookings.apply_modification(booking, string_attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+
+        assert updated.checkout_date == checkout
+        refute updated.modification_hold_expires_at
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "apply_modification returns error when expired hold cannot be refreshed",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(126)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 2,
+        children_count: 0
+      }
+
+      string_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
+      assert Money.positive?(preview.delta)
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs)
+
+      expired_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :minute)
+        |> DateTime.truncate(:second)
+
+      held_booking
+      |> Ecto.Changeset.change(modification_hold_expires_at: expired_at)
+      |> Repo.update!()
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :tahoe,
+                 reason: "Blocks modification refresh",
+                 start_date: checkin,
+                 end_date: checkout
+               })
+
+      payment_intent_id =
+        "pi_mod_hold_blocked_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error, :blackout_conflict} =
+                 Bookings.apply_modification(booking, string_attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
     end
   end
 
