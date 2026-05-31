@@ -6,6 +6,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias YscWeb.BookingActions
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
+  alias Ysc.Ledgers
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -1362,7 +1363,7 @@ defmodule YscWeb.BookingReceiptLive do
             {socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "Payment was successful, but there was an issue confirming your booking. Please contact support."
+               modification_redirect_error_message(reason)
              ), false, false}
         end
 
@@ -1408,7 +1409,11 @@ defmodule YscWeb.BookingReceiptLive do
 
           if reloaded_booking.status == :complete do
             if modification_payment_intent?(payment_intent) do
-              {:ok, reloaded_booking, payment_intent}
+              finalize_modification_redirect_payment(
+                reloaded_booking,
+                payment_intent_id,
+                payment_intent
+              )
             else
               finalize_paid_ledger_payment(reloaded_booking, payment_intent)
             end
@@ -1481,6 +1486,76 @@ defmodule YscWeb.BookingReceiptLive do
       {:error, reason} ->
         {:error, {:ledger_payment_failed, reason}}
     end
+  end
+
+  defp finalize_modification_redirect_payment(
+         booking,
+         payment_intent_id,
+         payment_intent
+       ) do
+    cond do
+      modification_ledger_recorded?(booking.id, payment_intent_id) ->
+        {:ok, reload_booking_for_receipt(booking.id), payment_intent}
+
+      true ->
+        case modification_params_from_hold(booking) do
+          nil ->
+            {:error, :modification_hold_expired}
+
+          attrs ->
+            case Bookings.apply_modification(booking, attrs,
+                   payment_intent_id: payment_intent_id
+                 ) do
+              {:ok, updated_booking} ->
+                {:ok, updated_booking, payment_intent}
+
+              {:error, :no_changes} ->
+                {:ok, reload_booking_for_receipt(booking.id), payment_intent}
+
+              {:error, reason} ->
+                {:error, reason}
+            end
+        end
+    end
+  end
+
+  defp modification_ledger_recorded?(booking_id, payment_intent_id) do
+    case Ledgers.get_payment_by_external_id(payment_intent_id) do
+      %{entity_type: :booking, entity_id: ^booking_id} -> true
+      _ -> false
+    end
+  end
+
+  defp modification_params_from_hold(%Booking{modification_hold_attrs: attrs})
+       when is_map(attrs) do
+    if is_binary(attrs["checkin_date"]) and is_binary(attrs["checkout_date"]) do
+      %{
+        "checkin_date" => attrs["checkin_date"],
+        "checkout_date" => attrs["checkout_date"],
+        "guests_count" => attrs["guests_count"] |> to_string(),
+        "children_count" => Map.get(attrs, "children_count", 0) |> to_string()
+      }
+    else
+      nil
+    end
+  end
+
+  defp modification_params_from_hold(_), do: nil
+
+  defp reload_booking_for_receipt(booking_id) do
+    Repo.get!(Booking, booking_id) |> Repo.preload([:rooms, :user])
+  end
+
+  defp modification_redirect_error_message(:modification_hold_expired) do
+    "Payment was successful, but your reservation hold expired before the change could be saved. Please contact support with your booking reference."
+  end
+
+  defp modification_redirect_error_message({:ledger_payment_failed, _reason}) do
+    "Payment was successful, but we could not record it for your updated reservation. Please contact support with your booking reference."
+  end
+
+  defp modification_redirect_error_message(_reason) do
+    "Payment was successful, but there was an issue updating your reservation. Please contact support with your booking reference."
   end
 
   defp modification_payment_intent?(payment_intent) do
