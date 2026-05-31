@@ -1874,9 +1874,7 @@ defmodule Ysc.ExpenseReportsTest do
   end
 
   describe "coverage — misc context functions" do
-    test "update_expense_report returns error for empty purpose on draft", %{
-      user: user
-    } do
+    test "update_expense_report rejects invalid status values", %{user: user} do
       {:ok, bank_account} =
         ExpenseReports.create_bank_account(
           %{
@@ -1897,12 +1895,19 @@ defmodule Ysc.ExpenseReportsTest do
           user
         )
 
-      report = Repo.preload(report, [:expense_items, :income_items])
-
       assert {:error, changeset} =
-               ExpenseReports.update_expense_report(report, %{"purpose" => ""})
+               ExpenseReports.update_expense_report(report, %{
+                 "status" => "not-a-status"
+               })
 
       refute changeset.valid?
+
+      assert {:ok, updated} =
+               ExpenseReports.update_expense_report(report, %{
+                 "status" => "approved"
+               })
+
+      assert updated.status == "approved"
     end
 
     test "delete_expense_report removes draft report", %{user: user} do
@@ -2236,6 +2241,129 @@ defmodule Ysc.ExpenseReportsTest do
 
       refute cs.valid?
       assert Map.has_key?(cs.changes, :expense_items)
+    end
+  end
+
+  describe "security: submission mass assignment and reimbursement IDOR" do
+    test "rejects another member's bank_account_id on bank_transfer submission" do
+      victim = user_fixture()
+      attacker = user_fixture()
+
+      {:ok, victim_bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          victim
+        )
+
+      {:ok, attacker_bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "9876543210"},
+          attacker
+        )
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               ExpenseReports.create_expense_report(
+                 %{
+                   "status" => "draft",
+                   "purpose" => "Redirect reimbursement",
+                   "reimbursement_method" => "bank_transfer",
+                   "bank_account_id" => victim_bank_account.id
+                 },
+                 attacker
+               )
+
+      assert "is invalid" in errors_on(changeset).bank_account_id
+
+      assert {:ok, report} =
+               ExpenseReports.create_expense_report(
+                 %{
+                   "status" => "draft",
+                   "purpose" => "Legitimate reimbursement",
+                   "reimbursement_method" => "bank_transfer",
+                   "bank_account_id" => attacker_bank_account.id
+                 },
+                 attacker
+               )
+
+      assert report.bank_account_id == attacker_bank_account.id
+    end
+
+    test "rejects another member's address_id on check reimbursement" do
+      victim = user_fixture()
+      attacker = user_fixture()
+
+      {:ok, victim} =
+        Accounts.update_billing_address(victim, %{
+          "address" => "1 Victim Lane",
+          "city" => "Oakland",
+          "region" => "CA",
+          "postal_code" => "94601",
+          "country" => "US"
+        })
+
+      victim = Repo.preload(victim, :billing_address)
+
+      {:ok, attacker} =
+        Accounts.update_billing_address(attacker, %{
+          "address" => "2 Attacker Road",
+          "city" => "Oakland",
+          "region" => "CA",
+          "postal_code" => "94602",
+          "country" => "US"
+        })
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               ExpenseReports.create_expense_report(
+                 %{
+                   "status" => "draft",
+                   "purpose" => "Redirect check",
+                   "reimbursement_method" => "check",
+                   "address_id" => victim.billing_address.id
+                 },
+                 attacker
+               )
+
+      assert "is invalid" in errors_on(changeset).address_id
+    end
+
+    test "ignores forged quickbooks_bill_id and privileged status on create" do
+      user = user_fixture()
+
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{"routing_number" => "021000021", "account_number" => "1234567890"},
+          user
+        )
+
+      assert {:error, %Ecto.Changeset{} = status_changeset} =
+               ExpenseReports.create_expense_report(
+                 %{
+                   "status" => "approved",
+                   "purpose" => "Status escalation attempt",
+                   "reimbursement_method" => "bank_transfer",
+                   "bank_account_id" => bank_account.id
+                 },
+                 user
+               )
+
+      refute status_changeset.valid?
+
+      assert {:ok, report} =
+               ExpenseReports.create_expense_report(
+                 %{
+                   "status" => "draft",
+                   "purpose" => "QB bypass attempt",
+                   "reimbursement_method" => "bank_transfer",
+                   "bank_account_id" => bank_account.id,
+                   "quickbooks_bill_id" => "attacker-controlled-bill",
+                   "quickbooks_sync_status" => "synced"
+                 },
+                 user
+               )
+
+      assert is_nil(report.quickbooks_bill_id)
+      assert report.quickbooks_sync_status == "pending"
+      assert report.status == "draft"
     end
   end
 end

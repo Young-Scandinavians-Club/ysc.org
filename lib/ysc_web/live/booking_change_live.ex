@@ -30,70 +30,15 @@ defmodule YscWeb.BookingChangeLive do
             calendar = ModificationDateAvailability.calendar_context(booking)
             form = modification_form(booking)
 
-            availability_snapshot =
-              ModificationDateAvailability.build_availability_snapshot(
-                booking,
-                calendar.min_date,
-                calendar.max_date,
-                calendar.today,
-                calendar.seasons
-              )
-
-            checkout_tooltips =
-              ModificationDateAvailability.checkout_date_tooltips(
-                booking,
-                booking.checkin_date,
-                calendar.max_date,
-                calendar.today,
-                calendar.seasons,
-                availability_snapshot
-              )
-
             socket =
               socket
-              |> assign(:page_title, "Change Reservation")
-              |> assign(:booking, booking)
-              |> assign(:form, form)
-              |> assign(:availability_snapshot, availability_snapshot)
-              |> assign(:preview, nil)
-              |> assign(:preview_error, nil)
-              |> assign(:acknowledged, false)
-              |> assign(:submitting, false)
-              |> assign(:payment_intent, nil)
-              |> assign(:show_payment_form, false)
-              |> assign(:stripe_payment_element_ready, false)
-              |> assign(:payment_error, nil)
-              |> assign(:today, calendar.today)
-              |> assign(:seasons, calendar.seasons)
-              |> assign(:calendar_min_date, calendar.min_date)
-              |> assign(:calendar_max_date, calendar.max_date)
-              |> assign(:max_nights, calendar.max_nights)
-              |> assign(:checkin_date_tooltips, %{})
-              |> assign(:checkout_date_tooltips, checkout_tooltips)
-              |> assign(:checkin_date_tooltips_loading?, true)
-              |> assign(:step, :edit)
-              |> assign(:guest_info_form, nil)
-              |> assign(:guest_info_errors, %{})
-              |> assign(:preview_booking, nil)
-              |> assign(:pending_modification_params, nil)
-              |> assign(:pending_guest_params, nil)
-              |> assign(:selected_family_members_for_guests, %{})
-              |> assign(:other_family_members, [])
+              |> assign_change_page_shell(booking, calendar, form)
 
-            socket =
-              socket
-              |> start_async(:load_checkin_date_tooltips, fn ->
-                ModificationDateAvailability.checkin_date_tooltips(
-                  booking,
-                  calendar.min_date,
-                  calendar.max_date,
-                  calendar.today,
-                  calendar.seasons,
-                  availability_snapshot
-                )
-              end)
-
-            {:ok, run_preview(socket, form_params(form))}
+            if connected?(socket) do
+              {:ok, load_change_data_async(socket, booking, calendar, form)}
+            else
+              {:ok, socket}
+            end
           else
             {:ok,
              socket
@@ -120,7 +65,8 @@ defmodule YscWeb.BookingChangeLive do
 
   @impl true
   def handle_info({:updated_event, attrs}, socket) do
-    if Map.get(attrs, :id) == "modification-dates" do
+    if Map.get(attrs, :id) == "modification-dates" and
+         socket.assigns.change_data_loaded? do
       checkin_date = datetime_to_date(attrs.start_date)
       checkout_date = datetime_to_date(attrs.end_date)
 
@@ -165,35 +111,51 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   @impl true
-  def handle_async(:load_checkin_date_tooltips, {:ok, tooltips}, socket) do
-    {:noreply,
-     socket
-     |> assign(:checkin_date_tooltips, tooltips)
-     |> assign(:checkin_date_tooltips_loading?, false)}
+  def handle_async(:load_change_data, {:ok, data}, socket) do
+    socket =
+      socket
+      |> assign(:availability_snapshot, data.availability_snapshot)
+      |> assign(:checkout_date_tooltips, data.checkout_tooltips)
+      |> assign(:checkin_date_tooltips, data.checkin_tooltips)
+      |> assign(:checkin_date_tooltips_loading?, false)
+      |> assign(:change_data_loaded?, true)
+      |> apply_preview_result(data.preview_result)
+
+    {:noreply, socket}
   end
 
-  def handle_async(:load_checkin_date_tooltips, {:exit, _reason}, socket) do
+  def handle_async(:load_change_data, {:exit, _reason}, socket) do
     {:noreply,
      socket
      |> assign(:checkin_date_tooltips, %{})
-     |> assign(:checkin_date_tooltips_loading?, false)}
+     |> assign(:checkout_date_tooltips, %{})
+     |> assign(:checkin_date_tooltips_loading?, false)
+     |> assign(:change_data_loaded?, true)
+     |> assign(
+       :preview_error,
+       "Unable to load availability. Please refresh the page."
+     )}
   end
 
   @impl true
   def handle_event("validate", %{"modification" => params}, socket) do
-    params = normalize_modification_params(params)
-    form = modification_form(socket.assigns.booking, params)
+    if socket.assigns.change_data_loaded? do
+      params = normalize_modification_params(params)
+      form = modification_form(socket.assigns.booking, params)
 
-    socket =
-      socket
-      |> assign(:form, form)
-      |> assign(
-        :checkout_date_tooltips,
-        checkout_tooltips_for_params(socket, params)
-      )
-      |> run_preview(params)
+      socket =
+        socket
+        |> assign(:form, form)
+        |> assign(
+          :checkout_date_tooltips,
+          checkout_tooltips_for_params(socket, params)
+        )
+        |> run_preview(params)
 
-    {:noreply, socket}
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
   end
 
   @impl true
@@ -466,12 +428,23 @@ defmodule YscWeb.BookingChangeLive do
         :if={@step == :edit}
         class="space-y-6 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
       >
+        <div
+          :if={!@change_data_loaded?}
+          id="change-data-loading"
+          class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600"
+        >
+          Loading availability and price preview…
+        </div>
+
         <.form
           for={@form}
           id="booking-change-form"
           phx-change="validate"
           phx-submit="submit-modification"
-          class="space-y-6"
+          class={[
+            "space-y-6",
+            !@change_data_loaded? && "pointer-events-none opacity-50"
+          ]}
         >
           <%= if @booking.rooms != [] do %>
             <div>
@@ -599,7 +572,7 @@ defmodule YscWeb.BookingChangeLive do
             type="submit"
             form="booking-change-form"
             class="w-full py-3"
-            disabled={!@acknowledged || @submitting}
+            disabled={!@acknowledged || @submitting || !@change_data_loaded?}
             phx-disable-with="Saving..."
           >
             {submit_button_label(@preview)}
@@ -679,6 +652,104 @@ defmodule YscWeb.BookingChangeLive do
       <% end %>
     </div>
     """
+  end
+
+  defp assign_change_page_shell(socket, booking, calendar, form) do
+    socket
+    |> assign(:page_title, "Change Reservation")
+    |> assign(:booking, booking)
+    |> assign(:form, form)
+    |> assign(:availability_snapshot, nil)
+    |> assign(:preview, nil)
+    |> assign(:preview_error, nil)
+    |> assign(:acknowledged, false)
+    |> assign(:submitting, false)
+    |> assign(:payment_intent, nil)
+    |> assign(:show_payment_form, false)
+    |> assign(:stripe_payment_element_ready, false)
+    |> assign(:payment_error, nil)
+    |> assign(:today, calendar.today)
+    |> assign(:seasons, calendar.seasons)
+    |> assign(:calendar_min_date, calendar.min_date)
+    |> assign(:calendar_max_date, calendar.max_date)
+    |> assign(:max_nights, calendar.max_nights)
+    |> assign(:checkin_date_tooltips, %{})
+    |> assign(:checkout_date_tooltips, %{})
+    |> assign(:checkin_date_tooltips_loading?, true)
+    |> assign(:change_data_loaded?, false)
+    |> assign(:step, :edit)
+    |> assign(:guest_info_form, nil)
+    |> assign(:guest_info_errors, %{})
+    |> assign(:preview_booking, nil)
+    |> assign(:pending_modification_params, nil)
+    |> assign(:pending_guest_params, nil)
+    |> assign(:selected_family_members_for_guests, %{})
+    |> assign(:other_family_members, [])
+  end
+
+  defp load_change_data_async(socket, booking, calendar, form) do
+    params = form_params(form)
+
+    start_async(socket, :load_change_data, fn ->
+      availability_snapshot =
+        ModificationDateAvailability.build_availability_snapshot(
+          booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons
+        )
+
+      checkout_tooltips =
+        ModificationDateAvailability.checkout_date_tooltips(
+          booking,
+          booking.checkin_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons,
+          availability_snapshot
+        )
+
+      checkin_tooltips =
+        ModificationDateAvailability.checkin_date_tooltips(
+          booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons,
+          availability_snapshot
+        )
+
+      preview_result = Bookings.prepare_modification(booking, params)
+
+      %{
+        availability_snapshot: availability_snapshot,
+        checkout_tooltips: checkout_tooltips,
+        checkin_tooltips: checkin_tooltips,
+        preview_result: preview_result
+      }
+    end)
+  end
+
+  defp apply_preview_result(socket, preview_result) do
+    case preview_result do
+      {:ok, preview} ->
+        assign(socket, preview: preview, preview_error: nil)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        socket
+        |> assign(:preview, nil)
+        |> assign(:preview_error, format_changeset_errors(changeset))
+
+      {:error, :no_changes} ->
+        assign(socket, preview: nil, preview_error: nil)
+
+      {:error, reason} ->
+        assign(socket,
+          preview: nil,
+          preview_error: modification_error_message(reason)
+        )
+    end
   end
 
   defp load_booking(booking_id, user) do
