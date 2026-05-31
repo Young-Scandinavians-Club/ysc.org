@@ -66,7 +66,7 @@ defmodule YscWeb.BookingCheckoutLive do
       nil ->
         {:error,
          {:redirect, ~p"/",
-          "We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. If you were checking out, start a new booking from the cabin page. Contact info@ysc.org if you need help."}}
+          YscWeb.BookingUserMessages.checkout_not_found()}}
 
       booking ->
         {:ok, booking}
@@ -970,7 +970,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     1
                   </span>
                   <span>
-                    Enter the name of every guest who will stay in your room(s)
+                    {YscWeb.BookingUserMessages.checkout_guest_info_step_enter_guests()}
                   </span>
                 </li>
                 <li class="flex items-start gap-3">
@@ -979,9 +979,9 @@ defmodule YscWeb.BookingCheckoutLive do
                   </span>
                   <span>
                     <%= if @complimentary_checkout do %>
-                      Continue to confirm your booking before the timer runs out
+                      {YscWeb.BookingUserMessages.checkout_guest_info_step_continue_complimentary()}
                     <% else %>
-                      Continue to payment and complete checkout before the timer runs out
+                      {YscWeb.BookingUserMessages.checkout_guest_info_step_continue_payment()}
                     <% end %>
                   </span>
                 </li>
@@ -1008,9 +1008,9 @@ defmodule YscWeb.BookingCheckoutLive do
                   </span>
                   <span>
                     <%= if @complimentary_checkout do %>
-                      Confirm your booking above
+                      {YscWeb.BookingUserMessages.checkout_payment_step_confirm_complimentary()}
                     <% else %>
-                      Complete your secure payment above
+                      {YscWeb.BookingUserMessages.checkout_payment_step_pay()}
                     <% end %>
                   </span>
                 </li>

@@ -46,7 +46,7 @@ defmodule YscWeb.BookingReceiptLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "We couldn't find this reservation. It may have expired, already been completed, or belong to a different account. Contact info@ysc.org if you need help.",
+             YscWeb.BookingUserMessages.reservation_not_found(),
              title: "Booking"
            )
            |> redirect(to: ~p"/")}

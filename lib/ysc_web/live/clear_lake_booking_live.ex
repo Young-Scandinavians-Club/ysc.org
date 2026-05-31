@@ -3744,7 +3744,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
       cond do
         day_availability && day_availability.is_blacked_out ->
-          "The cabin isn't open for bookings on #{date_str}. This date may be reserved for maintenance or a club event. Please choose different dates, or contact info@ysc.org if you have questions."
+          YscWeb.BookingUserMessages.clear_lake_blackout_date(date_str)
 
         day_availability && assigns[:selected_booking_mode] == :day ->
           "The date #{date_str} isn't available for shared stays — the cabin may be reserved for a private group that day."
