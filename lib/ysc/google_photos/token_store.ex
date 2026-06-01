@@ -3,7 +3,7 @@ defmodule Ysc.GooglePhotos.TokenStore do
   Caches short-lived Google Photos access tokens and refreshes them before expiry.
 
   Refresh tokens are read from the database in the calling process (sandbox-safe in tests);
-  only access tokens are cached in this GenServer.
+  only access tokens are cached in this GenServer, keyed by the refresh token in use.
   """
   use GenServer
 
@@ -43,12 +43,12 @@ defmodule Ysc.GooglePhotos.TokenStore do
 
   @impl true
   def init(_opts) do
-    {:ok, %{access_token: nil, expires_at: nil}}
+    {:ok, empty_cache()}
   end
 
   @impl true
   def handle_cast(:clear, _state) do
-    {:noreply, %{access_token: nil, expires_at: nil}}
+    {:noreply, empty_cache()}
   end
 
   @impl true
@@ -62,19 +62,27 @@ defmodule Ysc.GooglePhotos.TokenStore do
     end
   end
 
+  defp empty_cache do
+    %{access_token: nil, expires_at: nil, refresh_token: nil}
+  end
+
   defp ensure_access_token(state, refresh_token) do
-    if token_fresh?(state) do
+    if token_fresh?(state, refresh_token) do
       {:ok, state.access_token, state}
     else
       refresh_and_cache(state, refresh_token)
     end
   end
 
-  defp token_fresh?(%{
-         access_token: token,
-         expires_at: %DateTime{} = expires_at
-       })
-       when is_binary(token) do
+  defp token_fresh?(
+         %{
+           refresh_token: stored_refresh_token,
+           access_token: token,
+           expires_at: %DateTime{} = expires_at
+         },
+         refresh_token
+       )
+       when is_binary(token) and stored_refresh_token == refresh_token do
     DateTime.compare(
       DateTime.add(DateTime.utc_now(), @refresh_buffer_seconds),
       expires_at
@@ -82,7 +90,7 @@ defmodule Ysc.GooglePhotos.TokenStore do
       :lt
   end
 
-  defp token_fresh?(_), do: false
+  defp token_fresh?(_, _), do: false
 
   defp refresh_and_cache(state, refresh_token) do
     if OAuth.configured?() do
@@ -92,7 +100,8 @@ defmodule Ysc.GooglePhotos.TokenStore do
 
           new_state = %{
             access_token: access_token,
-            expires_at: expires_at
+            expires_at: expires_at,
+            refresh_token: refresh_token
           }
 
           {:ok, access_token, new_state}
@@ -102,8 +111,7 @@ defmodule Ysc.GooglePhotos.TokenStore do
             error: inspect(reason)
           )
 
-          {:error, :token_refresh_failed,
-           %{state | access_token: nil, expires_at: nil}}
+          {:error, :token_refresh_failed, empty_cache()}
       end
     else
       {:error, :not_configured, state}

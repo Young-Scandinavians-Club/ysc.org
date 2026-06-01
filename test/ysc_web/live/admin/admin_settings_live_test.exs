@@ -13,10 +13,10 @@ defmodule YscWeb.AdminSettingsLiveTest do
     setup [:create_admin]
 
     test "renders settings page", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/settings")
+      {:ok, view, html} = live(conn, ~p"/admin/settings")
       assert html =~ "Settings"
       assert html =~ "Recent Oban Jobs"
-      assert html =~ "Google Photos"
+      assert has_element?(view, "#google-photos-integration")
     end
 
     test "shows connect when not connected", %{conn: conn} do

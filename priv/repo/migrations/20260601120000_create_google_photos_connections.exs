@@ -17,5 +17,7 @@ defmodule Ysc.Repo.Migrations.CreateGooglePhotosConnections do
     end
 
     create unique_index(:google_photos_connections, [:key])
+
+    create constraint(:google_photos_connections, :only_default_key, check: "key = 'default'")
   end
 end

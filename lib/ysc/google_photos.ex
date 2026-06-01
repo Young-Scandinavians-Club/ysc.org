@@ -64,19 +64,18 @@ defmodule Ysc.GooglePhotos do
       refresh_token: refresh_token,
       account_email: account_email,
       scopes: scopes,
-      connected_at: now,
-      connected_by_id: user_id
+      connected_at: now
     }
 
     case existing do
       nil ->
         %Connection{}
-        |> Connection.changeset(attrs)
+        |> Connection.connect_changeset(attrs, user_id)
         |> Repo.insert!()
 
       row ->
         row
-        |> Connection.changeset(attrs)
+        |> Connection.connect_changeset(attrs, user_id)
         |> Repo.update!()
     end
     |> tap(fn _ -> TokenStore.reload() end)

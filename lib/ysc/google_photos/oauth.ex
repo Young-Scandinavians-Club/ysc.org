@@ -11,16 +11,8 @@ defmodule Ysc.GooglePhotos.OAuth do
   @photos_api_base "https://photoslibrary.googleapis.com/v1"
 
   @oauth_scopes [
-    "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
-    "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
     "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile",
-    "openid",
-    "https://www.googleapis.com/auth/photoslibrary",
-    "https://www.googleapis.com/auth/photoslibrary.appendonly",
-    "https://www.googleapis.com/auth/photoslibrary.sharing",
-    "https://www.googleapis.com/auth/photoslibrary.readonly",
-    "https://www.googleapis.com/auth/photoslibrary.readonly.originals"
+    "https://www.googleapis.com/auth/photoslibrary.readonly"
   ]
 
   @doc "Returns the space-separated OAuth scope string used in authorize requests."

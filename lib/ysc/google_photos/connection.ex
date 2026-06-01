@@ -39,11 +39,17 @@ defmodule Ysc.GooglePhotos.Connection do
       :refresh_token,
       :account_email,
       :scopes,
-      :connected_at,
-      :connected_by_id
+      :connected_at
     ])
     |> validate_required([:key, :refresh_token, :connected_at])
     |> unique_constraint(:key)
     |> foreign_key_constraint(:connected_by_id)
+  end
+
+  @doc false
+  def connect_changeset(connection, attrs, connected_by_id) do
+    connection
+    |> changeset(attrs)
+    |> put_change(:connected_by_id, connected_by_id)
   end
 end
