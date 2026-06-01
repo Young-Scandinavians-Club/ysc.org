@@ -363,7 +363,8 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
-     |> assign(:date_to, ""), temporary_assigns: [author_filter: []]}
+     |> assign(:date_to, "")
+     |> assign(:author_filter, [])}
   end
 
   def handle_params(params, _uri, socket) do

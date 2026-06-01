@@ -31,12 +31,22 @@ defmodule YscWeb.AdminPostEditorLiveTest do
     test "opens editor without creating a database row", %{conn: conn} do
       count_before = post_count()
 
-      {:ok, _view, html} = live(conn, ~p"/admin/posts/new")
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
 
-      assert html =~ "trix-editor"
-      assert html =~ "Draft"
-      assert html =~ "New Untitled Post"
-      assert html =~ "new-untitled-post"
+      assert has_element?(view, "#edit_post_form")
+      assert has_element?(view, "trix-editor")
+      assert has_element?(view, "span", "Draft")
+
+      assert has_element?(
+               view,
+               "input[name='post[title]'][value='New Untitled Post']"
+             )
+
+      assert has_element?(
+               view,
+               "input[name='post[url_name]'][value='new-untitled-post']"
+             )
+
       assert post_count() == count_before
     end
 
@@ -47,7 +57,10 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       |> form("#edit_post_form", post: %{title: "My Great Post"})
       |> render_change()
 
-      assert render(view) =~ "my-great-post"
+      assert has_element?(
+               view,
+               "input[name='post[url_name]'][value='my-great-post']"
+             )
     end
 
     test "restores default title when the title field is cleared", %{conn: conn} do
@@ -57,9 +70,15 @@ defmodule YscWeb.AdminPostEditorLiveTest do
       |> form("#edit_post_form", post: %{title: ""})
       |> render_change()
 
-      html = render(view)
-      assert html =~ "New Untitled Post"
-      assert html =~ "new-untitled-post"
+      assert has_element?(
+               view,
+               "input[name='post[title]'][value='New Untitled Post']"
+             )
+
+      assert has_element?(
+               view,
+               "input[name='post[url_name]'][value='new-untitled-post']"
+             )
     end
 
     test "persists new post when opening settings and patches editor URL", %{

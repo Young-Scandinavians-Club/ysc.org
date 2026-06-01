@@ -12,6 +12,10 @@ defmodule Ysc.Posts.SlugTest do
       assert Slug.from_title("") == "new-untitled-post"
     end
 
+    test "uses default slug for whitespace-only title" do
+      assert Slug.from_title("   ") == "new-untitled-post"
+    end
+
     test "slugifies the default new post title" do
       assert Slug.from_title(Slug.default_title()) == "new-untitled-post"
     end
@@ -26,6 +30,7 @@ defmodule Ysc.Posts.SlugTest do
 
     test "preserves non-blank titles" do
       assert Slug.title_or_default("My Post") == "My Post"
+      assert Slug.title_or_default("  My Post  ") == "My Post"
     end
   end
 

@@ -28,7 +28,8 @@ defmodule Ysc.Posts.Slug do
   def title_or_default(nil), do: @default_title
 
   def title_or_default(title) when is_binary(title) do
-    if String.trim(title) == "", do: @default_title, else: title
+    trimmed = String.trim(title)
+    if trimmed == "", do: @default_title, else: trimmed
   end
 
   def title_or_default(_), do: @default_title
@@ -38,11 +39,16 @@ defmodule Ysc.Posts.Slug do
   Does not check uniqueness; use `unique/1` before persisting.
   """
   def from_title(title) when is_binary(title) do
-    title
-    |> String.downcase()
-    |> then(&Regex.replace(~r/\s+/u, &1, "-"))
-    |> then(&Regex.replace(~r/[^0-9\-a-z]/u, &1, ""))
-    |> maybe_replace_empty()
+    if blank_title?(title) do
+      @untitled_slug
+    else
+      title
+      |> String.trim()
+      |> String.downcase()
+      |> then(&Regex.replace(~r/\s+/u, &1, "-"))
+      |> then(&Regex.replace(~r/[^0-9\-a-z]/u, &1, ""))
+      |> maybe_replace_empty()
+    end
   end
 
   def from_title(_), do: @untitled_slug

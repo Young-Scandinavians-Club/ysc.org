@@ -508,8 +508,12 @@ defmodule YscWeb.AdminPostEditorLive do
             {:ok, new_post} ->
               YscWeb.Endpoint.broadcast(create_topic, "created", new_post.id)
 
-            {:error, _} ->
-              :error
+            {:error, reason} ->
+              YscWeb.Endpoint.broadcast(
+                create_topic,
+                "create_failed",
+                %{reason: reason}
+              )
           end
         else
           opts =
@@ -523,18 +527,26 @@ defmodule YscWeb.AdminPostEditorLive do
             html_scrubbed_values
             |> maybe_unique_url_name(previous_url_name, updated_values)
 
-          Posts.update_post(
-            %Post{id: post_id},
-            persist_values,
-            current_user,
-            opts
-          )
+          case Posts.update_post(
+                 %Post{id: post_id},
+                 persist_values,
+                 current_user,
+                 opts
+               ) do
+            {:ok, _} ->
+              YscWeb.Endpoint.broadcast(
+                "post_saved:#{post_id}",
+                "saved",
+                post_id
+              )
 
-          YscWeb.Endpoint.broadcast(
-            "post_saved:#{post_id}",
-            "saved",
-            post_id
-          )
+            {:error, reason} ->
+              YscWeb.Endpoint.broadcast(
+                "post_saved:#{post_id}",
+                "save_failed",
+                %{post_id: post_id, reason: reason}
+              )
+          end
         end
       end,
       @save_debounce_timeout
@@ -784,6 +796,20 @@ defmodule YscWeb.AdminPostEditorLive do
        Posts.get_post!(socket.assigns.post_id)
        |> Ysc.Repo.preload(:featured_image)
      )}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "create_failed"}, socket) do
+    {:noreply,
+     socket
+     |> assign(:saving?, false)
+     |> persist_error_toast()}
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "save_failed"}, socket) do
+    {:noreply,
+     socket
+     |> assign(:saving?, false)
+     |> persist_error_toast()}
   end
 
   defp ensure_title_present(values) do
