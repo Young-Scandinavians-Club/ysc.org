@@ -701,6 +701,7 @@ defmodule Ysc.MessagesTest do
   end
 
   describe "run_send_sms_idempotent/3 - rate limiting" do
+    @tag async: false
     test "returns error when per-minute SMS rate limit is exceeded" do
       # Use a highly unique NANP-style number to avoid collisions with parallel tests.
       phone =
