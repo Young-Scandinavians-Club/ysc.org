@@ -834,8 +834,8 @@ defmodule Ysc.Bookings do
   @doc """
   Releases a modification payment hold without applying the modification.
   """
-  def release_modification_hold(booking_id) do
-    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id)
+  def release_modification_hold(booking_id, opts \\ []) do
+    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id, opts)
   end
 
   defp validate_modification_checkin_not_past(parsed) do

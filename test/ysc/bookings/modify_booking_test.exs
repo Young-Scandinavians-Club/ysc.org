@@ -415,7 +415,8 @@ defmodule Ysc.Bookings.ModifyBookingTest do
         assert pi.buyout_held
       end
 
-      assert {:ok, _} = Bookings.release_modification_hold(booking.id)
+      assert {:ok, released} = Bookings.release_modification_hold(booking.id)
+      assert is_nil(released.modification_hold_attrs)
 
       for day <- new_days do
         pi =

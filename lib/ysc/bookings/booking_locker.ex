@@ -2001,8 +2001,14 @@ defmodule Ysc.Bookings.BookingLocker do
 
   @doc """
   Releases a modification payment hold without applying the modification.
+
+  By default clears stored hold attrs (user cancelled). Pass `clear_attrs: false`
+  when the hold timed out but a Stripe payment may still complete — attrs are
+  needed to apply the modification on redirect return.
   """
-  def release_modification_hold(booking_id) do
+  def release_modification_hold(booking_id, opts \\ []) do
+    clear_attrs = Keyword.get(opts, :clear_attrs, true)
+
     retry_on_stale(
       fn _attempt ->
         result =
@@ -2013,11 +2019,14 @@ defmodule Ysc.Bookings.BookingLocker do
 
             release_modification_hold_inventory!(booking)
 
+            hold_attrs =
+              if clear_attrs, do: nil, else: booking.modification_hold_attrs
+
             case booking
                  |> Booking.changeset(
                    %{
                      modification_hold_expires_at: nil,
-                     modification_hold_attrs: nil
+                     modification_hold_attrs: hold_attrs
                    },
                    skip_validation: true
                  )
