@@ -159,7 +159,7 @@ defmodule Ysc.GooglePhotos.Api do
   defp upload_file_stream_http(access_token, file_path, filename, size) do
     content_type = content_type_for_filename(filename)
     timeout = upload_receive_timeout(size)
-    stream = File.stream!(file_path, [], 5_242_880)
+    stream = File.stream!(file_path, 5_242_880)
 
     case Req.post(@upload_url,
            body: stream,

@@ -62,11 +62,10 @@ defmodule Ysc.SafeFile do
 
   @doc "Stats a file when its path resolves under `root`."
   @spec stat_under_root(String.t(), String.t()) ::
-          File.stat_result() | {:error, term()}
+          {:ok, File.Stat.t()} | {:error, term()}
   def stat_under_root(root, path) when is_binary(root) and is_binary(path) do
-    with {:ok, absolute} <- resolve_under_root(root, path) do
-      File.stat(absolute)
-    else
+    case resolve_under_root(root, path) do
+      {:ok, absolute} -> File.stat(absolute)
       :error -> {:error, :invalid_path}
     end
   end
@@ -160,9 +159,13 @@ defmodule Ysc.SafeFile do
   end
 
   defp join_under_root(root, segments) when is_list(segments) do
-    with :ok <- validate_path_segments(segments),
-         relative = Path.join(segments) do
-      resolve_under_root(root, Path.join(Path.expand(root), relative))
+    case validate_path_segments(segments) do
+      :ok ->
+        relative = Path.join(segments)
+        resolve_under_root(root, Path.join(Path.expand(root), relative))
+
+      :error ->
+        :error
     end
   end
 
