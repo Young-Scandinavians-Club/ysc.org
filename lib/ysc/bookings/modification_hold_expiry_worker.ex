@@ -39,7 +39,9 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
     count = length(expired_bookings)
 
     Enum.each(expired_bookings, fn booking ->
-      case BookingLocker.release_modification_hold(booking.id) do
+      case BookingLocker.release_modification_hold(booking.id,
+             clear_attrs: false
+           ) do
         {:ok, _} ->
           Ysc.Logging.info("Expired modification hold due to timeout",
             booking_id: booking.id,
