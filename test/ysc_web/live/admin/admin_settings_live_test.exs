@@ -16,6 +16,31 @@ defmodule YscWeb.AdminSettingsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/settings")
       assert html =~ "Settings"
       assert html =~ "Recent Oban Jobs"
+      assert html =~ "Google Photos"
+    end
+
+    test "shows connect when not connected", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      assert has_element?(view, "#google-photos-connect")
+      refute has_element?(view, "#google-photos-disconnect")
+    end
+
+    test "shows disconnect when connected", %{conn: conn, admin: admin} do
+      Ysc.GooglePhotos.connect!(
+        %{
+          access_token: "access",
+          refresh_token: "refresh",
+          expires_in: 3600
+        },
+        admin.id,
+        "photos@example.com"
+      )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/settings")
+
+      assert has_element?(view, "#google-photos-disconnect")
+      assert has_element?(view, "#google-photos-test-connection")
+      refute has_element?(view, "#google-photos-connect")
     end
 
     test "updates settings", %{conn: conn} do
