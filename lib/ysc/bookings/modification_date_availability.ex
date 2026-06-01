@@ -92,6 +92,46 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
   end
 
   @doc """
+  Builds an availability snapshot sized for validating proposed modification dates.
+
+  Uses batched inventory, blackout, and booking-conflict queries instead of
+  per-day `room_available?/4` checks during `prepare_modification/2`.
+  """
+  def build_snapshot_for_modification(%Booking{} = booking, checkin, checkout) do
+    %{today: today, seasons: seasons, min_date: cal_min, max_date: cal_max} =
+      calendar_context(booking)
+
+    min_date =
+      [cal_min, booking.checkin_date, checkin]
+      |> Enum.min(Date)
+
+    max_date =
+      [cal_max, booking.checkout_date, checkout]
+      |> Enum.max(Date)
+
+    build_availability_snapshot(booking, min_date, max_date, today, seasons)
+  end
+
+  @doc """
+  Returns `:ok` or `{:error, reason}` for proposed modification dates.
+
+  Pass a prebuilt `Snapshot` from `build_snapshot_for_modification/3` or
+  `build_availability_snapshot/5` to avoid rebuilding inventory data.
+  """
+  def validate_modification_dates(%Snapshot{} = snapshot, checkin, checkout) do
+    case modification_availability_error(snapshot, checkin, checkout) do
+      nil -> :ok
+      reason -> {:error, reason}
+    end
+  end
+
+  def validate_modification_dates(%Booking{} = booking, checkin, checkout) do
+    booking
+    |> build_snapshot_for_modification(checkin, checkout)
+    |> validate_modification_dates(checkin, checkout)
+  end
+
+  @doc """
   Prefetches blackout, inventory, and room-conflict data for a calendar range.
 
   Pass the returned snapshot to `checkin_date_tooltips/6` and
