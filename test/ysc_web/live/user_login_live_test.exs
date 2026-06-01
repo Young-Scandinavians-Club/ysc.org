@@ -9,7 +9,8 @@ defmodule YscWeb.UserLoginLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Sign in to your YSC account"
-      assert html =~ "Apply for a membership"
+      assert html =~ "Apply for membership"
+      assert html =~ "Already applied?"
       assert html =~ "Forgot your password?"
     end
 
