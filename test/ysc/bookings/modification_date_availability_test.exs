@@ -82,6 +82,39 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     Repo.preload(booking, [:rooms, :user])
   end
 
+  test "validate_modification_dates matches Bookings.validate_modification_availability",
+       %{
+         user: user
+       } do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    parsed = %{
+      checkin_date: Date.add(checkin, 7),
+      checkout_date: Date.add(checkout, 7),
+      guests_count: 2,
+      children_count: 0
+    }
+
+    assert :ok = Bookings.validate_modification_availability(booking, parsed)
+
+    snapshot =
+      ModificationDateAvailability.build_snapshot_for_modification(
+        booking,
+        parsed.checkin_date,
+        parsed.checkout_date
+      )
+
+    assert :ok =
+             ModificationDateAvailability.validate_modification_dates(
+               snapshot,
+               parsed.checkin_date,
+               parsed.checkout_date
+             )
+  end
+
   test "checkout_date_tooltips marks overlapping checkout dates unavailable", %{
     user: user
   } do

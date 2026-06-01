@@ -449,6 +449,7 @@ defmodule YscWeb.BookingChangeLive do
           for={@form}
           id="booking-change-form"
           phx-change="validate"
+          phx-debounce="300"
           phx-submit="submit-modification"
           class={[
             "space-y-6",
@@ -731,7 +732,10 @@ defmodule YscWeb.BookingChangeLive do
           availability_snapshot
         )
 
-      preview_result = Bookings.prepare_modification(booking, params)
+      preview_result =
+        Bookings.prepare_modification(booking, params,
+          availability_snapshot: availability_snapshot
+        )
 
       %{
         calendar: calendar,
@@ -859,7 +863,13 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp run_preview(socket, params) do
-    case Bookings.prepare_modification(socket.assigns.booking, params) do
+    opts =
+      case socket.assigns[:availability_snapshot] do
+        nil -> []
+        snapshot -> [availability_snapshot: snapshot]
+      end
+
+    case Bookings.prepare_modification(socket.assigns.booking, params, opts) do
       {:ok, preview} ->
         assign(socket, preview: preview, preview_error: nil)
 
