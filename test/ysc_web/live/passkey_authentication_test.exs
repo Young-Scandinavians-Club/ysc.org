@@ -539,6 +539,7 @@ defmodule YscWeb.PasskeyAuthenticationTest do
       |> render_hook("passkey_support_detected", %{"supported" => true})
 
       html = render(lv)
+
       assert html =~ "Sign in with fingerprint or face" ||
                html =~ "Sign in with Face ID" ||
                html =~ "passkey"

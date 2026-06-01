@@ -2100,7 +2100,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                     Sign In to Book
                   </.link>
                   <.link
-                    :if={@user && @booking_error_title == "Application under review"}
+                    :if={
+                      @user && @booking_error_title == "Application under review"
+                    }
                     navigate={~p"/pending-review"}
                     class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
                   >
