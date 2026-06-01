@@ -530,6 +530,20 @@ defmodule YscWeb.AdminScannerLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/scanner/sessions/#{session.id}")
       assert has_element?(view, "a[href='/admin/scanner/sessions']")
     end
+
+    test "rejects viewing another admin's session detail", %{conn: conn} do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+      member = make_active_member()
+
+      session = scan_session_fixture(%{created_by: owner, name: "Owner scans"})
+      Scanning.process_scan(session, QrToken.sign_membership(member.id))
+
+      conn = log_in_user(conn, other)
+
+      assert {:error, {:live_redirect, %{to: "/admin/scanner/sessions"}}} =
+               live(conn, ~p"/admin/scanner/sessions/#{session.id}")
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -571,6 +585,26 @@ defmodule YscWeb.AdminScannerLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
 
       assert has_element?(view, "#scan-setup-form")
+    end
+
+    test "resume param rejects another admin's open session", %{conn: conn} do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+
+      {:ok, session} =
+        Scanning.create_session(%{
+          name: "Private session",
+          type: :membership,
+          created_by_id: owner.id
+        })
+
+      conn = log_in_user(conn, other)
+
+      {:ok, view, html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
+
+      assert html =~ "You can only resume scan sessions you created."
+      assert has_element?(view, "#scan-setup-form")
+      refute html =~ "Private session"
     end
   end
 

@@ -99,6 +99,33 @@ defmodule Ysc.ScanningTest do
     end
   end
 
+  describe "authorize_session_owner!/2" do
+    test "allows the admin who created the session" do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+
+      {:ok, session} =
+        Scanning.create_session(%{
+          name: "Owner session",
+          type: :membership,
+          created_by_id: owner.id
+        })
+
+      assert :ok = Scanning.authorize_session_owner!(session.id, owner.id)
+      assert {:error, :unauthorized} = Scanning.authorize_session_owner!(session.id, other.id)
+    end
+
+    test "returns not_found for unknown session id" do
+      admin = user_fixture(%{role: "admin"})
+
+      assert {:error, :not_found} =
+               Scanning.authorize_session_owner!(
+                 Ecto.ULID.generate(),
+                 admin.id
+               )
+    end
+  end
+
   describe "close_session/1" do
     test "sets closed_at on the session" do
       session = scan_session_fixture()
