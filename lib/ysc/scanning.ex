@@ -103,6 +103,62 @@ defmodule Ysc.Scanning do
     |> Repo.all()
   end
 
+  @event_check_in_session_types [:event, :event_membership]
+
+  @doc """
+  Returns the most relevant open scan session for an event, if any.
+
+  By default prefers `:event_membership` over `:event` when both are open.
+  Pass `types:` to limit which session types are considered, and `prefer:` to
+  change which type wins when multiple are open.
+  """
+  def get_open_session_for_event(event_id, opts \\ []) do
+    types = Keyword.get(opts, :types, @event_check_in_session_types)
+    prefer = Keyword.get(opts, :prefer, :event_membership)
+
+    ScanSession
+    |> where(
+      [s],
+      s.event_id == ^event_id and is_nil(s.closed_at) and s.type in ^types
+    )
+    |> order_by([s], desc: s.inserted_at)
+    |> Repo.all()
+    |> pick_open_session(prefer)
+  end
+
+  @doc """
+  Returns a map of `event_id => open session` for the given event ids.
+
+  Uses the same preference rules as `get_open_session_for_event/2`.
+  """
+  def get_open_check_in_sessions_by_event_id(event_ids, opts \\ []) do
+    types = Keyword.get(opts, :types, @event_check_in_session_types)
+    prefer = Keyword.get(opts, :prefer, :event_membership)
+
+    if event_ids == [] do
+      %{}
+    else
+      ScanSession
+      |> where(
+        [s],
+        s.event_id in ^event_ids and is_nil(s.closed_at) and s.type in ^types
+      )
+      |> order_by([s], desc: s.inserted_at)
+      |> Repo.all()
+      |> Enum.group_by(& &1.event_id, & &1)
+      |> Map.new(fn {event_id, sessions} ->
+        {event_id, pick_open_session(sessions, prefer)}
+      end)
+      |> Map.reject(fn {_id, session} -> is_nil(session) end)
+    end
+  end
+
+  defp pick_open_session([], _prefer), do: nil
+
+  defp pick_open_session(sessions, prefer) do
+    Enum.find(sessions, &(&1.type == prefer)) || List.first(sessions)
+  end
+
   @doc """
   Returns the number of successful scan records for a session.
   """

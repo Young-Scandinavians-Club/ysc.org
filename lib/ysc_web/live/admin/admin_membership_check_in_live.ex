@@ -102,7 +102,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           clear_event="clear-search"
           phx-hook="MembershipCheckInKeyboard"
         />
-        <.admin_check_in_keyboard_hints />
+        <.admin_check_in_keyboard_hints show={searching?(@search_query)} />
       </.admin_check_in_search_section>
 
       <.admin_check_in_content>
@@ -112,7 +112,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           </div>
         <% else %>
           <%!-- Search results (only when searching) --%>
-          <%= if @search_query != "" do %>
+          <%= if searching?(@search_query) do %>
             <div>
               <.admin_section_heading class="mb-3">
                 Search Results
@@ -147,7 +147,8 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                     assigns,
                     result,
                     index,
-                    is_nil(@session.closed_at)
+                    is_nil(@session.closed_at),
+                    searching?(@search_query)
                   )}
                 </div>
               </div>
@@ -232,12 +233,13 @@ defmodule YscWeb.AdminMembershipCheckInLive do
     """
   end
 
-  defp render_search_result(assigns, result, index, session_open?) do
+  defp render_search_result(assigns, result, index, session_open?, searching?) do
     assigns =
       assign(assigns,
         result: result,
         result_index: index,
-        session_open?: session_open?
+        session_open?: session_open?,
+        show_shortcuts?: searching?
       )
 
     ~H"""
@@ -248,19 +250,20 @@ defmodule YscWeb.AdminMembershipCheckInLive do
         else: "hover:bg-zinc-50/60"
       )
     ]}>
-      <%!-- Keyboard shortcut badge for the first 3 results --%>
-      <div class="shrink-0 hidden sm:flex items-center justify-center w-14">
-        <%= if @result_index < 3 do %>
-          <span
-            class="inline-flex items-center gap-0.5 select-none"
-            title={"Alt+#{@result_index + 1} to check in"}
-          >
-            <.admin_kbd size={:inline} tone={:muted} data-key="alt">alt</.admin_kbd>
-            <.admin_kbd size={:compact} tone={:muted}>
-              {@result_index + 1}
-            </.admin_kbd>
-          </span>
-        <% end %>
+      <%!-- Keyboard shortcut badge for the first 3 results (only while searching) --%>
+      <div
+        :if={@show_shortcuts? && @result_index < 3}
+        class="shrink-0 hidden sm:flex items-center justify-center w-14"
+      >
+        <span
+          class="inline-flex items-center gap-0.5 select-none"
+          title={"Alt+#{@result_index + 1} to check in"}
+        >
+          <.admin_kbd size={:inline} tone={:muted} data-key="alt">alt</.admin_kbd>
+          <.admin_kbd size={:compact} tone={:muted}>
+            {@result_index + 1}
+          </.admin_kbd>
+        </span>
       </div>
 
       <div class="flex-1 min-w-0">
@@ -384,14 +387,14 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    search_query = Map.get(params, "q", "")
+    search_query = normalize_search_query(Map.get(params, "q", ""))
 
     socket =
       socket
       |> assign(:search_query, search_query)
       |> reload_checked_in()
       |> then(fn s ->
-        if search_query != "" do
+        if searching?(search_query) do
           run_search(s, search_query)
         else
           assign(s, :search_results, [])
@@ -407,11 +410,16 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
   @impl true
   def handle_event("search", %{"q" => query}, socket) do
-    {:noreply,
-     push_patch(socket,
-       to:
-         ~p"/admin/membership-check-in/#{socket.assigns.session.id}?q=#{query}"
-     )}
+    query = normalize_search_query(query)
+
+    path =
+      if searching?(query) do
+        ~p"/admin/membership-check-in/#{socket.assigns.session.id}?q=#{query}"
+      else
+        ~p"/admin/membership-check-in/#{socket.assigns.session.id}"
+      end
+
+    {:noreply, push_patch(socket, to: path)}
   end
 
   def handle_event("clear-search", _params, socket) do
@@ -596,6 +604,13 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
     assign(socket, :search_results, results)
   end
+
+  defp normalize_search_query(query) when is_binary(query),
+    do: String.trim(query)
+
+  defp normalize_search_query(_), do: ""
+
+  defp searching?(query), do: normalize_search_query(query) != ""
 
   defp format_membership_type(nil), do: "Member"
   defp format_membership_type("lifetime"), do: "Lifetime"

@@ -103,6 +103,35 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
 
       assert has_element?(view, "#copy-url-btn")
     end
+
+    test "hides keyboard shortcut hints until the user searches", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{session: session} = setup_session(admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      html = render(view)
+      refute html =~ "quick check in"
+      refute html =~ ~s(data-key="alt")
+    end
+
+    test "hides keyboard hints and search results when q param is empty", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{session: session} = setup_session(admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/membership-check-in/#{session.id}?q=")
+
+      html = render(view)
+      refute html =~ "Search Results"
+      refute html =~ "quick check in"
+      refute html =~ ~s(data-key="alt")
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -150,6 +179,10 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
                "#search-result-#{member.id}",
                member.first_name
              )
+
+      html = render(view)
+      assert html =~ ~s(data-key="alt")
+      assert html =~ "quick check in"
     end
 
     test "shows inactive membership for user without membership", %{

@@ -5,6 +5,8 @@ defmodule YscWeb.AdminDashboardLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.{Posts, Events, Accounts, Bookings, BuildVersion, Newsletter}
+  alias Ysc.Scanning
+  alias YscWeb.AdminCheckInPaths
 
   @impl true
   def render(assigns) do
@@ -577,27 +579,36 @@ defmodule YscWeb.AdminDashboardLive do
                       </p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2 shrink-0">
-                      <.link
+                      <.button
                         id={"dashboard-event-#{event.id}-public"}
+                        variant="outline"
+                        color="zinc"
                         navigate={~p"/events/#{event.id}"}
-                        class="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-700 hover:border-blue-300 hover:text-blue-700"
                       >
-                        <.icon name="hero-globe-alt" class="w-3.5 h-3.5" /> View
-                      </.link>
-                      <.link
+                        <.icon name="hero-globe-alt" class="w-4 h-4 -mt-0.5" /> View
+                      </.button>
+                      <.button
                         id={"dashboard-event-#{event.id}-edit"}
+                        variant="outline"
+                        color="zinc"
                         navigate={~p"/admin/events/#{event.id}/edit"}
-                        class="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-zinc-700 hover:border-blue-300 hover:text-blue-700"
                       >
-                        <.icon name="hero-pencil-square" class="w-3.5 h-3.5" /> Edit
-                      </.link>
-                      <.link
+                        <.icon name="hero-pencil-square" class="w-4 h-4 -mt-0.5" />
+                        Edit
+                      </.button>
+                      <.button
                         id={"dashboard-event-#{event.id}-check-in"}
-                        navigate={~p"/admin/events/#{event.id}/check-in"}
-                        class="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                        color="green"
+                        navigate={
+                          AdminCheckInPaths.path_for_event(
+                            event.id,
+                            @open_check_in_sessions
+                          )
+                        }
                       >
-                        <.icon name="hero-qr-code" class="w-3.5 h-3.5" /> Check-in
-                      </.link>
+                        <.icon name="hero-qr-code" class="w-4 h-4 -mt-0.5" />
+                        Check-in
+                      </.button>
                     </div>
                   </div>
 
@@ -912,23 +923,23 @@ defmodule YscWeb.AdminDashboardLive do
                   <% end %>
                 </p>
                 <div class="flex flex-wrap items-center gap-2 mt-2">
-                  <span class="rounded-md bg-zinc-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+                  <.badge type="zinc" class="me-0">
                     Sent {row.edition.sent_count}
-                  </span>
-                  <span class="rounded-md bg-sky-100 px-2 py-1 text-[10px] font-black tabular-nums text-sky-900 ring-1 ring-sky-300/80 shadow-sm">
+                  </.badge>
+                  <.badge type="sky" class="me-0 tabular-nums">
                     {format_newsletter_stat(
                       row.opens,
                       row.edition.sent_count,
                       "opened"
                     )}
-                  </span>
-                  <span class="rounded-md bg-emerald-100 px-2 py-1 text-[10px] font-black tabular-nums text-emerald-900 ring-1 ring-emerald-300/80 shadow-sm">
+                  </.badge>
+                  <.badge type="green" class="me-0 tabular-nums">
                     {format_newsletter_stat(
                       row.clicks,
                       row.edition.sent_count,
                       "clicked"
                     )}
-                  </span>
+                  </.badge>
                 </div>
               </li>
             </ul>
@@ -1091,6 +1102,7 @@ defmodule YscWeb.AdminDashboardLive do
       |> assign(:loading_dashboard, true)
       |> assign(:latest_comments, [])
       |> assign(:events_with_tickets, [])
+      |> assign(:open_check_in_sessions, %{})
       # Admin-only placeholders
       |> assign(:pending_users, [])
       |> assign(:pending_reviews_count, 0)
@@ -1209,6 +1221,7 @@ defmodule YscWeb.AdminDashboardLive do
      |> assign(:loading_dashboard, false)
      |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
      |> assign(:events_with_tickets, events_with_tickets)
+     |> assign_dashboard_check_in_sessions(events_with_tickets)
      |> assign(:upcoming_events_count, length(events_with_tickets))
      |> assign(:published_posts_count, Map.fetch!(data, :published_posts_count))
      |> assign(
@@ -1268,12 +1281,14 @@ defmodule YscWeb.AdminDashboardLive do
       Map.fetch!(data, :newsletter_subscriber_stats)
 
     revenue = Map.fetch!(data, :revenue)
+    events_with_tickets = Map.fetch!(data, :events_with_tickets)
 
     socket =
       socket
       |> assign(:loading_dashboard, false)
       |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
-      |> assign(:events_with_tickets, Map.fetch!(data, :events_with_tickets))
+      |> assign(:events_with_tickets, events_with_tickets)
+      |> assign_dashboard_check_in_sessions(events_with_tickets)
       |> assign(:pending_users, pending_users)
       |> assign(:pending_reviews_count, length(pending_users))
       |> assign(:applications_this_month, applications_this_month)
@@ -1316,6 +1331,16 @@ defmodule YscWeb.AdminDashboardLive do
       end)
 
     {:noreply, socket}
+  end
+
+  defp assign_dashboard_check_in_sessions(socket, events_with_tickets) do
+    event_ids = Enum.map(events_with_tickets, & &1.event.id)
+
+    assign(
+      socket,
+      :open_check_in_sessions,
+      Scanning.get_open_check_in_sessions_by_event_id(event_ids)
+    )
   end
 
   defp build_review_url(user_id) do

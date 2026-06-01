@@ -135,6 +135,65 @@ defmodule Ysc.ScanningTest do
     end
   end
 
+  describe "get_open_session_for_event/2" do
+    test "prefers open event_membership session over event session" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Ticket desk",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Membership desk",
+          type: :event_membership,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      assert Scanning.get_open_session_for_event(event.id).id ==
+               membership_session.id
+
+      refute Scanning.get_open_session_for_event(event.id).id ==
+               event_session.id
+    end
+
+    test "returns open event session when limited to event type" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Membership desk",
+          type: :event_membership,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Ticket desk",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      found =
+        Scanning.get_open_session_for_event(event.id,
+          types: [:event],
+          prefer: :event
+        )
+
+      assert found.id == event_session.id
+      refute found.id == membership_session.id
+    end
+  end
+
   describe "get_open_sessions/1" do
     test "returns only open sessions for the given user" do
       admin = user_fixture(%{role: "admin"})

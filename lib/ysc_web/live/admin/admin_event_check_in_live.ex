@@ -442,52 +442,74 @@ defmodule YscWeb.AdminEventCheckInLive do
   def handle_event("launch-scanner", _params, socket) do
     %{event: event, current_user: current_user} = socket.assigns
 
-    session_name =
-      "#{event.title} – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
-
-    case Scanning.create_session(%{
-           name: session_name,
-           type: :event,
-           event_id: event.id,
-           created_by_id: current_user.id
-         }) do
-      {:ok, session} ->
+    case Scanning.get_open_session_for_event(event.id,
+           types: [:event],
+           prefer: :event
+         ) do
+      %{id: session_id} ->
         {:noreply,
-         push_navigate(socket, to: ~p"/admin/scanner?resume=#{session.id}")}
+         push_navigate(socket, to: ~p"/admin/scanner?resume=#{session_id}")}
 
-      {:error, _changeset} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Could not start scan session. Please try again."
-         )}
+      nil ->
+        session_name =
+          "#{event.title} – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
+
+        case Scanning.create_session(%{
+               name: session_name,
+               type: :event,
+               event_id: event.id,
+               created_by_id: current_user.id
+             }) do
+          {:ok, session} ->
+            {:noreply,
+             push_navigate(socket, to: ~p"/admin/scanner?resume=#{session.id}")}
+
+          {:error, _changeset} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "Could not start scan session. Please try again."
+             )}
+        end
     end
   end
 
   def handle_event("launch-membership-checkin", _params, socket) do
     %{event: event, current_user: current_user} = socket.assigns
 
-    session_name =
-      "#{event.title} – Membership – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
-
-    case Scanning.create_session(%{
-           name: session_name,
-           type: :event_membership,
-           event_id: event.id,
-           created_by_id: current_user.id
-         }) do
-      {:ok, session} ->
+    case Scanning.get_open_session_for_event(event.id,
+           types: [:event_membership],
+           prefer: :event_membership
+         ) do
+      %{id: session_id} ->
         {:noreply,
-         push_navigate(socket, to: ~p"/admin/membership-check-in/#{session.id}")}
+         push_navigate(socket, to: ~p"/admin/membership-check-in/#{session_id}")}
 
-      {:error, _changeset} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Could not start membership check-in session. Please try again."
-         )}
+      nil ->
+        session_name =
+          "#{event.title} – Membership – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
+
+        case Scanning.create_session(%{
+               name: session_name,
+               type: :event_membership,
+               event_id: event.id,
+               created_by_id: current_user.id
+             }) do
+          {:ok, session} ->
+            {:noreply,
+             push_navigate(socket,
+               to: ~p"/admin/membership-check-in/#{session.id}"
+             )}
+
+          {:error, _changeset} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "Could not start membership check-in session. Please try again."
+             )}
+        end
     end
   end
 
@@ -666,26 +688,36 @@ defmodule YscWeb.AdminEventCheckInLive do
     case socket.assigns.scan_session do
       nil ->
         event = socket.assigns.event
-        user = socket.assigns.current_user
 
-        case Scanning.create_session(%{
-               name: "Manual Check-in: #{event.title}",
-               type: :event,
-               event_id: event.id,
-               created_by_id: user.id
-             }) do
-          {:ok, session} ->
+        case Scanning.get_open_session_for_event(event.id,
+               types: [:event],
+               prefer: :event
+             ) do
+          %{} = session ->
             {session, assign(socket, :scan_session, session)}
 
-          {:error, changeset} ->
-            Ysc.Logging.error("Failed to create manual check-in session",
-              extra: %{
-                event_id: event.id,
-                errors: inspect(changeset.errors)
-              }
-            )
+          nil ->
+            user = socket.assigns.current_user
 
-            {nil, socket}
+            case Scanning.create_session(%{
+                   name: "Manual Check-in: #{event.title}",
+                   type: :event,
+                   event_id: event.id,
+                   created_by_id: user.id
+                 }) do
+              {:ok, session} ->
+                {session, assign(socket, :scan_session, session)}
+
+              {:error, changeset} ->
+                Ysc.Logging.error("Failed to create manual check-in session",
+                  extra: %{
+                    event_id: event.id,
+                    errors: inspect(changeset.errors)
+                  }
+                )
+
+                {nil, socket}
+            end
         end
 
       session ->

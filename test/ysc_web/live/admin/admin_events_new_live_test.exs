@@ -4,6 +4,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
 
   alias Ysc.Agendas
   alias Ysc.Events
@@ -12,6 +13,23 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
     %{conn: log_in_user(conn, user), admin: user}
+  end
+
+  describe "check-in navigation" do
+    setup [:create_admin]
+
+    test "check-in button joins open membership session", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      session = event_membership_session_fixture(event, admin)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert html =~ ~p"/admin/membership-check-in/#{session.id}"
+      refute html =~ ~s|href="/admin/events/#{event.id}/check-in"|
+    end
   end
 
   describe "hosts - create_event defaults" do
