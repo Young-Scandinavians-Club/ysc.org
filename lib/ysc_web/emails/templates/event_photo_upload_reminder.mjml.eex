@@ -1,0 +1,54 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding="48px 48px 24px 48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Share your photos &amp; videos</strong>
+    </mj-text>
+    <mj-text color="#444444" font-size="18px" line-height="1.4" padding="12px 0 0 0">
+      <%= @event_title %>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<%= if @event_image_url do %>
+<mj-section background-color="#fff" padding="0px 48px">
+  <mj-column padding="0">
+    <mj-image src="<%= @event_image_url %>" alt="<%= @event_title %>" border-radius="8px" padding="0px"></mj-image>
+  </mj-column>
+</mj-section>
+<% end %>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding="20px 48px 48px 48px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px" color="#444444">
+      Thank you for being part of <strong><%= @event_title %></strong>. We'd love to collect photos and videos from the event for our community album.
+    </mj-text>
+    <mj-spacer height="16px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px" color="#444444">
+      It only takes a moment — select or drag your favorite photos and videos from your phone or computer. Sign in with your YSC account to upload.
+    </mj-text>
+    <%= if @event_date_time do %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px">
+      <strong>📅 Event:</strong> <%= @event_date_time %>
+    </mj-text>
+    <% end %>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-button href="<%= @upload_url %>" css-class="btn_block" inner-padding="16px 32px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" font-weight="bold" border-radius="6px">
+      Upload photos &amp; videos →
+    </mj-button>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
+      Tusen tack for helping preserve the memories!
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
+      <strong>Young Scandinavians Club</strong>
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="12px" line-height="1.5" padding="0px" color="#888888">
+      You are receiving this email because you attended this event.
+      <a href="<%= @notification_settings_url %>" style="color: #888888; text-decoration: underline;">Manage notification settings</a>
+    </mj-text>
+  </mj-column>
+</mj-section>

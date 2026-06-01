@@ -78,6 +78,7 @@ defmodule YscWeb.Emails.Notifier do
     "booking_cancellation_confirmation" =>
       YscWeb.Emails.BookingCancellationConfirmation,
     "event_update_notification" => YscWeb.Emails.EventUpdateNotification,
+    "event_photo_upload_reminder" => YscWeb.Emails.EventPhotoUploadReminder,
     "newsletter_stats_snapshot" => YscWeb.Emails.NewsletterStatsSnapshot
   }
 

@@ -95,8 +95,39 @@ defmodule Ysc.GooglePhotos do
     :ok
   end
 
-  @doc "Returns a valid access token via `TokenStore`."
-  def get_access_token, do: TokenStore.get_access_token()
+  @doc "Returns true when dev stub mode is enabled (dev by default; test when configured)."
+  def dev_stub_enabled? do
+    cond do
+      Ysc.Env.dev?() -> google_photos_config()[:dev_stub] != false
+      Ysc.Env.test?() -> google_photos_config()[:dev_stub] == true
+      true -> false
+    end
+  end
+
+  @doc "Returns true when photo uploads can proceed (connected or dev stub)."
+  def uploads_available? do
+    get_connection() != nil or dev_stub_enabled?()
+  end
+
+  @doc "Returns a valid access token via `TokenStore`, or a dev stub token when stubbing."
+  def get_access_token do
+    case TokenStore.get_access_token() do
+      {:ok, token} ->
+        {:ok, token}
+
+      {:error, :not_connected} ->
+        if dev_stub_enabled?(),
+          do: {:ok, "dev-stub-token"},
+          else: {:error, :not_connected}
+
+      other ->
+        other
+    end
+  end
+
+  defp google_photos_config do
+    Application.get_env(:ysc, :google_photos, [])
+  end
 
   @doc """
   Verifies the integration: refreshes token if needed, calls Photos API, returns user email.
