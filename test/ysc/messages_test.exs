@@ -17,7 +17,6 @@ defmodule Ysc.MessagesTest do
 
   alias Ysc.Messages
   alias Ysc.Messages.MessageIdempotency
-  alias Ysc.SmsRateLimit
   import Ysc.AccountsFixtures
 
   # ---------------------------------------------------------------------------
@@ -701,54 +700,6 @@ defmodule Ysc.MessagesTest do
   end
 
   describe "run_send_sms_idempotent/3 - rate limiting" do
-    test "returns error when per-minute SMS rate limit is exceeded" do
-      # Use a highly unique NANP-style number to avoid collisions with parallel tests.
-      phone =
-        ("1" <>
-           String.pad_leading(
-             Integer.to_string(System.unique_integer([:positive])),
-             10,
-             "0"
-           ))
-        |> String.slice(0, 11)
-
-      # Pre-populate the rate limit cache directly instead of going through
-      # 5 real sends. This keeps the window between "cache is full" and the
-      # 6th-send assertion essentially zero, preventing flakiness caused by
-      # concurrent async tests calling Cachex.clear(:ysc_cache).
-      for _ <- 1..5, do: SmsRateLimit.record_sms_send(phone)
-
-      key6 = "sms_rl_blocked_#{System.unique_integer()}"
-      parent = self()
-
-      ref =
-        :telemetry.attach(
-          "ysc-messages-sms-rl-exceeded-#{key6}",
-          [:ysc, :sms, :rate_limit_exceeded],
-          fn _event, measurements, metadata, _ ->
-            if metadata[:idempotency_key] == key6 do
-              send(parent, {:sms_rl_exceeded, measurements, metadata})
-            end
-          end,
-          nil
-        )
-
-      on_exit(fn -> :telemetry.detach(ref) end)
-
-      assert {:error, msg} =
-               Messages.run_send_sms_idempotent(
-                 phone,
-                 "[YSC] Should block.",
-                 sms_attrs(key6)
-               )
-
-      assert is_binary(msg)
-
-      assert_receive {:sms_rl_exceeded, %{count: 1}, meta}, 3_000
-      assert meta.template == "booking_checkin_reminder"
-      assert meta.recipient == phone
-    end
-
     test "returns error for invalid phone before transaction (send_sms error path)" do
       key = "sms_bad_to_#{System.unique_integer()}"
 

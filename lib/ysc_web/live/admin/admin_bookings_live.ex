@@ -2559,23 +2559,12 @@ defmodule YscWeb.AdminBookingsLive do
                 </:action>
               </Flop.Phoenix.table>
 
-              <div :if={@reservation_empty} class="py-16">
-                <.empty_viking_state
-                  title="No reservations found"
-                  suggestion="Try adjusting your search term and filters."
-                />
-
-                <div class="px-4 py-4 flex items-center align-center justify-center">
-                  <button
-                    class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
-                    phx-click="clear-reservation-filters"
-                    phx-disable-with="Clearing..."
-                  >
-                    <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" />
-                    Clear filters
-                  </button>
-                </div>
-              </div>
+              <.admin_list_empty_state
+                :if={@reservation_empty}
+                title="No reservations found"
+                suggestion="Try adjusting your search term and filters."
+                clear_event="clear-reservation-filters"
+              />
 
               <.admin_flop_pagination
                 meta={@reservation_meta}

@@ -363,12 +363,11 @@ defmodule YscWeb.AdminNewslettersLive do
               </div>
             <% end %>
 
-            <div :if={@empty} class="py-16">
-              <.empty_viking_state
-                title="No newsletters yet"
-                suggestion="Create one to get started."
-              />
-            </div>
+            <.admin_list_empty_state
+              :if={@empty}
+              title="No newsletters yet"
+              suggestion="Create one to get started."
+            />
 
             <div :if={@meta && !@empty} class="pt-4">
               <.admin_flop_pagination
@@ -448,12 +447,11 @@ defmodule YscWeb.AdminNewslettersLive do
               </:action>
             </Flop.Phoenix.table>
 
-            <div :if={@empty} class="py-16">
-              <.empty_viking_state
-                title="No newsletters yet"
-                suggestion="Create one to get started."
-              />
-            </div>
+            <.admin_list_empty_state
+              :if={@empty}
+              title="No newsletters yet"
+              suggestion="Create one to get started."
+            />
 
             <.admin_flop_pagination
               :if={@meta}
@@ -592,19 +590,15 @@ defmodule YscWeb.AdminNewslettersLive do
                 </div>
               <% end %>
 
-              <div
+              <.admin_list_empty_state
                 :if={subscribers_empty?(@streams.subscribers, @sub_meta)}
-                class="py-16"
-              >
-                <.empty_viking_state
-                  title="No subscribers found"
-                  suggestion={
-                    if @sub_search != "" or @sub_filter != "all",
-                      do: "Try changing search or filter.",
-                      else: "Subscribers will appear here when they sign up."
-                  }
-                />
-              </div>
+                title="No subscribers found"
+                suggestion={
+                  if @sub_search != "" or @sub_filter != "all",
+                    do: "Try changing search or filter.",
+                    else: "Subscribers will appear here when they sign up."
+                }
+              />
 
               <div
                 :if={
@@ -658,19 +652,15 @@ defmodule YscWeb.AdminNewslettersLive do
                 </:action>
               </Flop.Phoenix.table>
 
-              <div
+              <.admin_list_empty_state
                 :if={subscribers_empty?(@streams.subscribers, @sub_meta)}
-                class="py-16"
-              >
-                <.empty_viking_state
-                  title="No subscribers found"
-                  suggestion={
-                    if @sub_search != "" or @sub_filter != "all",
-                      do: "Try changing search or filter.",
-                      else: "Subscribers will appear here when they sign up."
-                  }
-                />
-              </div>
+                title="No subscribers found"
+                suggestion={
+                  if @sub_search != "" or @sub_filter != "all",
+                    do: "Try changing search or filter.",
+                    else: "Subscribers will appear here when they sign up."
+                }
+              />
 
               <.admin_flop_pagination
                 :if={@sub_meta}
