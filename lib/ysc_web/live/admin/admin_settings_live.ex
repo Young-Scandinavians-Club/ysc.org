@@ -133,6 +133,12 @@ defmodule YscWeb.AdminSettingsLive do
                     <span class="font-semibold text-zinc-800">Scopes:</span>
                     <span class="break-all">{@google_photos_scopes_preview}</span>
                   </p>
+                  <p
+                    :if={google_photos_scopes_stale?(@google_photos_status.scopes)}
+                    class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2"
+                  >
+                    Missing upload, read, or edit permissions for app-created albums. Disconnect and connect again to grant all required Google Photos scopes.
+                  </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                   <button
@@ -631,6 +637,15 @@ defmodule YscWeb.AdminSettingsLive do
            title: "Google Photos"
          )}
 
+      {:error, :insufficient_scopes} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Google rejected the Photos API call (outdated scopes). Disconnect, then connect again to re-authorize.",
+           title: "Google Photos"
+         )}
+
       {:error, _} ->
         {:noreply,
          socket
@@ -839,6 +854,9 @@ defmodule YscWeb.AdminSettingsLive do
       _ -> "bg-zinc-100 text-zinc-800"
     end
   end
+
+  defp google_photos_scopes_stale?(scopes),
+    do: not Ysc.GooglePhotos.OAuth.scopes_grant_complete?(scopes)
 
   defp scopes_preview(nil), do: nil
 

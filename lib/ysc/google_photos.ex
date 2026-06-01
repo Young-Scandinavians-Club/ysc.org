@@ -123,7 +123,7 @@ defmodule Ysc.GooglePhotos do
             key: Connection.singleton_key(),
             refresh_token: token,
             connected_at: now,
-            scopes: OAuth.scope_string()
+            scopes: Enum.join(OAuth.photos_api_scopes(), " ")
           })
           |> Repo.insert()
 

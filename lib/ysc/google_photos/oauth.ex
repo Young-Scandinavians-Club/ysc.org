@@ -10,13 +10,33 @@ defmodule Ysc.GooglePhotos.OAuth do
   @userinfo_url "https://www.googleapis.com/oauth2/v2/userinfo"
   @photos_api_base "https://photoslibrary.googleapis.com/v1"
 
+  # Post–March 2025 Library API: only app-created content. These three scopes cover
+  # create album, upload media, list app albums, and move items between app albums.
+  # See https://developers.google.com/photos/overview/authorization
+  @photos_api_scopes [
+    "https://www.googleapis.com/auth/photoslibrary.appendonly",
+    "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
+    "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata"
+  ]
+
   @oauth_scopes [
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/photoslibrary.readonly"
+    "https://www.googleapis.com/auth/userinfo.email" | @photos_api_scopes
   ]
 
   @doc "Returns the space-separated OAuth scope string used in authorize requests."
   def scope_string, do: Enum.join(@oauth_scopes, " ")
+
+  @doc "Photos Library scopes required for upload, album create, and album moves."
+  def photos_api_scopes, do: @photos_api_scopes
+
+  @doc """
+  Returns true when the stored grant includes every Photos Library scope we request.
+  """
+  def scopes_grant_complete?(scopes) when is_binary(scopes) do
+    Enum.all?(@photos_api_scopes, &String.contains?(scopes, &1))
+  end
+
+  def scopes_grant_complete?(_), do: false
 
   @doc "Returns true when client id and secret are configured."
   def configured? do
@@ -103,12 +123,16 @@ defmodule Ysc.GooglePhotos.OAuth do
       {:ok, %{status: status}} when status in 200..299 ->
         :ok
 
-      {:ok, %{status: status, body: body}} ->
-        Ysc.Logging.error("Google Photos: albums test request failed",
-          status: status,
-          body: inspect(body, limit: 200)
-        )
+      {:ok, %{status: 403, body: body = %{"error" => %{"message" => message}}}} ->
+        if insufficient_scopes_message?(message) do
+          {:error, :insufficient_scopes}
+        else
+          log_albums_test_failure(403, body)
+          {:error, {:api_error, 403}}
+        end
 
+      {:ok, %{status: status, body: body}} ->
+        log_albums_test_failure(status, body)
         {:error, {:api_error, status}}
 
       {:error, reason} ->
@@ -118,6 +142,19 @@ defmodule Ysc.GooglePhotos.OAuth do
 
         {:error, reason}
     end
+  end
+
+  defp insufficient_scopes_message?(message) when is_binary(message) do
+    String.contains?(String.downcase(message), "insufficient")
+  end
+
+  defp insufficient_scopes_message?(_), do: false
+
+  defp log_albums_test_failure(status, body) do
+    Ysc.Logging.error("Google Photos: albums test request failed",
+      status: status,
+      body: inspect(body, limit: 200)
+    )
   end
 
   defp token_request(params) do

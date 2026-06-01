@@ -55,4 +55,16 @@ defmodule Ysc.GooglePhotosTest do
       assert GooglePhotos.configured?()
     end
   end
+
+  describe "OAuth.scopes_grant_complete?/1" do
+    test "requires append, read, and edit app-created scopes" do
+      assert Ysc.GooglePhotos.OAuth.scopes_grant_complete?(
+               Enum.join(Ysc.GooglePhotos.OAuth.photos_api_scopes(), " ")
+             )
+
+      refute Ysc.GooglePhotos.OAuth.scopes_grant_complete?(
+               "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata"
+             )
+    end
+  end
 end
