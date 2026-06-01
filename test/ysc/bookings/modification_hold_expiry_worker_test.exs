@@ -86,6 +86,7 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorkerTest do
     reloaded = Repo.get!(Booking, booking.id)
     assert is_nil(reloaded.modification_hold_expires_at)
     assert reloaded.modification_hold_attrs
+
     assert reloaded.modification_hold_attrs["checkout_date"] ==
              Date.to_iso8601(extended_checkout)
   end

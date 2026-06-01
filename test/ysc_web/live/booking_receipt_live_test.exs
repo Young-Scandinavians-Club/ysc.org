@@ -1347,9 +1347,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
     end
 
-    test "applies paid modification after hold expiry worker cleared inventory", %{
-      conn: conn
-    } do
+    test "applies paid modification after hold expiry worker cleared inventory",
+         %{
+           conn: conn
+         } do
       Ysc.Ledgers.ensure_basic_accounts()
       original_stripe_client = Application.get_env(:ysc, :stripe_client)
 
@@ -1375,12 +1376,15 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, category} =
         %Ysc.Bookings.RoomCategory{}
-        |> Ysc.Bookings.RoomCategory.changeset(%{name: "Receipt worker expiry category"})
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Receipt worker expiry category"
+        })
         |> Repo.insert()
 
       {:ok, room} =
         Bookings.create_room(%{
-          name: "Receipt worker expiry room #{System.unique_integer([:positive])}",
+          name:
+            "Receipt worker expiry room #{System.unique_integer([:positive])}",
           property: :tahoe,
           room_category_id: category.id,
           capacity_max: 4
