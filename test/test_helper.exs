@@ -18,6 +18,11 @@ Application.put_env(
   )
 )
 
+Application.put_env(:ysc, :google_photos,
+  client_id: "test_google_photos_client_id",
+  client_secret: "test_google_photos_client_secret"
+)
+
 Ecto.Adapters.SQL.Sandbox.mode(Ysc.Repo, :manual)
 
 # Per-process MX resolver overrides for async-safe newsletter tests (see EmailValidatorTestHelper).

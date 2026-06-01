@@ -7,6 +7,10 @@ config :ysc, Ysc.Newsletter.EmailValidator,
 
 config :ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock
 
+config :ysc, :google_photos,
+  client_id: "test_google_photos_client_id",
+  client_secret: "test_google_photos_client_secret"
+
 # Credential keys are cleared in test/test_helper.exs so host .env never triggers Intuit HTTP.
 
 # Skip SNS signature verification in tests (no real AWS cert to fetch)

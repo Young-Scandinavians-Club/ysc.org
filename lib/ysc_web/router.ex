@@ -402,6 +402,18 @@ defmodule YscWeb.Router do
     post "/impersonate/:user_id", ImpersonationController, :impersonate
     post "/stop-impersonation", ImpersonationController, :stop_impersonation
 
+    get "/integrations/google-photos/connect",
+        AdminGooglePhotosAuthController,
+        :connect
+
+    get "/integrations/google-photos/callback",
+        AdminGooglePhotosAuthController,
+        :callback
+
+    delete "/integrations/google-photos",
+           AdminGooglePhotosAuthController,
+           :disconnect
+
     live_dashboard "/dashboard", metrics: {YscWeb.Telemetry, :metrics}
   end
 
