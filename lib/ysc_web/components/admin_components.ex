@@ -630,7 +630,8 @@ defmodule YscWeb.AdminComponents do
 
   attr :clear_id, :string,
     default: nil,
-    doc: "DOM id for the clear-filters control (required when using clear_patch)"
+    doc:
+      "DOM id for the clear-filters control (required when using clear_patch)"
 
   attr :clear_patch, :any,
     default: nil,
@@ -638,7 +639,8 @@ defmodule YscWeb.AdminComponents do
 
   attr :clear_event, :string,
     default: nil,
-    doc: "phx-click event name; renders legacy text button clear filters (bookings)"
+    doc:
+      "phx-click event name; renders legacy text button clear filters (bookings)"
 
   attr :class, :any,
     default: nil,
@@ -671,8 +673,7 @@ defmodule YscWeb.AdminComponents do
           phx-click={@clear_event}
           phx-disable-with="Clearing..."
         >
-          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" />
-          Clear filters
+          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" /> Clear filters
         </button>
       </div>
     </div>
