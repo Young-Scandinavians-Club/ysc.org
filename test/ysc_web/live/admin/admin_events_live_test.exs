@@ -4,6 +4,7 @@ defmodule YscWeb.AdminEventsLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
 
   alias Ysc.Events
 
@@ -115,6 +116,43 @@ defmodule YscWeb.AdminEventsLiveTest do
     test "invalid flop params redirect to default events list", %{conn: conn} do
       assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
                live(conn, ~p"/admin/events?order_by=not_a_real_field")
+    end
+
+    test "check-in link joins open membership session for the event", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{title: "Check-in Join Test", organizer_id: admin.id})
+
+      session = event_membership_session_fixture(event, admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
+    end
+
+    test "check-in link uses ticket desk when no open session exists", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{title: "Check-in Default Test", organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
     end
 
     test "copy event creates a draft and redirects to edit the new event", %{

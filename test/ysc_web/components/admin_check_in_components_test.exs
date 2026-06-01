@@ -21,6 +21,17 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ ~s(data-key="alt")
       assert html =~ "↵ enter"
     end
+
+    test "renders nothing when show is false" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_keyboard_hints show={false} />
+        """)
+
+      assert html == ""
+    end
   end
 
   describe "admin_check_in_counter/1" do

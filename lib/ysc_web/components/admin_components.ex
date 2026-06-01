@@ -181,12 +181,19 @@ defmodule YscWeb.AdminComponents do
     default: nil,
     doc: "Additional Tailwind classes merged onto the hint row"
 
+  attr :show, :boolean,
+    default: true,
+    doc: "When false, the shortcut legend is not rendered"
+
   def admin_check_in_keyboard_hints(assigns) do
     ~H"""
-    <p class={[
-      "mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none",
-      @class
-    ]}>
+    <p
+      :if={@show}
+      class={[
+        "mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none",
+        @class
+      ]}
+    >
       <span class="flex items-center gap-0.5">
         <.admin_kbd size={:compact}>↑</.admin_kbd>
         <.admin_kbd size={:compact}>↓</.admin_kbd>

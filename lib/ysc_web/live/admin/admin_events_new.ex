@@ -7,6 +7,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   alias Ysc.Events
   alias Ysc.Events.Event
+  alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
 
   alias Ysc.Events.Agenda
@@ -115,7 +116,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 <.button
                   class="whitespace-nowrap"
                   color="green"
-                  navigate={~p"/admin/events/#{@event.id}/check-in"}
+                  navigate={@check_in_path}
                 >
                   <.icon
                     name="hero-clipboard-document-check"
@@ -912,7 +913,8 @@ defmodule YscWeb.AdminEventsNewLive do
        )
      )
      |> assign(:event_updates, Events.list_event_updates(event.id))
-     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))}
+     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+     |> assign_check_in_path(event)}
   end
 
   @impl true
@@ -1010,6 +1012,11 @@ defmodule YscWeb.AdminEventsNewLive do
     )
     |> assign(:event_updates, Events.list_event_updates(event.id))
     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+    |> assign_check_in_path(event)
+  end
+
+  defp assign_check_in_path(socket, event) do
+    assign(socket, :check_in_path, AdminCheckInPaths.path_for_event(event.id))
   end
 
   defp maybe_refresh_tab_data(socket) do
