@@ -15,46 +15,10 @@ defmodule YscWeb.AdminPostsLive do
       user={@current_user}
       role={@admin_role}
     >
-      <.modal
-        :if={@live_action == :new}
-        id="new-post-modal"
-        on_cancel={JS.patch(~p"/admin/posts")}
-        show
-      >
-        <.header>
-          Add new post
-        </.header>
-        <.simple_form
-          for={@form}
-          phx-change="validate"
-          phx-submit="save"
-          phx-key="enter"
-        >
-          <.input
-            type="text"
-            field={@form[:title]}
-            label="Title"
-            phx-mounted={JS.focus()}
-          />
-
-          <div class="flex flex-row justify-end w-full pt-8">
-            <button
-              phx-click={JS.patch(~p"/admin/posts")}
-              class="rounded hover:bg-zinc-100 py-2 px-3 mr-4 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-600"
-            >
-              Cancel
-            </button>
-            <.button type="submit" phx-disable-with="Creating...">
-              Create Post
-            </.button>
-          </div>
-        </.simple_form>
-      </.modal>
-
       <div class="flex justify-between py-6">
         <.admin_page_title>Posts</.admin_page_title>
 
-        <.button id="admin-posts-new-post" patch={~p"/admin/posts/new"}>
+        <.button id="admin-posts-new-post" navigate={~p"/admin/posts/new"}>
           <.icon name="hero-document-plus" class="w-5 h-5 -mt-0.5" />
           <span class="ms-1">
             New Post
@@ -379,8 +343,6 @@ defmodule YscWeb.AdminPostsLive do
 
   @dialyzer {:nowarn_function, mount: 3}
   def mount(_params, _session, socket) do
-    new_post_changeset = Post.new_post_changeset(%Post{}, %{})
-
     {:ok,
      socket
      |> assign(:page_title, "Posts")
@@ -388,9 +350,7 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
-     |> assign(:date_to, "")
-     |> assign(form: to_form(new_post_changeset, as: "new_post")),
-     temporary_assigns: [author_filter: []]}
+     |> assign(:date_to, ""), temporary_assigns: [author_filter: []]}
   end
 
   def handle_params(params, _uri, socket) do
@@ -513,31 +473,6 @@ defmodule YscWeb.AdminPostsLive do
     {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
   end
 
-  def handle_event("validate", %{"new_post" => params}, socket) do
-    changeset = Post.new_post_changeset(%Post{}, params)
-    {:noreply, assign_form(socket, changeset)}
-  end
-
-  def handle_event("save", %{"new_post" => params}, socket) do
-    updated_params =
-      Map.put(params, "url_name", title_to_url_name(params["title"]))
-
-    result = Posts.create_post(updated_params, socket.assigns[:current_user])
-
-    case result do
-      {:ok, new_post} ->
-        {:noreply, socket |> push_navigate(to: ~p"/admin/posts/#{new_post.id}")}
-
-      _ ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Something went wrong. Please try again."
-         )}
-    end
-  end
-
   def handle_event("toggle-featured", %{"id" => id}, socket) do
     current_user = socket.assigns[:current_user]
 
@@ -597,56 +532,6 @@ defmodule YscWeb.AdminPostsLive do
            :error,
            "Could not update featured post"
          )}
-    end
-  end
-
-  def handle_event("new-post", _params, socket) do
-    url_name = title_to_url_name("")
-
-    result =
-      Posts.create_post(
-        %{"url_name" => url_name},
-        socket.assigns[:current_user]
-      )
-
-    case result do
-      {:ok, new_post} ->
-        {:noreply, socket |> push_navigate(to: ~p"/admin/posts/#{new_post.id}")}
-
-      _ ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Something went wrong. Please try again."
-         )}
-    end
-  end
-
-  defp assign_form(socket, %Ecto.Changeset{} = changeset) do
-    form = to_form(changeset, as: "new_post")
-
-    if changeset.valid? do
-      assign(socket, form: form, check_errors: false)
-    else
-      assign(socket, form: form)
-    end
-  end
-
-  defp maybe_replace_url_name(""), do: "new-untitled-post"
-  defp maybe_replace_url_name(value), do: value
-
-  defp title_to_url_name(title) do
-    dd = String.downcase(Regex.replace(~r/\s+/u, title, "-"))
-    stripped_punctuation = Regex.replace(~r/[^0-9\-a-z]/u, dd, "")
-
-    maybe_add_number_to_url_name(maybe_replace_url_name(stripped_punctuation))
-  end
-
-  defp maybe_add_number_to_url_name(url_name) do
-    case Posts.count_posts_with_url_name(url_name) do
-      0 -> url_name
-      n -> "#{url_name}-#{n + 1}"
     end
   end
 

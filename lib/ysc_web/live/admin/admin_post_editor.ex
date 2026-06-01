@@ -9,8 +9,10 @@ defmodule YscWeb.AdminPostEditorLive do
   alias Ysc.Media.Image
   alias Ysc.Posts
   alias Ysc.Posts.Post
+  alias Ysc.Posts.Slug
 
   @save_debounce_timeout 2000
+  @new_post_debounce_key "new_post"
 
   def render(assigns) do
     ~H"""
@@ -193,6 +195,7 @@ defmodule YscWeb.AdminPostEditorLive do
             </.button>
 
             <.button
+              :if={@post_id}
               id="post-editor-preview-patch"
               patch={~p"/admin/posts/#{@post_id}/preview"}
               variant="outline"
@@ -216,7 +219,7 @@ defmodule YscWeb.AdminPostEditorLive do
                 <ul class="py-2 lg:hidden">
                   <li :if={@post.state == :draft}>
                     <button
-                      id={"publish-post-#{@post_id}"}
+                      id={"publish-post-#{@post_id || "new"}"}
                       type="button"
                       class="flex w-full items-center gap-2 px-4 py-2 text-left transition duration-300 ease-in-out hover:bg-zinc-100"
                       phx-click="publish-post"
@@ -230,10 +233,11 @@ defmodule YscWeb.AdminPostEditorLive do
                   </li>
                   <li :if={@post.state == :deleted}>
                     <button
-                      id={"restore-post-#{@post_id}"}
+                      id={"restore-post-#{@post_id || "new"}"}
                       type="button"
                       class="flex w-full items-center gap-2 px-4 py-2 text-left text-green-700 transition duration-300 ease-in-out hover:bg-zinc-100"
                       phx-click="restore-post"
+                      disabled={@unsaved?}
                     >
                       <.icon
                         name="hero-cloud-arrow-up"
@@ -242,7 +246,7 @@ defmodule YscWeb.AdminPostEditorLive do
                       <span>Restore</span>
                     </button>
                   </li>
-                  <li>
+                  <li :if={@post_id}>
                     <.link
                       id={"preview-post-#{@post_id}"}
                       navigate={~p"/admin/posts/#{@post_id}/preview"}
@@ -259,7 +263,21 @@ defmodule YscWeb.AdminPostEditorLive do
 
                 <ul class="py-2 text-sm font-medium text-zinc-800">
                   <li>
+                    <button
+                      :if={@unsaved?}
+                      id="settings-post-new"
+                      type="button"
+                      class="block w-full px-4 py-2 text-left transition duration-300 ease-in-out hover:bg-zinc-100"
+                      phx-click="open-settings"
+                    >
+                      <.icon
+                        name="hero-adjustments-horizontal"
+                        class="mr-2 h-5 w-5 -mt-1"
+                      />
+                      <span>Post Settings</span>
+                    </button>
                     <.link
+                      :if={@post_id && !@unsaved?}
                       id={"settings-post-#{@post_id}"}
                       navigate={~p"/admin/posts/#{@post_id}/settings"}
                       class="block px-4 py-2 transition duration-300 ease-in-out hover:bg-zinc-100"
@@ -272,7 +290,10 @@ defmodule YscWeb.AdminPostEditorLive do
                     </.link>
                   </li>
 
-                  <li class="px-3 py-2 text-red-600 transition duration-200 ease-in-out hover:bg-zinc-100">
+                  <li
+                    :if={@post_id}
+                    class="px-3 py-2 text-red-600 transition duration-200 ease-in-out hover:bg-zinc-100"
+                  >
                     <button
                       id={"delete-post-#{@post_id}"}
                       type="button"
@@ -290,7 +311,7 @@ defmodule YscWeb.AdminPostEditorLive do
         </div>
 
         <div class="flex flex-col gap-1 py-1 text-sm leading-6 text-zinc-500 sm:flex-row sm:items-end sm:gap-2">
-          <span>
+          <span :if={@post_id && @post.url_name}>
             <.link
               navigate={~p"/posts/#{@post.url_name}"}
               target="_blank"
@@ -301,6 +322,16 @@ defmodule YscWeb.AdminPostEditorLive do
                 class=" text-zinc-800 w-4 h-4 -mt-1 mr-2"
               />
             </.link>
+          </span>
+          <span
+            :if={!@post_id || !@post.url_name}
+            class="text-zinc-400"
+            title="Save the post to preview the public URL"
+          >
+            <.icon
+              name="hero-arrow-top-right-on-square"
+              class="w-4 h-4 -mt-1 mr-2 text-zinc-300"
+            />
           </span>
           <span class="pt-2 mr-1 hidden lg:block">
             {"#{YscWeb.Endpoint.url()}/posts/"}
@@ -343,9 +374,57 @@ defmodule YscWeb.AdminPostEditorLive do
     """
   end
 
-  def mount(%{"id" => id} = _params, _session, socket) do
+  def mount(_params, _session, %{assigns: %{live_action: :new}} = socket) do
+    create_topic = "post_editor:#{socket.id}"
+    YscWeb.Endpoint.subscribe(create_topic)
+
+    default_title = Slug.default_title()
+
+    changeset =
+      Post.update_post_changeset(%Post{state: :draft}, %{
+        "title" => default_title,
+        "url_name" => Slug.from_title(default_title)
+      })
+
+    {:ok,
+     socket
+     |> assign(:create_topic, create_topic)
+     |> assign(:page_title, default_title)
+     |> assign(:active_page, :news)
+     |> assign(:saving?, false)
+     |> assign(:unsaved?, true)
+     |> assign(:auto_url_name?, true)
+     |> assign(:pending_publish?, false)
+     |> assign(:pending_form_values, %{
+       "title" => default_title,
+       "url_name" => Slug.from_title(default_title)
+     })
+     |> assign(:post_id, nil)
+     |> assign(:post, %Post{
+       state: :draft,
+       title: default_title,
+       url_name: Slug.from_title(default_title)
+     })
+     |> assign(:preview_device, :computer)
+     |> assign(form: to_form(changeset, as: "post"))}
+  end
+
+  def mount(%{"id" => id}, _session, socket) do
     post = Posts.get_post!(id) |> Ysc.Repo.preload(:featured_image)
-    update_post_changeset = Post.update_post_changeset(post, %{})
+
+    form_attrs =
+      if Slug.blank_title?(post.title) do
+        default_title = Slug.default_title()
+
+        %{
+          "title" => default_title,
+          "url_name" => post.url_name || Slug.from_title(default_title)
+        }
+      else
+        %{}
+      end
+
+    update_post_changeset = Post.update_post_changeset(post, form_attrs)
 
     YscWeb.Endpoint.subscribe("post_saved:#{id}")
 
@@ -354,6 +433,11 @@ defmodule YscWeb.AdminPostEditorLive do
      |> assign(:page_title, post.title)
      |> assign(:active_page, :news)
      |> assign(:saving?, false)
+     |> assign(:unsaved?, false)
+     |> assign(:auto_url_name?, false)
+     |> assign(:pending_publish?, false)
+     |> assign(:pending_form_values, %{})
+     |> assign(:create_topic, nil)
      |> assign(:post_id, post.id)
      |> assign(:post, post)
      |> assign(:preview_device, :computer)
@@ -361,60 +445,97 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   def handle_params(_params, _uri, socket) do
+    socket =
+      if socket.assigns.live_action != :settings do
+        assign(socket, :pending_publish?, false)
+      else
+        socket
+      end
+
     {:noreply, socket}
   end
 
-  @spec handle_event(<<_::32, _::_*8>>, any(), atom() | map()) ::
-          {:noreply, map()}
   def handle_event("post-update", %{"post" => values}, socket) do
-    post = socket.assigns[:post]
+    post = socket.assigns.post
 
-    # Ensure UI is not cleared out
     updated_values =
-      Map.put_new(values, "title", post.title)
-      |> Map.put_new("url_name", post.url_name)
+      values
+      |> Map.put_new("title", post.title || Slug.default_title())
+      |> Map.put_new("url_name", post.url_name || "")
 
-    changeset = Post.update_post_changeset(%Post{}, updated_values)
-    form_socket = assign_form(socket, Map.put(changeset, :action, :validate))
+    {updated_values, title_restored?} = ensure_title_present(updated_values)
 
-    # Don't save too often. We wait a little and only save once user has stopped
-    # typing or removes focus from the field. Even if user navigates away from the page
-    # this function runs in a separate process and will complete.
+    socket =
+      if title_restored? do
+        assign(socket, :auto_url_name?, true)
+      else
+        socket
+      end
+
+    {updated_values, auto_url_name?} =
+      maybe_sync_url_name(socket, updated_values)
+
+    changeset =
+      Post.update_post_changeset(%Post{}, updated_values)
+      |> Map.put(:action, :validate)
+
+    form_socket =
+      socket
+      |> assign(:auto_url_name?, auto_url_name?)
+      |> assign(:pending_form_values, updated_values)
+      |> assign_form(changeset)
+
+    unsaved? = socket.assigns.unsaved?
+    post_id = socket.assigns.post_id
+    current_user = socket.assigns.current_user
+    previous_url_name = post.url_name
+    create_topic = socket.assigns[:create_topic]
+
+    debounce_key = post_id || @new_post_debounce_key
+
     Debouncer.delay(
-      socket.assigns[:post_id],
+      debounce_key,
       fn ->
-        # Only run DB validation if it has actually changed
-        opts =
-          if post.url_name != Map.get(values, "url_name", "") do
-            [validate_url_name: true]
-          else
-            []
+        html_scrubbed_values = scrub_raw_body(updated_values)
+
+        if unsaved? do
+          params =
+            html_scrubbed_values
+            |> Map.put("state", "draft")
+            |> ensure_url_name_for_persist()
+
+          case Posts.create_post(params, current_user) do
+            {:ok, new_post} ->
+              YscWeb.Endpoint.broadcast(create_topic, "created", new_post.id)
+
+            {:error, _} ->
+              :error
           end
+        else
+          opts =
+            if previous_url_name != Map.get(updated_values, "url_name", "") do
+              [validate_url_name: true]
+            else
+              []
+            end
 
-        # Need to scrub if html body has changed
-        html_scrubbed_values =
-          if Map.has_key?(values, "raw_body") do
-            Map.put(
-              values,
-              "rendered_body",
-              Scrubber.scrub(Map.get(values, "raw_body"), Scrubber.BasicHTML)
-            )
-          else
-            values
-          end
+          persist_values =
+            html_scrubbed_values
+            |> maybe_unique_url_name(previous_url_name, updated_values)
 
-        Posts.update_post(
-          %Post{id: socket.assigns[:post_id]},
-          html_scrubbed_values,
-          socket.assigns[:current_user],
-          opts
-        )
+          Posts.update_post(
+            %Post{id: post_id},
+            persist_values,
+            current_user,
+            opts
+          )
 
-        YscWeb.Endpoint.broadcast(
-          "post_saved:#{socket.assigns[:post_id]}",
-          "saved",
-          socket.assigns[:post_id]
-        )
+          YscWeb.Endpoint.broadcast(
+            "post_saved:#{post_id}",
+            "saved",
+            post_id
+          )
+        end
       end,
       @save_debounce_timeout
     )
@@ -434,51 +555,58 @@ defmodule YscWeb.AdminPostEditorLive do
     handle_event("post-update", %{"post" => %{"raw_body" => value}}, socket)
   end
 
+  def handle_event("open-settings", _params, socket) do
+    case ensure_persisted(socket) do
+      {:ok, socket} ->
+        {:noreply,
+         push_patch(socket,
+           to: ~p"/admin/posts/#{socket.assigns.post_id}/settings"
+         )}
+
+      {:error, socket} ->
+        {:noreply, persist_error_toast(socket)}
+    end
+  end
+
   def handle_event("publish-post", _params, socket) do
-    post = socket.assigns[:post]
+    case ensure_persisted(socket) do
+      {:error, socket} ->
+        {:noreply, persist_error_toast(socket)}
 
-    if is_nil(post.image_id) do
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(
-         :info,
-         "Please set a featured image before publishing.",
-         title: "Featured image required"
-       )
-       |> push_patch(to: ~p"/admin/posts/#{post.id}/settings")}
-    else
-      res =
-        Posts.update_post(
-          post,
-          %{state: :published, published_on: Timex.now()},
-          socket.assigns[:current_user]
-        )
+      {:ok, socket} ->
+        post = socket.assigns.post
 
-      case res do
-        {:ok, new_post} ->
+        if is_nil(post.image_id) do
           {:noreply,
            socket
-           |> assign(:post, new_post)
-           |> YscWeb.Flash.put_toast(:info, "Post published!",
-             title: "Published"
-           )
-           |> redirect(to: ~p"/admin/posts/#{post.id}")}
+           |> assign(:pending_publish?, true)
+           |> push_patch(to: ~p"/admin/posts/#{post.id}/settings")}
+        else
+          case publish_post(socket) do
+            {:ok, socket} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(:info, "Post published!",
+                 title: "Published"
+               )
+               |> redirect(to: ~p"/admin/posts/#{post.id}")}
 
-        {:error, _changeset} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "Something went wrong. Please try again.",
-             title: "Publish failed"
-           )
-           |> redirect(to: ~p"/admin/posts")}
-      end
+            {:error, socket} ->
+              {:noreply,
+               socket
+               |> YscWeb.Flash.put_toast(
+                 :error,
+                 "Something went wrong. Please try again.",
+                 title: "Publish failed"
+               )
+               |> redirect(to: ~p"/admin/posts")}
+          end
+        end
     end
   end
 
   def handle_event("restore-post", _params, socket) do
-    post = socket.assigns[:post]
+    post = socket.assigns.post
 
     res =
       Posts.update_post(
@@ -489,7 +617,7 @@ defmodule YscWeb.AdminPostEditorLive do
           deleted_on: nil,
           featured_post: false
         },
-        socket.assigns[:current_user]
+        socket.assigns.current_user
       )
 
     case res do
@@ -515,7 +643,7 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   def handle_event("delete-post", _params, socket) do
-    post = socket.assigns[:post]
+    post = socket.assigns.post
 
     res =
       Posts.update_post(
@@ -526,7 +654,7 @@ defmodule YscWeb.AdminPostEditorLive do
           published_on: nil,
           featured_post: false
         },
-        socket.assigns[:current_user]
+        socket.assigns.current_user
       )
 
     case res do
@@ -564,8 +692,8 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   def handle_info({YscWeb.MediaPickerComponent, _id, :cleared}, socket) do
-    post_id = socket.assigns[:post_id]
-    current_user = socket.assigns[:current_user]
+    post_id = socket.assigns.post_id
+    current_user = socket.assigns.current_user
 
     case Posts.update_post(
            %Post{id: post_id},
@@ -591,9 +719,10 @@ defmodule YscWeb.AdminPostEditorLive do
     end
   end
 
-  def handle_info({YscWeb.MediaPickerComponent, _id, image_id}, socket) do
-    post_id = socket.assigns[:post_id]
-    current_user = socket.assigns[:current_user]
+  def handle_info({YscWeb.MediaPickerComponent, _id, image_id}, socket)
+      when is_binary(image_id) do
+    post_id = socket.assigns.post_id
+    current_user = socket.assigns.current_user
 
     case Posts.update_post(
            %Post{id: post_id},
@@ -601,12 +730,14 @@ defmodule YscWeb.AdminPostEditorLive do
            current_user
          ) do
       {:ok, _} ->
-        {:noreply,
-         assign(
-           socket,
-           :post,
-           Posts.get_post!(post_id) |> Ysc.Repo.preload(:featured_image)
-         )}
+        post = Posts.get_post!(post_id) |> Ysc.Repo.preload(:featured_image)
+
+        socket =
+          socket
+          |> assign(:post, post)
+          |> maybe_complete_pending_publish()
+
+        {:noreply, socket}
 
       {:error, _} ->
         {:noreply,
@@ -628,14 +759,189 @@ defmodule YscWeb.AdminPostEditorLive do
      })}
   end
 
+  def handle_info(
+        %Phoenix.Socket.Broadcast{event: "created", payload: post_id},
+        socket
+      ) do
+    post = Posts.get_post!(post_id) |> Ysc.Repo.preload(:featured_image)
+    YscWeb.Endpoint.subscribe("post_saved:#{post_id}")
+
+    {:noreply,
+     socket
+     |> assign(:saving?, false)
+     |> assign(:unsaved?, false)
+     |> assign(:post_id, post_id)
+     |> assign(:post, post)
+     |> assign(:page_title, post.title)
+     |> push_patch(to: ~p"/admin/posts/#{post_id}", replace: true)}
+  end
+
   def handle_info(%Phoenix.Socket.Broadcast{event: "saved"}, socket) do
     {:noreply,
      assign(socket, :saving?, false)
      |> assign(
        :post,
-       Posts.get_post!(socket.assigns[:post_id])
+       Posts.get_post!(socket.assigns.post_id)
        |> Ysc.Repo.preload(:featured_image)
      )}
+  end
+
+  defp ensure_title_present(values) do
+    title = Map.get(values, "title")
+
+    if Slug.blank_title?(title) do
+      {Map.put(values, "title", Slug.default_title()), true}
+    else
+      {values, false}
+    end
+  end
+
+  defp maybe_sync_url_name(socket, values) do
+    title = values |> Map.get("title") |> Slug.title_or_default()
+    auto_slug = Slug.from_title(title)
+
+    values =
+      if socket.assigns.auto_url_name? do
+        Map.put(values, "url_name", auto_slug)
+      else
+        values
+      end
+
+    auto_url_name? = Map.get(values, "url_name", "") == auto_slug
+
+    {values, auto_url_name?}
+  end
+
+  defp ensure_persisted(socket) do
+    if socket.assigns.unsaved? do
+      {values, _} = ensure_title_present(socket.assigns.pending_form_values)
+
+      case create_post_from_values(values, socket.assigns.current_user) do
+        {:ok, post} ->
+          YscWeb.Endpoint.subscribe("post_saved:#{post.id}")
+
+          {:ok,
+           socket
+           |> assign(:unsaved?, false)
+           |> assign(:post_id, post.id)
+           |> assign(:post, post)
+           |> assign(:page_title, post.title)}
+
+        {:error, _} ->
+          {:error, socket}
+      end
+    else
+      {:ok, socket}
+    end
+  end
+
+  defp create_post_from_values(values, current_user) do
+    values
+    |> scrub_raw_body()
+    |> Map.put("state", "draft")
+    |> ensure_url_name_for_persist()
+    |> then(&Posts.create_post(&1, current_user))
+    |> case do
+      {:ok, post} ->
+        {:ok, Posts.get_post!(post.id) |> Ysc.Repo.preload(:featured_image)}
+
+      error ->
+        error
+    end
+  end
+
+  defp ensure_url_name_for_persist(params) do
+    params =
+      Map.update(
+        params,
+        "title",
+        Slug.default_title(),
+        &Slug.title_or_default/1
+      )
+
+    url_name =
+      params
+      |> Map.get("url_name")
+      |> case do
+        nil -> Slug.from_title(params["title"])
+        "" -> Slug.from_title(params["title"])
+        name -> name
+      end
+      |> Slug.unique()
+
+    Map.put(params, "url_name", url_name)
+  end
+
+  defp maybe_unique_url_name(params, previous_url_name, updated_values) do
+    new_url_name = Map.get(updated_values, "url_name", "")
+
+    if previous_url_name != new_url_name do
+      Map.put(params, "url_name", Slug.unique(new_url_name))
+    else
+      params
+    end
+  end
+
+  defp scrub_raw_body(values) do
+    if Map.has_key?(values, "raw_body") do
+      Map.put(
+        values,
+        "rendered_body",
+        Scrubber.scrub(Map.get(values, "raw_body"), Scrubber.BasicHTML)
+      )
+    else
+      values
+    end
+  end
+
+  defp publish_post(socket) do
+    post = socket.assigns.post
+
+    case Posts.update_post(
+           post,
+           %{state: :published, published_on: Timex.now()},
+           socket.assigns.current_user
+         ) do
+      {:ok, new_post} ->
+        {:ok, assign(socket, :post, new_post)}
+
+      {:error, _changeset} ->
+        {:error, socket}
+    end
+  end
+
+  defp maybe_complete_pending_publish(socket) do
+    if socket.assigns.pending_publish? do
+      case publish_post(socket) do
+        {:ok, socket} ->
+          socket
+          |> assign(:pending_publish?, false)
+          |> YscWeb.Flash.put_toast(:info, "Post published!",
+            title: "Published"
+          )
+          |> push_patch(to: ~p"/admin/posts/#{socket.assigns.post_id}")
+
+        {:error, socket} ->
+          socket
+          |> assign(:pending_publish?, false)
+          |> YscWeb.Flash.put_toast(
+            :error,
+            "Something went wrong. Please try again.",
+            title: "Publish failed"
+          )
+      end
+    else
+      socket
+    end
+  end
+
+  defp persist_error_toast(socket) do
+    YscWeb.Flash.put_toast(
+      socket,
+      :error,
+      "Could not save the post. Please try again.",
+      title: "Save failed"
+    )
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do

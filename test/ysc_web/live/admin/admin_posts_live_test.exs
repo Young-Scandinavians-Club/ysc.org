@@ -36,27 +36,14 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert html =~ "Viking News"
     end
 
-    test "navigates to new post modal", %{conn: conn} do
+    test "navigates to new post editor", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/posts")
 
       view
       |> element("#admin-posts-new-post")
       |> render_click()
 
-      assert_patched(view, ~p"/admin/posts/new")
-    end
-
-    test "creates a new post", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
-
-      view
-      |> form("#new-post-modal form", %{new_post: %{title: "Brand New Post"}})
-      |> render_submit()
-
-      # Should redirect to the post editor
-      # Since we don't know the ID exactly, we can check for a redirect and then verify if it's the right path pattern
-      {path, _flash} = assert_redirect(view)
-      assert path =~ ~r"/admin/posts/.*"
+      assert_redirect(view, ~p"/admin/posts/new")
     end
 
     test "search patches URL with title filter", %{conn: conn, admin: admin} do
