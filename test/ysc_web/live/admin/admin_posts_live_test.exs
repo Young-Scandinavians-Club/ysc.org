@@ -100,6 +100,37 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert Ysc.Posts.get_post!(p2.id).featured_post == false
     end
 
+    test "deletes a draft post from the actions menu", %{
+      conn: conn,
+      admin: admin
+    } do
+      draft =
+        post_fixture(admin, %{
+          title: "Draft To Delete",
+          state: :draft,
+          url_name: "draft-delete-#{System.unique_integer()}"
+        })
+
+      published =
+        post_fixture(admin, %{
+          title: "Published Stay",
+          state: :published,
+          url_name: "published-stay-#{System.unique_integer()}"
+        })
+
+      {:ok, view, html} = live(conn, ~p"/admin/posts")
+
+      assert html =~ "Draft To Delete"
+      refute html =~ ~s/id="post-actions-dt-#{published.id}-delete"/
+
+      view
+      |> element("#post-actions-dt-#{draft.id}-delete")
+      |> render_click()
+
+      refute render(view) =~ "Draft To Delete"
+      assert Ysc.Posts.get_post!(draft.id).state == :deleted
+    end
+
     test "invalid flop params redirect to default posts list", %{conn: conn} do
       assert {:error, {:live_redirect, %{to: "/admin/posts"}}} =
                live(conn, ~p"/admin/posts?order_by=not_a_real_field")

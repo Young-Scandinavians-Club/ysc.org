@@ -334,6 +334,19 @@ defmodule YscWeb.AdminPostsLive do
                 </span>
               </button>
             </li>
+            <li :if={@post.state == :draft}>
+              <button
+                id={"#{@menu_id}-delete"}
+                type="button"
+                phx-click="delete-post"
+                phx-value-id={@post.id}
+                data-confirm="Delete this draft? It will be marked as deleted."
+                class="flex w-full items-center gap-2 px-4 py-2 text-left text-red-600 transition hover:bg-zinc-100"
+              >
+                <.icon name="hero-trash" class="h-5 w-5 shrink-0" />
+                <span>Delete</span>
+              </button>
+            </li>
           </ul>
         </div>
       </.dropdown>
@@ -471,6 +484,48 @@ defmodule YscWeb.AdminPostsLive do
       end)
 
     {:noreply, push_patch(socket, to: ~p"/admin/posts?#{new_params}")}
+  end
+
+  def handle_event("delete-post", %{"id" => id}, socket) do
+    current_user = socket.assigns.current_user
+
+    with {:ok, target_id} <- Ecto.ULID.cast(id),
+         %Post{} = target <- Posts.get_post(target_id, [:author]),
+         :draft <- target.state,
+         {:ok, _} <-
+           Posts.update_post(
+             target,
+             %{
+               state: :deleted,
+               deleted_on: Timex.now(),
+               published_on: nil,
+               featured_post: false
+             },
+             current_user
+           ) do
+      {:noreply,
+       socket
+       |> stream_delete(:posts, target)
+       |> YscWeb.Flash.put_toast(:info, "Post deleted.", title: "Post deleted")}
+    else
+      :error ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Something went wrong. Please try again.",
+           title: "Delete failed"
+         )}
+
+      _ ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Only draft posts can be deleted from here.",
+           title: "Delete failed"
+         )}
+    end
   end
 
   def handle_event("toggle-featured", %{"id" => id}, socket) do
