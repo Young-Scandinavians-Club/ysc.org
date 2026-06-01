@@ -136,6 +136,43 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_magic_search_section/1 and admin_magic_search_link/1" do
+    test "renders section title and link row when show? is true" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_magic_search_section title="Events" show?={true}>
+          <.admin_magic_search_link navigate="/admin/events/1/edit">
+            <div class="font-medium">Summer Gala</div>
+          </.admin_magic_search_link>
+        </.admin_magic_search_section>
+        """)
+
+      assert html =~ "Events"
+      assert html =~ "Summer Gala"
+      assert html =~ ~s(data-phx-link="redirect")
+      assert html =~ "/admin/events/1/edit"
+      assert html =~ "data-result-item"
+    end
+
+    test "renders nothing when show? is false" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_magic_search_section title="Events" show?={false}>
+          <.admin_magic_search_link navigate="/admin/events/1/edit">
+            <div class="font-medium">Summer Gala</div>
+          </.admin_magic_search_link>
+        </.admin_magic_search_section>
+        """)
+
+      refute html =~ "Summer Gala"
+      refute html =~ "Events"
+    end
+  end
+
   describe "admin_list_empty_state/1" do
     test "renders viking empty state with title and suggestion" do
       assigns = %{}

@@ -1644,6 +1644,51 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_magic_search_section / admin_magic_search_link
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  A labeled group of results in the admin header magic search dropdown.
+
+  Renders nothing when `show?` is false (e.g. when the result list is empty).
+  """
+  attr :title, :string, required: true
+  attr :show?, :boolean, default: true
+
+  slot :inner_block, required: true
+
+  def admin_magic_search_section(assigns) do
+    ~H"""
+    <div :if={@show?} class="p-2">
+      <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+        {@title}
+      </div>
+      <div class="space-y-1">
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  A single navigable row in the admin header magic search dropdown.
+  """
+  attr :navigate, :string, required: true
+  slot :inner_block, required: true
+
+  def admin_magic_search_link(assigns) do
+    ~H"""
+    <.link
+      data-result-item
+      navigate={@navigate}
+      class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
+    >
+      {render_slot(@inner_block)}
+    </.link>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_search_bar
   # ---------------------------------------------------------------------------
 
