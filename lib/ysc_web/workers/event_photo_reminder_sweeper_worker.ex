@@ -9,7 +9,6 @@ defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
 
   import Ecto.Query
 
-  alias Ysc.EventPhotos
   alias Ysc.EventPhotos.Collection
   alias Ysc.Events.Event
   alias Ysc.Repo
@@ -26,12 +25,17 @@ defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
       on: c.event_id == e.id,
       where: e.state in [:published, "published"],
       where: is_nil(c.reminder_sent_at),
+      where:
+        fragment(
+          "(timezone(?, timezone('UTC', coalesce(?, ?))))::date = ?",
+          ^@timezone,
+          e.end_date,
+          e.start_date,
+          type(^yesterday, :date)
+        ),
       preload: [event: e]
     )
     |> Repo.all()
-    |> Enum.filter(fn %{event: event} ->
-      EventPhotos.effective_end_date(event) == yesterday
-    end)
     |> Enum.each(fn %{event: event} = collection ->
       Ysc.Logging.info("Sweeper sending event photo reminder",
         event_id: event.id

@@ -80,13 +80,18 @@ defmodule Ysc.GooglePhotos.Limits do
   `:photo_too_large`, `:video_too_large`, `:filename_too_long`, or `:empty_filename`.
   """
   def validate_upload(filename, size_bytes) when is_integer(size_bytes) do
+    basename =
+      filename
+      |> Path.basename()
+      |> String.trim()
+
     normalized = normalize_filename(filename)
 
     cond do
-      normalized == "" ->
+      basename == "" ->
         {:error, :empty_filename}
 
-      String.length(normalized) > @max_filename_length ->
+      String.length(basename) > @max_filename_length ->
         {:error, :filename_too_long}
 
       not photo?(normalized) and not video?(normalized) ->

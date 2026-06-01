@@ -42,12 +42,26 @@ defmodule Ysc.EventPhotos do
         {:ok, collection}
 
       nil ->
-        %Collection{}
-        |> Collection.changeset(%{
+        %Collection{
           event_id: event.id,
           upload_token: Ecto.UUID.generate()
-        })
+        }
+        |> Collection.insert_changeset()
         |> Repo.insert()
+        |> case do
+          {:ok, collection} ->
+            {:ok, collection}
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            if event_id_conflict?(changeset) do
+              case get_by_event_id(event.id) do
+                %Collection{} = collection -> {:ok, collection}
+                nil -> {:error, changeset}
+              end
+            else
+              {:error, changeset}
+            end
+        end
     end
   end
 
@@ -192,5 +206,22 @@ defmodule Ysc.EventPhotos do
       end
 
     Ysc.GooglePhotos.Limits.normalize_album_title(base)
+  end
+
+  defp event_id_conflict?(%Ecto.Changeset{} = changeset) do
+    Enum.any?(changeset.constraints, fn
+      %{
+        constraint: :unique,
+        constraint_name: "event_photo_collections_event_id_index"
+      } ->
+        true
+
+      _ ->
+        false
+    end) or
+      match?(
+        [event_id: {"has already been taken", _}],
+        changeset.errors
+      )
   end
 end

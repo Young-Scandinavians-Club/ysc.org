@@ -4,8 +4,7 @@ defmodule Ysc.GooglePhotos.Api.DevStub do
   require Ysc.Logging
 
   alias Ysc.GooglePhotos.Limits
-
-  @dev_dir "tmp/dev_event_photos"
+  alias Ysc.SafeFile
 
   def create_album(_access_token, title, event_id) do
     Ysc.Logging.info("Google Photos DevStub: create_album",
@@ -16,10 +15,32 @@ defmodule Ysc.GooglePhotos.Api.DevStub do
     {:ok, "dev-album-#{event_id}"}
   end
 
-  def upload_bytes(_access_token, bytes, filename, event_id) do
-    with :ok <- Limits.validate_upload(filename, byte_size(bytes)),
+  def upload_file(_access_token, file_path, filename, event_id, size) do
+    with :ok <- validate_event_id(event_id),
+         :ok <- Limits.validate_upload(filename, size),
          normalized <- Limits.normalize_filename(filename),
-         :ok <- write_dev_copy(event_id, normalized, bytes) do
+         {:ok, dest} <- SafeFile.dev_event_photo_path(event_id, normalized),
+         :ok <- SafeFile.copy_upload_to(file_path, dest) do
+      upload_token = "dev-upload-#{:erlang.unique_integer([:positive])}"
+
+      Ysc.Logging.info("Google Photos DevStub: upload_file",
+        filename: normalized,
+        size: size,
+        event_id: event_id
+      )
+
+      {:ok, upload_token}
+    else
+      :error -> {:error, :invalid_event_id}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def upload_bytes(_access_token, bytes, filename, event_id) do
+    with :ok <- validate_event_id(event_id),
+         :ok <- Limits.validate_upload(filename, byte_size(bytes)),
+         normalized <- Limits.normalize_filename(filename),
+         :ok <- SafeFile.write_dev_event_photo!(event_id, normalized, bytes) do
       upload_token = "dev-upload-#{:erlang.unique_integer([:positive])}"
 
       Ysc.Logging.info("Google Photos DevStub: upload_bytes",
@@ -29,6 +50,9 @@ defmodule Ysc.GooglePhotos.Api.DevStub do
       )
 
       {:ok, upload_token}
+    else
+      :error -> {:error, :invalid_event_id}
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -42,19 +66,6 @@ defmodule Ysc.GooglePhotos.Api.DevStub do
     {:ok, %{"id" => "dev-media-#{upload_token}"}}
   end
 
-  defp write_dev_copy(event_id, filename, bytes) do
-    dir = Path.join([@dev_dir, event_id])
-    path = Path.join(dir, filename)
-
-    case File.mkdir_p(dir) do
-      :ok ->
-        case File.write(path, bytes) do
-          :ok -> :ok
-          {:error, reason} -> {:error, reason}
-        end
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
+  defp validate_event_id(id) when is_binary(id) and byte_size(id) > 0, do: :ok
+  defp validate_event_id(_), do: :error
 end

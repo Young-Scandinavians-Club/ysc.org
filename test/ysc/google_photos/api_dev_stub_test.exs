@@ -4,6 +4,13 @@ defmodule Ysc.GooglePhotos.Api.DevStubTest do
   alias Ysc.GooglePhotos.Api.DevStub
   alias Ysc.GooglePhotos.Limits
 
+  @dev_event_dir Path.join(["tmp/dev_event_photos", "event-1"])
+
+  setup do
+    on_exit(fn -> File.rm_rf(@dev_event_dir) end)
+    :ok
+  end
+
   test "create_album returns dev album id" do
     assert {:ok, "dev-album-event-1"} =
              DevStub.create_album(
@@ -22,12 +29,8 @@ defmodule Ysc.GooglePhotos.Api.DevStubTest do
     assert is_binary(token)
     assert String.starts_with?(token, "dev-upload-")
 
-    path = Path.join(["tmp/dev_event_photos", "event-1", "photo.jpg"])
+    path = Path.join(@dev_event_dir, "photo.jpg")
     assert File.exists?(path)
-
-    on_exit(fn ->
-      File.rm_rf(Path.join(["tmp/dev_event_photos", "event-1"]))
-    end)
   end
 
   test "upload_bytes rejects oversize photos" do
@@ -42,5 +45,10 @@ defmodule Ysc.GooglePhotos.Api.DevStubTest do
 
     assert {:ok, _token} =
              DevStub.upload_bytes("token", bytes, "clip.mp4", "event-1")
+  end
+
+  test "upload_bytes rejects nil event_id" do
+    assert {:error, :invalid_event_id} =
+             DevStub.upload_bytes("token", "bytes", "photo.jpg", nil)
   end
 end

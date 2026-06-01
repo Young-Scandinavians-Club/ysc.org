@@ -13,6 +13,18 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   alias Ysc.GooglePhotos.Api
   alias Ysc.GooglePhotos.Limits
   alias Ysc.Repo
+  alias Ysc.SafeFile
+
+  @terminal_errors [
+    :photo_too_large,
+    :video_too_large,
+    :file_too_large,
+    :filename_too_long,
+    :empty_filename,
+    :unsupported_type,
+    :invalid_path,
+    :enoent
+  ]
 
   @impl Oban.Worker
   def perform(%Oban.Job{
@@ -23,8 +35,10 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
           "user_id" => user_id
         }
       }) do
-    try do
-      with {:ok, stat} <- File.stat(file_path),
+    tmp_root = SafeFile.event_photo_tmp_root()
+
+    result =
+      with {:ok, stat} <- SafeFile.stat_under_root(tmp_root, file_path),
            :ok <- Limits.validate_upload(filename, stat.size),
            collection <-
              EventPhotos.Collection
@@ -48,15 +62,17 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
 
         :ok
       else
+        {:error, :enoent} ->
+          Ysc.Logging.warning(
+            "Event media upload temp file missing, discarding job",
+            collection_id: collection_id,
+            file_path: file_path
+          )
+
+          :ok
+
         {:error, reason}
-        when reason in [
-               :photo_too_large,
-               :video_too_large,
-               :file_too_large,
-               :filename_too_long,
-               :empty_filename,
-               :unsupported_type
-             ] ->
+        when reason in @terminal_errors ->
           Ysc.Logging.warning("Event media upload rejected",
             collection_id: collection_id,
             reason: reason,
@@ -73,8 +89,18 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
 
           {:error, reason}
       end
-    after
-      _ = File.rm(file_path)
+
+    if should_remove_temp_file?(result) do
+      SafeFile.rm_under_root(tmp_root, file_path)
     end
+
+    result
   end
+
+  defp should_remove_temp_file?(:ok), do: true
+
+  defp should_remove_temp_file?({:error, reason})
+       when reason in @terminal_errors, do: true
+
+  defp should_remove_temp_file?({:error, _}), do: false
 end

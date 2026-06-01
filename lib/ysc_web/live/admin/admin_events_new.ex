@@ -1085,12 +1085,27 @@ defmodule YscWeb.AdminEventsNewLive do
   defp assign_photo_upload(socket, event) do
     dev_routes? = Application.get_env(:ysc, :dev_routes, false)
 
+    cached_collection =
+      case socket.assigns[:photo_collection] do
+        %EventPhotos.Collection{event_id: id} when id == event.id ->
+          socket.assigns.photo_collection
+
+        _ ->
+          nil
+      end
+
     {collection, upload_url} =
       if event.state in [:published, "published"] do
-        case EventPhotos.ensure_collection_for_event(event) do
-          {:ok, collection} -> {collection, EventPhotos.upload_url(collection)}
-          _ -> {nil, nil}
-        end
+        collection =
+          cached_collection ||
+            EventPhotos.get_by_event_id(event.id) ||
+            case EventPhotos.ensure_collection_for_event(event) do
+              {:ok, collection} -> collection
+              _ -> nil
+            end
+
+        {collection,
+         if(collection, do: EventPhotos.upload_url(collection), else: nil)}
       else
         {nil, nil}
       end

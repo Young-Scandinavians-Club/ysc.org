@@ -51,6 +51,13 @@ defmodule Ysc.GooglePhotos.LimitsTest do
       assert {:error, :empty_filename} = Limits.validate_upload("   ", 100)
     end
 
+    test "rejects filename longer than 255 characters before normalization" do
+      long_name = String.duplicate("a", 256) <> ".jpg"
+
+      assert {:error, :filename_too_long} =
+               Limits.validate_upload(long_name, 1024)
+    end
+
     test "rejects unsupported extension" do
       assert {:error, :unsupported_type} =
                Limits.validate_upload("file.xyz", 100)

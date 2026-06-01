@@ -67,15 +67,26 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
         end)
 
       success_count = Enum.count(results, &match?({:ok, _}, &1))
+      recipient_count = length(recipients)
 
       Ysc.Logging.info("Event photo reminders scheduled",
         event_id: event.id,
         success_count: success_count,
-        recipient_count: length(recipients)
+        recipient_count: recipient_count
       )
 
-      EventPhotos.mark_reminder_sent(collection)
-      :ok
+      if success_count == recipient_count do
+        EventPhotos.mark_reminder_sent(collection)
+        :ok
+      else
+        Ysc.Logging.warning("Event photo reminders partially failed",
+          event_id: event.id,
+          success_count: success_count,
+          recipient_count: recipient_count
+        )
+
+        {:error, :partial_failure}
+      end
     end
   rescue
     error ->

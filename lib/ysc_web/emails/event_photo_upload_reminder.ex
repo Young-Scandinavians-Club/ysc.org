@@ -28,7 +28,7 @@ defmodule YscWeb.Emails.EventPhotoUploadReminder do
       if Ecto.assoc_loaded?(event.cover_image) do
         event
       else
-        Repo.get!(Event, event.id) |> Repo.preload(:cover_image)
+        Repo.preload(event, :cover_image, force: true)
       end
 
     %{

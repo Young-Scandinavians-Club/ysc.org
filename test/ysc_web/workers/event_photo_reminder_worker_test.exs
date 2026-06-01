@@ -60,7 +60,14 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
         worker: "YscWeb.Workers.EventPhotoReminderWorker"
       }
 
-      assert :ok = EventPhotoReminderWorker.perform(job)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok = EventPhotoReminderWorker.perform(job)
+
+        refute_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template_name" => "event_photo_upload_reminder"}
+        )
+      end)
     end
   end
 

@@ -33,10 +33,20 @@ defmodule Ysc.EventPhotosTest do
 
     test "falls back to start_date when end_date is nil", %{event: event} do
       single_day = %{event | end_date: nil}
-      end_from_start = EventPhotos.effective_end_date(single_day)
-      end_with_end = EventPhotos.effective_end_date(event)
-      assert %Date{} = end_from_start
-      assert end_with_end != nil
+
+      expected =
+        case single_day.start_date do
+          %DateTime{} = dt ->
+            dt
+            |> DateTime.shift_zone!("America/Los_Angeles")
+            |> DateTime.to_date()
+
+          %Date{} = date ->
+            date
+        end
+
+      assert EventPhotos.effective_end_date(single_day) == expected
+      assert %Date{} = EventPhotos.effective_end_date(event)
     end
   end
 

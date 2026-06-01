@@ -79,15 +79,40 @@ defmodule Ysc.GooglePhotos.Api do
         file_path,
         filename
       ) do
-    with {:ok, stat} <- File.stat(file_path),
+    tmp_root = Ysc.SafeFile.event_photo_tmp_root()
+
+    with {:ok, stat} <- Ysc.SafeFile.stat_under_root(tmp_root, file_path),
          :ok <- Limits.validate_upload(filename, stat.size),
-         {:ok, bytes} <- File.read(file_path),
          {:ok, album_id} <- ensure_album_id(collection, event, access_token),
          {:ok, upload_token} <-
-           upload_bytes(access_token, bytes, filename, event.id),
+           upload_file(access_token, file_path, filename, event.id, stat.size),
          {:ok, _item} <-
            create_media_item(access_token, upload_token, album_id, filename) do
       {:ok, album_id}
+    end
+  end
+
+  defp upload_file(access_token, file_path, filename, event_id, size) do
+    normalized = Limits.normalize_filename(filename)
+
+    if use_dev_stub?() do
+      Ysc.GooglePhotos.Api.DevStub.upload_file(
+        access_token,
+        file_path,
+        normalized,
+        event_id,
+        size
+      )
+    else
+      if size > Limits.max_photo_bytes() do
+        upload_file_stream_http(access_token, file_path, normalized, size)
+      else
+        tmp_root = Ysc.SafeFile.event_photo_tmp_root()
+
+        with {:ok, bytes} <- Ysc.SafeFile.read_under_root(tmp_root, file_path) do
+          upload_bytes_http(access_token, bytes, normalized)
+        end
+      end
     end
   end
 
@@ -122,6 +147,37 @@ defmodule Ysc.GooglePhotos.Api do
 
       {:ok, %{status: status, body: body}} ->
         log_api_error("create_album", status, body)
+        {:error, {:api_error, status}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  # File path is validated under the event-photo tmp root before this runs.
+  # sobelow_skip ["Traversal.FileModule"]
+  defp upload_file_stream_http(access_token, file_path, filename, size) do
+    content_type = content_type_for_filename(filename)
+    timeout = upload_receive_timeout(size)
+    stream = File.stream!(file_path, [], 5_242_880)
+
+    case Req.post(@upload_url,
+           body: stream,
+           headers:
+             auth_headers(access_token) ++
+               [
+                 {"content-type", content_type},
+                 {"x-goog-upload-protocol", "raw"},
+                 {"x-goog-upload-content-type", content_type}
+               ],
+           receive_timeout: timeout
+         ) do
+      {:ok, %{status: status, body: upload_token}}
+      when status in 200..299 and is_binary(upload_token) and upload_token != "" ->
+        {:ok, String.trim(upload_token)}
+
+      {:ok, %{status: status, body: body}} ->
+        log_api_error("upload", status, body)
         {:error, {:api_error, status}}
 
       {:error, reason} ->

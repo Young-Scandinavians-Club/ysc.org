@@ -22,15 +22,19 @@ defmodule Ysc.EventPhotos.Collection do
     timestamps()
   end
 
+  @doc false
+  def insert_changeset(%__MODULE__{} = collection) do
+    collection
+    |> change()
+    |> validate_required([:event_id, :upload_token])
+    |> unique_constraint(:event_id)
+    |> unique_constraint(:upload_token)
+    |> foreign_key_constraint(:event_id)
+  end
+
   def changeset(collection, attrs) do
     collection
-    |> cast(attrs, [
-      :event_id,
-      :upload_token,
-      :google_album_id,
-      :reminder_sent_at
-    ])
-    |> validate_required([:event_id, :upload_token])
+    |> cast(attrs, [:google_album_id, :reminder_sent_at])
     |> unique_constraint(:event_id)
     |> unique_constraint(:upload_token)
     |> foreign_key_constraint(:event_id)

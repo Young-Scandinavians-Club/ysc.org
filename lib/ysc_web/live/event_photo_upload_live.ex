@@ -13,6 +13,7 @@ defmodule YscWeb.EventPhotoUploadLive do
   alias Ysc.Events.Event
   alias Ysc.GooglePhotos
   alias Ysc.GooglePhotos.Limits
+  alias Ysc.SafeFile
   alias YscWeb.Workers.EventPhotoUploadWorker
 
   @impl true
@@ -266,42 +267,76 @@ defmodule YscWeb.EventPhotoUploadLive do
   defp do_upload(socket) do
     collection = socket.assigns.collection
     user = socket.assigns.current_user
+    entry_count = length(socket.assigns.uploads.photos.entries)
 
     uploaded =
       consume_uploaded_entries(socket, :photos, fn %{path: path}, entry ->
-        dest =
-          Path.join(
-            System.tmp_dir!(),
-            "event-photo-#{collection.id}-#{entry.uuid}#{Path.extname(entry.client_name)}"
-          )
+        tmp_root = SafeFile.event_photo_tmp_root()
 
-        File.cp!(path, dest)
-
-        %{
-          "collection_id" => collection.id,
-          "file_path" => dest,
-          "filename" => entry.client_name,
-          "user_id" => user.id
-        }
-        |> EventPhotoUploadWorker.new()
-        |> Oban.insert()
-
-        {:ok, dest}
+        with {:ok, dest} <-
+               SafeFile.event_photo_tmp_path(
+                 collection.id,
+                 entry.uuid,
+                 entry.client_name
+               ),
+             {:ok, dest} <- SafeFile.copy_upload_to(path, tmp_root, dest),
+             {:ok, _job} <- enqueue_upload_job(collection, user, dest, entry) do
+          {:ok, dest}
+        else
+          {:error, _} ->
+            cleanup_staged_upload(tmp_root, collection, entry)
+            {:error, :upload_enqueue_failed}
+        end
       end)
 
-    if uploaded == [] do
-      {:noreply,
-       put_flash(socket, :error, "Please wait for files to finish uploading.")}
-    else
-      {:noreply,
-       socket
-       |> assign(:upload_complete?, true)
-       |> assign(:upload_errors, [])
-       |> YscWeb.Flash.put_toast(
-         :info,
-         "Your files are being uploaded. Thank you for contributing!",
-         title: "Upload"
-       )}
+    uploaded_count = length(uploaded)
+
+    cond do
+      uploaded_count == 0 ->
+        {:noreply,
+         put_flash(socket, :error, "Please wait for files to finish uploading.")}
+
+      uploaded_count < entry_count ->
+        {:noreply,
+         socket
+         |> assign(:upload_complete?, true)
+         |> assign(:upload_errors, [
+           "Some files could not be queued for upload. Please try again."
+         ])
+         |> put_flash(:error, "Some files could not be queued for upload.")}
+
+      true ->
+        {:noreply,
+         socket
+         |> assign(:upload_complete?, true)
+         |> assign(:upload_errors, [])
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your files are being uploaded. Thank you for contributing!",
+           title: "Upload"
+         )}
+    end
+  end
+
+  defp enqueue_upload_job(collection, user, dest, entry) do
+    %{
+      "collection_id" => collection.id,
+      "file_path" => dest,
+      "filename" => entry.client_name,
+      "user_id" => user.id
+    }
+    |> EventPhotoUploadWorker.new()
+    |> Oban.insert()
+  end
+
+  defp cleanup_staged_upload(tmp_root, collection, entry) do
+    case SafeFile.event_photo_tmp_path(
+           collection.id,
+           entry.uuid,
+           entry.client_name
+         ) do
+      {:ok, dest} -> SafeFile.rm_under_root(tmp_root, dest)
+      :error -> :ok
     end
   end
 
