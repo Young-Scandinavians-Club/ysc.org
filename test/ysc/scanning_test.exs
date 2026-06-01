@@ -112,7 +112,9 @@ defmodule Ysc.ScanningTest do
         })
 
       assert :ok = Scanning.authorize_session_owner!(session.id, owner.id)
-      assert {:error, :unauthorized} = Scanning.authorize_session_owner!(session.id, other.id)
+
+      assert {:error, :unauthorized} =
+               Scanning.authorize_session_owner!(session.id, other.id)
     end
 
     test "returns not_found for unknown session id" do

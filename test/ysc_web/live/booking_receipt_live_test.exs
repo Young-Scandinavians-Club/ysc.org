@@ -646,9 +646,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      today = Date.utc_today()
-      checkin_date = Date.add(today, 30)
-      checkout_date = Date.add(checkin_date, 3)
+      {checkin_date, checkout_date} =
+        Ysc.BookingsFixtures.tahoe_booking_dates(30)
 
       booking =
         booking_fixture(%{
@@ -671,9 +670,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      today = Date.utc_today()
-      checkin_date = Date.add(today, 30)
-      checkout_date = Date.add(checkin_date, 3)
+      {checkin_date, checkout_date} =
+        Ysc.BookingsFixtures.tahoe_booking_dates(30)
 
       booking =
         booking_fixture(%{
