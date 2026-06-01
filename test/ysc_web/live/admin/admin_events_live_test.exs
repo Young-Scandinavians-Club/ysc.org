@@ -127,10 +127,17 @@ defmodule YscWeb.AdminEventsLiveTest do
 
       session = event_membership_session_fixture(event, admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events")
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
 
-      assert html =~ ~p"/admin/membership-check-in/#{session.id}"
-      refute html =~ ~s|href="/admin/events/#{event.id}/check-in"|
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
     end
 
     test "check-in link uses ticket desk when no open session exists", %{
@@ -140,9 +147,12 @@ defmodule YscWeb.AdminEventsLiveTest do
       event =
         event_fixture(%{title: "Check-in Default Test", organizer_id: admin.id})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events")
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
 
-      assert html =~ ~p"/admin/events/#{event.id}/check-in"
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
     end
 
     test "copy event creates a draft and redirects to edit the new event", %{

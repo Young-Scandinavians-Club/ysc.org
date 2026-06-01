@@ -28,6 +28,9 @@ defmodule YscWeb.AdminCheckInPaths do
       %{type: :event_membership, id: session_id} ->
         ~p"/admin/membership-check-in/#{session_id}"
 
+      %{type: :event, id: session_id, event_id: session_event_id} ->
+        ~p"/admin/events/#{session_event_id}/check-in?scan_session_id=#{session_id}"
+
       _ ->
         ~p"/admin/events/#{event_id}/check-in"
     end

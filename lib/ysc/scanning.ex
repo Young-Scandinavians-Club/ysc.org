@@ -160,6 +160,44 @@ defmodule Ysc.Scanning do
   end
 
   @doc """
+  Returns an open session for the event and type, creating one if none exists.
+
+  Uses a per-event advisory lock so concurrent callers do not create duplicates.
+  """
+  def get_or_create_open_session_for_event(event_id, type, attrs)
+      when type in [:event, :event_membership] do
+    lock_key = advisory_lock_key(event_id, type)
+
+    result =
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [lock_key])
+
+        case get_open_session_for_event(event_id, types: [type], prefer: type) do
+          %ScanSession{} = session ->
+            session
+
+          nil ->
+            case create_session(attrs) do
+              {:ok, session} ->
+                session
+
+              {:error, changeset} ->
+                Repo.rollback(changeset)
+            end
+        end
+      end)
+
+    case result do
+      {:ok, session} -> {:ok, session}
+      {:error, %Ecto.Changeset{} = changeset} -> {:error, changeset}
+    end
+  end
+
+  defp advisory_lock_key(event_id, type) do
+    :erlang.phash2({event_id, type})
+  end
+
+  @doc """
   Returns the number of successful scan records for a session.
   """
   def get_session_scan_count(session_id) do

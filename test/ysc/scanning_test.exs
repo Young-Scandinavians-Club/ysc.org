@@ -194,6 +194,128 @@ defmodule Ysc.ScanningTest do
     end
   end
 
+  describe "get_open_check_in_sessions_by_event_id/2" do
+    test "returns preferred open session per event id" do
+      admin = user_fixture(%{role: "admin"})
+      event_a = event_fixture(%{organizer_id: admin.id})
+      event_b = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, event_a_session} =
+        Scanning.create_session(%{
+          name: "Event A tickets",
+          type: :event,
+          event_id: event_a.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_b_membership} =
+        Scanning.create_session(%{
+          name: "Event B members",
+          type: :event_membership,
+          event_id: event_b.id,
+          created_by_id: admin.id
+        })
+
+      by_id =
+        Scanning.get_open_check_in_sessions_by_event_id([
+          event_a.id,
+          event_b.id
+        ])
+
+      assert by_id[event_a.id].id == event_a_session.id
+      assert by_id[event_b.id].id == event_b_membership.id
+    end
+
+    test "returns empty map for empty event id list" do
+      assert Scanning.get_open_check_in_sessions_by_event_id([]) == %{}
+    end
+
+    test "respects types and prefer options" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Members",
+          type: :event_membership,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Tickets",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      event_only =
+        Scanning.get_open_check_in_sessions_by_event_id(
+          [event.id],
+          types: [:event],
+          prefer: :event
+        )
+
+      assert event_only[event.id].id == event_session.id
+
+      default =
+        Scanning.get_open_check_in_sessions_by_event_id([event.id])
+
+      assert default[event.id].id == membership_session.id
+    end
+  end
+
+  describe "get_or_create_open_session_for_event/3" do
+    test "returns existing open session without creating another" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, existing} =
+        Scanning.create_session(%{
+          name: "Existing",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      assert {:ok, session} =
+               Scanning.get_or_create_open_session_for_event(
+                 event.id,
+                 :event,
+                 %{
+                   name: "New",
+                   type: :event,
+                   event_id: event.id,
+                   created_by_id: admin.id
+                 }
+               )
+
+      assert session.id == existing.id
+    end
+
+    test "creates a session when none is open" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      assert {:ok, session} =
+               Scanning.get_or_create_open_session_for_event(
+                 event.id,
+                 :event,
+                 %{
+                   name: "Created",
+                   type: :event,
+                   event_id: event.id,
+                   created_by_id: admin.id
+                 }
+               )
+
+      assert session.event_id == event.id
+      assert session.type == :event
+      assert is_nil(session.closed_at)
+    end
+  end
+
   describe "get_open_sessions/1" do
     test "returns only open sessions for the given user" do
       admin = user_fixture(%{role: "admin"})

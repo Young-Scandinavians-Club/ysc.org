@@ -431,7 +431,10 @@ defmodule YscWeb.AdminEventCheckInLive do
     search = Map.get(params, "q", "")
 
     {:noreply,
-     socket |> assign(:search_query, search) |> reload_tickets(search)}
+     socket
+     |> assign(:search_query, search)
+     |> assign_scan_session_from_params(params)
+     |> reload_tickets(search)}
   end
 
   # ---------------------------------------------------------------------------
@@ -442,74 +445,56 @@ defmodule YscWeb.AdminEventCheckInLive do
   def handle_event("launch-scanner", _params, socket) do
     %{event: event, current_user: current_user} = socket.assigns
 
-    case Scanning.get_open_session_for_event(event.id,
-           types: [:event],
-           prefer: :event
-         ) do
-      %{id: session_id} ->
+    session_name =
+      "#{event.title} – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
+
+    case Scanning.get_or_create_open_session_for_event(event.id, :event, %{
+           name: session_name,
+           type: :event,
+           event_id: event.id,
+           created_by_id: current_user.id
+         }) do
+      {:ok, session} ->
         {:noreply,
-         push_navigate(socket, to: ~p"/admin/scanner?resume=#{session_id}")}
+         push_navigate(socket, to: ~p"/admin/scanner?resume=#{session.id}")}
 
-      nil ->
-        session_name =
-          "#{event.title} – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
-
-        case Scanning.create_session(%{
-               name: session_name,
-               type: :event,
-               event_id: event.id,
-               created_by_id: current_user.id
-             }) do
-          {:ok, session} ->
-            {:noreply,
-             push_navigate(socket, to: ~p"/admin/scanner?resume=#{session.id}")}
-
-          {:error, _changeset} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "Could not start scan session. Please try again."
-             )}
-        end
+      {:error, _changeset} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Could not start scan session. Please try again."
+         )}
     end
   end
 
   def handle_event("launch-membership-checkin", _params, socket) do
     %{event: event, current_user: current_user} = socket.assigns
 
-    case Scanning.get_open_session_for_event(event.id,
-           types: [:event_membership],
-           prefer: :event_membership
+    session_name =
+      "#{event.title} – Membership – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
+
+    case Scanning.get_or_create_open_session_for_event(
+           event.id,
+           :event_membership,
+           %{
+             name: session_name,
+             type: :event_membership,
+             event_id: event.id,
+             created_by_id: current_user.id
+           }
          ) do
-      %{id: session_id} ->
+      {:ok, session} ->
         {:noreply,
-         push_navigate(socket, to: ~p"/admin/membership-check-in/#{session_id}")}
+         push_navigate(socket, to: ~p"/admin/membership-check-in/#{session.id}")}
 
-      nil ->
-        session_name =
-          "#{event.title} – Membership – #{Calendar.strftime(Date.utc_today(), "%b %-d, %Y")}"
-
-        case Scanning.create_session(%{
-               name: session_name,
-               type: :event_membership,
-               event_id: event.id,
-               created_by_id: current_user.id
-             }) do
-          {:ok, session} ->
-            {:noreply,
-             push_navigate(socket,
-               to: ~p"/admin/membership-check-in/#{session.id}"
-             )}
-
-          {:error, _changeset} ->
-            {:noreply,
-             put_flash(
-               socket,
-               :error,
-               "Could not start membership check-in session. Please try again."
-             )}
-        end
+      {:error, _changeset} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Could not start membership check-in session. Please try again."
+         )}
     end
   end
 
@@ -688,42 +673,51 @@ defmodule YscWeb.AdminEventCheckInLive do
     case socket.assigns.scan_session do
       nil ->
         event = socket.assigns.event
+        user = socket.assigns.current_user
 
-        case Scanning.get_open_session_for_event(event.id,
-               types: [:event],
-               prefer: :event
-             ) do
-          %{} = session ->
+        case Scanning.get_or_create_open_session_for_event(event.id, :event, %{
+               name: "Manual Check-in: #{event.title}",
+               type: :event,
+               event_id: event.id,
+               created_by_id: user.id
+             }) do
+          {:ok, session} ->
             {session, assign(socket, :scan_session, session)}
 
-          nil ->
-            user = socket.assigns.current_user
+          {:error, changeset} ->
+            Ysc.Logging.error("Failed to create manual check-in session",
+              extra: %{
+                event_id: event.id,
+                errors: inspect(changeset.errors)
+              }
+            )
 
-            case Scanning.create_session(%{
-                   name: "Manual Check-in: #{event.title}",
-                   type: :event,
-                   event_id: event.id,
-                   created_by_id: user.id
-                 }) do
-              {:ok, session} ->
-                {session, assign(socket, :scan_session, session)}
-
-              {:error, changeset} ->
-                Ysc.Logging.error("Failed to create manual check-in session",
-                  extra: %{
-                    event_id: event.id,
-                    errors: inspect(changeset.errors)
-                  }
-                )
-
-                {nil, socket}
-            end
+            {nil, socket}
         end
 
       session ->
         {session, socket}
     end
   end
+
+  defp assign_scan_session_from_params(socket, %{
+         "scan_session_id" => session_id
+       }) do
+    event_id = socket.assigns.event.id
+
+    case Scanning.get_session!(session_id) do
+      %{event_id: ^event_id, type: :event, closed_at: nil} = session ->
+        assign(socket, :scan_session, session)
+
+      _ ->
+        socket
+    end
+  rescue
+    Ecto.NoResultsError ->
+      socket
+  end
+
+  defp assign_scan_session_from_params(socket, _params), do: socket
 
   defp fetch_ticket(ticket_id) do
     case Ysc.Repo.get(Ysc.Events.Ticket, ticket_id) do

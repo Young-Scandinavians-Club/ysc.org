@@ -25,10 +25,17 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id, state: :published})
       session = event_membership_session_fixture(event, admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      assert html =~ ~p"/admin/membership-check-in/#{session.id}"
-      refute html =~ ~s|href="/admin/events/#{event.id}/check-in"|
+      assert has_element?(
+               view,
+               "a[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "a[href='/admin/events/#{event.id}/check-in']"
+             )
     end
   end
 

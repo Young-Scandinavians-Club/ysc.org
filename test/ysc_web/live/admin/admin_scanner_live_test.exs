@@ -248,14 +248,18 @@ defmodule YscWeb.AdminScannerLiveTest do
     end
 
     test "end_session closes membership session and returns to setup", %{
-      conn: conn
+      conn: conn,
+      admin: admin
     } do
       {:ok, view, _html} = live(conn, ~p"/admin/scanner")
       start_membership_session(view)
 
+      [session] = Scanning.get_open_sessions(admin.id)
+
       view |> element("button[phx-click='end_session']") |> render_click()
 
       assert has_element?(view, "#scan-setup-form")
+      assert Scanning.get_session!(session.id).closed_at != nil
     end
   end
 
@@ -343,7 +347,11 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       view |> element("button[phx-click='end_session']") |> render_click()
 
-      assert_redirect(view, ~p"/admin/events/#{event.id}/check-in")
+      assert_redirect(
+        view,
+        ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}"
+      )
+
       assert is_nil(Scanning.get_session!(session.id).closed_at)
     end
 

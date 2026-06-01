@@ -65,13 +65,18 @@ defmodule YscWeb.AdminDashboardLiveTest do
       session = event_membership_session_fixture(event, admin)
 
       {:ok, view, _html} = live(conn, ~p"/admin")
-      html = render(view)
 
-      assert html =~ "Dashboard Check-in Join"
-      assert has_element?(view, "#dashboard-event-#{event.id}-check-in")
+      assert render(view) =~ "Dashboard Check-in Join"
 
-      assert html =~ ~p"/admin/membership-check-in/#{session.id}"
-      refute html =~ ~s|href="/admin/events/#{event.id}/check-in"|
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-check-in[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "#dashboard-event-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
     end
 
     test "navigates to user review from pending applications", %{conn: conn} do

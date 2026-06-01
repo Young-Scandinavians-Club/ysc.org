@@ -1732,8 +1732,8 @@ defmodule YscWeb.AdminScannerLive do
     ~p"/admin/membership-check-in/#{session_id}"
   end
 
-  defp desk_path(%{type: :event, event_id: event_id}) do
-    ~p"/admin/events/#{event_id}/check-in"
+  defp desk_path(%{type: :event, id: session_id, event_id: event_id}) do
+    ~p"/admin/events/#{event_id}/check-in?scan_session_id=#{session_id}"
   end
 
   defp load_joinable_sessions(socket, own_open_sessions) do

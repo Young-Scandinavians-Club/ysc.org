@@ -914,20 +914,12 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
 
-      result =
-        view
-        |> element("[phx-click='launch-scanner']", "QR Scanner")
-        |> render_click()
+      view
+      |> element("[phx-click='launch-scanner']", "QR Scanner")
+      |> render_click()
 
       assert session_count_for_event(event.id) == initial_count
-
-      case result do
-        {:error, {:live_redirect, %{to: path}}} ->
-          assert path =~ "resume=#{existing.id}"
-
-        _ ->
-          assert true
-      end
+      assert_redirect(view, ~p"/admin/scanner?resume=#{existing.id}")
     end
 
     test "creates an event scan session with the event's details", %{
