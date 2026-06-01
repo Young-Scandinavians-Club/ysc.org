@@ -507,7 +507,7 @@ defmodule YscWeb.Router do
 
       # News and notices
       live "/posts", AdminPostsLive, :index
-      live "/posts/new", AdminPostsLive, :new
+      live "/posts/new", AdminPostEditorLive, :new
       live "/posts/:id", AdminPostEditorLive, :edit
       live "/posts/:id/preview", AdminPostEditorLive, :preview
       live "/posts/:id/settings", AdminPostEditorLive, :settings

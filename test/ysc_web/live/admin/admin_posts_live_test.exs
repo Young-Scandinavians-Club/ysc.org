@@ -36,27 +36,14 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert html =~ "Viking News"
     end
 
-    test "navigates to new post modal", %{conn: conn} do
+    test "navigates to new post editor", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/posts")
 
       view
       |> element("#admin-posts-new-post")
       |> render_click()
 
-      assert_patched(view, ~p"/admin/posts/new")
-    end
-
-    test "creates a new post", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
-
-      view
-      |> form("#new-post-modal form", %{new_post: %{title: "Brand New Post"}})
-      |> render_submit()
-
-      # Should redirect to the post editor
-      # Since we don't know the ID exactly, we can check for a redirect and then verify if it's the right path pattern
-      {path, _flash} = assert_redirect(view)
-      assert path =~ ~r"/admin/posts/.*"
+      assert_redirect(view, ~p"/admin/posts/new")
     end
 
     test "search patches URL with title filter", %{conn: conn, admin: admin} do
@@ -111,6 +98,37 @@ defmodule YscWeb.AdminPostsLiveTest do
 
       assert Ysc.Posts.get_post!(p1.id).featured_post == true
       assert Ysc.Posts.get_post!(p2.id).featured_post == false
+    end
+
+    test "deletes a draft post from the actions menu", %{
+      conn: conn,
+      admin: admin
+    } do
+      draft =
+        post_fixture(admin, %{
+          title: "Draft To Delete",
+          state: :draft,
+          url_name: "draft-delete-#{System.unique_integer()}"
+        })
+
+      published =
+        post_fixture(admin, %{
+          title: "Published Stay",
+          state: :published,
+          url_name: "published-stay-#{System.unique_integer()}"
+        })
+
+      {:ok, view, html} = live(conn, ~p"/admin/posts")
+
+      assert html =~ "Draft To Delete"
+      refute html =~ ~s/id="post-actions-dt-#{published.id}-delete"/
+
+      view
+      |> element("#post-actions-dt-#{draft.id}-delete")
+      |> render_click()
+
+      refute render(view) =~ "Draft To Delete"
+      assert Ysc.Posts.get_post!(draft.id).state == :deleted
     end
 
     test "invalid flop params redirect to default posts list", %{conn: conn} do

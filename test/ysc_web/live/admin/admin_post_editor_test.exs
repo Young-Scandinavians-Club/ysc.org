@@ -1,13 +1,107 @@
 defmodule YscWeb.AdminPostEditorLiveTest do
   use YscWeb.ConnCase
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Media.Image
   alias Ysc.Posts
+  alias Ysc.Posts.Post
   alias Ysc.Repo
 
   setup :register_and_log_in_admin
+
+  defp image_fixture(user_id) do
+    {:ok, image} =
+      %Image{user_id: user_id}
+      |> Image.add_image_changeset(%{
+        raw_image_path: "/test/raw/hero-#{System.unique_integer()}.jpg"
+      })
+      |> Repo.insert()
+
+    image
+  end
+
+  defp post_count do
+    Repo.aggregate(Post, :count, :id)
+  end
+
+  describe "new post" do
+    test "opens editor without creating a database row", %{conn: conn} do
+      count_before = post_count()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
+
+      assert has_element?(view, "#edit_post_form")
+      assert has_element?(view, "trix-editor")
+      assert has_element?(view, "span", "Draft")
+
+      assert has_element?(
+               view,
+               "input[name='post[title]'][value='New Untitled Post']"
+             )
+
+      assert has_element?(
+               view,
+               "input[name='post[url_name]'][value='new-untitled-post']"
+             )
+
+      assert post_count() == count_before
+    end
+
+    test "updates url slug when title changes", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
+
+      view
+      |> form("#edit_post_form", post: %{title: "My Great Post"})
+      |> render_change()
+
+      assert has_element?(
+               view,
+               "input[name='post[url_name]'][value='my-great-post']"
+             )
+    end
+
+    test "restores default title when the title field is cleared", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
+
+      view
+      |> form("#edit_post_form", post: %{title: ""})
+      |> render_change()
+
+      assert has_element?(
+               view,
+               "input[name='post[title]'][value='New Untitled Post']"
+             )
+
+      assert has_element?(
+               view,
+               "input[name='post[url_name]'][value='new-untitled-post']"
+             )
+    end
+
+    test "persists new post when opening settings and patches editor URL", %{
+      conn: conn
+    } do
+      count_before = post_count()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/new")
+
+      view
+      |> form("#edit_post_form", post: %{title: "Saved Later"})
+      |> render_change()
+
+      view
+      |> element("#settings-post-new")
+      |> render_click()
+
+      assert post_count() == count_before + 1
+
+      post = Repo.one!(from p in Post, where: p.title == "Saved Later")
+      assert_patch(view, ~p"/admin/posts/#{post.id}/settings")
+    end
+  end
 
   describe "mount" do
     test "loads post for editing", %{conn: conn, user: user} do
@@ -189,7 +283,7 @@ defmodule YscWeb.AdminPostEditorLiveTest do
   end
 
   describe "publish validation" do
-    test "redirects to settings when publishing draft without featured image",
+    test "opens settings when publishing draft without featured image",
          %{
            conn: conn,
            user: user
@@ -207,12 +301,70 @@ defmodule YscWeb.AdminPostEditorLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
 
-      html =
+      _html =
         view
         |> render_hook("publish-post", %{})
 
-      assert html
       assert_patch(view, ~p"/admin/posts/#{post.id}/settings")
+      assert Posts.get_post!(post.id).state == :draft
+    end
+
+    test "publishes after featured image is selected from settings",
+         %{conn: conn, user: user} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Publish After Image",
+            "url_name" => "publish-after-image-#{System.unique_integer()}",
+            "state" => "draft",
+            "body" => "Content"
+          },
+          user
+        )
+
+      image = image_fixture(user.id)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      view
+      |> render_hook("publish-post", %{})
+
+      assert_patch(view, ~p"/admin/posts/#{post.id}/settings")
+
+      send(
+        view.pid,
+        {YscWeb.MediaPickerComponent, :post_featured_image, image.id}
+      )
+
+      _html = render(view)
+
+      assert Posts.get_post!(post.id).state == :published
+      assert Posts.get_post!(post.id).image_id == image.id
+    end
+
+    test "publishes immediately when featured image is already set",
+         %{conn: conn, user: user} do
+      image = image_fixture(user.id)
+
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Ready To Publish",
+            "url_name" => "ready-publish-#{System.unique_integer()}",
+            "state" => "draft",
+            "image_id" => image.id,
+            "body" => "Content"
+          },
+          user
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
+
+      view
+      |> render_hook("publish-post", %{})
+
+      assert_redirect(view, ~p"/admin/posts/#{post.id}")
+      assert Posts.get_post!(post.id).state == :published
     end
   end
 
