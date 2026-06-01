@@ -100,7 +100,7 @@ defmodule YscWeb.ReauthComponent do
        assign(
          socket,
          :reauth_error,
-         "Authentication session expired. Please try again."
+         "That sign-in timed out. Please try again, or verify with your password below."
        )}
     else
       try do

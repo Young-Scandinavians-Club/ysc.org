@@ -1323,7 +1323,7 @@ defmodule YscWeb.EventDetailsLive do
                         <%= if has_reservation do %>
                           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 border border-blue-200">
                             <.icon name="hero-ticket" class="w-3 h-3" />
-                            {reserved_quantity} reserved
+                            {reserved_quantity} at member price
                           </span>
                         <% end %>
                       </div>
@@ -1339,7 +1339,7 @@ defmodule YscWeb.EventDetailsLive do
                             You have {reserved_quantity} {if reserved_quantity ==
                                                                1,
                                                              do: "ticket",
-                                                             else: "tickets"} reserved for this tier
+                                                             else: "tickets"} saved at member price for this tier (not purchased until checkout)
                             <%= if has_discount do %>
                               <.badge
                                 type="green"
@@ -1355,7 +1355,7 @@ defmodule YscWeb.EventDetailsLive do
                             <p class="text-xs text-green-600">
                               You'll save {format_price(
                                 reservation_info.discount_savings
-                              )} with your reserved tickets
+                              )} with your member-price tickets
                             </p>
                           <% end %>
                         </div>

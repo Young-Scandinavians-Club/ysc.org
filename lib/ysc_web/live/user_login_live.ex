@@ -14,13 +14,18 @@ defmodule YscWeb.UserLoginLive do
       <.header class="text-center">
         Sign in to your YSC account
         <:subtitle>
-          Not a member yet?
-          <.link
-            navigate={~p"/users/register"}
-            class="font-semibold text-blue-600 hover:underline"
-          >
-            Apply for a membership
-          </.link>
+          <span class="block">
+            New to YSC?
+            <.link
+              navigate={~p"/users/register"}
+              class="font-semibold text-blue-600 hover:underline"
+            >
+              Apply for membership
+            </.link>
+          </span>
+          <span class="block mt-1 text-sm font-normal text-zinc-500">
+            Already applied? Sign in with the email you used on your application.
+          </span>
         </:subtitle>
       </.header>
       <!-- Alternative Authentication Methods -->
@@ -131,7 +136,7 @@ defmodule YscWeb.UserLoginLive do
             <%= if @is_ios_mobile do %>
               Sign in with Face ID
             <% else %>
-              Sign in with Passkey
+              Sign in with fingerprint or face
             <% end %>
           <% end %>
         </.button>
@@ -498,7 +503,7 @@ defmodule YscWeb.UserLoginLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "Authentication session expired. Please try again."
+         "That sign-in timed out. Please try again, or sign in with your email and password below."
        )
        |> assign(:passkey_loading, false)
        |> assign(:passkey_challenge, nil)

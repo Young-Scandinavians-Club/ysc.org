@@ -37,7 +37,7 @@ defmodule YscWeb.UserLoginLiveTest do
 
       html = render(lv)
 
-      assert html =~ "Sign in with Passkey" ||
+      assert html =~ "Sign in with fingerprint or face" ||
                html =~ "Sign in with Face ID"
     end
 
@@ -51,6 +51,7 @@ defmodule YscWeb.UserLoginLiveTest do
 
       html = render(lv)
       # Passkey button should not be visible when not supported
+      refute html =~ "Sign in with fingerprint or face"
       refute html =~ "Sign in with Passkey"
     end
 
