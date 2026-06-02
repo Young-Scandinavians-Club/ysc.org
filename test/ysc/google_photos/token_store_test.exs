@@ -1,5 +1,5 @@
 defmodule Ysc.GooglePhotos.TokenStoreTest do
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   import Ysc.GooglePhotos.OAuth.ReqTestHelper
 
@@ -10,14 +10,12 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
 
   setup {Req.Test, :set_req_test_from_context}
 
-  setup do
-    token_store_pid = Process.whereis(TokenStore)
-    :ok = Ecto.Adapters.SQL.Sandbox.allow(Ysc.Repo, self(), token_store_pid)
-    %{token_store_pid: token_store_pid}
-  end
+  setup %{sandbox_owner: owner} do
+    if token_store_pid = Process.whereis(TokenStore) do
+      :ok = Ecto.Adapters.SQL.Sandbox.allow(Ysc.Repo, owner, token_store_pid)
+    end
 
-  defp allow_token_store_http!(token_store_pid) do
-    assert :ok = Req.Test.allow(@stub, self(), token_store_pid)
+    :ok
   end
 
   describe "get_access_token/0" do
@@ -39,9 +37,11 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
         "photos@example.com"
       )
 
+      test_pid = self()
+
       Req.Test.stub(@stub, fn conn ->
         if token_url?(conn) do
-          send(self(), :unexpected_token_refresh)
+          send(test_pid, :unexpected_token_refresh)
           ok_token_response(conn)
         else
           Plug.Conn.send_resp(conn, 404, "unexpected")
@@ -52,9 +52,7 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
       refute_received :unexpected_token_refresh
     end
 
-    test "refreshes expired tokens and caches the new access token", %{
-      token_store_pid: token_store_pid
-    } do
+    test "refreshes expired tokens and caches the new access token" do
       user = Ysc.AccountsFixtures.user_fixture()
 
       GooglePhotos.connect!(
@@ -81,15 +79,11 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
         end
       end)
 
-      allow_token_store_http!(token_store_pid)
-
       assert {:ok, "fresh-access"} = TokenStore.get_access_token()
       assert {:ok, "fresh-access"} = TokenStore.get_access_token()
     end
 
-    test "persists rotated refresh tokens from Google", %{
-      token_store_pid: token_store_pid
-    } do
+    test "persists rotated refresh tokens from Google" do
       user = Ysc.AccountsFixtures.user_fixture()
 
       GooglePhotos.connect!(
@@ -117,15 +111,11 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
         end
       end)
 
-      allow_token_store_http!(token_store_pid)
-
       assert {:ok, "fresh-access"} = TokenStore.get_access_token()
       assert GooglePhotos.get_connection().refresh_token == "refresh-new"
     end
 
-    test "disconnects and returns :refresh_token_revoked on invalid_grant", %{
-      token_store_pid: token_store_pid
-    } do
+    test "disconnects and returns :refresh_token_revoked on invalid_grant" do
       user = Ysc.AccountsFixtures.user_fixture()
 
       GooglePhotos.connect!(
@@ -147,8 +137,6 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
           else: Plug.Conn.send_resp(conn, 404, "")
       end)
 
-      allow_token_store_http!(token_store_pid)
-
       assert {:error, :refresh_token_revoked} = TokenStore.get_access_token()
       assert GooglePhotos.get_connection() == nil
       assert %{connected: false} = GooglePhotos.connection_status()
@@ -156,9 +144,7 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
   end
 
   describe "reload/0" do
-    test "clears cached tokens so the next call refreshes", %{
-      token_store_pid: token_store_pid
-    } do
+    test "clears cached tokens so the next call refreshes" do
       user = Ysc.AccountsFixtures.user_fixture()
 
       GooglePhotos.connect!(
@@ -184,8 +170,6 @@ defmodule Ysc.GooglePhotos.TokenStoreTest do
           Plug.Conn.send_resp(conn, 404, "unexpected")
         end
       end)
-
-      allow_token_store_http!(token_store_pid)
 
       assert {:ok, "after-reload"} = TokenStore.get_access_token()
     end

@@ -29,8 +29,10 @@ defmodule Ysc.GooglePhotos.Api.DevStubTest do
     assert is_binary(token)
     assert String.starts_with?(token, "dev-upload-")
 
-    path = Path.join(@dev_event_dir, "photo.jpg")
-    assert File.exists?(path)
+    assert [stored | _] = File.ls!(@dev_event_dir)
+    assert String.starts_with?(stored, "photo-")
+    assert String.ends_with?(stored, ".jpg")
+    assert File.regular?(Path.join(@dev_event_dir, stored))
   end
 
   test "upload_bytes rejects oversize photos" do

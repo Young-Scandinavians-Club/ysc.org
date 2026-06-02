@@ -79,7 +79,12 @@ defmodule Ysc.GooglePhotos.Limits do
   Returns `:ok` or `{:error, reason}` where reason is an atom such as
   `:photo_too_large`, `:video_too_large`, `:filename_too_long`, or `:empty_filename`.
   """
-  def validate_upload(filename, size_bytes) when is_integer(size_bytes) do
+  def validate_upload(filename, _size_bytes) when not is_binary(filename) do
+    {:error, :invalid_filename}
+  end
+
+  def validate_upload(filename, size_bytes)
+      when is_binary(filename) and is_integer(size_bytes) do
     basename =
       filename
       |> Path.basename()

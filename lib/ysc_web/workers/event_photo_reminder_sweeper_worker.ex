@@ -1,7 +1,7 @@
 defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
   @moduledoc """
-  Daily safety net: sends photo reminders for published events that ended yesterday
-  but were not scheduled or sent.
+  Daily safety net: sends photo reminders for published events that ended on or before
+  yesterday (America/Los_Angeles) but were not scheduled or sent.
   """
   require Ysc.Logging
 
@@ -27,7 +27,7 @@ defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
       where: is_nil(c.reminder_sent_at),
       where:
         fragment(
-          "(timezone(?, timezone('UTC', coalesce(?, ?))))::date = ?",
+          "(timezone(?, timezone('UTC', coalesce(?, ?))))::date <= ?",
           ^@timezone,
           e.end_date,
           e.start_date,
@@ -36,15 +36,20 @@ defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
       preload: [event: e]
     )
     |> Repo.all()
-    |> Enum.each(fn %{event: event} = collection ->
+    |> Enum.reduce_while(:ok, fn %{event: event} = collection, :ok ->
       Ysc.Logging.info("Sweeper sending event photo reminder",
         event_id: event.id
       )
 
-      EventPhotoReminderWorker.send_reminders(event, collection)
+      case EventPhotoReminderWorker.send_reminders(event, collection) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
     end)
-
-    :ok
+    |> case do
+      :ok -> :ok
+      {:error, _} = error -> error
+    end
   end
 
   defp yesterday_in_la do

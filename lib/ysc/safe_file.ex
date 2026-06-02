@@ -144,9 +144,9 @@ defmodule Ysc.SafeFile do
   end
 
   @doc "Creates parent directories and writes bytes for a path under `dev_event_photos_root/0`."
-  @spec write_dev_event_photo!(String.t(), String.t(), binary()) ::
+  @spec write_dev_event_photo(String.t(), String.t(), binary()) ::
           :ok | {:error, term()}
-  def write_dev_event_photo!(event_id, filename, bytes)
+  def write_dev_event_photo(event_id, filename, bytes)
       when is_binary(event_id) and is_binary(filename) and is_binary(bytes) do
     with {:ok, path} <- dev_event_photo_path(event_id, filename),
          :ok <- do_mkdir_p(Path.dirname(path)),
