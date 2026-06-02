@@ -185,7 +185,7 @@ defmodule YscWeb.EventsListLive do
 
       <%!-- Event List Section (stream parent must stay mounted whenever !@defer_load) --%>
       <div
-        :if={!@defer_load}
+        :if={!@defer_load && (@event_count > 0 || @total_event_count == 0)}
         id="upcoming-events-stream"
         phx-update="stream"
         class="grid grid-cols-1 md:grid-cols-2 gap-8"
@@ -197,7 +197,11 @@ defmodule YscWeb.EventsListLive do
             selling_fast={Map.get(event, :selling_fast, false)}
           />
         </div>
-        <div id="events-empty-state" class="hidden only:block col-span-full">
+        <div
+          :if={@total_event_count == 0}
+          id="events-empty-state"
+          class="col-span-full"
+        >
           <div class="flex flex-col items-center justify-center py-10 md:py-20 px-0 md:px-6 flex-grow">
             <div class="flex flex-col items-center justify-center w-full border border-dashed border-zinc-200 rounded-xl bg-zinc-50/50 p-6 md:p-12">
               <div class="p-4 bg-white rounded-xl mb-6 border border-zinc-100">
