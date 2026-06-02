@@ -1,0 +1,31 @@
+<% {toasts_sync, flash} = YscWeb.Layouts.toasts_sync_with_flash(assigns) %>
+<div class="min-h-screen bg-zinc-50 flex flex-col">
+  <header class="pt-8 pb-4 px-4">
+    <div class="max-w-lg mx-auto flex justify-center">
+      <.link
+        navigate={~p"/"}
+        class="hover:opacity-80 transition duration-200 ease-in-out"
+        aria-label="Young Scandinavians Club home"
+      >
+        <.ysc_logo
+          class="h-28 w-28"
+          width={112}
+          height={112}
+          fetchpriority="high"
+        />
+      </.link>
+    </div>
+  </header>
+  <main class="flex-1 px-4 pb-12">
+    <div class="max-w-lg mx-auto w-full">
+      {@inner_content}
+    </div>
+  </main>
+  <.toast_group
+    flash={flash}
+    connected={assigns[:socket] != nil}
+    corner={:top_right}
+    toasts_sync={toasts_sync}
+    group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
+  />
+</div>

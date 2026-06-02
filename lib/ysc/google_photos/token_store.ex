@@ -24,9 +24,26 @@ defmodule Ysc.GooglePhotos.TokenStore do
   end
 
   @doc """
+  Seeds the cache with a freshly issued access token (e.g. after OAuth code exchange).
+
+  Avoids an immediate refresh round-trip when the token is already valid.
+  """
+  def prime(access_token, expires_in, refresh_token)
+      when is_binary(access_token) and is_integer(expires_in) and
+             is_binary(refresh_token) do
+    expires_at = DateTime.add(DateTime.utc_now(), expires_in, :second)
+
+    GenServer.call(
+      __MODULE__,
+      {:prime, access_token, expires_at, refresh_token}
+    )
+  end
+
+  @doc """
   Returns `{:ok, access_token}` or `{:error, reason}`.
 
-  Reasons include `:not_connected`, `:not_configured`, and `:token_refresh_failed`.
+  Reasons include `:not_connected`, `:not_configured`, `:token_refresh_failed`, and
+  `:refresh_token_revoked` (the stored grant was revoked; connection is cleared).
   """
   def get_access_token do
     case GooglePhotos.get_connection() do
@@ -49,6 +66,20 @@ defmodule Ysc.GooglePhotos.TokenStore do
   @impl true
   def handle_cast(:clear, _state) do
     {:noreply, empty_cache()}
+  end
+
+  @impl true
+  def handle_call(
+        {:prime, access_token, expires_at, refresh_token},
+        _from,
+        _state
+      ) do
+    {:reply, :ok,
+     %{
+       access_token: access_token,
+       expires_at: expires_at,
+       refresh_token: refresh_token
+     }}
   end
 
   @impl true
@@ -84,7 +115,7 @@ defmodule Ysc.GooglePhotos.TokenStore do
        )
        when is_binary(token) and stored_refresh_token == refresh_token do
     DateTime.compare(
-      DateTime.add(DateTime.utc_now(), @refresh_buffer_seconds),
+      DateTime.add(DateTime.utc_now(), @refresh_buffer_seconds, :second),
       expires_at
     ) ==
       :lt
@@ -92,19 +123,33 @@ defmodule Ysc.GooglePhotos.TokenStore do
 
   defp token_fresh?(_, _), do: false
 
-  defp refresh_and_cache(state, refresh_token) do
+  defp refresh_and_cache(_state, refresh_token) do
     if OAuth.configured?() do
       case OAuth.refresh_access_token(refresh_token) do
-        {:ok, %{access_token: access_token, expires_in: expires_in}} ->
+        {:ok, tokens} ->
+          %{
+            access_token: access_token,
+            expires_in: expires_in,
+            refresh_token: rotated_refresh
+          } = tokens
+
+          effective_refresh =
+            maybe_persist_rotated_refresh_token(refresh_token, rotated_refresh)
+
           expires_at = DateTime.add(DateTime.utc_now(), expires_in, :second)
 
           new_state = %{
             access_token: access_token,
             expires_at: expires_at,
-            refresh_token: refresh_token
+            refresh_token: effective_refresh
           }
 
           {:ok, access_token, new_state}
+
+        {:error, :invalid_grant} ->
+          GooglePhotos.handle_revoked_refresh_token!()
+
+          {:error, :refresh_token_revoked, empty_cache()}
 
         {:error, reason} ->
           Ysc.Logging.error("Google Photos: failed to refresh access token",
@@ -114,7 +159,17 @@ defmodule Ysc.GooglePhotos.TokenStore do
           {:error, :token_refresh_failed, empty_cache()}
       end
     else
-      {:error, :not_configured, state}
+      {:error, :not_configured, empty_cache()}
     end
+  end
+
+  defp maybe_persist_rotated_refresh_token(current, nil), do: current
+
+  defp maybe_persist_rotated_refresh_token(current, new) when current == new,
+    do: current
+
+  defp maybe_persist_rotated_refresh_token(_current, new) when is_binary(new) do
+    GooglePhotos.update_refresh_token!(new)
+    new
   end
 end

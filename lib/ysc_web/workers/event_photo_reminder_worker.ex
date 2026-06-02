@@ -1,0 +1,192 @@
+defmodule YscWeb.Workers.EventPhotoReminderWorker do
+  @moduledoc """
+  Sends post-event photo upload reminder emails to ticket holders the day after an event ends.
+
+  Scheduled for 9:00 AM America/Los_Angeles on the calendar day after the event's effective end date.
+  """
+  require Ysc.Logging
+
+  use Oban.Worker,
+    queue: :mailers,
+    max_attempts: 3,
+    unique: [
+      fields: [:args],
+      keys: [:event_id],
+      states: :incomplete,
+      period: :infinity
+    ]
+
+  alias Ysc.EventPhotos
+  alias Ysc.EventPhotos.Collection
+  alias Ysc.Events
+  alias Ysc.Events.Event
+  alias Ysc.Repo
+  alias YscWeb.Emails.{EventPhotoUploadReminder, Notifier}
+
+  @impl Oban.Worker
+  def perform(%Oban.Job{args: %{"event_id" => event_id}}) do
+    Ysc.Logging.info("Processing event photo reminder", event_id: event_id)
+
+    with %Event{} = event <- Repo.get(Event, event_id),
+         %Collection{} = collection <- EventPhotos.get_by_event_id(event_id) do
+      if should_send?(event, collection) do
+        send_reminders(event, collection)
+      else
+        :ok
+      end
+    else
+      _ -> :ok
+    end
+  end
+
+  @doc "Sends reminder emails to all event attendees and marks the collection as sent."
+  def send_reminders(%Event{} = event, %Collection{} = collection) do
+    recipients = Events.list_event_update_recipients(event.id)
+
+    if recipients == [] do
+      Ysc.Logging.info("No photo reminder recipients", event_id: event.id)
+      EventPhotos.mark_reminder_sent(collection)
+      :ok
+    else
+      event = Repo.preload(event, [:organizer, :cover_image])
+      template = EventPhotoUploadReminder
+      subject = template.get_subject(event)
+      template_name = template.get_template_name()
+      upload_url = EventPhotos.upload_url(collection)
+
+      results =
+        Enum.map(recipients, fn recipient ->
+          send_single(
+            event,
+            recipient,
+            subject,
+            template_name,
+            template,
+            upload_url
+          )
+        end)
+
+      success_count = Enum.count(results, &match?({:ok, _}, &1))
+      recipient_count = length(recipients)
+
+      Ysc.Logging.info("Event photo reminders scheduled",
+        event_id: event.id,
+        success_count: success_count,
+        recipient_count: recipient_count
+      )
+
+      if success_count == recipient_count do
+        EventPhotos.mark_reminder_sent(collection)
+        :ok
+      else
+        Ysc.Logging.warning("Event photo reminders partially failed",
+          event_id: event.id,
+          success_count: success_count,
+          recipient_count: recipient_count
+        )
+
+        {:error, :partial_failure}
+      end
+    end
+  rescue
+    error ->
+      Ysc.Logging.error("Failed to send event photo reminders",
+        event_id: event.id,
+        error: Exception.message(error),
+        stacktrace: __STACKTRACE__
+      )
+
+      {:error, error}
+  end
+
+  @doc """
+  Schedules the photo reminder for an event, or sends immediately if the time has passed.
+  """
+  def schedule_reminder(%Event{} = event) do
+    case EventPhotos.photo_reminder_scheduled_at(event) do
+      nil ->
+        Ysc.Logging.warning(
+          "Cannot schedule photo reminder without event dates",
+          event_id: event.id
+        )
+
+        :ok
+
+      scheduled_at ->
+        schedule_or_send_now(event.id, scheduled_at)
+    end
+  end
+
+  def schedule_reminder(event_id) when is_binary(event_id) do
+    case Repo.get(Event, event_id) do
+      nil -> :ok
+      event -> schedule_reminder(event)
+    end
+  end
+
+  defp schedule_or_send_now(event_id, scheduled_at) do
+    now = DateTime.utc_now()
+
+    if DateTime.compare(scheduled_at, now) == :gt do
+      %{"event_id" => event_id}
+      |> new(scheduled_at: scheduled_at)
+      |> Oban.insert()
+
+      Ysc.Logging.info("Scheduled event photo reminder",
+        event_id: event_id,
+        scheduled_at: scheduled_at
+      )
+    else
+      with %Event{} = event <- Repo.get(Event, event_id),
+           %Collection{} = collection <- EventPhotos.get_by_event_id(event_id),
+           true <- should_send?(event, collection) do
+        send_reminders(event, collection)
+      else
+        _ -> :ok
+      end
+    end
+  end
+
+  defp should_send?(%Event{}, %Collection{reminder_sent_at: sent_at})
+       when not is_nil(sent_at),
+       do: false
+
+  defp should_send?(%Event{state: :published}, _collection), do: true
+  defp should_send?(%Event{state: "published"}, _collection), do: true
+  defp should_send?(_, _), do: false
+
+  defp send_single(
+         event,
+         recipient,
+         subject,
+         template_name,
+         template,
+         upload_url
+       ) do
+    email_data = template.prepare_email_data(event, recipient, upload_url)
+
+    idempotency_key =
+      "event_photo_reminder_#{event.id}_#{String.downcase(recipient.email)}"
+
+    case Notifier.schedule_email(
+           recipient.email,
+           idempotency_key,
+           subject,
+           template_name,
+           email_data,
+           ""
+         ) do
+      %Oban.Job{} ->
+        {:ok, :scheduled}
+
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to schedule event photo reminder",
+          event_id: event.id,
+          recipient: recipient.email,
+          error: inspect(reason)
+        )
+
+        {:error, reason}
+    end
+  end
+end

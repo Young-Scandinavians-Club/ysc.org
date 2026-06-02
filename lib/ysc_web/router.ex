@@ -362,6 +362,7 @@ defmodule YscWeb.Router do
       live "/expensereport", ExpenseReportLive, :index
       live "/expensereports", ExpenseReportLive, :list
       live "/expensereport/:id/success", ExpenseReportLive, :success
+      live "/events/photos/:upload_token", EventPhotoUploadLive, :show
     end
   end
 

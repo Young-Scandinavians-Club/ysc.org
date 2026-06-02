@@ -123,6 +123,36 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "updates tab - event photo uploads" do
+    setup [:create_admin]
+
+    test "shows photo upload link when patching to updates on a published event",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html = render_patch(view, ~p"/admin/events/#{event.id}/updates")
+
+      assert html =~ "Event photo uploads"
+      assert has_element?(view, "#event-photo-upload-link-card")
+      assert has_element?(view, "#copy-photo-upload-url-btn")
+    end
+
+    test "shows photo upload link when opening updates directly", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert html =~ "Event photo uploads"
+      assert has_element?(view, "#event-photo-upload-link-card")
+    end
+  end
+
   describe "agendas - PubSub when switching events" do
     setup [:create_admin]
 

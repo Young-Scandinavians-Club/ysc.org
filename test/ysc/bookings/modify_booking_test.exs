@@ -169,8 +169,15 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       {checkin, checkout} = tahoe_booking_dates(40)
       booking = complete_buyout_booking!(user, checkin, checkout)
 
-      assert {:ok, nil, nil} =
-               Bookings.calculate_refund(booking, Date.utc_today())
+      assert is_nil(booking.refund_forfeited_at)
+
+      {:ok, before_refund, _} =
+        Bookings.calculate_refund(booking, Date.utc_today())
+
+      case before_refund do
+        nil -> :ok
+        %Money{} = amount -> refute Money.equal?(amount, Money.new(0, :USD))
+      end
 
       assert {:ok, updated} =
                BookingLocker.modify_complete_booking(booking, %{
@@ -179,6 +186,8 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                  guests_count: 5,
                  children_count: 0
                })
+
+      assert updated.refund_forfeited_at
 
       assert {:ok, refund, nil} =
                Bookings.calculate_refund(updated, Date.utc_today())

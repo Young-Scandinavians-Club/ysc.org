@@ -159,7 +159,8 @@ config :ueberauth, Ueberauth.Strategy.Facebook.OAuth,
 config :ysc, :google_photos,
   client_id: System.get_env("GOOGLE_PHOTOS_CLIENT_ID"),
   client_secret: System.get_env("GOOGLE_PHOTOS_CLIENT_SECRET"),
-  redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI")
+  redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI"),
+  dev_stub: System.get_env("GOOGLE_PHOTOS_DEV_STUB", "true") in ~w(true 1 yes)
 
 # Wax (WebAuthn) configuration for development
 #

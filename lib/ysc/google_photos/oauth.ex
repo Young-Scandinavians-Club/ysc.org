@@ -87,7 +87,7 @@ defmodule Ysc.GooglePhotos.OAuth do
 
   @doc "Fetches the Google account email for a bearer access token."
   def fetch_userinfo(access_token) when is_binary(access_token) do
-    case Req.get(@userinfo_url,
+    case req_get(@userinfo_url,
            headers: [{"authorization", "Bearer #{access_token}"}],
            receive_timeout: 15_000
          ) do
@@ -116,7 +116,7 @@ defmodule Ysc.GooglePhotos.OAuth do
   def test_photos_api(access_token) when is_binary(access_token) do
     url = "#{@photos_api_base}/albums?" <> URI.encode_query(%{pageSize: 1})
 
-    case Req.get(url,
+    case req_get(url,
            headers: [{"authorization", "Bearer #{access_token}"}],
            receive_timeout: 15_000
          ) do
@@ -166,7 +166,7 @@ defmodule Ysc.GooglePhotos.OAuth do
         |> Map.put(:client_secret, client_secret)
         |> URI.encode_query()
 
-      case Req.post(@token_url,
+      case req_post(@token_url,
              body: body,
              headers: [{"content-type", "application/x-www-form-urlencoded"}],
              receive_timeout: 15_000
@@ -180,7 +180,7 @@ defmodule Ysc.GooglePhotos.OAuth do
             body: inspect(body, limit: 200)
           )
 
-          {:error, {:token_error, status}}
+          {:error, classify_token_error(status, body)}
 
         {:error, reason} ->
           Ysc.Logging.error("Google Photos: token request error",
@@ -197,6 +197,7 @@ defmodule Ysc.GooglePhotos.OAuth do
     refresh_token = Map.get(body, "refresh_token")
     expires_in = Map.get(body, "expires_in", 3600)
     scope = Map.get(body, "scope")
+    token_type = Map.get(body, "token_type", "Bearer")
 
     cond do
       not is_binary(access_token) ->
@@ -208,7 +209,8 @@ defmodule Ysc.GooglePhotos.OAuth do
            access_token: access_token,
            refresh_token: refresh_token,
            expires_in: expires_in,
-           scope: scope
+           scope: scope,
+           token_type: token_type
          }}
     end
   end
@@ -220,6 +222,14 @@ defmodule Ysc.GooglePhotos.OAuth do
 
     {:error, :invalid_token_response}
   end
+
+  defp classify_token_error(_status, %{"error" => "invalid_grant"}),
+    do: :invalid_grant
+
+  defp classify_token_error(_status, %{"error" => error}) when is_binary(error),
+    do: {:token_error, error}
+
+  defp classify_token_error(status, _body), do: {:token_error, status}
 
   defp fetch_client_id do
     case Application.get_env(:ysc, :google_photos, [])[:client_id] do
@@ -261,4 +271,12 @@ defmodule Ysc.GooglePhotos.OAuth do
 
   defp present?(value) when is_binary(value), do: String.trim(value) != ""
   defp present?(_), do: false
+
+  defp req_get(url, opts), do: Req.get(url, Keyword.merge(req_opts(), opts))
+
+  defp req_post(url, opts), do: Req.post(url, Keyword.merge(req_opts(), opts))
+
+  defp req_opts do
+    Application.get_env(:ysc, :google_photos_req_opts, [])
+  end
 end
