@@ -1861,69 +1861,73 @@ defmodule YscWeb.AdminBookingsLive do
         </.button>
       </div>
       <!-- Property Tabs -->
-      <.admin_tabs aria_label="Properties" density={:spacious}>
-        <.notification_badge
-          count={@tahoe_pending_refunds_count}
-          badge_color="red"
-        >
-          <.admin_tab
-            patch={~p"/admin/bookings?property=tahoe"}
-            active={@selected_property == :tahoe}
-            density={:spacious}
+      <div class="border-b border-zinc-200 mb-6">
+        <nav class="-mb-px flex space-x-8" aria-label="Properties">
+          <.notification_badge
+            count={@tahoe_pending_refunds_count}
+            badge_color="red"
           >
-            Lake Tahoe
-          </.admin_tab>
-        </.notification_badge>
-        <.notification_badge
-          count={@clear_lake_pending_refunds_count}
-          badge_color="red"
-        >
-          <.admin_tab
-            patch={~p"/admin/bookings?property=clear_lake"}
-            active={@selected_property == :clear_lake}
-            density={:spacious}
+            <.link
+              patch={~p"/admin/bookings?property=tahoe"}
+              class={booking_property_tab_class(@selected_property == :tahoe)}
+            >
+              Lake Tahoe
+            </.link>
+          </.notification_badge>
+          <.notification_badge
+            count={@clear_lake_pending_refunds_count}
+            badge_color="red"
           >
-            Clear Lake
-          </.admin_tab>
-        </.notification_badge>
-      </.admin_tabs>
+            <.link
+              patch={~p"/admin/bookings?property=clear_lake"}
+              class={booking_property_tab_class(@selected_property == :clear_lake)}
+            >
+              Clear Lake
+            </.link>
+          </.notification_badge>
+        </nav>
+      </div>
       <!-- Section Tabs -->
-      <.admin_tabs aria_label="Section Tabs" density={:spacious}>
-        <.admin_tab
-          active={@current_section == :calendar}
-          density={:spacious}
-          phx-click="select-section"
-          phx-value-section="calendar"
-        >
-          Calendar
-        </.admin_tab>
-        <.admin_tab
-          active={@current_section == :reservations}
-          density={:spacious}
-          phx-click="select-section"
-          phx-value-section="reservations"
-        >
-          Reservations
-        </.admin_tab>
-        <.admin_tab
-          active={@current_section == :config}
-          density={:spacious}
-          phx-click="select-section"
-          phx-value-section="config"
-        >
-          Configuration
-        </.admin_tab>
-        <.notification_badge count={@pending_refunds_count} badge_color="red">
-          <.admin_tab
-            active={@current_section == :pending_refunds}
-            density={:spacious}
+      <div class="border-b border-zinc-200 mb-6">
+        <nav class="-mb-px flex space-x-8" aria-label="Section Tabs">
+          <button
+            type="button"
             phx-click="select-section"
-            phx-value-section="pending_refunds"
+            phx-value-section="calendar"
+            class={booking_section_tab_class(@current_section == :calendar)}
           >
-            Pending Refunds
-          </.admin_tab>
-        </.notification_badge>
-      </.admin_tabs>
+            Calendar
+          </button>
+          <button
+            type="button"
+            phx-click="select-section"
+            phx-value-section="reservations"
+            class={booking_section_tab_class(@current_section == :reservations)}
+          >
+            Reservations
+          </button>
+          <button
+            type="button"
+            phx-click="select-section"
+            phx-value-section="config"
+            class={booking_section_tab_class(@current_section == :config)}
+          >
+            Configuration
+          </button>
+          <.notification_badge count={@pending_refunds_count} badge_color="red">
+            <button
+              type="button"
+              phx-click="select-section"
+              phx-value-section="pending_refunds"
+              class={
+                booking_section_tab_class(@current_section == :pending_refunds)
+              }
+            >
+              Pending Refunds
+            </button>
+          </.notification_badge>
+        </nav>
+      </div>
       <!-- Calendar View -->
       <div :if={@current_section == :calendar} class="space-y-6 pb-16">
         <div class="bg-white rounded border p-3 sm:p-6">
@@ -2103,7 +2107,7 @@ defmodule YscWeb.AdminBookingsLive do
                           <.button
                             type="button"
                             variant="outline"
-                            color="amber"
+                            color="purple"
                             phx-click="show-day-guests"
                             phx-value-date={Date.to_string(date)}
                             phx-disable-with="Loading..."
@@ -6539,6 +6543,21 @@ defmodule YscWeb.AdminBookingsLive do
       true ->
         "Unknown User"
     end
+  end
+
+  defp booking_property_tab_class(active?) do
+    [
+      "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+      if(active?,
+        do: "border-blue-500 text-blue-600",
+        else:
+          "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+      )
+    ]
+  end
+
+  defp booking_section_tab_class(active?) do
+    booking_property_tab_class(active?)
   end
 
   defp format_calendar_guests(booking) do
