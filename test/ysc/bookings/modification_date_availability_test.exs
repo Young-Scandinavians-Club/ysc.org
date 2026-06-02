@@ -82,6 +82,47 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     Repo.preload(booking, [:rooms, :user])
   end
 
+  test "validate_modification_dates rejects extending stay on a deactivated room", %{
+    user: user
+  } do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    room
+    |> Ecto.Changeset.change(is_active: false)
+    |> Repo.update!()
+
+    booking = Repo.preload(booking, [:rooms, :user], force: true)
+
+    extended_checkout = Date.add(checkout, 1)
+
+    parsed = %{
+      checkin_date: checkin,
+      checkout_date: extended_checkout,
+      guests_count: 2,
+      children_count: 0
+    }
+
+    assert {:error, :room_unavailable} =
+             Bookings.validate_modification_availability(booking, parsed)
+
+    snapshot =
+      ModificationDateAvailability.build_snapshot_for_modification(
+        booking,
+        parsed.checkin_date,
+        parsed.checkout_date
+      )
+
+    assert {:error, :room_unavailable} =
+             ModificationDateAvailability.validate_modification_dates(
+               snapshot,
+               parsed.checkin_date,
+               parsed.checkout_date
+             )
+  end
+
   test "validate_modification_dates matches Bookings.validate_modification_availability",
        %{
          user: user
