@@ -8,6 +8,7 @@ defmodule YscWeb.AdminBookingsLive do
   import YscWeb.Components.Autocomplete
   alias Phoenix.LiveView.JS
 
+  alias Ysc.Avatars
   alias Ysc.Bookings
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
@@ -86,17 +87,17 @@ defmodule YscWeb.AdminBookingsLive do
           <:actions>
             <div class="flex justify-between w-full">
               <div>
-                <button
+                <.button
                   :if={@live_action == :edit_blackout}
                   type="button"
+                  color="red"
                   phx-click="delete-blackout"
                   phx-value-id={@blackout.id}
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this blackout?"
-                  class="rounded bg-red-600 hover:bg-red-700 py-2 px-4 transition duration-200 text-sm font-semibold text-white active:text-white/80"
                 >
                   <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
-                </button>
+                </.button>
               </div>
               <div class="flex gap-2">
                 <.button
@@ -238,17 +239,17 @@ defmodule YscWeb.AdminBookingsLive do
           <:actions>
             <div class="flex justify-between w-full">
               <div>
-                <button
+                <.button
                   :if={@live_action == :edit_pricing_rule}
                   type="button"
+                  color="red"
                   phx-click="delete-pricing-rule"
                   phx-value-id={@pricing_rule && @pricing_rule.id}
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this pricing rule?"
-                  class="rounded bg-red-600 hover:bg-red-700 py-2 px-4 transition duration-200 text-sm font-semibold text-white active:text-white/80"
                 >
                   <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
-                </button>
+                </.button>
               </div>
               <div class="flex gap-2">
                 <.button
@@ -756,10 +757,11 @@ defmodule YscWeb.AdminBookingsLive do
                             phx-hook="ClipboardCopy"
                             id={"copy-payment-ref-#{payment.id}"}
                             data-copy={payment.reference_id}
-                            class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                            class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                             title="Copy reference ID"
+                            aria-label="Copy reference ID"
                           >
-                            <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
+                            <.icon name="hero-clipboard" class="w-4 h-4" />
                           </button>
                           <.badge type={payment_status_type}>
                             {String.capitalize(to_string(payment.status))}
@@ -790,10 +792,11 @@ defmodule YscWeb.AdminBookingsLive do
                           phx-hook="ClipboardCopy"
                           id={"copy-stripe-payment-#{payment.id}"}
                           data-copy={payment.external_payment_id}
-                          class="text-zinc-400 hover:text-zinc-600 transition-colors flex-shrink-0"
+                          class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors flex-shrink-0"
                           title="Copy Stripe ID"
+                          aria-label="Copy Stripe ID"
                         >
-                          <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
+                          <.icon name="hero-clipboard" class="w-4 h-4" />
                         </button>
                       </div>
                       <p
@@ -836,10 +839,11 @@ defmodule YscWeb.AdminBookingsLive do
                             phx-hook="ClipboardCopy"
                             id={"copy-refund-ref-#{refund.id}"}
                             data-copy={refund.reference_id}
-                            class="text-zinc-400 hover:text-zinc-600 transition-colors"
+                            class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
                             title="Copy reference ID"
+                            aria-label="Copy reference ID"
                           >
-                            <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
+                            <.icon name="hero-clipboard" class="w-4 h-4" />
                           </button>
                           <.badge type={refund_status_type}>
                             {String.capitalize(to_string(refund.status))}
@@ -876,10 +880,11 @@ defmodule YscWeb.AdminBookingsLive do
                           phx-hook="ClipboardCopy"
                           id={"copy-stripe-refund-#{refund.id}"}
                           data-copy={refund.external_refund_id}
-                          class="text-zinc-400 hover:text-zinc-600 transition-colors flex-shrink-0"
+                          class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors flex-shrink-0"
                           title="Copy Stripe refund ID"
+                          aria-label="Copy Stripe refund ID"
                         >
-                          <.icon name="hero-clipboard" class="w-4 h-4 -mt-1" />
+                          <.icon name="hero-clipboard" class="w-4 h-4" />
                         </button>
                       </div>
                       <p
@@ -991,7 +996,7 @@ defmodule YscWeb.AdminBookingsLive do
               class="w-full sm:w-auto"
             >
               <.icon name="hero-pencil" class="w-4 h-4 -mt-0.5" />
-              <span class="ms-1">Edit</span>
+              <span>Edit</span>
             </.button>
             <.button
               variant="outline"
@@ -1012,8 +1017,7 @@ defmodule YscWeb.AdminBookingsLive do
               phx-disable-with="Loading..."
               class="w-full sm:w-auto"
             >
-              <.icon name="hero-x-mark" class="w-4 h-4 -mt-0.5" />
-              <span class="ms-1">Done</span>
+              Close
             </.button>
           </div>
         </div>
@@ -1080,6 +1084,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div class="flex justify-end gap-2 w-full">
               <.button
                 type="button"
+                variant="outline"
                 phx-click="close-booking-refund-modal"
                 phx-disable-with="Closing..."
               >
@@ -1183,15 +1188,17 @@ defmodule YscWeb.AdminBookingsLive do
                     <.badge type={badge_type}>
                       {String.upcase(to_string(booking.status))}
                     </.badge>
-                    <button
+                    <.button
                       type="button"
+                      variant="outline"
+                      color="blue"
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
                       phx-disable-with="Opening..."
-                      class="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       View
-                    </button>
+                    </.button>
                   </div>
                 </div>
               </div>
@@ -1285,6 +1292,7 @@ defmodule YscWeb.AdminBookingsLive do
 
           <:actions>
             <.button
+              variant="outline"
               phx-click={
                 JS.patch(
                   ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
@@ -1368,15 +1376,19 @@ defmodule YscWeb.AdminBookingsLive do
                     {rule.description}
                   </p>
                 </div>
-                <button
+                <.button
+                  type="button"
+                  variant="outline"
+                  color="red"
                   phx-click="delete-refund-policy-rule"
                   phx-value-rule-id={rule.id}
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this rule?"
-                  class="text-red-600 hover:text-red-800 font-semibold text-sm"
+                  class="!min-h-9 !p-2"
+                  aria-label="Delete rule"
                 >
                   <.icon name="hero-trash" class="w-4 h-4" />
-                </button>
+                </.button>
               </div>
             </div>
           </div>
@@ -1607,20 +1619,21 @@ defmodule YscWeb.AdminBookingsLive do
           <:actions>
             <div class="flex justify-between w-full">
               <div>
-                <button
+                <.button
                   :if={@live_action == :edit_booking && @booking}
                   type="button"
+                  color="red"
                   phx-click="delete-booking"
                   phx-value-id={@booking.id}
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this booking? This action cannot be undone."
-                  class="rounded bg-red-600 hover:bg-red-700 py-2 px-4 transition duration-200 text-sm font-semibold text-white active:text-white/80"
                 >
                   <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
-                </button>
+                </.button>
               </div>
               <div class="flex gap-2">
                 <.button
+                  variant="outline"
                   phx-click={
                     JS.patch(
                       ~p"/admin/bookings?property=#{@selected_property}&from_date=#{Date.to_string(@calendar_start_date)}&to_date=#{Date.to_string(@calendar_end_date)}"
@@ -1795,20 +1808,21 @@ defmodule YscWeb.AdminBookingsLive do
           <:actions>
             <div class="flex justify-between w-full">
               <div>
-                <button
+                <.button
                   :if={@live_action == :edit_room}
                   type="button"
+                  color="red"
                   phx-click="delete-room"
                   phx-value-id={@room.id}
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this room?"
-                  class="rounded bg-red-600 hover:bg-red-700 py-2 px-4 transition duration-200 text-sm font-semibold text-white active:text-white/80"
                 >
                   <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
-                </button>
+                </.button>
               </div>
               <div class="flex gap-2">
                 <.button
+                  variant="outline"
                   phx-click={
                     JS.patch(
                       ~p"/admin/bookings?property=#{@selected_property}&section=#{@current_section}"
@@ -1847,109 +1861,69 @@ defmodule YscWeb.AdminBookingsLive do
         </.button>
       </div>
       <!-- Property Tabs -->
-      <div class="border-b border-zinc-200 mb-6">
-        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-          <.notification_badge
-            count={@tahoe_pending_refunds_count}
-            badge_color="red"
+      <.admin_tabs aria_label="Properties" density={:spacious}>
+        <.notification_badge
+          count={@tahoe_pending_refunds_count}
+          badge_color="red"
+        >
+          <.admin_tab
+            patch={~p"/admin/bookings?property=tahoe"}
+            active={@selected_property == :tahoe}
+            density={:spacious}
           >
-            <button
-              phx-click={JS.patch(~p"/admin/bookings?property=tahoe")}
-              class={[
-                "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_property == :tahoe,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Lake Tahoe
-            </button>
-          </.notification_badge>
-          <.notification_badge
-            count={@clear_lake_pending_refunds_count}
-            badge_color="red"
+            Lake Tahoe
+          </.admin_tab>
+        </.notification_badge>
+        <.notification_badge
+          count={@clear_lake_pending_refunds_count}
+          badge_color="red"
+        >
+          <.admin_tab
+            patch={~p"/admin/bookings?property=clear_lake"}
+            active={@selected_property == :clear_lake}
+            density={:spacious}
           >
-            <button
-              phx-click={JS.patch(~p"/admin/bookings?property=clear_lake")}
-              class={[
-                "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@selected_property == :clear_lake,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Clear Lake
-            </button>
-          </.notification_badge>
-        </nav>
-      </div>
+            Clear Lake
+          </.admin_tab>
+        </.notification_badge>
+      </.admin_tabs>
       <!-- Section Tabs -->
-      <div class="border-b border-zinc-200 mb-6">
-        <nav class="-mb-px flex space-x-8" aria-label="Section Tabs">
-          <button
+      <.admin_tabs aria_label="Section Tabs" density={:spacious}>
+        <.admin_tab
+          active={@current_section == :calendar}
+          density={:spacious}
+          phx-click="select-section"
+          phx-value-section="calendar"
+        >
+          Calendar
+        </.admin_tab>
+        <.admin_tab
+          active={@current_section == :reservations}
+          density={:spacious}
+          phx-click="select-section"
+          phx-value-section="reservations"
+        >
+          Reservations
+        </.admin_tab>
+        <.admin_tab
+          active={@current_section == :config}
+          density={:spacious}
+          phx-click="select-section"
+          phx-value-section="config"
+        >
+          Configuration
+        </.admin_tab>
+        <.notification_badge count={@pending_refunds_count} badge_color="red">
+          <.admin_tab
+            active={@current_section == :pending_refunds}
+            density={:spacious}
             phx-click="select-section"
-            phx-value-section="calendar"
-            class={[
-              "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-              if(@current_section == :calendar,
-                do: "border-blue-500 text-blue-600",
-                else:
-                  "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-              )
-            ]}
+            phx-value-section="pending_refunds"
           >
-            Calendar
-          </button>
-          <button
-            phx-click="select-section"
-            phx-value-section="reservations"
-            class={[
-              "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-              if(@current_section == :reservations,
-                do: "border-blue-500 text-blue-600",
-                else:
-                  "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-              )
-            ]}
-          >
-            Reservations
-          </button>
-          <button
-            phx-click="select-section"
-            phx-value-section="config"
-            class={[
-              "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-              if(@current_section == :config,
-                do: "border-blue-500 text-blue-600",
-                else:
-                  "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-              )
-            ]}
-          >
-            Configuration
-          </button>
-          <.notification_badge count={@pending_refunds_count} badge_color="red">
-            <button
-              phx-click="select-section"
-              phx-value-section="pending_refunds"
-              class={[
-                "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
-                if(@current_section == :pending_refunds,
-                  do: "border-blue-500 text-blue-600",
-                  else:
-                    "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
-                )
-              ]}
-            >
-              Pending Refunds
-            </button>
-          </.notification_badge>
-        </nav>
-      </div>
+            Pending Refunds
+          </.admin_tab>
+        </.notification_badge>
+      </.admin_tabs>
       <!-- Calendar View -->
       <div :if={@current_section == :calendar} class="space-y-6 pb-16">
         <div class="bg-white rounded border p-3 sm:p-6">
@@ -2034,7 +2008,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <!-- Bookings Row Title (only for Clear Lake) -->
               <%= if @selected_property == :clear_lake do %>
-                <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
+                <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
                   <div class="h-2 w-2 rounded-full bg-purple-500 flex-shrink-0">
                   </div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
@@ -2043,14 +2017,14 @@ defmodule YscWeb.AdminBookingsLive do
                 </div>
               <% end %>
               <!-- Blackouts Row Title -->
-              <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
+              <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
                 <div class="h-2 w-2 rounded-full bg-red-500 flex-shrink-0"></div>
                 <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                   Blackouts
                 </div>
               </div>
               <!-- Full Buyout Row Title -->
-              <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
+              <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
                 <div class="h-2 w-2 rounded-full bg-green-500 flex-shrink-0"></div>
                 <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                   Full Buyout
@@ -2058,7 +2032,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <!-- Room Row Titles -->
               <%= for room <- @filtered_rooms do %>
-                <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-12 bg-white">
+                <div class="border-b border-zinc-200 flex items-center gap-1 sm:gap-2 px-2 sm:px-3 h-14 bg-white">
                   <div class="h-2 w-2 rounded-full bg-blue-500 flex-shrink-0"></div>
                   <div class="text-xs sm:text-sm font-medium text-zinc-800 truncate">
                     {room.name}
@@ -2107,7 +2081,7 @@ defmodule YscWeb.AdminBookingsLive do
                         true -> "bg-white"
                       end %>
                     <div
-                      class={"h-12 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""}"}
+                      class={"h-14 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""}"}
                       style={"grid-column: #{i + 1}; grid-row: 1;"}
                     >
                       <%= if rem(i + 1, 2) == 0 do %>
@@ -2122,19 +2096,21 @@ defmodule YscWeb.AdminBookingsLive do
                     <% col_end = col_start + 2 %>
                     <%= if availability_info do %>
                       <div
-                        class="flex items-center justify-center h-12"
+                        class="flex items-center justify-center h-14"
                         style={"grid-column: #{col_start} / #{col_end}; grid-row: 1; position: relative; z-index: 1;"}
                       >
                         <%= if availability_info.day_bookings_count > 0 do %>
-                          <button
+                          <.button
                             type="button"
+                            variant="outline"
+                            color="amber"
                             phx-click="show-day-guests"
                             phx-value-date={Date.to_string(date)}
                             phx-disable-with="Loading..."
-                            class="text-sm font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer transition-colors"
+                            class="!min-h-9 !py-1 !px-2 text-sm"
                           >
                             {availability_info.day_bookings_count} guests
-                          </button>
+                          </.button>
                         <% else %>
                           <span class="text-sm font-semibold text-zinc-400">
                             0 guests
@@ -2176,7 +2152,7 @@ defmodule YscWeb.AdminBookingsLive do
                       true -> "bg-white"
                     end %>
                   <div
-                    class={"h-12 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-red-50 transition-colors"}
+                    class={"h-14 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-red-50 transition-colors"}
                     style={"grid-column: #{i + 1}; grid-row: 1;"}
                     phx-click="select-date-blackout"
                     phx-value-date={if date, do: Date.to_string(date), else: ""}
@@ -2232,7 +2208,7 @@ defmodule YscWeb.AdminBookingsLive do
                       true -> "bg-white"
                     end %>
                   <div
-                    class={"h-12 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-green-50 transition-colors"}
+                    class={"h-14 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-green-50 transition-colors"}
                     style={"grid-column: #{i + 1}; grid-row: 1;"}
                     phx-click="select-date-buyout"
                     phx-value-date={if date, do: Date.to_string(date), else: ""}
@@ -2291,7 +2267,7 @@ defmodule YscWeb.AdminBookingsLive do
                         true -> "bg-white"
                       end %>
                     <div
-                      class={"h-12 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-blue-50 transition-colors"}
+                      class={"h-14 border-b #{if today_col?(i, @calendar_dates, @today), do: "border-blue-100", else: "border-zinc-100"} #{base_bg} #{if rem(i + 1, 2) == 0, do: "relative", else: ""} cursor-pointer hover:bg-blue-50 transition-colors"}
                       style={"grid-column: #{i + 1}; grid-row: 1;"}
                       phx-click="select-date-room"
                       phx-value-date={if date, do: Date.to_string(date), else: ""}
@@ -2518,43 +2494,48 @@ defmodule YscWeb.AdminBookingsLive do
                   </span>
                 </:col>
                 <:action :let={{_, booking}}>
-                  <div class="flex gap-3 items-center">
-                    <button
+                  <div class="flex flex-wrap gap-2 items-center">
+                    <.button
+                      type="button"
+                      variant="outline"
+                      color="blue"
                       phx-click="view-booking"
                       phx-value-booking-id={booking.id}
                       phx-disable-with="Opening..."
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm whitespace-nowrap"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       View
-                    </button>
-                    <button
-                      phx-click={
+                    </.button>
+                    <.button
+                      patch={
                         query_params = %{
                           "property" => Atom.to_string(@selected_property),
                           "from_date" => Date.to_string(@calendar_start_date),
                           "to_date" => Date.to_string(@calendar_end_date)
                         }
 
-                        query_string = URI.encode_query(query_params)
-
-                        JS.patch(
-                          "/admin/bookings/bookings/#{booking.id}/edit?#{query_string}"
-                        )
+                        "/admin/bookings/bookings/#{booking.id}/edit?" <>
+                          URI.encode_query(query_params)
                       }
                       phx-disable-with="Loading..."
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm whitespace-nowrap"
+                      variant="outline"
+                      color="blue"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       Edit
-                    </button>
-                    <button
+                    </.button>
+                    <.button
+                      type="button"
+                      variant="outline"
+                      color="red"
                       phx-click="delete-booking"
                       phx-value-id={booking.id}
-                      phx-confirm="Are you sure you want to delete this booking?"
+                      data-confirm="Are you sure you want to delete this booking?"
                       phx-disable-with="Deleting..."
-                      class="text-red-600 font-semibold hover:underline cursor-pointer text-sm whitespace-nowrap"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm whitespace-nowrap"
                     >
                       Delete
-                    </button>
+                    </.button>
                   </div>
                 </:action>
               </Flop.Phoenix.table>
@@ -2914,17 +2895,17 @@ defmodule YscWeb.AdminBookingsLive do
                     <span :if={!season.is_default} class="text-zinc-400">—</span>
                   </td>
                   <td class="py-3">
-                    <button
-                      phx-click={
-                        JS.patch(
-                          ~p"/admin/bookings/seasons/#{season.id}/edit?property=#{@selected_property}&section=config"
-                        )
+                    <.button
+                      patch={
+                        ~p"/admin/bookings/seasons/#{season.id}/edit?property=#{@selected_property}&section=config"
                       }
                       phx-disable-with="Loading..."
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                      variant="outline"
+                      color="blue"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm"
                     >
                       Edit
-                    </button>
+                    </.button>
                   </td>
                 </tr>
               </tbody>
@@ -3018,17 +2999,17 @@ defmodule YscWeb.AdminBookingsLive do
                     {if rule.season, do: rule.season.name, else: "All seasons"}
                   </td>
                   <td class="py-3">
-                    <button
-                      phx-click={
-                        JS.patch(
-                          ~p"/admin/bookings/pricing-rules/#{rule.id}/edit?property=#{@selected_property}&section=#{@current_section}"
-                        )
+                    <.button
+                      patch={
+                        ~p"/admin/bookings/pricing-rules/#{rule.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                       }
                       phx-disable-with="Loading..."
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                      variant="outline"
+                      color="blue"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm"
                     >
                       Edit
-                    </button>
+                    </.button>
                   </td>
                 </tr>
               </tbody>
@@ -3109,29 +3090,29 @@ defmodule YscWeb.AdminBookingsLive do
                     </span>
                   </td>
                   <td class="py-3">
-                    <div class="flex gap-2">
-                      <button
-                        phx-click={
-                          JS.patch(
-                            ~p"/admin/bookings/refund-policies/#{policy.id}/edit?property=#{@selected_property}&section=#{@current_section}"
-                          )
+                    <div class="flex flex-wrap gap-2">
+                      <.button
+                        patch={
+                          ~p"/admin/bookings/refund-policies/#{policy.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                         }
                         phx-disable-with="Loading..."
-                        class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                        variant="outline"
+                        color="blue"
+                        class="!min-h-9 !py-1 !px-2.5 text-sm"
                       >
                         Edit
-                      </button>
-                      <button
-                        phx-click={
-                          JS.patch(
-                            ~p"/admin/bookings/refund-policies/#{policy.id}/rules?property=#{@selected_property}&section=#{@current_section}"
-                          )
+                      </.button>
+                      <.button
+                        patch={
+                          ~p"/admin/bookings/refund-policies/#{policy.id}/rules?property=#{@selected_property}&section=#{@current_section}"
                         }
                         phx-disable-with="Loading..."
-                        class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                        variant="outline"
+                        color="blue"
+                        class="!min-h-9 !py-1 !px-2.5 text-sm"
                       >
                         Rules
-                      </button>
+                      </.button>
                     </div>
                   </td>
                 </tr>
@@ -3273,17 +3254,17 @@ defmodule YscWeb.AdminBookingsLive do
                     </span>
                   </td>
                   <td class="py-3">
-                    <button
-                      phx-click={
-                        JS.patch(
-                          ~p"/admin/bookings/rooms/#{room.id}/edit?property=#{@selected_property}&section=#{@current_section}"
-                        )
+                    <.button
+                      patch={
+                        ~p"/admin/bookings/rooms/#{room.id}/edit?property=#{@selected_property}&section=#{@current_section}"
                       }
                       phx-disable-with="Loading..."
-                      class="text-blue-600 font-semibold hover:underline cursor-pointer text-sm"
+                      variant="outline"
+                      color="blue"
+                      class="!min-h-9 !py-1 !px-2.5 text-sm"
                     >
                       Edit
-                    </button>
+                    </.button>
                   </td>
                 </tr>
               </tbody>
@@ -6491,12 +6472,10 @@ defmodule YscWeb.AdminBookingsLive do
     Date.diff(date, start_date)
   end
 
-  # Calculate grid column start and end for a booking
-  # Each day has 2 columns (half-columns)
-  # CSS Grid columns are 1-indexed
-  # Day 0: columns 1-2, Day 1: columns 3-4, etc.
-  # Bookings start on second half of check-in day, end on first half of check-out day
-  # Returns {col_start, col_end, extends_before, extends_after}
+  # Calculate grid column start and end for a date range on the calendar.
+  # Each day has 2 columns (half-columns); CSS Grid columns are 1-indexed.
+  # Ranges start on the second half of the start day and end on the first half of the end day
+  # (same as booking check-in / check-out). Returns {col_start, col_end, extends_before, extends_after}
   defp get_booking_grid_columns(
          start_date,
          checkin_date,
@@ -6562,35 +6541,37 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
+  defp format_calendar_guests(booking) do
+    adults = booking.guests_count || 0
+    children = booking.children_count || 0
+
+    adults_label = if adults == 1, do: "adult", else: "adults"
+
+    adults_part = "#{adults} #{adults_label}"
+
+    if children > 0 do
+      children_label = if children == 1, do: "child", else: "children"
+      adults_part <> ", #{children} #{children_label}"
+    else
+      adults_part
+    end
+  end
+
   # Render a blackout div for the grid calendar
-  # Blackouts cover full days (unlike bookings which have half-day coverage on check-in/check-out)
+  # Uses the same half-day column span as bookings (second half of start, first half of end)
   # sobelow_skip ["XSS.Raw"]
   defp render_blackout_div(blackout, start_date, total_days) do
-    total_cols = total_days * 2
-
-    # Calculate actual day indices (not clamped) to detect if blackout extends beyond view
-    actual_start_idx = day_index(start_date, blackout.start_date)
-    actual_end_idx = day_index(start_date, blackout.end_date)
-
-    # Check if blackout extends beyond visible range
-    extends_before = actual_start_idx < 0
-    extends_after = actual_end_idx >= total_days
-
-    # Clamp indices to visible range for rendering
-    start_idx = max(0, min(actual_start_idx, total_days - 1))
-    end_idx = max(0, min(actual_end_idx, total_days - 1))
-
-    # Blackouts cover full days: from first column of start day to last column of end day
-    # Each day has 2 columns: (day_idx * 2 + 1) and (day_idx * 2 + 2)
-    col_start = start_idx * 2 + 1
-    # +3 to include the full last day (end_idx * 2 + 2 + 1)
-    col_end = end_idx * 2 + 3
-    # Clamp to grid bounds
-    col_end = min(col_end, total_cols + 1)
+    {col_start, col_end, extends_before, extends_after} =
+      get_booking_grid_columns(
+        start_date,
+        blackout.start_date,
+        blackout.end_date,
+        total_days
+      )
 
     # Use CSS Grid positioning exactly like bookings to ensure proper alignment
     style_val =
-      "grid-column: #{col_start} / #{col_end}; grid-row: 1; margin-left: 1px; margin-right: 1px; position: relative; z-index: 5;"
+      "grid-column: #{col_start} / #{col_end}; grid-row: 1; align-self: center; margin: 2px 1px; position: relative; z-index: 5;"
 
     title_val =
       "Blackout: #{blackout.reason} • #{blackout.start_date} → #{blackout.end_date}"
@@ -6626,7 +6607,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     """
     <div
-      class="h-10 rounded shadow-sm border text-xs font-medium flex flex-col items-start justify-center bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{fade_class}"
+      class="h-12 rounded shadow-sm border text-xs font-medium flex flex-col items-start justify-center bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{fade_class}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-blackout"
@@ -6652,14 +6633,18 @@ defmodule YscWeb.AdminBookingsLive do
       )
 
     user_name = format_user_name(booking.user)
+    avatar_src = calendar_avatar_src(booking.user)
+    {:safe, escaped_avatar_src} = Phoenix.HTML.html_escape(avatar_src)
 
     # Use CSS Grid positioning instead of percentage-based absolute positioning
     # This ensures the booking aligns correctly with the grid columns
     style_val =
-      "grid-column: #{col_start} / #{col_end}; grid-row: 1; margin-left: 1px; margin-right: 1px; position: relative; z-index: 5;"
+      "grid-column: #{col_start} / #{col_end}; grid-row: 1; align-self: center; margin: 2px 1px; position: relative; z-index: 5;"
+
+    guests_str = format_calendar_guests(booking)
 
     title_val =
-      "#{user_name} - #{booking.checkin_date} - #{booking.checkout_date} (#{booking.guests_count} guests)"
+      "#{user_name} - #{booking.checkin_date} - #{booking.checkout_date} (#{guests_str})"
 
     checkin_str = Calendar.strftime(booking.checkin_date, "%m/%d")
     checkout_str = Calendar.strftime(booking.checkout_date, "%m/%d")
@@ -6667,6 +6652,7 @@ defmodule YscWeb.AdminBookingsLive do
     {:safe, escaped_title_str} = Phoenix.HTML.html_escape(title_val)
     {:safe, escaped_checkin_str} = Phoenix.HTML.html_escape(checkin_str)
     {:safe, escaped_checkout_str} = Phoenix.HTML.html_escape(checkout_str)
+    {:safe, escaped_guests_str} = Phoenix.HTML.html_escape(guests_str)
 
     # Determine if this is a buyout booking (no rooms or booking_mode is :buyout)
     has_rooms = Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
@@ -6730,23 +6716,36 @@ defmodule YscWeb.AdminBookingsLive do
 
     """
     <div
-      class="h-10 rounded shadow-sm border text-xs font-medium flex flex-col items-start justify-center #{bg_color} #{border_color} #{text_color} cursor-pointer #{hover_color} transition-colors duration-200 relative #{fade_class}"
+      class="h-12 rounded shadow-sm border text-xs font-medium flex flex-row items-center gap-1.5 px-1.5 #{bg_color} #{border_color} #{text_color} cursor-pointer #{hover_color} transition-colors duration-200 relative #{fade_class}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-booking"
       phx-value-booking-id="#{booking.id}"
       phx-disable-with="Opening..."
     >
-      <div class="truncate px-2 font-semibold flex items-center gap-1.5">
-        <span class="truncate">#{escaped_user_name_str}</span>
-        #{checked_in_indicator}
+      <img
+        src="#{escaped_avatar_src}"
+        alt=""
+        class="w-8 h-8 rounded-full object-cover ring-2 ring-white/80 flex-shrink-0"
+        loading="lazy"
+      />
+      <div class="flex flex-col min-w-0 flex-1 justify-center gap-0.5">
+        <div class="truncate font-semibold flex items-center gap-1 leading-tight">
+          <span class="truncate">#{escaped_user_name_str}</span>
+          #{checked_in_indicator}
+        </div>
+        <div class="truncate text-[10px] opacity-90 leading-tight">#{escaped_checkin_str} - #{escaped_checkout_str}</div>
+        <div class="truncate text-[10px] opacity-75 leading-tight">#{escaped_guests_str}</div>
       </div>
-      <div class="truncate px-2 text-xs opacity-90">#{escaped_checkin_str} - #{escaped_checkout_str}</div>
       #{right_indicator}
     </div>
     """
     |> Phoenix.HTML.raw()
   end
+
+  defp calendar_avatar_src(nil), do: "/images/default_avatars/sweden_flag.webp"
+
+  defp calendar_avatar_src(user), do: Avatars.display_avatar_url(user, :thumb)
 
   defp update_calendar_view(socket, property) do
     rooms = socket.assigns.rooms
@@ -6770,7 +6769,11 @@ defmodule YscWeb.AdminBookingsLive do
           end),
           Task.async(fn ->
             Bookings.list_bookings(property, start_date, end_date,
-              preload: [:rooms, :user, check_ins: :check_in_vehicles]
+              preload: [
+                :rooms,
+                {:user, :current_avatar},
+                check_ins: :check_in_vehicles
+              ]
             )
           end)
         ],
