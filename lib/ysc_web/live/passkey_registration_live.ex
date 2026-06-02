@@ -20,9 +20,9 @@ defmodule YscWeb.PasskeyRegistrationLive do
 
       <div :if={!@show_reauth}>
         <.header class="text-center">
-          Add a Passkey to Your Account
+          Set up fingerprint or face sign-in
           <:subtitle>
-            Use your device's fingerprint or face scan to sign in faster
+            Sign in faster without typing your password each time
           </:subtitle>
         </.header>
 
@@ -39,7 +39,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
             class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6"
           >
             <p class="text-sm text-green-800">
-              Passkey added successfully! You can now use it to sign in.
+              You're all set. You can now sign in with your fingerprint or face on this device.
             </p>
           </div>
 
@@ -65,7 +65,7 @@ defmodule YscWeb.PasskeyRegistrationLive do
               class="w-5 h-5 animate-spin"
             />
             <.icon :if={!@loading} name="hero-key" class="w-5 h-5" />
-            {if @loading, do: "Creating Passkey...", else: "Create Passkey"}
+            {if @loading, do: "Setting up...", else: "Set up sign-in"}
           </.button>
 
           <div :if={!@passkey_supported} class="text-center text-sm text-zinc-500">
@@ -99,9 +99,9 @@ defmodule YscWeb.PasskeyRegistrationLive do
 
       {:ok,
        assign(socket,
-         page_title: "Add Passkey",
+         page_title: "Set up fingerprint or face sign-in",
          meta_description:
-           "Register a passkey for secure, passwordless sign-in to Young Scandinavians Club.",
+           "Set up fingerprint or face sign-in for your Young Scandinavians Club account.",
          passkey_supported: false,
          error: nil,
          success: false,

@@ -21,7 +21,7 @@ defmodule YscWeb.UserSecurityLive do
       |> assign(:page_title, "Security Settings")
       |> assign(
         :meta_description,
-        "Manage your Young Scandinavians Club account security, password, and passkeys."
+        "Manage your Young Scandinavians Club account security, password, and sign-in options."
       )
       |> assign(:timezone, timezone)
       |> assign(:user, user)
@@ -426,11 +426,13 @@ defmodule YscWeb.UserSecurityLive do
 
         <div class="text-medium px-2 text-zinc-500 rounded w-full md:border-l md:border-1 md:border-zinc-100 md:pl-16">
           <div class="space-y-8">
-            <!-- Passkeys Section -->
+            <!-- Fingerprint / face sign-in -->
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
-              <h2 class="text-zinc-900 font-bold text-xl">Passkeys</h2>
+              <h2 class="text-zinc-900 font-bold text-xl">
+                Sign in with fingerprint or face
+              </h2>
               <p class="text-zinc-600 text-sm">
-                A passkey is a passwordless way to sign in using your device’s built-in security (fingerprint, face, or PIN). It’s tied to your device and this site, so it can’t be phished or leaked like a password.
+                You can sign in without typing a password by using your device's fingerprint, face scan, or screen lock PIN. This sign-in method stays on your device and this website, so it is harder to steal than a password you type.
               </p>
               <div class="flex flex-wrap gap-3">
                 <div class="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">
@@ -453,7 +455,7 @@ defmodule YscWeb.UserSecurityLive do
               <.async_section_loader
                 :if={@passkeys_loading}
                 id="user-security-passkeys-loading"
-                label="Loading passkeys..."
+                label="Loading sign-in methods..."
               />
 
               <div
@@ -461,13 +463,14 @@ defmodule YscWeb.UserSecurityLive do
                 class="text-center py-8"
               >
                 <p class="text-zinc-600 text-sm mb-4">
-                  You don't have any passkeys yet.
+                  You have not set up fingerprint or face sign-in yet.
                 </p>
                 <.link
                   navigate={~p"/users/settings/passkeys/new"}
                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                 >
-                  <.icon name="hero-plus" class="w-5 h-5 me-2" /> Add Passkey
+                  <.icon name="hero-plus" class="w-5 h-5 me-2" />
+                  Set up fingerprint or face sign-in
                 </.link>
               </div>
 
@@ -476,7 +479,8 @@ defmodule YscWeb.UserSecurityLive do
                   navigate={~p"/users/settings/passkeys/new"}
                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 mb-4"
                 >
-                  <.icon name="hero-plus" class="w-5 h-5 me-2" /> Add Passkey
+                  <.icon name="hero-plus" class="w-5 h-5 me-2" />
+                  Add another device
                 </.link>
 
                 <div class="space-y-3">

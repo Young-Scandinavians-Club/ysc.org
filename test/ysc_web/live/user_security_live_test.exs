@@ -50,7 +50,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       assert html =~ "Security Settings"
       assert html =~ "Change Password"
-      assert html =~ "Passkeys"
+      assert html =~ "Sign in with fingerprint or face"
       assert has_element?(view, "#password_form")
     end
 
@@ -60,7 +60,7 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/users/settings/security")
 
-      assert html =~ "Loading passkeys..."
+      assert html =~ "Loading sign-in methods..."
       assert html =~ ~s|id="user-security-passkeys-loading"|
     end
 
@@ -82,7 +82,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       render_async(view)
 
       html = render(view)
-      refute html =~ "Loading passkeys..."
+      refute html =~ "Loading sign-in methods..."
     end
 
     test "displays empty state when user has no passkeys", %{conn: conn} do
@@ -95,7 +95,8 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       html = render(view)
 
-      assert html =~ "Loading passkeys" or html =~ "Add Passkey"
+      assert html =~ "Loading sign-in methods" or
+               html =~ "Set up fingerprint or face sign-in"
     end
   end
 
