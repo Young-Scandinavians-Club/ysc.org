@@ -136,7 +136,7 @@ defmodule YscWeb.UserLoginLive do
             <%= if @is_ios_mobile do %>
               Sign in with Face ID
             <% else %>
-              Sign in with fingerprint or face
+              Sign in with Passkey
             <% end %>
           <% end %>
         </.button>

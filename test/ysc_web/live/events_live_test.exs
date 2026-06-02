@@ -16,6 +16,13 @@ defmodule YscWeb.EventsLiveTest do
 
   defp render_events_async(view), do: render_async(view, @events_async_timeout)
 
+  defp past_event_card_count(html) do
+    html
+    |> String.split("id=\"image-past-")
+    |> length()
+    |> Kernel.-(1)
+  end
+
   # Helper to create an image
   defp create_image do
     uploader = user_fixture()
@@ -308,16 +315,21 @@ defmodule YscWeb.EventsLiveTest do
         })
       end
 
+      Ysc.Events.EventListCache.invalidate()
+
       {:ok, view, _html} = live(conn, ~p"/events")
       render_events_async(view)
 
-      rendered_view = :sys.get_state(view.pid)
-      initial_limit = rendered_view.socket.assigns.past_events_limit
+      html_before = render(view)
+      count_before = past_event_card_count(html_before)
+      assert count_before == 10
 
       render_click(view, "show_more_past_events")
 
-      rendered_view = :sys.get_state(view.pid)
-      assert rendered_view.socket.assigns.past_events_limit > initial_limit
+      html_after = render(view)
+      count_after = past_event_card_count(html_after)
+      assert count_after > count_before
+      assert count_after == 20
     end
   end
 

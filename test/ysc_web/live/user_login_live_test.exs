@@ -36,10 +36,11 @@ defmodule YscWeb.UserLoginLiveTest do
       |> element("#auth-methods")
       |> render_hook("passkey_support_detected", %{"supported" => true})
 
+      assert has_element?(lv, "button[phx-click='sign_in_with_passkey']")
+
       html = render(lv)
 
-      assert html =~ "Sign in with fingerprint or face" ||
-               html =~ "Sign in with Face ID"
+      assert html =~ "Sign in with Face ID" || html =~ "Sign in with Passkey"
     end
 
     test "hides passkey button when not supported", %{conn: conn} do
@@ -50,10 +51,8 @@ defmodule YscWeb.UserLoginLiveTest do
       |> element("#auth-methods")
       |> render_hook("passkey_support_detected", %{"supported" => false})
 
-      html = render(lv)
       # Passkey button should not be visible when not supported
-      refute html =~ "Sign in with fingerprint or face"
-      refute html =~ "Sign in with Passkey"
+      refute has_element?(lv, "button[phx-click='sign_in_with_passkey']")
     end
 
     test "shows failed login attempts banner when attempts >= 3", %{conn: conn} do
