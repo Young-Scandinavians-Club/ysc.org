@@ -501,6 +501,9 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
   defp validate_room_modification(snapshot, checkin, checkout) do
     cond do
+      inactive_room_assigned?(snapshot.booking) ->
+        {:error, :room_unavailable}
+
       blackout_conflict?(snapshot, checkin, checkout) ->
         {:error, :blackout_conflict}
 
@@ -546,6 +549,12 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
     if unavailable?, do: {:error, :property_unavailable}, else: :ok
   end
+
+  defp inactive_room_assigned?(%Booking{rooms: rooms}) when is_list(rooms) do
+    Enum.any?(rooms, &(Map.get(&1, :is_active) == false))
+  end
+
+  defp inactive_room_assigned?(_), do: false
 
   defp room_unavailable?(snapshot, checkin, checkout) do
     held_days = held_days(snapshot.hold)
