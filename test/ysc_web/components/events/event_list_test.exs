@@ -106,6 +106,43 @@ defmodule YscWeb.EventsListLiveTest do
       assert html =~ "hero-event"
       assert html =~ "Happening Soon"
       assert html =~ event.title
+      refute html =~ "The calendar is clear"
+    end
+
+    test "does not show empty state when sole upcoming event is displayed as hero" do
+      organizer = user_fixture()
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          title: "Solo Hero #{System.unique_integer()}",
+          start_date:
+            DateTime.add(DateTime.utc_now(), 14, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 15, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      _tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA",
+          quantity: 100
+        })
+
+      html =
+        render_component(YscWeb.EventsListLive, %{
+          id: "events-list",
+          defer_load: false,
+          show_hero: true,
+          upcoming: true
+        })
+
+      assert html =~ "hero-event"
+      assert html =~ event.title
+      refute html =~ "The calendar is clear"
+      refute html =~ ~s(id="upcoming-events-stream")
     end
 
     test "lists past events when upcoming is false" do
