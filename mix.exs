@@ -177,7 +177,7 @@ defmodule Ysc.MixProject do
       {:debouncer, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:dns_cluster, "~> 0.2"},
-      {:duckdbex, "~> 0.3.21", only: [:dev], runtime: false},
+      {:duckdbex, "~> 0.4", only: [:dev], runtime: false},
       {:ecto_enum, "~> 1.4"},
       {:ecto_psql_extras, "~> 0.8"},
       {:ecto_sql, "~> 3.13"},
