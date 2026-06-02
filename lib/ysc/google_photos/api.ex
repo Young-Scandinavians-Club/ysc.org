@@ -13,6 +13,7 @@ defmodule Ysc.GooglePhotos.Api do
 
   @photos_api_base "https://photoslibrary.googleapis.com/v1"
   @upload_url "https://photoslibrary.googleapis.com/v1/uploads"
+  @stream_chunk_size 5_242_880
 
   @doc "Creates an album with a normalized title."
   def create_album(access_token, title, event_id \\ nil) do
@@ -37,7 +38,7 @@ defmodule Ysc.GooglePhotos.Api do
   def upload_bytes(access_token, bytes, filename, event_id \\ nil)
       when is_binary(bytes) do
     with :ok <- Limits.validate_upload(filename, byte_size(bytes)),
-         normalized <- Limits.normalize_filename(filename) do
+         normalized = Limits.normalize_filename(filename) do
       if use_dev_stub?() do
         Ysc.GooglePhotos.Api.DevStub.upload_bytes(
           access_token,
@@ -159,17 +160,14 @@ defmodule Ysc.GooglePhotos.Api do
   defp upload_file_stream_http(access_token, file_path, filename, size) do
     content_type = content_type_for_filename(filename)
     timeout = upload_receive_timeout(size)
-    stream = File.stream!(file_path, 5_242_880)
+    stream = File.stream!(file_path, @stream_chunk_size)
 
     case Req.post(@upload_url,
            body: stream,
            headers:
-             auth_headers(access_token) ++
-               [
-                 {"content-type", content_type},
-                 {"x-goog-upload-protocol", "raw"},
-                 {"x-goog-upload-content-type", content_type}
-               ],
+             upload_raw_headers(access_token, filename, content_type,
+               size: size
+             ),
            receive_timeout: timeout
          ) do
       {:ok, %{status: status, body: upload_token}}
@@ -191,13 +189,7 @@ defmodule Ysc.GooglePhotos.Api do
 
     case Req.post(@upload_url,
            body: bytes,
-           headers:
-             auth_headers(access_token) ++
-               [
-                 {"content-type", content_type},
-                 {"x-goog-upload-protocol", "raw"},
-                 {"x-goog-upload-content-type", content_type}
-               ],
+           headers: upload_raw_headers(access_token, filename, content_type),
            receive_timeout: timeout
          ) do
       {:ok, %{status: status, body: upload_token}}
@@ -254,6 +246,22 @@ defmodule Ysc.GooglePhotos.Api do
 
   defp auth_headers(access_token) do
     [{"authorization", "Bearer #{access_token}"}]
+  end
+
+  defp upload_raw_headers(access_token, filename, content_type, opts \\ []) do
+    headers =
+      auth_headers(access_token) ++
+        [
+          {"content-type", "application/octet-stream"},
+          {"x-goog-upload-protocol", "raw"},
+          {"x-goog-upload-content-type", content_type},
+          {"x-goog-upload-file-name", filename}
+        ]
+
+    case Keyword.get(opts, :size) do
+      nil -> headers
+      size -> headers ++ [{"content-length", to_string(size)}]
+    end
   end
 
   defp content_type_for_filename(filename) do
