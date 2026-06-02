@@ -366,8 +366,7 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:search_query, "")
      |> assign(:date_from, "")
      |> assign(:date_to, "")
-     |> assign(:open_check_in_sessions, %{}),
-     temporary_assigns: [author_filter: []]}
+     |> assign(:open_check_in_sessions, %{})}
   end
 
   def handle_params(params, _uri, socket) do
@@ -381,7 +380,6 @@ defmodule YscWeb.AdminEventsLive do
            tab: active_tab
          ) do
       {:ok, {events, meta}} ->
-        author_filter = Events.get_all_authors()
         title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
         search_query = if title_filter, do: title_filter.value, else: ""
 
@@ -392,10 +390,10 @@ defmodule YscWeb.AdminEventsLive do
 
         {:noreply,
          socket
+         |> assign_new(:author_filter, &Events.get_all_authors/0)
          |> assign(:meta, meta)
          |> assign(:params, params)
          |> assign(:active_tab, active_tab)
-         |> assign(:author_filter, author_filter)
          |> assign(:search_query, search_query)
          |> assign(:date_from, date_from)
          |> assign(:date_to, date_to)
