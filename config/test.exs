@@ -12,6 +12,9 @@ config :ysc, :google_photos,
   client_secret: "test_google_photos_client_secret",
   dev_stub: false
 
+config :ysc, :google_photos_req_opts,
+  plug: {Req.Test, Ysc.GooglePhotos.Api.ReqStub}
+
 # Credential keys are cleared in test/test_helper.exs so host .env never triggers Intuit HTTP.
 
 # Skip SNS signature verification in tests (no real AWS cert to fetch)

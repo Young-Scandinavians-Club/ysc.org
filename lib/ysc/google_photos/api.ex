@@ -37,8 +37,9 @@ defmodule Ysc.GooglePhotos.Api do
   @doc "Uploads raw bytes and returns an upload token."
   def upload_bytes(access_token, bytes, filename, event_id \\ nil)
       when is_binary(bytes) do
-    with :ok <- Limits.validate_upload(filename, byte_size(bytes)),
-         normalized = Limits.normalize_filename(filename) do
+    with :ok <- Limits.validate_upload(filename, byte_size(bytes)) do
+      normalized = Limits.normalize_filename(filename)
+
       if use_dev_stub?() do
         Ysc.GooglePhotos.Api.DevStub.upload_bytes(
           access_token,
@@ -55,16 +56,17 @@ defmodule Ysc.GooglePhotos.Api do
   @doc "Creates a media item in an album from an upload token."
   def create_media_item(access_token, upload_token, album_id, filename) do
     normalized = Limits.normalize_filename(filename)
+    token = String.trim(upload_token)
 
     if use_dev_stub?() do
       Ysc.GooglePhotos.Api.DevStub.create_media_item(
         access_token,
-        upload_token,
+        token,
         album_id,
         normalized
       )
     else
-      create_media_item_http(access_token, upload_token, album_id, normalized)
+      create_media_item_http(access_token, token, album_id, normalized)
     end
   end
 
@@ -132,13 +134,17 @@ defmodule Ysc.GooglePhotos.Api do
   end
 
   defp use_dev_stub? do
-    GooglePhotos.dev_stub_enabled?() and GooglePhotos.get_connection() == nil
+    if GooglePhotos.dev_stub_enabled?() do
+      GooglePhotos.get_connection() == nil
+    else
+      false
+    end
   end
 
   defp create_album_http(access_token, title) do
     body = %{"album" => %{"title" => title}}
 
-    case Req.post("#{@photos_api_base}/albums",
+    case req_post("#{@photos_api_base}/albums",
            json: body,
            headers: auth_headers(access_token),
            receive_timeout: 30_000
@@ -162,7 +168,7 @@ defmodule Ysc.GooglePhotos.Api do
     timeout = upload_receive_timeout(size)
     stream = File.stream!(file_path, @stream_chunk_size)
 
-    case Req.post(@upload_url,
+    case req_post(@upload_url,
            body: stream,
            headers:
              upload_raw_headers(access_token, filename, content_type,
@@ -187,7 +193,7 @@ defmodule Ysc.GooglePhotos.Api do
     content_type = content_type_for_filename(filename)
     timeout = upload_receive_timeout(byte_size(bytes))
 
-    case Req.post(@upload_url,
+    case req_post(@upload_url,
            body: bytes,
            headers: upload_raw_headers(access_token, filename, content_type),
            receive_timeout: timeout
@@ -216,7 +222,7 @@ defmodule Ysc.GooglePhotos.Api do
       ]
     }
 
-    case Req.post("#{@photos_api_base}/mediaItems:batchCreate",
+    case req_post("#{@photos_api_base}/mediaItems:batchCreate",
            json: body,
            headers: auth_headers(access_token),
            receive_timeout: 30_000
@@ -242,6 +248,14 @@ defmodule Ysc.GooglePhotos.Api do
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp req_post(url, opts) do
+    Req.post(url, Keyword.merge(req_opts(), opts))
+  end
+
+  defp req_opts do
+    Application.get_env(:ysc, :google_photos_req_opts, [])
   end
 
   defp auth_headers(access_token) do

@@ -67,18 +67,68 @@ defmodule Ysc.GooglePhotos do
       connected_at: now
     }
 
-    case existing do
-      nil ->
-        %Connection{}
-        |> Connection.connect_changeset(attrs, user_id)
-        |> Repo.insert!()
+    connection =
+      case existing do
+        nil ->
+          %Connection{}
+          |> Connection.connect_changeset(attrs, user_id)
+          |> Repo.insert!()
 
-      row ->
-        row
-        |> Connection.connect_changeset(attrs, user_id)
+        row ->
+          row
+          |> Connection.connect_changeset(attrs, user_id)
+          |> Repo.update!()
+      end
+
+    TokenStore.reload()
+    prime_token_cache!(token_map, connection.refresh_token)
+    connection
+  end
+
+  @doc """
+  Updates the stored refresh token when Google rotates it during a refresh grant.
+  """
+  def update_refresh_token!(new_refresh_token)
+      when is_binary(new_refresh_token) do
+    case get_connection() do
+      nil ->
+        :ok
+
+      connection ->
+        connection
+        |> Connection.changeset(%{refresh_token: new_refresh_token})
         |> Repo.update!()
+
+        :ok
     end
-    |> tap(fn _ -> TokenStore.reload() end)
+  end
+
+  @doc """
+  Clears credentials when Google returns `invalid_grant` on refresh.
+
+  The admin must reconnect via OAuth.
+  """
+  def handle_revoked_refresh_token! do
+    Ysc.Logging.warning(
+      "Google Photos refresh token revoked or expired; disconnecting"
+    )
+
+    disconnect!()
+  end
+
+  defp prime_token_cache!(token_map, refresh_token) do
+    access_token =
+      Map.get(token_map, :access_token) || Map.get(token_map, "access_token")
+
+    expires_in =
+      Map.get(token_map, :expires_in) || Map.get(token_map, "expires_in")
+
+    if is_binary(access_token) and is_integer(expires_in) and
+         is_binary(refresh_token) do
+      TokenStore.prime(access_token, expires_in, refresh_token)
+    end
+
+    :ok
   end
 
   @doc "Removes stored credentials and clears the in-memory token cache."
@@ -119,6 +169,9 @@ defmodule Ysc.GooglePhotos do
         if dev_stub_enabled?(),
           do: {:ok, "dev-stub-token"},
           else: {:error, :not_connected}
+
+      {:error, :refresh_token_revoked} ->
+        {:error, :refresh_token_revoked}
 
       other ->
         other

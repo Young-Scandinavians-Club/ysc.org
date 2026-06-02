@@ -94,7 +94,9 @@ defmodule YscWeb.AdminGooglePhotosAuthController do
     user = conn.assigns.current_user
 
     with {:ok, token_map} <- OAuth.exchange_code(code),
-         {:ok, email} <- OAuth.fetch_userinfo(token_map.access_token) do
+         :ok <- validate_photos_scopes(token_map),
+         {:ok, email} <- OAuth.fetch_userinfo(token_map.access_token),
+         :ok <- OAuth.test_photos_api(token_map.access_token) do
       GooglePhotos.connect!(token_map, user.id, email)
 
       conn
@@ -105,7 +107,16 @@ defmodule YscWeb.AdminGooglePhotosAuthController do
       )
       |> redirect(to: settings_path())
     else
-      {:error, {:token_error, _status}} ->
+      {:error, :insufficient_scopes} ->
+        conn
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "Google did not grant all required Photos permissions. Reconnect and approve every permission requested.",
+          title: "Google Photos"
+        )
+        |> redirect(to: settings_path())
+
+      {:error, {:token_error, _}} ->
         conn
         |> YscWeb.Flash.put_toast(
           :error,
@@ -122,6 +133,16 @@ defmodule YscWeb.AdminGooglePhotosAuthController do
           title: "Google Photos"
         )
         |> redirect(to: settings_path())
+    end
+  end
+
+  defp validate_photos_scopes(token_map) do
+    scope = Map.get(token_map, :scope) || ""
+
+    if OAuth.scopes_grant_complete?(scope) do
+      :ok
+    else
+      {:error, :insufficient_scopes}
     end
   end
 

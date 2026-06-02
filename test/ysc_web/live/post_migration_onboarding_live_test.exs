@@ -194,17 +194,35 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
   end
 
   describe "family members step" do
+    @onboarding_async_timeout 5_000
+
     defp family_onboarding_user!(attrs \\ %{}) do
       user = user_needing_post_migration_onboarding(attrs)
       signup_application_fixture(user, %{membership_type: "family"})
       user
     end
 
+    # mount/3 loads signup data via :load_onboarding_data; wait before interacting.
+    defp live_onboarding!(conn) do
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render_async(view, @onboarding_async_timeout)
+      assert has_element?(view, "#onboarding-profile-form")
+      view
+    end
+
+    defp last_stepper_index(view) do
+      0..10
+      |> Enum.filter(&has_element?(view, ~s|button[phx-value-step="#{&1}"]|))
+      |> Enum.max()
+    end
+
     defp go_to_family_step!(view) do
       assert has_element?(view, "#onboarding-profile-form")
 
-      # Profile, Address, Membership, Family
-      render_click(view, "set-step", %{"step" => "3"})
+      render_click(view, "set-step", %{
+        "step" => to_string(last_stepper_index(view))
+      })
+
       assert has_element?(view, "#family-member-entries")
     end
 
@@ -227,7 +245,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = family_onboarding_user!()
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      view = live_onboarding!(conn)
       go_to_family_step!(view)
 
       assert render(view) =~ "Add Family Members"
@@ -238,7 +256,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = family_onboarding_user!()
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      view = live_onboarding!(conn)
       go_to_family_step!(view)
 
       tomorrow =
@@ -265,7 +283,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = family_onboarding_user!()
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      view = live_onboarding!(conn)
       go_to_family_step!(view)
 
       render_click(view, "add_family_member")
@@ -278,7 +296,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = family_onboarding_user!()
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      view = live_onboarding!(conn)
       go_to_family_step!(view)
 
       render_change(
@@ -303,7 +321,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = family_onboarding_user!()
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      view = live_onboarding!(conn)
       go_to_family_step!(view)
 
       render_click(view, "complete_family_step")
@@ -329,7 +347,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
         |> Repo.insert!()
 
       conn = log_in_user(conn, user)
-      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      view = live_onboarding!(conn)
       go_to_family_step!(view)
 
       render_click(view, "add_family_member")
