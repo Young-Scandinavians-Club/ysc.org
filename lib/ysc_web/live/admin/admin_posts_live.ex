@@ -363,8 +363,7 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
-     |> assign(:date_to, "")
-     |> assign(:author_filter, [])}
+     |> assign(:date_to, "")}
   end
 
   def handle_params(params, _uri, socket) do
@@ -376,15 +375,14 @@ defmodule YscWeb.AdminPostsLive do
            date_to: date_to
          ) do
       {:ok, {posts, meta}} ->
-        author_filter = Ysc.Posts.get_all_authors()
         title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
         search_query = if title_filter, do: title_filter.value, else: ""
 
         {:noreply,
          socket
+         |> assign_new(:author_filter, &Posts.get_all_authors/0)
          |> assign(:meta, meta)
          |> assign(:params, params)
-         |> assign(:author_filter, author_filter)
          |> assign(:search_query, search_query)
          |> assign(:date_from, date_from)
          |> assign(:date_to, date_to)
