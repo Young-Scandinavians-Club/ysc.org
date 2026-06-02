@@ -179,7 +179,7 @@ defmodule YscWeb.UserRegistrationLive do
                 <div class="pb-2">
                   <h2 class="font-semibold leading-6 text-zinc-800">Family</h2>
                   <p class="text-sm leading-6 text-zinc-600">
-                    Please list all members of your family.
+                    List your spouse or partner and children age 18 or younger who will be on this family membership.
                   </p>
                 </div>
 
@@ -620,7 +620,7 @@ defmodule YscWeb.UserRegistrationLive do
              socket
              |> YscWeb.Flash.put_toast(
                :info,
-               "Application submitted successfully! Please complete your account setup.",
+               "Application submitted! Check your email for a verification code, then finish setup (payment method and password). We'll email you when the board reviews your application.",
                title: "Registration"
              )
              |> redirect(

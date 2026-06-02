@@ -9,7 +9,8 @@ defmodule YscWeb.UserLoginLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Sign in to your YSC account"
-      assert html =~ "Apply for a membership"
+      assert html =~ "Apply for membership"
+      assert html =~ "Already applied?"
       assert html =~ "Forgot your password?"
     end
 
@@ -35,10 +36,11 @@ defmodule YscWeb.UserLoginLiveTest do
       |> element("#auth-methods")
       |> render_hook("passkey_support_detected", %{"supported" => true})
 
+      assert has_element?(lv, "button[phx-click='sign_in_with_passkey']")
+
       html = render(lv)
 
-      assert html =~ "Sign in with Passkey" ||
-               html =~ "Sign in with Face ID"
+      assert html =~ "Sign in with Face ID" || html =~ "Sign in with Passkey"
     end
 
     test "hides passkey button when not supported", %{conn: conn} do
@@ -49,9 +51,8 @@ defmodule YscWeb.UserLoginLiveTest do
       |> element("#auth-methods")
       |> render_hook("passkey_support_detected", %{"supported" => false})
 
-      html = render(lv)
       # Passkey button should not be visible when not supported
-      refute html =~ "Sign in with Passkey"
+      refute has_element?(lv, "button[phx-click='sign_in_with_passkey']")
     end
 
     test "shows failed login attempts banner when attempts >= 3", %{conn: conn} do

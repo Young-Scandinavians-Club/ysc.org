@@ -150,7 +150,8 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       # Verify family member inputs are shown
       assert render_click(lv, "next-step") =~ "Family"
-      assert render(lv) =~ "Please list all members of your family"
+      assert render(lv) =~ "List your spouse or partner"
+      assert has_element?(lv, "#family-members")
     end
 
     test "allows navigation between steps", %{conn: conn} do

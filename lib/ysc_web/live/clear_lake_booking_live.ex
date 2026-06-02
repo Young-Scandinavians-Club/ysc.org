@@ -2083,8 +2083,11 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Ready to reserve?
                     </h4>
                     <p class="text-teal-700">{raw(@booking_disabled_reason)}</p>
-                    <p :if={@user} class="text-teal-600 text-sm mt-2">
-                      You will be able to use the booking system as soon as you pay for membership.
+                    <p
+                      :if={@user && @booking_error_title == "Membership Required"}
+                      class="text-teal-600 text-sm mt-2"
+                    >
+                      Pay or renew your membership to book a cabin.
                     </p>
                   </div>
                   <.link
@@ -2097,11 +2100,20 @@ defmodule YscWeb.ClearLakeBookingLive do
                     Sign In to Book
                   </.link>
                   <.link
-                    :if={@user}
+                    :if={
+                      @user && @booking_error_title == "Application under review"
+                    }
+                    navigate={~p"/pending-review"}
+                    class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
+                  >
+                    View application status
+                  </.link>
+                  <.link
+                    :if={@user && @booking_error_title == "Membership Required"}
                     navigate={~p"/users/membership"}
                     class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
                   >
-                    Manage Membership
+                    Pay or renew membership
                   </.link>
                 </div>
                 <!-- What to Bring -->

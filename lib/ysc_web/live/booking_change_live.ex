@@ -1183,7 +1183,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp modification_error_message(:modification_hold_expired),
     do:
-      "Your reservation hold expired before payment completed. Please start again."
+      "Your checkout timed out before payment finished. Please make your changes again and complete payment."
 
   defp modification_error_message(:modification_hold_mismatch),
     do:
@@ -1191,7 +1191,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp modification_error_message(reason) when is_atom(reason),
     do:
-      "Unable to update reservation (#{reason}). Please try again or contact support."
+      "We couldn't update your reservation. Please try again. If this keeps happening, contact info@ysc.org."
 
   defp modification_error_message(_),
     do: "Unable to update reservation. Please try again."
