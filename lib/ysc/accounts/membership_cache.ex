@@ -170,9 +170,9 @@ defmodule Ysc.Accounts.MembershipCache do
         user_id: user_to_check.id
       }
     else
-      # Always load from DB — preloaded subscriptions on a cached User can be stale
       subscriptions =
-        Customers.subscriptions(user_to_check)
+        user_to_check
+        |> loaded_subscriptions()
         |> Enum.filter(&Subscriptions.valid?/1)
 
       case subscriptions do
@@ -186,6 +186,17 @@ defmodule Ysc.Accounts.MembershipCache do
           # If multiple active subscriptions, pick the most expensive one
           get_most_expensive_subscription(multiple_subscriptions)
       end
+    end
+  end
+
+  # Uses preloaded subscriptions when present (e.g. admin user lists); otherwise queries.
+  defp loaded_subscriptions(%Accounts.User{} = user) do
+    case user.subscriptions do
+      %Ecto.Association.NotLoaded{} ->
+        Customers.subscriptions(user)
+
+      subscriptions when is_list(subscriptions) ->
+        subscriptions
     end
   end
 

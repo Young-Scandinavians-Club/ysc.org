@@ -604,15 +604,15 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">Membership:</span>
-                    <%= case get_active_membership_type(user) do %>
-                      <% nil -> %>
+                    <%= case membership_display(user) do %>
+                      <% {nil, _} -> %>
                         <span class="text-sm text-zinc-400">—</span>
-                      <% membership_type -> %>
+                      <% {membership_type, inherited?} -> %>
                         <div class="flex items-center gap-1">
                           <.badge type="sky">
                             {String.capitalize("#{membership_type}")}
                           </.badge>
-                          <%= if membership_inherited?(user) do %>
+                          <%= if inherited? do %>
                             <.tooltip tooltip_text="Membership inherited from parent account">
                               <.icon
                                 name="hero-users"
@@ -685,15 +685,15 @@ defmodule YscWeb.AdminUsersLive do
                 </.badge>
               </:col>
               <:col :let={{_, user}} label="Membership" field={:membership_type}>
-                <%= case get_active_membership_type(user) do %>
-                  <% nil -> %>
+                <%= case membership_display(user) do %>
+                  <% {nil, _} -> %>
                     <span class="text-zinc-400">—</span>
-                  <% membership_type -> %>
+                  <% {membership_type, inherited?} -> %>
                     <div class="flex items-center gap-1">
                       <.badge type="sky">
                         {String.capitalize("#{membership_type}")}
                       </.badge>
-                      <%= if membership_inherited?(user) do %>
+                      <%= if inherited? do %>
                         <.tooltip tooltip_text="Membership inherited from parent account">
                           <.icon name="hero-users" class="w-4 h-4 text-zinc-500" />
                         </.tooltip>
@@ -1341,12 +1341,10 @@ defmodule YscWeb.AdminUsersLive do
   defp user_state_to_readable(:pending_approval), do: "Pending Approval"
   defp user_state_to_readable(state), do: String.capitalize("#{state}")
 
-  defp get_active_membership_type(user) do
-    YscWeb.UserAuth.get_user_membership_plan_type(user)
-  end
-
-  defp membership_inherited?(user) do
-    Accounts.sub_account?(user) && get_active_membership_type(user) != nil
+  defp membership_display(user) do
+    plan_type = YscWeb.UserAuth.get_user_membership_plan_type(user)
+    inherited? = Accounts.sub_account?(user) && plan_type != nil
+    {plan_type, inherited?}
   end
 
   defp country_to_flag_class(nil), do: nil
