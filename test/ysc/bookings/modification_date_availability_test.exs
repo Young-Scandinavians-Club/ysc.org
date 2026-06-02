@@ -82,9 +82,10 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     Repo.preload(booking, [:rooms, :user])
   end
 
-  test "validate_modification_dates rejects extending stay on a deactivated room", %{
-    user: user
-  } do
+  test "validate_modification_dates rejects extending stay on a deactivated room",
+       %{
+         user: user
+       } do
     room = create_room!()
     checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)
