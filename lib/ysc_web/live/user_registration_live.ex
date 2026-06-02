@@ -91,7 +91,7 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="Tell us about your connection to Scandinavia (select at least one)*"
+                    label="How do you qualify for membership? (select all that apply)*"
                     options={SignupApplication.eligibility_options()}
                   />
                 </.inputs_for>
@@ -299,6 +299,9 @@ defmodule YscWeb.UserRegistrationLive do
               }
             >
               <.header class="text-left">Additional Questions</.header>
+              <p class="text-sm leading-6 text-zinc-600 -mt-2 mb-2">
+                When we say Scandinavian countries, we mean Denmark, Finland, Iceland, Norway, and Sweden.
+              </p>
               <.inputs_for :let={rf} field={@form[:registration_form]}>
                 <.input
                   prompt="Select country"
@@ -317,7 +320,7 @@ defmodule YscWeb.UserRegistrationLive do
                 <.input
                   prompt="Select country"
                   field={rf[:most_connected_nordic_country]}
-                  label="To which one Nordic/Scandinavian country do you feel the most connected?*"
+                  label="Which Scandinavian country do you feel most connected to?*"
                   type="select"
                   options={[
                     Sweden: "SE",
@@ -330,17 +333,17 @@ defmodule YscWeb.UserRegistrationLive do
                 />
                 <.input
                   field={rf[:link_to_scandinavia]}
-                  label="If not born in or a citizen of a Nordic/Scandinavian country, describe the descent or link to Scandinavia on which you base your eligibility for membership:"
+                  label="If you were not born in or are not a citizen of a Scandinavian country, describe your family background or other connection to Scandinavia:"
                   type="textarea"
                 />
                 <.input
                   field={rf[:lived_in_scandinavia]}
-                  label="If you have lived in a Nordic/Scandinavian country, where and for how long?"
+                  label="If you have lived in a Scandinavian country, where and for how long?"
                   type="textarea"
                 />
                 <.input
                   field={rf[:spoken_languages]}
-                  label="Which, if any, Nordic/Scandinavian languages do you speak?"
+                  label="Which Scandinavian languages do you speak, if any?"
                   type="textarea"
                 />
                 <.input

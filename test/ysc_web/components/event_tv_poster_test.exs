@@ -5,7 +5,7 @@ defmodule YscWeb.Components.EventTvPosterTest do
   import Phoenix.LiveViewTest
   import YscWeb.Components.Events.EventTvPoster
 
-  defp poster_event(overrides \\ %{}) do
+  defp poster_event(overrides) do
     Map.merge(
       %{
         title: "Summer Dance",
