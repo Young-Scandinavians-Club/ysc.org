@@ -101,7 +101,15 @@ defmodule Ysc.Application do
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Ysc.Supervisor]
-    {:ok, supervisor} = Supervisor.start_link(children, opts)
+
+    supervisor =
+      case Supervisor.start_link(children, opts) do
+        {:ok, sup} ->
+          sup
+
+        {:error, reason} ->
+          raise "failed to start Ysc.Supervisor: #{inspect(reason)}"
+      end
 
     # Start the outage scraper scheduler
     Ysc.PropertyOutages.Scheduler.start_scheduler()

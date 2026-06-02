@@ -228,6 +228,11 @@ if config_env() == :prod do
     System.get_env("ENVIRONMENT") == "sandbox" ||
       System.get_env("APP_ENV") == "sandbox"
 
+  # Sandbox VMs are small and scale to zero; skip headless Chrome (TV poster /image → 503).
+  if sandbox? do
+    config :ysc, :chromic_pdf_enabled, false
+  end
+
   missing_public =
     [
       {"S3_MEDIA_PUBLIC_BASE_URL", s3_media_public_url},

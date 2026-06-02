@@ -69,14 +69,19 @@ RUN BUILD_VERSION=${BUILD_VERSION:-$(git describe --first-parent --abbrev=10 --l
 # ===============================================
 FROM alpine:3.22@sha256:55ae5d250caebc548793f321534bc6a8ef1d116f334f18f4ada1b2daad3251b2 AS app
 
-# Install runtime dependencies
+# Install runtime dependencies (chromium + fonts for ChromicPDF / TV poster capture)
 RUN apk add --no-cache \
     libstdc++ \
     openssl \
     ncurses-libs \
     ca-certificates \
     tini \
-    imagemagick
+    imagemagick \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ttf-freefont
 
 # Create non-root user and working directory in one layer
 RUN adduser -D app && mkdir -p /app && chown app /app
