@@ -31,7 +31,11 @@ defmodule Ysc.Media.ImageTest do
 
   describe "display_path/1" do
     test "prefers optimized over raw" do
-      image = %Image{optimized_image_path: "/opt.jpg", raw_image_path: "/raw.jpg"}
+      image = %Image{
+        optimized_image_path: "/opt.jpg",
+        raw_image_path: "/raw.jpg"
+      }
+
       assert Image.display_path(image) == "/opt.jpg"
     end
 

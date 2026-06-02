@@ -1793,7 +1793,9 @@ defmodule YscWeb.TahoeBookingLive do
                               <!-- Render image with blur hash -->
                               <canvas
                                 id={"blur-hash-room-#{room.id}"}
-                                src={Ysc.Media.Image.blur_hash_for_display(room.image)}
+                                src={
+                                  Ysc.Media.Image.blur_hash_for_display(room.image)
+                                }
                                 class="absolute inset-0 z-0 w-full h-full object-cover"
                                 phx-hook="BlurHashCanvas"
                               >
@@ -2001,7 +2003,9 @@ defmodule YscWeb.TahoeBookingLive do
                               <!-- Render image with blur hash -->
                               <canvas
                                 id={"blur-hash-room-disabled-#{room.id}"}
-                                src={Ysc.Media.Image.blur_hash_for_display(room.image)}
+                                src={
+                                  Ysc.Media.Image.blur_hash_for_display(room.image)
+                                }
                                 class="absolute inset-0 z-0 w-full h-full object-cover"
                                 phx-hook="BlurHashCanvas"
                               >

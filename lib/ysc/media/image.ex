@@ -131,8 +131,9 @@ defmodule Ysc.Media.Image do
   """
   def blur_hash_for_display(nil), do: @default_blur_hash
 
-  def blur_hash_for_display(%__MODULE__{blur_hash: blur_hash}) when is_binary(blur_hash),
-    do: blur_hash
+  def blur_hash_for_display(%__MODULE__{blur_hash: blur_hash})
+      when is_binary(blur_hash),
+      do: blur_hash
 
   def blur_hash_for_display(%__MODULE__{}), do: @default_blur_hash
   def blur_hash_for_display(_), do: @default_blur_hash
