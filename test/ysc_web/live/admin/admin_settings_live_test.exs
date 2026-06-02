@@ -30,7 +30,8 @@ defmodule YscWeb.AdminSettingsLiveTest do
         %{
           access_token: "access",
           refresh_token: "refresh",
-          expires_in: 3600
+          expires_in: 3600,
+          scope: Enum.join(Ysc.GooglePhotos.OAuth.photos_api_scopes(), " ")
         },
         admin.id,
         "photos@example.com"
@@ -41,6 +42,28 @@ defmodule YscWeb.AdminSettingsLiveTest do
       assert has_element?(view, "#google-photos-disconnect")
       assert has_element?(view, "#google-photos-test-connection")
       refute has_element?(view, "#google-photos-connect")
+    end
+
+    test "warns when connected grant is missing required Photos scopes", %{
+      conn: conn,
+      admin: admin
+    } do
+      Ysc.GooglePhotos.connect!(
+        %{
+          access_token: "access",
+          refresh_token: "refresh",
+          expires_in: 3600,
+          scope:
+            "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata"
+        },
+        admin.id,
+        "photos@example.com"
+      )
+
+      {:ok, _view, html} = live(conn, ~p"/admin/settings")
+
+      assert html =~ "Missing upload, read, or edit permissions"
+      assert html =~ "Disconnect and connect again"
     end
 
     test "updates settings", %{conn: conn} do
