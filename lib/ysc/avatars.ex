@@ -290,4 +290,60 @@ defmodule Ysc.Avatars do
   end
 
   def resolve_user_avatar_url(_user, _size), do: nil
+
+  @doc """
+  Returns the image URL to display for a user (uploaded avatar or default country image).
+  """
+  def display_avatar_url(%User{} = user, size \\ :profile) do
+    case resolve_user_avatar_url(user, size) do
+      url when is_binary(url) and url != "" -> url
+      _ -> default_avatar_path_for_user(user)
+    end
+  end
+
+  defp default_avatar_path_for_user(%User{} = user) do
+    country = Map.get(user, :most_connected_country) || "SE"
+
+    image_id =
+      user.id
+      |> to_string()
+      |> String.replace(~r/[^\d]/, "")
+      |> then(fn s -> if s == "", do: "0", else: s end)
+      |> String.to_integer()
+      |> rem(2)
+
+    default_avatar_path(country, image_id)
+  end
+
+  defp default_avatar_path("DK", 0),
+    do: "/images/default_avatars/denmark_flag.webp"
+
+  defp default_avatar_path("DK", 1),
+    do: "/images/default_avatars/denmark_houses.webp"
+
+  defp default_avatar_path("FI", 0),
+    do: "/images/default_avatars/finland_flag.webp"
+
+  defp default_avatar_path("FI", 1),
+    do: "/images/default_avatars/finland_house.webp"
+
+  defp default_avatar_path("IS", 0),
+    do: "/images/default_avatars/iceland_flag.webp"
+
+  defp default_avatar_path("IS", 1),
+    do: "/images/default_avatars/iceland_landscape.webp"
+
+  defp default_avatar_path("NO", 0),
+    do: "/images/default_avatars/norway_flag.webp"
+
+  defp default_avatar_path("NO", 1),
+    do: "/images/default_avatars/norway_fjord.webp"
+
+  defp default_avatar_path("SE", 0),
+    do: "/images/default_avatars/sweden_flag.webp"
+
+  defp default_avatar_path("SE", 1),
+    do: "/images/default_avatars/sweden_houses.webp"
+
+  defp default_avatar_path(_, image_id), do: default_avatar_path("SE", image_id)
 end

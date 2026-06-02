@@ -520,7 +520,9 @@ defmodule YscWeb.CoreComponents do
       "zinc" =>
         "border border-zinc-200 hover:bg-zinc-50 text-zinc-700 active:text-zinc-700 bg-transparent",
       "teal" =>
-        "border border-teal-200 hover:bg-teal-50 text-teal-700 active:text-teal-700 bg-transparent"
+        "border border-teal-200 hover:bg-teal-50 text-teal-700 active:text-teal-700 bg-transparent",
+      "purple" =>
+        "border border-purple-200 hover:bg-purple-50 text-purple-700 active:text-purple-700 bg-transparent"
     }
   end
 

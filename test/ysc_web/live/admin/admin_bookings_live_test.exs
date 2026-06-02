@@ -162,7 +162,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/bookings?property=tahoe")
 
       view
-      |> element("button", "Clear Lake")
+      |> element("a[href*=\"property=clear_lake\"]", "Clear Lake")
       |> render_click()
 
       assert_patched(view, ~p"/admin/bookings?property=clear_lake")

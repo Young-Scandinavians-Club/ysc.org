@@ -822,7 +822,7 @@ defmodule YscWeb.AdminComponents do
 
   defp admin_tab_base(:spacious),
     do:
-      "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+      "whitespace-nowrap py-4 px-1 -mb-px border-b-2 font-medium text-sm transition-colors"
 
   defp admin_tab_state(true, :compact),
     do: "border-blue-500 text-blue-600 bg-white"
@@ -1470,7 +1470,7 @@ defmodule YscWeb.AdminComponents do
       |> assign(:show_badge, assigns.count && assigns.count > 0)
 
     ~H"""
-    <div class={["relative inline-block", @class]}>
+    <div class={["relative inline-flex -mb-px", @class]}>
       {render_slot(@inner_block)}
       <div
         :if={@show_badge}
