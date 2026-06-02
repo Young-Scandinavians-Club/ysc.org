@@ -183,6 +183,10 @@ config :stripity_stripe,
 
 config :stripity_stripe, :retries, max_attempts: 1
 
+# TV poster image capture uses a stub (no headless Chrome in test)
+config :ysc, :chromic_pdf_enabled, false
+config :ysc, :tv_poster_image_module, Ysc.Events.TvPosterImage.Stub
+
 # Avoid real S3 uploads and OpenSSL pass signing in tests
 config :ysc, :media_s3_uploader, Ysc.Media.TestS3Uploader
 

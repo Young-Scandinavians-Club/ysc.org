@@ -19,52 +19,56 @@ defmodule Ysc.Application do
     maybe_start_geo_ip_loader()
 
     # Add shutdown task for sandbox environment only
-    base_children = [
-      # Start the Vault for encryption
-      Ysc.Vault,
-      # Start the Telemetry supervisor
-      YscWeb.Telemetry,
-      # Start the Ecto repository
-      Ysc.Repo,
-      # Start the PubSub system
-      {Phoenix.PubSub, name: Ysc.PubSub},
-      # Start DNS cluster to cluster the app
-      {DNSCluster,
-       query: Application.get_env(:ysc, :dns_cluster_query) || :ignore},
-      # Start Finch
-      {Finch, name: Ysc.Finch},
-      # Start cache
-      {Cachex, name: :ysc_cache},
-      # Warm site settings cache on boot (avoids cold DB hits on public pages)
-      {Ysc.Settings, []},
-      # Auth rate limiting (credential stuffing protection)
-      {Ysc.AuthRateLimit, [clean_period: :timer.minutes(1)]},
-      # Newsletter rate limiting (bot protection)
-      {Ysc.NewsletterRateLimit, [clean_period: :timer.minutes(1)]},
-      # QR scan rate limiting (brute-force protection)
-      {Ysc.ScanRateLimit, [clean_period: :timer.minutes(1)]},
-      # Email verification code brute-force protection (account setup)
-      {Ysc.EmailVerificationRateLimit, [clean_period: :timer.minutes(1)]},
-      # Kiosk `/api/v1/mobile` JSON API (per-IP abuse / scraping)
-      {Ysc.MobileAPIRateLimit, [clean_period: :timer.minutes(1)]},
-      # Auto-login magic link: one use per token while valid
-      {Ysc.AutoLoginOneTime, [clean_period: :timer.minutes(1)]},
-      # Start verification code cache
-      Ysc.VerificationCache,
-      # Start Apple Wallet certificate manager
-      Ysc.AppleWallet.CertManager,
-      # Start Google Wallet credentials manager
-      Ysc.GoogleWallet.Credentials,
-      # Google Photos OAuth token cache
-      Ysc.GooglePhotos.TokenStore,
-      # Task supervisor for fire-and-forget async work (e.g. OAuth avatar sync)
-      {Task.Supervisor, name: Ysc.TaskSupervisor},
-      # Start the Endpoint (http/https)
-      YscWeb.Endpoint,
-      # Start a worker by calling: Ysc.Worker.start_link(arg)
-      # {Ysc.Worker, arg}
-      {Oban, Application.fetch_env!(:ysc, Oban)}
-    ]
+    base_children =
+      [
+        # Start the Vault for encryption
+        Ysc.Vault,
+        # Start the Telemetry supervisor
+        YscWeb.Telemetry,
+        # Start the Ecto repository
+        Ysc.Repo,
+        # Start the PubSub system
+        {Phoenix.PubSub, name: Ysc.PubSub},
+        # Start DNS cluster to cluster the app
+        {DNSCluster,
+         query: Application.get_env(:ysc, :dns_cluster_query) || :ignore},
+        # Start Finch
+        {Finch, name: Ysc.Finch},
+        # Start cache
+        {Cachex, name: :ysc_cache},
+        # Warm site settings cache on boot (avoids cold DB hits on public pages)
+        {Ysc.Settings, []},
+        # Auth rate limiting (credential stuffing protection)
+        {Ysc.AuthRateLimit, [clean_period: :timer.minutes(1)]},
+        # Newsletter rate limiting (bot protection)
+        {Ysc.NewsletterRateLimit, [clean_period: :timer.minutes(1)]},
+        # QR scan rate limiting (brute-force protection)
+        {Ysc.ScanRateLimit, [clean_period: :timer.minutes(1)]},
+        # Email verification code brute-force protection (account setup)
+        {Ysc.EmailVerificationRateLimit, [clean_period: :timer.minutes(1)]},
+        # Kiosk `/api/v1/mobile` JSON API (per-IP abuse / scraping)
+        {Ysc.MobileAPIRateLimit, [clean_period: :timer.minutes(1)]},
+        # Auto-login magic link: one use per token while valid
+        {Ysc.AutoLoginOneTime, [clean_period: :timer.minutes(1)]},
+        # Start verification code cache
+        Ysc.VerificationCache,
+        # Start Apple Wallet certificate manager
+        Ysc.AppleWallet.CertManager,
+        # Start Google Wallet credentials manager
+        Ysc.GoogleWallet.Credentials,
+        # Google Photos OAuth token cache
+        Ysc.GooglePhotos.TokenStore,
+        # Task supervisor for fire-and-forget async work (e.g. OAuth avatar sync)
+        {Task.Supervisor, name: Ysc.TaskSupervisor}
+      ] ++
+        chromic_pdf_children() ++
+        [
+          # Start the Endpoint (http/https)
+          YscWeb.Endpoint,
+          # Start a worker by calling: Ysc.Worker.start_link(arg)
+          # {Ysc.Worker, arg}
+          {Oban, Application.fetch_env!(:ysc, Oban)}
+        ]
 
     # Start Goth (Google OAuth2 token server) only when Google Wallet is configured
     base_children =
@@ -127,6 +131,14 @@ defmodule Ysc.Application do
   defp sandbox_environment? do
     System.get_env("ENVIRONMENT", "development") |> String.downcase() ==
       "sandbox"
+  end
+
+  defp chromic_pdf_children do
+    if Application.get_env(:ysc, :chromic_pdf_enabled, true) do
+      [{ChromicPDF, Application.get_env(:ysc, ChromicPDF, [])}]
+    else
+      []
+    end
   end
 
   defp maybe_start_geo_ip_loader do

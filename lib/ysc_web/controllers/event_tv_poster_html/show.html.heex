@@ -1,0 +1,78 @@
+<div class={[
+  "min-h-screen",
+  "flex",
+  "flex-col",
+  "items-center",
+  "justify-center",
+  "gap-6",
+  "p-8"
+]}>
+  <div class={[
+    "flex",
+    "flex-col",
+    "items-center",
+    "gap-3",
+    "print:hidden",
+    "text-center"
+  ]}>
+    <p class={[
+      "text-sm",
+      "text-zinc-400",
+      "font-medium",
+      "tracking-wide",
+      "uppercase"
+    ]}>
+      TV poster preview · 1920×1080 · scroll or zoom to inspect
+    </p>
+    <div class={[
+      "flex",
+      "flex-wrap",
+      "items-center",
+      "justify-center",
+      "gap-3",
+      "text-sm"
+    ]}>
+      <.link
+        href={~p"/admin/events/#{@event.id}/tv-poster/image"}
+        class={[
+          "font-bold",
+          "text-blue-400",
+          "hover:text-blue-300",
+          "underline"
+        ]}
+      >
+        View as PNG image
+      </.link>
+      <span class={["text-zinc-600"]}>·</span>
+      <.link
+        href={~p"/admin/events/#{@event.id}/tv-poster/image?format=jpeg"}
+        class={[
+          "font-bold",
+          "text-blue-400",
+          "hover:text-blue-300",
+          "underline"
+        ]}
+      >
+        JPEG
+      </.link>
+      <span class={["text-zinc-600"]}>·</span>
+      <.link
+        href={~p"/admin/events/#{@event.id}/tv-poster/image?format=webp"}
+        class={[
+          "font-bold",
+          "text-blue-400",
+          "hover:text-blue-300",
+          "underline"
+        ]}
+      >
+        WebP
+      </.link>
+    </div>
+  </div>
+  <.event_tv_poster
+    event={@event}
+    event_url={@event_url}
+    sold_out={@sold_out}
+    selling_fast={@selling_fast}
+  />
+</div>

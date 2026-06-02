@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" class="w-[1920px] h-[1080px] overflow-hidden">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <base href={@asset_base_url} />
+    <link rel="stylesheet" href="/assets/app.css" />
+  </head>
+  <body class="m-0 p-0 w-[1920px] h-[1080px] overflow-hidden bg-zinc-900">
+    <.event_tv_poster
+      event={@event}
+      event_url={@event_url}
+      sold_out={@sold_out}
+      selling_fast={@selling_fast}
+    />
+  </body>
+</html>

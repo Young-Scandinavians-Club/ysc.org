@@ -171,6 +171,7 @@ defmodule Ysc.MixProject do
       {:blurhash, "~> 0.1", hex: :rinpatch_blurhash},
       {:brotli, ">= 0.0.0", runtime: false},
       {:cachex, "~> 4.1"},
+      {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},

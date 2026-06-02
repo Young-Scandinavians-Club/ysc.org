@@ -483,6 +483,9 @@ defmodule YscWeb.Router do
       live "/events/:id/tickets", AdminEventsNewLive, :tickets
       live "/events/:id/updates", AdminEventsNewLive, :updates
 
+      get "/events/:id/tv-poster/image", EventTvPosterController, :image
+      get "/events/:id/tv-poster", EventTvPosterController, :show
+
       # Tahoe and Clear Lake settings etc, see bookings
       live "/bookings", AdminBookingsLive, :index
 
