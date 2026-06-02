@@ -37,7 +37,7 @@ defmodule YscWeb.Components.News.NewsCard do
         <div class="relative aspect-[16/10] overflow-hidden rounded-xl mb-8">
           <canvas
             id={"blur-hash-image-#{@post.id}"}
-            src={get_blur_hash(@post.featured_image)}
+            src={Image.blur_hash_for_display(@post.featured_image)}
             class="absolute inset-0 z-0 w-full h-full object-cover"
             phx-hook="BlurHashCanvas"
           >
@@ -117,11 +117,6 @@ defmodule YscWeb.Components.News.NewsCard do
     </div>
     """
   end
-
-  defp get_blur_hash(nil), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
-  defp get_blur_hash(_), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
 
   defp featured_image_url(nil), do: "/images/ysc_logo.webp"
 

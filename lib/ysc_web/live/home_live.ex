@@ -798,7 +798,7 @@ defmodule YscWeb.HomeLive do
               >
                 <canvas
                   id={"blur-hash-event-#{event.id}"}
-                  src={get_blur_hash(event.image)}
+                  src={Image.blur_hash_for_display(event.image)}
                   class="absolute inset-0 z-0 w-full h-full object-cover"
                   phx-hook="BlurHashCanvas"
                 >
@@ -939,7 +939,7 @@ defmodule YscWeb.HomeLive do
               <div class="relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] mb-6 sm:mb-8 aspect-square border border-zinc-100">
                 <canvas
                   id={"blur-hash-news-#{post.id}"}
-                  src={get_blur_hash(post.featured_image)}
+                  src={Image.blur_hash_for_display(post.featured_image)}
                   class="absolute inset-0 z-0 w-full h-full object-cover"
                   phx-hook="BlurHashCanvas"
                 >
@@ -1927,7 +1927,7 @@ defmodule YscWeb.HomeLive do
                         <div class="relative w-full h-full">
                           <canvas
                             id={"blur-hash-sidebar-#{post.id}"}
-                            src={get_blur_hash(post.featured_image)}
+                            src={Image.blur_hash_for_display(post.featured_image)}
                             class="absolute inset-0 z-0 w-full h-full object-cover"
                             phx-hook="BlurHashCanvas"
                           >
@@ -2735,10 +2735,6 @@ defmodule YscWeb.HomeLive do
     |> String.replace(~r/<[^>]*>/, "")
     |> String.trim()
   end
-
-  defp get_blur_hash(nil), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
 
   defp format_event_time(event_start_date, %Time{} = time) do
     # Convert event date and time to PST for display

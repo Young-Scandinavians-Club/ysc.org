@@ -169,7 +169,7 @@ defmodule YscWeb.EventsLive do
                   <div class="w-full h-full overflow-hidden rounded-xl relative">
                     <canvas
                       id={"blur-hash-past-#{event.id}"}
-                      src={get_blur_hash(event.image)}
+                      src={Image.blur_hash_for_display(event.image)}
                       class="absolute inset-0 z-0 w-full h-full object-cover"
                       phx-hook="BlurHashCanvas"
                     >
@@ -438,10 +438,6 @@ defmodule YscWeb.EventsLive do
     do: Calendar.strftime(date, "%b %d, %Y")
 
   defp format_event_date(_), do: ""
-
-  defp get_blur_hash(nil), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
 
   defp event_image_url(nil), do: "/images/ysc_logo.webp"
 

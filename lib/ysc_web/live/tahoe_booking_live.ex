@@ -1793,7 +1793,7 @@ defmodule YscWeb.TahoeBookingLive do
                               <!-- Render image with blur hash -->
                               <canvas
                                 id={"blur-hash-room-#{room.id}"}
-                                src={get_room_blur_hash(room.image)}
+                                src={Ysc.Media.Image.blur_hash_for_display(room.image)}
                                 class="absolute inset-0 z-0 w-full h-full object-cover"
                                 phx-hook="BlurHashCanvas"
                               >
@@ -2001,7 +2001,7 @@ defmodule YscWeb.TahoeBookingLive do
                               <!-- Render image with blur hash -->
                               <canvas
                                 id={"blur-hash-room-disabled-#{room.id}"}
-                                src={get_room_blur_hash(room.image)}
+                                src={Ysc.Media.Image.blur_hash_for_display(room.image)}
                                 class="absolute inset-0 z-0 w-full h-full object-cover"
                                 phx-hook="BlurHashCanvas"
                               >
@@ -7245,14 +7245,6 @@ defmodule YscWeb.TahoeBookingLive do
     </svg>
     """
   end
-
-  # Room image helper functions
-  defp get_room_blur_hash(nil), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-
-  defp get_room_blur_hash(%Ysc.Media.Image{blur_hash: nil}),
-    do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-
-  defp get_room_blur_hash(%Ysc.Media.Image{blur_hash: blur_hash}), do: blur_hash
 
   defp get_room_image_url(nil), do: "/images/ysc_logo.webp"
 
