@@ -183,7 +183,7 @@ defmodule Ysc.Accounts.User do
     |> validate_phone_optional(opts)
     |> set_sms_notifications_from_opt_in(attrs)
     |> cast_assoc(:registration_form,
-      with: &SignupApplication.application_changeset/2,
+      with: &SignupApplication.registration_application_changeset/2,
       opts: opts
     )
     |> copy_date_of_birth_from_application()

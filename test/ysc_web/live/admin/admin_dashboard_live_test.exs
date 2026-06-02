@@ -5,6 +5,8 @@ defmodule YscWeb.AdminDashboardLiveTest do
   import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
 
   alias Ysc.Accounts.User
   alias Ysc.Repo
@@ -42,6 +44,39 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert has_element?(view, "#dashboard-financials")
       assert has_element?(view, "#dashboard-newsletters")
       assert has_element?(view, "#dashboard-recent-discussions")
+    end
+
+    test "event check-in link joins open membership session", %{
+      conn: conn,
+      user: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Dashboard Check-in Join",
+          start_date:
+            DateTime.add(DateTime.utc_now(), 2, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 3, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      session = event_membership_session_fixture(event, admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert render(view) =~ "Dashboard Check-in Join"
+
+      assert has_element?(
+               view,
+               "#dashboard-event-#{event.id}-check-in[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "#dashboard-event-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
     end
 
     test "navigates to user review from pending applications", %{conn: conn} do

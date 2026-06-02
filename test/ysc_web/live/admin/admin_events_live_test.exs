@@ -4,6 +4,7 @@ defmodule YscWeb.AdminEventsLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
 
   alias Ysc.Events
 
@@ -112,9 +113,70 @@ defmodule YscWeb.AdminEventsLiveTest do
       )
     end
 
+    test "does not re-query event organizers on each search patch", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_fixture(%{title: "Organizer Cache XYZ", organizer_id: admin.id})
+
+      {:ok, view, _} = live(conn, ~p"/admin/events")
+
+      author_filter_pattern =
+        ~r/DISTINCT ON \(.*"organizer_id"\).*FROM "events"/is
+
+      {_patch, author_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> form("#events-search-form", %{q: "Organizer Cache"})
+            |> render_submit()
+          end,
+          pattern: author_filter_pattern
+        )
+
+      assert author_queries == 0
+    end
+
     test "invalid flop params redirect to default events list", %{conn: conn} do
       assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
                live(conn, ~p"/admin/events?order_by=not_a_real_field")
+    end
+
+    test "check-in link joins open membership session for the event", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{title: "Check-in Join Test", organizer_id: admin.id})
+
+      session = event_membership_session_fixture(event, admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
+    end
+
+    test "check-in link uses ticket desk when no open session exists", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{title: "Check-in Default Test", organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      assert has_element?(
+               view,
+               "#event-actions-dt-#{event.id}-check-in[href='/admin/events/#{event.id}/check-in']"
+             )
     end
 
     test "copy event creates a draft and redirects to edit the new event", %{

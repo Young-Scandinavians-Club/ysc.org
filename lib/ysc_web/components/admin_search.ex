@@ -5,6 +5,8 @@ defmodule YscWeb.AdminSearchComponent do
   """
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
+
   alias Ysc.Search
 
   @impl true
@@ -46,126 +48,95 @@ defmodule YscWeb.AdminSearchComponent do
           :if={!@loading && has_results?(@results)}
           class="divide-y divide-zinc-200"
         >
-          <!-- Events -->
-          <div :if={length(@results.events) > 0} class="p-2">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-              Events
-            </div>
-            <div class="space-y-1">
-              <.link
-                :for={event <- @results.events}
-                data-result-item
-                navigate={~p"/admin/events/#{event.id}/edit"}
-                class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
-              >
-                <div class="font-medium">{event.title}</div>
-                <div class="text-xs text-zinc-500">
-                  {if event.organizer,
-                    do:
-                      "#{event.organizer.first_name} #{event.organizer.last_name}",
-                    else: "No organizer"}
-                  <span :if={event.reference_id} class="ml-2">
-                    • {event.reference_id}
-                  </span>
-                </div>
-              </.link>
-            </div>
-          </div>
-          <!-- Posts -->
-          <div :if={length(@results.posts) > 0} class="p-2">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-              Posts
-            </div>
-            <div class="space-y-1">
-              <.link
-                :for={post <- @results.posts}
-                data-result-item
-                navigate={~p"/admin/posts/#{post.id}"}
-                class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
-              >
-                <div class="font-medium">{post.title}</div>
-                <div class="text-xs text-zinc-500">
-                  {if post.author,
-                    do: "#{post.author.first_name} #{post.author.last_name}",
-                    else: "No author"}
-                </div>
-              </.link>
-            </div>
-          </div>
-          <!-- Tickets -->
-          <div :if={length(@results.tickets) > 0} class="p-2">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-              Tickets
-            </div>
-            <div class="space-y-1">
-              <.link
-                :for={ticket <- @results.tickets}
-                data-result-item
-                navigate={~p"/admin/events/#{ticket.event_id}/tickets"}
-                class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
-              >
-                <div class="font-medium">
-                  {ticket.reference_id}
-                </div>
-                <div class="text-xs text-zinc-500">
-                  {ticket.event.title}
-                  <span :if={ticket.user} class="ml-2">
-                    • {ticket.user.first_name} {ticket.user.last_name}
-                  </span>
-                </div>
-              </.link>
-            </div>
-          </div>
-          <!-- Users -->
-          <div :if={length(@results.users) > 0} class="p-2">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-              Users
-            </div>
-            <div class="space-y-1">
-              <.link
-                :for={user <- @results.users}
-                data-result-item
-                navigate={~p"/admin/users/#{user.id}/details"}
-                class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
-              >
-                <div class="font-medium">
-                  {user.first_name} {user.last_name}
-                </div>
-                <div class="text-xs text-zinc-500">{user.email}</div>
-              </.link>
-            </div>
-          </div>
-          <!-- Bookings -->
-          <div :if={length(@results.bookings) > 0} class="p-2">
-            <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
-              Bookings
-            </div>
-            <div class="space-y-1">
-              <.link
-                :for={booking <- @results.bookings}
-                data-result-item
-                navigate={~p"/admin/bookings/#{booking.id}"}
-                class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
-              >
-                <div class="font-medium">
-                  {booking.reference_id}
-                </div>
-                <div class="text-xs text-zinc-500">
-                  {if booking.user do
-                    "#{booking.user.first_name} #{booking.user.last_name} • #{booking.property}"
-                  else
-                    "#{booking.property}"
-                  end}
-                  <span class="ml-2">
-                    {Timex.format!(booking.checkin_date, "{YYYY}-{0M}-{0D}")} - {Timex.format!(
-                      booking.checkout_date,
-                      "{YYYY}-{0M}-{0D}"
-                    )}
-                  </span>
-                </div>
-              </.link>
-            </div>
-          </div>
+          <.admin_magic_search_section title="Events" show?={@results.events != []}>
+            <.admin_magic_search_link
+              :for={event <- @results.events}
+              navigate={~p"/admin/events/#{event.id}/edit"}
+            >
+              <div class="font-medium">{event.title}</div>
+              <div class="text-xs text-zinc-500">
+                {if event.organizer,
+                  do: "#{event.organizer.first_name} #{event.organizer.last_name}",
+                  else: "No organizer"}
+                <span :if={event.reference_id} class="ml-2">
+                  • {event.reference_id}
+                </span>
+              </div>
+            </.admin_magic_search_link>
+          </.admin_magic_search_section>
+
+          <.admin_magic_search_section title="Posts" show?={@results.posts != []}>
+            <.admin_magic_search_link
+              :for={post <- @results.posts}
+              navigate={~p"/admin/posts/#{post.id}"}
+            >
+              <div class="font-medium">{post.title}</div>
+              <div class="text-xs text-zinc-500">
+                {if post.author,
+                  do: "#{post.author.first_name} #{post.author.last_name}",
+                  else: "No author"}
+              </div>
+            </.admin_magic_search_link>
+          </.admin_magic_search_section>
+
+          <.admin_magic_search_section
+            title="Tickets"
+            show?={@results.tickets != []}
+          >
+            <.admin_magic_search_link
+              :for={ticket <- @results.tickets}
+              navigate={~p"/admin/events/#{ticket.event_id}/tickets"}
+            >
+              <div class="font-medium">
+                {ticket.reference_id}
+              </div>
+              <div class="text-xs text-zinc-500">
+                {ticket.event.title}
+                <span :if={ticket.user} class="ml-2">
+                  • {ticket.user.first_name} {ticket.user.last_name}
+                </span>
+              </div>
+            </.admin_magic_search_link>
+          </.admin_magic_search_section>
+
+          <.admin_magic_search_section title="Users" show?={@results.users != []}>
+            <.admin_magic_search_link
+              :for={user <- @results.users}
+              navigate={~p"/admin/users/#{user.id}/details"}
+            >
+              <div class="font-medium">
+                {user.first_name} {user.last_name}
+              </div>
+              <div class="text-xs text-zinc-500">{user.email}</div>
+            </.admin_magic_search_link>
+          </.admin_magic_search_section>
+
+          <.admin_magic_search_section
+            title="Bookings"
+            show?={@results.bookings != []}
+          >
+            <.admin_magic_search_link
+              :for={booking <- @results.bookings}
+              navigate={~p"/admin/bookings/#{booking.id}"}
+            >
+              <div class="font-medium">
+                {booking.reference_id}
+              </div>
+              <div class="text-xs text-zinc-500">
+                {if booking.user do
+                  "#{booking.user.first_name} #{booking.user.last_name} • #{booking.property}"
+                else
+                  "#{booking.property}"
+                end}
+                <span class="ml-2">
+                  {Timex.format!(booking.checkin_date, "{YYYY}-{0M}-{0D}")} - {Timex.format!(
+                    booking.checkout_date,
+                    "{YYYY}-{0M}-{0D}"
+                  )}
+                </span>
+              </div>
+            </.admin_magic_search_link>
+          </.admin_magic_search_section>
         </div>
 
         <div
@@ -184,13 +155,7 @@ defmodule YscWeb.AdminSearchComponent do
     {:ok,
      socket
      |> assign(:query, "")
-     |> assign(:results, %{
-       events: [],
-       posts: [],
-       tickets: [],
-       users: [],
-       bookings: []
-     })
+     |> assign(:results, empty_results())
      |> assign(:loading, false)
      |> assign(:show_results, false)}
   end
@@ -203,13 +168,7 @@ defmodule YscWeb.AdminSearchComponent do
       {:noreply,
        socket
        |> assign(:query, "")
-       |> assign(:results, %{
-         events: [],
-         posts: [],
-         tickets: [],
-         users: [],
-         bookings: []
-       })
+       |> assign(:results, empty_results())
        |> assign(:show_results, false)
        |> assign(:loading, false)}
     else
@@ -234,5 +193,9 @@ defmodule YscWeb.AdminSearchComponent do
       results.tickets != [] ||
       results.users != [] ||
       results.bookings != []
+  end
+
+  defp empty_results do
+    %{events: [], posts: [], tickets: [], users: [], bookings: []}
   end
 end

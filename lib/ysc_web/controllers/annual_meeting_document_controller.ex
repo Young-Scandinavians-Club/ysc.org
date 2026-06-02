@@ -33,10 +33,7 @@ defmodule YscWeb.AnnualMeetingDocumentController do
       conn
     else
       _ ->
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 end

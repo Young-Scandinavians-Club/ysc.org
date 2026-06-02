@@ -181,12 +181,19 @@ defmodule YscWeb.AdminComponents do
     default: nil,
     doc: "Additional Tailwind classes merged onto the hint row"
 
+  attr :show, :boolean,
+    default: true,
+    doc: "When false, the shortcut legend is not rendered"
+
   def admin_check_in_keyboard_hints(assigns) do
     ~H"""
-    <p class={[
-      "mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none",
-      @class
-    ]}>
+    <p
+      :if={@show}
+      class={[
+        "mt-1.5 hidden sm:flex items-center gap-1.5 text-xs text-zinc-400 select-none",
+        @class
+      ]}
+    >
       <span class="flex items-center gap-0.5">
         <.admin_kbd size={:compact}>↑</.admin_kbd>
         <.admin_kbd size={:compact}>↓</.admin_kbd>
@@ -593,6 +600,90 @@ defmodule YscWeb.AdminComponents do
     >
       {render_slot(@inner_block)}
     </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_list_empty_state
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Centered Viking empty state for admin Flop list pages (mobile + desktop table views).
+
+  Wraps `<.empty_viking_state>` in the standard `py-16` container. Optionally renders a
+  "Clear filters" action below the illustration.
+
+  ## Examples
+
+      <.admin_list_empty_state
+        :if={@empty}
+        title="No results found"
+        suggestion="Try adjusting your search term and filters."
+        clear_id="admin-users-clear-filters-empty"
+        clear_patch={~p"/admin/users"}
+      />
+
+      <.admin_list_empty_state
+        :if={@reservation_empty}
+        title="No reservations found"
+        suggestion="Try adjusting your search term and filters."
+        clear_event="clear-reservation-filters"
+      />
+  """
+  attr :id, :string, default: nil
+  attr :title, :string, required: true
+  attr :suggestion, :string, default: nil
+  attr :viking, :integer, default: 4
+
+  attr :clear_id, :string,
+    default: nil,
+    doc:
+      "DOM id for the clear-filters control (required when using clear_patch)"
+
+  attr :clear_patch, :any,
+    default: nil,
+    doc: "LiveView patch path; renders outline `<.button>` clear filters"
+
+  attr :clear_event, :string,
+    default: nil,
+    doc:
+      "phx-click event name; renders legacy text button clear filters (bookings)"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes on the outer py-16 container"
+
+  def admin_list_empty_state(assigns) do
+    ~H"""
+    <div id={@id} class={["py-16", @class]}>
+      <.empty_viking_state title={@title} suggestion={@suggestion} viking={@viking} />
+      <div
+        :if={@clear_patch || @clear_event}
+        class="px-4 py-4 flex items-center align-center justify-center"
+      >
+        <.button
+          :if={@clear_patch}
+          id={@clear_id}
+          patch={@clear_patch}
+          variant="outline"
+          color="zinc"
+          class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
+        >
+          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+          Clear filters
+        </.button>
+        <button
+          :if={@clear_event}
+          id={@clear_id}
+          type="button"
+          class="rounded mx-auto hover:bg-zinc-100 w-36 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80"
+          phx-click={@clear_event}
+          phx-disable-with="Clearing..."
+        >
+          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" /> Clear filters
+        </button>
+      </div>
+    </div>
     """
   end
 
@@ -1549,6 +1640,51 @@ defmodule YscWeb.AdminComponents do
         <.icon name="hero-chevron-right" class="w-4 h-4" />
       </:next>
     </Flop.Phoenix.pagination>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_magic_search_section / admin_magic_search_link
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  A labeled group of results in the admin header magic search dropdown.
+
+  Renders nothing when `show?` is false (e.g. when the result list is empty).
+  """
+  attr :title, :string, required: true
+  attr :show?, :boolean, default: true
+
+  slot :inner_block, required: true
+
+  def admin_magic_search_section(assigns) do
+    ~H"""
+    <div :if={@show?} class="p-2">
+      <div class="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+        {@title}
+      </div>
+      <div class="space-y-1">
+        {render_slot(@inner_block)}
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  A single navigable row in the admin header magic search dropdown.
+  """
+  attr :navigate, :string, required: true
+  slot :inner_block, required: true
+
+  def admin_magic_search_link(assigns) do
+    ~H"""
+    <.link
+      data-result-item
+      navigate={@navigate}
+      class="block px-3 py-2 text-sm text-zinc-800 hover:bg-zinc-50 rounded"
+    >
+      {render_slot(@inner_block)}
+    </.link>
     """
   end
 

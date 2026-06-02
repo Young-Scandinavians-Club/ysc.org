@@ -598,6 +598,7 @@ defmodule Ysc.Events do
       {:ok, event} ->
         invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
+        maybe_reschedule_event_photo_reminder(event)
         {:ok, event}
 
       {:error, changeset} ->
@@ -1266,6 +1267,7 @@ defmodule Ysc.Events do
             })
 
             schedule_event_notifications(updated_event, now)
+            schedule_event_photo_reminders(updated_event)
 
             {:ok, updated_event}
 
@@ -1296,6 +1298,42 @@ defmodule Ysc.Events do
         )
     end
   end
+
+  defp schedule_event_photo_reminders(%Event{} = event) do
+    require Ysc.Logging
+
+    try do
+      case Ysc.EventPhotos.ensure_collection_for_event(event) do
+        {:ok, _collection} ->
+          YscWeb.Workers.EventPhotoReminderWorker.schedule_reminder(event)
+
+        {:error, reason} ->
+          Ysc.Logging.error("Failed to ensure event photo collection",
+            event_id: event.id,
+            error: inspect(reason)
+          )
+      end
+    rescue
+      error ->
+        Ysc.Logging.error("Failed to schedule event photo reminders",
+          event_id: event.id,
+          error: Exception.message(error)
+        )
+    end
+  end
+
+  defp maybe_reschedule_event_photo_reminder(%Event{state: state} = event)
+       when state in [:published, "published"] do
+    collection = Ysc.EventPhotos.get_by_event_id(event.id)
+
+    if collection && is_nil(collection.reminder_sent_at) do
+      YscWeb.Workers.EventPhotoReminderWorker.schedule_reminder(event)
+    end
+
+    :ok
+  end
+
+  defp maybe_reschedule_event_photo_reminder(_event), do: :ok
 
   def unpublish_event(%Event{} = event) do
     event

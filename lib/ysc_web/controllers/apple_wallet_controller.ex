@@ -36,16 +36,10 @@ defmodule YscWeb.AppleWalletController do
         |> send_resp(200, binary)
 
       {:error, :not_configured} ->
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
 
       {:error, :not_found} ->
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
 
       {:error, reason} ->
         Ysc.Logging.error(
@@ -55,10 +49,7 @@ defmodule YscWeb.AppleWalletController do
           error: reason
         )
 
-        conn
-        |> put_status(:internal_server_error)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"500")
+        YscWeb.ErrorHTML.render_page(conn, :"500")
     end
   end
 
@@ -83,10 +74,7 @@ defmodule YscWeb.AppleWalletController do
           |> send_resp(200, binary)
 
         {:error, :not_configured} ->
-          conn
-          |> put_status(:not_found)
-          |> put_view(html: YscWeb.ErrorHTML)
-          |> render(:"404")
+          YscWeb.ErrorHTML.render_page(conn, :"404")
 
         {:error, reason} ->
           Ysc.Logging.error(
@@ -95,16 +83,10 @@ defmodule YscWeb.AppleWalletController do
             error: reason
           )
 
-          conn
-          |> put_status(:internal_server_error)
-          |> put_view(html: YscWeb.ErrorHTML)
-          |> render(:"500")
+          YscWeb.ErrorHTML.render_page(conn, :"500")
       end
     else
-      conn
-      |> put_status(:not_found)
-      |> put_view(html: YscWeb.ErrorHTML)
-      |> render(:"404")
+      YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 end

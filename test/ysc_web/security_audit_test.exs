@@ -15,6 +15,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 15 (HIGH)     AccountSetupLive IDOR on post-verification setup events
   Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
+  Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -615,6 +616,46 @@ defmodule YscWeb.SecurityAuditTest do
   # ---------------------------------------------------------------------------
   # Finding 17 (MEDIUM): Account setup email verification requires setup token
   # ---------------------------------------------------------------------------
+
+  describe "Finding 18: registration cannot set signup application review fields" do
+    test "registration insert ignores review_outcome from registration_form params",
+         %{} do
+      alias Ysc.Accounts.User
+
+      email = "review_mass_#{System.unique_integer([:positive])}@example.com"
+
+      attrs = %{
+        email: email,
+        first_name: "Attacker",
+        last_name: "User",
+        registration_form: %{
+          membership_type: "single",
+          membership_eligibility: ["born_in_scandinavia"],
+          birth_date: ~D[1990-01-01],
+          address: "123 St",
+          country: "USA",
+          city: "SF",
+          postal_code: "94107",
+          place_of_birth: "Oslo",
+          citizenship: "Norwegian",
+          most_connected_nordic_country: "Norway",
+          agreed_to_bylaws: true,
+          review_outcome: "approved",
+          reviewed_at: ~U[2024-01-01 00:00:00Z]
+        }
+      }
+
+      user =
+        %User{}
+        |> User.registration_changeset(attrs, validate_email: false)
+        |> Repo.insert!()
+        |> Repo.preload(:registration_form)
+
+      assert user.registration_form
+      assert is_nil(user.registration_form.review_outcome)
+      assert is_nil(user.registration_form.reviewed_at)
+    end
+  end
 
   describe "Finding 17: Account setup email verification requires setup token" do
     test "unauthenticated mount without setup_token does not create verification code",

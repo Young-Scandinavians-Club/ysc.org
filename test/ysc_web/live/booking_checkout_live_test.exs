@@ -78,6 +78,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Complete Your Booking"
       assert html =~ "Booking Summary"
+      assert html =~ "What Happens Next?"
+      assert html =~ "Complete your secure payment above"
     end
 
     test "renders Clear Lake property title", %{conn: conn, user: user} do
@@ -121,10 +123,12 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       conn = log_in_user(conn, user)
       unknown_id = Ecto.ULID.generate()
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:redirect, %{to: path, flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{unknown_id}")
 
       assert path == ~p"/"
+      assert flash["error"] =~ "couldn't find this reservation"
+      assert flash["error"] =~ "start a new booking from the cabin page"
     end
 
     test "redirects when booking status is not hold", %{conn: conn, user: user} do
@@ -699,6 +703,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     } do
       {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
       assert html =~ "Guest Information"
+      assert html =~ "What Happens Next?"
+
+      assert html =~
+               "Enter the name of every guest who will stay in your room(s)"
+
+      assert html =~
+               "Continue to payment and complete checkout before the timer runs out"
     end
 
     test "validate-guest-info with invalid guest data collects errors", %{

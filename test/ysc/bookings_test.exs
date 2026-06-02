@@ -2009,8 +2009,19 @@ defmodule Ysc.BookingsTest do
 
   describe "calculate_refund/3 original_amount option" do
     setup do
+      previously_active_ids =
+        from(p in Ysc.Bookings.RefundPolicy,
+          where:
+            p.property == :tahoe and p.booking_mode == :buyout and
+              p.is_active == true,
+          select: p.id
+        )
+        |> Repo.all()
+
       from(p in Ysc.Bookings.RefundPolicy,
-        where: p.property == :tahoe and p.booking_mode == :buyout
+        where:
+          p.property == :tahoe and p.booking_mode == :buyout and
+            p.is_active == true
       )
       |> Repo.update_all(set: [is_active: false])
 
@@ -2031,6 +2042,17 @@ defmodule Ysc.BookingsTest do
         })
 
       Ysc.Bookings.RefundPolicyCache.invalidate()
+
+      on_exit(fn ->
+        {:ok, _} = Bookings.delete_refund_policy(refund_policy)
+
+        from(p in Ysc.Bookings.RefundPolicy,
+          where: p.id in ^previously_active_ids
+        )
+        |> Repo.update_all(set: [is_active: true])
+
+        Ysc.Bookings.RefundPolicyCache.invalidate()
+      end)
 
       :ok
     end

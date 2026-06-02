@@ -28,7 +28,8 @@ config :ysc, YscWeb.Endpoint,
   url: [host: "localhost"],
   render_errors: [
     formats: [html: YscWeb.ErrorHTML, json: YscWeb.ErrorJSON],
-    layout: {YscWeb.Layouts, :error}
+    root_layout: {YscWeb.Layouts, :error},
+    layout: false
   ],
   pubsub_server: Ysc.PubSub,
   live_view: [signing_salt: "CTGAp6Hk"]
@@ -136,7 +137,8 @@ config :ysc, Oban,
        {"0 9 * * *",
         YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
        # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
-       {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker}
+       {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
+       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker}
      ]}
   ]
 
@@ -317,7 +319,9 @@ config :phoenix_template, :format_encoders, []
 config :mime, :types, %{
   "application/atom+xml" => ["atom"],
   "application/xml" => ["xml"],
-  "text/styles" => ["styles"]
+  "text/styles" => ["styles"],
+  "video/x-m4v" => ["m4v"],
+  "video/x-matroska" => ["mkv"]
 }
 
 # Headless Chrome for TV poster image capture (ChromicPDF)

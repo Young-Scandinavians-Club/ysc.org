@@ -247,13 +247,19 @@ defmodule YscWeb.AdminScannerLiveTest do
       assert render(view) =~ "1 scan"
     end
 
-    test "end_session returns to setup phase", %{conn: conn} do
+    test "end_session closes membership session and returns to setup", %{
+      conn: conn,
+      admin: admin
+    } do
       {:ok, view, _html} = live(conn, ~p"/admin/scanner")
       start_membership_session(view)
+
+      [session] = Scanning.get_open_sessions(admin.id)
 
       view |> element("button[phx-click='end_session']") |> render_click()
 
       assert has_element?(view, "#scan-setup-form")
+      assert Scanning.get_session!(session.id).closed_at != nil
     end
   end
 
@@ -326,6 +332,27 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       assert html =~ "View Order" or html =~ "view order" or
                html =~ "/admin/users/"
+    end
+
+    test "end_session navigates to event desk without closing session", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner")
+      start_event_session(view, event)
+
+      [session] = Scanning.get_open_sessions(admin.id)
+
+      view |> element("button[phx-click='end_session']") |> render_click()
+
+      assert_redirect(
+        view,
+        ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}"
+      )
+
+      assert is_nil(Scanning.get_session!(session.id).closed_at)
     end
 
     test "group check-in prompt shown for multi-ticket order", %{
@@ -837,6 +864,25 @@ defmodule YscWeb.AdminScannerLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions")
       assert html =~ "Closed list session"
       assert html =~ "Closed"
+    end
+  end
+
+  describe "event_membership scanning" do
+    setup [:create_admin]
+
+    test "end_session navigates to membership desk without closing session", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
+
+      view |> element("button[phx-click='end_session']") |> render_click()
+
+      assert_redirect(view, ~p"/admin/membership-check-in/#{session.id}")
+      assert is_nil(Scanning.get_session!(session.id).closed_at)
     end
   end
 

@@ -1198,7 +1198,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "Your membership renewal is already set up. Tap Continue to finish updating your profile.",
+              "Your membership renewal is already set up. Click Continue at the bottom of this page to finish updating your profile.",
               title: "Membership renewal"
             )
 

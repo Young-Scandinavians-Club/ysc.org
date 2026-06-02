@@ -37,7 +37,7 @@ defmodule YscWeb.UserLoginLiveTest do
 
       html = render(lv)
 
-      assert html =~ "Sign in with passkey" ||
+      assert html =~ "Sign in with Passkey" ||
                html =~ "Sign in with Face ID"
     end
 

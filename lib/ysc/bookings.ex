@@ -39,7 +39,6 @@ defmodule Ysc.Bookings do
     RefundPolicyRule,
     PendingRefund,
     PropertyInventory,
-    RoomInventory,
     CheckIn,
     CheckInVehicle,
     CheckInBooking
@@ -675,7 +674,7 @@ defmodule Ysc.Bookings do
   @doc """
   Validates a proposed booking modification and returns pricing preview without persisting.
   """
-  def prepare_modification(%Booking{} = booking, attrs) do
+  def prepare_modification(%Booking{} = booking, attrs, opts \\ []) do
     booking = Repo.preload(booking, [:rooms, :user])
 
     with :ok <- validate_modification_eligible(booking),
@@ -684,7 +683,7 @@ defmodule Ysc.Bookings do
          :ok <- ensure_modification_changed(booking, parsed),
          {:ok, user} <- fetch_modification_user(booking),
          {:ok, _} <- validate_modification_changeset(booking, parsed, user),
-         :ok <- validate_modification_availability(booking, parsed),
+         :ok <- validate_modification_availability(booking, parsed, opts),
          {:ok, priced} <-
            calculate_modification_pricing(
              build_preview_booking(booking, parsed)
@@ -723,8 +722,9 @@ defmodule Ysc.Bookings do
     with :ok <- validate_modification_eligible(booking),
          {:ok, parsed} <- parse_modification_attrs(booking, attrs),
          {:ok, preview} <- prepare_modification(booking, attrs),
-         :ok <- verify_modification_hold(booking, parsed, preview),
-         :ok <- verify_modification_payment(preview, booking, opts) do
+         :ok <- verify_modification_payment(preview, booking, opts),
+         :ok <-
+           ensure_modification_hold_for_apply(booking, parsed, preview, opts) do
       previous_details = %{
         checkin_date: booking.checkin_date,
         checkout_date: booking.checkout_date,
@@ -833,8 +833,8 @@ defmodule Ysc.Bookings do
   @doc """
   Releases a modification payment hold without applying the modification.
   """
-  def release_modification_hold(booking_id) do
-    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id)
+  def release_modification_hold(booking_id, opts \\ []) do
+    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id, opts)
   end
 
   defp validate_modification_checkin_not_past(parsed) do
@@ -945,49 +945,30 @@ defmodule Ysc.Bookings do
 
   @doc """
   Validates that proposed modification dates and guest counts are available.
+
+  Uses batched availability snapshots (see `ModificationDateAvailability`) instead
+  of per-day `room_available?/4` queries. Pass `availability_snapshot:` in `opts`
+  when the caller already built a snapshot for the change-reservation calendar.
   """
-  def validate_modification_availability(%Booking{} = booking, parsed) do
-    booking = Repo.preload(booking, :rooms)
-    hold = Ysc.Bookings.BookingLocker.modification_hold_context(booking)
-
-    new_checkin = parsed.checkin_date
-    new_checkout = parsed.checkout_date
-    new_guests = parsed.guests_count
-
-    old_days =
-      modification_date_range(booking.checkin_date, booking.checkout_date)
-
-    new_days = modification_date_range(new_checkin, new_checkout)
-
-    case booking.booking_mode do
-      :buyout ->
-        validate_buyout_modification_availability(
+  def validate_modification_availability(
+        %Booking{} = booking,
+        parsed,
+        opts \\ []
+      ) do
+    snapshot =
+      Keyword.get_lazy(opts, :availability_snapshot, fn ->
+        Ysc.Bookings.ModificationDateAvailability.build_snapshot_for_modification(
           booking,
-          old_days,
-          new_days,
-          hold
+          parsed.checkin_date,
+          parsed.checkout_date
         )
+      end)
 
-      :room ->
-        validate_room_modification_availability(
-          booking,
-          new_checkin,
-          new_checkout,
-          hold
-        )
-
-      :day ->
-        validate_day_modification_availability(
-          booking,
-          old_days,
-          new_days,
-          new_guests,
-          hold
-        )
-
-      _ ->
-        {:error, :invalid_booking_mode}
-    end
+    Ysc.Bookings.ModificationDateAvailability.validate_modification_dates(
+      snapshot,
+      parsed.checkin_date,
+      parsed.checkout_date
+    )
   end
 
   defp validate_modification_changeset(booking, parsed, user) do
@@ -1021,183 +1002,6 @@ defmodule Ysc.Bookings do
     }
   end
 
-  defp modification_date_range(checkin, checkout) do
-    checkin
-    |> Date.range(Date.add(checkout, -1))
-    |> MapSet.new()
-  end
-
-  @dialyzer {:nowarn_function, validate_buyout_modification_availability: 4}
-  defp validate_buyout_modification_availability(
-         booking,
-         old_days,
-         new_days,
-         hold
-       ) do
-    held_days = modification_hold_held_days(hold)
-
-    prop_inv =
-      Repo.all(
-        from pi in PropertyInventory,
-          where:
-            pi.property == ^booking.property and
-              pi.day in ^MapSet.to_list(new_days)
-      )
-
-    unavailable? =
-      Enum.any?(prop_inv, fn pi ->
-        day_in_old = MapSet.member?(old_days, pi.day)
-        our_hold = MapSet.member?(held_days, pi.day)
-
-        blocked_buyout =
-          not day_in_old and
-            (pi.buyout_held == true or pi.buyout_booked == true) and
-            not (our_hold and pi.buyout_held == true)
-
-        blocked_capacity =
-          booking.property == :clear_lake and not day_in_old and
-            (pi.capacity_held > 0 or pi.capacity_booked > 0) and
-            not our_hold
-
-        blocked_buyout or blocked_capacity
-      end)
-
-    cond do
-      unavailable? ->
-        {:error, :property_unavailable}
-
-      booking.property == :tahoe ->
-        room_inv =
-          Repo.all(
-            from ri in RoomInventory,
-              join: r in Room,
-              on: ri.room_id == r.id,
-              where:
-                r.property == ^booking.property and
-                  ri.day in ^MapSet.to_list(new_days)
-          )
-
-        blocked_rooms =
-          Enum.any?(room_inv, fn ri ->
-            not MapSet.member?(old_days, ri.day) and
-              (ri.held == true or ri.booked == true) and
-              not MapSet.member?(held_days, ri.day)
-          end)
-
-        if blocked_rooms, do: {:error, :rooms_already_booked}, else: :ok
-
-      true ->
-        :ok
-    end
-  end
-
-  @dialyzer {:nowarn_function, validate_room_modification_availability: 4}
-  defp validate_room_modification_availability(
-         booking,
-         new_checkin,
-         new_checkout,
-         hold
-       ) do
-    held_days = modification_hold_held_days(hold)
-
-    cond do
-      has_blackout?(booking.property, new_checkin, new_checkout) ->
-        {:error, :blackout_conflict}
-
-      buyout_active?(booking.property, new_checkin, new_checkout) ->
-        {:error, :property_buyout_active}
-
-      room_unavailable?(booking, new_checkin, new_checkout, held_days) ->
-        {:error, :room_unavailable}
-
-      true ->
-        :ok
-    end
-  end
-
-  defp buyout_active?(property, checkin, checkout) do
-    Repo.exists?(
-      from pi in PropertyInventory,
-        where: pi.property == ^property,
-        where: pi.day >= ^checkin and pi.day < ^checkout,
-        where: pi.buyout_held == true or pi.buyout_booked == true
-    )
-  end
-
-  @dialyzer {:nowarn_function, room_unavailable?: 4}
-  defp room_unavailable?(booking, checkin, checkout, held_days) do
-    old_days =
-      modification_date_range(booking.checkin_date, booking.checkout_date)
-
-    booking.rooms
-    |> Enum.map(& &1.id)
-    |> Enum.any?(fn room_id ->
-      dates =
-        checkin
-        |> Date.range(Date.add(checkout, -1))
-        |> Enum.to_list()
-
-      Enum.any?(dates, fn day ->
-        not MapSet.member?(old_days, day) and
-          not MapSet.member?(held_days, day) and
-          not room_available?(room_id, day, Date.add(day, 1), booking.id)
-      end)
-    end)
-  end
-
-  @dialyzer {:nowarn_function, validate_day_modification_availability: 5}
-  defp validate_day_modification_availability(
-         booking,
-         old_days,
-         new_days,
-         new_guests,
-         hold
-       ) do
-    held_days = modification_hold_held_days(hold)
-    overlap_extra = modification_hold_overlap_extra(hold)
-
-    prop_inv =
-      Repo.all(
-        from pi in PropertyInventory,
-          where:
-            pi.property == ^booking.property and
-              pi.day in ^MapSet.to_list(new_days)
-      )
-
-    unavailable? =
-      Enum.any?(prop_inv, fn pi ->
-        released_guests =
-          if MapSet.member?(old_days, pi.day), do: booking.guests_count, else: 0
-
-        our_overlap_extra = Map.get(overlap_extra, pi.day, 0)
-
-        our_new_day_hold =
-          if MapSet.member?(held_days, pi.day), do: new_guests, else: 0
-
-        available =
-          pi.capacity_total - pi.capacity_booked - pi.capacity_held +
-            released_guests + our_overlap_extra + our_new_day_hold
-
-        new_guests > available
-      end)
-
-    if unavailable?, do: {:error, :property_unavailable}, else: :ok
-  end
-
-  defp modification_hold_held_days(%{active: true, held_days: held_days}) do
-    held_days |> MapSet.to_list() |> MapSet.new()
-  end
-
-  defp modification_hold_held_days(_), do: MapSet.new()
-
-  defp modification_hold_overlap_extra(%{
-         active: true,
-         overlap_extra_guests: overlap
-       }),
-       do: overlap
-
-  defp modification_hold_overlap_extra(_), do: %{}
-
   defp verify_modification_payment(%{delta: delta}, booking, opts) do
     if Money.positive?(delta) do
       case Keyword.get(opts, :payment_intent_id) do
@@ -1217,22 +1021,31 @@ defmodule Ysc.Bookings do
     end
   end
 
-  defp verify_modification_hold(booking, parsed, %{delta: delta}) do
+  defp ensure_modification_hold_for_apply(
+         booking,
+         parsed,
+         %{delta: delta},
+         opts
+       ) do
     if Money.positive?(delta) do
       booking = Repo.get!(Booking, booking.id)
 
-      cond do
-        not Ysc.Bookings.BookingLocker.modification_hold_active?(booking) ->
-          {:error, :modification_hold_expired}
+      hold_ok? =
+        Ysc.Bookings.BookingLocker.modification_hold_active?(booking) and
+          Ysc.Bookings.BookingLocker.modification_hold_matches?(booking, parsed)
 
-        not Ysc.Bookings.BookingLocker.modification_hold_matches?(
-          booking,
-          parsed
-        ) ->
-          {:error, :modification_hold_mismatch}
+      cond do
+        hold_ok? ->
+          :ok
+
+        Keyword.get(opts, :payment_intent_id) ->
+          case place_modification_hold(booking, parsed) do
+            {:ok, _} -> :ok
+            {:error, reason} -> {:error, reason}
+          end
 
         true ->
-          :ok
+          {:error, :modification_hold_expired}
       end
     else
       :ok

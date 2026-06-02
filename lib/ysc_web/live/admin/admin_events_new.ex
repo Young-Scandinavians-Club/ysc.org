@@ -5,8 +5,10 @@ defmodule YscWeb.AdminEventsNewLive do
 
   require Ysc.Logging
 
+  alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.Events.Event
+  alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
 
   alias Ysc.Events.Agenda
@@ -115,7 +117,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 <.button
                   class="whitespace-nowrap"
                   color="green"
-                  navigate={~p"/admin/events/#{@event.id}/check-in"}
+                  navigate={@check_in_path}
                 >
                   <.icon
                     name="hero-clipboard-document-check"
@@ -730,6 +732,70 @@ defmodule YscWeb.AdminEventsNewLive do
 
         <div :if={@live_action == :updates} class="relative py-8">
           <div class="max-w-3xl space-y-8">
+            <div
+              :if={@event.state in [:published, "published"] and @photo_upload_url}
+              class="border border-zinc-200 rounded py-6 px-4 space-y-4"
+              id="event-photo-upload-link-card"
+            >
+              <div>
+                <h2 class="text-xl font-bold">Event photo uploads</h2>
+                <p class="text-zinc-600 text-sm mt-1">
+                  Share this link with attendees so they can contribute photos after the event.
+                  Reminder emails are sent automatically the morning after the event ends.
+                </p>
+              </div>
+              <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <input
+                  type="text"
+                  readonly
+                  id="event-photo-upload-url"
+                  value={@photo_upload_url}
+                  class="flex-1 rounded border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-800"
+                />
+                <.button
+                  id="copy-photo-upload-url-btn"
+                  type="button"
+                  variant="outline"
+                  phx-hook="ClipboardCopy"
+                  data-copy={@photo_upload_url}
+                  class="shrink-0"
+                >
+                  <.icon name="hero-clipboard" class="w-5 h-5" /> Copy link
+                </.button>
+              </div>
+              <div
+                :if={@dev_routes?}
+                class="pt-2 border-t border-zinc-100 space-y-2"
+              >
+                <p class="text-sm text-zinc-600">
+                  Development: send reminder emails now or preview in the mailbox.
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <.button
+                    type="button"
+                    id="send-photo-reminder-btn"
+                    phx-click="send-photo-reminder"
+                    variant="outline"
+                    data-confirm={"Send photo reminder emails to #{@recipient_count} recipient(s) now?"}
+                  >
+                    Send photo reminder emails now
+                  </.button>
+                  <.link
+                    href="/dev/mailbox"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    Open dev mailbox
+                    <.icon
+                      name="hero-arrow-top-right-on-square"
+                      class="w-4 h-4 ml-1"
+                    />
+                  </.link>
+                </div>
+              </div>
+            </div>
+
             <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
               <div>
                 <h2 class="text-xl font-bold">Send Update to Attendees</h2>
@@ -912,7 +978,9 @@ defmodule YscWeb.AdminEventsNewLive do
        )
      )
      |> assign(:event_updates, Events.list_event_updates(event.id))
-     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))}
+     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+     |> assign_photo_upload(event)
+     |> assign_check_in_path(event)}
   end
 
   @impl true
@@ -1010,6 +1078,46 @@ defmodule YscWeb.AdminEventsNewLive do
     )
     |> assign(:event_updates, Events.list_event_updates(event.id))
     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+    |> assign_photo_upload(event)
+    |> assign_check_in_path(event)
+  end
+
+  defp assign_photo_upload(socket, event) do
+    dev_routes? = Application.get_env(:ysc, :dev_routes, false)
+
+    cached_collection =
+      case socket.assigns[:photo_collection] do
+        %EventPhotos.Collection{event_id: id} when id == event.id ->
+          socket.assigns.photo_collection
+
+        _ ->
+          nil
+      end
+
+    {collection, upload_url} =
+      if event.state in [:published, "published"] do
+        collection =
+          cached_collection ||
+            EventPhotos.get_by_event_id(event.id) ||
+            case EventPhotos.ensure_collection_for_event(event) do
+              {:ok, collection} -> collection
+              _ -> nil
+            end
+
+        {collection,
+         if(collection, do: EventPhotos.upload_url(collection), else: nil)}
+      else
+        {nil, nil}
+      end
+
+    socket
+    |> assign(:photo_collection, collection)
+    |> assign(:photo_upload_url, upload_url)
+    |> assign(:dev_routes?, dev_routes?)
+  end
+
+  defp assign_check_in_path(socket, event) do
+    assign(socket, :check_in_path, AdminCheckInPaths.path_for_event(event.id))
   end
 
   defp maybe_refresh_tab_data(socket) do
@@ -1026,6 +1134,7 @@ defmodule YscWeb.AdminEventsNewLive do
               :recipient_count,
               Events.count_event_update_recipients(event.id)
             )
+            |> assign_photo_upload(event)
 
           :tickets ->
             ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
@@ -1301,6 +1410,30 @@ defmodule YscWeb.AdminEventsNewLive do
 
   def handle_event("validate-event-update", %{"update" => params}, socket) do
     {:noreply, assign(socket, :update_form, to_form(params, as: "update"))}
+  end
+
+  def handle_event("send-photo-reminder", _params, socket) do
+    event = socket.assigns.event
+
+    case EventPhotos.deliver_reminder_now(event, force: true) do
+      :ok ->
+        collection = EventPhotos.get_by_event_id(event.id)
+
+        {:noreply,
+         socket
+         |> assign(:photo_collection, collection)
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Photo reminder emails have been queued.",
+           title: "Event photos"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Event not found.",
+           title: "Event photos"
+         )}
+    end
   end
 
   def handle_event("send-event-update", %{"update" => params}, socket) do

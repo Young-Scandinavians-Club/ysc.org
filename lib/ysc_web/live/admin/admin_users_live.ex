@@ -464,23 +464,15 @@ defmodule YscWeb.AdminUsersLive do
 
               <a
                 :if={@export_status == :complete}
-                class="flex gap-1 mt-1 text-sm leading-6"
+                id="download-user-export-button"
                 href={@file_export_path}
-                target="_blank"
-                rel="noopener noreferrer"
+                phx-click={close_dropdown("#export-users-button")}
+                class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
               >
                 <.icon
                   name="hero-document-check"
                   class="mt-0.5 w-5 h-5 flex-none text-green-600"
-                />
-                <span
-                  href={@file_export_path}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-blue-800 hover:underline"
-                >
-                  Download file
-                </span>
+                /> Download file
               </a>
             </form>
           </div>
@@ -612,15 +604,15 @@ defmodule YscWeb.AdminUsersLive do
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-sm text-zinc-600">Membership:</span>
-                    <%= case get_active_membership_type(user) do %>
-                      <% nil -> %>
+                    <%= case membership_display(user) do %>
+                      <% {nil, _} -> %>
                         <span class="text-sm text-zinc-400">—</span>
-                      <% membership_type -> %>
+                      <% {membership_type, inherited?} -> %>
                         <div class="flex items-center gap-1">
                           <.badge type="sky">
                             {String.capitalize("#{membership_type}")}
                           </.badge>
-                          <%= if membership_inherited?(user) do %>
+                          <%= if inherited? do %>
                             <.tooltip tooltip_text="Membership inherited from parent account">
                               <.icon
                                 name="hero-users"
@@ -642,26 +634,13 @@ defmodule YscWeb.AdminUsersLive do
                 </div>
               </div>
             <% end %>
-            <!-- Mobile Empty State -->
-            <div :if={@empty} class="py-16">
-              <.empty_viking_state
-                title="No results found"
-                suggestion="Try adjusting your search term and filters."
-              />
-
-              <div class="px-4 py-4 flex items-center align-center justify-center">
-                <.button
-                  id="admin-users-clear-filters-empty-mobile"
-                  patch={~p"/admin/users"}
-                  variant="outline"
-                  color="zinc"
-                  class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
-                >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                  Clear filters
-                </.button>
-              </div>
-            </div>
+            <.admin_list_empty_state
+              :if={@empty}
+              title="No results found"
+              suggestion="Try adjusting your search term and filters."
+              clear_id="admin-users-clear-filters-empty-mobile"
+              clear_patch={~p"/admin/users"}
+            />
             <!-- Mobile Pagination -->
             <div :if={@meta && !@empty} class="pt-4">
               <.admin_flop_pagination
@@ -706,15 +685,15 @@ defmodule YscWeb.AdminUsersLive do
                 </.badge>
               </:col>
               <:col :let={{_, user}} label="Membership" field={:membership_type}>
-                <%= case get_active_membership_type(user) do %>
-                  <% nil -> %>
+                <%= case membership_display(user) do %>
+                  <% {nil, _} -> %>
                     <span class="text-zinc-400">—</span>
-                  <% membership_type -> %>
+                  <% {membership_type, inherited?} -> %>
                     <div class="flex items-center gap-1">
                       <.badge type="sky">
                         {String.capitalize("#{membership_type}")}
                       </.badge>
-                      <%= if membership_inherited?(user) do %>
+                      <%= if inherited? do %>
                         <.tooltip tooltip_text="Membership inherited from parent account">
                           <.icon name="hero-users" class="w-4 h-4 text-zinc-500" />
                         </.tooltip>
@@ -731,25 +710,13 @@ defmodule YscWeb.AdminUsersLive do
               </:action>
             </Flop.Phoenix.table>
 
-            <div :if={@empty} class="py-16">
-              <.empty_viking_state
-                title="No results found"
-                suggestion="Try adjusting your search term and filters."
-              />
-
-              <div class="px-4 py-4 flex items-center align-center justify-center">
-                <.button
-                  id="admin-users-clear-filters-empty-desktop"
-                  patch={~p"/admin/users"}
-                  variant="outline"
-                  color="zinc"
-                  class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
-                >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                  Clear filters
-                </.button>
-              </div>
-            </div>
+            <.admin_list_empty_state
+              :if={@empty}
+              title="No results found"
+              suggestion="Try adjusting your search term and filters."
+              clear_id="admin-users-clear-filters-empty-desktop"
+              clear_patch={~p"/admin/users"}
+            />
 
             <.admin_flop_pagination
               meta={@meta}
@@ -971,15 +938,16 @@ defmodule YscWeb.AdminUsersLive do
         field == "only_subscribers" && active == "true"
       end)
 
-    current_user = socket.assigns[:current_user]
-    topic = "exporter:#{current_user.id}"
+    exporting_user = exporting_admin_user(socket)
+    topic = exporter_topic(exporting_user)
     YscWeb.Endpoint.subscribe(topic)
 
     # Async exporter
     %{
       channel: topic,
       fields: reduced_fields,
-      only_subscribed: only_subscribed?
+      only_subscribed: only_subscribed?,
+      created_by_user_id: to_string(exporting_user.id)
     }
     |> YscWeb.Workers.UserExporter.new()
     |> Oban.insert()
@@ -1243,9 +1211,7 @@ defmodule YscWeb.AdminUsersLive do
         %Phoenix.Socket.Broadcast{event: "user_export:complete", payload: path},
         socket
       ) do
-    current_user = socket.assigns[:current_user]
-    topic = "exporter:#{current_user.id}"
-    YscWeb.Endpoint.unsubscribe(topic)
+    unsubscribe_exporter(socket)
 
     {:noreply,
      socket
@@ -1258,15 +1224,23 @@ defmodule YscWeb.AdminUsersLive do
         %Phoenix.Socket.Broadcast{event: "user_export:failed", payload: msg},
         socket
       ) do
-    current_user = socket.assigns[:current_user]
-    topic = "exporter:#{current_user.id}"
-    YscWeb.Endpoint.unsubscribe(topic)
+    unsubscribe_exporter(socket)
 
     {:noreply,
      socket |> assign(:export_status, :failed) |> assign(:export_error, msg)}
   end
 
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  defp exporting_admin_user(socket) do
+    socket.assigns[:real_current_user] || socket.assigns[:current_user]
+  end
+
+  defp exporter_topic(user), do: "exporter:#{user.id}"
+
+  defp unsubscribe_exporter(socket) do
+    YscWeb.Endpoint.unsubscribe(exporter_topic(exporting_admin_user(socket)))
+  end
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")
@@ -1367,12 +1341,10 @@ defmodule YscWeb.AdminUsersLive do
   defp user_state_to_readable(:pending_approval), do: "Pending Approval"
   defp user_state_to_readable(state), do: String.capitalize("#{state}")
 
-  defp get_active_membership_type(user) do
-    YscWeb.UserAuth.get_user_membership_plan_type(user)
-  end
-
-  defp membership_inherited?(user) do
-    Accounts.sub_account?(user) && get_active_membership_type(user) != nil
+  defp membership_display(user) do
+    plan_type = YscWeb.UserAuth.get_user_membership_plan_type(user)
+    inherited? = Accounts.sub_account?(user) && plan_type != nil
+    {plan_type, inherited?}
   end
 
   defp country_to_flag_class(nil), do: nil

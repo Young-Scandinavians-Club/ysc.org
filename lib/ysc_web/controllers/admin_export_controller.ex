@@ -5,43 +5,35 @@ defmodule YscWeb.AdminExportController do
   """
   use YscWeb, :controller
 
+  alias YscWeb.AdminExportFiles
   alias YscWeb.SafeSendFile
 
   require Ysc.Logging
-
-  @exports_root Path.join([:code.priv_dir(:ysc), "static", "exports"])
-
-  @export_filename_regex ~r/^ysc-user-export-\d{4}-\d{2}-\d{2}-[0-9A-HJKMNP-TV-Z]{26}\.csv$/u
 
   def show(conn, %{"filename" => filename}) do
     user = conn.assigns[:real_current_user] || conn.assigns[:current_user]
 
     cond do
       is_nil(user) or user.role not in [:admin, :volunteer] ->
-        conn
-        |> put_status(:forbidden)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"403")
+        YscWeb.ErrorHTML.render_page(conn, :"403")
 
-      not valid_export_filename?(filename) ->
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+      not AdminExportFiles.valid_filename?(filename) ->
+        YscWeb.ErrorHTML.render_page(conn, :"404")
+
+      not AdminExportFiles.owned_by_user?(filename, user) ->
+        YscWeb.ErrorHTML.render_page(conn, :"403")
 
       true ->
         serve_export(conn, filename, user)
     end
   end
 
-  defp valid_export_filename?(filename) when is_binary(filename) do
-    Regex.match?(@export_filename_regex, filename)
-  end
-
-  defp valid_export_filename?(_), do: false
-
   defp serve_export(conn, filename, user) do
-    case SafeSendFile.send_within(conn, 200, @exports_root, filename,
+    case SafeSendFile.send_within(
+           conn,
+           200,
+           AdminExportFiles.exports_root(),
+           filename,
            prepare: fn conn, _absolute_path ->
              conn
              |> put_resp_header(
@@ -61,10 +53,7 @@ defmodule YscWeb.AdminExportController do
           filename: filename
         )
 
-        conn
-        |> put_status(:not_found)
-        |> put_view(html: YscWeb.ErrorHTML)
-        |> render(:"404")
+        YscWeb.ErrorHTML.render_page(conn, :"404")
     end
   end
 end

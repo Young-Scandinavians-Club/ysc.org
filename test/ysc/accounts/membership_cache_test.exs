@@ -121,6 +121,46 @@ defmodule Ysc.Accounts.MembershipCacheTest do
       assert membership.id == subscription.id
     end
 
+    test "uses preloaded subscriptions when association is loaded" do
+      user = user_fixture()
+
+      period_end =
+        DateTime.utc_now()
+        |> DateTime.add(30, :day)
+        |> DateTime.truncate(:second)
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_preloaded_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start:
+            DateTime.utc_now() |> DateTime.truncate(:second),
+          current_period_end: period_end
+        })
+
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      single = Enum.find(plans, &(&1.id == :single))
+      assert single
+
+      {:ok, _} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_preloaded_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_test",
+          stripe_price_id: single.stripe_price_id,
+          quantity: 1
+        })
+
+      subscription = Repo.preload(subscription, :subscription_items)
+      user = Repo.get!(Accounts.User, user.id)
+      user = %{user | subscriptions: [subscription]}
+
+      membership = MembershipCache.get_active_membership(user)
+      assert membership.id == subscription.id
+    end
+
     test "when multiple active subscriptions exist, picks the higher-priced plan" do
       user = user_fixture()
       plans = Application.fetch_env!(:ysc, :membership_plans)

@@ -99,6 +99,31 @@ defmodule Ysc.ScanningTest do
     end
   end
 
+  describe "authorize_session_owner!/2" do
+    test "returns :ok when user created the session" do
+      owner = user_fixture(%{role: "admin"})
+      session = scan_session_fixture(created_by: owner)
+
+      assert :ok = Scanning.authorize_session_owner!(session.id, owner.id)
+    end
+
+    test "returns {:error, :unauthorized} for another admin" do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+      session = scan_session_fixture(created_by: owner)
+
+      assert {:error, :unauthorized} =
+               Scanning.authorize_session_owner!(session.id, other.id)
+    end
+
+    test "returns {:error, :not_found} for unknown session id" do
+      admin = user_fixture(%{role: "admin"})
+
+      assert {:error, :not_found} =
+               Scanning.authorize_session_owner!(Ecto.ULID.generate(), admin.id)
+    end
+  end
+
   describe "close_session/1" do
     test "sets closed_at on the session" do
       session = scan_session_fixture()
@@ -132,6 +157,187 @@ defmodule Ysc.ScanningTest do
 
       assert s1.id in ids
       assert s2.id in ids
+    end
+  end
+
+  describe "get_open_session_for_event/2" do
+    test "prefers open event_membership session over event session" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Ticket desk",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Membership desk",
+          type: :event_membership,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      assert Scanning.get_open_session_for_event(event.id).id ==
+               membership_session.id
+
+      refute Scanning.get_open_session_for_event(event.id).id ==
+               event_session.id
+    end
+
+    test "returns open event session when limited to event type" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Membership desk",
+          type: :event_membership,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Ticket desk",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      found =
+        Scanning.get_open_session_for_event(event.id,
+          types: [:event],
+          prefer: :event
+        )
+
+      assert found.id == event_session.id
+      refute found.id == membership_session.id
+    end
+  end
+
+  describe "get_open_check_in_sessions_by_event_id/2" do
+    test "returns preferred open session per event id" do
+      admin = user_fixture(%{role: "admin"})
+      event_a = event_fixture(%{organizer_id: admin.id})
+      event_b = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, event_a_session} =
+        Scanning.create_session(%{
+          name: "Event A tickets",
+          type: :event,
+          event_id: event_a.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_b_membership} =
+        Scanning.create_session(%{
+          name: "Event B members",
+          type: :event_membership,
+          event_id: event_b.id,
+          created_by_id: admin.id
+        })
+
+      by_id =
+        Scanning.get_open_check_in_sessions_by_event_id([
+          event_a.id,
+          event_b.id
+        ])
+
+      assert by_id[event_a.id].id == event_a_session.id
+      assert by_id[event_b.id].id == event_b_membership.id
+    end
+
+    test "returns empty map for empty event id list" do
+      assert Scanning.get_open_check_in_sessions_by_event_id([]) == %{}
+    end
+
+    test "respects types and prefer options" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, membership_session} =
+        Scanning.create_session(%{
+          name: "Members",
+          type: :event_membership,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      {:ok, event_session} =
+        Scanning.create_session(%{
+          name: "Tickets",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      event_only =
+        Scanning.get_open_check_in_sessions_by_event_id(
+          [event.id],
+          types: [:event],
+          prefer: :event
+        )
+
+      assert event_only[event.id].id == event_session.id
+
+      default =
+        Scanning.get_open_check_in_sessions_by_event_id([event.id])
+
+      assert default[event.id].id == membership_session.id
+    end
+  end
+
+  describe "get_or_create_open_session_for_event/3" do
+    test "returns existing open session without creating another" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      {:ok, existing} =
+        Scanning.create_session(%{
+          name: "Existing",
+          type: :event,
+          event_id: event.id,
+          created_by_id: admin.id
+        })
+
+      assert {:ok, session} =
+               Scanning.get_or_create_open_session_for_event(
+                 event.id,
+                 :event,
+                 %{
+                   name: "New",
+                   type: :event,
+                   event_id: event.id,
+                   created_by_id: admin.id
+                 }
+               )
+
+      assert session.id == existing.id
+    end
+
+    test "creates a session when none is open" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+
+      assert {:ok, session} =
+               Scanning.get_or_create_open_session_for_event(
+                 event.id,
+                 :event,
+                 %{
+                   name: "Created",
+                   type: :event,
+                   event_id: event.id,
+                   created_by_id: admin.id
+                 }
+               )
+
+      assert session.event_id == event.id
+      assert session.type == :event
+      assert is_nil(session.closed_at)
     end
   end
 

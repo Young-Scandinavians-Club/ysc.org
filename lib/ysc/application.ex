@@ -56,6 +56,8 @@ defmodule Ysc.Application do
         Ysc.AppleWallet.CertManager,
         # Start Google Wallet credentials manager
         Ysc.GoogleWallet.Credentials,
+        # Google Photos OAuth token cache
+        Ysc.GooglePhotos.TokenStore,
         # Task supervisor for fire-and-forget async work (e.g. OAuth avatar sync)
         {Task.Supervisor, name: Ysc.TaskSupervisor}
       ] ++
@@ -109,6 +111,10 @@ defmodule Ysc.Application do
 
     # Start the ticket timeout scheduler
     Ysc.Tickets.Scheduler.start_scheduler()
+
+    if @env != :test do
+      Ysc.GooglePhotos.maybe_seed_from_env()
+    end
 
     {:ok, supervisor}
   end

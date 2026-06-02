@@ -1,4 +1,5 @@
 defmodule YscWeb.AdminSettingsLive do
+  alias Ysc.GooglePhotos
   alias Ysc.Settings
   alias Ysc.Repo
   alias Oban.Job
@@ -73,6 +74,106 @@ defmodule YscWeb.AdminSettingsLive do
               Save
             </button>
           </.form>
+        </div>
+
+        <div id="google-photos-integration" class="w-full py-4 max-w-screen-md">
+          <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">
+            Google Photos
+          </h2>
+          <div class="bg-white shadow rounded-lg p-4 space-y-4">
+            <%= if !@google_photos_status.oauth_configured do %>
+              <p class="text-sm text-zinc-600">
+                Set
+                <code class="text-xs bg-zinc-100 px-1 rounded">
+                  GOOGLE_PHOTOS_CLIENT_ID
+                </code>
+                and
+                <code class="text-xs bg-zinc-100 px-1 rounded">
+                  GOOGLE_PHOTOS_CLIENT_SECRET
+                </code>
+                to enable this integration.
+              </p>
+            <% else %>
+              <%= if @google_photos_status.connected do %>
+                <div class="space-y-2">
+                  <p class="text-sm text-zinc-800">
+                    <span class="font-semibold">Status:</span>
+                    <.badge type="green" class="!me-0 ms-2">Connected</.badge>
+                  </p>
+                  <p
+                    :if={@google_photos_status.account_email}
+                    class="text-sm text-zinc-600"
+                  >
+                    <span class="font-semibold text-zinc-800">Account:</span>
+                    {@google_photos_status.account_email}
+                  </p>
+                  <p
+                    :if={@google_photos_status.connected_at}
+                    class="text-sm text-zinc-600"
+                  >
+                    <span class="font-semibold text-zinc-800">Connected:</span>
+                    <span
+                      id="google-photos-connected-at"
+                      phx-hook="LocalTime"
+                      data-utc-time={
+                        DateTime.to_iso8601(@google_photos_status.connected_at)
+                      }
+                      data-prefix=""
+                    >
+                      {Calendar.strftime(
+                        @google_photos_status.connected_at,
+                        "%Y-%m-%d %H:%M UTC"
+                      )}
+                    </span>
+                  </p>
+                  <p
+                    :if={@google_photos_scopes_preview}
+                    class="text-sm text-zinc-600"
+                  >
+                    <span class="font-semibold text-zinc-800">Scopes:</span>
+                    <span class="break-all">{@google_photos_scopes_preview}</span>
+                  </p>
+                  <p
+                    :if={google_photos_scopes_stale?(@google_photos_status.scopes)}
+                    class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2"
+                  >
+                    Missing upload, read, or edit permissions for app-created albums. Disconnect and connect again to grant all required Google Photos scopes.
+                  </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    id="google-photos-test-connection"
+                    type="button"
+                    phx-click="google-photos-test-connection"
+                    class="rounded px-4 py-2 bg-blue-700 hover:bg-blue-800 text-sm font-semibold text-zinc-100"
+                    phx-disable-with="Testing..."
+                  >
+                    Test connection
+                  </button>
+                  <.link
+                    id="google-photos-disconnect"
+                    href={~p"/admin/integrations/google-photos"}
+                    method="delete"
+                    class="rounded px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-sm font-semibold text-zinc-800"
+                    data-confirm="Disconnect Google Photos? Upload features will stop working until you reconnect."
+                  >
+                    Disconnect
+                  </.link>
+                </div>
+              <% else %>
+                <p class="text-sm text-zinc-600">
+                  Connect the organization's Google account used for event photo albums and backups.
+                </p>
+                <.link
+                  id="google-photos-connect"
+                  href={~p"/admin/integrations/google-photos/connect"}
+                  class="inline-flex rounded px-4 py-2 bg-blue-700 hover:bg-blue-800 text-sm font-semibold text-zinc-100"
+                >
+                  Connect Google Photos
+                </.link>
+              <% end %>
+            <% end %>
+          </div>
         </div>
 
         <div class="w-full py-4">
@@ -430,10 +531,17 @@ defmodule YscWeb.AdminSettingsLive do
 
     form = to_form(all_settings, as: "settings")
 
+    google_photos_status = GooglePhotos.connection_status()
+
     socket =
       socket
       |> assign(:page_title, "Admin Settings")
       |> assign(:active_page, :admin_settings)
+      |> assign(:google_photos_status, google_photos_status)
+      |> assign(
+        :google_photos_scopes_preview,
+        scopes_preview(google_photos_status.scopes)
+      )
       |> assign(:grouped_settings, all_settings)
       |> assign(:scopes, scopes)
       |> assign(:recent_jobs, [])
@@ -491,6 +599,64 @@ defmodule YscWeb.AdminSettingsLive do
   end
 
   @impl true
+  def handle_event("google-photos-test-connection", _params, socket) do
+    case GooglePhotos.test_connection() do
+      {:ok, %{email: email}} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Connection OK (#{email}).",
+           title: "Google Photos"
+         )}
+
+      {:error, :not_connected} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Not connected. Use Connect Google Photos first.",
+           title: "Google Photos"
+         )}
+
+      {:error, :not_configured} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Google Photos OAuth is not configured.",
+           title: "Google Photos"
+         )}
+
+      {:error, :token_refresh_failed} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Token refresh failed. Try disconnecting and connecting again.",
+           title: "Google Photos"
+         )}
+
+      {:error, :insufficient_scopes} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Google rejected the Photos API call (outdated scopes). Disconnect, then connect again to re-authorize.",
+           title: "Google Photos"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Connection test failed. Check logs for details.",
+           title: "Google Photos"
+         )}
+    end
+  end
+
   def handle_event("update-settings", %{"settings" => settings}, socket) do
     for {k, v} <- settings do
       case Settings.update_setting(k, Map.get(v, "value")) do
@@ -686,6 +852,19 @@ defmodule YscWeb.AdminSettingsLive do
       "scheduled" -> "bg-purple-100 text-purple-800"
       "executing" -> "bg-orange-100 text-orange-800"
       _ -> "bg-zinc-100 text-zinc-800"
+    end
+  end
+
+  defp google_photos_scopes_stale?(scopes),
+    do: not Ysc.GooglePhotos.OAuth.scopes_grant_complete?(scopes)
+
+  defp scopes_preview(nil), do: nil
+
+  defp scopes_preview(scopes) when is_binary(scopes) do
+    if String.length(scopes) > 120 do
+      String.slice(scopes, 0, 117) <> "..."
+    else
+      scopes
     end
   end
 end

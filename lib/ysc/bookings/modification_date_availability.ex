@@ -46,16 +46,89 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     today = today_pst()
     seasons = Bookings.list_seasons(booking.property)
 
-    max_booking_date =
-      SeasonHelpers.calculate_max_booking_date(booking.property, today, seasons)
+    calendar_bounds(booking, today, seasons)
+  end
+
+  @doc """
+  Lightweight calendar bounds for the initial static render before WebSocket connect.
+
+  Avoids `list_seasons/1` and other database reads; replaced with `calendar_context/1`
+  when async change data loads.
+  """
+  def calendar_placeholder(%Booking{} = booking) do
+    today = today_pst()
+
+    calendar_bounds(
+      booking,
+      today,
+      [],
+      max_date: Date.add(today, 365),
+      max_nights: 365
+    )
+  end
+
+  defp calendar_bounds(booking, today, seasons, opts \\ []) do
+    max_date =
+      Keyword.get_lazy(opts, :max_date, fn ->
+        SeasonHelpers.calculate_max_booking_date(
+          booking.property,
+          today,
+          seasons
+        )
+      end)
+
+    max_nights =
+      Keyword.get_lazy(opts, :max_nights, fn ->
+        max_nights_for_checkin(booking, booking.checkin_date, seasons)
+      end)
 
     %{
       today: today,
       seasons: seasons,
       min_date: today,
-      max_date: max_booking_date,
-      max_nights: max_nights_for_checkin(booking, booking.checkin_date)
+      max_date: max_date,
+      max_nights: max_nights
     }
+  end
+
+  @doc """
+  Builds an availability snapshot sized for validating proposed modification dates.
+
+  Uses batched inventory, blackout, and booking-conflict queries instead of
+  per-day `room_available?/4` checks during `prepare_modification/2`.
+  """
+  def build_snapshot_for_modification(%Booking{} = booking, checkin, checkout) do
+    %{today: today, seasons: seasons, min_date: cal_min, max_date: cal_max} =
+      calendar_context(booking)
+
+    min_date =
+      [cal_min, booking.checkin_date, checkin]
+      |> Enum.min(Date)
+
+    max_date =
+      [cal_max, booking.checkout_date, checkout]
+      |> Enum.max(Date)
+
+    build_availability_snapshot(booking, min_date, max_date, today, seasons)
+  end
+
+  @doc """
+  Returns `:ok` or `{:error, reason}` for proposed modification dates.
+
+  Pass a prebuilt `Snapshot` from `build_snapshot_for_modification/3` or
+  `build_availability_snapshot/5` to avoid rebuilding inventory data.
+  """
+  def validate_modification_dates(%Snapshot{} = snapshot, checkin, checkout) do
+    case modification_availability_error(snapshot, checkin, checkout) do
+      nil -> :ok
+      reason -> {:error, reason}
+    end
+  end
+
+  def validate_modification_dates(%Booking{} = booking, checkin, checkout) do
+    booking
+    |> build_snapshot_for_modification(checkin, checkout)
+    |> validate_modification_dates(checkin, checkout)
   end
 
   @doc """
@@ -231,7 +304,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
       %{}
     else
       booking = snapshot.booking
-      max_nights = max_nights_for_checkin(booking, checkin_date)
+      max_nights = max_nights_for_checkin(booking, checkin_date, seasons)
       latest_checkout = min_date(Date.add(checkin_date, max_nights), max_date)
       first_checkout = Date.add(checkin_date, 1)
 
@@ -320,7 +393,7 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
   defp has_valid_checkout?(snapshot, checkin, max_date, today, seasons) do
     booking = snapshot.booking
-    max_nights = max_nights_for_checkin(booking, checkin)
+    max_nights = max_nights_for_checkin(booking, checkin, seasons)
     latest_checkout = min_date(Date.add(checkin, max_nights), max_date)
     first_checkout = Date.add(checkin, 1)
 
@@ -428,6 +501,9 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
   defp validate_room_modification(snapshot, checkin, checkout) do
     cond do
+      inactive_room_assigned?(snapshot.booking) ->
+        {:error, :room_unavailable}
+
       blackout_conflict?(snapshot, checkin, checkout) ->
         {:error, :blackout_conflict}
 
@@ -473,6 +549,12 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
     if unavailable?, do: {:error, :property_unavailable}, else: :ok
   end
+
+  defp inactive_room_assigned?(%Booking{rooms: rooms}) when is_list(rooms) do
+    Enum.any?(rooms, &(Map.get(&1, :is_active) == false))
+  end
+
+  defp inactive_room_assigned?(_), do: false
 
   defp room_unavailable?(snapshot, checkin, checkout) do
     held_days = held_days(snapshot.hold)
@@ -665,8 +747,13 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
   defp availability_error_message(_), do: "The selected dates are not available"
 
-  defp max_nights_for_checkin(booking, checkin_date) do
-    season = Season.for_date(booking.property, checkin_date)
+  defp max_nights_for_checkin(booking, checkin_date, seasons) do
+    season =
+      case seasons do
+        [_ | _] -> Season.find_season_for_date(seasons, checkin_date)
+        _ -> Season.for_date(booking.property, checkin_date)
+      end
+
     Season.get_max_nights(season, booking.property)
   end
 

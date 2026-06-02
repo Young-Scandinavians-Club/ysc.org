@@ -27,7 +27,9 @@ defmodule YscWeb.BookingChangeLive do
       case load_booking(booking_id, user) do
         {:ok, booking} ->
           if BookingActions.can_change_booking?(booking) do
-            calendar = ModificationDateAvailability.calendar_context(booking)
+            calendar =
+              ModificationDateAvailability.calendar_placeholder(booking)
+
             form = modification_form(booking)
 
             socket =
@@ -35,7 +37,7 @@ defmodule YscWeb.BookingChangeLive do
               |> assign_change_page_shell(booking, calendar, form)
 
             if connected?(socket) do
-              {:ok, load_change_data_async(socket, booking, calendar, form)}
+              {:ok, load_change_data_async(socket, booking, form)}
             else
               {:ok, socket}
             end
@@ -53,7 +55,9 @@ defmodule YscWeb.BookingChangeLive do
         {:error, :not_found} ->
           {:ok,
            socket
-           |> YscWeb.Flash.put_toast(:error, "Booking not found.",
+           |> YscWeb.Flash.put_toast(
+             :error,
+             YscWeb.BookingUserMessages.reservation_not_found(),
              title: "Booking"
            )
            |> redirect(to: ~p"/")}
@@ -110,8 +114,15 @@ defmodule YscWeb.BookingChangeLive do
 
   @impl true
   def handle_async(:load_change_data, {:ok, data}, socket) do
+    calendar = data.calendar
+
     socket =
       socket
+      |> assign(:today, calendar.today)
+      |> assign(:seasons, calendar.seasons)
+      |> assign(:calendar_min_date, calendar.min_date)
+      |> assign(:calendar_max_date, calendar.max_date)
+      |> assign(:max_nights, calendar.max_nights)
       |> assign(:availability_snapshot, data.availability_snapshot)
       |> assign(:checkout_date_tooltips, data.checkout_tooltips)
       |> assign(:checkin_date_tooltips, data.checkin_tooltips)
@@ -245,7 +256,7 @@ defmodule YscWeb.BookingChangeLive do
        YscWeb.Flash.put_toast(
          socket,
          :error,
-         "Please acknowledge the refund forfeiture notice before continuing."
+         YscWeb.BookingUserMessages.modification_acknowledgment_required()
        )}
     end
   end
@@ -414,7 +425,9 @@ defmodule YscWeb.BookingChangeLive do
         id="refund-forfeiture-notice"
         class="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950"
       >
-        <p class="font-semibold mb-2">Important: refund forfeiture</p>
+        <p class="font-semibold mb-2">
+          {YscWeb.BookingUserMessages.modification_forfeiture_title()}
+        </p>
         <p class="text-sm leading-relaxed">
           By changing this reservation, you forfeit all refund eligibility — even if you would normally receive a full refund under our cancellation policy. This cannot be undone. You may still cancel later, but you will not receive a refund.
         </p>
@@ -436,6 +449,7 @@ defmodule YscWeb.BookingChangeLive do
           for={@form}
           id="booking-change-form"
           phx-change="validate"
+          phx-debounce="300"
           phx-submit="submit-modification"
           class={[
             "space-y-6",
@@ -683,10 +697,12 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:other_family_members, [])
   end
 
-  defp load_change_data_async(socket, booking, calendar, form) do
+  defp load_change_data_async(socket, booking, form) do
     params = form_params(form)
 
     start_async(socket, :load_change_data, fn ->
+      calendar = ModificationDateAvailability.calendar_context(booking)
+
       availability_snapshot =
         ModificationDateAvailability.build_availability_snapshot(
           booking,
@@ -716,9 +732,13 @@ defmodule YscWeb.BookingChangeLive do
           availability_snapshot
         )
 
-      preview_result = Bookings.prepare_modification(booking, params)
+      preview_result =
+        Bookings.prepare_modification(booking, params,
+          availability_snapshot: availability_snapshot
+        )
 
       %{
+        calendar: calendar,
         availability_snapshot: availability_snapshot,
         checkout_tooltips: checkout_tooltips,
         checkin_tooltips: checkin_tooltips,
@@ -843,7 +863,13 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp run_preview(socket, params) do
-    case Bookings.prepare_modification(socket.assigns.booking, params) do
+    opts =
+      case socket.assigns[:availability_snapshot] do
+        nil -> []
+        snapshot -> [availability_snapshot: snapshot]
+      end
+
+    case Bookings.prepare_modification(socket.assigns.booking, params, opts) do
       {:ok, preview} ->
         assign(socket, preview: preview, preview_error: nil)
 

@@ -5,6 +5,8 @@ defmodule YscWeb.AdminEventsLive do
   alias Phoenix.LiveView.JS
 
   alias Ysc.Events
+  alias Ysc.Scanning
+  alias YscWeb.AdminCheckInPaths
 
   def render(assigns) do
     ~H"""
@@ -187,6 +189,12 @@ defmodule YscWeb.AdminEventsLive do
                   <.event_actions_dropdown
                     event={event}
                     menu_id={"event-actions-mob-#{event.id}"}
+                    check_in_path={
+                      AdminCheckInPaths.path_for_event(
+                        event.id,
+                        @open_check_in_sessions
+                      )
+                    }
                   />
                 </div>
               </div>
@@ -252,6 +260,12 @@ defmodule YscWeb.AdminEventsLive do
                 <.event_actions_dropdown
                   event={event}
                   menu_id={"event-actions-dt-#{event.id}"}
+                  check_in_path={
+                    AdminCheckInPaths.path_for_event(
+                      event.id,
+                      @open_check_in_sessions
+                    )
+                  }
                 />
               </:action>
             </Flop.Phoenix.table>
@@ -264,6 +278,7 @@ defmodule YscWeb.AdminEventsLive do
 
   attr :event, :map, required: true
   attr :menu_id, :string, required: true
+  attr :check_in_path, :string, required: true
 
   def event_actions_dropdown(assigns) do
     ~H"""
@@ -327,7 +342,7 @@ defmodule YscWeb.AdminEventsLive do
             <li :if={@event.state in [:published, :scheduled]}>
               <.link
                 id={"#{@menu_id}-check-in"}
-                navigate={~p"/admin/events/#{@event.id}/check-in"}
+                navigate={@check_in_path}
                 class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
               >
                 <.icon name="hero-qr-code" class="h-5 w-5 shrink-0" />
@@ -350,7 +365,8 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
-     |> assign(:date_to, ""), temporary_assigns: [author_filter: []]}
+     |> assign(:date_to, "")
+     |> assign(:open_check_in_sessions, %{})}
   end
 
   def handle_params(params, _uri, socket) do
@@ -364,19 +380,24 @@ defmodule YscWeb.AdminEventsLive do
            tab: active_tab
          ) do
       {:ok, {events, meta}} ->
-        author_filter = Events.get_all_authors()
         title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
         search_query = if title_filter, do: title_filter.value, else: ""
 
+        event_ids = Enum.map(events, & &1.id)
+
+        open_check_in_sessions =
+          Scanning.get_open_check_in_sessions_by_event_id(event_ids)
+
         {:noreply,
          socket
+         |> assign_new(:author_filter, &Events.get_all_authors/0)
          |> assign(:meta, meta)
          |> assign(:params, params)
          |> assign(:active_tab, active_tab)
-         |> assign(:author_filter, author_filter)
          |> assign(:search_query, search_query)
          |> assign(:date_from, date_from)
          |> assign(:date_to, date_to)
+         |> assign(:open_check_in_sessions, open_check_in_sessions)
          |> stream(:events, events, reset: true)}
 
       {:error, _meta} ->

@@ -95,6 +95,12 @@ config :ysc, :google_wallet,
   credentials_json: System.get_env("GOOGLE_WALLET_CREDENTIALS_JSON"),
   issuer_id: System.get_env("GOOGLE_WALLET_ISSUER_ID")
 
+# ## Google Photos (admin OAuth integration)
+config :ysc, :google_photos,
+  client_id: System.get_env("GOOGLE_PHOTOS_CLIENT_ID"),
+  client_secret: System.get_env("GOOGLE_PHOTOS_CLIENT_SECRET"),
+  redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI")
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server
@@ -176,7 +182,8 @@ if config_env() == :prod do
     secret_key_base: secret_key_base,
     render_errors: [
       formats: [html: YscWeb.ErrorHTML, json: YscWeb.ErrorJSON],
-      layout: {YscWeb.Layouts, :error}
+      root_layout: {YscWeb.Layouts, :error},
+      layout: false
     ]
 
   config :ysc, dns_cluster_query: System.get_env("DNS_CLUSTER_QUERY")

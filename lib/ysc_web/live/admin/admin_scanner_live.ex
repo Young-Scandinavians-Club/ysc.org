@@ -752,8 +752,11 @@ defmodule YscWeb.AdminScannerLive do
                   {@scan_count} {if(@scan_count == 1, do: "scan", else: "scans")}
                 </span>
                 <.link
-                  :if={@active_session.type == :event_membership}
-                  navigate={~p"/admin/membership-check-in/#{@active_session.id}"}
+                  :if={
+                    @active_session.type == :event_membership ||
+                      (@active_session.type == :event && @active_session.event)
+                  }
+                  navigate={desk_path(@active_session)}
                   class="bg-white/15 hover:bg-white/25 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors border border-white/20"
                 >
                   Desk
@@ -1488,61 +1491,106 @@ defmodule YscWeb.AdminScannerLive do
   end
 
   def handle_event("resume_session", %{"session-id" => session_id}, socket) do
-    session = Scanning.get_session!(session_id)
+    current_user_id = socket.assigns.current_user.id
 
     socket =
-      if is_nil(session.closed_at) do
-        scan_count = Scanning.get_session_scan_count(session_id)
+      case Scanning.authorize_session_owner!(session_id, current_user_id) do
+        :ok ->
+          resume_session_socket(socket, session_id)
 
-        socket
-        |> assign(:phase, :scanning)
-        |> assign(:active_session, session)
-        |> assign(:scan_count, scan_count)
-        |> assign(:scan_result, nil)
-        |> assign(:camera_error, nil)
-        |> assign(:group_prompt, nil)
-      else
-        put_flash(socket, :error, "That session is already closed.")
+        {:error, :unauthorized} ->
+          put_flash(
+            socket,
+            :error,
+            "You can only resume scan sessions you created."
+          )
+
+        {:error, :not_found} ->
+          put_flash(socket, :error, "Scan session not found.")
       end
 
     {:noreply, socket}
   end
 
   def handle_event("end_session", _params, socket) do
-    if socket.assigns.active_session do
-      Scanning.close_session(socket.assigns.active_session.id)
+    session = socket.assigns.active_session
+
+    socket = push_event(socket, "stop-camera", %{})
+
+    if session && has_desk_view?(session) do
+      {:noreply, push_navigate(socket, to: desk_path(session))}
+    else
+      if session do
+        Scanning.close_session(session.id)
+      end
+
+      open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+      joinable_sessions = load_joinable_sessions(socket, open_sessions)
+
+      socket =
+        socket
+        |> assign(:phase, :setup)
+        |> assign(:active_session, nil)
+        |> assign(:scan_result, nil)
+        |> assign(:scan_count, 0)
+        |> assign(:camera_error, nil)
+        |> assign(:group_prompt, nil)
+        |> assign(:open_sessions, open_sessions)
+        |> assign(:joinable_sessions, joinable_sessions)
+
+      {:noreply, socket}
     end
-
-    open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
-    joinable_sessions = load_joinable_sessions(socket, open_sessions)
-
-    socket =
-      socket
-      |> assign(:phase, :setup)
-      |> assign(:active_session, nil)
-      |> assign(:scan_result, nil)
-      |> assign(:scan_count, 0)
-      |> assign(:camera_error, nil)
-      |> assign(:group_prompt, nil)
-      |> assign(:open_sessions, open_sessions)
-      |> assign(:joinable_sessions, joinable_sessions)
-      |> push_event("stop-camera", %{})
-
-    {:noreply, socket}
   end
 
   def handle_event("export-csv", %{"session-id" => session_id}, socket) do
-    csv_content = Scanning.export_session_csv(session_id)
-    encoded = Base.encode64(csv_content)
+    current_user_id = socket.assigns.current_user.id
 
-    filename =
-      "scan_session_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+    case Scanning.authorize_session_owner!(session_id, current_user_id) do
+      :ok ->
+        csv_content = Scanning.export_session_csv(session_id)
+        encoded = Base.encode64(csv_content)
 
-    {:noreply,
-     push_event(socket, "download-csv", %{content: encoded, filename: filename})}
+        filename =
+          "scan_session_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+
+        {:noreply,
+         push_event(socket, "download-csv", %{
+           content: encoded,
+           filename: filename
+         })}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "You can only export scan sessions you created."
+         )}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Scan session not found.")}
+    end
   end
 
   # --- Private ---
+
+  defp resume_session_socket(socket, session_id) do
+    session = Scanning.get_session!(session_id)
+
+    if is_nil(session.closed_at) do
+      scan_count = Scanning.get_session_scan_count(session_id)
+
+      socket
+      |> assign(:phase, :scanning)
+      |> assign(:active_session, session)
+      |> assign(:scan_count, scan_count)
+      |> assign(:scan_result, nil)
+      |> assign(:camera_error, nil)
+      |> assign(:group_prompt, nil)
+    else
+      put_flash(socket, :error, "That session is already closed.")
+    end
+  end
 
   defp handle_scan(socket, data) do
     session = socket.assigns.active_session
@@ -1671,6 +1719,22 @@ defmodule YscWeb.AdminScannerLive do
     do: "bg-violet-100 text-violet-800"
 
   defp session_type_badge_class(_), do: "bg-blue-100 text-blue-800"
+
+  defp has_desk_view?(%{type: :event_membership}), do: true
+
+  defp has_desk_view?(%{type: :event, event_id: event_id})
+       when not is_nil(event_id),
+       do: true
+
+  defp has_desk_view?(_), do: false
+
+  defp desk_path(%{type: :event_membership, id: session_id}) do
+    ~p"/admin/membership-check-in/#{session_id}"
+  end
+
+  defp desk_path(%{type: :event, id: session_id, event_id: event_id}) do
+    ~p"/admin/events/#{event_id}/check-in?scan_session_id=#{session_id}"
+  end
 
   defp load_joinable_sessions(socket, own_open_sessions) do
     current_user_id = socket.assigns.current_user.id

@@ -4,6 +4,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
 
   alias Ysc.Agendas
   alias Ysc.Events
@@ -12,6 +13,30 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
     %{conn: log_in_user(conn, user), admin: user}
+  end
+
+  describe "check-in navigation" do
+    setup [:create_admin]
+
+    test "check-in button joins open membership session", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      session = event_membership_session_fixture(event, admin)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(
+               view,
+               "a[href='/admin/membership-check-in/#{session.id}']"
+             )
+
+      refute has_element?(
+               view,
+               "a[href='/admin/events/#{event.id}/check-in']"
+             )
+    end
   end
 
   describe "hosts - create_event defaults" do
@@ -95,6 +120,36 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
 
       refute html =~ "event-hosts-manager"
+    end
+  end
+
+  describe "updates tab - event photo uploads" do
+    setup [:create_admin]
+
+    test "shows photo upload link when patching to updates on a published event",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      html = render_patch(view, ~p"/admin/events/#{event.id}/updates")
+
+      assert html =~ "Event photo uploads"
+      assert has_element?(view, "#event-photo-upload-link-card")
+      assert has_element?(view, "#copy-photo-upload-url-btn")
+    end
+
+    test "shows photo upload link when opening updates directly", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert html =~ "Event photo uploads"
+      assert has_element?(view, "#event-photo-upload-link-card")
     end
   end
 

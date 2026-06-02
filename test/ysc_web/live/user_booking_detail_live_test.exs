@@ -162,10 +162,11 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: _user} = log_in_member(conn)
       missing = Ecto.ULID.generate()
 
-      assert {:error, {:redirect, %{to: path}}} =
+      assert {:error, {:redirect, %{to: path, flash: flash}}} =
                live(conn, ~p"/bookings/#{missing}")
 
       assert path == ~p"/"
+      assert flash["error"] =~ "couldn't find this reservation"
     end
 
     test "shows payment summary when a ledger payment exists", %{conn: conn} do

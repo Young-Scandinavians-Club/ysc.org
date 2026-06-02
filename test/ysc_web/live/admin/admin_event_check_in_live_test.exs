@@ -5,6 +5,7 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
+  import Ysc.ScanningFixtures
 
   alias Ysc.Repo
   alias Ysc.Scanning
@@ -900,6 +901,26 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
   describe "launch-scanner" do
     setup [:create_admin]
+
+    test "reuses an existing open event scan session", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{organizer_id: admin.id, title: "Reuse Scan Session"})
+
+      existing = event_scan_session_fixture(event, admin)
+      initial_count = session_count_for_event(event.id)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      view
+      |> element("[phx-click='launch-scanner']", "QR Scanner")
+      |> render_click()
+
+      assert session_count_for_event(event.id) == initial_count
+      assert_redirect(view, ~p"/admin/scanner?resume=#{existing.id}")
+    end
 
     test "creates an event scan session with the event's details", %{
       conn: conn,

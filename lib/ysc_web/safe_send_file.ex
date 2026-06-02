@@ -22,17 +22,47 @@ defmodule YscWeb.SafeSendFile do
   def send_within(conn, status, root, relative_path, opts \\ [])
       when is_integer(status) and is_binary(root) and is_binary(relative_path) do
     prepare = Keyword.get(opts, :prepare, fn conn, _absolute_path -> conn end)
+
+    case resolve_regular_file(root, relative_path) do
+      {:ok, absolute_path} ->
+        {:ok,
+         do_send_file(prepare.(conn, absolute_path), status, absolute_path)}
+
+      :error ->
+        :error
+    end
+  end
+
+  @doc """
+  Reads a regular file at `relative_path` when it resolves inside `root`.
+
+  Returns `{:ok, binary}` or `:error`.
+  """
+  @spec read_within(String.t(), String.t()) :: {:ok, binary()} | :error
+  def read_within(root, relative_path)
+      when is_binary(root) and is_binary(relative_path) do
+    case resolve_regular_file(root, relative_path) do
+      {:ok, absolute_path} -> {:ok, do_read_file!(absolute_path)}
+      :error -> :error
+    end
+  end
+
+  defp resolve_regular_file(root, relative_path) do
     expanded_root = Path.expand(root)
 
     with {:ok, safe_relative} <-
            Path.safe_relative(relative_path, expanded_root),
          absolute_path = Path.join(expanded_root, safe_relative),
          true <- File.regular?(absolute_path) do
-      {:ok, do_send_file(prepare.(conn, absolute_path), status, absolute_path)}
+      {:ok, absolute_path}
     else
       _ -> :error
     end
   end
+
+  # Path is validated with Path.safe_relative/2 in resolve_regular_file/2.
+  # sobelow_skip ["Traversal.FileModule"]
+  defp do_read_file!(absolute_path), do: File.read!(absolute_path)
 
   # Paths are validated with Path.safe_relative/2 before send_file is invoked.
   # sobelow_skip ["Traversal.SendFile"]
