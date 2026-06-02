@@ -42,6 +42,45 @@ defmodule Ysc.GooglePhotosTest do
       assert GooglePhotos.get_connection() == nil
       assert %{connected: false} = GooglePhotos.connection_status()
     end
+
+    test "reuses stored refresh_token when reconnecting without one in the token map" do
+      user = user_fixture()
+
+      GooglePhotos.connect!(
+        %{
+          access_token: "access",
+          refresh_token: "original-refresh",
+          expires_in: 3600,
+          scope: Enum.join(Ysc.GooglePhotos.OAuth.photos_api_scopes(), " ")
+        },
+        user.id,
+        "photos@example.com"
+      )
+
+      GooglePhotos.connect!(
+        %{
+          access_token: "new-access",
+          expires_in: 3600,
+          scope: Enum.join(Ysc.GooglePhotos.OAuth.photos_api_scopes(), " ")
+        },
+        user.id,
+        "photos@example.com"
+      )
+
+      assert GooglePhotos.get_connection().refresh_token == "original-refresh"
+    end
+
+    test "raises when no refresh_token is available on first connect" do
+      user = user_fixture()
+
+      assert_raise ArgumentError, ~r/refresh_token/, fn ->
+        GooglePhotos.connect!(
+          %{access_token: "access", expires_in: 3600},
+          user.id,
+          "photos@example.com"
+        )
+      end
+    end
   end
 
   describe "TokenStore" do
