@@ -62,7 +62,10 @@ defmodule YscWeb.AdminPostsLiveTest do
       )
     end
 
-    test "does not re-query post authors on each search patch", %{conn: conn, admin: admin} do
+    test "does not re-query post authors on each search patch", %{
+      conn: conn,
+      admin: admin
+    } do
       post_fixture(admin, %{title: "Author Cache Headline"})
 
       {:ok, view, _} = live(conn, ~p"/admin/posts")

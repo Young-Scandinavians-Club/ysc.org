@@ -121,7 +121,8 @@ defmodule YscWeb.AdminEventsLiveTest do
 
       {:ok, view, _} = live(conn, ~p"/admin/events")
 
-      author_filter_pattern = ~r/DISTINCT ON \(.*"organizer_id"\).*FROM "events"/is
+      author_filter_pattern =
+        ~r/DISTINCT ON \(.*"organizer_id"\).*FROM "events"/is
 
       {_patch, author_queries} =
         Ysc.QueryCounter.with_query_counter(
