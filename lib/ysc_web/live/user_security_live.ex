@@ -479,8 +479,7 @@ defmodule YscWeb.UserSecurityLive do
                   navigate={~p"/users/settings/passkeys/new"}
                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 mb-4"
                 >
-                  <.icon name="hero-plus" class="w-5 h-5 me-2" />
-                  Add another device
+                  <.icon name="hero-plus" class="w-5 h-5 me-2" /> Add another device
                 </.link>
 
                 <div class="space-y-3">
