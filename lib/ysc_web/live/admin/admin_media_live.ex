@@ -1327,11 +1327,6 @@ defmodule YscWeb.AdminMediaLive do
   defp get_image_version_path(_, _), do: nil
 
   # Helper functions for image display (similar to GalleryComponent)
-  defp get_blur_hash(%Media.Image{blur_hash: nil}),
-    do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-
-  defp get_blur_hash(%Media.Image{blur_hash: blur_hash}), do: blur_hash
-
   defp get_image_path(%Media.Image{thumbnail_path: nil} = image),
     do: image.raw_image_path
 
@@ -1614,7 +1609,7 @@ defmodule YscWeb.AdminMediaLive do
 
               <canvas
                 id={"blur-hash-img-#{item.id}"}
-                src={get_blur_hash(item)}
+                src={Media.Image.blur_hash_for_display(item)}
                 class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
                 phx-hook="BlurHashCanvas"
               >

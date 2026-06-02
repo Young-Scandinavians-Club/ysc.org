@@ -402,12 +402,10 @@ defmodule Ysc.Media do
         generate_blur_hash_safely(optimized_output_path, path)
       rescue
         _e ->
-          # Return a default blurhash on failure
-          "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+          Media.Image.default_blur_hash()
       catch
         _kind, _reason ->
-          # Return a default blurhash on failure
-          "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+          Media.Image.default_blur_hash()
       end
 
     # Use original dimensions for database (not resized dimensions)

@@ -25,7 +25,7 @@ defmodule YscWeb.Components.GalleryComponent do
           >
             <canvas
               id={"blur-hash-image-#{image.id}"}
-              src={get_blur_hash(image)}
+              src={Image.blur_hash_for_display(image)}
               class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
               phx-hook="BlurHashCanvas"
             >
@@ -65,9 +65,6 @@ defmodule YscWeb.Components.GalleryComponent do
     </div>
     """
   end
-
-  defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
 
   defp get_image_path(%Image{thumbnail_path: nil} = image),
     do: image.raw_image_path

@@ -18,6 +18,8 @@ defmodule Ysc.Media.Image do
 
   import Ecto.Changeset
 
+  @default_blur_hash "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+
   @derive {
     Flop.Schema,
     filterable: [:title, :alt_text, :user_id], sortable: [:inserted_at]
@@ -113,4 +115,26 @@ defmodule Ysc.Media.Image do
   def display_path(%{raw_image_path: _} = image) do
     Map.get(image, :optimized_image_path) || Map.get(image, :raw_image_path)
   end
+
+  @doc """
+  Returns the default blur hash used when an image has no blur hash yet.
+
+  Used for BlurHash canvas placeholders during progressive image loading.
+  """
+  def default_blur_hash, do: @default_blur_hash
+
+  @doc """
+  Returns a blur hash string suitable for BlurHash canvas placeholders.
+
+  Uses the image's `blur_hash` when present; otherwise returns `default_blur_hash/0`.
+  Accepts `nil` and non-image values (returns the default).
+  """
+  def blur_hash_for_display(nil), do: @default_blur_hash
+
+  def blur_hash_for_display(%__MODULE__{blur_hash: blur_hash})
+      when is_binary(blur_hash),
+      do: blur_hash
+
+  def blur_hash_for_display(%__MODULE__{}), do: @default_blur_hash
+  def blur_hash_for_display(_), do: @default_blur_hash
 end

@@ -14,7 +14,7 @@ defmodule YscWeb.Components.Image do
     <div class={"relative w-full #{@aspect_class}"}>
       <canvas
         id={"blur-hash-image-#{@id}"}
-        src={get_blur_hash(@image)}
+        src={Image.blur_hash_for_display(@image)}
         class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
         phx-hook="BlurHashCanvas"
       >
@@ -75,10 +75,6 @@ defmodule YscWeb.Components.Image do
 
     {:ok, socket |> assign(image: image)}
   end
-
-  defp get_blur_hash(nil), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
 
   # Helper function to get the best available image path with fallbacks
   # Supports preferred_type: :optimized, :thumbnail, :raw, or nil (default)

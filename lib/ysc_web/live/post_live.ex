@@ -103,7 +103,7 @@ defmodule YscWeb.PostLive do
       >
         <canvas
           id={"blur-hash-image-#{@post.image_id}"}
-          src={get_blur_hash(@post.featured_image)}
+          src={Image.blur_hash_for_display(@post.featured_image)}
           class="absolute inset-0 z-0 w-full h-full object-cover"
           phx-hook="BlurHashCanvas"
         >
@@ -407,9 +407,6 @@ defmodule YscWeb.PostLive do
          optimized_image_path: optimized
        }),
        do: "#{thumb} 500w, #{optimized} 1920w"
-
-  defp get_blur_hash(%Image{blur_hash: nil}), do: "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
-  defp get_blur_hash(%Image{blur_hash: blur_hash}), do: blur_hash
 
   # Format board position using the lookup map
   defp format_board_position(position) when is_atom(position) do
