@@ -936,7 +936,7 @@ defmodule Ysc.Bookings do
 
         case Ledgers.process_payment(attrs) do
           {:ok, _} -> :ok
-          {:error, reason} -> {:error, {:ledger_payment_failed, reason}}
+          {:error, reason} -> {:error, reason}
         end
 
       {:error, reason} ->

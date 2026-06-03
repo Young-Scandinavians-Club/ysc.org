@@ -6,7 +6,6 @@ defmodule YscWeb.BookingReceiptLive do
   alias YscWeb.BookingActions
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
-  alias Ysc.Ledgers
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
