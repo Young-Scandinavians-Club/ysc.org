@@ -81,7 +81,7 @@ defmodule YscWeb.UserRegistrationLive do
                         family: %{
                           option: "family",
                           subtitle:
-                            "You, your partner and dependents (18 years or younger)",
+                            "You, your partner, and children age 18 or younger",
                           icon: "user-group"
                         }
                       ]}
@@ -135,7 +135,7 @@ defmodule YscWeb.UserRegistrationLive do
                 field={@form[:email]}
                 type="email"
                 label="Email*"
-                placeholder="example@ysc.org"
+                placeholder="you@example.com"
                 autocomplete="email"
                 required
               />

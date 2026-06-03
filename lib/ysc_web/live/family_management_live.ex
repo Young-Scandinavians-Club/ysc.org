@@ -553,13 +553,13 @@ defmodule YscWeb.FamilyManagementLive do
         Family Management
       </h1>
       <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-        As a primary account holder with a family or lifetime membership, you can manage family members on your account and invite them to share your membership benefits.
+        With a Family or Lifetime membership, you can add family members to your account and invite them to share your member benefits.
       </p>
       <%= if not @can_send_invite do %>
         <div class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p class="text-sm text-amber-800">
             You cannot send invites at this time. Please ensure you have an active family or
-            lifetime membership and have not reached the limit of 10 linked family members.
+            lifetime membership and have not reached the limit of 10 family members with accounts.
           </p>
         </div>
       <% end %>

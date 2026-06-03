@@ -407,7 +407,7 @@ defmodule YscWeb.UserBookingDetailLive do
                     <%= if @booking.booking_mode == :room do %>
                       Individual room(s)
                     <% else %>
-                      Shared stay
+                      Group booking (shared cabin)
                     <% end %>
                   <% end %>
                 </div>
