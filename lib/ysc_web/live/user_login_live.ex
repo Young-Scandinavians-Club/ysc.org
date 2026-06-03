@@ -23,9 +23,6 @@ defmodule YscWeb.UserLoginLive do
               Apply for membership
             </.link>
           </span>
-          <span class="block mt-1 text-sm font-normal text-zinc-500">
-            Already applied? Sign in with the email you used on your application.
-          </span>
         </:subtitle>
       </.header>
       <!-- Alternative Authentication Methods -->
