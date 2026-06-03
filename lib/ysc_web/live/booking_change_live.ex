@@ -1181,7 +1181,9 @@ defmodule YscWeb.BookingChangeLive do
       :rooms_already_booked,
       :property_buyout_active,
       :blackout_conflict
-    ] or match?({:payment_verification_failed, _}, reason)
+    ] or
+      match?({:payment_verification_failed, _}, reason) or
+      match?({:ledger_payment_failed, _}, reason)
   end
 
   defp modification_error_message_after_payment(%Ecto.Changeset{} = changeset) do

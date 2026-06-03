@@ -1501,13 +1501,17 @@ defmodule YscWeb.BookingReceiptLive do
          payment_intent
        ) do
     cond do
-      modification_ledger_recorded?(booking.id, payment_intent_id) ->
+      Bookings.modification_ledger_recorded?(booking.id, payment_intent_id) ->
         {:ok, reload_booking_for_receipt(booking.id), payment_intent}
 
       true ->
         case modification_params_from_hold(booking) do
           nil ->
-            {:error, :modification_hold_expired}
+            finalize_modification_ledger_only(
+              booking,
+              payment_intent_id,
+              payment_intent
+            )
 
           attrs ->
             case Bookings.apply_modification(booking, attrs,
@@ -1517,7 +1521,18 @@ defmodule YscWeb.BookingReceiptLive do
                 {:ok, updated_booking, payment_intent}
 
               {:error, :no_changes} ->
-                {:ok, reload_booking_for_receipt(booking.id), payment_intent}
+                finalize_modification_ledger_only(
+                  booking,
+                  payment_intent_id,
+                  payment_intent
+                )
+
+              {:error, {:ledger_payment_failed, _reason}} ->
+                finalize_modification_ledger_only(
+                  booking,
+                  payment_intent_id,
+                  payment_intent
+                )
 
               {:error, reason} ->
                 {:error, reason}
@@ -1526,10 +1541,23 @@ defmodule YscWeb.BookingReceiptLive do
     end
   end
 
-  defp modification_ledger_recorded?(booking_id, payment_intent_id) do
-    case Ledgers.get_payment_by_external_id(payment_intent_id) do
-      %{entity_type: :booking, entity_id: ^booking_id} -> true
-      _ -> false
+  defp finalize_modification_ledger_only(
+         booking,
+         payment_intent_id,
+         payment_intent
+       ) do
+    case Bookings.ensure_modification_ledger_recorded(
+           booking,
+           payment_intent_id
+         ) do
+      :ok ->
+        {:ok, reload_booking_for_receipt(booking.id), payment_intent}
+
+      {:error, :modification_not_applied} ->
+        {:error, :modification_hold_expired}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
