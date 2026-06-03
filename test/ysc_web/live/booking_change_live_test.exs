@@ -318,23 +318,18 @@ defmodule YscWeb.BookingChangeLiveTest do
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
 
-    extended_checkout = Date.add(booking.checkout_date, 2)
+    extended_checkout = Date.add(booking.checkout_date, 1)
     checkin_str = date_to_datetime_string(booking.checkin_date)
     extended_checkout_str = date_to_datetime_string(extended_checkout)
-    original_checkout_str = date_to_datetime_string(booking.checkout_date)
 
     {view, _html} = live_change(conn, booking)
 
-    view
-    |> form("#booking-change-form", %{
-      "modification" => %{
-        "checkin_date" => checkin_str,
-        "checkout_date" => extended_checkout_str,
-        "guests_count" => "4",
-        "children_count" => "0"
-      }
-    })
-    |> render_change()
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
 
     view |> element("#acknowledge-forfeiture") |> render_click()
 
@@ -343,9 +338,7 @@ defmodule YscWeb.BookingChangeLiveTest do
       |> form("#booking-change-form", %{
         "modification" => %{
           "checkin_date" => checkin_str,
-          "checkout_date" => extended_checkout_str,
-          "guests_count" => "4",
-          "children_count" => "0"
+          "checkout_date" => extended_checkout_str
         }
       })
       |> render_submit()
@@ -353,22 +346,17 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "Additional payment required"
     assert has_element?(view, "#stripe-payment-container")
 
-    view
-    |> form("#booking-change-form", %{
-      "modification" => %{
-        "checkin_date" => checkin_str,
-        "checkout_date" => original_checkout_str,
-        "guests_count" => "4",
-        "children_count" => "0"
-      }
-    })
-    |> render_change()
+    send(
+      view.pid,
+      {:updated_event,
+       updated_event(booking.checkin_date, booking.checkout_date)}
+    )
 
     html = render(view)
     refute html =~ "Additional payment required"
     refute has_element?(view, "#stripe-payment-container")
     assert has_element?(view, "#submit-modification-button")
-    assert html =~ "$0.00"
+    refute has_element?(view, "#submit-payment")
   end
 
   test "shows downgrade notice when shortening stay reduces total", %{
