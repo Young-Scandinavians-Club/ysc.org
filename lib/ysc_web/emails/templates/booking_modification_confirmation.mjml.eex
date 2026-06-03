@@ -13,8 +13,10 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your reservation has been successfully updated. Below are your new stay details.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" background-color="#FEF3C7" border-left="4px solid #F59E0B" border-radius="6px">
-      <strong>Refund policy:</strong> Because this reservation was modified, cancellation refunds no longer apply if you cancel later.
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      <div class="yellow-alert-box">
+        <strong>Refund policy:</strong> Because this reservation was modified, cancellation refunds no longer apply if you cancel later.
+      </div>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <%= if @dates_changed || @guests_changed do %>
