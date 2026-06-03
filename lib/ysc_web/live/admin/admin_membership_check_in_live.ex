@@ -116,19 +116,13 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                 Search Results
               </.admin_section_heading>
 
-              <div
+              <.admin_icon_empty_state
                 :if={@search_results == []}
-                class="py-10 text-center text-zinc-500"
-              >
-                <.icon
-                  name="hero-magnifying-glass"
-                  class="w-10 h-10 mx-auto mb-2 text-zinc-300"
-                />
-                <p class="font-medium">No members found</p>
-                <p class="text-sm mt-1 text-zinc-400">
-                  Try a different name or email address
-                </p>
-              </div>
+                variant={:compact}
+                icon="hero-magnifying-glass"
+                title="No members found"
+                description="Try a different name or email address"
+              />
 
               <div
                 :if={@search_results != []}
@@ -169,19 +163,15 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               phx-update="stream"
               class="bg-white rounded border border-zinc-200 divide-y divide-zinc-100"
             >
-              <div
+              <.admin_icon_empty_state
                 id="checked-in-members-empty"
-                class="hidden only:flex flex-col items-center py-12 text-zinc-500"
-              >
-                <.icon
-                  name="hero-identification"
-                  class="w-10 h-10 mb-2 text-zinc-300"
-                />
-                <p class="font-medium">No members checked in yet</p>
-                <p class="text-sm mt-1 text-zinc-400">
-                  Use the search bar above to find and check in members
-                </p>
-              </div>
+                variant={:compact}
+                icon="hero-identification"
+                title="No members checked in yet"
+                description="Use the search bar above to find and check in members"
+                class="hidden only:flex flex-col items-center py-12"
+                icon_class="w-10 h-10 mb-2 text-zinc-300"
+              />
 
               <div
                 :for={{dom_id, check_in} <- @streams.checked_in_members}

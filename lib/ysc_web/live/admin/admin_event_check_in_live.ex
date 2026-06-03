@@ -65,22 +65,20 @@ defmodule YscWeb.AdminEventCheckInLive do
           </div>
         <% else %>
           <%!-- Empty state --%>
-          <div
+          <.admin_icon_empty_state
             :if={@total_count == 0 || @filtered_total == 0}
-            class="py-16 text-center text-zinc-500"
-          >
-            <.icon name="hero-ticket" class="w-12 h-12 mx-auto mb-3 text-zinc-300" />
-            <p class="text-lg font-medium">
-              <%= if @search_query != "" do %>
-                No tickets match your search
-              <% else %>
-                No confirmed tickets for this event
-              <% end %>
-            </p>
-            <p :if={@search_query != ""} class="text-sm mt-1">
-              Try a different name, email, or reference ID
-            </p>
-          </div>
+            icon="hero-ticket"
+            title={
+              if @search_query != "",
+                do: "No tickets match your search",
+                else: "No confirmed tickets for this event"
+            }
+            description={
+              if @search_query != "",
+                do: "Try a different name, email, or reference ID",
+                else: nil
+            }
+          />
 
           <%!-- Pending tickets --%>
           <div :if={@filtered_total > 0}>

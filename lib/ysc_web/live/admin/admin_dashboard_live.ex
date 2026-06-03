@@ -540,16 +540,12 @@ defmodule YscWeb.AdminDashboardLive do
               </.link>
             </div>
 
-            <div
+            <.admin_icon_empty_state
               :if={Enum.empty?(@events_with_tickets)}
-              class="text-center py-12 border-2 border-dashed border-zinc-100 rounded-lg"
-            >
-              <.icon
-                name="hero-calendar"
-                class="w-8 h-8 text-zinc-200 mx-auto mb-2"
-              />
-              <p class="text-sm text-zinc-400">No upcoming events</p>
-            </div>
+              variant={:dashed}
+              icon="hero-calendar"
+              title="No upcoming events"
+            />
 
             <ul
               :if={not Enum.empty?(@events_with_tickets)}
@@ -973,16 +969,14 @@ defmodule YscWeb.AdminDashboardLive do
           </.link>
         </div>
 
-        <div
+        <.admin_icon_empty_state
           :if={Enum.empty?(@pending_users)}
-          class="text-center py-8 border-2 border-dashed border-zinc-100 rounded-lg"
-        >
-          <.icon
-            name="hero-check-circle"
-            class="w-7 h-7 text-zinc-200 mx-auto mb-2"
-          />
-          <p class="text-sm text-zinc-400">No pending applications</p>
-        </div>
+          variant={:dashed}
+          icon="hero-check-circle"
+          title="No pending applications"
+          class="py-8"
+          icon_class="w-7 h-7 text-zinc-200 mx-auto mb-2"
+        />
 
         <div :if={not Enum.empty?(@pending_users)} class="space-y-3">
           <div

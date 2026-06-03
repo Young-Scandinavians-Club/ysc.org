@@ -727,6 +727,119 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_icon_empty_state
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Centered hero icon + title empty state for admin pages.
+
+  Used on scanner sessions, check-in flows, and dashboard widgets. Pass `title` as an
+  attribute or override with the `title` slot for dynamic copy.
+
+  ## Variants
+
+  - `:default` — `py-16`, large icon, prominent title (scanner, event check-in)
+  - `:compact` — `py-10`, medium icon (search no-results, stream empty lists)
+  - `:dashed` — dashed border panel for dashboard widgets (default `py-12`)
+
+  ## Examples
+
+      <.admin_icon_empty_state
+        icon="hero-qr-code"
+        title="No scan sessions yet"
+        description="Start a new scan session to begin."
+      />
+
+      <.admin_icon_empty_state
+        variant={:dashed}
+        icon="hero-calendar"
+        title="No upcoming events"
+        class="py-8"
+        icon_class="w-7 h-7 text-zinc-200 mx-auto mb-2"
+      />
+
+      <.admin_icon_empty_state
+        id="checked-in-members-empty"
+        variant={:compact}
+        icon="hero-identification"
+        title="No members checked in yet"
+        description="Use the search bar above to find and check in members"
+        class="hidden only:flex flex-col items-center"
+      />
+  """
+  attr :id, :string, default: nil
+  attr :icon, :string, required: true
+  attr :title, :string, required: true
+  attr :description, :string, default: nil
+
+  attr :variant, :atom,
+    default: :default,
+    values: [:default, :compact, :dashed],
+    doc: "Layout density; :dashed adds a bordered panel (dashboard widgets)"
+
+  attr :icon_class, :any,
+    default: nil,
+    doc: "Override default icon Tailwind classes for the variant"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the outer container"
+
+  slot :action,
+    doc: "Optional CTA below the description (e.g. upload button on media page)"
+
+  def admin_icon_empty_state(assigns) do
+    assigns =
+      assign_new(assigns, :icon_class, fn ->
+        icon_empty_state_icon_class(assigns.variant)
+      end)
+
+    ~H"""
+    <div id={@id} class={icon_empty_state_container_class(@variant, @class)}>
+      <.icon name={@icon} class={@icon_class} />
+      <p :if={@title} class={icon_empty_state_title_class(@variant)}>
+        {@title}
+      </p>
+      <p :if={@description} class={icon_empty_state_description_class(@variant)}>
+        {@description}
+      </p>
+      <div :if={@action != []} class="mt-4">
+        {render_slot(@action)}
+      </div>
+    </div>
+    """
+  end
+
+  defp icon_empty_state_container_class(:default, extra),
+    do: ["py-16 text-center text-zinc-500", extra]
+
+  defp icon_empty_state_container_class(:compact, extra),
+    do: ["py-10 text-center text-zinc-500", extra]
+
+  defp icon_empty_state_container_class(:dashed, extra),
+    do: [
+      "text-center py-12 border-2 border-dashed border-zinc-100 rounded-lg",
+      extra
+    ]
+
+  defp icon_empty_state_icon_class(:default),
+    do: "w-12 h-12 mx-auto mb-3 text-zinc-300"
+
+  defp icon_empty_state_icon_class(:compact),
+    do: "w-10 h-10 mx-auto mb-2 text-zinc-300"
+
+  defp icon_empty_state_icon_class(:dashed),
+    do: "w-8 h-8 text-zinc-200 mx-auto mb-2"
+
+  defp icon_empty_state_title_class(:default), do: "text-lg font-medium"
+  defp icon_empty_state_title_class(:compact), do: "font-medium"
+  defp icon_empty_state_title_class(:dashed), do: "text-sm text-zinc-400"
+
+  defp icon_empty_state_description_class(:default), do: "text-sm mt-1"
+  defp icon_empty_state_description_class(:compact), do: "text-sm mt-1 text-zinc-400"
+  defp icon_empty_state_description_class(:dashed), do: "text-sm mt-1 text-zinc-400"
+
+  # ---------------------------------------------------------------------------
   # admin_tabs / admin_tab
   # ---------------------------------------------------------------------------
 
