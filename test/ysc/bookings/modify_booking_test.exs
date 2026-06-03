@@ -411,6 +411,76 @@ defmodule Ysc.Bookings.ModifyBookingTest do
   end
 
   describe "modification holds" do
+    test "apply_modification with payment uses hold attrs when submitted params differ",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(117)
+      extended_checkout = Date.add(checkout, 1)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      hold_attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, hold_attrs)
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(held_booking, %{
+                 "checkin_date" => Date.to_string(checkin),
+                 "checkout_date" => Date.to_string(extended_checkout),
+                 "guests_count" => "4",
+                 "children_count" => "0"
+               })
+
+      payment_intent_id =
+        "pi_apply_hold_attrs_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      wrong_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "4",
+        "children_count" => "0"
+      }
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, updated} =
+                 Bookings.apply_modification(held_booking, wrong_attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+
+        assert updated.checkout_date == extended_checkout
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
     test "apply_modification after payment skips availability blocked by own hold flags",
          %{
            user: user

@@ -2,6 +2,7 @@ defmodule Ysc.AvatarsTest do
   use Ysc.DataCase, async: true
 
   alias Ysc.Avatars
+  alias Ysc.Accounts.User
 
   import Ysc.AccountsFixtures
 
@@ -174,6 +175,128 @@ defmodule Ysc.AvatarsTest do
 
     test "returns nil for nil avatar" do
       assert is_nil(Avatars.avatar_url(nil, :profile))
+    end
+  end
+
+  describe "resolve_user_avatar_url/2" do
+    test "returns profile URL when current_avatar is preloaded and completed" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          profile_path: "https://example.com/profile.webp",
+          thumb_path: "https://example.com/thumb.webp"
+        })
+
+      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+      user = Ysc.Repo.preload(user, :current_avatar)
+
+      assert Avatars.resolve_user_avatar_url(user, :profile) ==
+               "https://example.com/profile.webp"
+
+      assert Avatars.resolve_user_avatar_url(user, :thumb) ==
+               "https://example.com/thumb.webp"
+    end
+
+    test "returns nil when current_avatar is not preloaded" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          profile_path: "https://example.com/profile.webp"
+        })
+
+      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+
+      refute Ecto.assoc_loaded?(user.current_avatar)
+      assert is_nil(Avatars.resolve_user_avatar_url(user, :profile))
+    end
+
+    test "returns nil when current avatar is still processing" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+      user = Ysc.Repo.preload(user, :current_avatar)
+
+      assert is_nil(Avatars.resolve_user_avatar_url(user, :profile))
+      refute avatar.processing_state == :completed
+    end
+
+    test "returns nil for non-user input" do
+      assert is_nil(Avatars.resolve_user_avatar_url(nil, :profile))
+    end
+  end
+
+  describe "display_avatar_url/2" do
+    test "returns uploaded avatar URL when preloaded and completed" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          profile_path: "https://example.com/display.webp"
+        })
+
+      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+      user = Ysc.Repo.preload(user, :current_avatar)
+
+      assert Avatars.display_avatar_url(user, :profile) ==
+               "https://example.com/display.webp"
+    end
+
+    test "returns country default path when no uploaded avatar is available" do
+      user = user_fixture(%{most_connected_country: "NO"})
+
+      assert Avatars.display_avatar_url(user, :profile) =~
+               "/images/default_avatars/norway"
+    end
+
+    test "uses Sweden defaults for unknown country codes" do
+      user = user_fixture(%{most_connected_country: "XX"})
+
+      url = Avatars.display_avatar_url(user, :thumb)
+      assert url =~ "/images/default_avatars/sweden"
+    end
+
+    test "alternates default image variant based on user id digits" do
+      even_user = %User{
+        id: "0190000000000000000000000",
+        most_connected_country: "SE"
+      }
+
+      odd_user = %User{
+        id: "0190000000000000000000001",
+        most_connected_country: "SE"
+      }
+
+      assert Avatars.display_avatar_url(even_user, :profile) =~ "sweden_flag"
+      assert Avatars.display_avatar_url(odd_user, :profile) =~ "sweden_houses"
     end
   end
 
