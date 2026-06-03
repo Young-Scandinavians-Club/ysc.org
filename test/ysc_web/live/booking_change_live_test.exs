@@ -1,14 +1,16 @@
 defmodule YscWeb.BookingChangeLiveTest do
-  use YscWeb.ConnCase, async: false
+  use YscWeb.ConnCase, async: false, mox_global_first: true
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Mox
 
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingLocker, RoomCategory}
   alias Ysc.Ledgers
   alias Ysc.Repo
+  alias Ysc.StripeMock
 
   setup do
     Ledgers.ensure_basic_accounts()
@@ -289,6 +291,82 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert html =~ "modification-preview-error"
     assert html =~ "Total room capacity is 4"
+  end
+
+  test "payment form keeps amount after preview is cleared by validate", %{
+    conn: conn
+  } do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: "pi_change_upgrade",
+         client_secret: "pi_change_upgrade_secret",
+         status: "requires_payment_method"
+       }}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    extended_checkout = Date.add(booking.checkout_date, 2)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+    original_checkout_str = date_to_datetime_string(booking.checkout_date)
+
+    {view, _html} = live_change(conn, booking)
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str,
+        "guests_count" => "4",
+        "children_count" => "0"
+      }
+    })
+    |> render_change()
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    html =
+      view
+      |> form("#booking-change-form", %{
+        "modification" => %{
+          "checkin_date" => checkin_str,
+          "checkout_date" => extended_checkout_str,
+          "guests_count" => "4",
+          "children_count" => "0"
+        }
+      })
+      |> render_submit()
+
+    assert html =~ "Additional payment required"
+    assert has_element?(view, "#stripe-payment-container")
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => original_checkout_str,
+        "guests_count" => "4",
+        "children_count" => "0"
+      }
+    })
+    |> render_change()
+
+    html = render(view)
+    assert html =~ "Additional payment required"
+    assert html =~ "Pay $"
+    assert has_element?(view, "#stripe-payment-container")
   end
 
   test "shows downgrade notice when shortening stay reduces total", %{

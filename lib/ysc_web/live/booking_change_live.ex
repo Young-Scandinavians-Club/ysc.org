@@ -104,7 +104,7 @@ defmodule YscWeb.BookingChangeLive do
         socket
         |> assign(:form, form)
         |> assign(:checkout_date_tooltips, checkout_tooltips)
-        |> run_preview(params)
+        |> maybe_run_preview(params)
 
       {:noreply, socket}
     else
@@ -159,7 +159,7 @@ defmodule YscWeb.BookingChangeLive do
           :checkout_date_tooltips,
           checkout_tooltips_for_params(socket, params)
         )
-        |> run_preview(params)
+        |> maybe_run_preview(params)
 
       {:noreply, socket}
     else
@@ -273,7 +273,8 @@ defmodule YscWeb.BookingChangeLive do
      |> assign(:guest_info_form, nil)
      |> assign(:guest_info_errors, %{})
      |> assign(:show_payment_form, false)
-     |> assign(:payment_intent, nil)}
+     |> assign(:payment_intent, nil)
+     |> assign(:payment_delta, nil)}
   end
 
   @impl true
@@ -618,13 +619,13 @@ defmodule YscWeb.BookingChangeLive do
         </div>
       <% end %>
 
-      <%= if @show_payment_form && @payment_intent do %>
+      <%= if @show_payment_form && @payment_intent && @payment_delta do %>
         <div class="mt-8 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
           <h2 class="text-lg font-semibold text-zinc-900 mb-2">
             Additional payment required
           </h2>
           <p class="text-sm text-zinc-600 mb-4">
-            Pay {MoneyHelper.format_money!(@preview.delta)} to confirm your reservation changes.
+            Pay {MoneyHelper.format_money!(@payment_delta)} to confirm your reservation changes.
           </p>
 
           <%= if @payment_error do %>
@@ -656,7 +657,7 @@ defmodule YscWeb.BookingChangeLive do
             disabled={!@stripe_payment_element_ready || @submitting}
           >
             <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
-            Pay {MoneyHelper.format_money!(@preview.delta)} and save changes
+            Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
           </.button>
         </div>
       <% end %>
@@ -675,6 +676,7 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:acknowledged, false)
     |> assign(:submitting, false)
     |> assign(:payment_intent, nil)
+    |> assign(:payment_delta, nil)
     |> assign(:show_payment_form, false)
     |> assign(:stripe_payment_element_ready, false)
     |> assign(:payment_error, nil)
@@ -748,6 +750,14 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp apply_preview_result(socket, preview_result) do
+    if socket.assigns.show_payment_form do
+      socket
+    else
+      do_apply_preview_result(socket, preview_result)
+    end
+  end
+
+  defp do_apply_preview_result(socket, preview_result) do
     case preview_result do
       {:ok, preview} ->
         assign(socket, preview: preview, preview_error: nil)
@@ -862,6 +872,14 @@ defmodule YscWeb.BookingChangeLive do
     end
   end
 
+  defp maybe_run_preview(socket, params) do
+    if socket.assigns.show_payment_form do
+      socket
+    else
+      run_preview(socket, params)
+    end
+  end
+
   defp run_preview(socket, params) do
     opts =
       case socket.assigns[:availability_snapshot] do
@@ -963,6 +981,7 @@ defmodule YscWeb.BookingChangeLive do
          |> assign(:step, :edit)
          |> assign(:pending_modification_params, params)
          |> assign(:payment_intent, payment_intent)
+         |> assign(:payment_delta, preview.delta)
          |> assign(:show_payment_form, true)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:payment_error, nil)}
