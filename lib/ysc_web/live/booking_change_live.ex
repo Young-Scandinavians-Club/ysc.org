@@ -205,7 +205,7 @@ defmodule YscWeb.BookingChangeLive do
     params = normalize_modification_params(params)
 
     if socket.assigns.acknowledged do
-      case Bookings.prepare_modification(booking, params) do
+      case Bookings.prepare_modification(booking, params, preview_opts(socket)) do
         {:ok, preview} ->
           socket =
             socket
@@ -954,11 +954,34 @@ defmodule YscWeb.BookingChangeLive do
     end
   end
 
-  defp preview_opts(_socket) do
-    # Always rebuild availability for previews. The cached snapshot from initial
-    # page load can be stale after a modification hold is placed (buyout_held on
-    # held days would block the member's own pending change).
-    []
+  defp preview_opts(socket) do
+    # Rebuild while the payment hold is active: inventory rows get buyout_held and
+    # a cached snapshot from before the hold would block the member's own change.
+    if socket.assigns.show_payment_form or
+         is_nil(socket.assigns.availability_snapshot) do
+      []
+    else
+      [availability_snapshot: socket.assigns.availability_snapshot]
+    end
+  end
+
+  defp refresh_availability_snapshot(socket) do
+    if socket.assigns.change_data_loaded? do
+      booking = socket.assigns.booking
+
+      snapshot =
+        ModificationDateAvailability.build_availability_snapshot(
+          booking,
+          socket.assigns.calendar_min_date,
+          socket.assigns.calendar_max_date,
+          socket.assigns.today,
+          socket.assigns.seasons
+        )
+
+      assign(socket, :availability_snapshot, snapshot)
+    else
+      assign(socket, :availability_snapshot, nil)
+    end
   end
 
   defp sync_payment_form_with_preview(socket, params) do
@@ -1008,14 +1031,16 @@ defmodule YscWeb.BookingChangeLive do
         socket
       end
 
-    assign(socket,
-      show_payment_form: false,
-      payment_intent: nil,
-      payment_delta: nil,
-      availability_snapshot: nil,
-      stripe_payment_element_ready: false,
-      payment_error: nil
-    )
+    socket =
+      assign(socket,
+        show_payment_form: false,
+        payment_intent: nil,
+        payment_delta: nil,
+        stripe_payment_element_ready: false,
+        payment_error: nil
+      )
+
+    refresh_availability_snapshot(socket)
   end
 
   defp modification_params_for_payment_apply(socket, booking) do
