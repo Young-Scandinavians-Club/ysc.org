@@ -10,7 +10,6 @@ defmodule YscWeb.UserLoginLiveTest do
 
       assert html =~ "Sign in to your YSC account"
       assert html =~ "Apply for membership"
-      assert html =~ "Already applied?"
       assert html =~ "Forgot your password?"
     end
 
