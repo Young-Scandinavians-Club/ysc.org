@@ -760,7 +760,7 @@ defmodule Ysc.Bookings do
                 error: reason
               )
 
-              result
+              {:error, {:ledger_payment_failed, reason}}
           end
 
         other ->
@@ -781,6 +781,133 @@ defmodule Ysc.Bookings do
     else
       :ok
     end
+  end
+
+  @doc """
+  Idempotently records a modification payment in the ledger when the booking
+  already reflects the change but the payment intent is not yet recorded.
+
+  Used to recover from ledger write failures after `apply_modification/3`
+  commits inventory and date changes.
+  """
+  def ensure_modification_ledger_recorded(
+        %Booking{} = booking,
+        payment_intent_id
+      ) do
+    booking = Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
+
+    if modification_ledger_recorded?(booking.id, payment_intent_id) do
+      :ok
+    else
+      with {:ok, amount} <-
+             modification_payment_amount_from_intent(
+               payment_intent_id,
+               booking.id,
+               booking.user_id
+             ),
+           true <- modification_payment_balance_due?(booking, amount) do
+        record_modification_ledger_payment(booking, payment_intent_id, amount)
+      else
+        false -> {:error, :modification_not_applied}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  @doc false
+  def modification_ledger_recorded?(booking_id, payment_intent_id) do
+    case Ledgers.get_payment_by_external_id(payment_intent_id) do
+      nil ->
+        false
+
+      payment ->
+        from(e in Ysc.Ledgers.LedgerEntry,
+          where: e.payment_id == ^payment.id,
+          where: e.related_entity_type == ^:booking,
+          where: e.related_entity_id == ^booking_id,
+          limit: 1
+        )
+        |> Repo.exists?()
+    end
+  end
+
+  defp modification_payment_amount_from_intent(
+         payment_intent_id,
+         booking_id,
+         user_id
+       ) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
+      {:ok, %{status: "succeeded"} = payment_intent} ->
+        metadata = payment_intent.metadata || %{}
+
+        metadata_booking_id =
+          Map.get(metadata, "booking_id") || Map.get(metadata, :booking_id)
+
+        metadata_user_id =
+          Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
+        modification_flag =
+          Map.get(metadata, "modification") || Map.get(metadata, :modification)
+
+        cond do
+          modification_flag not in ["true", true] ->
+            {:error, :payment_metadata_mismatch}
+
+          to_string(metadata_booking_id || "") != to_string(booking_id) ->
+            {:error, :payment_metadata_mismatch}
+
+          to_string(metadata_user_id || "") != to_string(user_id) ->
+            {:error, :payment_metadata_mismatch}
+
+          true ->
+            {:ok, stripe_cents_to_money(payment_intent.amount, :USD)}
+        end
+
+      {:ok, _} ->
+        {:error, :payment_not_succeeded}
+
+      {:error, reason} ->
+        {:error, {:payment_verification_failed, reason}}
+    end
+  end
+
+  defp modification_payment_balance_due?(%Booking{} = booking, amount) do
+    recorded_total = sum_booking_stripe_payment_entries(booking.id)
+
+    case Money.sub(booking.total_price, recorded_total) do
+      {:ok, remaining} ->
+        Money.positive?(amount) and Money.cmp(remaining, amount) == 0
+
+      {:error, _} ->
+        false
+    end
+  end
+
+  defp stripe_cents_to_money(cents, currency) when is_integer(cents) do
+    cents_decimal = Decimal.new(cents)
+    dollars = Decimal.div(cents_decimal, Decimal.new(100))
+    Money.new(currency, dollars)
+  end
+
+  defp sum_booking_stripe_payment_entries(booking_id) do
+    from(e in Ysc.Ledgers.LedgerEntry,
+      join: a in Ysc.Ledgers.LedgerAccount,
+      on: e.account_id == a.id,
+      where: e.related_entity_type == ^:booking,
+      where: e.related_entity_id == ^booking_id,
+      where: e.debit_credit == "debit",
+      where: a.name == "stripe_account",
+      where: not is_nil(e.payment_id)
+    )
+    |> Repo.all()
+    |> Enum.reduce(Money.new(0, :USD), fn entry, acc ->
+      case Money.add(acc, entry.amount) do
+        {:ok, sum} -> sum
+        {:error, _} -> acc
+      end
+    end)
   end
 
   defp record_modification_ledger_payment(booking, payment_intent_id, amount) do
@@ -809,7 +936,7 @@ defmodule Ysc.Bookings do
 
         case Ledgers.process_payment(attrs) do
           {:ok, _} -> :ok
-          {:error, reason} -> {:error, {:ledger_payment_failed, reason}}
+          {:error, reason} -> {:error, reason}
         end
 
       {:error, reason} ->

@@ -851,6 +851,202 @@ defmodule Ysc.Bookings.ModifyBookingTest do
     end
   end
 
+  describe "modification ledger recovery" do
+    test "ensure_modification_ledger_recorded records missing payment after applied modification",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(119)
+      extended_checkout = Date.add(checkout, 1)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      string_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(extended_checkout),
+        "guests_count" => "4",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
+      assert Money.positive?(preview.delta)
+
+      hold_attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, hold_attrs)
+
+      payment_intent_id =
+        "pi_ledger_recovery_#{System.unique_integer([:positive])}"
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, updated} =
+                 BookingLocker.modify_complete_booking(
+                   held_booking,
+                   hold_attrs,
+                   previous_details: %{
+                     checkin_date: booking.checkin_date,
+                     checkout_date: booking.checkout_date,
+                     guests_count: booking.guests_count,
+                     children_count: booking.children_count || 0,
+                     total_price: booking.total_price
+                   }
+                 )
+
+        assert updated.checkout_date == extended_checkout
+        assert is_nil(Ledgers.get_payment_by_external_id(payment_intent_id))
+
+        {:ok, balance_due} = Money.sub(updated.total_price, booking.total_price)
+        amount_cents = Ysc.MoneyHelper.money_to_cents(balance_due)
+        assert amount_cents == Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => to_string(booking.id),
+               "user_id" => to_string(user.id),
+               "modification" => "true"
+             },
+             latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+           }}
+        end)
+
+        assert :ok =
+                 Bookings.ensure_modification_ledger_recorded(
+                   updated,
+                   payment_intent_id
+                 )
+
+        assert Ledgers.get_payment_by_external_id(payment_intent_id)
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "ensure_modification_ledger_recorded is idempotent when ledger already recorded",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(121)
+      extended_checkout = Date.add(checkout, 1)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      string_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(extended_checkout),
+        "guests_count" => "4",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, %{
+                 checkin_date: checkin,
+                 checkout_date: extended_checkout,
+                 guests_count: 4,
+                 children_count: 0
+               })
+
+      payment_intent_id =
+        "pi_ledger_idempotent_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, updated} =
+                 Bookings.apply_modification(held_booking, string_attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+
+        assert :ok =
+                 Bookings.ensure_modification_ledger_recorded(
+                   updated,
+                   payment_intent_id
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "ensure_modification_ledger_recorded rejects when modification was not applied",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(120)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      payment_intent_id =
+        "pi_ledger_no_mod_#{System.unique_integer([:positive])}"
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: 5_000,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error, :modification_not_applied} =
+                 Bookings.ensure_modification_ledger_recorded(
+                   booking,
+                   payment_intent_id
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+  end
+
   defp first_friday_on_or_after(date) do
     days_until_friday = rem(5 - Date.day_of_week(date, :monday) + 7, 7)
     Date.add(date, days_until_friday)
