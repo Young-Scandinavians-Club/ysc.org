@@ -1731,6 +1731,52 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "× 3"
     end
 
+    test "buyout line amount matches nights × rate when subtotal_price is stale",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :buyout,
+          total_price: Money.new(1275, :USD),
+          subtotal_price: Money.new(850, :USD)
+        })
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "buyout",
+            "nights" => 3,
+            "price_per_night" => %{"amount" => "425", "currency" => "USD"},
+            "total" => %{"amount" => "1275", "currency" => "USD"}
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+
+      create_payment_for_booking(booking, Money.new(850, :USD))
+      create_payment_for_booking(booking, Money.new(425, :USD))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      assert has_element?(
+               view,
+               "#payment-summary-buyout-line",
+               "($425.00 × 3 nights)"
+             )
+
+      assert has_element?(view, "#payment-summary-buyout-line", "$1,275.00")
+      refute has_element?(view, "#payment-summary-buyout-line", "$850.00")
+    end
+
     test "renders room breakdown with children line when pricing_items include room rooms",
          %{
            conn: conn

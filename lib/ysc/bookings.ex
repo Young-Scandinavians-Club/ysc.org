@@ -683,7 +683,7 @@ defmodule Ysc.Bookings do
          :ok <- ensure_modification_changed(booking, parsed),
          {:ok, user} <- fetch_modification_user(booking),
          {:ok, _} <- validate_modification_changeset(booking, parsed, user),
-         :ok <- validate_modification_availability(booking, parsed, opts),
+         :ok <- maybe_validate_modification_availability(booking, parsed, opts),
          {:ok, priced} <-
            calculate_modification_pricing(
              build_preview_booking(booking, parsed)
@@ -717,11 +717,13 @@ defmodule Ysc.Bookings do
   Applies a booking modification after optional payment verification.
   """
   def apply_modification(%Booking{} = booking, attrs, opts \\ []) do
-    booking = Repo.preload(booking, [:rooms, :user])
+    booking = Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
+    attrs = attrs_for_paid_modification_apply(booking, attrs, opts)
+    prepare_opts = prepare_modification_opts_for_apply(opts)
 
     with :ok <- validate_modification_eligible(booking),
          {:ok, parsed} <- parse_modification_attrs(booking, attrs),
-         {:ok, preview} <- prepare_modification(booking, attrs),
+         {:ok, preview} <- prepare_modification(booking, attrs, prepare_opts),
          :ok <- verify_modification_payment(preview, booking, opts),
          :ok <-
            ensure_modification_hold_for_apply(booking, parsed, preview, opts) do
@@ -835,6 +837,49 @@ defmodule Ysc.Bookings do
   """
   def release_modification_hold(booking_id, opts \\ []) do
     Ysc.Bookings.BookingLocker.release_modification_hold(booking_id, opts)
+  end
+
+  @doc """
+  Returns modification form params stored on an active payment hold, if any.
+  """
+  def modification_hold_form_params(%Booking{modification_hold_attrs: attrs})
+      when is_map(attrs) do
+    if is_binary(attrs["checkin_date"]) and is_binary(attrs["checkout_date"]) do
+      %{
+        "checkin_date" => attrs["checkin_date"],
+        "checkout_date" => attrs["checkout_date"],
+        "guests_count" => attrs["guests_count"] |> to_string(),
+        "children_count" => Map.get(attrs, "children_count", 0) |> to_string()
+      }
+    else
+      nil
+    end
+  end
+
+  def modification_hold_form_params(_), do: nil
+
+  defp maybe_validate_modification_availability(booking, parsed, opts) do
+    if Keyword.get(opts, :skip_availability_check) do
+      :ok
+    else
+      validate_modification_availability(booking, parsed, opts)
+    end
+  end
+
+  defp attrs_for_paid_modification_apply(booking, attrs, opts) do
+    if Keyword.get(opts, :payment_intent_id) do
+      modification_hold_form_params(booking) || attrs
+    else
+      attrs
+    end
+  end
+
+  defp prepare_modification_opts_for_apply(opts) do
+    if Keyword.get(opts, :payment_intent_id) do
+      Keyword.put(opts, :skip_availability_check, true)
+    else
+      opts
+    end
   end
 
   defp validate_modification_checkin_not_past(parsed) do
@@ -1219,12 +1264,21 @@ defmodule Ysc.Bookings do
         }
 
       :buyout ->
-        Map.merge(breakdown, %{
+        price_per_night_map =
+          case Map.get(breakdown, :price_per_night) ||
+                 Map.get(breakdown, "price_per_night") do
+            %Money{} = money -> money_map(money)
+            other -> other
+          end
+
+        %{
           "type" => "buyout",
           "nights" => nights,
           "guests_count" => booking.guests_count,
+          "price_per_night" => price_per_night_map,
+          "subtotal" => money_map(priced.subtotal),
           "total" => total_map
-        })
+        }
     end
   end
 

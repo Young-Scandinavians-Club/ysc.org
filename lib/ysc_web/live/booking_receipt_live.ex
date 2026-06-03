@@ -793,7 +793,10 @@ defmodule YscWeb.BookingReceiptLive do
                   <%= case @booking.booking_mode do %>
                     <% :buyout -> %>
                       <%= if @price_breakdown.nights && @price_breakdown.price_per_night do %>
-                        <div class="flex justify-between">
+                        <div
+                          id="payment-summary-buyout-line"
+                          class="flex justify-between"
+                        >
                           <span class={
                             if(@booking.status == :canceled,
                               do: "text-zinc-600",
@@ -815,7 +818,7 @@ defmodule YscWeb.BookingReceiptLive do
                             )
                           }>
                             {MoneyHelper.format_money!(
-                              @booking.subtotal_price || @payment.amount
+                              buyout_line_amount(@price_breakdown, @booking)
                             )}
                           </span>
                         </div>
@@ -1855,6 +1858,18 @@ defmodule YscWeb.BookingReceiptLive do
       true ->
         nil
     end
+  end
+
+  defp buyout_line_amount(
+         %{price_per_night: price_per_night, nights: nights},
+         _booking
+       )
+       when not is_nil(price_per_night) and is_integer(nights) and nights > 0 do
+    Money.mult!(price_per_night, nights)
+  end
+
+  defp buyout_line_amount(_price_breakdown, booking) do
+    booking.subtotal_price || booking.total_price
   end
 
   defp parse_pricing_items(nil), do: nil

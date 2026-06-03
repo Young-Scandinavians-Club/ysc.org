@@ -472,8 +472,8 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
 
         blocked_buyout =
           not day_in_old and
-            (pi.buyout_held == true or pi.buyout_booked == true) and
-            not (our_hold and pi.buyout_held == true)
+            not our_hold and
+            (pi.buyout_held == true or pi.buyout_booked == true)
 
         blocked_capacity =
           booking.property == :clear_lake and not day_in_old and

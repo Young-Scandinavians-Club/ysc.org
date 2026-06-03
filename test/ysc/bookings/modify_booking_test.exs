@@ -158,6 +158,10 @@ defmodule Ysc.Bookings.ModifyBookingTest do
         assert updated.checkout_date == new_checkout
         assert updated.refund_forfeited_at
 
+        {:ok, priced} = Bookings.calculate_modification_pricing(updated)
+        assert Money.equal?(updated.subtotal_price, priced.subtotal)
+        assert Money.equal?(updated.total_price, priced.total)
+
         assert_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
           args: %{"template" => "booking_modification_confirmation"}
@@ -389,6 +393,73 @@ defmodule Ysc.Bookings.ModifyBookingTest do
   end
 
   describe "modification holds" do
+    test "apply_modification after payment skips availability blocked by own hold flags",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(118)
+      extended_checkout = Date.add(checkout, 1)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      string_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(extended_checkout),
+        "guests_count" => "4",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
+      assert Money.positive?(preview.delta)
+
+      hold_attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, hold_attrs)
+
+      payment_intent_id =
+        "pi_apply_skip_avail_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, updated} =
+                 Bookings.apply_modification(held_booking, string_attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+
+        assert updated.checkout_date == extended_checkout
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
     test "validate_modification_dates honors active modification hold on stale snapshot",
          %{
            user: user
