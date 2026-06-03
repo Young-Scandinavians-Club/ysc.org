@@ -495,6 +495,10 @@ defmodule Ysc.Accounts do
 
   """
   def register_user(attrs) do
+    started_at = extract_registration_started(attrs)
+    family_invite_id = extract_registration_family_invite_id(attrs)
+    attrs = sanitize_registration_attrs(attrs)
+
     Repo.transaction(fn ->
       case %User{}
            |> User.registration_changeset(attrs, require_password: false)
@@ -503,6 +507,7 @@ defmodule Ysc.Accounts do
           # Preload registration_form within the same transaction
           # This ensures the association is available immediately after insert
           user = Repo.preload(user, :registration_form)
+          user = stamp_signup_application_submission(user, started_at)
 
           # Copy date_of_birth from registration_form if not already set
           user =
@@ -520,7 +525,8 @@ defmodule Ysc.Accounts do
               user
             end
 
-          user = link_family_invite_to_signup_application(user, attrs)
+          user =
+            link_family_invite_to_signup_application(user, family_invite_id)
 
           # Create billing address from signup application
           # This happens within the same transaction, so registration_form is guaranteed to be available
@@ -602,14 +608,169 @@ defmodule Ysc.Accounts do
     end
   end
 
+  @registration_form_client_drop_keys ~w(
+    started completed family_invite_id user_id
+    reviewed_at review_outcome reviewed_by_user_id
+  )a
+
+  defp sanitize_registration_attrs(attrs) when is_map(attrs) do
+    attrs
+    |> sanitize_registration_form_attrs()
+    |> sanitize_family_members_attrs()
+  end
+
+  defp sanitize_registration_form_attrs(attrs) do
+    case registration_form_params(attrs) do
+      nil ->
+        attrs
+
+      form ->
+        put_registration_form_params(
+          attrs,
+          drop_registration_form_client_keys(form)
+        )
+    end
+  end
+
+  defp drop_registration_form_client_keys(form) when is_map(form) do
+    string_keys = Enum.map(@registration_form_client_drop_keys, &to_string/1)
+    Map.drop(form, @registration_form_client_drop_keys ++ string_keys)
+  end
+
+  defp sanitize_family_members_attrs(attrs) do
+    cond do
+      is_list(Map.get(attrs, "family_members")) ->
+        Map.put(
+          attrs,
+          "family_members",
+          sanitize_family_member_list(attrs["family_members"])
+        )
+
+      is_list(Map.get(attrs, :family_members)) ->
+        Map.put(
+          attrs,
+          :family_members,
+          sanitize_family_member_list(attrs[:family_members])
+        )
+
+      is_map(Map.get(attrs, "family_members")) ->
+        Map.put(
+          attrs,
+          "family_members",
+          sanitize_family_member_map(attrs["family_members"])
+        )
+
+      is_map(Map.get(attrs, :family_members)) ->
+        Map.put(
+          attrs,
+          :family_members,
+          sanitize_family_member_map(attrs[:family_members])
+        )
+
+      true ->
+        attrs
+    end
+  end
+
+  defp sanitize_family_member_list(members),
+    do: Enum.map(members, &drop_family_member_client_keys/1)
+
+  defp sanitize_family_member_map(members),
+    do:
+      Map.new(members, fn {key, member} ->
+        {key, drop_family_member_client_keys(member)}
+      end)
+
+  defp drop_family_member_client_keys(member) when is_map(member) do
+    Map.drop(member, ["id", "user_id", :id, :user_id])
+  end
+
+  defp drop_family_member_client_keys(other), do: other
+
+  defp registration_form_params(attrs) do
+    Map.get(attrs, "registration_form") || Map.get(attrs, :registration_form)
+  end
+
+  defp put_registration_form_params(attrs, form) do
+    if Map.has_key?(attrs, "registration_form") do
+      Map.put(attrs, "registration_form", form)
+    else
+      Map.put(attrs, :registration_form, form)
+    end
+  end
+
+  defp extract_registration_started(attrs) do
+    attrs
+    |> registration_form_params()
+    |> case do
+      nil -> nil
+      form -> Map.get(form, "started") || Map.get(form, :started)
+    end
+    |> parse_registration_timestamp()
+    |> case do
+      nil -> DateTime.utc_now() |> DateTime.truncate(:second)
+      dt -> dt
+    end
+  end
+
+  defp parse_registration_timestamp(nil), do: nil
+
+  defp parse_registration_timestamp(%DateTime{} = dt),
+    do: DateTime.truncate(dt, :second)
+
+  defp parse_registration_timestamp(value) when is_binary(value) do
+    case DateTime.from_iso8601(value) do
+      {:ok, dt, _} ->
+        DateTime.truncate(dt, :second)
+
+      _ ->
+        case NaiveDateTime.from_iso8601(value) do
+          {:ok, naive} ->
+            naive
+            |> DateTime.from_naive!("Etc/UTC")
+            |> DateTime.truncate(:second)
+
+          _ ->
+            nil
+        end
+    end
+  end
+
+  defp parse_registration_timestamp(_), do: nil
+
+  defp stamp_signup_application_submission(%User{} = user, started_at) do
+    completed_at = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    case user.registration_form do
+      %SignupApplication{} = application ->
+        case application
+             |> Ecto.Changeset.change(%{
+               started: started_at,
+               completed: completed_at
+             })
+             |> Repo.update() do
+          {:ok, _} -> Repo.preload(user, :registration_form, force: true)
+          {:error, _} -> user
+        end
+
+      _ ->
+        user
+    end
+  end
+
+  defp extract_registration_family_invite_id(attrs) do
+    case registration_form_params(attrs) do
+      nil ->
+        nil
+
+      form ->
+        Map.get(form, "family_invite_id") || Map.get(form, :family_invite_id)
+    end
+  end
+
   # Links a family invite to the signup application only when the invite email matches
   # the registering user. Ignores forged `family_invite_id` values from client params.
-  defp link_family_invite_to_signup_application(user, attrs) do
-    invite_id =
-      attrs
-      |> Map.get("registration_form", %{})
-      |> Map.get("family_invite_id")
-
+  defp link_family_invite_to_signup_application(user, invite_id) do
     with invite_id when is_binary(invite_id) and invite_id != "" <- invite_id,
          %SignupApplication{} = application <- user.registration_form,
          %FamilyInvite{} = invite <- Repo.get(FamilyInvite, invite_id),

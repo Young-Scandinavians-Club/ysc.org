@@ -105,9 +105,12 @@ defmodule Ysc.Accounts.SignupApplication do
     :spoken_languages,
     :hear_about_the_club,
     :agreed_to_bylaws,
-    :started,
-    :completed,
     :browser_timezone
+  ]
+
+  @timestamp_fields [
+    :started,
+    :completed
   ]
 
   @privileged_fields [
@@ -121,8 +124,8 @@ defmodule Ysc.Accounts.SignupApplication do
   @doc """
   Changeset for public membership registration (LiveView / `register_user/1`).
 
-  Does not cast admin review fields, `user_id`, or `family_invite_id` — those must
-  be set only by trusted server code after insert.
+  Does not cast admin review fields, `user_id`, `family_invite_id`, `started`, or
+  `completed` — those must be set only by trusted server code (`register_user/1`).
   """
   def registration_application_changeset(application, attrs, opts \\ []) do
     application
@@ -160,7 +163,10 @@ defmodule Ysc.Accounts.SignupApplication do
         ) :: Ecto.Changeset.t()
   def application_changeset(application, attrs, opts \\ []) do
     application
-    |> cast(attrs, @registration_fields ++ @privileged_fields)
+    |> cast(
+      attrs,
+      @registration_fields ++ @timestamp_fields ++ @privileged_fields
+    )
     |> validate_required([
       :membership_type,
       :birth_date,

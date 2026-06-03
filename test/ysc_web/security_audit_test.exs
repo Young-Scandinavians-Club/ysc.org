@@ -28,9 +28,12 @@ defmodule YscWeb.SecurityAuditTest do
   import Mox
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
   alias YscWeb.AuthController
+
+  import Ysc.AccountsFixtures
 
   setup :verify_on_exit!
 
@@ -541,7 +544,8 @@ defmodule YscWeb.SecurityAuditTest do
     test "registration insert ignores board_position in params", %{} do
       alias Ysc.Accounts.User
 
-      email = "board_mass_assign_#{System.unique_integer([:positive])}@example.com"
+      email =
+        "board_mass_assign_#{System.unique_integer([:positive])}@example.com"
 
       attrs = %{
         email: email,
@@ -664,7 +668,8 @@ defmodule YscWeb.SecurityAuditTest do
           most_connected_nordic_country: "Norway",
           agreed_to_bylaws: true,
           review_outcome: "approved",
-          reviewed_at: ~U[2024-01-01 00:00:00Z]
+          reviewed_at: ~U[2024-01-01 00:00:00Z],
+          reviewed_by_user_id: Ecto.ULID.generate()
         }
       }
 
@@ -677,6 +682,126 @@ defmodule YscWeb.SecurityAuditTest do
       assert user.registration_form
       assert is_nil(user.registration_form.review_outcome)
       assert is_nil(user.registration_form.reviewed_at)
+      assert is_nil(user.registration_form.reviewed_by_user_id)
+    end
+
+    test "registration insert ignores reviewed_by_user_id from registration_form params",
+         %{} do
+      admin = user_fixture(%{role: :admin})
+
+      attrs =
+        security_registration_attrs(%{
+          registration_form: %{
+            reviewed_by_user_id: admin.id
+          }
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert is_nil(user.registration_form.reviewed_by_user_id)
+    end
+
+    test "register_user ignores forged completed timestamp on signup application",
+         %{} do
+      forged_completed = ~U[2001-01-01 00:00:00Z]
+
+      attrs =
+        security_registration_attrs(%{
+          registration_form: %{completed: forged_completed}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert user.registration_form.completed
+
+      refute DateTime.compare(
+               user.registration_form.completed,
+               forged_completed
+             ) == :eq
+
+      assert DateTime.diff(
+               DateTime.utc_now(),
+               user.registration_form.completed,
+               :second
+             ) <
+               30
+    end
+  end
+
+  describe "registration hardening: family invite and family members" do
+    test "register_user does not link family_invite when email does not match invite",
+         %{} do
+      primary =
+        user_fixture(%{state: :active})
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      invited_email =
+        "invited_#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, invite} = FamilyInvites.create_invite(primary, invited_email)
+
+      attacker_email =
+        "attacker_#{System.unique_integer([:positive])}@example.com"
+
+      attrs =
+        security_registration_attrs(%{
+          email: attacker_email,
+          registration_form: %{family_invite_id: invite.id}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert user.email == attacker_email
+      assert is_nil(user.registration_form.family_invite_id)
+    end
+
+    test "register_user does not reassign an existing family member via forged id",
+         %{} do
+      victim = user_fixture()
+
+      victim_member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "Victim",
+          last_name: "Child",
+          type: "child",
+          birth_date: ~D[2015-01-01]
+        })
+        |> Ecto.Changeset.put_change(:user_id, victim.id)
+        |> Repo.insert!()
+
+      attacker_email =
+        "attacker_fm_#{System.unique_integer([:positive])}@example.com"
+
+      attrs =
+        security_registration_attrs(%{
+          email: attacker_email,
+          registration_form: %{membership_type: "family"},
+          family_members: [
+            %{
+              "id" => victim_member.id,
+              "type" => "child",
+              "first_name" => "Stolen",
+              "last_name" => "Child",
+              "birth_date" => "2016-02-02"
+            }
+          ]
+        })
+
+      assert {:ok, attacker} = Accounts.register_user(attrs)
+
+      victim_member = Repo.get!(FamilyMember, victim_member.id)
+      assert victim_member.user_id == victim.id
+
+      attacker = Accounts.get_user!(attacker.id, [:family_members])
+      refute Enum.any?(attacker.family_members, &(&1.id == victim_member.id))
     end
   end
 
@@ -731,5 +856,46 @@ defmodule YscWeb.SecurityAuditTest do
       assert {:ok, _code} =
                Ysc.VerificationCache.get_code(user.id, :email_verification)
     end
+  end
+
+  defp security_registration_attrs(overrides) do
+    email = "security_reg_#{System.unique_integer([:positive])}@example.com"
+
+    base = %{
+      email: email,
+      first_name: "Security",
+      last_name: "Tester",
+      phone_number: unique_user_phone(),
+      registration_form: %{
+        membership_type: "single",
+        membership_eligibility: ["born_in_scandinavia"],
+        birth_date: ~D[1990-01-01],
+        address: "123 St",
+        country: "USA",
+        city: "SF",
+        postal_code: "94107",
+        place_of_birth: "Oslo",
+        citizenship: "Norwegian",
+        most_connected_nordic_country: "Norway",
+        agreed_to_bylaws: true
+      }
+    }
+
+    deep_merge_security_attrs(base, overrides)
+  end
+
+  defp deep_merge_security_attrs(base, overrides) when is_map(overrides) do
+    Map.merge(base, overrides, fn
+      :registration_form, base_form, override_form
+      when is_map(base_form) and is_map(override_form) ->
+        Map.merge(base_form, override_form)
+
+      "registration_form", base_form, override_form
+      when is_map(base_form) and is_map(override_form) ->
+        Map.merge(base_form, override_form)
+
+      _key, _base_val, override_val ->
+        override_val
+    end)
   end
 end

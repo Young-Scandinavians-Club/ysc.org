@@ -48,21 +48,23 @@ defmodule Ysc.AccountsFixtures do
     attrs = Map.new(attrs)
     role = Map.get(attrs, :role, :member)
     state = Map.get(attrs, :state, :active)
+    board_position = Map.get(attrs, :board_position)
 
     {:ok, user} =
       attrs
-      |> Map.drop([:role, :state])
+      |> Map.drop([:role, :state, :board_position])
       |> valid_user_attributes()
       |> Ysc.Accounts.register_user()
 
-    apply_fixture_role_state(user, role, state)
+    apply_fixture_role_state(user, role, state, board_position)
   end
 
-  defp apply_fixture_role_state(user, role, state) do
+  defp apply_fixture_role_state(user, role, state, board_position) do
     attrs =
       %{}
       |> maybe_put_enum(:role, role)
       |> maybe_put_enum(:state, state)
+      |> maybe_put_enum(:board_position, board_position)
 
     user
     |> Ysc.Accounts.User.update_user_changeset(attrs)
@@ -95,6 +97,7 @@ defmodule Ysc.AccountsFixtures do
     attrs = Map.new(attrs)
     role = Map.get(attrs, :role, :member)
     state = Map.get(attrs, :state, :active)
+    board_position = Map.get(attrs, :board_position)
 
     user_attrs =
       %{
@@ -106,7 +109,7 @@ defmodule Ysc.AccountsFixtures do
         password_set_at: nil,
         confirmed_at: now
       }
-      |> Map.merge(Map.drop(attrs, [:role, :state]))
+      |> Map.merge(Map.drop(attrs, [:role, :state, :board_position]))
 
     user =
       %Ysc.Accounts.User{}
@@ -114,7 +117,7 @@ defmodule Ysc.AccountsFixtures do
       |> Ecto.Changeset.put_change(:post_migration_onboarding_completed_at, now)
       |> Ysc.Repo.insert!()
 
-    apply_fixture_role_state(user, role, state)
+    apply_fixture_role_state(user, role, state, board_position)
   end
 
   def extract_user_token(fun) do

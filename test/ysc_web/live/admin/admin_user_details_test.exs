@@ -4,6 +4,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -507,6 +508,59 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       updated = Ysc.Repo.get!(Ysc.Accounts.User, user.id)
       assert updated.first_name == "Alicia"
+    end
+
+    test "admin can set board position and bio on admin user via profile form",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{role: :admin})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert has_element?(view, "#user-profile-form")
+
+      empty_billing = %{
+        "address" => "",
+        "city" => "",
+        "region" => "",
+        "postal_code" => "",
+        "country" => ""
+      }
+
+      board_bio = "Treasurer bio for the public board page."
+
+      # Board bio is only rendered after a board position is selected (phx-change).
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "role" => "admin",
+          "board_position" => "treasurer",
+          "billing_address" => empty_billing
+        }
+      })
+      |> render_change()
+
+      assert has_element?(view, "#board_bio")
+
+      view
+      |> form("#user-profile-form", %{
+        "user" => %{
+          "role" => "admin",
+          "board_position" => "treasurer",
+          "board_bio" => board_bio,
+          "billing_address" => empty_billing
+        }
+      })
+      |> render_submit()
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.board_position == :treasurer
+      assert updated.board_bio == board_bio
+
+      history = Accounts.list_board_position_history(updated)
+      assert length(history) == 1
+      assert hd(history).position == :treasurer
     end
   end
 
