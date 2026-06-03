@@ -829,34 +829,72 @@ defmodule Ysc.Bookings do
   Places a short-lived inventory hold while the member completes modification payment.
   """
   def place_modification_hold(%Booking{} = booking, attrs, opts \\ []) do
-    Ysc.Bookings.BookingLocker.place_modification_hold(booking, attrs, opts)
+    booking
+    |> Ysc.Bookings.BookingLocker.place_modification_hold(attrs, opts)
+    |> unwrap_transaction_rollback_error()
   end
 
   @doc """
   Releases a modification payment hold without applying the modification.
   """
   def release_modification_hold(booking_id, opts \\ []) do
-    Ysc.Bookings.BookingLocker.release_modification_hold(booking_id, opts)
+    booking_id
+    |> Ysc.Bookings.BookingLocker.release_modification_hold(opts)
+    |> unwrap_transaction_rollback_error()
   end
+
+  defp unwrap_transaction_rollback_error({:error, {:error, reason}}),
+    do: {:error, reason}
+
+  defp unwrap_transaction_rollback_error(result), do: result
 
   @doc """
   Returns modification form params stored on an active payment hold, if any.
+
+  Accepts a `%Booking{}` (from `modification_hold_attrs`) or a parsed attrs map
+  (string or atom keys, dates as binaries or `%Date{}`).
   """
   def modification_hold_form_params(%Booking{modification_hold_attrs: attrs})
       when is_map(attrs) do
-    if is_binary(attrs["checkin_date"]) and is_binary(attrs["checkout_date"]) do
-      %{
-        "checkin_date" => attrs["checkin_date"],
-        "checkout_date" => attrs["checkout_date"],
-        "guests_count" => attrs["guests_count"] |> to_string(),
-        "children_count" => Map.get(attrs, "children_count", 0) |> to_string()
-      }
-    else
-      nil
-    end
+    modification_attrs_to_form_params(attrs)
+  end
+
+  def modification_hold_form_params(attrs)
+      when is_map(attrs) and not is_struct(attrs, Booking) do
+    modification_attrs_to_form_params(attrs)
   end
 
   def modification_hold_form_params(_), do: nil
+
+  defp modification_attrs_to_form_params(attrs) do
+    checkin = Map.get(attrs, "checkin_date") || Map.get(attrs, :checkin_date)
+    checkout = Map.get(attrs, "checkout_date") || Map.get(attrs, :checkout_date)
+
+    with {:ok, checkin_str} <- normalize_modification_form_date(checkin),
+         {:ok, checkout_str} <- normalize_modification_form_date(checkout) do
+      guests = Map.get(attrs, "guests_count") || Map.get(attrs, :guests_count)
+
+      children =
+        Map.get(attrs, "children_count") || Map.get(attrs, :children_count, 0)
+
+      %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => to_string(guests),
+        "children_count" => to_string(children)
+      }
+    else
+      :error -> nil
+    end
+  end
+
+  defp normalize_modification_form_date(%Date{} = date),
+    do: {:ok, Date.to_iso8601(date)}
+
+  defp normalize_modification_form_date(date) when is_binary(date),
+    do: {:ok, date}
+
+  defp normalize_modification_form_date(_), do: :error
 
   defp maybe_validate_modification_availability(booking, parsed, opts) do
     if Keyword.get(opts, :skip_availability_check) do
@@ -868,7 +906,9 @@ defmodule Ysc.Bookings do
 
   defp attrs_for_paid_modification_apply(booking, attrs, opts) do
     if Keyword.get(opts, :payment_intent_id) do
-      modification_hold_form_params(booking) || attrs
+      modification_hold_form_params(booking) ||
+        modification_hold_form_params(attrs) ||
+        attrs
     else
       attrs
     end

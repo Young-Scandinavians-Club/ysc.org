@@ -133,6 +133,24 @@ defmodule Ysc.Bookings.ModifyBookingTest do
     room
   end
 
+  describe "modification_hold_form_params/1" do
+    test "normalizes atom-key attrs with Date structs" do
+      attrs = %{
+        checkin_date: ~D[2026-07-01],
+        checkout_date: ~D[2026-07-04],
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert %{
+               "checkin_date" => "2026-07-01",
+               "checkout_date" => "2026-07-04",
+               "guests_count" => "4",
+               "children_count" => "0"
+             } = Bookings.modification_hold_form_params(attrs)
+    end
+  end
+
   describe "modify_complete_booking/3" do
     test "updates dates, sets refund_forfeited_at, and schedules modification email",
          %{

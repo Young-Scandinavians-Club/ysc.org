@@ -150,6 +150,30 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   @impl true
+  def handle_async(:finalize_modification, {:ok, result}, socket) do
+    payment_intent_id = socket.assigns[:finalize_payment_intent_id]
+
+    handle_apply_modification_result(socket, result, payment_intent_id)
+  end
+
+  def handle_async(:finalize_modification, {:exit, _reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(:submitting, false)
+     |> assign(:payment_processing, false)
+     |> assign(:finalize_payment_intent_id, nil)
+     |> assign(
+       :payment_error,
+       "Your payment was received but we could not update your reservation. Please open your confirmation page or contact support."
+     )
+     |> YscWeb.Flash.put_toast(
+       :error,
+       "Your payment was received but we could not update your reservation. Please open your confirmation page or contact support.",
+       title: "Payment received"
+     )}
+  end
+
+  @impl true
   def handle_event("validate", %{"modification" => params}, socket) do
     if socket.assigns.change_data_loaded? do
       params = normalize_modification_params(params)
@@ -400,14 +424,16 @@ defmodule YscWeb.BookingChangeLive do
 
     params = modification_params_for_payment_apply(socket, booking)
 
-    socket =
-      socket
-      |> assign(:booking, booking)
-      |> assign(:payment_processing, true)
-      |> assign(:payment_error, nil)
-      |> assign(:submitting, true)
-
-    apply_modification_and_redirect(socket, params, payment_intent_id)
+    {:noreply,
+     socket
+     |> assign(:booking, booking)
+     |> assign(:payment_processing, true)
+     |> assign(:payment_error, nil)
+     |> assign(:submitting, true)
+     |> assign(:finalize_payment_intent_id, payment_intent_id)
+     |> start_async(:finalize_modification, fn ->
+       apply_modification_after_payment(booking, params, payment_intent_id)
+     end)}
   end
 
   @impl true
@@ -999,23 +1025,24 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp apply_modification_and_redirect(socket, params, payment_intent_id) do
-    booking = socket.assigns.booking
+    result = Bookings.apply_modification(socket.assigns.booking, params, [])
+    handle_apply_modification_result(socket, result, payment_intent_id)
+  end
 
-    result =
-      if payment_intent_id do
-        apply_modification_after_payment(booking, params, payment_intent_id)
-      else
-        Bookings.apply_modification(booking, params, [])
-      end
+  defp handle_apply_modification_result(socket, result, payment_intent_id) do
+    booking = socket.assigns.booking
 
     case result do
       {:ok, updated_booking} ->
-        finalize_modification_redirect(socket, updated_booking)
+        finalize_modification_redirect(
+          assign(socket, :finalize_payment_intent_id, nil),
+          updated_booking
+        )
 
       {:error, %Ecto.Changeset{} = changeset} ->
         if payment_intent_id do
           redirect_to_receipt_after_payment(
-            socket,
+            assign(socket, :finalize_payment_intent_id, nil),
             booking.id,
             payment_intent_id
           )
@@ -1024,6 +1051,7 @@ defmodule YscWeb.BookingChangeLive do
            socket
            |> assign(:submitting, false)
            |> assign(:payment_processing, false)
+           |> assign(:finalize_payment_intent_id, nil)
            |> assign(:form, to_form(changeset, as: "modification"))
            |> assign(:preview_error, format_changeset_errors(changeset))}
         end
@@ -1031,7 +1059,7 @@ defmodule YscWeb.BookingChangeLive do
       {:error, reason} ->
         if payment_intent_id && recoverable_payment_finalize_error?(reason) do
           redirect_to_receipt_after_payment(
-            socket,
+            assign(socket, :finalize_payment_intent_id, nil),
             booking.id,
             payment_intent_id
           )
@@ -1045,6 +1073,7 @@ defmodule YscWeb.BookingChangeLive do
            socket
            |> assign(:submitting, false)
            |> assign(:payment_processing, false)
+           |> assign(:finalize_payment_intent_id, nil)
            |> assign(:payment_error, error_message)
            |> YscWeb.Flash.put_toast(
              :error,
