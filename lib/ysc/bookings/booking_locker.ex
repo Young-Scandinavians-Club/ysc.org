@@ -2180,6 +2180,8 @@ defmodule Ysc.Bookings.BookingLocker do
                    rooms: booking.rooms,
                    skip_validation: true
                  )
+                 |> put_change(:subtotal_price, priced.subtotal)
+                 |> put_change(:discount_total, priced.discount)
                  |> put_change(:refund_forfeited_at, refund_forfeited_at)
                  |> Repo.update() do
               {:ok, updated_booking} ->

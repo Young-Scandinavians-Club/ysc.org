@@ -11,6 +11,9 @@ defmodule YscWeb.BookingChangeLive do
   import Ecto.Query
   require Ysc.Logging
 
+  @payment_finalize_retry_attempts 5
+  @payment_finalize_retry_delay_ms 400
+
   @impl true
   def mount(%{"booking_id" => booking_id}, _session, socket) do
     user = socket.assigns.current_user
@@ -143,6 +146,30 @@ defmodule YscWeb.BookingChangeLive do
      |> assign(
        :preview_error,
        "Unable to load availability. Please refresh the page."
+     )}
+  end
+
+  @impl true
+  def handle_async(:finalize_modification, {:ok, result}, socket) do
+    payment_intent_id = socket.assigns[:finalize_payment_intent_id]
+
+    handle_apply_modification_result(socket, result, payment_intent_id)
+  end
+
+  def handle_async(:finalize_modification, {:exit, _reason}, socket) do
+    {:noreply,
+     socket
+     |> assign(:submitting, false)
+     |> assign(:payment_processing, false)
+     |> assign(:finalize_payment_intent_id, nil)
+     |> assign(
+       :payment_error,
+       "Your payment was received but we could not update your reservation. Please open your confirmation page or contact support."
+     )
+     |> YscWeb.Flash.put_toast(
+       :error,
+       "Your payment was received but we could not update your reservation. Please open your confirmation page or contact support.",
+       title: "Payment received"
      )}
   end
 
@@ -391,11 +418,22 @@ defmodule YscWeb.BookingChangeLive do
         %{"payment_intent_id" => payment_intent_id},
         socket
       ) do
-    params =
-      socket.assigns.pending_modification_params ||
-        form_params(socket.assigns.form)
+    booking =
+      Repo.get!(Booking, socket.assigns.booking.id)
+      |> Repo.preload(:rooms)
 
-    apply_modification_and_redirect(socket, params, payment_intent_id)
+    params = modification_params_for_payment_apply(socket, booking)
+
+    {:noreply,
+     socket
+     |> assign(:booking, booking)
+     |> assign(:payment_processing, true)
+     |> assign(:payment_error, nil)
+     |> assign(:submitting, true)
+     |> assign(:finalize_payment_intent_id, payment_intent_id)
+     |> start_async(:finalize_modification, fn ->
+       apply_modification_after_payment(booking, params, payment_intent_id)
+     end)}
   end
 
   @impl true
@@ -615,44 +653,62 @@ defmodule YscWeb.BookingChangeLive do
 
       <%= if @show_payment_form && @payment_intent && @payment_delta && Money.positive?(@payment_delta) do %>
         <div class="mt-8 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-          <h2 class="text-lg font-semibold text-zinc-900 mb-2">
-            Additional payment required
-          </h2>
-          <p class="text-sm text-zinc-600 mb-4">
-            Pay {MoneyHelper.format_money!(@payment_delta)} to confirm your reservation changes.
-          </p>
-
-          <%= if @payment_error do %>
-            <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">
-              {@payment_error}
-            </div>
-          <% end %>
-
-          <div
-            id="stripe-payment-container"
-            phx-hook="StripeElements"
-            data-client-secret={@payment_intent.client_secret}
-            data-booking-id={@booking.id}
-            data-modification="true"
-          >
-            <.payment_element_loading :if={!@stripe_payment_element_ready} />
+          <%= if @payment_processing do %>
             <div
-              id="payment-element"
-              phx-update="ignore"
-              class="mb-6 min-h-[12rem]"
-            />
-            <div id="payment-message" class="hidden mt-4" />
-          </div>
+              id="modification-payment-success"
+              class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-900"
+            >
+              <p class="font-semibold flex items-center gap-2">
+                <.icon name="hero-check-circle" class="w-5 h-5" />
+                Payment successful
+              </p>
+              <p class="text-sm mt-2 text-green-800">
+                We're saving your reservation changes. You'll be redirected to your confirmation shortly.
+              </p>
+            </div>
+          <% else %>
+            <h2 class="text-lg font-semibold text-zinc-900 mb-2">
+              Additional payment required
+            </h2>
+            <p class="text-sm text-zinc-600 mb-4">
+              Pay {MoneyHelper.format_money!(@payment_delta)} to confirm your reservation changes.
+            </p>
 
-          <.button
-            id="submit-payment"
-            type="button"
-            class="w-full py-3"
-            disabled={!@stripe_payment_element_ready || @submitting}
-          >
-            <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
-            Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
-          </.button>
+            <%= if @payment_error do %>
+              <div
+                id="modification-payment-error"
+                class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
+              >
+                {@payment_error}
+              </div>
+            <% end %>
+
+            <div
+              id="stripe-payment-container"
+              phx-hook="StripeElements"
+              data-client-secret={@payment_intent.client_secret}
+              data-booking-id={@booking.id}
+              data-modification="true"
+            >
+              <.payment_element_loading :if={!@stripe_payment_element_ready} />
+              <div
+                id="payment-element"
+                phx-update="ignore"
+                class="mb-6 min-h-[12rem]"
+              />
+              <div id="payment-message" class="hidden mt-4" />
+            </div>
+
+            <.button
+              id="submit-payment"
+              type="button"
+              class="w-full py-3"
+              disabled={!@stripe_payment_element_ready || @submitting}
+            >
+              <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
+              Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
+            </.button>
+          <% end %>
         </div>
       <% end %>
     </div>
@@ -674,6 +730,7 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:show_payment_form, false)
     |> assign(:stripe_payment_element_ready, false)
     |> assign(:payment_error, nil)
+    |> assign(:payment_processing, false)
     |> assign(:today, calendar.today)
     |> assign(:seasons, calendar.seasons)
     |> assign(:calendar_min_date, calendar.min_date)
@@ -961,61 +1018,181 @@ defmodule YscWeb.BookingChangeLive do
     )
   end
 
+  defp modification_params_for_payment_apply(socket, booking) do
+    Bookings.modification_hold_form_params(booking) ||
+      socket.assigns.pending_modification_params ||
+      form_params(socket.assigns.form)
+  end
+
   defp apply_modification_and_redirect(socket, params, payment_intent_id) do
-    opts =
-      if payment_intent_id do
-        [payment_intent_id: payment_intent_id]
-      else
-        []
-      end
+    result = Bookings.apply_modification(socket.assigns.booking, params, [])
+    handle_apply_modification_result(socket, result, payment_intent_id)
+  end
 
-    case Bookings.apply_modification(socket.assigns.booking, params, opts) do
-      {:ok, booking} ->
-        case sync_guests_after_modification(socket, booking) do
-          :ok ->
-            {:noreply,
-             socket
-             |> YscWeb.Flash.put_toast(
-               :info,
-               "Your reservation has been updated.",
-               title: "Reservation updated"
-             )
-             |> push_navigate(
-               to: ~p"/bookings/#{booking.id}/receipt?updated=true"
-             )}
+  defp handle_apply_modification_result(socket, result, payment_intent_id) do
+    booking = socket.assigns.booking
 
-          {:error, _} ->
-            {:noreply,
-             socket
-             |> assign(:submitting, false)
-             |> YscWeb.Flash.put_toast(
-               :error,
-               "Reservation was updated but guest details could not be saved. Please contact support.",
-               title: "Guest details"
-             )
-             |> push_navigate(
-               to: ~p"/bookings/#{booking.id}/receipt?updated=true"
-             )}
-        end
+    case result do
+      {:ok, updated_booking} ->
+        finalize_modification_redirect(
+          assign(socket, :finalize_payment_intent_id, nil),
+          updated_booking
+        )
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply,
-         socket
-         |> assign(:submitting, false)
-         |> assign(:form, to_form(changeset, as: "modification"))
-         |> assign(:preview_error, format_changeset_errors(changeset))}
+        if payment_intent_id do
+          redirect_to_receipt_after_payment(
+            assign(socket, :finalize_payment_intent_id, nil),
+            booking.id,
+            payment_intent_id
+          )
+        else
+          {:noreply,
+           socket
+           |> assign(:submitting, false)
+           |> assign(:payment_processing, false)
+           |> assign(:finalize_payment_intent_id, nil)
+           |> assign(:form, to_form(changeset, as: "modification"))
+           |> assign(:preview_error, format_changeset_errors(changeset))}
+        end
 
       {:error, reason} ->
+        if payment_intent_id && recoverable_payment_finalize_error?(reason) do
+          redirect_to_receipt_after_payment(
+            assign(socket, :finalize_payment_intent_id, nil),
+            booking.id,
+            payment_intent_id
+          )
+        else
+          error_message =
+            if payment_intent_id,
+              do: modification_error_message_after_payment(reason),
+              else: modification_error_message(reason)
+
+          {:noreply,
+           socket
+           |> assign(:submitting, false)
+           |> assign(:payment_processing, false)
+           |> assign(:finalize_payment_intent_id, nil)
+           |> assign(:payment_error, error_message)
+           |> YscWeb.Flash.put_toast(
+             :error,
+             error_message,
+             title:
+               if(payment_intent_id,
+                 do: "Payment received",
+                 else: "Unable to update"
+               )
+           )}
+        end
+    end
+  end
+
+  defp apply_modification_after_payment(
+         booking,
+         params,
+         payment_intent_id,
+         attempt \\ 1
+       ) do
+    case Bookings.apply_modification(booking, params,
+           payment_intent_id: payment_intent_id
+         ) do
+      {:ok, _} = ok ->
+        ok
+
+      {:error, :payment_not_succeeded}
+      when attempt < @payment_finalize_retry_attempts ->
+        Process.sleep(@payment_finalize_retry_delay_ms)
+
+        apply_modification_after_payment(
+          booking,
+          params,
+          payment_intent_id,
+          attempt + 1
+        )
+
+      other ->
+        other
+    end
+  end
+
+  defp finalize_modification_redirect(socket, booking) do
+    case sync_guests_after_modification(socket, booking) do
+      :ok ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your reservation has been updated.",
+           title: "Reservation updated"
+         )
+         |> push_navigate(
+           to: ~p"/bookings/#{booking.id}/receipt?updated=true&confetti=true"
+         )}
+
+      {:error, _} ->
         {:noreply,
          socket
          |> assign(:submitting, false)
-         |> assign(:payment_error, modification_error_message(reason))
          |> YscWeb.Flash.put_toast(
-           :error,
-           modification_error_message(reason),
-           title: "Unable to update"
+           :info,
+           "Your reservation has been updated.",
+           title: "Reservation updated"
+         )
+         |> YscWeb.Flash.put_toast(
+           :warning,
+           "Guest details could not be saved. Please contact support if needed.",
+           title: "Guest details"
+         )
+         |> push_navigate(
+           to: ~p"/bookings/#{booking.id}/receipt?updated=true&confetti=true"
          )}
     end
+  end
+
+  defp redirect_to_receipt_after_payment(socket, booking_id, payment_intent_id) do
+    {:noreply,
+     socket
+     |> assign(:payment_processing, true)
+     |> YscWeb.Flash.put_toast(
+       :info,
+       "Payment successful. Finishing your reservation update…",
+       title: "Payment received"
+     )
+     |> push_navigate(
+       to: receipt_after_modification_payment_url(booking_id, payment_intent_id)
+     )}
+  end
+
+  defp receipt_after_modification_payment_url(booking_id, payment_intent_id) do
+    ~p"/bookings/#{booking_id}/receipt?payment_intent=#{payment_intent_id}&redirect_status=succeeded&updated=true&confetti=true"
+  end
+
+  defp recoverable_payment_finalize_error?(reason) do
+    reason in [
+      :payment_not_succeeded,
+      :modification_hold_expired,
+      :modification_hold_mismatch,
+      :inventory_update_failed,
+      :payment_metadata_mismatch,
+      :payment_amount_mismatch,
+      :property_unavailable,
+      :room_unavailable,
+      :rooms_already_booked,
+      :property_buyout_active,
+      :blackout_conflict
+    ] or match?({:payment_verification_failed, _}, reason)
+  end
+
+  defp modification_error_message_after_payment(%Ecto.Changeset{} = changeset) do
+    "Your payment was received, but these changes could not be applied: " <>
+      format_changeset_errors(changeset)
+  end
+
+  defp modification_error_message_after_payment(reason) do
+    "Your payment was received. " <>
+      modification_error_message(reason) <>
+      " Please open your confirmation page or contact support if your dates did not update."
   end
 
   defp proceed_after_modification_details(socket, params, preview) do
