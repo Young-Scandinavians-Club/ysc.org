@@ -171,7 +171,6 @@ defmodule Ysc.Accounts.User do
       :last_name,
       :phone_number,
       :most_connected_country,
-      :board_position,
       :sms_opt_in,
       :date_of_birth
     ])

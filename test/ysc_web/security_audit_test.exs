@@ -11,7 +11,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 11 (MEDIUM)   Session cookie signed-only, not encrypted
   Finding 12 (LOW)      Email address exposed in URL during email-change flow
   Finding 13 (LOW)      User's email interpolated in OAuth reauth error flash message
-  Finding 14 (CRITICAL) Registration mass assignment allowed role/state escalation
+  Finding 14 (CRITICAL) Registration mass assignment allowed role/state/board_position escalation
   Finding 15 (HIGH)     AccountSetupLive IDOR on post-verification setup events
   Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
@@ -509,10 +509,10 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Finding 14 (CRITICAL): Registration must not accept role/state from params
+  # Finding 14 (CRITICAL): Registration must not accept role/state/board_position from params
   # ---------------------------------------------------------------------------
 
-  describe "Finding 14: registration cannot escalate role or state" do
+  describe "Finding 14: registration cannot escalate role, state, or board position" do
     test "registration insert uses DB defaults for role and state, not attacker params",
          %{} do
       alias Ysc.Accounts.User
@@ -536,6 +536,29 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert user.role == :member
       assert user.state == :pending_approval
+    end
+
+    test "registration insert ignores board_position in params", %{} do
+      alias Ysc.Accounts.User
+
+      email = "board_mass_assign_#{System.unique_integer([:positive])}@example.com"
+
+      attrs = %{
+        email: email,
+        first_name: "Attacker",
+        last_name: "User",
+        board_position: "president"
+      }
+
+      user =
+        %User{}
+        |> User.registration_changeset(attrs, validate_email: false)
+        |> Repo.insert!()
+
+      user = Repo.get!(User, user.id)
+
+      assert user.board_position == nil
+      assert Accounts.list_board_position_history(user) == []
     end
   end
 
