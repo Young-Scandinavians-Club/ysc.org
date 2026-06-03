@@ -157,6 +157,61 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
              )
   end
 
+  test "prepare_modification reuses calendar availability snapshot without inventory queries",
+       %{
+         user: user
+       } do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    new_checkin = Date.add(checkin, 7)
+    new_checkout = Date.add(checkout, 7)
+
+    attrs = %{
+      "checkin_date" => Date.to_iso8601(new_checkin),
+      "checkout_date" => Date.to_iso8601(new_checkout),
+      "guests_count" => "2",
+      "children_count" => "0"
+    }
+
+    inventory_pattern = ~r/FROM "(property_inventory|room_inventory)"/i
+
+    {_preview, with_snapshot} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          assert {:ok, _} =
+                   Bookings.prepare_modification(booking, attrs,
+                     availability_snapshot: snapshot
+                   )
+        end,
+        pattern: inventory_pattern
+      )
+
+    {_preview, without_snapshot} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          assert {:ok, _} = Bookings.prepare_modification(booking, attrs)
+        end,
+        pattern: inventory_pattern
+      )
+
+    assert with_snapshot == 0
+    assert without_snapshot > 0
+  end
+
   test "checkout_date_tooltips marks overlapping checkout dates unavailable", %{
     user: user
   } do
