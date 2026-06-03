@@ -104,7 +104,7 @@ defmodule YscWeb.BookingChangeLive do
         socket
         |> assign(:form, form)
         |> assign(:checkout_date_tooltips, checkout_tooltips)
-        |> run_preview(params)
+        |> run_preview_and_sync_payment(params)
 
       {:noreply, socket}
     else
@@ -159,7 +159,7 @@ defmodule YscWeb.BookingChangeLive do
           :checkout_date_tooltips,
           checkout_tooltips_for_params(socket, params)
         )
-        |> run_preview(params)
+        |> run_preview_and_sync_payment(params)
 
       {:noreply, socket}
     else
@@ -263,17 +263,12 @@ defmodule YscWeb.BookingChangeLive do
 
   @impl true
   def handle_event("back-to-modification", _params, socket) do
-    if socket.assigns.show_payment_form do
-      Bookings.release_modification_hold(socket.assigns.booking.id)
-    end
-
     {:noreply,
      socket
+     |> dismiss_payment_form()
      |> assign(:step, :edit)
      |> assign(:guest_info_form, nil)
-     |> assign(:guest_info_errors, %{})
-     |> assign(:show_payment_form, false)
-     |> assign(:payment_intent, nil)}
+     |> assign(:guest_info_errors, %{})}
   end
 
   @impl true
@@ -618,13 +613,13 @@ defmodule YscWeb.BookingChangeLive do
         </div>
       <% end %>
 
-      <%= if @show_payment_form && @payment_intent do %>
+      <%= if @show_payment_form && @payment_intent && @payment_delta && Money.positive?(@payment_delta) do %>
         <div class="mt-8 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
           <h2 class="text-lg font-semibold text-zinc-900 mb-2">
             Additional payment required
           </h2>
           <p class="text-sm text-zinc-600 mb-4">
-            Pay {MoneyHelper.format_money!(@preview.delta)} to confirm your reservation changes.
+            Pay {MoneyHelper.format_money!(@payment_delta)} to confirm your reservation changes.
           </p>
 
           <%= if @payment_error do %>
@@ -656,7 +651,7 @@ defmodule YscWeb.BookingChangeLive do
             disabled={!@stripe_payment_element_ready || @submitting}
           >
             <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
-            Pay {MoneyHelper.format_money!(@preview.delta)} and save changes
+            Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
           </.button>
         </div>
       <% end %>
@@ -675,6 +670,7 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:acknowledged, false)
     |> assign(:submitting, false)
     |> assign(:payment_intent, nil)
+    |> assign(:payment_delta, nil)
     |> assign(:show_payment_form, false)
     |> assign(:stripe_payment_element_ready, false)
     |> assign(:payment_error, nil)
@@ -748,6 +744,14 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp apply_preview_result(socket, preview_result) do
+    if socket.assigns.show_payment_form do
+      socket
+    else
+      do_apply_preview_result(socket, preview_result)
+    end
+  end
+
+  defp do_apply_preview_result(socket, preview_result) do
     case preview_result do
       {:ok, preview} ->
         assign(socket, preview: preview, preview_error: nil)
@@ -862,14 +866,18 @@ defmodule YscWeb.BookingChangeLive do
     end
   end
 
-  defp run_preview(socket, params) do
-    opts =
-      case socket.assigns[:availability_snapshot] do
-        nil -> []
-        snapshot -> [availability_snapshot: snapshot]
-      end
+  defp run_preview_and_sync_payment(socket, params) do
+    socket
+    |> run_preview(params)
+    |> sync_payment_form_with_preview(params)
+  end
 
-    case Bookings.prepare_modification(socket.assigns.booking, params, opts) do
+  defp run_preview(socket, params) do
+    case Bookings.prepare_modification(
+           socket.assigns.booking,
+           params,
+           preview_opts(socket)
+         ) do
       {:ok, preview} ->
         assign(socket, preview: preview, preview_error: nil)
 
@@ -887,6 +895,70 @@ defmodule YscWeb.BookingChangeLive do
           preview_error: modification_error_message(reason)
         )
     end
+  end
+
+  defp preview_opts(_socket) do
+    # Always rebuild availability for previews. The cached snapshot from initial
+    # page load can be stale after a modification hold is placed (buyout_held on
+    # held days would block the member's own pending change).
+    []
+  end
+
+  defp sync_payment_form_with_preview(socket, params) do
+    if socket.assigns.show_payment_form do
+      case socket.assigns.preview do
+        %{delta: %Money{} = delta} = preview ->
+          cond do
+            not Money.positive?(delta) ->
+              dismiss_payment_form(socket)
+
+            Money.equal?(delta, socket.assigns.payment_delta) ->
+              assign(socket, :pending_modification_params, params)
+
+            true ->
+              socket
+              |> dismiss_payment_form()
+              |> refresh_payment_for_preview(params, preview)
+          end
+
+        _ ->
+          dismiss_payment_form(socket)
+      end
+    else
+      socket
+    end
+  end
+
+  defp refresh_payment_for_preview(socket, params, preview) do
+    case proceed_after_modification_details(socket, params, preview) do
+      {:payment, payment_socket} ->
+        payment_socket
+
+      {:apply, apply_socket} ->
+        apply_socket
+
+      {:error, error_socket} ->
+        error_socket
+    end
+  end
+
+  defp dismiss_payment_form(socket) do
+    socket =
+      if socket.assigns.show_payment_form do
+        Bookings.release_modification_hold(socket.assigns.booking.id)
+        socket
+      else
+        socket
+      end
+
+    assign(socket,
+      show_payment_form: false,
+      payment_intent: nil,
+      payment_delta: nil,
+      availability_snapshot: nil,
+      stripe_payment_element_ready: false,
+      payment_error: nil
+    )
   end
 
   defp apply_modification_and_redirect(socket, params, payment_intent_id) do
@@ -963,7 +1035,9 @@ defmodule YscWeb.BookingChangeLive do
          |> assign(:step, :edit)
          |> assign(:pending_modification_params, params)
          |> assign(:payment_intent, payment_intent)
+         |> assign(:payment_delta, preview.delta)
          |> assign(:show_payment_form, true)
+         |> assign(:availability_snapshot, nil)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:payment_error, nil)}
       else

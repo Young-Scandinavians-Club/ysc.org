@@ -119,6 +119,8 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
   `build_availability_snapshot/5` to avoid rebuilding inventory data.
   """
   def validate_modification_dates(%Snapshot{} = snapshot, checkin, checkout) do
+    snapshot = refresh_snapshot_hold(snapshot)
+
     case modification_availability_error(snapshot, checkin, checkout) do
       nil -> :ok
       reason -> {:error, reason}
@@ -129,6 +131,11 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     booking
     |> build_snapshot_for_modification(checkin, checkout)
     |> validate_modification_dates(checkin, checkout)
+  end
+
+  @doc false
+  def refresh_snapshot_hold(%Snapshot{booking: booking} = snapshot) do
+    %{snapshot | hold: BookingLocker.modification_hold_context(booking)}
   end
 
   @doc """
