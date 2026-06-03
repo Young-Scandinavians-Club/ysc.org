@@ -21,6 +21,8 @@ defmodule Ysc.Scanning do
   alias Ysc.Scanning.{QrToken, ScanSession, ScanRecord, SessionCheckIn}
   alias Ysc.MessagePassingEvents
 
+  @membership_checkin_search_min_length 3
+
   # --- Session Management ---
 
   def create_session(attrs) do
@@ -1085,10 +1087,11 @@ defmodule Ysc.Scanning do
   def search_users_for_checkin(session_id, query) when is_binary(query) do
     trimmed = String.trim(query)
 
-    if trimmed == "" do
+    if trimmed == "" or
+         String.length(trimmed) < @membership_checkin_search_min_length do
       []
     else
-      users = Accounts.search_users(trimmed, limit: 20)
+      users = search_users_for_membership_checkin(trimmed, limit: 20)
       user_ids = Enum.map(users, & &1.id)
       checked_in_ids = checked_in_user_ids(session_id, user_ids)
 
@@ -1104,6 +1107,14 @@ defmodule Ysc.Scanning do
           checked_in?: user.id in checked_in_ids
         }
       end)
+    end
+  end
+
+  defp search_users_for_membership_checkin(trimmed, opts) do
+    if String.contains?(trimmed, "@") do
+      Accounts.search_active_user_by_email_for_checkin(trimmed)
+    else
+      Accounts.search_users_by_name(trimmed, opts)
     end
   end
 

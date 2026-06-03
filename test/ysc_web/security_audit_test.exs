@@ -16,6 +16,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
+  Finding 19 (MEDIUM)   Registration mass assignment allowed forged board_position on public /board
+  Finding 20 (MEDIUM)   Membership check-in search allowed club-wide email enumeration
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -25,6 +27,8 @@ defmodule YscWeb.SecurityAuditTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
   import Mox
 
   alias Ysc.Accounts
@@ -707,6 +711,63 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:ok, _code} =
                Ysc.VerificationCache.get_code(user.id, :email_verification)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 19 (MEDIUM): Registration must not set board_position
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 19: registration cannot set board_position" do
+    test "registration insert ignores board_position and pending users are excluded from /board",
+         %{} do
+      alias Ysc.Accounts.User
+
+      email = "bod_mass_#{System.unique_integer([:positive])}@example.com"
+
+      attrs = %{
+        email: email,
+        first_name: "Fake",
+        last_name: "President",
+        board_position: "president"
+      }
+
+      user =
+        %User{}
+        |> User.registration_changeset(attrs, validate_email: false)
+        |> Repo.insert!()
+
+      user = Repo.get!(User, user.id)
+
+      assert is_nil(user.board_position)
+      refute user.id in Enum.map(Accounts.list_bod_members(), & &1.id)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 20 (MEDIUM): Membership check-in search must not allow email harvesting
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 20: membership check-in search limits enumeration" do
+    test "short queries return no results" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      assert [] = Ysc.Scanning.search_users_for_checkin(session.id, "ab")
+    end
+
+    test "partial email fragments do not return a member list" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      _member =
+        user_fixture(%{
+          email: "harvest_#{System.unique_integer([:positive])}@gmail.com"
+        })
+
+      assert [] = Ysc.Scanning.search_users_for_checkin(session.id, "@gmail")
     end
   end
 end

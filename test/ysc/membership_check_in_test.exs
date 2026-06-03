@@ -281,6 +281,30 @@ defmodule Ysc.MembershipCheckInTest do
       assert [] = Scanning.search_users_for_checkin(session.id, "")
     end
 
+    test "returns empty list for queries shorter than three characters", %{
+      session: session
+    } do
+      assert [] = Scanning.search_users_for_checkin(session.id, "ab")
+    end
+
+    test "does not return members for partial email fragments", %{
+      session: session
+    } do
+      user =
+        user_fixture(%{
+          email: "partial_#{System.unique_integer([:positive])}@gmail.com"
+        })
+
+      user
+      |> Ecto.Changeset.change(
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Repo.update!()
+
+      assert [] = Scanning.search_users_for_checkin(session.id, "@gmail")
+    end
+
     test "enriches results with membership_status and checked_in? flag", %{
       admin: admin,
       session: session

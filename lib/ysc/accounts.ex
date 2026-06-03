@@ -413,6 +413,50 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Searches active members by name only (no email substring match).
+
+  Used by membership check-in desk search to avoid club-wide email enumeration.
+  """
+  def search_users_by_name(query, opts \\ []) when is_binary(query) do
+    limit = Keyword.get(opts, :limit, 10)
+    state = Keyword.get(opts, :state, :active)
+    search_term = "%#{query}%"
+
+    from(u in User,
+      where: u.state == ^state,
+      where:
+        ilike(u.first_name, ^search_term) or
+          ilike(u.last_name, ^search_term) or
+          ilike(
+            fragment("? || ' ' || ?", u.first_name, u.last_name),
+            ^search_term
+          ),
+      order_by: [asc: u.last_name, asc: u.first_name],
+      limit: ^limit,
+      preload: [:current_avatar]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns at most one active user when `email` is an exact address match.
+
+  Partial email fragments (e.g. `@gmail`) must not return a member list.
+  """
+  def search_active_user_by_email_for_checkin(email) when is_binary(email) do
+    normalized = email |> String.trim() |> String.downcase()
+
+    if normalized == "" or not String.contains?(normalized, "@") do
+      []
+    else
+      case get_user_by_email(normalized) do
+        %User{state: :active} = user -> [Repo.preload(user, :current_avatar)]
+        _ -> []
+      end
+    end
+  end
+
+  @doc """
   Checks if a user has an active membership.
   Includes lifetime membership which never expires.
 
@@ -1132,7 +1176,7 @@ defmodule Ysc.Accounts do
 
   def list_bod_members() do
     from(u in User,
-      where: not is_nil(u.board_position),
+      where: not is_nil(u.board_position) and u.state == :active,
       preload: [:current_avatar],
       order_by: [
         desc: fragment("CASE
