@@ -389,6 +389,46 @@ defmodule Ysc.Bookings.ModifyBookingTest do
   end
 
   describe "modification holds" do
+    test "validate_modification_dates honors active modification hold on stale snapshot",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(115)
+      extended_checkout = Date.add(checkout, 1)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      hold_attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, hold_attrs)
+
+      calendar =
+        Ysc.Bookings.ModificationDateAvailability.calendar_context(held_booking)
+
+      snapshot =
+        Ysc.Bookings.ModificationDateAvailability.build_availability_snapshot(
+          held_booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons
+        )
+
+      stale_snapshot = %{snapshot | hold: %{active: false}}
+
+      assert :ok =
+               Ysc.Bookings.ModificationDateAvailability.validate_modification_dates(
+                 stale_snapshot,
+                 hold_attrs.checkin_date,
+                 hold_attrs.checkout_date
+               )
+    end
+
     test "place_modification_hold reserves newly added calendar days", %{
       user: user
     } do

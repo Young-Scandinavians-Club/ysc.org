@@ -293,9 +293,10 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "Total room capacity is 4"
   end
 
-  test "payment form keeps amount after preview is cleared by validate", %{
-    conn: conn
-  } do
+  test "dismisses payment form when dates no longer require additional payment",
+       %{
+         conn: conn
+       } do
     original_stripe_client = Application.get_env(:ysc, :stripe_client)
 
     on_exit(fn ->
@@ -364,9 +365,10 @@ defmodule YscWeb.BookingChangeLiveTest do
     |> render_change()
 
     html = render(view)
-    assert html =~ "Additional payment required"
-    assert html =~ "Pay $"
-    assert has_element?(view, "#stripe-payment-container")
+    refute html =~ "Additional payment required"
+    refute has_element?(view, "#stripe-payment-container")
+    assert has_element?(view, "#submit-modification-button")
+    assert html =~ "$0.00"
   end
 
   test "shows downgrade notice when shortening stay reduces total", %{
