@@ -602,6 +602,47 @@ defmodule Ysc.Accounts.SignupApplicationTest do
     end
   end
 
+  describe "registration_application_changeset/2" do
+    test "does not cast server-owned or privileged fields from public registration attrs" do
+      attrs = %{
+        membership_type: "single",
+        membership_eligibility: ["born_in_scandinavia"],
+        birth_date: ~D[1990-01-01],
+        address: "123 Viking Way",
+        country: "USA",
+        city: "San Francisco",
+        postal_code: "94107",
+        place_of_birth: "Oslo",
+        citizenship: "Norwegian",
+        most_connected_nordic_country: "Norway",
+        agreed_to_bylaws: true,
+        started: ~U[2000-01-01 00:00:00Z],
+        completed: ~U[2000-01-02 00:00:00Z],
+        user_id: Ecto.ULID.generate(),
+        family_invite_id: Ecto.ULID.generate(),
+        review_outcome: "approved",
+        reviewed_at: ~U[2024-01-01 00:00:00Z],
+        reviewed_by_user_id: Ecto.ULID.generate()
+      }
+
+      changeset =
+        SignupApplication.registration_application_changeset(
+          %SignupApplication{},
+          attrs
+        )
+
+      assert changeset.valid?
+
+      refute Map.has_key?(changeset.changes, :started)
+      refute Map.has_key?(changeset.changes, :completed)
+      refute Map.has_key?(changeset.changes, :user_id)
+      refute Map.has_key?(changeset.changes, :family_invite_id)
+      refute Map.has_key?(changeset.changes, :review_outcome)
+      refute Map.has_key?(changeset.changes, :reviewed_at)
+      refute Map.has_key?(changeset.changes, :reviewed_by_user_id)
+    end
+  end
+
   describe "database operations" do
     test "can insert and retrieve complete application" do
       user = user_fixture()

@@ -84,6 +84,40 @@ defmodule Ysc.Events.CancelTicketReservationTest do
       refute reloaded.cancelled_at
     end
 
+    test "cancel after fulfill_ticket_reservation/2 does not revert fulfillment",
+         %{
+           tier: tier,
+           buyer: buyer,
+           organizer: organizer,
+           event: event
+         } do
+      reservation = insert_active_reservation!(tier, buyer, organizer)
+
+      # Use a different tier for the order so create_ticket_order does not fulfill this hold.
+      other_tier = ticket_tier_fixture(%{event_id: event.id, quantity: 50})
+
+      order =
+        ticket_order_fixture(%{
+          user: buyer,
+          event: event,
+          tier: other_tier
+        })
+
+      assert {:ok, fulfilled} =
+               Events.fulfill_ticket_reservation(reservation, order.id)
+
+      assert fulfilled.status == "fulfilled"
+      assert fulfilled.ticket_order_id == order.id
+
+      assert {:error, :reservation_not_active} =
+               Events.cancel_ticket_reservation(fulfilled)
+
+      reloaded = Repo.get!(TicketReservation, reservation.id)
+      assert reloaded.status == "fulfilled"
+      assert reloaded.ticket_order_id == order.id
+      refute reloaded.cancelled_at
+    end
+
     test "returns reservation_not_active when reservation is already cancelled",
          %{
            tier: tier,
