@@ -1445,7 +1445,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     @checkout_date,
                     @guests_count,
                     @availability_error
-                  ) || !!@availability_error
+                  )
                 }
                 class={
                   if can_submit_booking?(
@@ -1454,7 +1454,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                        @checkout_date,
                        @guests_count,
                        @availability_error
-                     ) && !@availability_error do
+                     ) do
                     "px-6 py-3"
                   else
                     "px-6 py-3 bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed"
