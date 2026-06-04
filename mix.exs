@@ -18,7 +18,7 @@ defmodule Ysc.MixProject do
         list_unused_filters: true
       ],
       test_coverage: [
-        tool: Ysc.Coveralls,
+        tool: ExCoveralls,
         ignore_modules: [
           Mix.Tasks.CheckQuickbooksSync,
           Mix.Tasks.Ci.QueryExplain,

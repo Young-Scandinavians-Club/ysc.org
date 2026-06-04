@@ -2,24 +2,12 @@ defmodule Ysc.Coveralls do
   @moduledoc false
 
   @doc """
-  ExCoveralls-compatible coverage entrypoint with clearer failures when
-  Erlang `:cover` cannot instrument stale or incompatible BEAM files.
+  Verifies Erlang `:cover` can instrument BEAM files before ExCoveralls runs.
+
+  Raises with actionable guidance when `_build` contains stale or incompatible modules
+  (common after Elixir/OTP upgrades when CI restores a cached `_build`).
   """
-  def start(compile_path, opts) do
-    compile!(compile_path)
-
-    fn ->
-      options = ExCoveralls.ConfServer.get()
-
-      if options[:import_cover] do
-        ExCoveralls.Cover.import(options[:import_cover])
-      end
-
-      ExCoveralls.execute(options, compile_path, opts)
-    end
-  end
-
-  defp compile!(compile_path) do
+  def compile_beams!(compile_path) do
     :cover.stop()
     {:ok, pid} = :cover.start()
 
