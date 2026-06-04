@@ -836,8 +836,12 @@ defmodule YscWeb.AdminComponents do
   defp icon_empty_state_title_class(:dashed), do: "text-sm text-zinc-400"
 
   defp icon_empty_state_description_class(:default), do: "text-sm mt-1"
-  defp icon_empty_state_description_class(:compact), do: "text-sm mt-1 text-zinc-400"
-  defp icon_empty_state_description_class(:dashed), do: "text-sm mt-1 text-zinc-400"
+
+  defp icon_empty_state_description_class(:compact),
+    do: "text-sm mt-1 text-zinc-400"
+
+  defp icon_empty_state_description_class(:dashed),
+    do: "text-sm mt-1 text-zinc-400"
 
   # ---------------------------------------------------------------------------
   # admin_tabs / admin_tab
