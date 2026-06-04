@@ -728,6 +728,79 @@ defmodule YscWeb.SecurityAuditTest do
              ) <
                30
     end
+
+    test "register_user preserves a valid client started timestamp", %{} do
+      client_started =
+        DateTime.utc_now()
+        |> DateTime.add(-2, :hour)
+        |> DateTime.truncate(:second)
+
+      attrs =
+        security_registration_attrs(%{
+          registration_form: %{started: DateTime.to_iso8601(client_started)}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert DateTime.compare(user.registration_form.started, client_started) ==
+               :eq
+    end
+
+    test "register_user replaces unparseable started with a recent server timestamp",
+         %{} do
+      attrs =
+        security_registration_attrs(%{
+          registration_form: %{started: "not-a-valid-timestamp"}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert user.registration_form.started
+
+      assert DateTime.diff(
+               DateTime.utc_now(),
+               user.registration_form.started,
+               :second
+             ) < 30
+    end
+
+    test "register_user sets started on or before completed", %{} do
+      client_started =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :day)
+        |> DateTime.truncate(:second)
+
+      attrs =
+        security_registration_attrs(%{
+          registration_form: %{started: client_started}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert DateTime.compare(
+               user.registration_form.started,
+               user.registration_form.completed
+             ) in [:lt, :eq]
+    end
+
+    test "register_user links signup application to the new user, not a forged user_id",
+         %{} do
+      other = user_fixture()
+
+      attrs =
+        security_registration_attrs(%{
+          registration_form: %{user_id: other.id}
+        })
+
+      assert {:ok, user} = Accounts.register_user(attrs)
+      user = Accounts.get_user!(user.id, [:registration_form])
+
+      assert user.registration_form.user_id == user.id
+      refute user.registration_form.user_id == other.id
+    end
   end
 
   describe "registration hardening: family invite and family members" do
