@@ -598,11 +598,15 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
                   %{stripe_status: stripe_subscription.status}
                   |> maybe_put_period(
                     :current_period_start,
-                    stripe_unix_to_datetime(stripe_subscription.current_period_start)
+                    stripe_unix_to_datetime(
+                      stripe_subscription.current_period_start
+                    )
                   )
                   |> maybe_put_period(
                     :current_period_end,
-                    stripe_unix_to_datetime(stripe_subscription.current_period_end)
+                    stripe_unix_to_datetime(
+                      stripe_subscription.current_period_end
+                    )
                   )
 
                 case Subscriptions.update_subscription(sub, attrs) do

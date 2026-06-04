@@ -2011,7 +2011,8 @@ defmodule Ysc.Quickbooks.Client do
 
         detail_map =
           if detail[:class_ref] do
-            class_ref_map = normalize_class_ref_for_sales_detail(detail.class_ref)
+            class_ref_map =
+              normalize_class_ref_for_sales_detail(detail.class_ref)
 
             if class_ref_map do
               Map.put(detail_map, "ClassRef", class_ref_map)

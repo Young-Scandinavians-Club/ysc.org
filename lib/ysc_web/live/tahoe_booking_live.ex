@@ -4983,7 +4983,7 @@ defmodule YscWeb.TahoeBookingLive do
          |> assign(show_terms_modal: true)}
 
       Map.get(socket.assigns, :linens_confirmed, false) &&
-          Map.get(socket.assigns, :chores_confirmed, false) &&
+        Map.get(socket.assigns, :chores_confirmed, false) &&
           Map.get(socket.assigns, :party_size_confirmed, false) ->
         case validate_and_create_booking(socket) do
           {:ok, booking} ->

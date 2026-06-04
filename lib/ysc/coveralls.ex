@@ -38,7 +38,9 @@ defmodule Ysc.Coveralls do
   defp cover_failure_message(failures) do
     modules =
       failures
-      |> Enum.map_join("\n", fn {beam, error} -> "  #{beam}: #{inspect(error)}" end)
+      |> Enum.map_join("\n", fn {beam, error} ->
+        "  #{beam}: #{inspect(error)}"
+      end)
 
     """
     cover instrumentation failed for #{length(failures)} module(s).
