@@ -1171,7 +1171,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <p class="text-xs font-bold text-zinc-400 uppercase">
                       Booking Type
                     </p>
-                    <div class="text-sm text-zinc-700 font-medium">Group booking</div>
+                    <div class="text-sm text-zinc-700 font-medium">
+                      Group booking
+                    </div>
                   </div>
                   <!-- Sunday Morning Parking Tip -->
                   <div
