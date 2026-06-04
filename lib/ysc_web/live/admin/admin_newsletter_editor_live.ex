@@ -1023,14 +1023,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     """
   end
 
-  defp image_url(nil), do: "/images/ysc_logo.webp"
-
   defp image_url(%{optimized_image_path: nil} = img),
     do: img.raw_image_path || "/images/ysc_logo.webp"
 
   defp image_url(%{optimized_image_path: url}), do: url
 
-  defp event_image_url(%{cover_image: nil}), do: "/images/ysc_logo.webp"
   defp event_image_url(%{cover_image: img}), do: image_url(img)
 
   @impl true

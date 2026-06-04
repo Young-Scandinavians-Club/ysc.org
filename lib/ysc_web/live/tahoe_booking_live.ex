@@ -1032,16 +1032,6 @@ defmodule YscWeb.TahoeBookingLive do
           >
             <!-- Left Column: Selection Area (2 columns on large screens) -->
             <div class="lg:col-span-2 space-y-8">
-              <!-- Booking Eligibility Banner -->
-              <.warning_callout
-                :if={!@can_book}
-                id="tahoe-booking-eligibility-banner-dashboard"
-                title={@booking_error_title}
-              >
-                {raw(@booking_disabled_reason)}
-              </.warning_callout>
-              <div :if={!@can_book} class="relative opacity-60 pointer-events-none">
-              </div>
               <!-- Step 1: Booking Mode Selection -->
               <section class="bg-zinc-50 p-6 rounded border border-zinc-200">
                 <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
@@ -1207,14 +1197,11 @@ defmodule YscWeb.TahoeBookingLive do
                 >
                   <p class="text-xs text-blue-900">
                     <strong>Winter Policy:</strong>
-                    {if @checkin_date do
-                      month = @checkin_date.month
-
-                      if month >= 12 or month <= 4 do
-                        "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
-                      else
-                        "May–November: you can rent the entire cabin or book individual rooms."
-                      end
+                    <% month = @checkin_date.month %>
+                    {if month >= 12 or month <= 4 do
+                      "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
+                    else
+                      "May–November: you can rent the entire cabin or book individual rooms."
                     end}
                   </p>
                 </div>
@@ -1287,7 +1274,6 @@ defmodule YscWeb.TahoeBookingLive do
                         end_date_field={@date_form[:checkout_date]}
                         min={@restricted_min_date}
                         max={@restricted_max_date}
-                        disabled={!@can_book}
                         date_tooltips={@date_tooltips}
                         property={@property}
                         today={@today}
@@ -1308,7 +1294,6 @@ defmodule YscWeb.TahoeBookingLive do
                           type="button"
                           id="guests-dropdown-button"
                           phx-click="toggle-guests-dropdown"
-                          disabled={!@can_book}
                           aria-labelledby="guests-label"
                           aria-expanded={@guests_dropdown_open}
                           aria-haspopup="true"
@@ -1910,18 +1895,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </span>
                             </div>
                             <div class="border-t border-zinc-200 pt-2 mt-auto">
-                              <% season_id =
-                                if @checkin_date do
-                                  season =
-                                    Season.find_season_for_date(
-                                      @seasons,
-                                      @checkin_date
-                                    )
-
-                                  if season, do: season.id, else: nil
-                                else
-                                  nil
-                                end %>
+                              <% season =
+                                Season.find_season_for_date(
+                                  @seasons,
+                                  @checkin_date
+                                ) %>
+                              <% season_id = if season, do: season.id, else: nil %>
                               <div class="text-sm text-zinc-900 font-bold">
                                 <div :if={room.minimum_price}>
                                   {MoneyHelper.format_money!(room.minimum_price)} min
@@ -2094,18 +2073,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </span>
                             </div>
                             <div class="border-t border-zinc-200 pt-2 mt-auto">
-                              <% season_id =
-                                if @checkin_date do
-                                  season =
-                                    Season.find_season_for_date(
-                                      @seasons,
-                                      @checkin_date
-                                    )
-
-                                  if season, do: season.id, else: nil
-                                else
-                                  nil
-                                end %>
+                              <% season =
+                                Season.find_season_for_date(
+                                  @seasons,
+                                  @checkin_date
+                                ) %>
+                              <% season_id = if season, do: season.id, else: nil %>
                               <div class="text-sm text-zinc-900 font-bold">
                                 <div :if={room.minimum_price}>
                                   {MoneyHelper.format_money!(room.minimum_price)} min
@@ -2261,18 +2234,12 @@ defmodule YscWeb.TahoeBookingLive do
                                   {room.name} requires minimum of {min_required} guests
                                 </p>
                                 <p class="text-xs text-red-800 mt-0.5">
-                                  <% season_id =
-                                    if @checkin_date do
-                                      season =
-                                        Season.find_season_for_date(
-                                          @seasons,
-                                          @checkin_date
-                                        )
-
-                                      if season, do: season.id, else: nil
-                                    else
-                                      nil
-                                    end %>
+                                  <% season =
+                                    Season.find_season_for_date(
+                                      @seasons,
+                                      @checkin_date
+                                    ) %>
+                                  <% season_id = if season, do: season.id, else: nil %>
                                   <% fallback_adult_price =
                                     get_default_adult_price(@property, season_id) %>
                                   <% room_adult_price =
@@ -2496,7 +2463,7 @@ defmodule YscWeb.TahoeBookingLive do
                         @price_error,
                         @form_errors,
                         @date_validation_errors
-                      ) && @can_book
+                      )
                     }
                     class="p-3 bg-amber-50 border border-amber-200 rounded"
                   >
@@ -2537,17 +2504,16 @@ defmodule YscWeb.TahoeBookingLive do
                   <!-- Agreement Checkbox -->
                   <div
                     :if={
-                      @can_book &&
-                        can_submit_booking?(
-                          @selected_booking_mode,
-                          @checkin_date,
-                          @checkout_date,
-                          get_selected_rooms_for_submit(assigns),
-                          @capacity_error,
-                          @price_error,
-                          @form_errors,
-                          @date_validation_errors
-                        )
+                      can_submit_booking?(
+                        @selected_booking_mode,
+                        @checkin_date,
+                        @checkout_date,
+                        get_selected_rooms_for_submit(assigns),
+                        @capacity_error,
+                        @price_error,
+                        @form_errors,
+                        @date_validation_errors
+                      )
                     }
                     class="pt-2"
                   >
@@ -2573,7 +2539,6 @@ defmodule YscWeb.TahoeBookingLive do
                   <!-- Submit Button -->
                   <div class="pt-2">
                     <.button
-                      :if={@can_book}
                       phx-click="show-confirm-modal"
                       phx-disable-with="Loading..."
                       disabled={
@@ -2610,14 +2575,8 @@ defmodule YscWeb.TahoeBookingLive do
                         <.icon name="hero-check-circle-solid" class="w-5 h-5" />Confirm Booking
                       </span>
                     </.button>
-                    <div
-                      :if={!@can_book}
-                      class="w-full bg-zinc-200 text-zinc-600 font-semibold py-4 rounded text-center cursor-not-allowed"
-                    >
-                      Booking Unavailable
-                    </div>
                     <p
-                      :if={@can_book && @calculated_price}
+                      :if={@calculated_price}
                       class="text-center text-xs text-zinc-400 mt-2"
                     >
                       You won't be charged yet.
@@ -7249,8 +7208,6 @@ defmodule YscWeb.TahoeBookingLive do
     </svg>
     """
   end
-
-  defp get_room_image_url(nil), do: "/images/ysc_logo.webp"
 
   defp get_room_image_url(%Ysc.Media.Image{} = image) do
     # Prefer thumbnail for room cards (smaller, faster loading)

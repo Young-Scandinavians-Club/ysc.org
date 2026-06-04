@@ -804,8 +804,6 @@ defmodule YscWeb.AdminSettingsLive do
   defp format_duration(ms) when is_number(ms),
     do: "#{Float.round(ms / 3_600_000, 2)}h"
 
-  defp format_duration(_), do: "N/A"
-
   defp reschedule_job(job_id) do
     case Repo.get(Job, job_id) do
       nil ->

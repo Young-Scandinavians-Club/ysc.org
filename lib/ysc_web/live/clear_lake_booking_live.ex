@@ -826,7 +826,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                           type="button"
                           id="guests-dropdown-button"
                           phx-click="toggle-guests-dropdown"
-                          disabled={!@can_book}
                           aria-labelledby="guests-label"
                           aria-expanded={@guests_dropdown_open}
                           aria-haspopup="true"
@@ -1229,15 +1228,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                                  @price_breakdown.price_per_guest_per_night do
                               @price_breakdown.price_per_guest_per_night
                             else
-                              if @calculated_price && nights > 0 &&
-                                   @guests_count > 0 do
-                                case Money.div(
-                                       @calculated_price,
-                                       nights * @guests_count
-                                     ) do
-                                  {:ok, price} -> price
-                                  _ -> Money.new(0, :USD)
-                                end
+                              if nights > 0 && @guests_count > 0 do
+                                {:ok, price} =
+                                  Money.div(
+                                    @calculated_price,
+                                    nights * @guests_count
+                                  )
+
+                                price
                               else
                                 Money.new(0, :USD)
                               end
@@ -1269,11 +1267,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                             if @price_breakdown && @price_breakdown.price_per_night do
                               @price_breakdown.price_per_night
                             else
-                              if @calculated_price && nights > 0 do
-                                case Money.div(@calculated_price, nights) do
-                                  {:ok, price} -> price
-                                  _ -> Money.new(0, :USD)
-                                end
+                              if nights > 0 do
+                                {:ok, price} = Money.div(@calculated_price, nights)
+                                price
                               else
                                 Money.new(0, :USD)
                               end
@@ -1396,14 +1392,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                   <div :if={@checkin_date && @checkout_date}>
                     <.button
                       :if={
-                        @can_book &&
-                          can_submit_booking?(
-                            @selected_booking_mode,
-                            @checkin_date,
-                            @checkout_date,
-                            @guests_count,
-                            @availability_error
-                          ) &&
+                        can_submit_booking?(
+                          @selected_booking_mode,
+                          @checkin_date,
+                          @checkout_date,
+                          @guests_count,
+                          @availability_error
+                        ) &&
                           !@availability_error
                       }
                       phx-click="create-booking"
@@ -1422,12 +1417,6 @@ defmodule YscWeb.ClearLakeBookingLive do
                     >
                       Update Selection
                     </.button>
-                    <div
-                      :if={!@can_book}
-                      class="w-full bg-zinc-200 text-zinc-600 font-semibold py-4 rounded text-center cursor-not-allowed"
-                    >
-                      Booking Unavailable
-                    </div>
                   </div>
                 </div>
               </div>
@@ -2084,14 +2073,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                     </h4>
                     <p class="text-teal-700">{raw(@booking_disabled_reason)}</p>
                     <p
-                      :if={@user && @booking_error_title == "Membership Required"}
+                      :if={@booking_error_title == "Membership Required"}
                       class="text-teal-600 text-sm mt-2"
                     >
                       Pay or renew your membership to book a cabin.
                     </p>
                   </div>
                   <.link
-                    :if={!@user}
+                    :if={@booking_error_title == "Sign In Required"}
                     navigate={
                       ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"
                     }
@@ -2100,16 +2089,14 @@ defmodule YscWeb.ClearLakeBookingLive do
                     Sign In to Book
                   </.link>
                   <.link
-                    :if={
-                      @user && @booking_error_title == "Application under review"
-                    }
+                    :if={@booking_error_title == "Application under review"}
                     navigate={~p"/pending-review"}
                     class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
                   >
                     View application status
                   </.link>
                   <.link
-                    :if={@user && @booking_error_title == "Membership Required"}
+                    :if={@booking_error_title == "Membership Required"}
                     navigate={~p"/users/membership"}
                     class="px-8 py-3 bg-teal-600 text-white font-bold rounded-lg hover:bg-teal-700 transition shadow-sm"
                   >
@@ -3415,7 +3402,6 @@ defmodule YscWeb.ClearLakeBookingLive do
     end)
   end
 
-  defp parse_query_string(nil), do: %{}
   defp parse_query_string(""), do: %{}
 
   defp parse_query_string(query_string) when is_binary(query_string) do

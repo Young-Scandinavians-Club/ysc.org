@@ -374,20 +374,10 @@ defmodule YscWeb.OrderConfirmationLive do
                     <% has_ticket_discount = has_discount && !is_refunded %>
                     <%= if has_ticket_discount do %>
                       <% discount_percentage =
-                        if ticket.ticket_tier.price &&
-                             Money.positive?(ticket.ticket_tier.price) do
-                          case Money.div(ticket_discount, ticket.ticket_tier.price) do
-                            {:ok, ratio} ->
-                              Decimal.mult(ratio.amount, Decimal.new(100))
-                              |> Decimal.to_float()
-                              |> Float.round(2)
-
-                            _ ->
-                              nil
-                          end
-                        else
-                          nil
-                        end %>
+                        ticket_discount_percentage(
+                          ticket_discount,
+                          ticket.ticket_tier.price
+                        ) %>
                       <div class="mt-3 pt-3 border-t border-zinc-300">
                         <div class="flex justify-between text-xs text-green-600">
                           <span>
@@ -734,6 +724,16 @@ defmodule YscWeb.OrderConfirmationLive do
   end
 
   # Helper function to calculate donation amount for a ticket
+  defp ticket_discount_percentage(discount, tier_price) do
+    if Money.positive?(tier_price) do
+      discount.amount
+      |> Decimal.div(tier_price.amount)
+      |> Decimal.mult(Decimal.new(100))
+      |> Decimal.to_float()
+      |> Float.round(2)
+    end
+  end
+
   defp get_donation_amount_for_ticket(_ticket, ticket_order) do
     if ticket_order && ticket_order.tickets do
       # Calculate non-donation ticket costs
@@ -776,11 +776,7 @@ defmodule YscWeb.OrderConfirmationLive do
 
       if donation_count > 0 && Money.positive?(donation_total) do
         # Calculate per-ticket donation amount
-        per_ticket_amount =
-          case Money.div(donation_total, donation_count) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
+        {:ok, per_ticket_amount} = Money.div(donation_total, donation_count)
 
         # Format and display
         case Money.to_string(per_ticket_amount) do

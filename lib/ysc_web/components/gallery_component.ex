@@ -74,7 +74,4 @@ defmodule YscWeb.Components.GalleryComponent do
 
   defp get_image_path(%Image{thumbnail_path: thumbnail_path}),
     do: thumbnail_path
-
-  defp get_image_path(%Image{optimized_image_path: optimized_path}),
-    do: optimized_path
 end

@@ -32,8 +32,6 @@ defmodule Ysc.Logging do
       Ysc.Logging.warning("Rate limit approaching", current: 90, max: 100)
   """
 
-  require Logger
-
   # Compile-time check for test environment
   @in_test Mix.env() == :test
 
@@ -144,52 +142,50 @@ defmodule Ysc.Logging do
       )
   """
   defmacro error(message, opts \\ []) do
-    # Capture the compile-time test flag
-    in_test = @in_test
+    if @in_test do
+      quote do
+        require Logger
 
-    # Build the Sentry integration code conditionally at compile-time
-    sentry_code =
-      if in_test do
-        # In test: no Sentry calls at all
-        quote do
-          :ok
-        end
-      else
-        # In production: full Sentry integration
-        quote do
-          Ysc.Logging.capture_sentry(
-            error,
-            stacktrace,
-            sentry_extra,
-            sentry_tags,
-            message,
-            opts
-          )
-        end
+        opts = Ysc.Logging.normalize_opts(unquote(opts))
+        message = unquote(message)
+
+        {error, opts} = Keyword.pop(opts, :error)
+        {stacktrace, opts} = Keyword.pop(opts, :stacktrace)
+
+        logger_metadata =
+          Ysc.Logging.build_error_metadata(opts, error, stacktrace)
+
+        Logger.error(message, logger_metadata)
+        :ok
       end
+    else
+      quote do
+        require Logger
 
-    quote do
-      require Logger
+        opts = Ysc.Logging.normalize_opts(unquote(opts))
+        message = unquote(message)
 
-      opts = Ysc.Logging.normalize_opts(unquote(opts))
-      message = unquote(message)
+        {error, opts} = Keyword.pop(opts, :error)
+        {stacktrace, opts} = Keyword.pop(opts, :stacktrace)
+        {sentry_extra, opts} = Keyword.pop(opts, :extra)
+        {sentry_tags, opts} = Keyword.pop(opts, :tags)
 
-      # Extract Sentry-specific options
-      {error, opts} = Keyword.pop(opts, :error)
-      {stacktrace, opts} = Keyword.pop(opts, :stacktrace)
-      {sentry_extra, opts} = Keyword.pop(opts, :extra)
-      {sentry_tags, opts} = Keyword.pop(opts, :tags)
+        logger_metadata =
+          Ysc.Logging.build_error_metadata(opts, error, stacktrace)
 
-      logger_metadata =
-        Ysc.Logging.build_error_metadata(opts, error, stacktrace)
+        Logger.error(message, logger_metadata)
 
-      # Log to Logger (always, in all environments)
-      Logger.error(message, logger_metadata)
+        Ysc.Logging.capture_sentry(
+          error,
+          stacktrace,
+          sentry_extra,
+          sentry_tags,
+          message,
+          opts
+        )
 
-      # Send to Sentry (compile-time conditional)
-      unquote(sentry_code)
-
-      :ok
+        :ok
+      end
     end
   end
 

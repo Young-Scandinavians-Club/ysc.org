@@ -209,17 +209,10 @@ defmodule YscWeb.Emails.TicketOrderRefund do
         )
 
       if total_donation_count > 0 && Money.positive?(donation_total) do
-        per_ticket_amount =
-          case Money.div(donation_total, total_donation_count) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
+        {:ok, per_ticket_amount} =
+          Money.div(donation_total, total_donation_count)
 
-        tier_total =
-          case Money.mult(per_ticket_amount, this_tier_count) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
+        {:ok, tier_total} = Money.mult(per_ticket_amount, this_tier_count)
 
         {format_money(per_ticket_amount), format_money(tier_total)}
       else

@@ -3,8 +3,6 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
   import YscWeb.CoreComponents
 
-  require Ysc.Logging
-
   alias Ysc.Scanning
   alias Ysc.MessagePassingEvents
 

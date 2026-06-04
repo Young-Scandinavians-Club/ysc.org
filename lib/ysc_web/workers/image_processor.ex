@@ -305,10 +305,6 @@ defmodule YscWeb.Workers.ImageProcessor do
             "#{scheme}://#{host}"
         end
 
-      %URI{scheme: scheme, host: host}
-      when is_binary(host) and is_binary(scheme) ->
-        "#{scheme}://#{host}"
-
       _ ->
         "(unparseable URL)"
     end

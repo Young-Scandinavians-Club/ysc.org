@@ -1877,10 +1877,7 @@ defmodule Ysc.Quickbooks.Client do
           class_ref: inspect(other)
         )
 
-        case other do
-          %{value: v} when is_binary(v) -> %{"value" => v}
-          _ -> %{"value" => to_string(other)}
-        end
+        %{"value" => to_string(other)}
     end
   end
 
@@ -2018,11 +2015,8 @@ defmodule Ysc.Quickbooks.Client do
                 ref when is_binary(ref) ->
                   %{"value" => ref}
 
-                other ->
-                  case other do
-                    %{value: v} when is_binary(v) -> %{"value" => v}
-                    _ -> nil
-                  end
+                _other ->
+                  nil
               end
 
             if class_ref_map do
@@ -3211,8 +3205,8 @@ defmodule Ysc.Quickbooks.Client do
       Ysc.Logging.debug(
         "[QB Client] attempt_token_refresh: Making refresh request",
         url: @token_url,
-        has_client_id: !is_nil(client_id),
-        has_client_secret: !is_nil(client_secret),
+        has_client_id: true,
+        has_client_secret: true,
         has_refresh_token: !is_nil(refresh_token)
       )
 
@@ -3319,9 +3313,7 @@ defmodule Ysc.Quickbooks.Client do
         {:error, :quickbooks_client_id_not_configured}
 
       client_id ->
-        Ysc.Logging.debug("[QB Client] get_client_id: Client ID found",
-          has_client_id: !is_nil(client_id)
-        )
+        Ysc.Logging.debug("[QB Client] get_client_id: Client ID found")
 
         {:ok, client_id}
     end
@@ -3337,9 +3329,7 @@ defmodule Ysc.Quickbooks.Client do
         {:error, :quickbooks_client_secret_not_configured}
 
       client_secret ->
-        Ysc.Logging.debug("[QB Client] get_client_secret: Client secret found",
-          has_client_secret: !is_nil(client_secret)
-        )
+        Ysc.Logging.debug("[QB Client] get_client_secret: Client secret found")
 
         {:ok, client_secret}
     end

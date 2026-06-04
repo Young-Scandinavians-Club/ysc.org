@@ -726,9 +726,7 @@ defmodule YscWeb.UserRegistrationLive do
   def handle_event("next-step", _values, socket) do
     current_step = socket.assigns.current_step
 
-    step_invalid = false
-
-    new_step = if step_invalid, do: current_step, else: current_step + 1
+    new_step = current_step + 1
 
     {:noreply,
      socket
@@ -1023,8 +1021,6 @@ defmodule YscWeb.UserRegistrationLive do
     end)
     |> Enum.into(%{})
   end
-
-  defp map_to_string_keys(value), do: value
 
   defp get_family_invite_from_params(params) do
     case params["invite"] do

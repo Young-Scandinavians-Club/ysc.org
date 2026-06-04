@@ -708,18 +708,15 @@ defmodule YscWeb.AdminMoneyLive do
                     |> length()
 
                   if donation_tickets_count > 0 do
-                    case Money.div(
-                           ticket_order.total_amount,
-                           donation_tickets_count
-                         ) do
-                      {:ok, ticket_amount} ->
-                        case Money.add(acc, ticket_amount) do
-                          {:ok, new_total} -> new_total
-                          {:error, _} -> acc
-                        end
+                    {:ok, ticket_amount} =
+                      Money.div(
+                        ticket_order.total_amount,
+                        donation_tickets_count
+                      )
 
-                      {:error, _} ->
-                        acc
+                    case Money.add(acc, ticket_amount) do
+                      {:ok, new_total} -> new_total
+                      {:error, _} -> acc
                     end
                   else
                     acc
@@ -2300,7 +2297,7 @@ defmodule YscWeb.AdminMoneyLive do
                 </span>
                 <span class="text-sm font-bold text-zinc-900">
                   {Money.to_string!(
-                    (@selected_payout.payments || [])
+                    @selected_payout.payments
                     |> Enum.reduce(Money.new(0, :USD), fn payment, acc ->
                       case Money.add(acc, payment.amount) do
                         {:ok, total} -> total
@@ -2411,7 +2408,7 @@ defmodule YscWeb.AdminMoneyLive do
                 </span>
                 <span class="text-sm font-bold text-red-600">
                   {Money.to_string!(
-                    (@selected_payout.refunds || [])
+                    @selected_payout.refunds
                     |> Enum.reduce(Money.new(0, :USD), fn refund, acc ->
                       case Money.add(acc, refund.amount) do
                         {:ok, total} -> total
@@ -3308,8 +3305,6 @@ defmodule YscWeb.AdminMoneyLive do
       _ -> "text-zinc-900"
     end
   end
-
-  defp get_user_display_name(nil), do: "System"
 
   defp get_user_display_name(%Ecto.Association.NotLoaded{}), do: "Unknown User"
 

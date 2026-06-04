@@ -53,7 +53,6 @@ defmodule YscWeb.PaymentMethodLogo do
   def path_for_stripe_summary(:google_pay, _), do: file("google.svg")
   def path_for_stripe_summary(_, _), do: nil
 
-  defp alternative_type_to_file(:link), do: file("link.png")
   defp alternative_type_to_file(:cashapp), do: file("cashapp.svg")
   defp alternative_type_to_file(:paypal), do: file("paypal.svg")
   defp alternative_type_to_file(:klarna), do: file("klarna.svg")

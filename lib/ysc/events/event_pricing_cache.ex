@@ -3,8 +3,6 @@ defmodule Ysc.Events.EventPricingCache do
   Per-event cache for pricing enrichment (tiers, counts, images).
   """
 
-  require Ysc.Logging
-
   @cache_name :ysc_cache
   @cache_version_key "event_pricing:version"
   @default_ttl :timer.hours(24)

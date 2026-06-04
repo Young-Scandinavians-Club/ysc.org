@@ -2054,28 +2054,6 @@ defmodule YscWeb.CoreComponents do
     end
   end
 
-  defp get_event_badges(event, true, _selling_fast) do
-    # Check for cancelled state first - if cancelled, only show "Cancelled" badge
-    state = Map.get(event, :state) || Map.get(event, "state")
-
-    if state == :cancelled or state == "cancelled" do
-      [{"red", "Cancelled"}]
-    else
-      [{"red", "Sold Out"}]
-    end
-  end
-
-  defp get_event_badges(event, false, selling_fast) do
-    # Check for cancelled state first - if cancelled, only show "Cancelled" badge
-    state = Map.get(event, :state) || Map.get(event, "state")
-
-    if state == :cancelled or state == "cancelled" do
-      [{"red", "Cancelled"}]
-    else
-      get_event_badges_continue(event, false, selling_fast)
-    end
-  end
-
   defp get_event_badges(_, _, _), do: []
 
   defp get_event_badges_continue(event, sold_out, selling_fast) do
@@ -2202,15 +2180,11 @@ defmodule YscWeb.CoreComponents do
         NaiveDateTime.new!(date, time)
         |> DateTime.from_naive!("Etc/UTC")
 
-      {date, nil} when not is_nil(date) ->
-        if match?(%DateTime{}, date) do
-          date
-        else
-          DateTime.from_naive!(
-            NaiveDateTime.new!(date, ~T[00:00:00]),
-            "Etc/UTC"
-          )
-        end
+      {date, nil} when is_struct(date, Date) ->
+        DateTime.from_naive!(
+          NaiveDateTime.new!(date, ~T[00:00:00]),
+          "Etc/UTC"
+        )
 
       _ ->
         nil
@@ -3200,8 +3174,6 @@ defmodule YscWeb.CoreComponents do
     Ysc.Subscriptions.scheduled_for_cancellation?(subscription)
   end
 
-  defp membership_scheduled_for_cancellation?(_), do: false
-
   defp get_membership_ends_at(%{type: :lifetime}), do: nil
 
   defp get_membership_ends_at(%{subscription: subscription})
@@ -3212,8 +3184,6 @@ defmodule YscWeb.CoreComponents do
   defp get_membership_ends_at(subscription) when is_struct(subscription) do
     subscription.ends_at
   end
-
-  defp get_membership_ends_at(_), do: nil
 
   defp get_membership_renewal_date(%{type: :lifetime}), do: nil
 
@@ -3230,8 +3200,6 @@ defmodule YscWeb.CoreComponents do
   defp get_membership_renewal_date(subscription) when is_struct(subscription) do
     subscription.current_period_end
   end
-
-  defp get_membership_renewal_date(_), do: nil
 
   defp format_utc_date_display(%DateTime{} = dt) do
     dt

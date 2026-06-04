@@ -60,7 +60,7 @@ defmodule Ysc.WpMigration.PhpDeserialize do
     {len_str, after_colon} = take_until(rest, ?:)
     len = String.to_integer(len_str)
     # Read exactly `len` bytes then expect ;
-    <<value::binary-size(len), ";", tail::binary>> = after_colon
+    <<value::binary-size(^len), ";", tail::binary>> = after_colon
     {value, tail}
   end
 

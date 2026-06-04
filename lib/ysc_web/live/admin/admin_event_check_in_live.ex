@@ -197,9 +197,7 @@ defmodule YscWeb.AdminEventCheckInLive do
                         tooltip_text={ticket.ticket_order.reference_id}
                       >
                         <span class="text-xs font-mono text-zinc-400 hover:text-zinc-600 cursor-default whitespace-nowrap">
-                          {short_ref(
-                            ticket.ticket_order && ticket.ticket_order.reference_id
-                          )}
+                          {short_ref(ticket.ticket_order.reference_id)}
                         </span>
                       </.tooltip>
                     </div>
@@ -757,8 +755,6 @@ defmodule YscWeb.AdminEventCheckInLive do
 
   defp short_ref(nil), do: "—"
   defp short_ref(ref), do: ref
-
-  defp format_checkin_time(nil), do: ""
 
   defp format_checkin_time(dt) do
     Calendar.strftime(dt, "%b %-d, %H:%M UTC")

@@ -735,8 +735,6 @@ defmodule Ysc.PropertyOutages.Scraper do
 
   defp filter_affected_areas_for_account(_, _), do: []
 
-  defp parse_liberty_date(nil), do: nil
-
   defp parse_liberty_date(date_string) when is_binary(date_string) do
     # Liberty date format: "11/05/2025 09:42:47"
     # Try parsing as MM/DD/YYYY HH:MM:SS

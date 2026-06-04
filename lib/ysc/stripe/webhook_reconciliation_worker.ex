@@ -166,17 +166,6 @@ defmodule Ysc.Stripe.WebhookReconciliationWorker do
           {:ok, all}
         end
 
-      {:ok, %Stripe.List{data: data, has_more: has_more}} when is_list(data) ->
-        all = acc ++ data
-
-        if has_more and data != [] do
-          last_id = List.last(data).id
-          next_params = Map.put(params, :starting_after, last_id)
-          fetch_events_page(stripe_client, next_params, all)
-        else
-          {:ok, all}
-        end
-
       {:error, reason} ->
         {:error, reason}
     end

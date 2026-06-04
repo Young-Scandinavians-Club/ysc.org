@@ -5,7 +5,8 @@ defmodule Ysc.MixProject do
     [
       app: :ysc,
       version: "1.5.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.20",
+      elixirc_options: [module_definition: :interpreted],
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -173,7 +174,12 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      # GitHub master for Elixir 1.20.0 sigil end-position tokens (Hex 1.7.18 still crashes in to_col_end/3)
+      {:credo,
+       github: "rrrene/credo",
+       branch: "master",
+       only: [:dev, :test],
+       runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},

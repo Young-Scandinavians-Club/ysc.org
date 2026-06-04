@@ -10,7 +10,7 @@ defmodule Mix.Tasks.TestOutageEmail do
   """
 
   use Mix.Task
-  require Ysc.Logging
+
   import Ecto.Query
 
   alias Ysc.Repo

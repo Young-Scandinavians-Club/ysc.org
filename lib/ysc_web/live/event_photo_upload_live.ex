@@ -6,8 +6,6 @@ defmodule YscWeb.EventPhotoUploadLive do
 
   import YscWeb.CoreComponents
 
-  require Ysc.Logging
-
   alias Ysc.EventPhotos
   alias Ysc.Events.DateTimeFormatter
   alias Ysc.Events.Event

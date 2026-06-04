@@ -202,15 +202,9 @@ defmodule Ysc.Tickets.StripeService do
   """
   @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
   def ensure_stripe_customer(user) do
-    case get_stripe_customer_id(user) do
-      nil ->
-        # Preload billing_address to ensure it's available for customer creation
-        user = Ysc.Repo.preload(user, :billing_address)
-        create_stripe_customer(user)
-
-      customer_id ->
-        {:ok, customer_id}
-    end
+    # Preload billing_address to ensure it's available for customer creation
+    user = Ysc.Repo.preload(user, :billing_address)
+    create_stripe_customer(user)
   end
 
   @doc """

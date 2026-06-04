@@ -651,9 +651,6 @@ defmodule Ysc.Bookings.BookingLocker do
 
           {nil, _} ->
             Repo.rollback(:pricing_calculation_failed)
-
-          {_, nil} ->
-            Repo.rollback(:pricing_calculation_failed)
         end
       end)
       |> case do
@@ -2595,9 +2592,6 @@ defmodule Ysc.Bookings.BookingLocker do
       raise_stale_inventory!(List.first(room_inv))
     end
   end
-
-  defp release_day_held_days!(_property, days, _guests_count) when days == [],
-    do: :ok
 
   defp release_day_held_days!(property, days, guests_count) do
     prop_inv =

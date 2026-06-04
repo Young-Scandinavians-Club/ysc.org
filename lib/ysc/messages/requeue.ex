@@ -6,8 +6,6 @@ defmodule Ysc.Messages.Requeue do
   Mix tasks (development) and Release module functions (production).
   """
 
-  require Ysc.Logging
-
   alias Ysc.Repo
   alias Oban.Job
   import Ecto.Query

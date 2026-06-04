@@ -1336,9 +1336,6 @@ defmodule YscWeb.AdminMediaLive do
   defp get_image_path(%Media.Image{thumbnail_path: thumbnail_path}),
     do: thumbnail_path
 
-  defp get_image_path(%Media.Image{optimized_image_path: optimized_path}),
-    do: optimized_path
-
   # Get DOM ID for stream items (headers or images)
   defp get_dom_id(%Timeline.Header{} = header), do: header.id
   defp get_dom_id(%Media.Image{} = image), do: "image-#{image.id}"

@@ -553,8 +553,6 @@ defmodule YscWeb.Components.DateRangePicker do
     }
   end
 
-  defp set_field_value(nil, _field, _value), do: nil
-
   defp set_field_value(assigns, field, value) when is_binary(value) do
     if Map.has_key?(assigns, field) and is_map(assigns[field]) do
       {:ok, value, _} = DateTime.from_iso8601(value)
@@ -861,8 +859,6 @@ defmodule YscWeb.Components.DateRangePicker do
     "Select Date"
   end
 
-  defp select_button_text(nil, nil), do: "Close"
-  defp select_button_text("", nil), do: "Close"
   defp select_button_text(nil, ""), do: "Close"
   defp select_button_text("", ""), do: "Close"
   defp select_button_text(_start_date, _end_date), do: "Select Dates"

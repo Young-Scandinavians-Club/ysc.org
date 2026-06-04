@@ -375,17 +375,13 @@ defmodule YscWeb.Workers.SmsNotifier do
     )
   end
 
-  defp get_params_type_string(params) do
-    if is_map(params) do
-      "map"
-    else
-      if is_struct(params) do
-        inspect(params.__struct__)
-      else
-        "unknown"
-      end
-    end
-  end
+  defp get_params_type_string(params)
+       when is_map(params) and not is_struct(params), do: "map"
+
+  defp get_params_type_string(params) when is_struct(params),
+    do: inspect(params.__struct__)
+
+  defp get_params_type_string(_), do: "unknown"
 
   defp prepare_and_atomize_params(job, params) do
     params_type_before = get_params_type_string(params)
@@ -505,8 +501,7 @@ defmodule YscWeb.Workers.SmsNotifier do
           Map.put(acc, atom_key, atomize_keys(value))
         rescue
           ArgumentError ->
-            key_type =
-              if is_struct(key), do: inspect(key.__struct__), else: "not_struct"
+            key_type = "not_struct"
 
             Ysc.Logging.error(
               "Failed to convert key to existing atom in atomize_keys",
@@ -536,11 +531,7 @@ defmodule YscWeb.Workers.SmsNotifier do
   end
 
   defp atomize_keys(value) do
-    value_type =
-      if is_struct(value), do: inspect(value.__struct__), else: "not_struct"
-
     Ysc.Logging.debug("Atomizing non-map, non-list value",
-      value_type: value_type,
       value_preview: inspect(value, limit: 100)
     )
 

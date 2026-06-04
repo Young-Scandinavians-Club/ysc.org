@@ -512,12 +512,12 @@ defmodule YscWeb.UserBookingDetailLive do
                   </p>
                 </div>
               <% else %>
-                <%= if @refund_info && @refund_info.estimated_refund &&
-                       Money.positive?(@refund_info.estimated_refund) do %>
+                <% estimated_refund = Map.get(@refund_info, :estimated_refund) %>
+                <%= if match?(%Money{}, estimated_refund) && Money.positive?(estimated_refund) do %>
                   <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
                     <p class="text-sm text-blue-800">
                       <strong>Estimated Refund:</strong>
-                      {MoneyHelper.format_money!(@refund_info.estimated_refund)}
+                      {MoneyHelper.format_money!(estimated_refund)}
                     </p>
                   </div>
                 <% end %>

@@ -2718,9 +2718,6 @@ defmodule Ysc.Bookings do
           }
 
           {:ok, total, breakdown}
-
-        {:error, reason} ->
-          {:error, reason}
       end
     else
       {:error, :pricing_rule_not_found}
@@ -3223,7 +3220,6 @@ defmodule Ysc.Bookings do
 
     case Money.mult(original_amount, multiplier) do
       {:ok, refund_amount} -> refund_amount
-      {:error, _} -> Money.new(0, :USD)
     end
   end
 
@@ -3346,15 +3342,9 @@ defmodule Ysc.Bookings do
                     end
                   else
                     # Policy rule applied (partial refund, full refund via policy, or $0) - create pending refund for admin review
-                    applied_rule_days =
-                      if applied_rule,
-                        do: applied_rule.days_before_checkin,
-                        else: nil
+                    applied_rule_days = applied_rule.days_before_checkin
 
-                    applied_rule_percentage =
-                      if applied_rule,
-                        do: applied_rule.refund_percentage,
-                        else: nil
+                    applied_rule_percentage = applied_rule.refund_percentage
 
                     pending_refund_attrs = %{
                       booking_id: canceled_booking.id,

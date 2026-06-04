@@ -23,8 +23,6 @@ defmodule Ysc.WpMigration.SqlToDuckdb do
   (typically a few MB at most) rather than the whole dump.
   """
 
-  require Ysc.Logging
-
   @required_tables ~w(users usermeta posts postmeta)
   @optional_tables ~w(wc_orders wc_orders_meta wc_order_stats woocommerce_payment_tokens woocommerce_payment_tokenmeta)
 

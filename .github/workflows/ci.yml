@@ -32,7 +32,7 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.4"
+          elixir-version: "1.20.0"
           otp-version: "27.3"
 
       - name: Restore dependencies cache
@@ -119,7 +119,7 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.4"
+          elixir-version: "1.20.0"
           otp-version: "27.3"
 
       - name: Restore dependencies cache
@@ -148,7 +148,7 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.4"
+          elixir-version: "1.20.0"
           otp-version: "27.3"
 
       - name: Restore dependencies cache
@@ -181,7 +181,7 @@ jobs:
         id: setup-beam
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.4"
+          elixir-version: "1.20.0"
           otp-version: "27.3"
 
       - name: Restore PLT cache
@@ -224,7 +224,7 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.4"
+          elixir-version: "1.20.0"
           otp-version: "27.3"
 
       - name: Restore dependencies cache
@@ -286,7 +286,7 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
-          elixir-version: "1.19.4"
+          elixir-version: "1.20.0"
           otp-version: "27.3"
 
       - name: Restore dependencies cache

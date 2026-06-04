@@ -1,7 +1,7 @@
 # ===============================================
 # Stage 1: Build the Elixir/Phoenix application
 # ===============================================
-FROM elixir:1.19-alpine@sha256:b1fd9f99dfb3f56576646c173ff2e75a3b971172a55f624941cc83eafe5aa8fd AS builder
+FROM elixir:1.20-alpine AS builder
 
 # Install build dependencies
 # ffmpeg is required during asset compilation (mix assets.deploy)

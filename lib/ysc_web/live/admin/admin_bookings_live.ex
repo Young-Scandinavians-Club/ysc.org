@@ -2151,7 +2151,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <% base_bg =
                     cond do
                       is_selected_start -> "bg-red-200"
-                      is_in_range && !is_selected_start -> "bg-red-100/60"
+                      is_in_range -> "bg-red-100/60"
                       today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
                       true -> "bg-white"
                     end %>
@@ -2207,7 +2207,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <% base_bg =
                     cond do
                       is_selected_start -> "bg-green-200"
-                      is_in_range && !is_selected_start -> "bg-green-100/60"
+                      is_in_range -> "bg-green-100/60"
                       today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
                       true -> "bg-white"
                     end %>
@@ -2266,7 +2266,7 @@ defmodule YscWeb.AdminBookingsLive do
                     <% base_bg =
                       cond do
                         is_selected_start -> "bg-blue-200"
-                        is_in_range && !is_selected_start -> "bg-blue-100/60"
+                        is_in_range -> "bg-blue-100/60"
                         today_col?(i, @calendar_dates, @today) -> "bg-blue-100/20"
                         true -> "bg-white"
                       end %>
@@ -5139,14 +5139,6 @@ defmodule YscWeb.AdminBookingsLive do
            )
            |> update_calendar_view(socket.assigns.selected_property)}
 
-        {:error, {:already_processed, _, _}} ->
-          {:noreply,
-           YscWeb.Flash.put_toast(
-             socket,
-             :error,
-             "Refund has already been processed."
-           )}
-
         {:error, {:stripe_error, msg}} ->
           {:noreply,
            YscWeb.Flash.put_toast(
@@ -6430,7 +6422,7 @@ defmodule YscWeb.AdminBookingsLive do
       rule.room_category_id && rule.room_category ->
         "Category: #{atom_to_readable(rule.room_category.name)}"
 
-      rule.property && rule.property != nil ->
+      rule.property ->
         "Property: #{atom_to_readable(rule.property)}"
 
       true ->
@@ -6458,7 +6450,6 @@ defmodule YscWeb.AdminBookingsLive do
     |> Enum.map_join(" ", &String.capitalize/1)
   end
 
-  defp atom_to_readable(nil), do: "—"
   defp atom_to_readable(_), do: "—"
 
   defp format_datetime(%DateTime{} = datetime, timezone) do
@@ -6873,9 +6864,6 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   # Check if a date is in the selected range (for visual feedback)
-  defp date_selection_in_range?(_date, start_date, _hover_end)
-       when is_nil(start_date), do: false
-
   defp date_selection_in_range?(date, start_date, hover_end) do
     # Use hover_end if available (for ghost preview), otherwise show all dates after start
     end_date = hover_end || start_date

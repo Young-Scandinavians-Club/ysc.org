@@ -51,7 +51,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
     previous = normalize_previous_details(previous_details)
 
     additional_payment =
-      case Map.get(previous, :additional_payment) do
+      case previous.additional_payment do
         %Money{} = money ->
           if Money.positive?(money), do: format_money(money), else: nil
 
@@ -102,7 +102,10 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
         Map.get(details, :children_count) || Map.get(details, "children_count") ||
           0,
       total_price:
-        Map.get(details, :total_price) || Map.get(details, "total_price")
+        Map.get(details, :total_price) || Map.get(details, "total_price"),
+      additional_payment:
+        Map.get(details, :additional_payment) ||
+          Map.get(details, "additional_payment")
     }
   end
 

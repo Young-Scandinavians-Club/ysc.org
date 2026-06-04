@@ -236,8 +236,6 @@ defmodule Ysc.Events.Event do
     |> DateTime.from_naive!("Etc/UTC")
   end
 
-  defp combine_date_time(_, _), do: nil
-
   defp validate_partiful_link(changeset) do
     partiful_link = get_field(changeset, :partiful_link)
 

@@ -457,8 +457,6 @@ defmodule Ysc.GoogleWallet do
     }
   end
 
-  defp format_event_date(nil, _time), do: "TBD"
-
   defp format_event_date(start_date, start_time) do
     date_str = Calendar.strftime(start_date, "%a, %b %-d, %Y")
 
