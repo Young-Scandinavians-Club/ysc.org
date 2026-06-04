@@ -1,8 +1,8 @@
-defmodule Mix.Tasks.Coveralls.Lcov do
+defmodule Mix.Tasks.Ysc.Coveralls.Lcov do
   @moduledoc false
   use Mix.Task
 
-  @shortdoc "Output the test coverage as an Lcov file"
+  @shortdoc "Output the test coverage as an Lcov file (with stale BEAM pre-check)"
   @preferred_cli_env :test
 
   @impl Mix.Task

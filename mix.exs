@@ -174,10 +174,10 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      # GitHub master for Elixir 1.20.0 sigil end-position tokens (Hex 1.7.18 still crashes in to_col_end/3)
+      # Git ref for Elixir 1.20.0 sigil end-position tokens (Hex 1.7.18 still crashes in to_col_end/3)
       {:credo,
        github: "rrrene/credo",
-       branch: "master",
+       ref: "d4d33fdab14beb55139f1c7d7b97bd0034d48ad9",
        only: [:dev, :test],
        runtime: false},
       {:csv, "~> 3.2"},
@@ -278,6 +278,7 @@ defmodule Ysc.MixProject do
         "dialyzer",
         "shell_lint"
       ],
+      "coveralls.lcov": ["ysc.coveralls.lcov"],
       test: [
         "ecto.create --quiet",
         "ecto.migrate --quiet",

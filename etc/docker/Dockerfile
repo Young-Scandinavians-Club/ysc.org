@@ -2,7 +2,8 @@
 # Stage 1: Build the Elixir/Phoenix application
 # ===============================================
 # Official library/elixir has no 1.20-alpine tag; pin hexpm image (Elixir 1.20, OTP 27.3.x, Alpine 3.22).
-FROM hexpm/elixir:1.20-erlang-27.3.4.12-alpine-3.22.4 AS builder
+# Digest pins the multi-arch manifest (linux/amd64 + linux/arm64) for reproducible builds.
+FROM hexpm/elixir:1.20-erlang-27.3.4.12-alpine-3.22.4@sha256:9fcf66fc47130d57c1ebb3a676cbd0a7f3c3b68c1ca984d867d66ca6ede9a63f AS builder
 
 # Install build dependencies
 # ffmpeg is required during asset compilation (mix assets.deploy)
