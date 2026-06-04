@@ -360,7 +360,9 @@ defmodule YscWeb.ContactLive do
         {:error, _} ->
           socket =
             socket
-            |> YscWeb.Flash.put_toast(:error, "Please try submitting again",
+            |> YscWeb.Flash.put_toast(
+              :error,
+              "We couldn't verify you're a real person. Please try submitting again. If this keeps happening, refresh the page or try a different browser.",
               title: "Contact"
             )
             |> Turnstile.refresh()

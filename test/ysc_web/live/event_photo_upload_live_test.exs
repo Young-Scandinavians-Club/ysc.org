@@ -58,6 +58,7 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
 
     assert html =~ "Share your photos"
     assert html =~ "videos"
+    assert html =~ "up to 30 files per batch"
     assert has_element?(view, "#event-photo-upload-form")
     assert has_element?(view, "#photo-drop-zone")
   end
