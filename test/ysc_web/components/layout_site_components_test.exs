@@ -60,7 +60,8 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
 
   describe "footer_section_heading/1" do
     test "renders uppercase section title" do
-      html = render_component(&Layouts.footer_section_heading/1, %{title: "Policies"})
+      html =
+        render_component(&Layouts.footer_section_heading/1, %{title: "Policies"})
 
       assert html =~ "Policies"
       assert html =~ "uppercase"
