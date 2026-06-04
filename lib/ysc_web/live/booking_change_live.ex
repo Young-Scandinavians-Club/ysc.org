@@ -130,6 +130,7 @@ defmodule YscWeb.BookingChangeLive do
       |> assign(:checkin_date_tooltips, data.checkin_tooltips)
       |> assign(:checkin_date_tooltips_loading?, false)
       |> assign(:change_data_loaded?, true)
+      |> assign(:amount_paid, amount_paid_from_preview(data.preview_result))
       |> apply_preview_result(data.preview_result)
 
     {:noreply, socket}
@@ -745,6 +746,7 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:preview_booking, nil)
     |> assign(:pending_modification_params, nil)
     |> assign(:pending_guest_params, nil)
+    |> assign(:amount_paid, nil)
     |> assign(:selected_family_members_for_guests, %{})
     |> assign(:other_family_members, [])
   end
@@ -935,7 +937,9 @@ defmodule YscWeb.BookingChangeLive do
            preview_opts(socket)
          ) do
       {:ok, preview} ->
-        assign(socket, preview: preview, preview_error: nil)
+        socket
+        |> assign(preview: preview, preview_error: nil)
+        |> assign(:amount_paid, preview.amount_paid)
 
       {:error, %Ecto.Changeset{} = changeset} ->
         socket
@@ -956,13 +960,27 @@ defmodule YscWeb.BookingChangeLive do
   defp preview_opts(socket) do
     # Rebuild while the payment hold is active: inventory rows get buyout_held and
     # a cached snapshot from before the hold would block the member's own change.
-    if socket.assigns.show_payment_form or
-         is_nil(socket.assigns.availability_snapshot) do
-      []
-    else
-      [availability_snapshot: socket.assigns.availability_snapshot]
+    base_opts =
+      if socket.assigns.show_payment_form or
+           is_nil(socket.assigns.availability_snapshot) do
+        []
+      else
+        [availability_snapshot: socket.assigns.availability_snapshot]
+      end
+
+    case socket.assigns[:amount_paid] do
+      %Money{} = amount_paid ->
+        Keyword.put(base_opts, :amount_paid, amount_paid)
+
+      _ ->
+        base_opts
     end
   end
+
+  defp amount_paid_from_preview({:ok, %{amount_paid: %Money{} = amount_paid}}),
+    do: amount_paid
+
+  defp amount_paid_from_preview(_), do: nil
 
   defp refresh_availability_snapshot(socket) do
     if socket.assigns.change_data_loaded? do
