@@ -39,9 +39,7 @@ jobs:
       - name: Restore dependencies cache
         uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
-          path: |
-            deps
-            _build
+          path: deps
           key: ${{ runner.os }}-mix-test-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
             ${{ runner.os }}-mix-test-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
@@ -52,7 +50,9 @@ jobs:
       - name: Compile
         env:
           MIX_ENV: test
-        run: mix compile --warnings-as-errors
+        run: |
+          mix deps.compile
+          mix compile --warnings-as-errors
 
       # GHA service containers do not pass `server /data` to the MinIO image, so the
       # container exits immediately (help text only) and the health check never passes.
