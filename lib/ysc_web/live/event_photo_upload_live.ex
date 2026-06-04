@@ -118,7 +118,7 @@ defmodule YscWeb.EventPhotoUploadLive do
         </div>
       <% else %>
         <p class="text-center text-zinc-600 leading-relaxed -mt-2">
-          Drag photos and videos below or tap to browse — you can upload as many as you like.
+          Drag photos and videos below or tap to browse. You can add up to 30 files per batch; after you submit, use Upload more to add another batch.
         </p>
 
         <%= if not @uploads_available? do %>
@@ -358,7 +358,9 @@ defmodule YscWeb.EventPhotoUploadLive do
   defp error_to_string(:too_large),
     do: "File is too large (photos max 200 MB, videos max 20 GB)"
 
-  defp error_to_string(:too_many_files), do: "Too many files"
+  defp error_to_string(:too_many_files),
+    do:
+      "You can upload up to 30 files per batch. Submit these first, then use Upload more to add another batch."
 
   defp error_to_string(:not_accepted),
     do: "File type not accepted — use a photo or video format we support"

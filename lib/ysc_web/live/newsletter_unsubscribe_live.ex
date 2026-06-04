@@ -74,14 +74,14 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
         </p>
 
         <p :if={!@subscriber} class="mt-4 text-zinc-600">
-          This unsubscribe link is invalid or has already been used. If you still receive our newsletter,
+          This link does not work. It may be outdated or mistyped. If you still receive our newsletter, email
           <.link
             href="mailto:info@ysc.org"
             class="text-blue-600 hover:underline font-semibold"
           >
-            contact us at info@ysc.org
+            info@ysc.org
           </.link>
-          and we will help.
+          with the address you want removed and we will unsubscribe you manually.
         </p>
 
         <.button
@@ -138,7 +138,7 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
          |> assign(:error, "Something went wrong. Please try again.")
          |> YscWeb.Flash.put_toast(
            :error,
-           "Could not unsubscribe. Please try again.",
+           "We couldn't unsubscribe you right now. Please try again in a few minutes, or email info@ysc.org if you still receive newsletters.",
            title: "Newsletter"
          )}
     end

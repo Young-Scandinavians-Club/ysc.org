@@ -19,7 +19,8 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
 
       assert html =~ "Invalid or expired link"
       assert html =~ "mailto:info@ysc.org"
-      assert html =~ "contact us at info@ysc.org"
+      assert html =~ "info@ysc.org"
+      assert html =~ "outdated or mistyped"
     end
 
     test "shows invalid link for token that is only whitespace", %{conn: conn} do
