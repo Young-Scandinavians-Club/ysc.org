@@ -444,6 +444,69 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert render(view) =~ "Booking Details"
       assert render(view) =~ unique
     end
+
+    test "does not re-query reservations list when opening view booking modal", %{
+      conn: conn
+    } do
+      unique = "PerfList#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      bookings_list_pattern = ~r/SELECT .* FROM "bookings"/is
+
+      {_html, reservation_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> element("button", "View")
+            |> render_click()
+          end,
+          pattern: bookings_list_pattern
+        )
+
+      assert reservation_queries == 0
+      assert has_element?(view, "#booking-modal")
+    end
+
+    test "does not re-query pending refund badge counts when opening view booking modal",
+         %{conn: conn} do
+      unique = "PerfBadge#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      pending_refund_pattern = ~r/FROM "pending_refunds"/i
+
+      {_html, badge_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> element("button", "View")
+            |> render_click()
+          end,
+          pattern: pending_refund_pattern
+        )
+
+      assert badge_queries == 0
+      assert has_element?(view, "#booking-modal")
+    end
   end
 
   describe "new booking form" do

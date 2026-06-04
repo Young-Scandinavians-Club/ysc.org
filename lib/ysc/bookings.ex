@@ -675,7 +675,12 @@ defmodule Ysc.Bookings do
   Validates a proposed booking modification and returns pricing preview without persisting.
   """
   def prepare_modification(%Booking{} = booking, attrs, opts \\ []) do
-    booking = Repo.preload(booking, [:rooms, :user])
+    booking =
+      if modification_preload_needed?(booking) do
+        Repo.preload(booking, [:rooms, :user])
+      else
+        booking
+      end
 
     with :ok <- validate_modification_eligible(booking),
          {:ok, parsed} <- parse_modification_attrs(booking, attrs),
@@ -688,7 +693,7 @@ defmodule Ysc.Bookings do
            calculate_modification_pricing(
              build_preview_booking(booking, parsed)
            ),
-         {:ok, amount_paid} <- get_booking_total_paid_amount(booking) do
+         {:ok, amount_paid} <- modification_amount_paid(booking, opts) do
       previous_total = booking.total_price || Money.new(0, :USD)
 
       {:ok,
@@ -1038,6 +1043,17 @@ defmodule Ysc.Bookings do
         attrs
     else
       attrs
+    end
+  end
+
+  defp modification_preload_needed?(booking) do
+    not (Ecto.assoc_loaded?(booking.rooms) and Ecto.assoc_loaded?(booking.user))
+  end
+
+  defp modification_amount_paid(booking, opts) do
+    case Keyword.get(opts, :amount_paid) do
+      %Money{} = amount -> {:ok, amount}
+      _ -> get_booking_total_paid_amount(booking)
     end
   end
 

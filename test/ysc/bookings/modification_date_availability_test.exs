@@ -212,6 +212,55 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     assert without_snapshot > 0
   end
 
+  test "prepare_modification reuses amount_paid option without ledger queries", %{
+    user: user
+  } do
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    new_checkin = Date.add(checkin, 7)
+    new_checkout = Date.add(checkout, 7)
+
+    attrs = %{
+      "checkin_date" => Date.to_iso8601(new_checkin),
+      "checkout_date" => Date.to_iso8601(new_checkout),
+      "guests_count" => "2",
+      "children_count" => "0"
+    }
+
+    amount_paid = Money.new(:USD, 500)
+    ledger_pattern = ~r/FROM "ledger_entries"/i
+
+    {_preview, ledger_queries} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          assert {:ok, preview} =
+                   Bookings.prepare_modification(booking, attrs,
+                     availability_snapshot: snapshot,
+                     amount_paid: amount_paid
+                   )
+
+          assert Money.equal?(preview.amount_paid, amount_paid)
+        end,
+        pattern: ledger_pattern
+      )
+
+    assert ledger_queries == 0
+  end
+
   test "checkout_date_tooltips marks overlapping checkout dates unavailable", %{
     user: user
   } do

@@ -3409,6 +3409,7 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:pending_refunds_count, 0)
       |> assign(:tahoe_pending_refunds_count, 0)
       |> assign(:clear_lake_pending_refunds_count, 0)
+      |> assign(:pending_refund_badges_loaded?, false)
       |> assign(:selected_pending_refund, nil)
       |> assign(:approve_refund_form, nil)
       |> assign(:reject_refund_form, nil)
@@ -3533,10 +3534,11 @@ defmodule YscWeb.AdminBookingsLive do
     # This prevents stale live_action values from blocking modal opens
     socket = assign(socket, :live_action, socket.assigns.live_action || :index)
 
-    # Track if dates or property changed to avoid unnecessary calendar updates
+    # Track if dates, property, or section changed to avoid unnecessary reloads
     old_start_date = socket.assigns[:calendar_start_date]
     old_end_date = socket.assigns[:calendar_end_date]
     old_property = socket.assigns[:selected_property]
+    old_section = socket.assigns[:current_section] || :calendar
 
     # Update calendar date range first if provided in params, to preserve it when updating property
     {socket, dates_changed} =
@@ -3616,6 +3618,8 @@ defmodule YscWeb.AdminBookingsLive do
         socket
       end
 
+    section_changed = old_section != socket.assigns.current_section
+
     # Update selected_property if provided in params
     {socket, property_changed} =
       if params["property"] do
@@ -3668,38 +3672,57 @@ defmodule YscWeb.AdminBookingsLive do
         socket
       end
 
-    # Load reservations for the table only if on reservations section
+    # Load reservations for the table only if on reservations section.
+    # Opening a booking modal only changes `live_action`; skip the list refetch
+    # (same pattern as AdminUsersLive after PR #419).
     socket =
-      if socket.assigns[:current_section] == :reservations do
+      if socket.assigns[:current_section] == :reservations &&
+           not skip_reservations_refetch?(
+             socket,
+             params,
+             dates_changed,
+             property_changed
+           ) do
         load_reservations(socket, params)
       else
         socket
       end
 
-    # Load pending refunds count and list if on pending_refunds section
-    # Parallelize pending refunds queries for better performance
+    # Load pending refunds count and list if on pending_refunds section.
+    # Tab badge counts are cached across modal-only patches.
     selected_property = socket.assigns.selected_property
+    refresh_pending_refund_badges? =
+      not skip_pending_refund_badges?(
+        socket,
+        dates_changed,
+        property_changed,
+        section_changed
+      )
 
-    # Start both queries in parallel
-    pending_refunds_count_task =
-      if socket.assigns[:current_section] == :pending_refunds do
-        nil
+    {pending_refunds_count_task, property_counts_task} =
+      if refresh_pending_refund_badges? do
+        pending_refunds_count_task =
+          if socket.assigns[:current_section] == :pending_refunds do
+            nil
+          else
+            Task.async(fn ->
+              from(pr in Ysc.Bookings.PendingRefund,
+                join: b in assoc(pr, :booking),
+                where: pr.status == :pending,
+                where: b.property == ^selected_property,
+                select: count(pr.id)
+              )
+              |> Repo.one() || 0
+            end)
+          end
+
+        property_counts_task =
+          Task.async(fn -> load_property_pending_refunds_counts_data() end)
+
+        {pending_refunds_count_task, property_counts_task}
       else
-        # Still load count for the badge (filtered by selected property at DB level)
-        Task.async(fn ->
-          from(pr in Ysc.Bookings.PendingRefund,
-            join: b in assoc(pr, :booking),
-            where: pr.status == :pending,
-            where: b.property == ^selected_property,
-            select: count(pr.id)
-          )
-          |> Repo.one() || 0
-        end)
+        {nil, nil}
       end
-
-    # Load pending refunds counts per property for tab badges (parallelize with property count)
-    property_counts_task =
-      Task.async(fn -> load_property_pending_refunds_counts_data() end)
 
     # Load full pending refunds list if on that section
     socket =
@@ -3709,27 +3732,32 @@ defmodule YscWeb.AdminBookingsLive do
         socket
       end
 
-    # Await both tasks in parallel
-    property_counts = Task.await(property_counts_task, :infinity)
-
     socket =
-      socket
-      |> assign(
-        :tahoe_pending_refunds_count,
-        Map.get(property_counts, :tahoe, 0)
-      )
-      |> assign(
-        :clear_lake_pending_refunds_count,
-        Map.get(property_counts, :clear_lake, 0)
-      )
+      if property_counts_task do
+        property_counts = Task.await(property_counts_task, :infinity)
 
-    # Await property-specific count if needed
+        socket
+        |> assign(
+          :tahoe_pending_refunds_count,
+          Map.get(property_counts, :tahoe, 0)
+        )
+        |> assign(
+          :clear_lake_pending_refunds_count,
+          Map.get(property_counts, :clear_lake, 0)
+        )
+        |> assign(:pending_refund_badges_loaded?, true)
+      else
+        socket
+      end
+
     socket =
       if pending_refunds_count_task do
         pending_refunds_count =
           Task.await(pending_refunds_count_task, :infinity)
 
-        assign(socket, :pending_refunds_count, pending_refunds_count)
+        socket
+        |> assign(:pending_refunds_count, pending_refunds_count)
+        |> assign(:pending_refund_badges_loaded?, true)
       else
         socket
       end
@@ -3947,6 +3975,16 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp apply_action(socket, :view_booking, %{"id" => id}) do
+    if view_booking_details_loaded?(socket, id) do
+      socket
+      |> assign(:page_title, "Booking Details")
+      |> assign(:show_refund_modal, false)
+    else
+      apply_view_booking_action(socket, id)
+    end
+  end
+
+  defp apply_view_booking_action(socket, id) do
     booking = Bookings.get_booking!(id)
 
     booking =
@@ -7221,6 +7259,71 @@ defmodule YscWeb.AdminBookingsLive do
   # Check if there are no results
   defp no_results?([]), do: true
   defp no_results?(_), do: false
+
+  defp skip_reservations_refetch?(socket, params, dates_changed, property_changed) do
+    match?(%Flop.Meta{}, socket.assigns[:reservation_meta]) &&
+      not dates_changed &&
+      not property_changed &&
+      not reservation_params_changed?(socket.assigns[:reservation_params], params)
+  end
+
+  defp skip_pending_refund_badges?(
+         socket,
+         dates_changed,
+         property_changed,
+         section_changed
+       ) do
+    socket.assigns[:pending_refund_badges_loaded?] &&
+      not dates_changed &&
+      not property_changed &&
+      not section_changed &&
+      socket.assigns[:current_section] != :pending_refunds
+  end
+
+  defp view_booking_details_loaded?(socket, id) do
+    case socket.assigns[:booking] do
+      %{id: ^id} ->
+        is_list(socket.assigns[:booking_payments]) and
+          is_list(socket.assigns[:booking_refunds])
+
+      _ ->
+        false
+    end
+  end
+
+  defp reservation_params_changed?(stored, current) do
+    normalize_reservation_params(stored) != normalize_reservation_params(current)
+  end
+
+  defp normalize_reservation_params(params) when is_map(params) do
+    params
+    |> stringify_param_keys()
+    |> Map.take([
+      "search",
+      "filter",
+      "page",
+      "page_size",
+      "order_by",
+      "order_directions"
+    ])
+  end
+
+  defp normalize_reservation_params(_), do: %{}
+
+  defp stringify_param_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {key, value} when is_atom(key) ->
+        {Atom.to_string(key), stringify_param_keys(value)}
+
+      {key, value} when is_map(value) ->
+        {key, stringify_param_keys(value)}
+
+      {key, value} ->
+        {key, value}
+    end)
+  end
+
+  defp stringify_param_keys(value), do: value
 
   defp validate_amount_format(changeset) do
     case Ecto.Changeset.get_change(changeset, :amount) do
