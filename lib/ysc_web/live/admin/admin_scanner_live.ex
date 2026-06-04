@@ -31,11 +31,12 @@ defmodule YscWeb.AdminScannerLive do
           </.link>
         </div>
 
-        <div :if={@sessions == []} class="text-center py-16 text-zinc-500">
-          <.icon name="hero-qr-code" class="w-12 h-12 mx-auto mb-3 text-zinc-300" />
-          <p class="text-lg font-medium">No scan sessions yet</p>
-          <p class="text-sm mt-1">Start a new scan session to begin.</p>
-        </div>
+        <.admin_icon_empty_state
+          :if={@sessions == []}
+          icon="hero-qr-code"
+          title="No scan sessions yet"
+          description="Start a new scan session to begin."
+        />
 
         <div :if={@sessions != []} class="space-y-3">
           <div
