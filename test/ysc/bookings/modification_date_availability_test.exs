@@ -212,9 +212,10 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     assert without_snapshot > 0
   end
 
-  test "prepare_modification reuses amount_paid option without ledger queries", %{
-    user: user
-  } do
+  test "prepare_modification reuses amount_paid option without ledger queries",
+       %{
+         user: user
+       } do
     room = create_room!()
     checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)

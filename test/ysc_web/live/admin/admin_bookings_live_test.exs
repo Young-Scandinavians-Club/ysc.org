@@ -445,9 +445,10 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert render(view) =~ unique
     end
 
-    test "does not re-query reservations list when opening view booking modal", %{
-      conn: conn
-    } do
+    test "does not re-query reservations list when opening view booking modal",
+         %{
+           conn: conn
+         } do
       unique = "PerfList#{System.unique_integer([:positive])}"
       user = user_fixture(%{first_name: unique, last_name: "Guest"})
       _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
@@ -461,7 +462,7 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       })
       |> render_change()
 
-      bookings_list_pattern = ~r/SELECT .* FROM "bookings"/is
+      bookings_list_pattern = ~r/FROM "bookings".*ORDER BY.*inserted_at/is
 
       {_html, reservation_queries} =
         Ysc.QueryCounter.with_query_counter(

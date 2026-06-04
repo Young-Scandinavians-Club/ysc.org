@@ -958,9 +958,9 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp preview_opts(socket) do
+    # Rebuild while the payment hold is active: inventory rows get buyout_held and
+    # a cached snapshot from before the hold would block the member's own change.
     base_opts =
-      # Rebuild while the payment hold is active: inventory rows get buyout_held and
-      # a cached snapshot from before the hold would block the member's own change.
       if socket.assigns.show_payment_form or
            is_nil(socket.assigns.availability_snapshot) do
         []
@@ -969,8 +969,11 @@ defmodule YscWeb.BookingChangeLive do
       end
 
     case socket.assigns[:amount_paid] do
-      %Money{} = amount_paid -> Keyword.put(base_opts, :amount_paid, amount_paid)
-      _ -> base_opts
+      %Money{} = amount_paid ->
+        Keyword.put(base_opts, :amount_paid, amount_paid)
+
+      _ ->
+        base_opts
     end
   end
 

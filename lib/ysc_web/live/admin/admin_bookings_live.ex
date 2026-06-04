@@ -3691,6 +3691,7 @@ defmodule YscWeb.AdminBookingsLive do
     # Load pending refunds count and list if on pending_refunds section.
     # Tab badge counts are cached across modal-only patches.
     selected_property = socket.assigns.selected_property
+
     refresh_pending_refund_badges? =
       not skip_pending_refund_badges?(
         socket,
@@ -3984,68 +3985,6 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
-  defp apply_view_booking_action(socket, id) do
-    booking = Bookings.get_booking!(id)
-
-    booking =
-      Ysc.Repo.preload(booking,
-        user: :current_avatar,
-        booking_guests: [],
-        rooms: :room_category,
-        check_ins: :check_in_vehicles
-      )
-
-    # Ensure selected_property matches the booking's property
-    socket =
-      if socket.assigns.selected_property != booking.property do
-        assign(socket, :selected_property, booking.property)
-      else
-        socket
-      end
-
-    # Calendar dates should already be set from handle_params, but ensure they're preserved
-    timezone = socket.assigns[:timezone] || "America/Los_Angeles"
-
-    socket =
-      if socket.assigns[:calendar_start_date] &&
-           socket.assigns[:calendar_end_date] do
-        socket
-      else
-        {start_date, end_date} = default_date_range(timezone)
-
-        socket
-        |> assign(:calendar_start_date, start_date)
-        |> assign(:calendar_end_date, end_date)
-      end
-
-    # Get payments and refunds related to this booking
-    payments = get_booking_payments(booking.id)
-    refunds = get_booking_refunds(booking.id)
-
-    # Get the primary payment for refund processing
-    primary_payment = List.first(payments)
-
-    # Initialize refund form if there's a payment
-    refund_form =
-      if primary_payment do
-        {%{},
-         %{amount: :string, reason: :string, release_availability: :boolean}}
-        |> Ecto.Changeset.cast(%{}, [:amount, :reason, :release_availability])
-        |> to_form(as: "refund")
-      else
-        nil
-      end
-
-    socket
-    |> assign(:page_title, "Booking Details")
-    |> assign(:booking, booking)
-    |> assign(:booking_payments, payments)
-    |> assign(:booking_refunds, refunds)
-    |> assign(:primary_payment, primary_payment)
-    |> assign(:show_refund_modal, false)
-    |> assign(:refund_form, refund_form)
-  end
-
   defp apply_action(socket, :new_booking, params) do
     # Determine booking type from params
     booking_type =
@@ -4304,6 +4243,68 @@ defmodule YscWeb.AdminBookingsLive do
     |> assign(:room, nil)
     |> assign(:room_form, nil)
     |> assign(:selected_room_image, nil)
+  end
+
+  defp apply_view_booking_action(socket, id) do
+    booking = Bookings.get_booking!(id)
+
+    booking =
+      Ysc.Repo.preload(booking,
+        user: :current_avatar,
+        booking_guests: [],
+        rooms: :room_category,
+        check_ins: :check_in_vehicles
+      )
+
+    # Ensure selected_property matches the booking's property
+    socket =
+      if socket.assigns.selected_property != booking.property do
+        assign(socket, :selected_property, booking.property)
+      else
+        socket
+      end
+
+    # Calendar dates should already be set from handle_params, but ensure they're preserved
+    timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+
+    socket =
+      if socket.assigns[:calendar_start_date] &&
+           socket.assigns[:calendar_end_date] do
+        socket
+      else
+        {start_date, end_date} = default_date_range(timezone)
+
+        socket
+        |> assign(:calendar_start_date, start_date)
+        |> assign(:calendar_end_date, end_date)
+      end
+
+    # Get payments and refunds related to this booking
+    payments = get_booking_payments(booking.id)
+    refunds = get_booking_refunds(booking.id)
+
+    # Get the primary payment for refund processing
+    primary_payment = List.first(payments)
+
+    # Initialize refund form if there's a payment
+    refund_form =
+      if primary_payment do
+        {%{},
+         %{amount: :string, reason: :string, release_availability: :boolean}}
+        |> Ecto.Changeset.cast(%{}, [:amount, :reason, :release_availability])
+        |> to_form(as: "refund")
+      else
+        nil
+      end
+
+    socket
+    |> assign(:page_title, "Booking Details")
+    |> assign(:booking, booking)
+    |> assign(:booking_payments, payments)
+    |> assign(:booking_refunds, refunds)
+    |> assign(:primary_payment, primary_payment)
+    |> assign(:show_refund_modal, false)
+    |> assign(:refund_form, refund_form)
   end
 
   @impl true
@@ -7260,11 +7261,19 @@ defmodule YscWeb.AdminBookingsLive do
   defp no_results?([]), do: true
   defp no_results?(_), do: false
 
-  defp skip_reservations_refetch?(socket, params, dates_changed, property_changed) do
+  defp skip_reservations_refetch?(
+         socket,
+         params,
+         dates_changed,
+         property_changed
+       ) do
     match?(%Flop.Meta{}, socket.assigns[:reservation_meta]) &&
       not dates_changed &&
       not property_changed &&
-      not reservation_params_changed?(socket.assigns[:reservation_params], params)
+      not reservation_params_changed?(
+        socket.assigns[:reservation_params],
+        params
+      )
   end
 
   defp skip_pending_refund_badges?(
@@ -7292,7 +7301,8 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp reservation_params_changed?(stored, current) do
-    normalize_reservation_params(stored) != normalize_reservation_params(current)
+    normalize_reservation_params(stored) !=
+      normalize_reservation_params(current)
   end
 
   defp normalize_reservation_params(params) when is_map(params) do
