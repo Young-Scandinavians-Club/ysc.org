@@ -1958,8 +1958,8 @@ defmodule Ysc.AccountsTest do
                joins_ytd_change_percent: pct
              } = cmp
 
-      assert is_integer(a) and a >= 0
-      assert is_integer(b) and b >= 0
+      assert a >= 0
+      assert b >= 0
       assert is_binary(y) and y != ""
       assert pct == nil or is_integer(pct)
     end

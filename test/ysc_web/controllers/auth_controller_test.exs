@@ -295,7 +295,7 @@ defmodule YscWeb.AuthControllerTest do
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})
 
-      assert redirected_to(conn) != nil
+      assert redirected_to(conn)
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
                "Successfully signed in"
@@ -318,7 +318,7 @@ defmodule YscWeb.AuthControllerTest do
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})
 
-      assert redirected_to(conn) != nil
+      assert redirected_to(conn)
 
       # Verify email was marked as verified
       updated_user = Accounts.get_user_by_email(user.email)
@@ -438,7 +438,7 @@ defmodule YscWeb.AuthControllerTest do
 
       # Result depends on whether Accounts.get_user_by_email is case-insensitive
       # This test documents the behavior
-      assert redirected_to(conn) != nil
+      assert redirected_to(conn)
     end
 
     test "handles very long email addresses", %{conn: conn} do
@@ -592,7 +592,7 @@ defmodule YscWeb.AuthControllerTest do
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})
 
-      assert redirected_to(conn) != nil
+      assert redirected_to(conn)
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Google"
     end
 
@@ -607,7 +607,7 @@ defmodule YscWeb.AuthControllerTest do
         |> assign(:ueberauth_auth, auth)
         |> AuthController.callback(%{})
 
-      assert redirected_to(conn) != nil
+      assert redirected_to(conn)
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Facebook"
     end
   end

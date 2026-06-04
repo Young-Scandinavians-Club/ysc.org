@@ -1,6 +1,8 @@
 defmodule YscWeb.Workers.WebhookRetryWorkerTest do
   use Ysc.DataCase, async: false
 
+  require Logger
+
   alias YscWeb.Workers.WebhookRetryWorker
   alias Ysc.Webhooks.WebhookEvent
 
@@ -773,7 +775,6 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
 
   describe "retry_webhook/1 — Stripe handler returns generic error" do
     test "returns webhook_not_found_after_duplicate when duplicate insert races with nil lookup" do
-      require Logger
       event_id = "evt_dup_nil_#{System.unique_integer([:positive])}"
       old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
 

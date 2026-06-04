@@ -56,10 +56,10 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     setup [:create_admin]
 
     test "renders the editor with empty form", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/newsletters/new")
+      {:ok, view, html} = live(conn, ~p"/admin/newsletters/new")
 
       assert html =~ "Newsletter"
-      assert has_element?(_view, "#newsletter-editor-form")
+      assert has_element?(view, "#newsletter-editor-form")
     end
 
     test "shows title and subject fields", %{conn: conn} do

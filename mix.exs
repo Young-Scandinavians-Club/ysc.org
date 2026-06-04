@@ -6,7 +6,7 @@ defmodule Ysc.MixProject do
       app: :ysc,
       version: "1.5.0",
       elixir: "~> 1.20",
-      elixirc_options: [module_definition: :interpreted],
+      elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -152,6 +152,10 @@ defmodule Ysc.MixProject do
       extra_applications: [:logger, :runtime_tools, :os_mon, :tzdata]
     ]
   end
+
+  # Gradual typing in tests produces many warnings on intentional invalid-arg assert_raise calls.
+  defp elixirc_options_for(:test), do: []
+  defp elixirc_options_for(_), do: [module_definition: :interpreted]
 
   # Specifies which paths to compile per environment.
   # dev/ contains custom Credo checks (Credo is only a dev/test dep), so we must not compile it in prod.

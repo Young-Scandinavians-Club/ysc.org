@@ -79,7 +79,8 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert data.property_name == "Tahoe"
       assert data.checkin_time == "3:00 PM"
       assert is_binary(data.checkin_date)
-      assert is_binary(data.door_code) or data.door_code == "Not Available"
+
+      assert data.door_code == "Not Available" or is_binary(data.door_code)
     end
 
     test "uses Clear Lake property label" do

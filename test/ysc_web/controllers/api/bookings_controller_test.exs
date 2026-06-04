@@ -43,10 +43,14 @@ defmodule YscWeb.Api.BookingsControllerTest do
   defp adjust_active_booking_dates(checkin, checkout, max_nights \\ 4) do
     checkout = ensure_sunday_when_saturday_included(checkin, checkout)
 
-    if Date.diff(checkout, checkin) > max_nights do
-      checkin = Date.add(checkout, -max_nights)
-      checkout = ensure_sunday_when_saturday_included(checkin, checkout)
-    end
+    {checkin, checkout} =
+      if Date.diff(checkout, checkin) > max_nights do
+        checkin = Date.add(checkout, -max_nights)
+        checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+        {checkin, checkout}
+      else
+        {checkin, checkout}
+      end
 
     {checkin, checkout}
   end

@@ -35,8 +35,6 @@ defmodule Ysc.Ledgers.ReconciliationWorkerTest do
   # async: false due to Oban inline mode
   use Ysc.DataCase, async: false
 
-  require Ysc.Logging
-
   alias Ysc.Ledgers.ReconciliationWorker
   alias Ysc.Ledgers
   alias Ysc.Ledgers.Reconciliation

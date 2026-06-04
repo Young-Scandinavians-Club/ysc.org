@@ -25,7 +25,7 @@ The project targets **Elixir 1.20**, which infers types at compile time and repo
 - CI and `mix precommit` use `mix compile --warnings-as-errors`, so typing violations fail the build. Treat new compile warnings as real defects: narrow with `case`/guards before use, remove unreachable clauses, and avoid redundant `nil` checks when types are already narrowed.
 - [Gradual set-theoretic types](https://hexdocs.pm/elixir/gradual-set-theoretic-types.html) and the [type cheatsheet](https://hexdocs.pm/elixir/typespecs.html#set-theoretic-types) explain the model.
 - **Dialyzer** (`mix dialyzer` in precommit) remains complementary; do not remove `@dialyzer` suppressions in the same change as typing fixes unless you confirm Dialyzer is clean without them.
-- Faster compiles: `mix.exs` sets `elixirc_options: [module_definition: :interpreted]` (~15% faster clean compile here; safe for production `.beam` output).
+- Faster compiles: `mix.exs` sets `elixirc_options: [module_definition: :interpreted]` in dev/prod (~15% faster clean compile here; safe for production `.beam` output). Test env omits it to avoid gradual-typing noise on intentional invalid-arg tests.
 
 - Elixir lists **do not support index based access via the access syntax**
 
