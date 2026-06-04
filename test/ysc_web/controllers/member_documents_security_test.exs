@@ -2,9 +2,11 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
   @moduledoc """
   Regression tests for member-only annual meeting documents and admin exports.
   """
-  use YscWeb.ConnCase, async: true
+  use YscWeb.ConnCase, async: false
 
   import Ysc.AccountsFixtures
+
+  alias YscWeb.AdminExportFiles
 
   @sample_pdf "2026/YSC_ANNUAL_REPORT_FY_2025.pdf"
 
@@ -74,7 +76,7 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
       filename =
         "ysc-user-export-2026-05-26-#{owner.id}-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
 
-      exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
+      exports_root = AdminExportFiles.exports_root()
       File.mkdir_p!(exports_root)
       file_path = Path.join(exports_root, filename)
       File.write!(file_path, "id,email\n1,secret@example.com")
@@ -94,7 +96,7 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
       filename =
         "ysc-user-export-2026-05-26-#{user.id}-01ARZ3NDEKTSV4RRFFQ69G5FAV.csv"
 
-      exports_root = Path.join([:code.priv_dir(:ysc), "static", "exports"])
+      exports_root = AdminExportFiles.exports_root()
       File.mkdir_p!(exports_root)
       file_path = Path.join(exports_root, filename)
       File.write!(file_path, "id,email\n1,test@example.com")

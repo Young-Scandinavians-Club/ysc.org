@@ -15,7 +15,6 @@ defmodule Mix.Tasks.Quickbooks.VerifySandbox do
   """
 
   use Mix.Task
-  require Ysc.Logging
 
   @shortdoc "Verify QuickBooks sandbox: bank account, accounts, classes"
 

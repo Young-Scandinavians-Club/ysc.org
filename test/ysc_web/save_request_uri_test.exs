@@ -28,8 +28,12 @@ defmodule YscWeb.SaveRequestUriTest do
 
     test "handles nil path in URI" do
       # Test edge case where path might be nil
-      uri = %URI{path: nil}
-      path = uri.path || ""
+      path =
+        case %URI{path: nil} do
+          %URI{path: nil} -> ""
+          %URI{path: path} -> path
+        end
+
       assert path == ""
     end
   end

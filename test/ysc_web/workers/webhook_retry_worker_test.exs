@@ -284,7 +284,6 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           payload: nil
         })
 
-      require Logger
       Logger.put_module_level(WebhookRetryWorker, :none)
       result = WebhookRetryWorker.retry_webhook(webhook)
       Logger.put_module_level(WebhookRetryWorker, :error)
@@ -351,7 +350,6 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           payload: %{"data" => 123}
         })
 
-      require Logger
       Logger.put_module_level(WebhookRetryWorker, :none)
 
       assert {:error, {:parse_error, _}} =
@@ -773,7 +771,6 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
 
   describe "retry_webhook/1 — Stripe handler returns generic error" do
     test "returns webhook_not_found_after_duplicate when duplicate insert races with nil lookup" do
-      require Logger
       event_id = "evt_dup_nil_#{System.unique_integer([:positive])}"
       old_time = DateTime.add(DateTime.utc_now(), -10, :minute)
 

@@ -64,7 +64,7 @@ defmodule YscWeb.Emails.HelpersTest do
 
     test "raises when user is nil" do
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        Helpers.membership_payment_reminder_data(nil)
+        Ysc.Test.Invoke.call(Helpers, :membership_payment_reminder_data, [nil])
       end
     end
   end

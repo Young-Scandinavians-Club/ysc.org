@@ -278,8 +278,8 @@ defmodule Ysc.Subscriptions do
             true
         end
 
-      # Subscription is active only if status is valid AND period is valid AND ends_at is valid
-      status_valid? and period_valid? and ends_at_valid?
+      # Subscription is active only if period is valid AND ends_at is valid
+      period_valid? and ends_at_valid?
     else
       false
     end
@@ -1699,8 +1699,6 @@ defmodule Ysc.Subscriptions do
        %Ysc.MessagePassingEvents.MembershipUpdated{user_id: user_id}}
     )
   end
-
-  defp broadcast_membership_updated(_), do: :ok
 
   defp invalidate_membership_caches(user_id) when is_binary(user_id) do
     MembershipCache.invalidate_user(user_id)

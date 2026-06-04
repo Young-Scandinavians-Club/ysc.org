@@ -110,8 +110,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
 
     # Prepare agenda data if available
     # Handle case where event.agendas might be nil
-    agendas =
-      if ticket_order.event, do: ticket_order.event.agendas || [], else: []
+    agendas = ticket_order.event.agendas || []
 
     agenda_data = prepare_agenda_data(agendas)
 
@@ -227,20 +226,13 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
           discount_pct =
             if Money.positive?(total_tier_discount) && Money.positive?(price) do
               # Calculate average discount percentage
-              per_ticket_discount =
-                case Money.div(total_tier_discount, quantity) do
-                  {:ok, discount} -> discount
-                  {:error, _} -> Money.new(0, :USD)
-                end
+              {:ok, per_ticket_discount} =
+                Money.div(total_tier_discount, quantity)
 
-              case Money.div(per_ticket_discount, price) do
-                {:ok, ratio} ->
-                  Decimal.mult(ratio.amount, Decimal.new(100))
-                  |> Decimal.to_float()
-
-                _ ->
-                  nil
-              end
+              per_ticket_discount.amount
+              |> Decimal.div(price.amount)
+              |> Decimal.mult(Decimal.new(100))
+              |> Decimal.to_float()
             else
               nil
             end
@@ -290,7 +282,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       donation_total =
         case Money.sub(ticket_order.total_amount, non_donation_total) do
           {:ok, amount} -> amount
-          _ -> Money.new(0, :USD)
+          {:error, _} -> Money.new(0, :USD)
         end
 
       # Group all donation tickets by tier
@@ -319,18 +311,11 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
         # If there's only one donation tier, divide evenly
         # If multiple tiers, we can't determine exact amounts per tier without original data
         # So we'll divide evenly across all donation tickets (best approximation)
-        per_ticket_amount =
-          case Money.div(donation_total, total_donation_count) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
+        {:ok, per_ticket_amount} =
+          Money.div(donation_total, total_donation_count)
 
         # For this tier, multiply by the quantity of tickets in this tier
-        tier_total =
-          case Money.mult(per_ticket_amount, this_tier_count) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
+        {:ok, tier_total} = Money.mult(per_ticket_amount, this_tier_count)
 
         {format_money(per_ticket_amount), format_money(tier_total)}
       else

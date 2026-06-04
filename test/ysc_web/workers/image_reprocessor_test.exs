@@ -29,7 +29,7 @@ defmodule YscWeb.Workers.ImageReprocessorTest do
       # For now, we'll just verify the function can be called
       result = ImageReprocessor.perform(job)
       # Result could be :ok or error depending on available images
-      assert result == :ok or match?({:error, _}, result)
+      assert result == :ok
     end
 
     test "handles empty list of unprocessed images" do
@@ -45,7 +45,7 @@ defmodule YscWeb.Workers.ImageReprocessorTest do
 
       # Should complete successfully with no images
       result = ImageReprocessor.perform(job)
-      assert result == :ok or match?({:error, _}, result)
+      assert result == :ok
     end
   end
 

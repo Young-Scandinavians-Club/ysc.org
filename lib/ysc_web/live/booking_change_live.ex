@@ -9,7 +9,6 @@ defmodule YscWeb.BookingChangeLive do
   alias YscWeb.BookingGuestForm
   import YscWeb.Components.BookingGuestInfoForm
   import Ecto.Query
-  require Ysc.Logging
 
   @payment_finalize_retry_attempts 5
   @payment_finalize_retry_delay_ms 400
@@ -1209,11 +1208,6 @@ defmodule YscWeb.BookingChangeLive do
     ] or
       match?({:payment_verification_failed, _}, reason) or
       match?({:ledger_payment_failed, _}, reason)
-  end
-
-  defp modification_error_message_after_payment(%Ecto.Changeset{} = changeset) do
-    "Your payment was received, but these changes could not be applied: " <>
-      format_changeset_errors(changeset)
   end
 
   defp modification_error_message_after_payment(reason) do

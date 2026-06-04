@@ -69,14 +69,6 @@ defmodule YscWeb.QuickbooksWebhookController do
             # Duplicate webhook - already processed, return 200 OK
             Ysc.Logging.info("Duplicate QuickBooks webhook event, returning OK")
             send_resp(conn, 200, "OK")
-
-          {:error, reason} ->
-            Ysc.Logging.error("Failed to create QuickBooks webhook event",
-              error: inspect(reason),
-              payload: inspect(params, limit: 100)
-            )
-
-            send_resp(conn, 500, "Internal Server Error")
         end
 
       {:error, reason} ->

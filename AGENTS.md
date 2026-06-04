@@ -18,6 +18,15 @@ This is a web application written using the Phoenix web framework.
 
 ## Elixir guidelines
 
+### Gradual typing (Elixir 1.20+)
+
+The project targets **Elixir 1.20**, which infers types at compile time and reports **verified bugs** (disjoint types) and dead code as compiler warnings—no `@spec` or type annotations required yet.
+
+- CI and `mix precommit` use `mix compile --warnings-as-errors`, so typing violations fail the build. Treat new compile warnings as real defects: narrow with `case`/guards before use, remove unreachable clauses, and avoid redundant `nil` checks when types are already narrowed.
+- [Gradual set-theoretic types](https://hexdocs.pm/elixir/gradual-set-theoretic-types.html) and the [type cheatsheet](https://hexdocs.pm/elixir/typespecs.html#set-theoretic-types) explain the model.
+- **Dialyzer** (`mix dialyzer` in precommit) remains complementary; do not remove `@dialyzer` suppressions in the same change as typing fixes unless you confirm Dialyzer is clean without them.
+- Faster compiles: `mix.exs` sets `elixirc_options: [module_definition: :interpreted]` in dev/prod (~15% faster clean compile here; safe for production `.beam` output). Test env omits it to avoid gradual-typing noise on intentional invalid-arg tests.
+
 - Elixir lists **do not support index based access via the access syntax**
 
   **Never do this (invalid)**:
@@ -361,8 +370,8 @@ And **never** do this:
 
 ### System dependencies (pre-installed in environment)
 
-- **Erlang/OTP 27** (installed at system level via esl-erlang package)
-- **Elixir 1.19.5** (installed at `/usr/local/elixir/bin`, added to PATH via `~/.bashrc`)
+- **Erlang/OTP 27–28** (see `.tool-versions`; CI uses OTP 27.3)
+- **Elixir 1.20.0** (see `.tool-versions`; use `asdf install` or the [official release](https://github.com/elixir-lang/elixir/releases/tag/v1.20.0))
 - **Docker** with `docker compose` (fuse-overlayfs storage driver, iptables-legacy)
 - **shellcheck** and **shfmt** (for shell script linting)
 - **inotify-tools** (for Phoenix live reload file watching)
@@ -379,7 +388,8 @@ And **never** do this:
 - The `make dev` target calls `etc/scripts/check_dev_prerequisites.sh` which uses `tput` for coloring; if this fails in a non-TTY context, run `mix phx.server` directly with `.env` sourced
 - Test suite runs with `MIX_ENV=test mix test` (7256 tests); no external services needed beyond PostgreSQL
 - Docker containers must be started with `sudo docker compose` since the daemon runs as root in this environment
-- `.tool-versions` specifies `elixir 1.19.5-otp-28` but the environment uses OTP 27; Elixir 1.19.5 compiled for OTP 27 works correctly
+- `.tool-versions` specifies `elixir 1.20.0-otp-28` and `erlang 28.3`; CI pins Elixir `1.20.0` with OTP `27.3`
+- **Credo** is pinned to `github: "rrrene/credo", branch: "master"` until a Hex release fully supports Elixir 1.20 sigil tokens; custom checks in `dev/ysc/credo/` must implement `scheduled_in_group/0`
 - Lint: `mix format --check-formatted && mix credo --all` plus `shellcheck` and `shfmt -d -i 2 -ci` on shell scripts (see Makefile `lint` target)
 - The seeded admin account is `admin@ysc.org` / `very_secure_password`
 - After login, the app may redirect to an onboarding page; navigate to `/admin` directly to access the admin dashboard

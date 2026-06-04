@@ -10,6 +10,8 @@ defmodule YscWeb.Api.BookingsControllerTest do
   import Ysc.BookingsFixtures
   import Ysc.AccountsFixtures
 
+  @test_token "test-kiosk-secret"
+
   # Creates a booking that is currently active (checked in already, not yet checked out),
   # which is required for the lookup endpoint to find it.
   defp active_booking_fixture(attrs) do
@@ -19,14 +21,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     checkin = Date.add(today, -1)
     checkout = Date.add(today, 2)
-
-    # If checkout lands on Sunday (day 7), the booking would include Saturday night
-    # but not Sunday night, violating the "Saturday must include Sunday" rule.
-    # Extend to Monday so both Saturday and Sunday nights are covered.
-    checkout =
-      if Date.day_of_week(checkout) == 7,
-        do: Date.add(checkout, 1),
-        else: checkout
+    {checkin, checkout} = adjust_active_booking_dates(checkin, checkout)
 
     {:ok, booking} =
       attrs
@@ -45,7 +40,22 @@ defmodule YscWeb.Api.BookingsControllerTest do
     booking
   end
 
-  @test_token "test-kiosk-secret"
+  # Tahoe weekend rule: inclusive stay dates containing Saturday must also contain Sunday.
+  # Keep within the default 4-night limit after adjustments.
+  defp adjust_active_booking_dates(checkin, checkout, max_nights \\ 4) do
+    checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+
+    {checkin, checkout} =
+      if Date.diff(checkout, checkin) > max_nights do
+        checkin = Date.add(checkout, -max_nights)
+        checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+        {checkin, checkout}
+      else
+        {checkin, checkout}
+      end
+
+    {checkin, checkout}
+  end
 
   setup %{conn: conn} do
     previous = Application.get_env(:ysc, :kiosk_api_key)

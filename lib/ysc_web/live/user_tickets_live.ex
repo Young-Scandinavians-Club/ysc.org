@@ -461,11 +461,7 @@ defmodule YscWeb.UserTicketsLive do
 
       if donation_count > 0 && Money.positive?(donation_total) do
         # Calculate per-ticket donation amount
-        per_ticket_amount =
-          case Money.div(donation_total, donation_count) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
+        {:ok, per_ticket_amount} = Money.div(donation_total, donation_count)
 
         format_price(per_ticket_amount)
       else

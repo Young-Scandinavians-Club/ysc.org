@@ -73,7 +73,7 @@ defmodule YscWeb.Uploads do
         consume_and_update(socket, name, key, fn [x | _], _ -> x end)
 
       %{^name => %Phoenix.LiveView.UploadConfig{}} ->
-        consume_and_update(socket, name, key, & &1)
+        consume_and_update(socket, name, key, fn entries, _ -> entries end)
 
       _ ->
         raise "no upload named #{name} found"

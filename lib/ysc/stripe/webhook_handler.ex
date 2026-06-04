@@ -2896,10 +2896,6 @@ defmodule Ysc.Stripe.WebhookHandler do
 
             :ok
 
-          {:error, {:already_processed, refund, refund_transaction}} ->
-            # Return the error tuple so caller can handle idempotency
-            {:error, {:already_processed, refund, refund_transaction}}
-
           {:error, reason} ->
             Ysc.Logging.error("Failed to process refund in ledger",
               payment_id: payment.id,

@@ -231,7 +231,8 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
         _ ->
           # If subtraction fails, at least verify total is >= $100
-          assert Money.gte?(ticket_order.total_amount, paid_tickets_amount)
+          assert Money.compare(ticket_order.total_amount, paid_tickets_amount) !=
+                   :lt
       end
 
       # Verify tickets were created

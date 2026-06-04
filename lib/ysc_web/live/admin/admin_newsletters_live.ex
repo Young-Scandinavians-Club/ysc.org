@@ -1065,12 +1065,10 @@ defmodule YscWeb.AdminNewslettersLive do
 
   defp edition_status_badge(:draft), do: "yellow"
   defp edition_status_badge(:scheduled), do: "sky"
-  defp edition_status_badge(:sending), do: "blue"
   defp edition_status_badge(:sent), do: "green"
 
   defp format_status(:draft), do: "Draft"
   defp format_status(:scheduled), do: "Scheduled"
-  defp format_status(:sending), do: "Sending…"
   defp format_status(:sent), do: "Sent"
 
   defp format_date(nil), do: ""
@@ -1092,7 +1090,6 @@ defmodule YscWeb.AdminNewslettersLive do
   defp subscribers_loading?(nil), do: true
   defp subscribers_loading?(_meta), do: false
 
-  defp subscribers_empty?(_streams, nil), do: false
   defp subscribers_empty?(_streams, meta), do: meta.total_count == 0
 
   defp subscriber_name(sub) do

@@ -98,9 +98,5 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   end
 
   defp should_remove_temp_file?(:ok), do: true
-
-  defp should_remove_temp_file?({:error, reason})
-       when reason in @terminal_errors, do: true
-
   defp should_remove_temp_file?({:error, _}), do: false
 end

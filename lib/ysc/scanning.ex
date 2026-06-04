@@ -10,8 +10,6 @@ defmodule Ysc.Scanning do
 
   import Ecto.Query
 
-  require Ysc.Logging
-
   alias Ysc.Repo
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache

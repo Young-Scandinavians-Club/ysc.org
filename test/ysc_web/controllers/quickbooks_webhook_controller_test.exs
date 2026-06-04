@@ -7,7 +7,6 @@ defmodule YscWeb.QuickbooksWebhookControllerTest do
   """
   use YscWeb.ConnCase, async: false
 
-  require Ysc.Logging
   import Ecto.Query
   import Mox
 

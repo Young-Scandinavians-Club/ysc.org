@@ -312,9 +312,29 @@ defmodule YscWeb.EventsListLive do
     # Merge assigns from update with existing socket assigns
     # Prefer new assigns if provided, otherwise keep existing
     show_hero =
-      Map.get(assigns, :show_hero) || socket.assigns[:show_hero] || false
+      cond do
+        Map.has_key?(assigns, :show_hero) ->
+          Map.get(assigns, :show_hero)
 
-    upcoming = Map.get(assigns, :upcoming) || socket.assigns[:upcoming] || true
+        Map.has_key?(socket.assigns, :show_hero) ->
+          Map.get(socket.assigns, :show_hero)
+
+        true ->
+          false
+      end
+
+    upcoming =
+      cond do
+        Map.has_key?(assigns, :upcoming) ->
+          Map.get(assigns, :upcoming)
+
+        Map.has_key?(socket.assigns, :upcoming) ->
+          Map.get(socket.assigns, :upcoming)
+
+        true ->
+          true
+      end
+
     limit = Map.get(assigns, :limit) || socket.assigns[:limit]
 
     defer_load =
@@ -346,7 +366,7 @@ defmodule YscWeb.EventsListLive do
       # Stream not initialized - load events first
       # This can happen if send_update is called before the component is fully mounted
       show_hero = socket.assigns[:show_hero] || false
-      upcoming = socket.assigns[:upcoming] || true
+      upcoming = Map.get(socket.assigns, :upcoming, true)
       limit = socket.assigns[:limit]
 
       load_events(
@@ -416,7 +436,7 @@ defmodule YscWeb.EventsListLive do
 
   # Reload all events from database and update hero/stream
   defp reload_all_events(socket) do
-    upcoming = socket.assigns[:upcoming] || true
+    upcoming = Map.get(socket.assigns, :upcoming, true)
     show_hero = socket.assigns[:show_hero] || false
     limit = socket.assigns[:limit]
 

@@ -3,8 +3,6 @@ defmodule Ysc.Bookings.AvailabilityCache do
   Short-TTL cache for Clear Lake daily availability maps.
   """
 
-  require Ysc.Logging
-
   @cache_name :ysc_cache
   @pubsub_topic "availability_cache:invalidate"
   @default_ttl 2 * 60 * 1000

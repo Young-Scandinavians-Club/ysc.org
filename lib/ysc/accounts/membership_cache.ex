@@ -256,8 +256,6 @@ defmodule Ysc.Accounts.MembershipCache do
   defp get_membership_plan_type_from_membership(_), do: nil
 
   # Validates that a cached membership is still valid (hasn't expired)
-  defp membership_valid?(nil), do: false
-
   defp membership_valid?(%{type: :lifetime}), do: true
 
   defp membership_valid?(%Subscriptions.Subscription{id: id}) do

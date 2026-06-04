@@ -28,6 +28,7 @@ defmodule Ysc.DataCase do
       import Ecto.Query
       import Ysc.DataCase
       import Ysc.EmailValidatorTestHelper
+      import Ysc.Test.Invoke
       import Mox
     end
   end

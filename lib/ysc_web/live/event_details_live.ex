@@ -1052,10 +1052,7 @@ defmodule YscWeb.EventDetailsLive do
             <%!-- Mobile: Fixed bottom bar --%>
             <div
               :if={@event.state != :cancelled}
-              class={[
-                "lg:hidden fixed bottom-0 left-0 right-0 z-50",
-                if(@event.state == :cancelled, do: "opacity-50 pointer-events-none")
-              ]}
+              class="lg:hidden fixed bottom-0 left-0 right-0 z-50"
             >
               <div class="h-8 bg-gradient-to-t from-white to-transparent"></div>
 
@@ -3102,23 +3099,10 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
                 <%= if has_discount do %>
                   <% discount_percentage =
-                    if ticket.ticket_tier.price &&
-                         Money.positive?(ticket.ticket_tier.price) do
-                      case Money.div(
-                             ticket_discount_amount,
-                             ticket.ticket_tier.price
-                           ) do
-                        {:ok, ratio} ->
-                          Decimal.mult(ratio.amount, Decimal.new(100))
-                          |> Decimal.to_float()
-                          |> Float.round(2)
-
-                        _ ->
-                          nil
-                      end
-                    else
-                      nil
-                    end %>
+                    ticket_discount_percentage(
+                      ticket_discount_amount,
+                      ticket.ticket_tier.price
+                    ) %>
                   <div class="flex justify-between text-xs text-green-600 px-3">
                     <span>
                       Member discount<%= if discount_percentage do %>
@@ -4238,11 +4222,6 @@ defmodule YscWeb.EventDetailsLive do
     |> Decimal.to_integer()
   end
 
-  @dialyzer {:nowarn_function, money_to_cents: 1}
-  defp money_to_cents(_) do
-    0
-  end
-
   # Build selected_tickets map from a ticket order
   # For regular tickets: tier_id => quantity
   # For donation tickets: tier_id => amount_cents (total donation amount in cents)
@@ -4283,15 +4262,11 @@ defmodule YscWeb.EventDetailsLive do
             case Money.div(donation_amount, donation_tickets_count) do
               {:ok, amount_per_ticket} ->
                 # Multiply by quantity for this tier and convert to cents
-                case Money.mult(amount_per_ticket, quantity) do
-                  {:ok, tier_donation_total} ->
-                    # Convert Money to cents
-                    amount_cents = money_to_cents(tier_donation_total)
-                    Map.put(acc, tier_id, amount_cents)
+                {:ok, tier_donation_total} =
+                  Money.mult(amount_per_ticket, quantity)
 
-                  _ ->
-                    acc
-                end
+                amount_cents = money_to_cents(tier_donation_total)
+                Map.put(acc, tier_id, amount_cents)
 
               _ ->
                 acc
@@ -7492,11 +7467,7 @@ defmodule YscWeb.EventDetailsLive do
 
         if donation_count > 0 && Money.positive?(donation_total) do
           # Calculate per-ticket donation amount
-          per_ticket_amount =
-            case Money.div(donation_total, donation_count) do
-              {:ok, amount} -> amount
-              _ -> Money.new(0, :USD)
-            end
+          {:ok, per_ticket_amount} = Money.div(donation_total, donation_count)
 
           # Format and display
           case Money.to_string(per_ticket_amount) do
@@ -7515,6 +7486,16 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   # Check if event is "selling fast" (based on recent ticket sales)
+
+  defp ticket_discount_percentage(discount, tier_price) do
+    if Money.positive?(tier_price) do
+      discount.amount
+      |> Decimal.div(tier_price.amount)
+      |> Decimal.mult(Decimal.new(100))
+      |> Decimal.to_float()
+      |> Float.round(2)
+    end
+  end
 
   # Check if event is currently "live" (happening now in PST)
   defp event_live?(event) do

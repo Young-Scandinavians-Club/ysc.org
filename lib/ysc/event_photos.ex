@@ -5,8 +5,6 @@ defmodule Ysc.EventPhotos do
 
   import Ecto.Query
 
-  require Ysc.Logging
-
   alias Ysc.EventPhotos.Collection
   alias Ysc.Events
   alias Ysc.Events.Event

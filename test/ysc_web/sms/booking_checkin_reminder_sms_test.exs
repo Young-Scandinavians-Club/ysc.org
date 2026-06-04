@@ -51,13 +51,15 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
   describe "prepare_sms_data/1" do
     test "raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCheckinReminder.prepare_sms_data(nil)
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_sms_data, [nil])
       end
     end
 
     test "raises when booking has no id" do
       assert_raise ArgumentError, fn ->
-        BookingCheckinReminder.prepare_sms_data(%Ysc.Bookings.Booking{})
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_sms_data, [
+          %Ysc.Bookings.Booking{}
+        ])
       end
     end
 
@@ -79,7 +81,8 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
       assert data.property_name == "Tahoe"
       assert data.checkin_time == "3:00 PM"
       assert is_binary(data.checkin_date)
-      assert is_binary(data.door_code) or data.door_code == "Not Available"
+
+      assert data.door_code == "Not Available" or is_binary(data.door_code)
     end
 
     test "uses Clear Lake property label" do

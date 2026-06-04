@@ -3,8 +3,6 @@ defmodule Ysc.Events.EventListCache do
   Cache for public event index lists (past/upcoming) and counts.
   """
 
-  require Ysc.Logging
-
   @cache_name :ysc_cache
   @cache_version_key "event_list:version"
   @pubsub_topic "event_list_cache:invalidate"

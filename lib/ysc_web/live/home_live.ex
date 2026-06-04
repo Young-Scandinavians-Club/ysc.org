@@ -209,12 +209,7 @@ defmodule YscWeb.HomeLive do
     # For family/lifetime members, get family group (primary + sub-accounts)
     user_for_family = primary_user || user_with_subs
 
-    family_group =
-      if user_for_family do
-        Accounts.get_family_group(user_for_family)
-      else
-        []
-      end
+    family_group = Accounts.get_family_group(user_for_family)
 
     # Same household set as Accounts.household_board_member/1 (single DB path vs. extra async task)
     membership_paused_by_board =

@@ -446,11 +446,6 @@ defmodule YscWeb.AccountSetupLive do
     Map.get(step_mapping, current_step, 0)
   end
 
-  defp stepper_active_step(_invalid_user_needs, _current_step) do
-    # Fallback for invalid user_needs
-    0
-  end
-
   # Helper function to conditionally add a step to the mapping
   defp add_step_if_needed({step_index, step_mapping}, condition, step_key) do
     if condition do

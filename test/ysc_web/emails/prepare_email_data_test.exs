@@ -82,13 +82,21 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
       payment: payment
     } do
       assert_raise ArgumentError, "Pending refund cannot be nil", fn ->
-        BookingRefundPending.prepare_email_data(nil, booking, payment)
+        Ysc.Test.Invoke.call(BookingRefundPending, :prepare_email_data, [
+          nil,
+          booking,
+          payment
+        ])
       end
     end
 
     test "raises when booking is nil", %{pending_refund: pr, payment: payment} do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingRefundPending.prepare_email_data(pr, nil, payment)
+        Ysc.Test.Invoke.call(BookingRefundPending, :prepare_email_data, [
+          pr,
+          nil,
+          payment
+        ])
       end
     end
 
@@ -110,7 +118,11 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
         })
 
       assert_raise ArgumentError, fn ->
-        BookingRefundPending.prepare_email_data(pr, missing, payment)
+        Ysc.Test.Invoke.call(BookingRefundPending, :prepare_email_data, [
+          pr,
+          missing,
+          payment
+        ])
       end
     end
 
@@ -175,13 +187,15 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCheckinReminder.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_email_data, [nil])
       end
     end
 
     test "raises when booking id is nil", %{booking: booking} do
       assert_raise ArgumentError, fn ->
-        BookingCheckinReminder.prepare_email_data(%{booking | id: nil})
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_email_data, [
+          %{booking | id: nil}
+        ])
       end
     end
 
@@ -201,7 +215,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
         })
 
       assert_raise ArgumentError, fn ->
-        BookingCheckinReminder.prepare_email_data(b)
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_email_data, [b])
       end
     end
 
@@ -292,7 +306,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCheckoutReminder.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(BookingCheckoutReminder, :prepare_email_data, [nil])
       end
     end
 
@@ -311,7 +325,9 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when booking id is nil", %{booking: booking} do
       assert_raise ArgumentError, fn ->
-        BookingCheckoutReminder.prepare_email_data(%{booking | id: nil})
+        Ysc.Test.Invoke.call(BookingCheckoutReminder, :prepare_email_data, [
+          %{booking | id: nil}
+        ])
       end
     end
 
@@ -349,7 +365,7 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingConfirmation.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(BookingConfirmation, :prepare_email_data, [nil])
       end
     end
 
@@ -465,25 +481,31 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when expense report is nil" do
       assert_raise ArgumentError, "Expense report cannot be nil", fn ->
-        ExpenseReportConfirmation.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(ExpenseReportConfirmation, :prepare_email_data, [
+          nil
+        ])
       end
     end
 
     test "raises when id is missing" do
       assert_raise ArgumentError, fn ->
-        ExpenseReportConfirmation.prepare_email_data(%ExpenseReport{
-          id: nil,
-          user_id: Ecto.ULID.generate()
-        })
+        Ysc.Test.Invoke.call(ExpenseReportConfirmation, :prepare_email_data, [
+          %ExpenseReport{
+            id: nil,
+            user_id: Ecto.ULID.generate()
+          }
+        ])
       end
     end
 
     test "raises when expense report does not exist" do
       assert_raise ArgumentError, fn ->
-        ExpenseReportConfirmation.prepare_email_data(%ExpenseReport{
-          id: Ecto.ULID.generate(),
-          user_id: Ecto.ULID.generate()
-        })
+        Ysc.Test.Invoke.call(ExpenseReportConfirmation, :prepare_email_data, [
+          %ExpenseReport{
+            id: Ecto.ULID.generate(),
+            user_id: Ecto.ULID.generate()
+          }
+        ])
       end
     end
 
@@ -605,7 +627,11 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when expense report is nil" do
       assert_raise ArgumentError, fn ->
-        ExpenseReportTreasurerNotification.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(
+          ExpenseReportTreasurerNotification,
+          :prepare_email_data,
+          [nil]
+        )
       end
     end
 
@@ -727,7 +753,11 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCancellationConfirmation.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(
+          BookingCancellationConfirmation,
+          :prepare_email_data,
+          [nil]
+        )
       end
     end
 
@@ -746,7 +776,11 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
         })
 
       assert_raise ArgumentError, ~r/Booking not found/, fn ->
-        BookingCancellationConfirmation.prepare_email_data(missing)
+        Ysc.Test.Invoke.call(
+          BookingCancellationConfirmation,
+          :prepare_email_data,
+          [missing]
+        )
       end
     end
 
@@ -906,13 +940,21 @@ defmodule YscWeb.Emails.PrepareEmailDataTest do
 
     test "raises when refund is nil", %{booking: booking, payment: payment} do
       assert_raise ArgumentError, "Refund cannot be nil", fn ->
-        BookingRefundProcessed.prepare_email_data(nil, booking, payment)
+        Ysc.Test.Invoke.call(BookingRefundProcessed, :prepare_email_data, [
+          nil,
+          booking,
+          payment
+        ])
       end
     end
 
     test "raises when booking is nil", %{refund: refund, payment: payment} do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingRefundProcessed.prepare_email_data(refund, nil, payment)
+        Ysc.Test.Invoke.call(BookingRefundProcessed, :prepare_email_data, [
+          refund,
+          nil,
+          payment
+        ])
       end
     end
 

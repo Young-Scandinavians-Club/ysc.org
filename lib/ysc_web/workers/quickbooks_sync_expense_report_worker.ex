@@ -160,13 +160,6 @@ defmodule YscWeb.Workers.QuickbooksSyncExpenseReportWorker do
           error: inspect(reason)
         )
 
-        # Report to Sentry (only for non-lock errors)
-        unless match?(
-                 %Postgrex.Error{postgres: %{code: :lock_not_available}},
-                 reason
-               ) do
-        end
-
         {:error, reason}
     end
   end

@@ -190,13 +190,19 @@ defmodule YscWeb.Emails.EventNotificationTest do
 
     test "raises ArgumentError when event is nil", %{user: user} do
       assert_raise ArgumentError, "Event cannot be nil", fn ->
-        EventNotification.prepare_email_data(nil, user)
+        Ysc.Test.Invoke.call(EventNotification, :prepare_email_data, [
+          nil,
+          user
+        ])
       end
     end
 
     test "raises ArgumentError when user is nil", %{event: event} do
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        EventNotification.prepare_email_data(event, nil)
+        Ysc.Test.Invoke.call(EventNotification, :prepare_email_data, [
+          event,
+          nil
+        ])
       end
     end
 

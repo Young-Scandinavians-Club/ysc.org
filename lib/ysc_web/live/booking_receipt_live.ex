@@ -2212,8 +2212,6 @@ defmodule YscWeb.BookingReceiptLive do
     |> Calendar.strftime("%B %d, %Y at %I:%M %p %Z")
   end
 
-  defp format_datetime(_, _timezone), do: "—"
-
   defp format_payment_date(%DateTime{} = datetime, timezone) do
     format_datetime(datetime, timezone)
   end

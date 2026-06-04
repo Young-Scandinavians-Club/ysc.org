@@ -239,7 +239,7 @@ defmodule YscWeb.AdminUsersLive do
                       </span>
                       {nordic_country_display_name(
                         @selected_user_application.place_of_birth
-                      ) || @selected_user_application.place_of_birth}
+                      )}
                     </dd>
                   </div>
                   <div class="py-2">
@@ -264,7 +264,7 @@ defmodule YscWeb.AdminUsersLive do
                       </span>
                       {nordic_country_display_name(
                         @selected_user_application.citizenship
-                      ) || @selected_user_application.citizenship}
+                      )}
                     </dd>
                   </div>
                   <div class="py-2">

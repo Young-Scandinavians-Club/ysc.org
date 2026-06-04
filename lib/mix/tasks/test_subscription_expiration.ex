@@ -53,7 +53,6 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
   """
 
   use Mix.Task
-  require Ysc.Logging
 
   import Ecto.Query
 
@@ -103,9 +102,6 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
         IO.puts("❌ Error: #{message}")
         show_help()
         System.halt(1)
-
-      _ ->
-        show_help()
     end
   end
 
@@ -598,19 +594,20 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
                 )
 
                 # Sync local subscription from Stripe
-                attrs = %{
-                  stripe_status: stripe_subscription.status,
-                  current_period_start:
-                    stripe_subscription.current_period_start &&
-                      DateTime.from_unix!(
-                        stripe_subscription.current_period_start
-                      ),
-                  current_period_end:
-                    stripe_subscription.current_period_end &&
-                      DateTime.from_unix!(
-                        stripe_subscription.current_period_end
-                      )
-                }
+                attrs =
+                  %{stripe_status: stripe_subscription.status}
+                  |> maybe_put_period(
+                    :current_period_start,
+                    stripe_unix_to_datetime(
+                      stripe_subscription.current_period_start
+                    )
+                  )
+                  |> maybe_put_period(
+                    :current_period_end,
+                    stripe_unix_to_datetime(
+                      stripe_subscription.current_period_end
+                    )
+                  )
 
                 case Subscriptions.update_subscription(sub, attrs) do
                   {:ok, _updated_sub} ->
@@ -708,4 +705,14 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
   defp show_help do
     IO.puts(@moduledoc)
   end
+
+  defp maybe_put_period(attrs, _key, nil), do: attrs
+  defp maybe_put_period(attrs, key, value), do: Map.put(attrs, key, value)
+
+  defp stripe_unix_to_datetime(nil), do: nil
+
+  defp stripe_unix_to_datetime(unix) when is_integer(unix),
+    do: DateTime.from_unix!(unix)
+
+  defp stripe_unix_to_datetime(_), do: nil
 end

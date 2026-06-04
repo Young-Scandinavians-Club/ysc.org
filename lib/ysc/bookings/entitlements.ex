@@ -133,7 +133,6 @@ defmodule Ysc.Bookings.Entitlements do
           :percent_off when not is_nil(percent_off) ->
             case Money.mult(one_night_buyout, Decimal.div(percent_off, 100)) do
               {:ok, m} -> {:ok, m}
-              _ -> {:ok, Money.new(0, :USD)}
             end
 
           :free_nights ->
@@ -142,7 +141,6 @@ defmodule Ysc.Bookings.Entitlements do
 
             case Money.mult(one_night_buyout, Decimal.new(n)) do
               {:ok, m} -> {:ok, m}
-              _ -> {:ok, Money.new(0, :USD)}
             end
 
           _ ->

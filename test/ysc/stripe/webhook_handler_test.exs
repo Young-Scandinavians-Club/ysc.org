@@ -3242,8 +3242,8 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       # Simulate the sequential lookup: first try PI (miss), then invoice (hit)
       payment_from_fallback =
-        (pi_id && Ledgers.get_payment_by_external_id(pi_id)) ||
-          (inv_id && Ledgers.get_payment_by_external_id(inv_id))
+        Ledgers.get_payment_by_external_id(pi_id) ||
+          Ledgers.get_payment_by_external_id(inv_id)
 
       assert payment_from_fallback.id == payment.id
 

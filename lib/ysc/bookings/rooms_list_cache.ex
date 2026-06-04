@@ -3,8 +3,6 @@ defmodule Ysc.Bookings.RoomsListCache do
   Cache for property room lists (preloaded categories and images).
   """
 
-  require Ysc.Logging
-
   @cache_name :ysc_cache
   @cache_version_key "rooms_list:version"
 

@@ -1518,10 +1518,7 @@ defmodule YscWeb.UserSettingsLive do
                   </.button>
                   <.button
                     :if={
-                      @current_membership != nil &&
-                        Subscriptions.scheduled_for_cancellation?(
-                          @current_membership
-                        )
+                      Subscriptions.scheduled_for_cancellation?(@current_membership)
                     }
                     phx-click="reactivate-membership"
                     phx-disable-with="Saving..."
@@ -1533,11 +1530,9 @@ defmodule YscWeb.UserSettingsLive do
                   </.button>
                   <.button
                     :if={
-                      @current_membership != nil &&
-                        !Subscriptions.scheduled_for_cancellation?(
-                          @current_membership
-                        ) &&
-                        @active_plan_type != :lifetime
+                      !Subscriptions.scheduled_for_cancellation?(
+                        @current_membership
+                      )
                     }
                     phx-click="cancel-membership"
                     phx-disable-with="Saving..."
@@ -5296,7 +5291,6 @@ defmodule YscWeb.UserSettingsLive do
     do: card_icon(brand)
 
   defp payment_method_icon(%{type: :bank_account}), do: bank_account_icon()
-  defp payment_method_icon(_), do: "hero-credit-card"
 
   defp bank_account_icon(),
     do:

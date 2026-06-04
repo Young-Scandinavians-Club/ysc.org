@@ -104,7 +104,6 @@ defmodule Ysc.Quickbooks do
       case params.quantity do
         %Decimal{} = qty -> qty
         qty when is_integer(qty) -> Decimal.new(qty)
-        qty when is_float(qty) -> Decimal.from_float(qty)
         _ -> Decimal.new(1)
       end
 
@@ -346,7 +345,6 @@ defmodule Ysc.Quickbooks do
       case params.quantity do
         %Decimal{} = qty -> qty
         qty when is_integer(qty) -> Decimal.new(qty)
-        qty when is_float(qty) -> Decimal.from_float(qty)
         _ -> Decimal.new(1)
       end
 

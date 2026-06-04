@@ -257,6 +257,4 @@ defmodule YscWeb.Workers.EventNotificationWorker do
     NaiveDateTime.new!(date, time)
     |> DateTime.from_naive!("Etc/UTC")
   end
-
-  defp combine_date_time(_, _), do: nil
 end

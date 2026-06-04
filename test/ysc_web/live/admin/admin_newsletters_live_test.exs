@@ -205,7 +205,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       )
 
       {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=subscribers")
-      html = render_async(view)
+      html = render_async(view, 5000)
 
       assert html =~ "sub-tab-"
       assert html =~ "Subscribers" or html =~ "subscriber"

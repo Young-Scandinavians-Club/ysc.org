@@ -5,7 +5,8 @@ defmodule Ysc.MixProject do
     [
       app: :ysc,
       version: "1.5.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.20",
+      elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -152,6 +153,10 @@ defmodule Ysc.MixProject do
     ]
   end
 
+  # Gradual typing in tests produces many warnings on intentional invalid-arg assert_raise calls.
+  defp elixirc_options_for(:test), do: []
+  defp elixirc_options_for(_), do: [module_definition: :interpreted]
+
   # Specifies which paths to compile per environment.
   # dev/ contains custom Credo checks (Credo is only a dev/test dep), so we must not compile it in prod.
   defp elixirc_paths(:test), do: ["lib", "test/support", "dev"]
@@ -173,7 +178,12 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      # Git ref for Elixir 1.20.0 sigil end-position tokens (Hex 1.7.18 still crashes in to_col_end/3)
+      {:credo,
+       github: "rrrene/credo",
+       ref: "d4d33fdab14beb55139f1c7d7b97bd0034d48ad9",
+       only: [:dev, :test],
+       runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
@@ -267,7 +277,7 @@ defmodule Ysc.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       precommit: [
         "format",
-        "compile",
+        "compile --warnings-as-errors",
         "credo --strict",
         "dialyzer",
         "shell_lint"

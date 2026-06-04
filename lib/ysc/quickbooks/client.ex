@@ -1849,8 +1849,10 @@ defmodule Ysc.Quickbooks.Client do
 
   defp add_class_ref_if_present(sales_detail, detail) do
     if detail[:class_ref] do
-      class_ref_map = normalize_class_ref_for_sales_detail(detail.class_ref)
-      Map.put(sales_detail, "ClassRef", class_ref_map)
+      case normalize_class_ref_for_sales_detail(detail.class_ref) do
+        nil -> sales_detail
+        class_ref_map -> Map.put(sales_detail, "ClassRef", class_ref_map)
+      end
     else
       sales_detail
     end
@@ -1868,6 +1870,12 @@ defmodule Ysc.Quickbooks.Client do
       %{value: value} when is_binary(value) ->
         %{"value" => value}
 
+      %{"value" => value, "name" => name} ->
+        %{"value" => to_string(value), "name" => to_string(name)}
+
+      %{"value" => value} ->
+        %{"value" => to_string(value)}
+
       ref when is_binary(ref) ->
         %{"value" => ref}
 
@@ -1877,10 +1885,7 @@ defmodule Ysc.Quickbooks.Client do
           class_ref: inspect(other)
         )
 
-        case other do
-          %{value: v} when is_binary(v) -> %{"value" => v}
-          _ -> %{"value" => to_string(other)}
-        end
+        nil
     end
   end
 
@@ -2006,24 +2011,8 @@ defmodule Ysc.Quickbooks.Client do
 
         detail_map =
           if detail[:class_ref] do
-            # Normalize class_ref to proper format
             class_ref_map =
-              case detail.class_ref do
-                %{value: value, name: name} when is_binary(value) ->
-                  %{"value" => value, "name" => name}
-
-                %{value: value} when is_binary(value) ->
-                  %{"value" => value}
-
-                ref when is_binary(ref) ->
-                  %{"value" => ref}
-
-                other ->
-                  case other do
-                    %{value: v} when is_binary(v) -> %{"value" => v}
-                    _ -> nil
-                  end
-              end
+              normalize_class_ref_for_sales_detail(detail.class_ref)
 
             if class_ref_map do
               Map.put(detail_map, "ClassRef", class_ref_map)
@@ -3211,8 +3200,8 @@ defmodule Ysc.Quickbooks.Client do
       Ysc.Logging.debug(
         "[QB Client] attempt_token_refresh: Making refresh request",
         url: @token_url,
-        has_client_id: !is_nil(client_id),
-        has_client_secret: !is_nil(client_secret),
+        has_client_id: true,
+        has_client_secret: true,
         has_refresh_token: !is_nil(refresh_token)
       )
 
@@ -3319,9 +3308,7 @@ defmodule Ysc.Quickbooks.Client do
         {:error, :quickbooks_client_id_not_configured}
 
       client_id ->
-        Ysc.Logging.debug("[QB Client] get_client_id: Client ID found",
-          has_client_id: !is_nil(client_id)
-        )
+        Ysc.Logging.debug("[QB Client] get_client_id: Client ID found")
 
         {:ok, client_id}
     end
@@ -3337,9 +3324,7 @@ defmodule Ysc.Quickbooks.Client do
         {:error, :quickbooks_client_secret_not_configured}
 
       client_secret ->
-        Ysc.Logging.debug("[QB Client] get_client_secret: Client secret found",
-          has_client_secret: !is_nil(client_secret)
-        )
+        Ysc.Logging.debug("[QB Client] get_client_secret: Client secret found")
 
         {:ok, client_secret}
     end

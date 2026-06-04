@@ -3,8 +3,6 @@ defmodule Ysc.Accounts.UserProfileCache do
   Cache for user profile loads used in LiveView assigns (not session tokens).
   """
 
-  require Ysc.Logging
-
   @cache_name :ysc_cache
   @cache_prefix "user_profile:"
   @default_ttl 5 * 60 * 1000
