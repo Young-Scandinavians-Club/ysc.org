@@ -282,7 +282,6 @@ defmodule Ysc.MixProject do
         "dialyzer",
         "shell_lint"
       ],
-      "coveralls.lcov": ["ysc.coveralls.lcov"],
       test: [
         "ecto.create --quiet",
         "ecto.migrate --quiet",

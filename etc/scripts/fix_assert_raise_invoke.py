@@ -21,13 +21,18 @@ CALL_START = re.compile(
 ASSERT_RAISE_START = re.compile(r"\bassert_raise\b")
 
 
+BLOCK_START = re.compile(
+    r"\b(fn\s*->|do\b|case\b|if\b|begin\b|receive\b|try\b)"
+)
+
+
 def find_matching_end(lines: list[str], start: int) -> int:
     depth = 0
 
     for i in range(start, len(lines)):
         line = lines[i]
 
-        if re.search(r"\bfn\s*->", line):
+        if BLOCK_START.search(line):
             depth += 1
 
         if re.search(r"\bend\b", line):
@@ -143,8 +148,9 @@ def transform(content: str) -> str:
             if new_lines and not new_lines[-1].endswith("\n"):
                 new_lines[-1] += "\n"
             lines[i + 1 : block_end] = new_lines
-
-        i = block_end + 1
+            i = i + 1 + len(new_lines) + 1
+        else:
+            i = block_end + 1
 
     return "".join(lines)
 
