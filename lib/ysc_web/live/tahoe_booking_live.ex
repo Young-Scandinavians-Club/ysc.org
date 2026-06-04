@@ -1197,11 +1197,10 @@ defmodule YscWeb.TahoeBookingLive do
                 >
                   <p class="text-xs text-blue-900">
                     <strong>Winter Policy:</strong>
-                    <% month = @checkin_date.month %>
-                    {if month >= 12 or month <= 4 do
-                      "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
-                    else
+                    {if can_select_booking_mode?(@seasons, @checkin_date) do
                       "May–November: you can rent the entire cabin or book individual rooms."
+                    else
+                      "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
                     end}
                   </p>
                 </div>
@@ -2687,7 +2686,8 @@ defmodule YscWeb.TahoeBookingLive do
                     disabled={
                       !Map.get(assigns, :linens_confirmed, false) ||
                         !Map.get(assigns, :chores_confirmed, false) ||
-                        !Map.get(assigns, :party_size_confirmed, false)
+                        !Map.get(assigns, :party_size_confirmed, false) ||
+                        !Map.get(assigns, :terms_agreed, false)
                     }
                     class={
                       [
@@ -2695,7 +2695,8 @@ defmodule YscWeb.TahoeBookingLive do
                         if(
                           Map.get(assigns, :linens_confirmed, false) &&
                             Map.get(assigns, :chores_confirmed, false) &&
-                            Map.get(assigns, :party_size_confirmed, false),
+                            Map.get(assigns, :party_size_confirmed, false) &&
+                            Map.get(assigns, :terms_agreed, false),
                           do: "bg-blue-600 text-white hover:bg-blue-700",
                           else: "bg-zinc-300 text-zinc-500 cursor-not-allowed"
                         )
@@ -4423,7 +4424,7 @@ defmodule YscWeb.TahoeBookingLive do
                     @price_error,
                     @form_errors,
                     @date_validation_errors
-                  )
+                  ) || !Map.get(assigns, :terms_agreed, false)
                 }
                 class={
                   if can_submit_booking?(
@@ -4435,7 +4436,8 @@ defmodule YscWeb.TahoeBookingLive do
                        @price_error,
                        @form_errors,
                        @date_validation_errors
-                     ) do
+                     ) &&
+                       Map.get(assigns, :terms_agreed, false) do
                     "px-6 py-3"
                   else
                     "px-6 py-3 bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed"
@@ -4969,164 +4971,172 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   def handle_event("create-booking", _params, socket) do
-    # Check if confirmation modal checkboxes are checked
-    if Map.get(socket.assigns, :linens_confirmed, false) &&
-         Map.get(socket.assigns, :chores_confirmed, false) &&
-         Map.get(socket.assigns, :party_size_confirmed, false) do
-      case validate_and_create_booking(socket) do
-        {:ok, booking} ->
-          # Redirect to checkout page for payment
-          {:noreply,
-           socket
-           |> assign(
-             show_confirm_modal: false,
-             linens_confirmed: false,
-             chores_confirmed: false,
-             party_size_confirmed: false
-           )
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "Booking created! Please complete payment to confirm.",
-             title: "Booking",
-             icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
-           )
-           |> push_navigate(to: ~p"/bookings/checkout/#{booking.id}")}
+    cond do
+      not Map.get(socket.assigns, :terms_agreed, false) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Please agree to Rules & Policies",
+           title: "Booking"
+         )
+         |> assign(show_terms_modal: true)}
 
-        {:error, :insufficient_capacity} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "Sorry, there is not enough capacity for your requested dates.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{
-               general:
-                 "Sorry, there is not enough capacity for your requested dates."
-             },
-             calculated_price: nil,
-             price_error: "Insufficient capacity"
-           )}
+      Map.get(socket.assigns, :linens_confirmed, false) &&
+          Map.get(socket.assigns, :chores_confirmed, false) &&
+          Map.get(socket.assigns, :party_size_confirmed, false) ->
+        case validate_and_create_booking(socket) do
+          {:ok, booking} ->
+            {:noreply,
+             socket
+             |> assign(
+               show_confirm_modal: false,
+               linens_confirmed: false,
+               chores_confirmed: false,
+               party_size_confirmed: false
+             )
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Booking created! Please complete payment to confirm.",
+               title: "Booking",
+               icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+             )
+             |> push_navigate(to: ~p"/bookings/checkout/#{booking.id}")}
 
-        {:error, :property_unavailable} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "Sorry, the property is not available for your requested dates.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{
-               general:
-                 "Sorry, the property is not available for your requested dates."
-             },
-             calculated_price: nil,
-             price_error: "Property unavailable"
-           )}
+          {:error, :insufficient_capacity} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Sorry, there is not enough capacity for your requested dates.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{
+                 general:
+                   "Sorry, there is not enough capacity for your requested dates."
+               },
+               calculated_price: nil,
+               price_error: "Insufficient capacity"
+             )}
 
-        {:error, :rooms_already_booked} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "Sorry, some rooms are already booked for your requested dates.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{
-               general:
-                 "Sorry, some rooms are already booked for your requested dates."
-             },
-             calculated_price: nil,
-             price_error: "Rooms unavailable"
-           )}
+          {:error, :property_unavailable} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Sorry, the property is not available for your requested dates.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{
+                 general:
+                   "Sorry, the property is not available for your requested dates."
+               },
+               calculated_price: nil,
+               price_error: "Property unavailable"
+             )}
 
-        {:error, :room_unavailable} ->
-          # Map room_unavailable to rooms_already_booked for consistent error handling
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "Sorry, some rooms are already booked for your requested dates.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{
-               general:
-                 "Sorry, some rooms are already booked for your requested dates."
-             },
-             calculated_price: nil,
-             price_error: "Rooms unavailable"
-           )}
+          {:error, :rooms_already_booked} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Sorry, some rooms are already booked for your requested dates.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{
+                 general:
+                   "Sorry, some rooms are already booked for your requested dates."
+               },
+               calculated_price: nil,
+               price_error: "Rooms unavailable"
+             )}
 
-        {:error, :stale_inventory} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "The availability changed while you were booking. Please refresh the calendar and try again.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{
-               general:
-                 "The availability changed while you were booking. Please refresh the calendar and try again."
-             },
-             calculated_price: nil,
-             price_error: "Availability changed"
-           )}
+          {:error, :room_unavailable} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Sorry, some rooms are already booked for your requested dates.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{
+                 general:
+                   "Sorry, some rooms are already booked for your requested dates."
+               },
+               calculated_price: nil,
+               price_error: "Rooms unavailable"
+             )}
 
-        {:error, :invalid_parameters} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "Please fill in all required fields.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{general: "Please fill in all required fields."},
-             calculated_price: nil,
-             price_error: "Invalid parameters",
-             show_confirm_modal: false
-           )}
+          {:error, :stale_inventory} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "The availability changed while you were booking. Please refresh the calendar and try again.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{
+                 general:
+                   "The availability changed while you were booking. Please refresh the calendar and try again."
+               },
+               calculated_price: nil,
+               price_error: "Availability changed"
+             )}
 
-        {:error, %Ecto.Changeset{} = changeset} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(:error, "Please fix the errors below.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: format_errors(changeset),
-             calculated_price: nil,
-             price_error: "Validation errors",
-             show_confirm_modal: false
-           )}
+          {:error, :invalid_parameters} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Please fill in all required fields.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{general: "Please fill in all required fields."},
+               calculated_price: nil,
+               price_error: "Invalid parameters",
+               show_confirm_modal: false
+             )}
 
-        {:error, _reason} ->
-          # Handle any other error atoms that weren't explicitly handled above
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             "An error occurred while creating your booking. Please try again.",
-             title: "Booking"
-           )
-           |> assign(
-             form_errors: %{
-               general:
-                 "An error occurred while creating your booking. Please try again."
-             },
-             calculated_price: nil,
-             price_error: "Booking failed",
-             show_confirm_modal: false
-           )}
-      end
-    else
-      {:noreply, assign(socket, show_confirm_modal: true)}
+          {:error, %Ecto.Changeset{} = changeset} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Please fix the errors below.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: format_errors(changeset),
+               calculated_price: nil,
+               price_error: "Validation errors",
+               show_confirm_modal: false
+             )}
+
+          {:error, _reason} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "An error occurred while creating your booking. Please try again.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: %{
+                 general:
+                   "An error occurred while creating your booking. Please try again."
+               },
+               calculated_price: nil,
+               price_error: "Booking failed",
+               show_confirm_modal: false
+             )}
+        end
+
+      true ->
+        {:noreply, assign(socket, show_confirm_modal: true)}
     end
   end
 

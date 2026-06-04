@@ -30,6 +30,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up Elixir
+        id: setup-beam
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.20.0"
@@ -41,9 +42,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-test-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-test-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-test-
+            ${{ runner.os }}-mix-test-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -117,6 +118,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up Elixir
+        id: setup-beam
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.20.0"
@@ -128,9 +130,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-format-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-format-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-format-
+            ${{ runner.os }}-mix-format-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -146,6 +148,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up Elixir
+        id: setup-beam
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.20.0"
@@ -157,9 +160,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-credo-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-credo-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-credo-
+            ${{ runner.os }}-mix-credo-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -198,9 +201,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-dialyzer-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-dialyzer-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-dialyzer-
+            ${{ runner.os }}-mix-dialyzer-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -222,6 +225,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set up Elixir
+        id: setup-beam
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.20.0"
@@ -233,9 +237,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-security-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-security-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-security-
+            ${{ runner.os }}-mix-security-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
 
       - name: Install dependencies
         run: mix deps.get
@@ -284,6 +288,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Elixir
+        id: setup-beam
         uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
         with:
           elixir-version: "1.20.0"
@@ -295,9 +300,9 @@ jobs:
           path: |
             deps
             _build
-          key: ${{ runner.os }}-mix-query-explain-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-query-explain-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-query-explain-
+            ${{ runner.os }}-mix-query-explain-${{ steps.setup-beam.outputs.elixir-version }}-${{ steps.setup-beam.outputs.otp-version }}-
 
       - name: Install dependencies
         run: mix deps.get

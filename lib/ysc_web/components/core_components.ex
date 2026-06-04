@@ -2142,25 +2142,32 @@ defmodule YscWeb.CoreComponents do
     if start_date == nil do
       nil
     else
-      now = DateTime.utc_now()
+      today = Date.utc_today()
 
-      # Combine start_date and start_time to get the event datetime
-      event_datetime = combine_date_time_for_event(start_date, start_time)
+      cond do
+        start_time == nil and is_struct(start_date, Date) ->
+          if Date.compare(today, start_date) == :gt do
+            nil
+          else
+            max(0, Date.diff(start_date, today))
+          end
 
-      # If we couldn't combine the datetime, return nil
-      if event_datetime == nil do
-        nil
-      else
-        # If event is in the past, return nil
-        if DateTime.compare(now, event_datetime) == :gt do
-          nil
-        else
-          # Calculate days difference using calendar days
-          event_date_only = DateTime.to_date(event_datetime)
-          now_date_only = DateTime.to_date(now)
-          diff = Date.diff(event_date_only, now_date_only)
-          max(0, diff)
-        end
+        true ->
+          now = DateTime.utc_now()
+          event_datetime = combine_date_time_for_event(start_date, start_time)
+
+          if event_datetime == nil do
+            nil
+          else
+            if DateTime.compare(now, event_datetime) == :gt do
+              nil
+            else
+              event_date_only = DateTime.to_date(event_datetime)
+              now_date_only = DateTime.to_date(now)
+              diff = Date.diff(event_date_only, now_date_only)
+              max(0, diff)
+            end
+          end
       end
     end
   end

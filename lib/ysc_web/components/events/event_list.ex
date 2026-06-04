@@ -312,7 +312,16 @@ defmodule YscWeb.EventsListLive do
     # Merge assigns from update with existing socket assigns
     # Prefer new assigns if provided, otherwise keep existing
     show_hero =
-      Map.get(assigns, :show_hero) || socket.assigns[:show_hero] || false
+      cond do
+        Map.has_key?(assigns, :show_hero) ->
+          Map.get(assigns, :show_hero)
+
+        Map.has_key?(socket.assigns, :show_hero) ->
+          Map.get(socket.assigns, :show_hero)
+
+        true ->
+          false
+      end
 
     upcoming =
       cond do

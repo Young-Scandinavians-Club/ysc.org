@@ -1398,8 +1398,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           @checkout_date,
                           @guests_count,
                           @availability_error
-                        ) &&
-                          !@availability_error
+                        )
                       }
                       phx-click="create-booking"
                       class="w-full text-lg py-4"

@@ -1849,8 +1849,10 @@ defmodule Ysc.Quickbooks.Client do
 
   defp add_class_ref_if_present(sales_detail, detail) do
     if detail[:class_ref] do
-      class_ref_map = normalize_class_ref_for_sales_detail(detail.class_ref)
-      Map.put(sales_detail, "ClassRef", class_ref_map)
+      case normalize_class_ref_for_sales_detail(detail.class_ref) do
+        nil -> sales_detail
+        class_ref_map -> Map.put(sales_detail, "ClassRef", class_ref_map)
+      end
     else
       sales_detail
     end
@@ -1868,6 +1870,12 @@ defmodule Ysc.Quickbooks.Client do
       %{value: value} when is_binary(value) ->
         %{"value" => value}
 
+      %{"value" => value, "name" => name} ->
+        %{"value" => to_string(value), "name" => to_string(name)}
+
+      %{"value" => value} ->
+        %{"value" => to_string(value)}
+
       ref when is_binary(ref) ->
         %{"value" => ref}
 
@@ -1877,7 +1885,7 @@ defmodule Ysc.Quickbooks.Client do
           class_ref: inspect(other)
         )
 
-        %{"value" => to_string(other)}
+        nil
     end
   end
 
@@ -2003,21 +2011,7 @@ defmodule Ysc.Quickbooks.Client do
 
         detail_map =
           if detail[:class_ref] do
-            # Normalize class_ref to proper format
-            class_ref_map =
-              case detail.class_ref do
-                %{value: value, name: name} when is_binary(value) ->
-                  %{"value" => value, "name" => name}
-
-                %{value: value} when is_binary(value) ->
-                  %{"value" => value}
-
-                ref when is_binary(ref) ->
-                  %{"value" => ref}
-
-                _other ->
-                  nil
-              end
+            class_ref_map = normalize_class_ref_for_sales_detail(detail.class_ref)
 
             if class_ref_map do
               Map.put(detail_map, "ClassRef", class_ref_map)

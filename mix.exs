@@ -18,7 +18,7 @@ defmodule Ysc.MixProject do
         list_unused_filters: true
       ],
       test_coverage: [
-        tool: ExCoveralls,
+        tool: Ysc.Coveralls,
         ignore_modules: [
           Mix.Tasks.CheckQuickbooksSync,
           Mix.Tasks.Ci.QueryExplain,
@@ -273,7 +273,7 @@ defmodule Ysc.MixProject do
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       precommit: [
         "format",
-        "compile",
+        "compile --warnings-as-errors",
         "credo --strict",
         "dialyzer",
         "shell_lint"
