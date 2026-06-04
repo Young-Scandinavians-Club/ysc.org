@@ -8,15 +8,7 @@ defmodule YscWeb.Workers.FileExportCleanUpTest do
       export_dir = "#{:code.priv_dir(:ysc)}/static/exports"
       File.mkdir_p!(export_dir)
 
-      try do
-        result = FileExportCleanUp.perform(%Oban.Job{})
-        assert result == :ok
-      after
-        # Leave directory in place; other tests or app may use it
-        if File.exists?(export_dir) do
-          for f <- File.ls!(export_dir), do: File.rm(Path.join(export_dir, f))
-        end
-      end
+      assert FileExportCleanUp.perform(%Oban.Job{}) == :ok
     end
   end
 
