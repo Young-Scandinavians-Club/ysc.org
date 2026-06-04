@@ -158,4 +158,77 @@ defmodule YscWeb.Layouts do
   end
 
   def hero_mode?(_, _), do: false
+
+  attr :current_user, :any, default: nil
+  attr :active_membership?, :boolean, default: false
+  attr :is_fullscreen, :boolean, default: false
+
+  @doc """
+  Pending-approval and inactive-membership alert banners shown in the app layout.
+  """
+  def membership_status_banners(assigns) do
+    ~H"""
+    <.alert_banner
+      :if={
+        @current_user && @current_user.state == :pending_approval &&
+          !@is_fullscreen
+      }
+      type="warning"
+      icon="hero-exclamation-triangle"
+      title="Application Under Review"
+    >
+      Our board is reviewing your membership application. We will email you when there is a decision. Cabin bookings, event tickets, and other member benefits are available after the board approves you and your membership dues are paid. For timelines and optional early payment setup, <.link
+        navigate={~p"/pending-review"}
+        class="hover:underline font-bold"
+      >view your application status</.link>.
+    </.alert_banner>
+
+    <.alert_banner
+      :if={
+        @current_user && @current_user.state == :active && !@active_membership? &&
+          !@is_fullscreen
+      }
+      type="orange"
+      icon="hero-exclamation-triangle"
+      title="Membership Required"
+      action_label="Manage Membership"
+      action_path={~p"/users/membership"}
+    >
+      To access events and the cabin booking system, you need an active, paid membership. Use the
+      <strong>Manage Membership</strong>
+      button to choose a plan and complete payment.
+    </.alert_banner>
+    """
+  end
+
+  attr :title, :string, required: true
+
+  @doc "Uppercase section heading for the site footer link columns."
+  def footer_section_heading(assigns) do
+    ~H"""
+    <h2 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
+      {@title}
+    </h2>
+    """
+  end
+
+  attr :class, :string, default: nil
+  attr :rest, :global, include: ~w(navigate href target rel aria-label)
+
+  slot :inner_block, required: true
+
+  @doc "Footer column link with shared underline styling."
+  def footer_nav_link(assigns) do
+    ~H"""
+    <.link
+      {@rest}
+      class={[
+        "underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors",
+        @class
+      ]}
+    >
+      {render_slot(@inner_block)}
+    </.link>
+    """
+  end
 end
