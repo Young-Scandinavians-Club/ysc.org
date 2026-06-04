@@ -412,9 +412,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
-                >
-                  Facebook
-                </.footer_nav_link>
+                  label="Facebook"
+                />
               </li>
               <li :if={@site_setting_socials_instagram}>
                 <.footer_nav_link
@@ -422,9 +421,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
-                >
-                  Instagram
-                </.footer_nav_link>
+                  label="Instagram"
+                />
               </li>
               <li :if={@site_setting_socials_discord}>
                 <.footer_nav_link
@@ -432,9 +430,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Discord"
-                >
-                  Discord
-                </.footer_nav_link>
+                  label="Discord"
+                />
               </li>
               <li :if={@current_user && @site_setting_socials_whatsapp}>
                 <.footer_nav_link
@@ -442,9 +439,8 @@
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
-                >
-                  WhatsApp
-                </.footer_nav_link>
+                  label="WhatsApp"
+                />
               </li>
             </ul>
           </div>
@@ -453,19 +449,13 @@
             <.footer_section_heading title="Policies" />
             <ul class="space-y-3 text-sm text-zinc-600">
               <li>
-                <.footer_nav_link navigate={~p"/privacy-policy"}>
-                  Privacy Policy
-                </.footer_nav_link>
+                <.footer_nav_link navigate={~p"/privacy-policy"} label="Privacy Policy" />
               </li>
               <li>
-                <.footer_nav_link navigate={~p"/terms-of-service"}>
-                  Terms of Service
-                </.footer_nav_link>
+                <.footer_nav_link navigate={~p"/terms-of-service"} label="Terms of Service" />
               </li>
               <li>
-                <.footer_nav_link navigate={~p"/code-of-conduct"}>
-                  Code of Conduct
-                </.footer_nav_link>
+                <.footer_nav_link navigate={~p"/code-of-conduct"} label="Code of Conduct" />
               </li>
             </ul>
           </div>
@@ -473,19 +463,16 @@
             <.footer_section_heading title="Governance" />
             <ul class="space-y-3 text-sm text-zinc-600">
               <li>
-                <.footer_nav_link navigate={~p"/financials"}>
-                  Financials & Meetings
-                </.footer_nav_link>
+                <.footer_nav_link navigate={~p"/financials"} label="Financials & Meetings" />
               </li>
               <li>
-                <.footer_nav_link navigate={~p"/bylaws"}>
-                  Bylaws
-                </.footer_nav_link>
+                <.footer_nav_link navigate={~p"/bylaws"} label="Bylaws" />
               </li>
               <li>
-                <.footer_nav_link navigate={~p"/report-conduct-violation"}>
-                  Report Conduct Violation
-                </.footer_nav_link>
+                <.footer_nav_link
+                  navigate={~p"/report-conduct-violation"}
+                  label="Report Conduct Violation"
+                />
               </li>
             </ul>
           </div>

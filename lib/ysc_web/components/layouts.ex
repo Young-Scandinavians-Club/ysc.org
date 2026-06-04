@@ -212,10 +212,9 @@ defmodule YscWeb.Layouts do
     """
   end
 
+  attr :label, :string, required: true
   attr :class, :string, default: nil
   attr :rest, :global, include: ~w(navigate href target rel aria-label)
-
-  slot :inner_block, required: true
 
   @doc "Footer column link with shared underline styling."
   def footer_nav_link(assigns) do
@@ -227,7 +226,7 @@ defmodule YscWeb.Layouts do
         @class
       ]}
     >
-      {render_slot(@inner_block)}
+      {@label}
     </.link>
     """
   end

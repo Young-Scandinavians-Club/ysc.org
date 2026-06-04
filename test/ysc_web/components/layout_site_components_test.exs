@@ -72,7 +72,7 @@ defmodule YscWeb.Components.LayoutSiteComponentsTest do
       html =
         render_component(&Layouts.footer_nav_link/1, %{
           navigate: "/privacy-policy",
-          inner_block: ["Privacy Policy"]
+          label: "Privacy Policy"
         })
 
       assert html =~ "Privacy Policy"
