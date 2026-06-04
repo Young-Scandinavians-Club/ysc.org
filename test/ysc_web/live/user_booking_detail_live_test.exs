@@ -649,7 +649,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert html =~ "Individual room(s)"
     end
 
-    test "shows Shared stay when booking_mode is day", %{conn: conn} do
+    test "shows group booking label when booking_mode is day", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 
       booking =
@@ -661,7 +661,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         })
 
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
-      assert html =~ "Shared stay"
+      assert html =~ "Group booking (shared cabin)"
     end
   end
 

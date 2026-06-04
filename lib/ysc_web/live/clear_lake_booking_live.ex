@@ -603,7 +603,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       do: "Guest",
                       else: "Guests"} • {if booking.booking_mode == :buyout,
                       do: "Entire cabin",
-                      else: "Shared stay"}
+                      else: "Group booking"}
                   </p>
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -692,11 +692,11 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Shared stay
+                            Group booking
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
-                          Shared cabin stay. Perfect for individuals and small groups.
+                          Reserve space for your group. Other YSC members may also stay at the cabin during the same dates.
                         </p>
                       </label>
                       <label class={[
@@ -786,7 +786,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Shared stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
+                      Group bookings are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -796,7 +796,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared stay if that option is open.
+                      Reserving the whole cabin is not available for the selected dates. Try different dates or choose a group booking if that option is open.
                     </span>
                   </p>
                 </div>
@@ -1171,7 +1171,9 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <p class="text-xs font-bold text-zinc-400 uppercase">
                       Booking Type
                     </p>
-                    <div class="text-sm text-zinc-700 font-medium">Shared stay</div>
+                    <div class="text-sm text-zinc-700 font-medium">
+                      Group booking
+                    </div>
                   </div>
                   <!-- Sunday Morning Parking Tip -->
                   <div
@@ -1692,7 +1694,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         to check availability and select your dates.
                       </li>
                       <li>
-                        Choose <strong>Shared stay</strong>
+                        Choose <strong>Group booking</strong>
                         or <strong>Reserve the whole cabin</strong>
                         and enter your guest count.
                       </li>
@@ -3744,7 +3746,7 @@ defmodule YscWeb.ClearLakeBookingLive do
           YscWeb.BookingUserMessages.clear_lake_blackout_date(date_str)
 
         day_availability && assigns[:selected_booking_mode] == :day ->
-          "The date #{date_str} isn't available for shared stays — the cabin may be reserved for a private group that day."
+          "The date #{date_str} isn't available for group bookings — the cabin may be reserved for a private group that day."
 
         day_availability && assigns[:selected_booking_mode] == :buyout ->
           "The date #{date_str} isn't available for reserving the whole cabin — there are existing shared-stay bookings or another whole-cabin reservation."
@@ -3868,10 +3870,10 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "Shared stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
+        "Group bookings are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
-        "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a shared stay if that option is open."
+        "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a group booking if that option is open."
 
       true ->
         nil

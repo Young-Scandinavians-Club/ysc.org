@@ -3814,7 +3814,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Linked family members cannot purchase a separate membership. Your benefits are included in the primary account holder's family membership.",
+           "Family members on a shared plan can't buy a separate membership. Your access comes from the family membership on this account.",
            title: "Membership"
          )}
       else
@@ -3889,7 +3889,7 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Linked family members cannot purchase a separate membership. Your benefits are included in the primary account holder's family membership.",
+               "Family members on a shared plan can't buy a separate membership. Your access comes from the family membership on this account.",
                title: "Membership"
              )}
 
