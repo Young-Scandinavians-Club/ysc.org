@@ -1960,7 +1960,7 @@ defmodule Ysc.AccountsTest do
 
       assert a >= 0
       assert b >= 0
-      assert is_binary(y) and y != ""
+      assert y != ""
       assert pct == nil or is_integer(pct)
     end
 

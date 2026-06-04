@@ -95,6 +95,22 @@ defmodule Ysc.BookingsFixtures do
     end
   end
 
+  @doc """
+  Ensures inclusive stay dates containing Saturday also include Sunday (Tahoe weekend rule).
+  """
+  def ensure_sunday_when_saturday_included(checkin, checkout) do
+    dates = Date.range(checkin, checkout) |> Enum.to_list()
+
+    has_saturday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 6))
+    has_sunday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 7))
+
+    if has_saturday? and not has_sunday? do
+      Date.add(checkout, 1)
+    else
+      checkout
+    end
+  end
+
   def booking_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id

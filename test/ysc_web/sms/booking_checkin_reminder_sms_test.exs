@@ -51,13 +51,15 @@ defmodule YscWeb.Sms.BookingCheckinReminderTest do
   describe "prepare_sms_data/1" do
     test "raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCheckinReminder.prepare_sms_data(nil)
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_sms_data, [nil])
       end
     end
 
     test "raises when booking has no id" do
       assert_raise ArgumentError, fn ->
-        BookingCheckinReminder.prepare_sms_data(%Ysc.Bookings.Booking{})
+        Ysc.Test.Invoke.call(BookingCheckinReminder, :prepare_sms_data, [
+          %Ysc.Bookings.Booking{}
+        ])
       end
     end
 

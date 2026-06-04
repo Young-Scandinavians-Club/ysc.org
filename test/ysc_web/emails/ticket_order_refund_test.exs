@@ -170,7 +170,11 @@ defmodule YscWeb.Emails.TicketOrderRefundTest do
       refunded_tickets: refunded
     } do
       assert_raise ArgumentError, "Refund cannot be nil", fn ->
-        TicketOrderRefund.prepare_email_data(nil, ticket_order, refunded)
+        Ysc.Test.Invoke.call(TicketOrderRefund, :prepare_email_data, [
+          nil,
+          ticket_order,
+          refunded
+        ])
       end
     end
 
@@ -179,7 +183,11 @@ defmodule YscWeb.Emails.TicketOrderRefundTest do
       refunded_tickets: refunded
     } do
       assert_raise ArgumentError, "Ticket order cannot be nil", fn ->
-        TicketOrderRefund.prepare_email_data(refund, nil, refunded)
+        Ysc.Test.Invoke.call(TicketOrderRefund, :prepare_email_data, [
+          refund,
+          nil,
+          refunded
+        ])
       end
     end
 
@@ -198,7 +206,11 @@ defmodule YscWeb.Emails.TicketOrderRefundTest do
         })
 
       assert_raise ArgumentError, fn ->
-        TicketOrderRefund.prepare_email_data(refund, missing, refunded)
+        Ysc.Test.Invoke.call(TicketOrderRefund, :prepare_email_data, [
+          refund,
+          missing,
+          refunded
+        ])
       end
     end
 
@@ -248,7 +260,11 @@ defmodule YscWeb.Emails.TicketOrderRefundTest do
       bad = %{t1 | ticket_tier: nil}
 
       assert_raise ArgumentError, ~r/missing ticket_tier association/, fn ->
-        TicketOrderRefund.prepare_email_data(refund, ticket_order, [bad])
+        Ysc.Test.Invoke.call(TicketOrderRefund, :prepare_email_data, [
+          refund,
+          ticket_order,
+          [bad]
+        ])
       end
     end
 

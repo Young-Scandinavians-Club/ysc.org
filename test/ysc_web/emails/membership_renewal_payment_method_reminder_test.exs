@@ -198,9 +198,13 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
       subscription = build_subscription(days_from_now: 14)
 
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        MembershipRenewalPaymentMethodReminder.prepare_email_data(
-          nil,
-          subscription
+        Ysc.Test.Invoke.call(
+          MembershipRenewalPaymentMethodReminder,
+          :prepare_email_data,
+          [
+            nil,
+            subscription
+          ]
         )
       end
     end
@@ -209,7 +213,14 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
       user = user_fixture()
 
       assert_raise ArgumentError, "Subscription cannot be nil", fn ->
-        MembershipRenewalPaymentMethodReminder.prepare_email_data(user, nil)
+        Ysc.Test.Invoke.call(
+          MembershipRenewalPaymentMethodReminder,
+          :prepare_email_data,
+          [
+            user,
+            nil
+          ]
+        )
       end
     end
 
@@ -228,9 +239,13 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
 
       # Should raise FunctionClauseError when trying to call DateTime.to_date on nil
       assert_raise FunctionClauseError, fn ->
-        MembershipRenewalPaymentMethodReminder.prepare_email_data(
-          user,
-          subscription
+        Ysc.Test.Invoke.call(
+          MembershipRenewalPaymentMethodReminder,
+          :prepare_email_data,
+          [
+            user,
+            subscription
+          ]
         )
       end
     end

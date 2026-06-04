@@ -76,11 +76,19 @@ defmodule YscWeb.Emails.EventUpdateNotificationTest do
       event = event_fixture()
 
       assert_raise ArgumentError, "Event cannot be nil", fn ->
-        EventUpdateNotification.prepare_email_data(nil, update, recipient)
+        Ysc.Test.Invoke.call(EventUpdateNotification, :prepare_email_data, [
+          nil,
+          update,
+          recipient
+        ])
       end
 
       assert_raise ArgumentError, "Update cannot be nil", fn ->
-        EventUpdateNotification.prepare_email_data(event, nil, recipient)
+        Ysc.Test.Invoke.call(EventUpdateNotification, :prepare_email_data, [
+          event,
+          nil,
+          recipient
+        ])
       end
     end
 

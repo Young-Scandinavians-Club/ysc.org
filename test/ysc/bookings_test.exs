@@ -2826,9 +2826,11 @@ defmodule Ysc.BookingsTest do
       raw_checkout = Date.add(today, 2)
 
       checkout =
-        if Date.day_of_week(raw_checkout) == 7,
-          do: Date.add(raw_checkout, 1),
-          else: raw_checkout
+        raw_checkout
+        |> then(fn date ->
+          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
+        end)
+        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
 
       booking =
         booking_fixture(%{

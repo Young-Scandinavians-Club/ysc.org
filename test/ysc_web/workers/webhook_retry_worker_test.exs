@@ -1,8 +1,6 @@
 defmodule YscWeb.Workers.WebhookRetryWorkerTest do
   use Ysc.DataCase, async: false
 
-  require Logger
-
   alias YscWeb.Workers.WebhookRetryWorker
   alias Ysc.Webhooks.WebhookEvent
 
@@ -286,7 +284,6 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           payload: nil
         })
 
-      require Logger
       Logger.put_module_level(WebhookRetryWorker, :none)
       result = WebhookRetryWorker.retry_webhook(webhook)
       Logger.put_module_level(WebhookRetryWorker, :error)
@@ -353,7 +350,6 @@ defmodule YscWeb.Workers.WebhookRetryWorkerTest do
           payload: %{"data" => 123}
         })
 
-      require Logger
       Logger.put_module_level(WebhookRetryWorker, :none)
 
       assert {:error, {:parse_error, _}} =

@@ -48,6 +48,7 @@ defmodule YscWeb.ConnCase do
       import Phoenix.ConnTest
       import YscWeb.ConnCase
       import Ysc.EmailValidatorTestHelper
+      import Ysc.Test.Invoke
       import Mox
 
       setup tags do

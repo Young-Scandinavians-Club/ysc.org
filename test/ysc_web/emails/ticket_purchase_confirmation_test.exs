@@ -274,13 +274,17 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
 
     test "raises when ticket order is nil" do
       assert_raise ArgumentError, "Ticket order cannot be nil", fn ->
-        TicketPurchaseConfirmation.prepare_email_data(nil)
+        Ysc.Test.Invoke.call(TicketPurchaseConfirmation, :prepare_email_data, [
+          nil
+        ])
       end
     end
 
     test "raises when ticket order id is nil" do
       assert_raise ArgumentError, fn ->
-        TicketPurchaseConfirmation.prepare_email_data(%{id: nil})
+        Ysc.Test.Invoke.call(TicketPurchaseConfirmation, :prepare_email_data, [
+          %{id: nil}
+        ])
       end
     end
 
@@ -296,7 +300,9 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
         })
 
       assert_raise ArgumentError, fn ->
-        TicketPurchaseConfirmation.prepare_email_data(fake)
+        Ysc.Test.Invoke.call(TicketPurchaseConfirmation, :prepare_email_data, [
+          fake
+        ])
       end
     end
 
@@ -455,9 +461,9 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
       )
 
       assert_raise ArgumentError, fn ->
-        TicketPurchaseConfirmation.prepare_email_data(
+        Ysc.Test.Invoke.call(TicketPurchaseConfirmation, :prepare_email_data, [
           Tickets.get_ticket_order(ticket_order.id)
-        )
+        ])
       end
     end
   end

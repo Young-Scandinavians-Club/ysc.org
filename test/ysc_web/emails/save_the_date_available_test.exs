@@ -92,13 +92,19 @@ defmodule YscWeb.Emails.SaveTheDateAvailableTest do
 
     test "raises when event is nil", %{user: user} do
       assert_raise ArgumentError, fn ->
-        SaveTheDateAvailable.prepare_email_data(nil, user)
+        Ysc.Test.Invoke.call(SaveTheDateAvailable, :prepare_email_data, [
+          nil,
+          user
+        ])
       end
     end
 
     test "raises when user is nil", %{event: event} do
       assert_raise ArgumentError, fn ->
-        SaveTheDateAvailable.prepare_email_data(event, nil)
+        Ysc.Test.Invoke.call(SaveTheDateAvailable, :prepare_email_data, [
+          event,
+          nil
+        ])
       end
     end
 

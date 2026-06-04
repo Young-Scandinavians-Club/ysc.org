@@ -258,7 +258,10 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       subscription = %{current_period_end: DateTime.utc_now()}
 
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        MembershipRenewalReminder.prepare_email_data(nil, subscription)
+        Ysc.Test.Invoke.call(MembershipRenewalReminder, :prepare_email_data, [
+          nil,
+          subscription
+        ])
       end
     end
 
@@ -266,7 +269,10 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       user = user_fixture()
 
       assert_raise ArgumentError, "Subscription cannot be nil", fn ->
-        MembershipRenewalReminder.prepare_email_data(user, nil)
+        Ysc.Test.Invoke.call(MembershipRenewalReminder, :prepare_email_data, [
+          user,
+          nil
+        ])
       end
     end
   end
@@ -292,9 +298,13 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       subscription = %{current_period_end: DateTime.utc_now()}
 
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        MembershipRenewalPaymentMethodReminder.prepare_email_data(
-          nil,
-          subscription
+        Ysc.Test.Invoke.call(
+          MembershipRenewalPaymentMethodReminder,
+          :prepare_email_data,
+          [
+            nil,
+            subscription
+          ]
         )
       end
     end
@@ -303,7 +313,14 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       user = user_fixture()
 
       assert_raise ArgumentError, "Subscription cannot be nil", fn ->
-        MembershipRenewalPaymentMethodReminder.prepare_email_data(user, nil)
+        Ysc.Test.Invoke.call(
+          MembershipRenewalPaymentMethodReminder,
+          :prepare_email_data,
+          [
+            user,
+            nil
+          ]
+        )
       end
     end
   end
@@ -531,7 +548,10 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
     test "prepare_email_data raises when user is nil" do
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        MembershipPaymentFailure.prepare_email_data(nil, "single")
+        Ysc.Test.Invoke.call(MembershipPaymentFailure, :prepare_email_data, [
+          nil,
+          "single"
+        ])
       end
     end
 
@@ -605,12 +625,16 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
     test "prepare_email_data raises when user is nil" do
       assert_raise ArgumentError, "User cannot be nil", fn ->
-        MembershipPaymentConfirmation.prepare_email_data(
-          nil,
-          "Single",
-          Money.new(50, :USD),
-          ~D[2024-12-01],
-          []
+        Ysc.Test.Invoke.call(
+          MembershipPaymentConfirmation,
+          :prepare_email_data,
+          [
+            nil,
+            "Single",
+            Money.new(50, :USD),
+            ~D[2024-12-01],
+            []
+          ]
         )
       end
     end
@@ -687,11 +711,15 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
     test "prepare_email_data raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCancellationTreasurerNotification.prepare_email_data(
-          nil,
-          nil,
-          nil,
-          nil
+        Ysc.Test.Invoke.call(
+          BookingCancellationTreasurerNotification,
+          :prepare_email_data,
+          [
+            nil,
+            nil,
+            nil,
+            nil
+          ]
         )
       end
     end
@@ -727,11 +755,15 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
     test "prepare_email_data raises when booking is nil" do
       assert_raise ArgumentError, "Booking cannot be nil", fn ->
-        BookingCancellationCabinMasterNotification.prepare_email_data(
-          nil,
-          nil,
-          nil,
-          nil
+        Ysc.Test.Invoke.call(
+          BookingCancellationCabinMasterNotification,
+          :prepare_email_data,
+          [
+            nil,
+            nil,
+            nil,
+            nil
+          ]
         )
       end
     end

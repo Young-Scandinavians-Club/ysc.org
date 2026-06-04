@@ -10,6 +10,8 @@ defmodule YscWeb.Api.BookingsControllerTest do
   import Ysc.BookingsFixtures
   import Ysc.AccountsFixtures
 
+  @test_token "test-kiosk-secret"
+
   # Creates a booking that is currently active (checked in already, not yet checked out),
   # which is required for the lookup endpoint to find it.
   defp active_booking_fixture(attrs) do
@@ -54,21 +56,6 @@ defmodule YscWeb.Api.BookingsControllerTest do
 
     {checkin, checkout}
   end
-
-  defp ensure_sunday_when_saturday_included(checkin, checkout) do
-    dates = Date.range(checkin, checkout) |> Enum.to_list()
-
-    has_saturday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 6))
-    has_sunday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 7))
-
-    if has_saturday? and not has_sunday? do
-      Date.add(checkout, 1)
-    else
-      checkout
-    end
-  end
-
-  @test_token "test-kiosk-secret"
 
   setup %{conn: conn} do
     previous = Application.get_env(:ysc, :kiosk_api_key)
