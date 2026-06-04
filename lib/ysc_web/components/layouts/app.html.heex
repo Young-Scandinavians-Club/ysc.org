@@ -161,17 +161,7 @@
                 <li>
                   <.link
                     navigate={~p"/news"}
-                    phx-click={
-                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
-                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
-                      |> JS.add_class("-translate-x-full",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("translate-x-0",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("overflow-hidden", to: "body")
-                    }
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     News
@@ -180,17 +170,7 @@
                 <li>
                   <.link
                     navigate={~p"/events"}
-                    phx-click={
-                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
-                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
-                      |> JS.add_class("-translate-x-full",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("translate-x-0",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("overflow-hidden", to: "body")
-                    }
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Events
@@ -199,17 +179,7 @@
                 <li>
                   <.link
                     navigate={~p"/bookings/tahoe"}
-                    phx-click={
-                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
-                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
-                      |> JS.add_class("-translate-x-full",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("translate-x-0",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("overflow-hidden", to: "body")
-                    }
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Tahoe Cabin
@@ -218,17 +188,7 @@
                 <li>
                   <.link
                     navigate={~p"/bookings/clear-lake"}
-                    phx-click={
-                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
-                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
-                      |> JS.add_class("-translate-x-full",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("translate-x-0",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("overflow-hidden", to: "body")
-                    }
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Clear Lake Cabin
@@ -254,21 +214,7 @@
                       <li>
                         <.link
                           navigate={~p"/newsletters"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Newsletters
@@ -277,21 +223,7 @@
                       <li>
                         <.link
                           navigate={~p"/choir"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           YSC Choir
@@ -300,21 +232,7 @@
                       <li>
                         <.link
                           navigate={~p"/history"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Our History
@@ -323,21 +241,7 @@
                       <li>
                         <.link
                           navigate={~p"/board"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Board of Directors
@@ -346,21 +250,7 @@
                       <li>
                         <.link
                           navigate={~p"/volunteer"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
                         >
                           Volunteer
@@ -369,21 +259,7 @@
                       <li>
                         <.link
                           navigate={~p"/contact"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out duration-150 hover:bg-zinc-100"
                         >
                           Contact Us
@@ -416,21 +292,7 @@
                       <li>
                         <.link
                           navigate={~p"/users/membership"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Membership
@@ -439,21 +301,7 @@
                       <li>
                         <.link
                           navigate={~p"/users/payments"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           My Bookings & Tickets
@@ -462,21 +310,7 @@
                       <li>
                         <.link
                           navigate={~p"/users/settings"}
-                          phx-click={
-                            JS.remove_class("open",
-                              to: "#navbar-dropdown-hamburger"
-                            )
-                            |> JS.add_class("hidden",
-                              to: "#navbar-dropdown-overlay"
-                            )
-                            |> JS.add_class("-translate-x-full",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("translate-x-0",
-                              to: "#navbar-dropdown"
-                            )
-                            |> JS.remove_class("overflow-hidden", to: "body")
-                          }
+                          phx-click={hide_mobile_menu("navbar-dropdown")}
                           class="block px-4 py-2 transition ease-in-out hover:bg-zinc-100 duration-150"
                         >
                           Account Settings
@@ -487,21 +321,7 @@
                       <.link
                         href={~p"/users/log-out"}
                         method="delete"
-                        phx-click={
-                          JS.remove_class("open",
-                            to: "#navbar-dropdown-hamburger"
-                          )
-                          |> JS.add_class("hidden",
-                            to: "#navbar-dropdown-overlay"
-                          )
-                          |> JS.add_class("-translate-x-full",
-                            to: "#navbar-dropdown"
-                          )
-                          |> JS.remove_class("translate-x-0",
-                            to: "#navbar-dropdown"
-                          )
-                          |> JS.remove_class("overflow-hidden", to: "body")
-                        }
+                        phx-click={hide_mobile_menu("navbar-dropdown")}
                         class="block px-4 py-2 text-sm text-zinc-800 transition ease-in-out hover:bg-zinc-100 duration-150"
                       >
                         Sign out
@@ -513,34 +333,14 @@
                 <div class="flex items-center space-x-2">
                   <.link
                     href={~p"/users/log-in"}
-                    phx-click={
-                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
-                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
-                      |> JS.add_class("-translate-x-full",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("translate-x-0",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("overflow-hidden", to: "body")
-                    }
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="nav-link px-2 py-2 lg:px-3 lg:py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Sign In
                   </.link>
                   <.link
                     navigate={~p"/users/register"}
-                    phx-click={
-                      JS.remove_class("open", to: "#navbar-dropdown-hamburger")
-                      |> JS.add_class("hidden", to: "#navbar-dropdown-overlay")
-                      |> JS.add_class("-translate-x-full",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("translate-x-0",
-                        to: "#navbar-dropdown"
-                      )
-                      |> JS.remove_class("overflow-hidden", to: "body")
-                    }
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
                     class="px-3 py-2 lg:px-4 lg:py-2.5 text-sm font-bold text-center text-zinc-100 transition ease-in-out bg-blue-700 rounded duration-150 hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                   >
                     Become a Member
@@ -557,36 +357,11 @@
 
   <%!-- Non–hero pages: notice between header and main --%>
   <div :if={!is_hero_mode}>
-    <.alert_banner
-      :if={
-        @current_user && @current_user.state == :pending_approval &&
-          !is_fullscreen
-      }
-      type="warning"
-      icon="hero-exclamation-triangle"
-      title="Application Under Review"
-    >
-      Our board is reviewing your membership application. We will email you when there is a decision. Cabin bookings, event tickets, and other member benefits are available after the board approves you and your membership dues are paid. For timelines and optional early payment setup, <.link
-        navigate={~p"/pending-review"}
-        class="hover:underline font-bold"
-      >view your application status</.link>.
-    </.alert_banner>
-
-    <.alert_banner
-      :if={
-        @current_user && @current_user.state == :active && !@active_membership? &&
-          !is_fullscreen
-      }
-      type="orange"
-      icon="hero-exclamation-triangle"
-      title="Membership Required"
-      action_label="Manage Membership"
-      action_path={~p"/users/membership"}
-    >
-      To access events and the cabin booking system, you need an active, paid membership. Use the
-      <strong>Manage Membership</strong>
-      button to choose a plan and complete payment.
-    </.alert_banner>
+    <.membership_status_banners
+      current_user={@current_user}
+      active_membership?={@active_membership?}
+      is_fullscreen={is_fullscreen}
+    />
   </div>
 
   <main class={["flex-1 w-full", is_hero_mode && "relative z-[1]"]}>
@@ -596,37 +371,11 @@
   <%!-- Hero mode: banner below main so it doesn't cover hero/nav --%>
   <div :if={hero_banner_visible} class="px-4 py-4">
     <div class="max-w-screen-xl mx-auto rounded-xl overflow-hidden shadow-lg">
-      <.alert_banner
-        :if={
-          @current_user && @current_user.state == :pending_approval &&
-            !is_fullscreen
-        }
-        type="warning"
-        icon="hero-exclamation-triangle"
-        title="Application Under Review"
-      >
-        Our board is reviewing your membership application. We will email you when there is a decision. Cabin bookings, event tickets, and other member benefits are available after the board approves you and your membership dues are paid. For timelines and optional early payment setup, <.link
-          navigate={~p"/pending-review"}
-          class="hover:underline font-bold"
-        >view your application status</.link>.
-      </.alert_banner>
-
-      <.alert_banner
-        :if={
-          @current_user && @current_user.state == :active &&
-            !@active_membership? &&
-            !is_fullscreen
-        }
-        type="orange"
-        icon="hero-exclamation-triangle"
-        title="Membership Required"
-        action_label="Manage Membership"
-        action_path={~p"/users/membership"}
-      >
-        To access events and the cabin booking system, you need an active, paid membership. Use the
-        <strong>Manage Membership</strong>
-        button to choose a plan and complete payment.
-      </.alert_banner>
+      <.membership_status_banners
+        current_user={@current_user}
+        active_membership?={@active_membership?}
+        is_fullscreen={is_fullscreen}
+      />
     </div>
   </div>
 
@@ -655,116 +404,87 @@
               @site_setting_socials_discord ||
               (@current_user && @site_setting_socials_whatsapp)
           }>
-            <h2 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
-              Socials
-            </h2>
+            <.footer_section_heading title="Socials" />
             <ul class="space-y-3 text-sm text-zinc-600">
               <li :if={@site_setting_socials_facebook}>
-                <.link
+                <.footer_nav_link
                   href={@site_setting_socials_facebook}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Facebook
-                </.link>
+                  label="Facebook"
+                />
               </li>
               <li :if={@site_setting_socials_instagram}>
-                <.link
+                <.footer_nav_link
                   href={@site_setting_socials_instagram}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Instagram
-                </.link>
+                  label="Instagram"
+                />
               </li>
               <li :if={@site_setting_socials_discord}>
-                <.link
+                <.footer_nav_link
                   href={@site_setting_socials_discord}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Discord"
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Discord
-                </.link>
+                  label="Discord"
+                />
               </li>
               <li :if={@current_user && @site_setting_socials_whatsapp}>
-                <.link
+                <.footer_nav_link
                   href={@site_setting_socials_whatsapp}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="WhatsApp"
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  WhatsApp
-                </.link>
+                  label="WhatsApp"
+                />
               </li>
             </ul>
           </div>
 
           <div>
-            <h2 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
-              Policies
-            </h2>
+            <.footer_section_heading title="Policies" />
             <ul class="space-y-3 text-sm text-zinc-600">
               <li>
-                <.link
+                <.footer_nav_link
                   navigate={~p"/privacy-policy"}
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Privacy Policy
-                </.link>
+                  label="Privacy Policy"
+                />
               </li>
               <li>
-                <.link
+                <.footer_nav_link
                   navigate={~p"/terms-of-service"}
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Terms of Service
-                </.link>
+                  label="Terms of Service"
+                />
               </li>
               <li>
-                <.link
+                <.footer_nav_link
                   navigate={~p"/code-of-conduct"}
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Code of Conduct
-                </.link>
+                  label="Code of Conduct"
+                />
               </li>
             </ul>
           </div>
           <div>
-            <h2 class="mb-4 text-sm font-semibold text-zinc-900 uppercase tracking-wide">
-              Governance
-            </h2>
+            <.footer_section_heading title="Governance" />
             <ul class="space-y-3 text-sm text-zinc-600">
               <li>
-                <.link
+                <.footer_nav_link
                   navigate={~p"/financials"}
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Financials & Meetings
-                </.link>
+                  label="Financials & Meetings"
+                />
               </li>
               <li>
-                <.link
-                  navigate={~p"/bylaws"}
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Bylaws
-                </.link>
+                <.footer_nav_link navigate={~p"/bylaws"} label="Bylaws" />
               </li>
               <li>
-                <.link
+                <.footer_nav_link
                   navigate={~p"/report-conduct-violation"}
-                  class="underline underline-offset-4 decoration-zinc-300 hover:decoration-zinc-600 hover:text-zinc-900 transition-colors"
-                >
-                  Report Conduct Violation
-                </.link>
+                  label="Report Conduct Violation"
+                />
               </li>
             </ul>
           </div>

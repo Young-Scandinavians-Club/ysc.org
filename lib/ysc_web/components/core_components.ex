@@ -1926,7 +1926,13 @@ defmodule YscWeb.CoreComponents do
     |> JS.add_class("overflow-hidden", to: "body")
   end
 
-  defp hide_mobile_menu(id) do
+  @doc """
+  Closes the slide-in mobile menu created by `hamburger_menu/1` for the given `id`
+  (the `toggle_id` passed to the component).
+
+  Chain with `|>` when composing other `Phoenix.LiveView.JS` commands on the same click.
+  """
+  def hide_mobile_menu(id) when is_binary(id) do
     JS.remove_class("open", to: "##{id}-hamburger")
     |> JS.add_class("hidden", to: "##{id}-overlay")
     |> JS.add_class("-translate-x-full", to: "##{id}")
