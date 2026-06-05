@@ -253,6 +253,117 @@ defmodule YscWeb.TicketQrLiveTest do
     end
   end
 
+  describe "filters out donation tickets" do
+    test "excludes donations from QR slider and ticket count", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+
+      paid_tier =
+        ticket_tier_fixture(%{event_id: event.id, name: "General Admission"})
+
+      donation_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil,
+          quantity: nil
+        })
+
+      order =
+        ticket_order_fixture(%{user: member, event: event, tier: paid_tier})
+
+      loaded_order =
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload([:tickets])
+
+      Enum.each(loaded_order.tickets, fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      {:ok, donation_ticket} =
+        %Ysc.Events.Ticket{}
+        |> Ysc.Events.Ticket.changeset(%{
+          ticket_order_id: order.id,
+          ticket_tier_id: donation_tier.id,
+          event_id: event.id,
+          user_id: member.id,
+          reference_id: "TKT-DON-#{System.unique_integer()}",
+          status: :confirmed,
+          expires_at: DateTime.add(DateTime.utc_now(), 30, :minute)
+        })
+        |> Ysc.Repo.insert()
+
+      paid_ticket =
+        loaded_order.tickets
+        |> Enum.find(&(&1.ticket_tier_id == paid_tier.id))
+        |> Ysc.Repo.preload(:ticket_tier)
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+      html = render_async(view)
+
+      assert html =~ "1 ticket"
+      assert html =~ paid_ticket.reference_id
+      refute html =~ donation_ticket.reference_id
+      refute html =~ donation_tier.name
+    end
+
+    test "redirects when order only has confirmed donations", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
+      member =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.reload!()
+
+      event = event_fixture()
+
+      donation_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil,
+          quantity: nil
+        })
+
+      order =
+        ticket_order_fixture(%{user: member, event: event, tier: donation_tier})
+
+      loaded_order =
+        Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        |> Ysc.Repo.preload([:tickets])
+
+      Enum.each(loaded_order.tickets, fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      conn = log_in_user(conn, member)
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
+
+      assert_redirect(view, "/users/tickets")
+    end
+  end
+
   describe "filters out non-confirmed tickets" do
     test "only shows confirmed tickets", %{conn: conn} do
       Ysc.Ledgers.ensure_basic_accounts()

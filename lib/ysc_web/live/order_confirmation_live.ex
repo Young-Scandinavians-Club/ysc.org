@@ -10,7 +10,6 @@ defmodule YscWeb.OrderConfirmationLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   import Ecto.Query
-  alias HtmlSanitizeEx
 
   @impl true
   def mount(%{"order_id" => order_id} = params, _session, socket) do
@@ -208,14 +207,11 @@ defmodule YscWeb.OrderConfirmationLive do
                     <.icon name="hero-information-circle" class="w-8 h-8" />
                     Event Details
                   </h2>
+                  <% ticket_count = non_donation_ticket_count(@ticket_order.tickets) %>
                   <span class="text-sm font-medium bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-                    {length(@ticket_order.tickets)} {if length(
-                                                          @ticket_order.tickets
-                                                        ) == 1 do
-                      "Ticket"
-                    else
-                      "Tickets"
-                    end}
+                    {ticket_count} {if ticket_count == 1,
+                      do: "Ticket",
+                      else: "Tickets"}
                   </span>
                 </div>
               </div>
@@ -224,9 +220,6 @@ defmodule YscWeb.OrderConfirmationLive do
               <div>
                 <p class="text-xs font-bold text-zinc-400 uppercase mb-1">Event</p>
                 <p class="text-xl font-bold text-zinc-900">{@event.title}</p>
-                <p class="text-sm text-zinc-500">
-                  {HtmlSanitizeEx.strip_tags(@event.description || "")}
-                </p>
               </div>
               <div>
                 <p class="text-xs font-bold text-zinc-400 uppercase mb-1">
@@ -268,7 +261,16 @@ defmodule YscWeb.OrderConfirmationLive do
           <div class="bg-white rounded-lg border border-zinc-200 overflow-hidden">
             <div class="px-6 py-4 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between gap-4">
               <h2 class="text-lg font-semibold text-zinc-900 flex items-center gap-2">
-                <.icon name="hero-ticket" class="w-5 h-5" /> Your Tickets
+                <.icon
+                  name={
+                    if order_has_donations?(@ticket_order.tickets) &&
+                         non_donation_ticket_count(@ticket_order.tickets) == 0,
+                       do: "hero-heart",
+                       else: "hero-ticket"
+                  }
+                  class="w-5 h-5"
+                />
+                {order_items_section_title(@ticket_order.tickets)}
               </h2>
               <%= if @ticket_order.status != :cancelled do %>
                 <.link
@@ -284,19 +286,21 @@ defmodule YscWeb.OrderConfirmationLive do
               <div class="space-y-3">
                 <%= for ticket <- @ticket_order.tickets do %>
                   <% is_refunded = ticket.status == :cancelled %>
+                  <% is_donation = donation_ticket?(ticket) %>
                   <% requires_registration =
                     ticket.ticket_tier.requires_registration == true %>
                   <% ticket_detail = ticket.registration %>
                   <div class={[
                     "p-4 rounded-lg border",
-                    if(is_refunded,
-                      do: "bg-red-50 border-red-200 opacity-60",
-                      else: "bg-zinc-50 border-zinc-200"
-                    )
+                    cond do
+                      is_refunded -> "bg-red-50 border-red-200 opacity-60"
+                      is_donation -> "bg-amber-50 border-amber-200"
+                      true -> "bg-zinc-50 border-zinc-200"
+                    end
                   ]}>
                     <div class="flex justify-between items-start mb-3">
                       <div class="flex-1">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                           <p class={[
                             "font-semibold",
                             if(is_refunded,
@@ -306,21 +310,47 @@ defmodule YscWeb.OrderConfirmationLive do
                           ]}>
                             {ticket.ticket_tier.name}
                           </p>
+                          <%= if is_donation do %>
+                            <span class="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                              Donation
+                            </span>
+                          <% end %>
                           <%= if is_refunded do %>
                             <span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded">
                               Refunded
                             </span>
                           <% end %>
                         </div>
-                        <p class={[
-                          "text-sm font-mono",
-                          if(is_refunded,
-                            do: "text-zinc-400",
-                            else: "text-zinc-500"
-                          )
-                        ]}>
-                          Ticket #{ticket.reference_id}
-                        </p>
+                        <%= if is_donation do %>
+                          <p class={[
+                            "text-sm mt-1",
+                            if(is_refunded,
+                              do: "text-zinc-400",
+                              else: "text-amber-900"
+                            )
+                          ]}>
+                            Not an event ticket — thank you for your support.
+                          </p>
+                          <p class={[
+                            "text-sm font-mono mt-1",
+                            if(is_refunded,
+                              do: "text-zinc-400",
+                              else: "text-zinc-500"
+                            )
+                          ]}>
+                            Reference {ticket.reference_id}
+                          </p>
+                        <% else %>
+                          <p class={[
+                            "text-sm font-mono",
+                            if(is_refunded,
+                              do: "text-zinc-400",
+                              else: "text-zinc-500"
+                            )
+                          ]}>
+                            Ticket #{ticket.reference_id}
+                          </p>
+                        <% end %>
                       </div>
                       <div class="text-right">
                         <% ticket_discount =
@@ -345,7 +375,7 @@ defmodule YscWeb.OrderConfirmationLive do
                           )
                         ]}>
                           <%= cond do %>
-                            <% ticket.ticket_tier.type == "donation" || ticket.ticket_tier.type == :donation -> %>
+                            <% is_donation -> %>
                               {get_donation_amount_for_ticket(
                                 ticket,
                                 @ticket_order
@@ -371,7 +401,8 @@ defmodule YscWeb.OrderConfirmationLive do
                         </p>
                       </div>
                     </div>
-                    <% has_ticket_discount = has_discount && !is_refunded %>
+                    <% has_ticket_discount =
+                      has_discount && !is_refunded && !is_donation %>
                     <%= if has_ticket_discount do %>
                       <% discount_percentage =
                         ticket_discount_percentage(
@@ -391,7 +422,7 @@ defmodule YscWeb.OrderConfirmationLive do
                         </div>
                       </div>
                     <% end %>
-                    <%= if requires_registration && ticket_detail do %>
+                    <%= if requires_registration && ticket_detail && !is_donation do %>
                       <div class={[
                         "pt-3 border-t border-zinc-300",
                         if(has_ticket_discount, do: "mt-3", else: "mt-3")
@@ -668,16 +699,18 @@ defmodule YscWeb.OrderConfirmationLive do
                 }>
                   Tickets
                 </span>
-                <span>
-                  {length(
-                    Enum.filter(@ticket_order.tickets, fn t ->
-                      t.status != :cancelled
-                    end)
-                  )}
-                  <%= if @refund_data && @refund_data.refunded_tickets && length(@refund_data.refunded_tickets) > 0 do %>
-                    <span class="text-zinc-400">
-                      ({length(@refund_data.refunded_tickets)} refunded)
-                    </span>
+                <span id="order-confirmation-payment-ticket-count">
+                  {active_non_donation_ticket_count(@ticket_order.tickets)}
+                  <%= if @refund_data && @refund_data.refunded_tickets do %>
+                    <% refunded_event_ticket_count =
+                      @refund_data.refunded_tickets
+                      |> Enum.reject(&donation_ticket?/1)
+                      |> length() %>
+                    <%= if refunded_event_ticket_count > 0 do %>
+                      <span class="text-zinc-400">
+                        ({refunded_event_ticket_count} refunded)
+                      </span>
+                    <% end %>
                   <% end %>
                 </span>
               </div>
@@ -686,15 +719,16 @@ defmodule YscWeb.OrderConfirmationLive do
           <!-- Action Buttons -->
           <div class="space-y-3">
             <%= if @ticket_order.status != :cancelled do %>
-              <.link
+              <.button
                 navigate={~p"/tickets/#{@ticket_order.id}/qr" <> "?return_to=/orders/#{@ticket_order.id}/confirmation"}
-                class="inline-flex items-center justify-center w-full rounded py-3 px-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-100 active:text-zinc-100/80 active:scale-[0.98] transition duration-150 ease-in-out text-sm font-semibold leading-6"
+                class="w-full py-3"
+                color="zinc"
               >
                 <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5 me-2" />View tickets for check-in
-              </.link>
+              </.button>
             <% end %>
             <.button phx-click="view-tickets" class="w-full py-3">
-              <.icon name="hero-ticket" class="w-5 h-5 -mt-0.5 me-2" />View All My Tickets
+              <.icon name="hero-ticket" class="w-5 h-5" />View All My Tickets
             </.button>
             <.button
               phx-click="view-event"
@@ -721,6 +755,38 @@ defmodule YscWeb.OrderConfirmationLive do
       </div>
     </div>
     """
+  end
+
+  defp non_donation_ticket_count(tickets) do
+    tickets
+    |> Enum.reject(&donation_ticket?/1)
+    |> length()
+  end
+
+  defp active_non_donation_ticket_count(tickets) do
+    tickets
+    |> Enum.reject(&(donation_ticket?(&1) or &1.status == :cancelled))
+    |> length()
+  end
+
+  defp order_has_donations?(tickets) do
+    Enum.any?(tickets, &donation_ticket?/1)
+  end
+
+  defp order_items_section_title(tickets) do
+    ticket_count = non_donation_ticket_count(tickets)
+    donation_count = length(tickets) - ticket_count
+
+    cond do
+      ticket_count > 0 && donation_count > 0 -> "Tickets & Donations"
+      donation_count > 0 -> "Your Donations"
+      true -> "Your Tickets"
+    end
+  end
+
+  defp donation_ticket?(ticket) do
+    ticket.ticket_tier.type == "donation" ||
+      ticket.ticket_tier.type == :donation
   end
 
   # Helper function to calculate donation amount for a ticket
