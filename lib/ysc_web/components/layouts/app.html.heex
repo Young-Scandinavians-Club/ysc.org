@@ -352,7 +352,6 @@
         </div>
       </div>
     </nav>
-    <%!-- Hero mode: no banner in header - it's rendered below main to avoid covering hero/nav --%>
   </header>
 
   <%!-- Non–hero pages: notice between header and main --%>
@@ -365,19 +364,22 @@
   </div>
 
   <main class={["flex-1 w-full", is_hero_mode && "relative z-[1]"]}>
+    <%!-- Hero mode: membership banner floats over hero media, below fixed nav --%>
+    <div
+      :if={hero_banner_visible}
+      id="hero-membership-banner"
+      class="absolute inset-x-0 top-[var(--nav-height)] z-20 px-4 pt-3 sm:pt-4 pointer-events-none"
+    >
+      <div class="max-w-screen-xl mx-auto pointer-events-auto rounded-xl overflow-hidden shadow-lg">
+        <.membership_status_banners
+          current_user={@current_user}
+          active_membership?={@active_membership?}
+          is_fullscreen={is_fullscreen}
+        />
+      </div>
+    </div>
     {@inner_content}
   </main>
-
-  <%!-- Hero mode: banner below main so it doesn't cover hero/nav --%>
-  <div :if={hero_banner_visible} class="px-4 py-4">
-    <div class="max-w-screen-xl mx-auto rounded-xl overflow-hidden shadow-lg">
-      <.membership_status_banners
-        current_user={@current_user}
-        active_membership?={@active_membership?}
-        is_fullscreen={is_fullscreen}
-      />
-    </div>
-  </div>
 
   <footer
     :if={!is_fullscreen}
