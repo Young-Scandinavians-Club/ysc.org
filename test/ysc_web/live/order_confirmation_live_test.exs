@@ -1078,7 +1078,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       paid_tier =
         create_ticket_tier(event, %{
           name: "General Admission",
-          price: Money.new(5000, :USD)
+          price: Money.new(:USD, "50.00")
         })
 
       donation_tier =
@@ -1090,12 +1090,12 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       order =
         create_ticket_order(user, event, %{
-          total_amount: Money.new(5500, :USD)
+          total_amount: Money.new(:USD, "55.00")
         })
 
       _paid =
         create_ticket(order, paid_tier, %{
-          discount_amount: Money.new(1000, :USD)
+          discount_amount: Money.new(:USD, "10.00")
         })
 
       donation = create_ticket(order, donation_tier)
