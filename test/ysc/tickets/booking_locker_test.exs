@@ -378,10 +378,12 @@ defmodule Ysc.Tickets.BookingLockerTest do
         other = user_fixture() |> with_lifetime_membership()
 
         assert {:ok, _} =
-                 BookingLocker.atomic_booking(other.id, event.id, %{paid_tier.id => 1})
+                 BookingLocker.atomic_booking(other.id, event.id, %{
+                   paid_tier.id => 1
+                 })
       end
 
-      for _ <- 1..5 do
+      for i <- 1..5 do
         donor = user_fixture() |> with_lifetime_membership()
 
         assert {:ok, _} =
