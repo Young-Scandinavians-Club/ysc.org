@@ -2527,6 +2527,32 @@ defmodule YscWeb.CoreComponents do
 
   slot :inner_block, required: true
 
+  def warning_callout(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={["bg-amber-50 border border-amber-200 rounded p-4", @class]}
+    >
+      <div class="flex items-start">
+        <div class="flex-shrink-0">
+          <.icon
+            name="hero-exclamation-triangle-solid"
+            class="h-5 w-5 text-amber-600"
+          />
+        </div>
+        <div class="ms-2 flex-1">
+          <h3 :if={@title} class="text-sm font-semibold text-amber-900">
+            {@title}
+          </h3>
+          <div class="mt-2 text-sm text-amber-800">
+            <p>{render_slot(@inner_block)}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @doc """
   Full-width amber banner shown when staff preview unpublished content.
 
@@ -2567,32 +2593,6 @@ defmodule YscWeb.CoreComponents do
 
   defp staff_content_preview_message(:article),
     do: "Staff preview — this article is not published yet."
-
-  def warning_callout(assigns) do
-    ~H"""
-    <div
-      id={@id}
-      class={["bg-amber-50 border border-amber-200 rounded p-4", @class]}
-    >
-      <div class="flex items-start">
-        <div class="flex-shrink-0">
-          <.icon
-            name="hero-exclamation-triangle-solid"
-            class="h-5 w-5 text-amber-600"
-          />
-        </div>
-        <div class="ms-2 flex-1">
-          <h3 :if={@title} class="text-sm font-semibold text-amber-900">
-            {@title}
-          </h3>
-          <div class="mt-2 text-sm text-amber-800">
-            <p>{render_slot(@inner_block)}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-    """
-  end
 
   attr :id, :string, required: true
   attr :text, :string, required: true
