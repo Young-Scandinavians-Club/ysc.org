@@ -180,11 +180,15 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       {:ok, _} = Events.mark_event_update_sent(update, 3)
 
-      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
 
-      assert html =~ "Venue Change"
-      assert html =~ "timeline-item-update-#{update.id}"
       assert has_element?(view, "#timeline-item-update-#{update.id}")
+
+      assert has_element?(
+               view,
+               "#timeline-item-update-#{update.id}",
+               "Venue Change"
+             )
     end
 
     test "shows publication notification in timeline when marked sent", %{
@@ -194,11 +198,21 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       event = event_fixture(%{organizer_id: admin.id, state: :published})
       {:ok, event} = Events.mark_event_notification_sent(event, 25)
 
-      {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
 
-      assert html =~ "New Event Announcement"
-      assert html =~ "25 member(s) notified"
       assert has_element?(view, "#timeline-item-publication-#{event.id}")
+
+      assert has_element?(
+               view,
+               "#timeline-item-publication-#{event.id}",
+               "New Event Announcement"
+             )
+
+      assert has_element?(
+               view,
+               "#timeline-item-publication-#{event.id}",
+               "25 member(s) notified"
+             )
     end
 
     test "preview modal opens with message body", %{conn: conn, admin: admin} do

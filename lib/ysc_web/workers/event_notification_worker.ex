@@ -98,8 +98,18 @@ defmodule YscWeb.Workers.EventNotificationWorker do
       recipient_count = length(users)
 
       if success_count == recipient_count do
-        Events.mark_event_notification_sent(event, recipient_count)
-        :ok
+        case Events.mark_event_notification_sent(event, recipient_count) do
+          {:ok, _} ->
+            :ok
+
+          {:error, changeset} ->
+            Ysc.Logging.error("Failed to mark event notification sent",
+              event_id: event.id,
+              errors: inspect(changeset.errors)
+            )
+
+            {:error, :db_update_failed}
+        end
       else
         Ysc.Logging.warning("Event notifications partially failed",
           event_id: event.id,

@@ -4,10 +4,12 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
   """
   use Ysc.DataCase, async: false
 
+  alias Ysc.Accounts.User
   alias YscWeb.Workers.EventNotificationWorker
   alias Ysc.Events
   alias Ysc.Events.Event
   alias YscWeb.Emails.{EventNotification, Notifier}
+  import Ecto.Query
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
@@ -337,6 +339,8 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
            event: event,
            organizer: organizer
          } do
+      Repo.update_all(from(u in User), set: [event_notifications: false])
+
       {:ok, _} =
         Ysc.Accounts.update_notification_preferences(organizer, %{
           event_notifications: false,
@@ -376,9 +380,7 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       updated = Repo.get!(Event, event.id)
       assert updated.notification_sent_at != nil
-      assert updated.notification_recipient_count >= 2
-
-      import Ecto.Query
+      assert updated.notification_recipient_count == 2
 
       expected_keys = [
         "event_notification_#{event.id}_#{user_with_events_a.id}",
