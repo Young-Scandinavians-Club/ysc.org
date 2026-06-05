@@ -335,6 +335,84 @@ defmodule Ysc.Tickets.BookingLockerTest do
              ) == 3
     end
 
+    test "donation tickets do not count toward event max_attendees capacity", %{
+      organizer: organizer
+    } do
+      buyer = user_fixture() |> with_lifetime_membership()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Donation capacity",
+          description: "donations should not block regular sales",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 10,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, paid_tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(10, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Support",
+          type: :donation,
+          price: nil,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      for _ <- 1..8 do
+        other = user_fixture() |> with_lifetime_membership()
+
+        assert {:ok, _} =
+                 BookingLocker.atomic_booking(other.id, event.id, %{
+                   paid_tier.id => 1
+                 })
+      end
+
+      for i <- 1..5 do
+        donor = user_fixture() |> with_lifetime_membership()
+
+        assert {:ok, _} =
+                 BookingLocker.atomic_booking(donor.id, event.id, %{
+                   donation_tier.id => 1000 * i
+                 })
+      end
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(buyer.id, event.id, %{
+                 paid_tier.id => 1
+               })
+
+      assert order.event_id == event.id
+
+      regular_ticket_count =
+        Repo.aggregate(
+          from(t in Ticket,
+            join: tt in assoc(t, :ticket_tier),
+            where:
+              t.event_id == ^event.id and t.status in [:confirmed, :pending] and
+                tt.type != :donation
+          ),
+          :count
+        )
+
+      assert regular_ticket_count == 9
+    end
+
     test "donation tier accepts cents amount and creates one ticket", %{
       user: user,
       event: event

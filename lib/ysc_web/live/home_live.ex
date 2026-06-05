@@ -2629,9 +2629,7 @@ defmodule YscWeb.HomeLive do
             available == 0
           end)
 
-        # Also check event capacity if max_attendees is set
-        # (Note: This includes all tickets including donations, but if capacity is reached,
-        #  all regular tickets are effectively sold out even if some tiers show availability)
+        # Also check event capacity if max_attendees is set (ticket_count excludes donations)
         event_at_capacity =
           case Map.get(event, :max_attendees) || Map.get(event, "max_attendees") do
             nil ->

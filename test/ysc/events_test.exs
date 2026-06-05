@@ -151,11 +151,9 @@ defmodule Ysc.EventsTest do
       assert Events.event_selling_fast?(event.id) == false
     end
 
-    test "count_recent_tickets_sold returns correct count" do
-      # Create a user and event
+    test "count_recent_tickets_sold returns correct count excluding donations" do
       user = user_fixture()
 
-      # Create an event
       {:ok, event} =
         Events.create_event(%{
           title: "Test Event 4",
@@ -166,66 +164,66 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now()
         })
 
-      # Create tickets with different timestamps
+      {:ok, paid_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      {:ok, donation_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
       now = DateTime.utc_now() |> DateTime.truncate(:second)
-      # 1 day ago
       recent_time = DateTime.add(now, -1, :day)
-      # 5 days ago
       old_time = DateTime.add(now, -5, :day)
 
-      # Insert 3 recent confirmed tickets
+      expires_at = DateTime.add(now, 1, :day)
+
       for _i <- 1..3 do
         %Ticket{
           id: Ecto.ULID.generate(),
           event_id: event.id,
           user_id: user.id,
+          ticket_tier_id: paid_tier.id,
           status: :confirmed,
           inserted_at: recent_time,
-          expires_at:
-            DateTime.add(
-              DateTime.utc_now() |> DateTime.truncate(:second),
-              1,
-              :day
-            )
+          expires_at: expires_at
         }
         |> Repo.insert!()
       end
 
-      # Insert 2 old confirmed tickets
       for _i <- 1..2 do
         %Ticket{
           id: Ecto.ULID.generate(),
           event_id: event.id,
           user_id: user.id,
+          ticket_tier_id: paid_tier.id,
           status: :confirmed,
           inserted_at: old_time,
-          expires_at:
-            DateTime.add(
-              DateTime.utc_now() |> DateTime.truncate(:second),
-              1,
-              :day
-            )
+          expires_at: expires_at
         }
         |> Repo.insert!()
       end
 
-      # Insert 1 pending ticket (should not be counted)
       %Ticket{
         id: Ecto.ULID.generate(),
         event_id: event.id,
         user_id: user.id,
-        status: :pending,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed,
         inserted_at: recent_time,
-        expires_at:
-          DateTime.add(
-            DateTime.utc_now() |> DateTime.truncate(:second),
-            1,
-            :day
-          )
+        expires_at: expires_at
       }
       |> Repo.insert!()
 
-      # Test the function
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: paid_tier.id,
+        status: :pending,
+        inserted_at: recent_time,
+        expires_at: expires_at
+      }
+      |> Repo.insert!()
+
       assert Events.count_recent_tickets_sold(event.id) == 3
     end
   end
@@ -1175,6 +1173,9 @@ defmodule Ysc.EventsTest do
       {:ok, tier} =
         create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
 
+      {:ok, donation_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
       for _i <- 1..3 do
         create_ticket_fixture(%{
           event_id: event.id,
@@ -1184,8 +1185,42 @@ defmodule Ysc.EventsTest do
         })
       end
 
-      count = Events.count_tickets_sold_excluding_donations(event.id)
-      assert count >= 3
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed
+      })
+
+      assert Events.count_tickets_sold_excluding_donations(event.id) == 3
+    end
+
+    test "enrich_single_event_with_pricing_from_db ticket_count excludes donations" do
+      {:ok, event} = create_event_fixture()
+      user = user_fixture()
+
+      {:ok, paid_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      {:ok, donation_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: paid_tier.id,
+        status: :confirmed
+      })
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed
+      })
+
+      enriched = Events.enrich_single_event_with_pricing_from_db(event)
+      assert enriched.ticket_count == 1
     end
 
     test "list_unique_attendees_for_event/1 returns unique attendees" do

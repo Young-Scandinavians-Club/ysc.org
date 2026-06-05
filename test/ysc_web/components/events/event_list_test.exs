@@ -473,6 +473,62 @@ defmodule YscWeb.EventsListLiveTest do
       assert html =~ "Sold Out"
     end
 
+    test "does not mark sold out when only donations exceed max_attendees" do
+      organizer = user_fixture()
+
+      event =
+        event_fixture(%{
+          organizer_id: organizer.id,
+          title: "DonCap #{System.unique_integer()}",
+          max_attendees: 1,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 24, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 25, :day)
+            |> DateTime.truncate(:second)
+        })
+
+      _paid_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA",
+          quantity: 10
+        })
+
+      donation_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Support",
+          type: :donation,
+          quantity: 50
+        })
+
+      for _ <- 1..2 do
+        order = ticket_order_fixture(%{event: event, tier: donation_tier})
+
+        order
+        |> Repo.preload(:tickets)
+        |> Map.get(:tickets)
+        |> List.first()
+        |> then(fn ticket ->
+          Repo.update!(Ecto.Changeset.change(ticket, status: :confirmed))
+        end)
+      end
+
+      html =
+        render_component(YscWeb.EventsListLive, %{
+          id: "events-list",
+          defer_load: false,
+          show_hero: true,
+          upcoming: true,
+          limit: 4
+        })
+
+      assert html =~ "DonCap"
+      refute html =~ "Sold Out"
+    end
+
     test "does not mark sold out when tiers are only pre-sale (not on sale yet)" do
       organizer = user_fixture()
 
