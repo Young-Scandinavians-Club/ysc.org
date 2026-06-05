@@ -562,6 +562,46 @@ defmodule Ysc.Tickets.BookingValidatorTest do
     end
   end
 
+  describe "donation tiers and event capacity" do
+    test "donation tickets do not count toward event max_attendees", %{
+      user: user,
+      event: event
+    } do
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Support",
+          type: :donation,
+          price: nil,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      for _i <- 1..100 do
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: donation_tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(
+              DateTime.utc_now() |> DateTime.truncate(:second),
+              1,
+              :day
+            )
+        }
+        |> Repo.insert!()
+      end
+
+      refute BookingValidator.event_at_capacity?(event.id)
+
+      assert :ok =
+               BookingValidator.validate_booking(user.id, event.id, %{
+                 donation_tier.id => 5000
+               })
+    end
+  end
+
   describe "get_event_availability/1" do
     test "returns availability information for event", %{
       event: event,

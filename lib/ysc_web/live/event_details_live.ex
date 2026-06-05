@@ -6071,7 +6071,7 @@ defmodule YscWeb.EventDetailsLive do
               if availability_data do
                 availability_data.event_capacity.current_attendees
               else
-                Events.count_total_tickets_sold_for_event(event.id)
+                Events.count_tickets_sold_excluding_donations(event.id)
               end
 
             total_sold >= max_attendees
@@ -6096,7 +6096,7 @@ defmodule YscWeb.EventDetailsLive do
                 if availability_data do
                   availability_data.event_capacity.current_attendees
                 else
-                  Events.count_total_tickets_sold_for_event(event.id)
+                  Events.count_tickets_sold_excluding_donations(event.id)
                 end
 
               total_sold >= max_attendees

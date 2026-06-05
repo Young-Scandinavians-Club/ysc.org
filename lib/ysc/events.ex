@@ -1108,19 +1108,9 @@ defmodule Ysc.Events do
     end
   end
 
-  # Batch load ticket counts for multiple events
+  # Batch load attendee ticket counts for multiple events (donations excluded).
   defp batch_load_ticket_counts(event_ids) when is_list(event_ids) do
-    if event_ids == [] do
-      %{}
-    else
-      from(t in Ticket,
-        where: t.event_id in ^event_ids and t.status == :confirmed,
-        group_by: t.event_id,
-        select: {t.event_id, count(t.id)}
-      )
-      |> Repo.all()
-      |> Enum.into(%{}, fn {event_id, count} -> {event_id, count} end)
-    end
+    batch_count_tickets_sold_excluding_donations(event_ids)
   end
 
   # Batch count confirmed tickets excluding donation tiers (same rules as count_tickets_sold_excluding_donations/1).
@@ -1815,8 +1805,10 @@ defmodule Ysc.Events do
     three_days_ago = DateTime.add(DateTime.utc_now(), -3, :day)
 
     Ticket
-    |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-    |> where([t], t.inserted_at >= ^three_days_ago)
+    |> join(:inner, [t], tt in TicketTier, on: t.ticket_tier_id == tt.id)
+    |> where([t, tt], t.event_id == ^event_id and t.status == :confirmed)
+    |> where([t, tt], t.inserted_at >= ^three_days_ago)
+    |> where([t, tt], tt.type != :donation)
     |> Repo.aggregate(:count, :id)
   end
 

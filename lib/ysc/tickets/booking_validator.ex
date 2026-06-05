@@ -203,11 +203,17 @@ defmodule Ysc.Tickets.BookingValidator do
     if not user_has_reservations and event_at_capacity?(event) do
       {:error, :event_at_capacity}
     else
-      # Check each tier capacity
+      # Check each tier capacity (donation tiers skip tier/event capacity)
       tier_capacity_validations =
         ticket_selections
         |> Enum.map(fn {tier_id, quantity} ->
-          check_tier_capacity(tier_id, quantity, user_id)
+          case get_ticket_tier(tier_id) do
+            %{type: type} when type in [:donation, "donation"] ->
+              :ok
+
+            _ ->
+              check_tier_capacity(tier_id, quantity, user_id)
+          end
         end)
 
       if Enum.any?(
@@ -216,8 +222,7 @@ defmodule Ysc.Tickets.BookingValidator do
          ) do
         {:error, :tier_capacity_exceeded}
       else
-        # Check total event capacity (unless user has reservations)
-        total_requested = Enum.sum(Map.values(ticket_selections))
+        total_requested = non_donation_ticket_quantity(ticket_selections)
 
         if user_has_reservations or
              within_event_capacity?(event, total_requested) do
@@ -364,10 +369,23 @@ defmodule Ysc.Tickets.BookingValidator do
     |> Repo.exists?()
   end
 
+  defp count_confirmed_tickets_for_event(nil), do: 0
+
   defp count_confirmed_tickets_for_event(event_id) do
-    Ticket
-    |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-    |> Repo.aggregate(:count, :id)
+    Events.count_tickets_sold_excluding_donations(event_id)
+  end
+
+  defp non_donation_ticket_quantity(ticket_selections) do
+    ticket_selections
+    |> Enum.reduce(0, fn {tier_id, quantity}, acc ->
+      case get_ticket_tier(tier_id) do
+        %{type: type} when type in [:donation, "donation"] ->
+          acc
+
+        _ ->
+          acc + quantity
+      end
+    end)
   end
 
   defp count_sold_tickets_for_tier(tier_id) do
