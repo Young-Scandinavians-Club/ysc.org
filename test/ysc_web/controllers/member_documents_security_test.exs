@@ -43,6 +43,44 @@ defmodule YscWeb.MemberDocumentsSecurityTest do
 
       assert conn.status == 404
     end
+
+    test "pending_approval member cannot download annual report PDFs", %{
+      conn: conn
+    } do
+      user = oauth_user_fixture(%{state: :pending_approval})
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> get("/annual_meetings/#{@sample_pdf}")
+
+      assert redirected_to(conn) == ~p"/pending-review"
+    end
+  end
+
+  describe "financials page" do
+    test "pending_approval member cannot view financials", %{conn: conn} do
+      user = oauth_user_fixture(%{state: :pending_approval})
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> get("/financials")
+
+      assert redirected_to(conn) == ~p"/pending-review"
+    end
+
+    test "active member can view financials", %{conn: conn} do
+      user = oauth_user_fixture(%{state: :active})
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> get("/financials")
+
+      assert conn.status == 200
+      assert html_response(conn, 200) =~ "Financials"
+    end
   end
 
   describe "admin CSV exports" do

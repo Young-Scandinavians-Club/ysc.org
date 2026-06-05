@@ -307,6 +307,19 @@ defmodule YscWeb.Router do
     end
   end
 
+  # Member financial documents — approved members only (not pending applicants).
+  scope "/", YscWeb do
+    pipe_through [
+      :browser,
+      :require_authenticated_user,
+      :require_onboarding_complete,
+      :require_approved
+    ]
+
+    get "/financials", PageController, :financials
+    get "/annual_meetings/*path", AnnualMeetingDocumentController, :show
+  end
+
   scope "/", YscWeb do
     pipe_through [
       :browser,
@@ -314,8 +327,6 @@ defmodule YscWeb.Router do
       :require_onboarding_complete
     ]
 
-    get "/financials", PageController, :financials
-    get "/annual_meetings/*path", AnnualMeetingDocumentController, :show
     get "/expensereport/files/:encoded_path", ExpenseReportFileController, :show
     get "/wallet/tickets/:ticket_id", AppleWalletController, :ticket
     get "/wallet/membership", AppleWalletController, :membership
