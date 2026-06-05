@@ -4362,7 +4362,7 @@ defmodule YscWeb.EventDetailsLive do
       ) do
     # Only update if this is the event we're viewing
     if event.id == socket.assigns.event.id do
-      event = Repo.preload(event, :ticket_tiers)
+      event = Repo.preload(event, [:ticket_tiers, :cover_image])
       event_with_pricing = add_pricing_info(event)
 
       subscribed =
