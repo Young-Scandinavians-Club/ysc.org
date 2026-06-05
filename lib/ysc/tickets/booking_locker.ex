@@ -446,11 +446,14 @@ defmodule Ysc.Tickets.BookingLocker do
   defp count_all_tickets_for_event_locked(nil), do: 0
 
   defp count_all_tickets_for_event_locked(event_id) do
-    # Count both confirmed and pending tickets since pending tickets are reserved
+    # Count both confirmed and pending tickets since pending tickets are reserved.
+    # Donation tiers do not count toward event max_attendees (see validate_event_capacity/4).
     Ticket
+    |> join(:inner, [t], tt in TicketTier, on: t.ticket_tier_id == tt.id)
     |> where(
-      [t],
-      t.event_id == ^event_id and t.status in [:confirmed, :pending]
+      [t, tt],
+      t.event_id == ^event_id and t.status in [:confirmed, :pending] and
+        tt.type != :donation
     )
     |> Repo.aggregate(:count, :id)
   end
