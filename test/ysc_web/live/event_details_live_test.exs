@@ -1566,10 +1566,15 @@ defmodule YscWeb.EventDetailsLiveTest do
         |> Ysc.Repo.insert()
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      html = render_async(view)
+      render_async(view)
 
-      assert html =~ "1 confirmed ticket"
-      refute html =~ "1x Donation"
+      assert has_element?(
+               view,
+               "#user-tickets-confirmed-count",
+               "1 confirmed ticket"
+             )
+
+      refute has_element?(view, "span", "1x Donation")
     end
   end
 

@@ -157,11 +157,13 @@ defmodule YscWeb.EventDetailsLive do
           <%!-- Left Column: Event Details (8/12 width on desktop) --%>
           <div class="lg:col-span-8 space-y-16">
             <%!-- User's Existing Tickets - Combined View --%>
+            <% user_event_tickets = event_tickets(@user_tickets) %>
             <div
-              :if={@current_user != nil && length(@user_tickets) > 0}
+              :if={@current_user != nil && length(user_event_tickets) > 0}
+              id="user-tickets-section"
               class="mb-12"
             >
-              <% orders_data = group_tickets_by_order(@user_tickets) %>
+              <% orders_data = group_tickets_by_order(user_event_tickets) %>
               <% all_confirmed_count =
                 Enum.reduce(orders_data, 0, fn {order_id, _}, acc ->
                   confirmed =
@@ -186,7 +188,10 @@ defmodule YscWeb.EventDetailsLive do
                       <h3 class="text-lg font-black text-white tracking-tight leading-none">
                         Your Tickets
                       </h3>
-                      <p class="text-xs text-zinc-500 uppercase tracking-widest font-bold mt-1">
+                      <p
+                        id="user-tickets-confirmed-count"
+                        class="text-xs text-zinc-500 uppercase tracking-widest font-bold mt-1"
+                      >
                         {all_confirmed_count} confirmed {if all_confirmed_count == 1,
                           do: "ticket",
                           else: "tickets"}

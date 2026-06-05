@@ -44,7 +44,7 @@ defmodule YscWeb.TicketQrLive do
               >
                 {@event.title}
               </p>
-              <p class="text-sm text-zinc-300 mt-0.5">
+              <p id="event-ticket-count" class="text-sm text-zinc-300 mt-0.5">
                 {@ticket_count} ticket{if @ticket_count != 1, do: "s", else: ""}
               </p>
           <% end %>

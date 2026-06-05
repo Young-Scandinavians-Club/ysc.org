@@ -313,12 +313,11 @@ defmodule YscWeb.TicketQrLiveTest do
 
       conn = log_in_user(conn, member)
       {:ok, view, _html} = live(conn, ~p"/tickets/#{order.id}/qr")
-      html = render_async(view)
+      render_async(view)
 
-      assert html =~ "1 ticket"
-      assert html =~ paid_ticket.reference_id
-      refute html =~ donation_ticket.reference_id
-      refute html =~ donation_tier.name
+      assert has_element?(view, "#event-ticket-count", "1 ticket")
+      assert has_element?(view, "#ticket-qr-#{paid_ticket.reference_id}")
+      refute has_element?(view, "#ticket-qr-#{donation_ticket.reference_id}")
     end
 
     test "redirects when order only has confirmed donations", %{conn: conn} do

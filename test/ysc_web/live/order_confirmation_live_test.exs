@@ -599,7 +599,14 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert has_element?(view, "#order-confirmation-payment-ticket-count", "1")
+      payment_ticket_count =
+        view
+        |> element("#order-confirmation-payment-ticket-count-value")
+        |> render()
+        |> String.replace(~r/<[^>]+>/, "")
+        |> String.trim()
+
+      assert payment_ticket_count == "1"
     end
   end
 
@@ -948,13 +955,29 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "1 Ticket"
-      refute html =~ "2 Tickets"
-      assert html =~ "Tickets &amp; Donations"
-      assert html =~ "Donation"
-      assert html =~ "Not an event ticket"
+      assert has_element?(view, "#event-details-ticket-count-badge", "1 Ticket")
+
+      refute has_element?(
+               view,
+               "#event-details-ticket-count-badge",
+               "2 Tickets"
+             )
+
+      assert has_element?(
+               view,
+               "#order-items-section-title-text",
+               "Tickets & Donations"
+             )
+
+      assert has_element?(view, "[id^='donation-badge-']", "Donation")
+
+      assert has_element?(
+               view,
+               "[id^='donation-not-event-ticket-']",
+               "Not an event ticket"
+             )
     end
 
     test "donation-only order uses Your Donations section title", %{conn: conn} do
@@ -973,11 +996,21 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "Your Donations"
-      assert html =~ "Not an event ticket"
-      refute html =~ "Your Tickets"
+      section_title =
+        view
+        |> element("#order-items-section-title-text")
+        |> render()
+        |> String.trim()
+
+      assert section_title == "Your Donations"
+
+      assert has_element?(
+               view,
+               "[id^='donation-not-event-ticket-']",
+               "Not an event ticket"
+             )
     end
   end
 

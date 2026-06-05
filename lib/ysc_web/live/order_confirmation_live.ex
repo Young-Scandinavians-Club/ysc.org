@@ -208,7 +208,10 @@ defmodule YscWeb.OrderConfirmationLive do
                     Event Details
                   </h2>
                   <% ticket_count = non_donation_ticket_count(@ticket_order.tickets) %>
-                  <span class="text-sm font-medium bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+                  <span
+                    id="event-details-ticket-count-badge"
+                    class="text-sm font-medium bg-blue-100 text-blue-700 px-3 py-1 rounded-full"
+                  >
                     {ticket_count} {if ticket_count == 1,
                       do: "Ticket",
                       else: "Tickets"}
@@ -258,9 +261,15 @@ defmodule YscWeb.OrderConfirmationLive do
             </div>
           </div>
           <!-- Tickets Card -->
-          <div class="bg-white rounded-lg border border-zinc-200 overflow-hidden">
+          <div
+            id="order-confirmation-items-section"
+            class="bg-white rounded-lg border border-zinc-200 overflow-hidden"
+          >
             <div class="px-6 py-4 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between gap-4">
-              <h2 class="text-lg font-semibold text-zinc-900 flex items-center gap-2">
+              <h2
+                id="order-items-section-title"
+                class="text-lg font-semibold text-zinc-900 flex items-center gap-2"
+              >
                 <.icon
                   name={
                     if order_has_donations?(@ticket_order.tickets) &&
@@ -270,7 +279,9 @@ defmodule YscWeb.OrderConfirmationLive do
                   }
                   class="w-5 h-5"
                 />
-                {order_items_section_title(@ticket_order.tickets)}
+                <span id="order-items-section-title-text">
+                  {order_items_section_title(@ticket_order.tickets)}
+                </span>
               </h2>
               <%= if @ticket_order.status != :cancelled do %>
                 <.link
@@ -311,7 +322,10 @@ defmodule YscWeb.OrderConfirmationLive do
                             {ticket.ticket_tier.name}
                           </p>
                           <%= if is_donation do %>
-                            <span class="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
+                            <span
+                              id={"donation-badge-#{ticket.id}"}
+                              class="text-xs font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded"
+                            >
                               Donation
                             </span>
                           <% end %>
@@ -322,13 +336,16 @@ defmodule YscWeb.OrderConfirmationLive do
                           <% end %>
                         </div>
                         <%= if is_donation do %>
-                          <p class={[
-                            "text-sm mt-1",
-                            if(is_refunded,
-                              do: "text-zinc-400",
-                              else: "text-amber-900"
-                            )
-                          ]}>
+                          <p
+                            id={"donation-not-event-ticket-#{ticket.id}"}
+                            class={[
+                              "text-sm mt-1",
+                              if(is_refunded,
+                                do: "text-zinc-400",
+                                else: "text-amber-900"
+                              )
+                            ]}
+                          >
                             Not an event ticket — thank you for your support.
                           </p>
                           <p class={[
@@ -700,7 +717,9 @@ defmodule YscWeb.OrderConfirmationLive do
                   Tickets
                 </span>
                 <span id="order-confirmation-payment-ticket-count">
-                  {active_non_donation_ticket_count(@ticket_order.tickets)}
+                  <span id="order-confirmation-payment-ticket-count-value">
+                    {active_non_donation_ticket_count(@ticket_order.tickets)}
+                  </span>
                   <%= if @refund_data && @refund_data.refunded_tickets do %>
                     <% refunded_event_ticket_count =
                       @refund_data.refunded_tickets
@@ -809,12 +828,20 @@ defmodule YscWeb.OrderConfirmationLive do
           t.ticket_tier.type != "donation" && t.ticket_tier.type != :donation
         end)
         |> Enum.reduce(Money.new(0, :USD), fn t, acc ->
+          discount = t.discount_amount || Money.new(0, :USD)
+
           case t.ticket_tier.price do
             nil ->
               acc
 
             price when is_struct(price, Money) ->
-              case Money.add(acc, price) do
+              ticket_total =
+                case Money.sub(price, discount) do
+                  {:ok, net} -> net
+                  _ -> price
+                end
+
+              case Money.add(acc, ticket_total) do
                 {:ok, new_total} -> new_total
                 _ -> acc
               end
