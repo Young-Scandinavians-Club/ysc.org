@@ -998,7 +998,11 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert has_element?(view, "#order-items-section-title-text", "Your Donations")
+      assert has_element?(
+               view,
+               "#order-items-section-title-text",
+               "Your Donations"
+             )
 
       assert has_element?(
                view,
