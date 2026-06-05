@@ -153,6 +153,93 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "updates tab - communication timeline" do
+    setup [:create_admin]
+
+    test "shows communication timeline", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert has_element?(view, "#communication-timeline")
+      assert has_element?(view, "#preview-event-update-btn")
+    end
+
+    test "shows event update in timeline after send", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      {:ok, update} =
+        Events.create_event_update(event, %{
+          title: "Venue Change",
+          raw_body: "<div>Please use the side entrance.</div>",
+          rendered_body: "<div>Please use the side entrance.</div>",
+          sent_by_id: admin.id
+        })
+
+      {:ok, _} = Events.mark_event_update_sent(update, 3)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert has_element?(view, "#timeline-item-update-#{update.id}")
+
+      assert has_element?(
+               view,
+               "#timeline-item-update-#{update.id}",
+               "Venue Change"
+             )
+    end
+
+    test "shows publication notification in timeline when marked sent", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, event} = Events.mark_event_notification_sent(event, 25)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert has_element?(view, "#timeline-item-publication-#{event.id}")
+
+      assert has_element?(
+               view,
+               "#timeline-item-publication-#{event.id}",
+               "New Event Announcement"
+             )
+
+      assert has_element?(
+               view,
+               "#timeline-item-publication-#{event.id}",
+               "25 member(s) notified"
+             )
+    end
+
+    test "preview modal opens with message body", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => "<div>Preview body content</div>"
+      })
+
+      view |> element("#preview-event-update-btn") |> render_click()
+
+      assert has_element?(view, "#event-update-preview-modal")
+      assert has_element?(view, "#event-update-preview-iframe")
+    end
+
+    test "preview shows error when body is empty", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      view |> element("#preview-event-update-btn") |> render_click()
+
+      refute has_element?(view, "#event-update-preview-modal")
+    end
+  end
+
   describe "agendas - PubSub when switching events" do
     setup [:create_admin]
 

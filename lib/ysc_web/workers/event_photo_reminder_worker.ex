@@ -45,8 +45,19 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
 
     if recipients == [] do
       Ysc.Logging.info("No photo reminder recipients", event_id: event.id)
-      EventPhotos.mark_reminder_sent(collection)
-      :ok
+
+      case EventPhotos.mark_reminder_sent(collection, 0) do
+        {:ok, _} ->
+          :ok
+
+        {:error, changeset} ->
+          Ysc.Logging.error("Failed to mark photo reminder sent",
+            event_id: event.id,
+            errors: inspect(changeset.errors)
+          )
+
+          {:error, :db_update_failed}
+      end
     else
       event = Repo.preload(event, [:organizer, :cover_image])
       template = EventPhotoUploadReminder
@@ -76,8 +87,18 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
       )
 
       if success_count == recipient_count do
-        EventPhotos.mark_reminder_sent(collection)
-        :ok
+        case EventPhotos.mark_reminder_sent(collection, recipient_count) do
+          {:ok, _} ->
+            :ok
+
+          {:error, changeset} ->
+            Ysc.Logging.error("Failed to mark photo reminder sent",
+              event_id: event.id,
+              errors: inspect(changeset.errors)
+            )
+
+            {:error, :db_update_failed}
+        end
       else
         Ysc.Logging.warning("Event photo reminders partially failed",
           event_id: event.id,

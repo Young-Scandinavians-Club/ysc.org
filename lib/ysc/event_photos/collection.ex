@@ -18,6 +18,7 @@ defmodule Ysc.EventPhotos.Collection do
     field :upload_token, Ecto.UUID
     field :google_album_id, :string
     field :reminder_sent_at, :utc_datetime
+    field :reminder_recipient_count, :integer
 
     timestamps()
   end
@@ -34,7 +35,11 @@ defmodule Ysc.EventPhotos.Collection do
 
   def changeset(collection, attrs) do
     collection
-    |> cast(attrs, [:google_album_id, :reminder_sent_at])
+    |> cast(attrs, [
+      :google_album_id,
+      :reminder_sent_at,
+      :reminder_recipient_count
+    ])
     |> unique_constraint(:event_id)
     |> unique_constraint(:upload_token)
     |> foreign_key_constraint(:event_id)

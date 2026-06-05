@@ -84,12 +84,15 @@ defmodule Ysc.EventPhotos do
     |> Repo.update()
   end
 
-  @doc "Marks the post-event photo reminder as sent."
-  def mark_reminder_sent(%Collection{} = collection) do
+  @doc "Marks the post-event photo reminder as sent with the recipient count."
+  def mark_reminder_sent(%Collection{} = collection, recipient_count) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     collection
-    |> Collection.changeset(%{reminder_sent_at: now})
+    |> Collection.changeset(%{
+      reminder_sent_at: now,
+      reminder_recipient_count: recipient_count
+    })
     |> Repo.update()
   end
 
@@ -133,7 +136,7 @@ defmodule Ysc.EventPhotos do
   @doc """
   Sends photo reminder emails immediately (dev helper or forced resend).
 
-  When `force: true`, clears `reminder_sent_at` before sending.
+  When `force: true`, clears `reminder_sent_at` and `reminder_recipient_count` before sending.
   """
   def deliver_reminder_now(event_or_id, opts \\ [])
 
@@ -144,7 +147,10 @@ defmodule Ysc.EventPhotos do
       collection =
         if force do
           collection
-          |> Collection.changeset(%{reminder_sent_at: nil})
+          |> Collection.changeset(%{
+            reminder_sent_at: nil,
+            reminder_recipient_count: nil
+          })
           |> Repo.update!()
         else
           collection

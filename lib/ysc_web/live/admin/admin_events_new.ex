@@ -8,12 +8,15 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.Events.Event
+  alias Ysc.Events.EventUpdate
   alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
 
   alias Ysc.Events.Agenda
   alias Ysc.Agendas
   alias YscWeb.AdminEventsLive.TicketTierManagement
+  alias YscWeb.Components.Events.CommunicationTimeline
+  alias YscWeb.Emails.EventUpdateNotification
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -731,186 +734,180 @@ defmodule YscWeb.AdminEventsNewLive do
         </div>
 
         <div :if={@live_action == :updates} class="relative py-8">
-          <div class="max-w-3xl space-y-8">
-            <div
-              :if={@event.state in [:published, "published"] and @photo_upload_url}
-              class="border border-zinc-200 rounded py-6 px-4 space-y-4"
-              id="event-photo-upload-link-card"
-            >
-              <div>
-                <h2 class="text-xl font-bold">Event photo uploads</h2>
-                <p class="text-zinc-600 text-sm mt-1">
-                  Share this link with attendees so they can contribute photos after the event.
-                  Reminder emails are sent automatically the morning after the event ends.
-                </p>
-              </div>
-              <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                <input
-                  type="text"
-                  readonly
-                  id="event-photo-upload-url"
-                  value={@photo_upload_url}
-                  class="flex-1 rounded border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-800"
-                />
-                <.button
-                  id="copy-photo-upload-url-btn"
-                  type="button"
-                  variant="outline"
-                  phx-hook="ClipboardCopy"
-                  data-copy={@photo_upload_url}
-                  class="shrink-0"
-                >
-                  <.icon name="hero-clipboard" class="w-5 h-5" /> Copy link
-                </.button>
-              </div>
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div class="lg:col-span-7 space-y-8">
               <div
-                :if={@dev_routes?}
-                class="pt-2 border-t border-zinc-100 space-y-2"
+                :if={
+                  @event.state in [:published, "published"] and @photo_upload_url
+                }
+                class="border border-zinc-200 rounded py-6 px-4 space-y-4"
+                id="event-photo-upload-link-card"
               >
-                <p class="text-sm text-zinc-600">
-                  Development: send reminder emails now or preview in the mailbox.
-                </p>
-                <div class="flex flex-wrap gap-2">
-                  <.button
-                    type="button"
-                    id="send-photo-reminder-btn"
-                    phx-click="send-photo-reminder"
-                    variant="outline"
-                    data-confirm={"Send photo reminder emails to #{@recipient_count} recipient(s) now?"}
-                  >
-                    Send photo reminder emails now
-                  </.button>
-                  <.link
-                    href="/dev/mailbox"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    Open dev mailbox
-                    <.icon
-                      name="hero-arrow-top-right-on-square"
-                      class="w-4 h-4 ml-1"
-                    />
-                  </.link>
-                </div>
-              </div>
-            </div>
-
-            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
-              <div>
-                <h2 class="text-xl font-bold">Send Update to Attendees</h2>
-                <p class="text-zinc-600 text-sm">
-                  Send a branded email notification to everyone who has a ticket for this event.
-                  This includes both ticket purchasers and registered attendees.
-                </p>
-                <p class="mt-2 text-sm font-medium text-blue-600">
-                  {@recipient_count} recipient(s) will receive this update
-                </p>
-              </div>
-
-              <.form
-                for={@update_form}
-                id="event-update-form"
-                phx-submit="send-event-update"
-                phx-change="validate-event-update"
-                class="space-y-4"
-              >
-                <.input
-                  field={@update_form[:title]}
-                  type="text"
-                  label="Title (optional)"
-                  placeholder="e.g. Venue Change, Schedule Update..."
-                />
-
                 <div>
-                  <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
-                    Message
-                  </label>
-                  <.input
-                    type="hidden"
-                    id="update[raw_body]"
-                    field={@update_form[:raw_body]}
-                    phx-hook="TrixHook"
-                    phx-debounce={200}
-                  />
-                  <div id="update-richtext" phx-update="ignore">
-                    <trix-editor
-                      input="update[raw_body]"
-                      class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px]"
-                      placeholder="Write the update message to send to all attendees..."
-                    >
-                    </trix-editor>
-                  </div>
+                  <h2 class="text-xl font-bold">Event photo uploads</h2>
+                  <p class="text-zinc-600 text-sm mt-1">
+                    Share this link with attendees so they can contribute photos after the event.
+                    Reminder emails are sent automatically the morning after the event ends.
+                  </p>
                 </div>
-
-                <div class="flex items-center gap-2">
-                  <.input
-                    field={@update_form[:show_on_event_page]}
-                    type="checkbox"
-                    label="Also show this update on the public event page"
+                <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  <input
+                    type="text"
+                    readonly
+                    id="event-photo-upload-url"
+                    value={@photo_upload_url}
+                    class="flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
                   />
-                </div>
-
-                <div class="flex items-center gap-4 pt-2">
                   <.button
-                    type="submit"
-                    phx-disable-with="Sending..."
-                    class="bg-blue-600 hover:bg-blue-700"
-                    data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                    id="copy-photo-upload-url-btn"
+                    type="button"
+                    variant="outline"
+                    phx-hook="ClipboardCopy"
+                    data-copy={@photo_upload_url}
+                    class="shrink-0"
                   >
-                    <.icon name="hero-paper-airplane" class="w-5 h-5 -mt-0.5 mr-1" />
-                    Send Update
+                    <.icon name="hero-clipboard" class="w-5 h-5" /> Copy link
                   </.button>
                 </div>
-              </.form>
-            </div>
-
-            <div
-              :if={@event_updates != []}
-              class="border border-zinc-200 rounded py-6 px-4 space-y-4"
-            >
-              <h2 class="text-xl font-bold">Past Updates</h2>
-              <div class="divide-y divide-zinc-100">
                 <div
-                  :for={update <- @event_updates}
-                  class="py-4 first:pt-0 last:pb-0"
+                  :if={@dev_routes?}
+                  class="pt-2 border-t border-zinc-100 space-y-2"
                 >
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0 flex-1">
-                      <p :if={update.title} class="font-semibold text-zinc-900">
-                        {update.title}
-                      </p>
-                      <div class="text-sm text-zinc-600 mt-1 prose prose-sm prose-zinc max-w-none line-clamp-3">
-                        {Phoenix.HTML.raw(update.rendered_body)}
-                      </div>
-                    </div>
-                    <div class="shrink-0 text-right text-xs text-zinc-500 space-y-1">
-                      <p :if={update.sent_at}>
-                        Sent {Calendar.strftime(
-                          update.sent_at,
-                          "%b %d, %Y %I:%M %p"
-                        )}
-                      </p>
-                      <p :if={update.recipient_count}>
-                        {update.recipient_count} recipient(s)
-                      </p>
-                      <p>
-                        <span
-                          :if={update.show_on_event_page}
-                          class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700"
-                        >
-                          Visible on event page
-                        </span>
-                      </p>
-                      <p :if={update.sent_by}>
-                        by {update.sent_by.first_name} {update.sent_by.last_name}
-                      </p>
-                    </div>
+                  <p class="text-sm text-zinc-600">
+                    Development: send reminder emails now or preview in the mailbox.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <.button
+                      type="button"
+                      id="send-photo-reminder-btn"
+                      phx-click="send-photo-reminder"
+                      variant="outline"
+                      data-confirm={"Send photo reminder emails to #{@recipient_count} recipient(s) now?"}
+                    >
+                      Send photo reminder emails now
+                    </.button>
+                    <.link
+                      href="/dev/mailbox"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Open dev mailbox
+                      <.icon
+                        name="hero-arrow-top-right-on-square"
+                        class="w-4 h-4 ml-1"
+                      />
+                    </.link>
                   </div>
                 </div>
               </div>
+
+              <div class="bg-white border border-zinc-200 rounded py-6 px-4 space-y-4">
+                <div>
+                  <h2 class="text-xl font-bold">Send Update to Attendees</h2>
+                  <p class="text-zinc-600 text-sm">
+                    Send a branded email notification to everyone who has a ticket for this event.
+                    This includes both ticket purchasers and registered attendees.
+                  </p>
+                  <p class="mt-2 text-sm font-medium text-blue-600">
+                    {@recipient_count} recipient(s) will receive this update
+                  </p>
+                </div>
+
+                <.form
+                  for={@update_form}
+                  id="event-update-form"
+                  phx-submit="send-event-update"
+                  phx-change="validate-event-update"
+                  class="space-y-4"
+                >
+                  <.input
+                    field={@update_form[:title]}
+                    type="text"
+                    label="Title (optional)"
+                    placeholder="e.g. Venue Change, Schedule Update..."
+                  />
+
+                  <div>
+                    <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
+                      Message
+                    </label>
+                    <.input
+                      type="hidden"
+                      id="update[raw_body]"
+                      field={@update_form[:raw_body]}
+                      phx-hook="TrixHook"
+                      phx-debounce={200}
+                    />
+                    <div id="update-richtext" phx-update="ignore">
+                      <trix-editor
+                        input="update[raw_body]"
+                        class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                        placeholder="Write the update message to send to all attendees..."
+                      >
+                      </trix-editor>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <.input
+                      field={@update_form[:show_on_event_page]}
+                      type="checkbox"
+                      label="Also show this update on the public event page"
+                    />
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-4 pt-2">
+                    <.button
+                      type="submit"
+                      phx-disable-with="Sending..."
+                      class="bg-blue-600 hover:bg-blue-700"
+                      data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                    >
+                      <.icon
+                        name="hero-paper-airplane"
+                        class="w-5 h-5 -mt-0.5 mr-1"
+                      /> Send Update
+                    </.button>
+                    <.button
+                      type="button"
+                      id="preview-event-update-btn"
+                      variant="outline"
+                      phx-click="open-update-preview"
+                    >
+                      <.icon name="hero-eye" class="w-5 h-5 -mt-0.5 mr-1" /> Preview
+                    </.button>
+                  </div>
+                </.form>
+              </div>
+            </div>
+
+            <div class="lg:col-span-5 lg:sticky lg:top-8 self-start">
+              <CommunicationTimeline.communication_timeline entries={
+                @communication_timeline
+              } />
             </div>
           </div>
+
+          <.modal
+            :if={@show_update_preview_modal}
+            id="event-update-preview-modal"
+            show
+            on_cancel={JS.push("close-update-preview")}
+            max_width="max-w-4xl"
+          >
+            <.header>
+              Email preview
+              <:subtitle :if={@update_preview_subject}>
+                Subject: {@update_preview_subject}
+              </:subtitle>
+            </.header>
+            <iframe
+              id="event-update-preview-iframe"
+              phx-hook="EmailPreview"
+              class="w-full border border-zinc-200 rounded min-h-[400px]"
+            />
+          </.modal>
         </div>
       </div>
     </.side_menu>
@@ -977,9 +974,9 @@ defmodule YscWeb.AdminEventsNewLive do
          as: "update"
        )
      )
-     |> assign(:event_updates, Events.list_event_updates(event.id))
-     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
-     |> assign_photo_upload(event)
+     |> assign_updates_tab_data(event)
+     |> assign(:show_update_preview_modal, false)
+     |> assign(:update_preview_subject, nil)
      |> assign_check_in_path(event)}
   end
 
@@ -1076,10 +1073,46 @@ defmodule YscWeb.AdminEventsNewLive do
         as: "update"
       )
     )
-    |> assign(:event_updates, Events.list_event_updates(event.id))
+    |> assign_updates_tab_data(event)
+    |> assign(:show_update_preview_modal, false)
+    |> assign(:update_preview_subject, nil)
+    |> assign_check_in_path(event)
+  end
+
+  defp assign_updates_tab_data(socket, event) do
+    event_updates = Events.list_event_updates(event.id)
+
+    socket
+    |> assign(:event_updates, event_updates)
     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
     |> assign_photo_upload(event)
-    |> assign_check_in_path(event)
+    |> then(fn socket ->
+      assign_communication_timeline(
+        socket,
+        event,
+        event_updates,
+        socket.assigns.photo_collection
+      )
+    end)
+  end
+
+  defp assign_communication_timeline(
+         socket,
+         event,
+         event_updates,
+         photo_collection
+       ) do
+    collection =
+      photo_collection ||
+        if event.state in [:published, "published"],
+          do: EventPhotos.get_by_event_id(event.id),
+          else: nil
+
+    assign(
+      socket,
+      :communication_timeline,
+      CommunicationTimeline.build_entries(event, event_updates, collection)
+    )
   end
 
   defp assign_photo_upload(socket, event) do
@@ -1128,13 +1161,25 @@ defmodule YscWeb.AdminEventsNewLive do
       event ->
         case socket.assigns.live_action do
           :updates ->
+            event = Events.get_event!(event.id)
+            event_updates = Events.list_event_updates(event.id)
+
             socket
-            |> assign(:event_updates, Events.list_event_updates(event.id))
+            |> assign(:event, event)
+            |> assign(:event_updates, event_updates)
             |> assign(
               :recipient_count,
               Events.count_event_update_recipients(event.id)
             )
             |> assign_photo_upload(event)
+            |> then(fn socket ->
+              assign_communication_timeline(
+                socket,
+                event,
+                event_updates,
+                socket.assigns.photo_collection
+              )
+            end)
 
           :tickets ->
             ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
@@ -1372,8 +1417,12 @@ defmodule YscWeb.AdminEventsNewLive do
         "rendered_body" => rendered
       })
 
-    {:noreply,
-     assign(socket, :update_form, to_form(updated_params, as: "update"))}
+    socket =
+      socket
+      |> assign(:update_form, to_form(updated_params, as: "update"))
+      |> maybe_refresh_update_preview()
+
+    {:noreply, socket}
   end
 
   def handle_event(
@@ -1409,7 +1458,26 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("validate-event-update", %{"update" => params}, socket) do
-    {:noreply, assign(socket, :update_form, to_form(params, as: "update"))}
+    socket =
+      socket
+      |> assign(:update_form, to_form(params, as: "update"))
+      |> maybe_refresh_update_preview()
+
+    {:noreply, socket}
+  end
+
+  def handle_event("open-update-preview", _params, socket) do
+    case build_update_preview(socket) do
+      {:ok, socket} ->
+        {:noreply, assign(socket, :show_update_preview_modal, true)}
+
+      {:error, socket} ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("close-update-preview", _params, socket) do
+    {:noreply, assign(socket, :show_update_preview_modal, false)}
   end
 
   def handle_event("send-photo-reminder", _params, socket) do
@@ -1417,11 +1485,15 @@ defmodule YscWeb.AdminEventsNewLive do
 
     case EventPhotos.deliver_reminder_now(event, force: true) do
       :ok ->
+        event = Events.get_event!(event.id)
         collection = EventPhotos.get_by_event_id(event.id)
+        event_updates = Events.list_event_updates(event.id)
 
         {:noreply,
          socket
+         |> assign(:event, event)
          |> assign(:photo_collection, collection)
+         |> assign_communication_timeline(event, event_updates, collection)
          |> YscWeb.Flash.put_toast(
            :info,
            "Photo reminder emails have been queued.",
@@ -1503,7 +1575,7 @@ defmodule YscWeb.AdminEventsNewLive do
                as: "update"
              )
            )
-           |> assign(:event_updates, Events.list_event_updates(event.id))}
+           |> assign_updates_tab_data(event)}
 
         {:error, changeset} ->
           message =
@@ -2000,8 +2072,7 @@ defmodule YscWeb.AdminEventsNewLive do
         socket
       ) do
     if socket.assigns[:event] && event_id == socket.assigns.event.id do
-      {:noreply,
-       assign(socket, :event_updates, Events.list_event_updates(event_id))}
+      {:noreply, refresh_event_updates(socket, event_id)}
     else
       {:noreply, socket}
     end
@@ -2014,8 +2085,7 @@ defmodule YscWeb.AdminEventsNewLive do
         socket
       ) do
     if socket.assigns[:event] && event_id == socket.assigns.event.id do
-      {:noreply,
-       assign(socket, :event_updates, Events.list_event_updates(event_id))}
+      {:noreply, refresh_event_updates(socket, event_id)}
     else
       {:noreply, socket}
     end
@@ -2058,6 +2128,90 @@ defmodule YscWeb.AdminEventsNewLive do
       socket
     else
       _ -> socket
+    end
+  end
+
+  defp refresh_event_updates(socket, event_id) do
+    event = Events.get_event!(event_id)
+    event_updates = Events.list_event_updates(event_id)
+
+    photo_collection = socket.assigns[:photo_collection]
+
+    socket
+    |> assign(:event, event)
+    |> assign(:event_updates, event_updates)
+    |> assign_communication_timeline(event, event_updates, photo_collection)
+  end
+
+  defp build_update_preview(socket) do
+    params = socket.assigns.update_form.params || %{}
+    raw_body = params["raw_body"] || ""
+
+    if String.trim(raw_body) == "" do
+      {:error,
+       YscWeb.Flash.put_toast(socket, :error, "Message body cannot be empty.",
+         title: "Preview"
+       )}
+    else
+      event = socket.assigns.event
+
+      rendered_body =
+        params["rendered_body"] || Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+
+      preview_update = %EventUpdate{
+        title: params["title"],
+        rendered_body: rendered_body
+      }
+
+      recipient = %{
+        first_name: socket.assigns.current_user.first_name,
+        email: socket.assigns.current_user.email
+      }
+
+      preview_html =
+        try do
+          event
+          |> EventUpdateNotification.prepare_email_data(
+            preview_update,
+            recipient
+          )
+          |> EventUpdateNotification.render()
+        rescue
+          _ ->
+            "<p style=\"padding: 1rem; color: #71717a;\">Preview unavailable.</p>"
+        end
+
+      prev_hash = Map.get(socket.assigns, :_update_preview_hash)
+      new_hash = :erlang.phash2(preview_html)
+
+      socket =
+        socket
+        |> assign(
+          :update_preview_subject,
+          EventUpdateNotification.get_subject(event, preview_update)
+        )
+
+      socket =
+        if new_hash != prev_hash do
+          socket
+          |> assign(:_update_preview_hash, new_hash)
+          |> push_event("preview-html", %{html: preview_html})
+        else
+          socket
+        end
+
+      {:ok, socket}
+    end
+  end
+
+  defp maybe_refresh_update_preview(socket) do
+    if socket.assigns[:show_update_preview_modal] do
+      case build_update_preview(socket) do
+        {:ok, socket} -> socket
+        {:error, socket} -> assign(socket, :show_update_preview_modal, false)
+      end
+    else
+      socket
     end
   end
 
