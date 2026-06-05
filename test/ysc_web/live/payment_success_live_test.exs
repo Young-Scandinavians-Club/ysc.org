@@ -278,7 +278,9 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                  )
 
         assert flash["error"] =~
-                 "Payment was successful, but we couldn't find your booking or order"
+                 "Your payment went through, but we couldn't load your confirmation"
+
+        assert flash["error"] =~ Ysc.EmailConfig.contact_email()
       after
         Logger.put_module_level(YscWeb.PaymentSuccessLive, :error)
         Application.put_env(:ysc, :stripe_client, original_client)
@@ -356,7 +358,9 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                  )
 
         assert flash["error"] =~
-                 "Payment was successful, but we couldn't find your booking or order"
+                 "Your payment went through, but we couldn't load your confirmation"
+
+        assert flash["error"] =~ Ysc.EmailConfig.contact_email()
       after
         Logger.put_module_level(YscWeb.PaymentSuccessLive, :error)
         Application.put_env(:ysc, :stripe_client, original_client)

@@ -76,7 +76,7 @@ defmodule YscWeb.PaymentSuccessLive do
                  socket
                  |> YscWeb.Flash.put_toast(
                    :error,
-                   "Payment was successful, but we couldn't find your booking or order. Please contact support.",
+                   "Your payment went through, but we couldn't load your confirmation. Please email #{Ysc.EmailConfig.contact_email()} with the date and amount charged, and we'll help right away.",
                    title: "Payment"
                  )
                  |> redirect(to: ~p"/")}

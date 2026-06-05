@@ -1347,7 +1347,7 @@ defmodule YscWeb.EventDetailsLive do
                             You have {reserved_quantity} {if reserved_quantity ==
                                                                1,
                                                              do: "ticket",
-                                                             else: "tickets"} saved at member price for this tier (not purchased until checkout)
+                                                             else: "tickets"} saved at the member price. You still need to finish checkout to buy them.
                             <%= if has_discount do %>
                               <.badge
                                 type="green"
@@ -1817,8 +1817,8 @@ defmodule YscWeb.EventDetailsLive do
               Time ran out
             </h2>
             <p class="text-zinc-600 max-w-md">
-              You have 30 minutes to finish buying tickets. Your timer expired, so we released your hold.
-              Select your tickets again to continue.
+              You have 30 minutes to complete your purchase. Time ran out, so your reserved tickets were returned to the pool.
+              Please select your tickets again to continue.
             </p>
           </div>
 
