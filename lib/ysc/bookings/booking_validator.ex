@@ -581,4 +581,29 @@ defmodule Ysc.Bookings.BookingValidator do
       "#{String.capitalize("#{membership_type}")} membership allows maximum #{max_rooms} room(s) in the same time period"
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    family_user_ids = [Fixtures.ulid()]
+    checkin_date = Fixtures.today()
+    checkout_date = Date.add(checkin_date, 3)
+
+    from b in Booking,
+      join: br in "booking_rooms",
+      on: br.booking_id == b.id,
+      where: b.user_id in ^family_user_ids,
+      where: b.property == :tahoe,
+      where: b.status == :complete,
+      where:
+        fragment(
+          "? < ? AND ? > ?",
+          b.checkin_date,
+          ^checkout_date,
+          b.checkout_date,
+          ^checkin_date
+        ),
+      select: count(br.id)
+  end
 end

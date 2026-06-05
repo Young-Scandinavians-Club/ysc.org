@@ -590,4 +590,14 @@ defmodule Ysc.Media do
 
     blur_hash
   end
+
+  @doc false
+  def ci_query_explain_query do
+    limit = 30
+
+    from(i in Media.Image,
+      order_by: [desc: i.inserted_at, desc: i.id],
+      limit: ^limit
+    )
+  end
 end

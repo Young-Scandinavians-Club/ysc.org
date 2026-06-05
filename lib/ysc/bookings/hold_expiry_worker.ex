@@ -83,4 +83,13 @@ defmodule Ysc.Bookings.HoldExpiryWorker do
     # Job timeout after 60 seconds (may need to process multiple bookings)
     60_000
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    now = Fixtures.now()
+
+    from(b in Booking, where: b.status == :hold and b.hold_expires_at < ^now)
+  end
 end

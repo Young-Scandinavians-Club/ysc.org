@@ -425,4 +425,18 @@ defmodule Ysc.AppleWallet do
       date_str
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    ticket_id = Fixtures.ulid()
+    user_id = Fixtures.user().id
+
+    from(t in Ticket,
+      where:
+        t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed,
+      preload: [:ticket_tier, :registration, event: :cover_image]
+    )
+  end
 end

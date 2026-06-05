@@ -4,6 +4,8 @@ defmodule Ysc.Payments do
   """
 
   import Ecto.Query, warn: false
+
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
   alias Ysc.Payments.PaymentMethod
 
@@ -656,5 +658,14 @@ defmodule Ysc.Payments do
 
   defp stripe_customer_module do
     Application.get_env(:ysc, :stripe_customer_module, Stripe.Customer)
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    user = Fixtures.user()
+
+    from(pm in PaymentMethod,
+      where: pm.user_id == ^user.id and pm.is_default == true
+    )
   end
 end

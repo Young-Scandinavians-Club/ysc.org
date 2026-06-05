@@ -1174,4 +1174,20 @@ defmodule Ysc.Scanning do
         user.inserted_at
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Accounts.User
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    session_id = Fixtures.ulid()
+
+    from(sc in SessionCheckIn,
+      where: sc.scan_session_id == ^session_id,
+      join: u in User,
+      on: u.id == sc.user_id,
+      preload: [:user, :checked_in_by],
+      order_by: [desc: sc.inserted_at]
+    )
+  end
 end

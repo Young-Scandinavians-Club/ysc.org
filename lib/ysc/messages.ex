@@ -7,6 +7,7 @@ defmodule Ysc.Messages do
   require Ysc.Logging
   import Ecto.Query, warn: false
 
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
   alias Ysc.Messages.MessageIdempotency
 
@@ -899,4 +900,16 @@ defmodule Ysc.Messages do
     do: :warning
 
   defp sms_transaction_failure_level(_), do: :error
+
+  @doc false
+  def ci_query_explain_query do
+    user_id = Fixtures.ulid()
+    limit = 50
+
+    from(m in MessageIdempotency,
+      where: m.user_id == ^user_id,
+      order_by: [desc: m.id],
+      limit: ^limit
+    )
+  end
 end

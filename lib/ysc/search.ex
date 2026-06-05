@@ -108,4 +108,62 @@ defmodule Ysc.Search do
     )
     |> Repo.all()
   end
+
+  @doc false
+  def ci_query_explain_events_query do
+    search_term = "ci"
+    search_like = "%ci%"
+    limit = 5
+
+    from(e in Event,
+      where:
+        fragment("SIMILARITY(?, ?) > 0.2", e.title, ^search_term) or
+          ilike(e.title, ^search_like) or
+          ilike(e.description, ^search_like) or
+          ilike(e.reference_id, ^search_like),
+      preload: [:organizer],
+      order_by: [desc: e.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  @doc false
+  def ci_query_explain_tickets_query do
+    search_term = "ci"
+    search_like = "%ci%"
+    limit = 5
+
+    from(t in Ticket,
+      join: e in assoc(t, :event),
+      join: u in assoc(t, :user),
+      where:
+        ilike(t.reference_id, ^search_like) or
+          fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+          fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
+          fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term),
+      preload: [event: e, user: u],
+      order_by: [desc: t.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  @doc false
+  def ci_query_explain_users_query do
+    search_term = "ci"
+    phone_like = "%ci%"
+    limit = 5
+
+    from(u in User,
+      where:
+        fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
+          fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
+          fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
+          ilike(u.phone_number, ^phone_like),
+      order_by: [desc: u.inserted_at],
+      limit: ^limit
+    )
+  end
+
+  @doc false
+  def ci_query_explain_query, do: ci_query_explain_events_query()
 end

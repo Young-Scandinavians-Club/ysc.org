@@ -509,4 +509,16 @@ defmodule Ysc.Accounts.AuthEvent do
       score
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    suspicious_events_query()
+  end
+
+  @doc false
+  def ci_query_explain_failed_attempts_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    recent_failed_attempts_query(Fixtures.ip())
+  end
 end

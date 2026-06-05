@@ -282,4 +282,7 @@ defmodule Ysc.Ledgers.ReconciliationWorker do
 
     :ok
   end
+
+  @doc false
+  def ci_query_explain_query, do: Reconciliation.ci_query_explain_query()
 end

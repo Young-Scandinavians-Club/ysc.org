@@ -5,6 +5,7 @@ defmodule Ysc.ExpenseReports do
   require Ysc.Logging
   import Ecto.Query, warn: false
 
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
   alias Ysc.Accounts.{Address, User}
 
@@ -983,6 +984,17 @@ defmodule Ysc.ExpenseReports do
       # Auto-set the billing address if available
       Ecto.Changeset.put_change(changeset, :address_id, billing_address.id)
     end
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    user_id = Fixtures.ulid()
+
+    from(er in ExpenseReport,
+      where: er.user_id == ^user_id,
+      order_by: [desc: er.inserted_at],
+      preload: [:expense_items, :income_items, :address, :event]
+    )
   end
 
   defp validate_and_send_expense_report_emails(loaded_report) do

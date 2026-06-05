@@ -5,6 +5,7 @@ defmodule Ysc.EventPhotos do
 
   import Ecto.Query
 
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.EventPhotos.Collection
   alias Ysc.Events
   alias Ysc.Events.Event
@@ -204,6 +205,15 @@ defmodule Ysc.EventPhotos do
       end
 
     Ysc.GooglePhotos.Limits.normalize_album_title(base)
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    upload_token = Fixtures.uuid()
+
+    Collection
+    |> where([c], c.upload_token == ^upload_token)
+    |> preload(:event)
   end
 
   defp event_id_conflict?(%Ecto.Changeset{} = changeset) do

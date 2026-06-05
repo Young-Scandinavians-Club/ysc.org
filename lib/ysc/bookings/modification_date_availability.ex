@@ -773,4 +773,18 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
   rescue
     _ -> Date.utc_today()
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    property = :tahoe
+    min_date = Fixtures.today()
+    max_date = Date.add(min_date, 30)
+    days = Date.range(min_date, max_date) |> Enum.to_list()
+
+    from(pi in PropertyInventory,
+      where: pi.property == ^property and pi.day in ^days
+    )
+  end
 end

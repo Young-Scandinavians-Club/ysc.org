@@ -279,4 +279,12 @@ defmodule Ysc.Bookings.Season do
         {date_month, date_day} <= {end_month, end_day}
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(s in __MODULE__,
+      where: s.property == ^:tahoe,
+      order_by: [asc: s.name]
+    )
+  end
 end

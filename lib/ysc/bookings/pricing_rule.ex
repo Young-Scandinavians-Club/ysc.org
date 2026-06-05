@@ -413,4 +413,19 @@ defmodule Ysc.Bookings.PricingRule do
 
     result
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    property = :tahoe
+    season_id = Fixtures.ulid()
+    booking_mode = :room
+    price_unit = :per_person_per_night
+
+    build_base_query(property, booking_mode, price_unit)
+    |> apply_season_filter(season_id)
+    |> apply_room_category_filters(nil, nil)
+    |> apply_ordering()
+  end
 end

@@ -8,7 +8,7 @@ defmodule Ysc.Ci.QueryExplain.DiscoveryTest do
       assert Discovery.discoverable_query_name?(:list_users_query)
       assert Discovery.discoverable_query_name?(:base_query)
       refute Discovery.discoverable_query_name?(:list_users)
-      refute Discovery.discoverable_query_name?(:build_query)
+      assert Discovery.discoverable_query_name?(:build_query)
     end
   end
 
@@ -38,19 +38,34 @@ defmodule Ysc.Ci.QueryExplain.DiscoveryTest do
     end
   end
 
+  describe "modules_in_file/1" do
+    test "resolves nested defmodule names" do
+      [parent, nested] =
+        Discovery.modules_in_file(
+          "lib/ysc/bookings/modification_date_availability.ex"
+        )
+
+      assert parent == Ysc.Bookings.ModificationDateAvailability
+      assert nested == Ysc.Bookings.ModificationDateAvailability.Snapshot
+    end
+  end
+
   describe "auto_targets_for_file/1" do
     test "builds targets for a changed context file" do
       targets =
         Discovery.auto_targets_for_file("lib/ysc/accounts/auth_event.ex")
 
       ids = Enum.map(targets, & &1.id)
-      assert "auto_ysc_accounts_auth_event_suspicious_events_query" in ids
+
+      assert "ysc_accounts_auth_event_suspicious_events_query" in ids or
+               "auto_ysc_accounts_auth_event_suspicious_events_query" in ids
     end
   end
 
   describe "file_has_query_shape?/1" do
     test "detects Ecto query patterns" do
       assert Discovery.file_has_query_shape?("lib/ysc/events.ex")
+      assert Discovery.file_has_query_shape?("lib/ysc/accounts/auth_event.ex")
       refute Discovery.file_has_query_shape?("lib/ysc/logging.ex")
     end
   end

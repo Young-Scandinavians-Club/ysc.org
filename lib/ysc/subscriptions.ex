@@ -1705,4 +1705,16 @@ defmodule Ysc.Subscriptions do
     UserProfileCache.invalidate_user(user_id)
     :ok
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_id = Fixtures.ulid()
+
+    from(s in Subscription,
+      where: s.user_id == ^user_id,
+      preload: :subscription_items
+    )
+  end
 end

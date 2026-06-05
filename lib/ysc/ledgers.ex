@@ -11,6 +11,7 @@ defmodule Ysc.Ledgers do
   """
 
   import Ecto.Query, warn: false
+
   alias Ysc.Repo
 
   alias Ysc.Ledgers.{
@@ -3553,5 +3554,17 @@ defmodule Ysc.Ledgers do
 
         {:error, {:imbalanced, difference, account_balances}}
     end
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    payout_id = Ecto.UUID.bingenerate()
+
+    from(p in Payment,
+      join: pp in "payout_payments",
+      on: pp.payment_id == p.id,
+      where: pp.payout_id == ^payout_id,
+      preload: [:user, :payment_method]
+    )
   end
 end

@@ -6,6 +6,8 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
   creating vendors, bills, and uploading receipts.
   """
 
+  import Ecto.Query, warn: false
+
   require Ysc.Logging
   alias Ysc.Repo
   alias Ysc.ExpenseReports.ExpenseReport
@@ -1052,6 +1054,16 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
       quickbooks_synced_at: now
     })
     |> Repo.update()
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    from(er in ExpenseReport,
+      where: er.status == "submitted",
+      where: er.quickbooks_sync_status in ["pending", "failed"],
+      order_by: [asc: er.inserted_at],
+      limit: 50
+    )
   end
 
   defp update_expense_report_error(%ExpenseReport{} = expense_report, error) do

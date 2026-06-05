@@ -833,4 +833,23 @@ defmodule Ysc.Tickets.BookingLocker do
         |> DateTime.from_naive!("Etc/UTC")
     end
   end
+
+  @doc false
+  def active_reservations_for_event_ordered_query(user_id, event_id) do
+    TicketReservation
+    |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
+    |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+    |> Events.where_ticket_reservation_hold_active()
+    |> order_by([tr], asc: tr.inserted_at)
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    active_reservations_for_event_ordered_query(
+      Fixtures.ulid(),
+      Fixtures.ulid()
+    )
+  end
 end

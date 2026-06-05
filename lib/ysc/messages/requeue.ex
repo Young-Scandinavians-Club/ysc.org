@@ -216,4 +216,20 @@ defmodule Ysc.Messages.Requeue do
         {:error, changeset}
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    limit = 100
+
+    from(j in Job,
+      where:
+        j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+      where: j.state in ["discarded", "retryable"],
+      order_by: [
+        desc: fragment("COALESCE(?, ?)", j.discarded_at, j.inserted_at),
+        desc: j.inserted_at
+      ],
+      limit: ^limit
+    )
+  end
 end

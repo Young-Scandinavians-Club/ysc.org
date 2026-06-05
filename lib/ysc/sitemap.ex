@@ -157,4 +157,12 @@ defmodule Ysc.Sitemap do
     |> String.replace("'", "&apos;")
     |> String.replace("\"", "&quot;")
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(e in Event,
+      where: e.state == :published,
+      select: %{id: e.id, updated_at: e.updated_at}
+    )
+  end
 end

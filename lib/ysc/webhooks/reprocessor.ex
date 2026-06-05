@@ -529,4 +529,13 @@ defmodule Ysc.Webhooks.Reprocessor do
       metadata: data["metadata"] || %{}
     }
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(w in WebhookEvent,
+      where: w.state == :failed,
+      order_by: [desc: w.updated_at],
+      limit: 100
+    )
+  end
 end

@@ -2,75 +2,51 @@
 
 Pull requests that change Ecto query code under `lib/` can receive a sticky GitHub comment with rendered SQL and PostgreSQL `EXPLAIN` output (plus an optional LLM summary when `OPENROUTER_API_KEY` is set).
 
+## `lib/ysc` coverage
+
+Every `lib/ysc/**/*.ex` module with a discoverable query function is included in the registry. When **any** `lib/ysc` file changes in a PR, CI runs **all** `Ysc.*` explain targets (~60+ query shapes today).
+
+The registry is built at runtime by `Ysc.Ci.QueryExplain.Registry.all_targets()` (see `priv/ci/query_explain_targets.exs`).
+
+### Standard entry point: `ci_query_explain_query/0`
+
+Each `lib/ysc` context module with Ecto queries should define:
+
+```elixir
+@doc false
+def ci_query_explain_query do
+  # returns %Ecto.Query{} — representative shape for this module
+end
+```
+
+Use `Ysc.Ci.QueryExplain.Fixtures` for stable IDs (`ulid/0`, `uuid/0`, `user/0`, `ip/0`, etc.). Match column types (UUID columns need `Ecto.UUID.bingenerate()` or `Fixtures.uuid/0` for string UUID fields).
+
+Additional shapes: `ci_query_explain_<name>_query/0` (e.g. `Ysc.Search` has separate events/tickets/users queries).
+
+Existing `*_query/1` helpers with defaults and `base_query/0` are also discovered automatically.
+
 ## How CI selects targets
 
-1. **Heuristic** — the diff adds query-shaped lines (`from(`, `join(`, `fragment(`, etc.) under `lib/**/*.ex` (excluding `*_test.exs`).
-2. **Changed files** — `git diff --name-only` lists touched `lib/*.ex` files.
-3. **Targets** — union of:
-   - **Registered** rows in `priv/ci/query_explain_targets.exs` whose `source_paths` intersect changed files.
-   - **Auto-discovered** public `*_query` or `base_query/0` functions in changed modules where `apply(module, function, [])` returns `%Ecto.Query{}` (default arguments are fine).
-
-If the heuristic matches but no targets run, CI posts the “Targets run: 0” opt-in message.
+1. **Heuristic** — the diff adds query-shaped lines under `lib/**/*.ex` (excluding `*_test.exs`).
+2. **Changed files** — `git diff --name-only` lists touched `lib/**/*.ex` files.
+3. **Targets**:
+   - **Any `lib/ysc` change** → all `Ysc.*` registry targets.
+   - **Other `lib/` changes** → registry rows whose `source_paths` intersect changed files, plus auto-discovery on changed modules.
 
 ## Writing analyzable queries
 
 ### Do
 
-1. **Extract the query** into a public function named `something_query` (suffix `_query`) or `base_query/0`.
-2. **Return `%Ecto.Query{}` only** — no `Repo.all`, `Repo.one`, preloads, or side effects in the `*_query` function.
-3. **Use stable inputs** — `DateTime.utc_now()`, `Date.utc_today()`, small literal limits, or fixture IDs / ULIDs for foreign keys.
-4. **Keep execution separate**:
-
-```elixir
-@doc false
-def my_list_query(opts \\ []) do
-  limit = Keyword.get(opts, :limit, 50)
-  now = DateTime.utc_now()
-
-  from(r in MySchema,
-    where: r.status == :active and r.starts_at > ^now,
-    order_by: [asc: r.starts_at],
-    limit: ^limit
-  )
-end
-
-def my_list(opts \\ []) do
-  opts
-  |> my_list_query()
-  |> Repo.all()
-end
-```
-
-5. **Register** queries that need real arguments without defaults in `lib/ysc/ci/query_explain.ex` (fixture wrapper) plus `priv/ci/query_explain_targets.exs`.
-6. **List every trigger path** in `source_paths` when the query lives in a context module but LiveViews or workers also change.
+1. Add `ci_query_explain_query/0` (or `*_query` / `base_query/0`) returning `%Ecto.Query{}` only.
+2. Use stable inputs — `DateTime.utc_now()`, fixture IDs, small limits.
+3. Keep `Repo.*` execution in separate functions.
+4. Use correct types for `where` bindings (Ecto enums as atoms, UUID columns as `Ecto.UUID.bingenerate()` when required).
 
 ### Don't
 
-- Leave queries only inline inside `def list_*`, LiveViews, or workers.
-- Perform side effects inside `*_query` (HTTP, Oban enqueue, `Repo.insert`).
-- Require runtime-only values (session token, current user id) without defaults or a CI wrapper.
-
-## Registry example
-
-```elixir
-%{
-  id: "booking_locker_active_reservations",
-  source_paths: ["lib/ysc/tickets/booking_locker.ex"],
-  mfa: {Ysc.Ci.QueryExplain, :booking_locker_active_reservations_query, []}
-}
-```
-
-Fixture wrapper:
-
-```elixir
-# lib/ysc/ci/query_explain.ex
-def booking_locker_active_reservations_query do
-  BookingLocker.active_reservations_for_event_ordered_query(
-    Ecto.ULID.generate(),
-    Ecto.ULID.generate()
-  )
-end
-```
+- Leave queries only inline in LiveViews (`lib/ysc_web`) without a matching `lib/ysc` `ci_query_explain_query/0`.
+- Perform side effects inside explain functions.
+- Pass ULID strings into UUID columns (or string enum values into `Ecto.Enum` fields).
 
 ## Local commands
 
@@ -78,32 +54,21 @@ end
 |---------|---------|
 | `make query-explain-staged` | Explain targets for staged `lib/*.ex` changes |
 | `make query-explain-main` | Explain targets for branch vs `origin/main` |
-| `mix ci.query_explain.suggest` | List modules missing explain coverage |
-| `mix ci.query_explain.suggest lib/ysc/foo.ex` | Check specific files |
+| `make query-explain-suggest` | List modules missing explain coverage |
+| `mix ci.query_explain --all-targets` | Run every registry target |
 
 Output: `.query-explain/result.json` and `.query-explain/comment.md`.
 
 ## LLM checklist
 
-When adding or changing Ecto queries under `lib/`:
+When adding or changing Ecto queries under `lib/ysc`:
 
-- [ ] Public `*_query` or `base_query/0` returning `%Ecto.Query{}`?
-- [ ] Callable via `apply(Module, :fn, [])` or registered `mfa` in `query_explain_targets.exs`?
-- [ ] `Repo.*` execution in a separate function?
-- [ ] `source_paths` updated if the PR touches callers in other files?
-- [ ] `make query-explain-staged` shows **Targets run** > 0?
-
-## When auto-discovery is not enough
-
-| Situation | Fix |
-|-----------|-----|
-| Query needs IDs, tokens, user | `Ysc.Ci.QueryExplain` wrapper + registry row |
-| Query in context, PR edits LiveView | Add LiveView path to `source_paths` |
-| Multiple query shapes in one module | Multiple `*_query` functions or registry rows |
-| `update_all` / `delete_all` | Not supported yet; extract an equivalent `from` for review |
+- [ ] `ci_query_explain_query/0` returns `%Ecto.Query{}` with representative filters/joins?
+- [ ] Fixture types match schema (`Fixtures`, `Ecto.UUID.bingenerate()`, enum atoms)?
+- [ ] `make query-explain-staged` shows **Targets run** > 0 for `lib/ysc` edits?
 
 ## Related
 
-- [Query Optimization Guide](QUERY_OPTIMIZATION_GUIDE.md) — profiling and index strategies
-- `lib/mix/tasks/ci/query_explain.ex` — task implementation
+- [Query Optimization Guide](QUERY_OPTIMIZATION_GUIDE.md)
+- `lib/ysc/ci/query_explain/registry.ex`
 - `.github/workflows/ci.yml` — `query_explain_pr` job

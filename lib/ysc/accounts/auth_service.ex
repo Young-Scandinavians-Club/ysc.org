@@ -565,4 +565,19 @@ defmodule Ysc.Accounts.AuthService do
   end
 
   def sanitize_utf8(other), do: other
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_id = Fixtures.user().id
+
+    from(ae in AuthEvent,
+      where: ae.user_id == ^user_id,
+      where: ae.success == true,
+      where: ae.inserted_at > ago(30, "day"),
+      select: ae.device_type,
+      distinct: true
+    )
+  end
 end

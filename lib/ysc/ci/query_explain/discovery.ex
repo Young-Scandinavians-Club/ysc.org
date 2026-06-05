@@ -1,7 +1,7 @@
 defmodule Ysc.Ci.QueryExplain.Discovery do
   @moduledoc false
 
-  @query_shape_pattern ~r/\bfrom\s*\(|\bjoin\s*\(|dynamic\s*\(|fragment\s*\(|subquery\s*\(|union_all\s*\(|\bexcept\s*\(|\bintersect\s*\(/
+  @query_shape_pattern ~r/\bfrom\s*\(|\bfrom\s+\w+\s+in\b|\bjoin\s*\(|\bjoin\s+\w+\s+in\b|dynamic\s*\(|fragment\s*\(|subquery\s*\(|union_all\s*\(|\bexcept\s*\(|\bintersect\s*\(/
 
   @doc false
   def discoverable_query_name?(name) when is_atom(name) do
@@ -13,8 +13,10 @@ defmodule Ysc.Ci.QueryExplain.Discovery do
     if Code.ensure_loaded?(module) do
       module
       |> function_names()
-      |> Enum.filter(&discoverable_query_name?/1)
-      |> Enum.filter(&callable_query_function?(module, &1))
+      |> Enum.filter(fn name ->
+        discoverable_query_name?(name) and
+          callable_query_function?(module, name)
+      end)
       |> Enum.sort()
     else
       []
@@ -34,20 +36,40 @@ defmodule Ysc.Ci.QueryExplain.Discovery do
   def modules_in_file(path) when is_binary(path) do
     with {:ok, contents} <- File.read(path),
          {:ok, ast} <- Code.string_to_quoted(contents) do
-      {_ast, modules} =
-        Macro.prewalk(ast, [], fn
-          {:defmodule, _, [{:__aliases__, _, parts}, _body]} = node, acc ->
-            {node, [Module.concat(parts) | acc]}
-
-          node, acc ->
-            {node, acc}
-        end)
-
-      Enum.reverse(modules)
+      ast
+      |> collect_modules(nil)
+      |> Enum.uniq()
     else
       _ -> []
     end
   end
+
+  defp collect_modules({:defmodule, _, [alias_node, [do: body]]}, parent) do
+    module = expand_module_alias(alias_node, parent)
+    [module | collect_modules(body, module)]
+  end
+
+  defp collect_modules({:defmodule, _, [alias_node, body]}, parent)
+       when is_list(body) do
+    module = expand_module_alias(alias_node, parent)
+    [module | Enum.flat_map(body, &collect_modules(&1, module))]
+  end
+
+  defp collect_modules({_, _, args}, parent) when is_list(args) do
+    Enum.flat_map(args, &collect_modules(&1, parent))
+  end
+
+  defp collect_modules(list, parent) when is_list(list) do
+    Enum.flat_map(list, &collect_modules(&1, parent))
+  end
+
+  defp collect_modules(_other, _parent), do: []
+
+  defp expand_module_alias({:__aliases__, _, parts}, nil),
+    do: Module.concat(parts)
+
+  defp expand_module_alias({:__aliases__, _, parts}, parent),
+    do: Module.concat([parent | parts])
 
   @doc false
   def elixir_source_path?(path) when is_binary(path) do

@@ -715,4 +715,21 @@ defmodule Ysc.Accounts.FamilyInvites do
         {:ok, nil}
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    now = Fixtures.now()
+    normalized_email = Email.normalize(Fixtures.email())
+
+    from(i in FamilyInvite,
+      where:
+        i.email == ^normalized_email and
+          is_nil(i.accepted_at) and
+          i.expires_at > ^now,
+      order_by: [desc: i.inserted_at],
+      preload: [:primary_user]
+    )
+  end
 end

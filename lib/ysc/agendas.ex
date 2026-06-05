@@ -412,4 +412,17 @@ defmodule Ysc.Agendas do
   defp broadcast(event_id, event) do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic(event_id), {__MODULE__, event})
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    event_id = Fixtures.ulid()
+
+    from(a in Agenda,
+      where: a.event_id == ^event_id,
+      order_by: [asc: a.position],
+      preload: [:agenda_items]
+    )
+  end
 end

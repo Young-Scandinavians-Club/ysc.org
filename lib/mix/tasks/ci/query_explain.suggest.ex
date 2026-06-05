@@ -1,6 +1,7 @@
 defmodule Mix.Tasks.Ci.QueryExplain.Suggest do
   @moduledoc """
-  Lists `lib/**/*.ex` modules that contain query-shaped code but lack CI explain targets.
+  Lists `lib/ysc/**/*.ex` modules that contain query-shaped code but lack CI explain
+  targets (`ci_query_explain_query/0`, other `*_query`, or `base_query/0`).
 
   Scans for `from(`, `join(`, and similar patterns, then reports modules with no
   auto-discoverable `*_query` / `base_query` function and no registered target in
@@ -29,42 +30,24 @@ defmodule Mix.Tasks.Ci.QueryExplain.Suggest do
         files -> files
       end
 
-    registry_modules = registered_modules()
-
     paths
-    |> Enum.filter(&Discovery.elixir_source_path?/1)
-    |> Enum.filter(&Discovery.file_has_query_shape?/1)
+    |> Enum.filter(fn path ->
+      Discovery.elixir_source_path?(path) and
+        Discovery.file_has_query_shape?(path)
+    end)
     |> Enum.flat_map(fn path ->
       path
       |> Discovery.modules_in_file()
       |> Enum.map(&{path, &1})
     end)
     |> Enum.uniq_by(fn {_path, module} -> module end)
-    |> Enum.reject(fn {_path, module} ->
-      covered_by_discovery?(module) or MapSet.member?(registry_modules, module)
-    end)
+    |> Enum.reject(fn {_path, module} -> covered_by_discovery?(module) end)
     |> Enum.sort_by(fn {path, module} -> {path, module} end)
     |> print_suggestions()
   end
 
   defp all_lib_ex_paths do
-    "lib/**/*.ex"
-    |> Path.wildcard()
-    |> Enum.sort()
-  end
-
-  defp registered_modules do
-    registry_path = Path.join(File.cwd!(), "priv/ci/query_explain_targets.exs")
-
-    case Code.eval_file(registry_path) do
-      {targets, _} when is_list(targets) ->
-        targets
-        |> Enum.map(fn t -> t |> Map.fetch!(:mfa) |> elem(0) end)
-        |> MapSet.new()
-
-      _ ->
-        MapSet.new()
-    end
+    Ysc.Ci.QueryExplain.Registry.lib_ysc_paths()
   end
 
   defp covered_by_discovery?(module) do
@@ -89,9 +72,8 @@ defmodule Mix.Tasks.Ci.QueryExplain.Suggest do
     Mix.shell().info("""
 
     Next steps:
-      1. Extract queries into public *_query/0 or *_query(opts \\\\ []) functions returning %Ecto.Query{}
-      2. Or add a fixture wrapper in lib/ysc/ci/query_explain.ex
-      3. Register cross-file triggers in priv/ci/query_explain_targets.exs
+      1. Add ci_query_explain_query/0 returning %Ecto.Query{} (use Ysc.Ci.QueryExplain.Fixtures)
+      2. Or add *_query/0 with defaults / base_query/0 if more appropriate
 
     See docs/QUERY_EXPLAIN_CI.md
     """)

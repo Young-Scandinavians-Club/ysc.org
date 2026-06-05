@@ -151,4 +151,18 @@ defmodule Ysc.Bookings.RefundPolicyCache do
       nil
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    property = :tahoe
+    booking_mode = :room
+
+    from(rp in RefundPolicy,
+      where: rp.property == ^property,
+      where: rp.booking_mode == ^booking_mode,
+      where: rp.is_active == true,
+      order_by: [desc: rp.inserted_at, desc: rp.id],
+      limit: 1
+    )
+  end
 end

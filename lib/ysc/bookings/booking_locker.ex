@@ -3438,4 +3438,20 @@ defmodule Ysc.Bookings.BookingLocker do
       _ -> 0
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    property = :tahoe
+    checkin_date = Fixtures.today()
+    checkout_date = Date.add(checkin_date, 3)
+
+    from(pi in PropertyInventory,
+      where:
+        pi.property == ^property and
+          pi.day >= ^checkin_date and
+          pi.day < ^checkout_date
+    )
+  end
 end

@@ -583,4 +583,22 @@ defmodule Ysc.Bookings.Entitlements do
       )
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    now = Fixtures.now()
+
+    from(e in BookingEntitlement,
+      join: u in assoc(e, :user),
+      left_join: iu in assoc(e, :issued_by_user),
+      where: e.status == :active,
+      where: is_nil(e.consumed_at),
+      where: is_nil(e.consumed_booking_id),
+      where: is_nil(e.expires_at) or e.expires_at > ^now,
+      order_by: [asc: e.expires_at, asc: e.inserted_at],
+      preload: [user: u, issued_by_user: iu]
+    )
+  end
 end
