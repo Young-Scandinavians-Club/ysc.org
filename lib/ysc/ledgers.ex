@@ -3558,7 +3558,9 @@ defmodule Ysc.Ledgers do
 
   @doc false
   def ci_query_explain_query do
-    payout_id = Ecto.UUID.bingenerate()
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    payout_id = Fixtures.ulid()
 
     from(p in Payment,
       join: pp in "payout_payments",

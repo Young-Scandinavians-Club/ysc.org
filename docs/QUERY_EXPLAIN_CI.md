@@ -52,7 +52,7 @@ Existing `*_query/1` helpers with defaults and `base_query/0` are also discovere
 
 | Command | Purpose |
 |---------|---------|
-| `make query-explain-staged` | Explain targets for staged `lib/*.ex` changes |
+| `make query-explain-staged` | Explain targets for staged `lib/**/*.ex` changes |
 | `make query-explain-main` | Explain targets for branch vs `origin/main` |
 | `make query-explain-suggest` | List modules missing explain coverage |
 | `mix ci.query_explain --all-targets` | Run every registry target |

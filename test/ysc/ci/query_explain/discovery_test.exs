@@ -40,13 +40,15 @@ defmodule Ysc.Ci.QueryExplain.DiscoveryTest do
 
   describe "modules_in_file/1" do
     test "resolves nested defmodule names" do
-      [parent, nested] =
+      modules =
         Discovery.modules_in_file(
           "lib/ysc/bookings/modification_date_availability.ex"
         )
 
-      assert parent == Ysc.Bookings.ModificationDateAvailability
-      assert nested == Ysc.Bookings.ModificationDateAvailability.Snapshot
+      assert length(modules) == 2
+
+      assert Ysc.Bookings.ModificationDateAvailability in modules
+      assert Ysc.Bookings.ModificationDateAvailability.Snapshot in modules
     end
   end
 

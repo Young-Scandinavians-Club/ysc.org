@@ -34,7 +34,7 @@ defmodule Ysc.Ci.QueryExplain.Discovery do
 
   @doc false
   def modules_in_file(path) when is_binary(path) do
-    with {:ok, contents} <- File.read(path),
+    with {:ok, contents} <- read_elixir_source(path),
          {:ok, ast} <- Code.string_to_quoted(contents) do
       ast
       |> collect_modules(nil)
@@ -78,11 +78,21 @@ defmodule Ysc.Ci.QueryExplain.Discovery do
 
   @doc false
   def file_has_query_shape?(path) when is_binary(path) do
-    case File.read(path) do
+    case read_elixir_source(path) do
       {:ok, contents} -> Regex.match?(@query_shape_pattern, contents)
       {:error, _} -> false
     end
   end
+
+  defp read_elixir_source(path) do
+    if elixir_source_path?(path) do
+      Ysc.SafeFile.read_under_root(project_root(), path)
+    else
+      {:error, :invalid_path}
+    end
+  end
+
+  defp project_root, do: File.cwd!()
 
   @doc false
   def auto_targets_for_file(path) when is_binary(path) do

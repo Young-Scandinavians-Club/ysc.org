@@ -5,7 +5,6 @@ defmodule Ysc.ExpenseReports do
   require Ysc.Logging
   import Ecto.Query, warn: false
 
-  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
   alias Ysc.Accounts.{Address, User}
 
@@ -988,6 +987,8 @@ defmodule Ysc.ExpenseReports do
 
   @doc false
   def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
     user_id = Fixtures.ulid()
 
     from(er in ExpenseReport,
