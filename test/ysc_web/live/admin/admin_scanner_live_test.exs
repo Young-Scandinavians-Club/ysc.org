@@ -626,7 +626,7 @@ defmodule YscWeb.AdminScannerLiveTest do
       conn: conn,
       admin: admin
     } do
-      missing_id = Ecto.UUID.generate()
+      missing_id = Ecto.ULID.generate()
 
       {:ok, view, html} = live(conn, ~p"/admin/scanner?resume=#{missing_id}")
 
