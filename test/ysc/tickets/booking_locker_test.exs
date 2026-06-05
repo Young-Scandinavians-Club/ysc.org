@@ -393,7 +393,9 @@ defmodule Ysc.Tickets.BookingLockerTest do
       end
 
       assert {:ok, order} =
-               BookingLocker.atomic_booking(buyer.id, event.id, %{paid_tier.id => 1})
+               BookingLocker.atomic_booking(buyer.id, event.id, %{
+                 paid_tier.id => 1
+               })
 
       assert order.event_id == event.id
 
