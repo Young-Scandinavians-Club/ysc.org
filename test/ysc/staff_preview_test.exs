@@ -8,7 +8,10 @@ defmodule Ysc.StaffPreviewTest do
   describe "staff_content_preview?/1" do
     test "returns true for admin and volunteer users" do
       assert StaffPreview.staff_content_preview?(user_fixture(%{role: :admin}))
-      assert StaffPreview.staff_content_preview?(user_fixture(%{role: :volunteer}))
+
+      assert StaffPreview.staff_content_preview?(
+               user_fixture(%{role: :volunteer})
+             )
     end
 
     test "returns false for members and nil" do
