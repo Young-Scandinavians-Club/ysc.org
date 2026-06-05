@@ -5,6 +5,7 @@ defmodule YscWeb.EventDetailsLiveTest do
   import Ysc.TestDataFactory
   import Ysc.EventsFixtures
   import Ysc.AccountsFixtures
+  import Ysc.TicketsFixtures
   import Mox
   import EventDetailsLiveHelpers
 
@@ -1519,6 +1520,56 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       result = render_click(view, "close-free-ticket-confirmation")
       assert is_binary(result)
+    end
+  end
+
+  describe "user tickets section" do
+    test "confirmed ticket count excludes donations", %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      paid_tier = hd(event.ticket_tiers)
+
+      donation_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil,
+          quantity: nil
+        })
+
+      order = ticket_order_fixture(%{user: user, event: event, tier: paid_tier})
+
+      Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+      |> Ysc.Repo.preload([:tickets])
+      |> Map.fetch!(:tickets)
+      |> Enum.each(fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Ysc.Repo.update!()
+      end)
+
+      {:ok, _donation_ticket} =
+        %Ysc.Events.Ticket{}
+        |> Ysc.Events.Ticket.changeset(%{
+          ticket_order_id: order.id,
+          ticket_tier_id: donation_tier.id,
+          event_id: event.id,
+          user_id: user.id,
+          reference_id: "TKT-DON-#{System.unique_integer()}",
+          status: :confirmed,
+          expires_at: DateTime.add(DateTime.utc_now(), 30, :minute)
+        })
+        |> Ysc.Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      html = render_async(view)
+
+      assert html =~ "1 confirmed ticket"
+      refute html =~ "1x Donation"
     end
   end
 

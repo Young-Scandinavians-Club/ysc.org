@@ -352,7 +352,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
   end
 
   describe "event details display" do
-    test "displays event title and description", %{conn: conn} do
+    test "displays event title", %{conn: conn} do
       user = create_user_with_membership()
 
       event =
@@ -370,7 +370,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
       assert html =~ "Annual Gala"
-      assert html =~ "A wonderful evening"
+      refute html =~ "A wonderful evening"
     end
 
     test "displays event date", %{conn: conn} do
@@ -577,6 +577,29 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
       assert html =~ "Payment Summary"
+    end
+
+    test "payment summary ticket count excludes donations", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      paid_tier = create_ticket_tier(event, %{name: "General Admission"})
+
+      donation_tier =
+        create_ticket_tier(event, %{
+          name: "Donation",
+          type: :donation,
+          price: nil
+        })
+
+      order = create_ticket_order(user, event)
+      _paid = create_ticket(order, paid_tier)
+      _donation = create_ticket(order, donation_tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(view, "#order-confirmation-payment-ticket-count", "1")
     end
   end
 
@@ -903,6 +926,58 @@ defmodule YscWeb.OrderConfirmationLiveTest do
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
       assert html =~ "2 Tickets"
+    end
+
+    test "event details badge excludes donation tickets from count", %{
+      conn: conn
+    } do
+      user = create_user_with_membership()
+      event = create_event(%{})
+      paid_tier = create_ticket_tier(event, %{name: "General Admission"})
+
+      donation_tier =
+        create_ticket_tier(event, %{
+          name: "Donation",
+          type: :donation,
+          price: nil
+        })
+
+      order = create_ticket_order(user, event)
+      _paid = create_ticket(order, paid_tier)
+      _donation = create_ticket(order, donation_tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "1 Ticket"
+      refute html =~ "2 Tickets"
+      assert html =~ "Tickets &amp; Donations"
+      assert html =~ "Donation"
+      assert html =~ "Not an event ticket"
+    end
+
+    test "donation-only order uses Your Donations section title", %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+
+      donation_tier =
+        create_ticket_tier(event, %{
+          name: "Donation",
+          type: :donation,
+          price: nil
+        })
+
+      order = create_ticket_order(user, event)
+      _donation = create_ticket(order, donation_tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert html =~ "Your Donations"
+      assert html =~ "Not an event ticket"
+      refute html =~ "Your Tickets"
     end
   end
 

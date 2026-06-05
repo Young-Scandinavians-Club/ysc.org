@@ -167,6 +167,7 @@ defmodule YscWeb.EventDetailsLive do
                   confirmed =
                     @all_tickets_by_order
                     |> Map.get(order_id, [])
+                    |> event_tickets()
                     |> Enum.count(&(&1.status == :confirmed))
 
                   acc + confirmed
@@ -227,17 +228,20 @@ defmodule YscWeb.EventDetailsLive do
                           nil
                         end
                       end %>
-                    <% all_order_tickets =
-                      Map.get(@all_tickets_by_order, order_id, []) %>
+                    <% order_event_tickets =
+                      @all_tickets_by_order
+                      |> Map.get(order_id, [])
+                      |> event_tickets() %>
                     <% confirmed_tickets =
-                      Enum.filter(all_order_tickets, &(&1.status == :confirmed)) %>
+                      Enum.filter(order_event_tickets, &(&1.status == :confirmed)) %>
                     <% refunded_tickets =
-                      Enum.filter(all_order_tickets, &(&1.status == :cancelled)) %>
+                      Enum.filter(order_event_tickets, &(&1.status == :cancelled)) %>
                     <% all_refunded =
                       length(confirmed_tickets) == 0 && length(refunded_tickets) > 0 %>
                     <% partial_refund =
                       length(confirmed_tickets) > 0 && length(refunded_tickets) > 0 %>
-                    <% all_tiers_by_name = group_tickets_by_tier(all_order_tickets) %>
+                    <% all_tiers_by_name =
+                      group_tickets_by_tier(order_event_tickets) %>
                     <% confirmed_tiers_by_name =
                       if length(confirmed_tickets) > 0,
                         do: group_tickets_by_tier(confirmed_tickets),
@@ -6626,6 +6630,11 @@ defmodule YscWeb.EventDetailsLive do
   defp donation_tier?(ticket_tier) do
     ticket_tier.type == "donation" || ticket_tier.type == :donation
   end
+
+  defp donation_ticket?(%{ticket_tier: tier}), do: donation_tier?(tier)
+  defp donation_ticket?(_), do: false
+
+  defp event_tickets(tickets), do: Enum.reject(tickets, &donation_ticket?/1)
 
   defp check_availability_cached(
          availability,

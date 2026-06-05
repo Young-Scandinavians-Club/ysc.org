@@ -461,28 +461,7 @@ defmodule YscWeb.TicketQrLive do
 
   defp load_event_ticket_data(user_id, event_id) do
     tickets = Tickets.list_user_tickets_for_event(user_id, event_id)
-
-    confirmed_tickets =
-      tickets
-      |> Enum.map(fn ticket ->
-        holder =
-          case ticket do
-            %{registration: %{first_name: first, last_name: last}}
-            when not is_nil(first) ->
-              "#{first} #{last}"
-
-            _ ->
-              nil
-          end
-
-        %{
-          id: ticket.id,
-          reference_id: ticket.reference_id,
-          tier_name: ticket.ticket_tier.name,
-          holder_name: holder,
-          qr_token: QrToken.sign_ticket(ticket.id)
-        }
-      end)
+    confirmed_tickets = tickets_for_qr_display(tickets)
 
     if confirmed_tickets == [] do
       :no_confirmed_tickets
@@ -516,25 +495,7 @@ defmodule YscWeb.TicketQrLive do
         confirmed_tickets =
           order.tickets
           |> Enum.filter(&(&1.status == :confirmed))
-          |> Enum.map(fn ticket ->
-            holder =
-              case ticket do
-                %{registration: %{first_name: first, last_name: last}}
-                when not is_nil(first) ->
-                  "#{first} #{last}"
-
-                _ ->
-                  nil
-              end
-
-            %{
-              id: ticket.id,
-              reference_id: ticket.reference_id,
-              tier_name: ticket.ticket_tier.name,
-              holder_name: holder,
-              qr_token: QrToken.sign_ticket(ticket.id)
-            }
-          end)
+          |> tickets_for_qr_display()
 
         if confirmed_tickets == [] do
           :no_confirmed_tickets
@@ -559,6 +520,38 @@ defmodule YscWeb.TicketQrLive do
         end
     end
   end
+
+  defp tickets_for_qr_display(tickets) do
+    tickets
+    |> Enum.reject(&donation_ticket?/1)
+    |> Enum.map(&ticket_to_qr_card/1)
+  end
+
+  defp ticket_to_qr_card(ticket) do
+    holder =
+      case ticket do
+        %{registration: %{first_name: first, last_name: last}}
+        when not is_nil(first) ->
+          "#{first} #{last}"
+
+        _ ->
+          nil
+      end
+
+    %{
+      id: ticket.id,
+      reference_id: ticket.reference_id,
+      tier_name: ticket.ticket_tier.name,
+      holder_name: holder,
+      qr_token: QrToken.sign_ticket(ticket.id)
+    }
+  end
+
+  defp donation_ticket?(%{ticket_tier: %{type: type}})
+       when type in [:donation, "donation"],
+       do: true
+
+  defp donation_ticket?(_), do: false
 
   defp safe_return_to(path)
        when is_binary(path) and byte_size(path) > 0 do
