@@ -487,7 +487,7 @@ defmodule YscWeb.TicketQrLive do
   end
 
   defp load_ticket_data(user_id, order_id) do
-    case Tickets.get_user_ticket_order(user_id, order_id) do
+    case Tickets.get_user_ticket_order_for_qr(user_id, order_id) do
       nil ->
         :not_found
 
