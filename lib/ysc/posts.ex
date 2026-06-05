@@ -10,6 +10,7 @@ defmodule Ysc.Posts do
   alias Ysc.Posts.Comment
   alias YscWeb.Authorization.Policy
   alias Ysc.Accounts.User
+  alias Ysc.StaffPreview
 
   def get_post(id, preloads \\ []) do
     Repo.get(Post, id) |> Repo.preload(preloads)
@@ -107,7 +108,7 @@ defmodule Ysc.Posts do
   end
 
   defp get_staff_preview_post(id, viewer, preloads) do
-    if staff_content_preview?(viewer) do
+    if StaffPreview.staff_content_preview?(viewer) do
       from(p in Post,
         where: p.id == ^id and p.state in ^@staff_preview_post_states
       )
@@ -117,7 +118,7 @@ defmodule Ysc.Posts do
   end
 
   defp get_staff_preview_post_by_url_name(url_name, viewer, preloads) do
-    if staff_content_preview?(viewer) do
+    if StaffPreview.staff_content_preview?(viewer) do
       from(p in Post,
         where:
           p.url_name == ^url_name and p.state in ^@staff_preview_post_states
@@ -126,12 +127,6 @@ defmodule Ysc.Posts do
       |> preload_public_post(preloads)
     end
   end
-
-  defp staff_content_preview?(%User{role: role})
-       when role in [:admin, :volunteer],
-       do: true
-
-  defp staff_content_preview?(_), do: false
 
   defp preload_public_post(nil, _preloads), do: nil
 
