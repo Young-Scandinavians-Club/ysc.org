@@ -39,16 +39,11 @@ defmodule YscWeb.PostLive do
       </div>
     </div>
 
-    <div
+    <.staff_content_preview_banner
       :if={@content_preview?}
       id="post-content-preview-banner"
-      class="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center"
-    >
-      <p class="text-sm font-semibold text-amber-900">
-        <.icon name="hero-eye" class="w-4 h-4 inline -mt-0.5 me-1" />
-        Staff preview — this article is not published yet.
-      </p>
-    </div>
+      kind={:article}
+    />
 
     <div class="py-8 lg:py-10">
       <div :if={@post == nil} class="my-14 mx-auto">

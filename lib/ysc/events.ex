@@ -19,6 +19,7 @@ defmodule Ysc.Events do
   alias Ysc.Events.EventNotificationSubscription
   alias Ysc.Events.EventUpdate
   alias Ysc.Accounts.User
+  alias Ysc.StaffPreview
 
   def subscribe() do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic())
@@ -106,7 +107,7 @@ defmodule Ysc.Events do
   end
 
   defp get_staff_preview_event(id, viewer) do
-    if staff_content_preview?(viewer) do
+    if StaffPreview.staff_content_preview?(viewer) do
       from(e in Event,
         where: e.id == ^id and e.state in ^@staff_preview_event_states
       )
@@ -115,7 +116,7 @@ defmodule Ysc.Events do
   end
 
   defp get_staff_preview_event_by_reference(reference_id, viewer) do
-    if staff_content_preview?(viewer) do
+    if StaffPreview.staff_content_preview?(viewer) do
       from(e in Event,
         where:
           e.reference_id == ^reference_id and
@@ -124,12 +125,6 @@ defmodule Ysc.Events do
       |> Repo.one()
     end
   end
-
-  defp staff_content_preview?(%User{role: role})
-       when role in [:admin, :volunteer],
-       do: true
-
-  defp staff_content_preview?(_), do: false
 
   @doc """
   Loads an event with pricing, ticket tiers, and cover image for TV/Roku poster rendering.
