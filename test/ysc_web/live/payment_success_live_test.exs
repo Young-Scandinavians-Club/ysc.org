@@ -277,7 +277,9 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                    ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
                  )
 
-        assert flash["error"] =~ "Your payment went through, but we couldn't load your confirmation"
+        assert flash["error"] =~
+                 "Your payment went through, but we couldn't load your confirmation"
+
         assert flash["error"] =~ Ysc.EmailConfig.contact_email()
       after
         Logger.put_module_level(YscWeb.PaymentSuccessLive, :error)
@@ -355,7 +357,9 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                    ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
                  )
 
-        assert flash["error"] =~ "Your payment went through, but we couldn't load your confirmation"
+        assert flash["error"] =~
+                 "Your payment went through, but we couldn't load your confirmation"
+
         assert flash["error"] =~ Ysc.EmailConfig.contact_email()
       after
         Logger.put_module_level(YscWeb.PaymentSuccessLive, :error)
