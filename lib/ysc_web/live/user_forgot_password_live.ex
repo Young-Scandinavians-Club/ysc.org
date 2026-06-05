@@ -63,7 +63,7 @@ defmodule YscWeb.UserForgotPasswordLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Too many attempts from your connection. Please try again later.",
+           "Too many password reset attempts. Please wait a few minutes and try again.",
            title: "Password reset"
          )
          |> redirect(to: ~p"/users/reset-password")}
