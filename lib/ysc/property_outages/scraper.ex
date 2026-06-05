@@ -6,7 +6,11 @@ defmodule Ysc.PropertyOutages.Scraper do
   the database with the latest outage information.
   """
 
+  import Ecto.Query
+
   require Ysc.Logging
+
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.PropertyOutages.OutageTracker
   alias Ysc.Repo
   alias Ysc.Bookings
@@ -1029,5 +1033,12 @@ defmodule Ysc.PropertyOutages.Scraper do
     else
       "Binary data (first 100 bytes): #{Base.encode16(:binary.part(body, 0, min(100, byte_size(body))))}"
     end
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    incident_id = Fixtures.ulid()
+
+    from(o in OutageTracker, where: o.incident_id == ^incident_id)
   end
 end

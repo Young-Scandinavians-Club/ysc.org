@@ -22,6 +22,7 @@ defmodule Ysc.GoogleWallet do
 
   require Ysc.Logging
 
+  alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
   alias Ysc.Events.Ticket
   alias Ysc.Scanning.QrToken
@@ -471,5 +472,17 @@ defmodule Ysc.GoogleWallet do
     map
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Map.new()
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    ticket_id = Fixtures.ulid()
+    user_id = Fixtures.ulid()
+
+    from(t in Ticket,
+      where:
+        t.id == ^ticket_id and t.user_id == ^user_id and t.status == :confirmed,
+      preload: [:ticket_tier, :registration, event: :cover_image]
+    )
   end
 end

@@ -267,4 +267,9 @@ defmodule Ysc.Tickets.TimeoutWorker do
     # Job timeout after 30 seconds
     30_000
   end
+
+  @doc false
+  def ci_query_explain_query do
+    Ysc.Ci.QueryExplain.ticket_orders_pending_timeout_batch_query()
+  end
 end

@@ -3385,4 +3385,27 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp known_qb_sync_failure?(_), do: false
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    payment_id = Fixtures.ulid()
+
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id == ^payment_id,
+      where: e.debit_credit == "credit",
+      where:
+        e.related_entity_type in ^[
+          "event",
+          "booking",
+          "donation",
+          "membership"
+        ],
+      where: a.account_type == "revenue",
+      order_by: [desc: e.inserted_at],
+      preload: [:account]
+    )
+  end
 end

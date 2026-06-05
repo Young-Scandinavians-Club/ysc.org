@@ -3716,4 +3716,13 @@ defmodule Ysc.Accounts do
     )
     |> Repo.update()
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(u in User,
+      where: u.state != :deleted,
+      order_by: [asc: u.last_name, asc: u.first_name],
+      limit: 50
+    )
+  end
 end

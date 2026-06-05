@@ -1163,4 +1163,17 @@ defmodule Ysc.Ledgers.Reconciliation do
        }) do
     "║   #{label} ledger: #{Money.to_string!(ledger_revenue)} vs stripe/payment: #{Money.to_string!(payment_total)}"
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      join: t in LedgerTransaction,
+      on: t.payment_id == e.payment_id,
+      where: a.name == "stripe_account",
+      where: t.type == :payment,
+      where: e.debit_credit == "debit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+  end
 end

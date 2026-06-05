@@ -1631,4 +1631,21 @@ defmodule Ysc.Tickets do
       Stripe.PaymentMethod
     )
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_id = Fixtures.ulid()
+    now = Fixtures.now()
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      where: to.status != ^:cancelled,
+      join: e in assoc(to, :event),
+      where: e.start_date > ^now,
+      order_by: [desc: to.inserted_at],
+      preload: [:tickets, :event, tickets: :ticket_tier]
+    )
+  end
 end

@@ -68,4 +68,15 @@ defmodule Ysc.Events.EventPublishWorker do
     # Job timeout after 60 seconds (may need to process multiple events)
     60_000
   end
+
+  @doc false
+  def ci_query_explain_query do
+    now = DateTime.utc_now()
+
+    from(e in Event,
+      where: e.state == "scheduled",
+      where: not is_nil(e.publish_at),
+      where: e.publish_at <= ^now
+    )
+  end
 end

@@ -939,4 +939,7 @@ defmodule Ysc.Newsletter do
         {:other, nil}
     end
   end
+
+  @doc false
+  def ci_query_explain_query, do: recent_sent_editions_query()
 end

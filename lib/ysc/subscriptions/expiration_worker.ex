@@ -221,4 +221,17 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
     # Job timeout after 120 seconds (may need to process multiple subscriptions and sync with Stripe)
     120_000
   end
+
+  @doc false
+  def ci_query_explain_query do
+    now = DateTime.utc_now()
+
+    from(s in Subscription,
+      where: s.stripe_status in ["active", "trialing"],
+      where:
+        (not is_nil(s.current_period_end) and s.current_period_end < ^now) or
+          (not is_nil(s.ends_at) and s.ends_at < ^now),
+      preload: :user
+    )
+  end
 end

@@ -442,4 +442,17 @@ defmodule Ysc.Tickets.BookingValidator do
   defp get_ticket_tier(tier_id) do
     Events.get_ticket_tier(tier_id)
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_id = Fixtures.ulid()
+    event_id = Fixtures.ulid()
+
+    TicketReservation
+    |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
+    |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)
+    |> Events.where_ticket_reservation_hold_active()
+  end
 end

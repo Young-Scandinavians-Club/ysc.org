@@ -386,4 +386,9 @@ defmodule Ysc.Settings do
 
     warm_cache()
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(s in SiteSetting, order_by: [{:desc, :id}])
+  end
 end

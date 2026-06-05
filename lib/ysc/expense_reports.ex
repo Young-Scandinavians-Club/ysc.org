@@ -985,6 +985,19 @@ defmodule Ysc.ExpenseReports do
     end
   end
 
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_id = Fixtures.ulid()
+
+    from(er in ExpenseReport,
+      where: er.user_id == ^user_id,
+      order_by: [desc: er.inserted_at],
+      preload: [:expense_items, :income_items, :address, :event]
+    )
+  end
+
   defp validate_and_send_expense_report_emails(loaded_report) do
     # Validate that we have required associations
     if is_nil(loaded_report.user) do

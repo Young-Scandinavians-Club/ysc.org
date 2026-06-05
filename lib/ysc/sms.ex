@@ -118,4 +118,14 @@ defmodule Ysc.Sms do
         |> Repo.update()
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(dlr in SmsDeliveryReceipt,
+      where:
+        dlr.provider == ^:flowroute and
+          dlr.provider_message_id == ^"ci-message-id",
+      order_by: [desc: dlr.provider_timestamp]
+    )
+  end
 end

@@ -4866,4 +4866,12 @@ defmodule Ysc.Bookings do
       end
     end
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(b in Booking,
+      preload: [:user, rooms: :room_category, check_ins: :check_in_vehicles],
+      limit: 50
+    )
+  end
 end

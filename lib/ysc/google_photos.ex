@@ -227,4 +227,9 @@ defmodule Ysc.GooglePhotos do
 
       :ok
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(c in Connection, where: c.key == ^Connection.singleton_key())
+  end
 end

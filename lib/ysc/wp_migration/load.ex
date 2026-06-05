@@ -2226,4 +2226,16 @@ defmodule Ysc.WpMigration.Load do
   end
 
   defp parse_booking_money(_), do: Money.new(0, :USD)
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_ids = [Fixtures.ulid()]
+
+    from(u in User,
+      where: u.id in ^user_ids,
+      select: {u.id, u.first_name, u.last_name}
+    )
+  end
 end

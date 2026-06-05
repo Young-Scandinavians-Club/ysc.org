@@ -346,4 +346,16 @@ defmodule Ysc.Avatars do
     do: "/images/default_avatars/sweden_houses.webp"
 
   defp default_avatar_path(_, image_id), do: default_avatar_path("SE", image_id)
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_id = Fixtures.user().id
+
+    from(a in Avatar,
+      where: a.user_id == ^user_id and a.processing_state == :completed,
+      order_by: [desc: a.inserted_at, desc: a.id]
+    )
+  end
 end

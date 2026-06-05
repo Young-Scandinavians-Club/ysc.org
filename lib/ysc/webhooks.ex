@@ -238,4 +238,13 @@ defmodule Ysc.Webhooks do
       w.inserted_at >= ^start_date and w.inserted_at <= ^end_date
     )
   end
+
+  @doc false
+  def ci_query_explain_query do
+    from(w in WebhookEvent,
+      where: w.state == :pending,
+      order_by: [asc: w.inserted_at],
+      limit: 100
+    )
+  end
 end

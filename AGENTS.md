@@ -362,6 +362,12 @@ And **never** do this:
   <!-- phoenix:liveview-end -->
   <!-- usage-rules-end -->
 
+## Query EXPLAIN (CI)
+
+All `lib/ysc` modules with Ecto queries should expose `ci_query_explain_query/0` returning `%Ecto.Query{}` (no `Repo` calls). Use `Ysc.Ci.QueryExplain.Fixtures` for stable IDs. Any PR that touches `lib/ysc/**/*.ex` runs **all** `Ysc.*` explain targets in CI.
+
+Verify: `make query-explain-staged` or `mix ci.query_explain.suggest`. Full guide: [docs/QUERY_EXPLAIN_CI.md](docs/QUERY_EXPLAIN_CI.md).
+
 ## Shell Scripts
 
 - Always use `#!/usr/bin/env bash` as shebang for scripts

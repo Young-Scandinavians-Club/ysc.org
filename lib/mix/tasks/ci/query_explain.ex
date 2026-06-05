@@ -2,10 +2,11 @@ defmodule Mix.Tasks.Ci.QueryExplain do
   @moduledoc """
   Runs `Ecto.Adapters.SQL.to_sql/3` and `Repo.explain/3` for CI query targets.
 
-  Explicit targets live in `priv/ci/query_explain_targets.exs`. With
-  `--changed-files`, only explicit targets whose `source_paths` intersect that
-  file list are run. The task also auto-discovers public zero-arity functions
-  ending in `_query` from changed modules and runs any that return `%Ecto.Query{}`.
+  Targets are built from every discoverable `*_query` / `base_query` function
+  under `lib/ysc` via `Ysc.Ci.QueryExplain.Registry` (see
+  `priv/ci/query_explain_targets.exs`). When any `lib/ysc/**/*.ex` file changes,
+  all `Ysc.*` targets run. Other `lib/` changes still match by `source_paths` or
+  auto-discovery on the changed module.
 
   ## Examples
 
@@ -20,6 +21,9 @@ defmodule Mix.Tasks.Ci.QueryExplain do
   """
 
   use Mix.Task
+
+  alias Ysc.Ci.QueryExplain.Discovery
+  alias Ysc.Ci.QueryExplain.Registry
 
   @shortdoc "Dump SQL + EXPLAIN for CI query explain targets"
 
@@ -96,13 +100,18 @@ defmodule Mix.Tasks.Ci.QueryExplain do
       end
 
     explicit_selected =
-      if changed == :all do
-        targets
-      else
-        Enum.filter(targets, fn t ->
-          paths = Map.fetch!(t, :source_paths)
-          Enum.any?(paths, &MapSet.member?(changed, &1))
-        end)
+      cond do
+        changed == :all ->
+          targets
+
+        Registry.lib_ysc_scope?(changed) ->
+          Enum.filter(targets, &Registry.ysc_target?/1)
+
+        true ->
+          Enum.filter(targets, fn t ->
+            paths = Map.fetch!(t, :source_paths)
+            Enum.any?(paths, &MapSet.member?(changed, &1))
+          end)
       end
 
     selected =
@@ -196,7 +205,7 @@ defmodule Mix.Tasks.Ci.QueryExplain do
         """
         Query-shaped changes were detected in this PR, but no registered or auto-discovered explain targets matched the changed files.
 
-        Auto-discovery runs public zero-arity `*_query` functions from changed modules when they return `%Ecto.Query{}`. For queries that need arguments or live behind side-effecting functions, add or extend a row in `priv/ci/query_explain_targets.exs` and point `source_paths` at the modules you care about.
+        Auto-discovery runs public `*_query` and `base_query/0` functions from changed modules when `apply(module, function, [])` returns `%Ecto.Query{}`. Add `ci_query_explain_query/0` to `lib/ysc` modules (see `docs/QUERY_EXPLAIN_CI.md`). Any `lib/ysc` change should run the full `Ysc.*` registry.
 
         """
       else
@@ -221,69 +230,7 @@ defmodule Mix.Tasks.Ci.QueryExplain do
   end
 
   defp auto_discovered_targets_for_file(path) do
-    path
-    |> modules_in_file()
-    |> Enum.flat_map(fn module ->
-      if Code.ensure_loaded?(module) do
-        module
-        |> module_query_functions()
-        |> Enum.map(&auto_target(module, &1, path))
-      else
-        []
-      end
-    end)
-  end
-
-  defp modules_in_file(path) do
-    with {:ok, contents} <- File.read(path),
-         {:ok, ast} <- Code.string_to_quoted(contents) do
-      {_ast, modules} =
-        Macro.prewalk(ast, [], fn
-          {:defmodule, _, [{:__aliases__, _, parts}, _body]} = node, acc ->
-            {node, [Module.concat(parts) | acc]}
-
-          node, acc ->
-            {node, acc}
-        end)
-
-      Enum.reverse(modules)
-    else
-      _ -> []
-    end
-  end
-
-  defp module_query_functions(module) do
-    module.__info__(:functions)
-    |> Enum.filter(fn {name, arity} ->
-      arity == 0 and String.ends_with?(Atom.to_string(name), "_query") and
-        query_function?(module, name)
-    end)
-    |> Enum.map(fn {name, 0} -> name end)
-    |> Enum.sort()
-  end
-
-  defp query_function?(module, function) do
-    query = apply(module, function, [])
-    match?(%Ecto.Query{}, query)
-  rescue
-    _ -> false
-  end
-
-  defp auto_target(module, function, path) do
-    id =
-      [
-        module |> Module.split() |> Enum.map_join("_", &Macro.underscore/1),
-        function
-      ]
-      |> Enum.join("_")
-      |> Macro.underscore()
-
-    %{
-      id: "auto_#{id}",
-      source_paths: [path],
-      mfa: {module, function, []},
-      discovered: true
-    }
+    Discovery.auto_targets_for_file(path)
   end
 
   defp target_key(t) do

@@ -81,4 +81,17 @@ defmodule Ysc.Bookings.ModificationHoldExpiryWorker do
 
   @impl Oban.Worker
   def timeout(_job), do: 60_000
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    now = Fixtures.now()
+
+    from(b in Booking,
+      where:
+        b.status == :complete and not is_nil(b.modification_hold_expires_at) and
+          b.modification_hold_expires_at < ^now
+    )
+  end
 end

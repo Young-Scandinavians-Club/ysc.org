@@ -539,4 +539,17 @@ defmodule Ysc.Posts do
   end
 
   defp maybe_invalidate_public_post_cache(other, _), do: other
+
+  @doc false
+  def ci_query_explain_query do
+    limit = 50
+
+    from(p in Post,
+      where: p.state == :published,
+      order_by: [
+        desc: fragment("COALESCE(?, ?)", p.published_on, p.inserted_at)
+      ],
+      limit: ^limit
+    )
+  end
 end

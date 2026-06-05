@@ -62,4 +62,14 @@ defmodule Ysc.Bookings.RefundPolicyRule do
     from r in query,
       order_by: [desc: r.days_before_checkin, asc: r.priority]
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    policy_id = Fixtures.ulid()
+
+    from(r in __MODULE__, where: r.refund_policy_id == ^policy_id)
+    |> ordered_by_days()
+  end
 end

@@ -130,4 +130,16 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
     |> Enum.reject(&is_nil/1)
     |> MapSet.new()
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    family_ids = [Fixtures.ulid()]
+
+    from(u in User,
+      where: u.id in ^family_ids,
+      where: not is_nil(u.board_position)
+    )
+  end
 end

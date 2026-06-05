@@ -2915,4 +2915,7 @@ defmodule Ysc.Events do
     Ysc.Events.EventPricingCache.invalidate()
     :ok
   end
+
+  @doc false
+  def ci_query_explain_query, do: upcoming_events_with_preload_query()
 end

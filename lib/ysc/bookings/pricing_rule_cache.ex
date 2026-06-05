@@ -248,4 +248,9 @@ defmodule Ysc.Bookings.PricingRuleCache do
   end
 
   defp next_cache_version, do: System.unique_integer([:monotonic])
+
+  @doc false
+  def ci_query_explain_query do
+    PricingRule.ci_query_explain_query()
+  end
 end

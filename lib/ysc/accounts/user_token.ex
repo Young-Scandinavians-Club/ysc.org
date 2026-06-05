@@ -237,4 +237,11 @@ defmodule Ysc.Accounts.UserToken do
   def by_user_and_contexts_query(user, [_ | _] = contexts) do
     from t in UserToken, where: t.user_id == ^user.id and t.context in ^contexts
   end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    by_token_and_context_query(Fixtures.token(), "session")
+  end
 end

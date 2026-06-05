@@ -4095,4 +4095,17 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   defp expected_stripe_fetch_failure?(_), do: false
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+    alias Ysc.Subscriptions.SubscriptionItem
+
+    subscription_id = Fixtures.ulid()
+
+    from(s in SubscriptionItem,
+      where: s.subscription_id == ^subscription_id,
+      where: s.stripe_id not in ^["ci_stripe_item"]
+    )
+  end
 end
