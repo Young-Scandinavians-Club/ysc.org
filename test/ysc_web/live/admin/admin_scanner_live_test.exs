@@ -622,6 +622,18 @@ defmodule YscWeb.AdminScannerLiveTest do
       refute html =~ "Private session"
     end
 
+    test "resume param with unknown session id shows not found flash", %{
+      conn: conn,
+      admin: admin
+    } do
+      missing_id = Ecto.UUID.generate()
+
+      {:ok, view, html} = live(conn, ~p"/admin/scanner?resume=#{missing_id}")
+
+      assert html =~ "Scan session not found."
+      assert has_element?(view, "#scan-setup-form")
+    end
+
     test "resume param on closed session stays in setup and shows flash", %{
       conn: conn,
       admin: admin
