@@ -187,6 +187,22 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Gets a ticket order for the QR check-in page.
+
+  Skips agendas, payment, and user preloads that the QR view does not render.
+  """
+  def get_user_ticket_order_for_qr(user_id, order_id) do
+    from(to in TicketOrder,
+      where: to.id == ^order_id and to.user_id == ^user_id,
+      preload: [
+        :event,
+        tickets: [:ticket_tier, :registration]
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Returns `event_id` when the user owns the ticket order, otherwise `nil`.
 
   Use for redirect/authorization checks that do not need full order preloads.

@@ -4,6 +4,7 @@ defmodule YscWeb.UserTicketsLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.Tickets
+  alias Ysc.Tickets.DonationDisplay
 
   @impl true
   def render(assigns) do
@@ -148,6 +149,8 @@ defmodule YscWeb.UserTicketsLive do
 
                 <%!-- Ticket Manifest Section --%>
                 <div class="p-8 bg-zinc-50/50 rounded-b-3xl">
+                  <% donation_amounts =
+                    DonationDisplay.amounts_by_ticket_id(ticket_order) %>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <%= for ticket <- ticket_order.tickets do %>
                       <div class="bg-white p-4 rounded-2xl border border-zinc-200">
@@ -166,15 +169,9 @@ defmodule YscWeb.UserTicketsLive do
                               <% :free -> %>
                                 Free
                               <% "donation" -> %>
-                                {get_donation_amount_for_ticket(
-                                  ticket,
-                                  ticket_order
-                                )}
+                                {Map.get(donation_amounts, ticket.id, "Donation")}
                               <% :donation -> %>
-                                {get_donation_amount_for_ticket(
-                                  ticket,
-                                  ticket_order
-                                )}
+                                {Map.get(donation_amounts, ticket.id, "Donation")}
                               <% _ -> %>
                                 {format_price(ticket.ticket_tier.price)}
                             <% end %>
@@ -417,59 +414,6 @@ defmodule YscWeb.UserTicketsLive do
       {String.capitalize(to_string(@status))}
     </span>
     """
-  end
-
-  defp get_donation_amount_for_ticket(_ticket, ticket_order) do
-    if ticket_order && ticket_order.tickets do
-      # Calculate non-donation ticket costs
-      non_donation_total =
-        ticket_order.tickets
-        |> Enum.filter(fn t ->
-          t.ticket_tier.type != "donation" && t.ticket_tier.type != :donation
-        end)
-        |> Enum.reduce(Money.new(0, :USD), fn t, acc ->
-          case t.ticket_tier.price do
-            nil ->
-              acc
-
-            price when is_struct(price, Money) ->
-              case Money.add(acc, price) do
-                {:ok, new_total} -> new_total
-                _ -> acc
-              end
-
-            _ ->
-              acc
-          end
-        end)
-
-      # Calculate donation total
-      donation_total =
-        case Money.sub(ticket_order.total_amount, non_donation_total) do
-          {:ok, amount} -> amount
-          _ -> Money.new(0, :USD)
-        end
-
-      # Count donation tickets
-      donation_tickets =
-        ticket_order.tickets
-        |> Enum.filter(fn t ->
-          t.ticket_tier.type == "donation" || t.ticket_tier.type == :donation
-        end)
-
-      donation_count = length(donation_tickets)
-
-      if donation_count > 0 && Money.positive?(donation_total) do
-        # Calculate per-ticket donation amount
-        {:ok, per_ticket_amount} = Money.div(donation_total, donation_count)
-
-        format_price(per_ticket_amount)
-      else
-        "Donation"
-      end
-    else
-      "Donation"
-    end
   end
 
   defp format_date(datetime) do

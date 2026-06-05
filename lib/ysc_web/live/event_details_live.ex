@@ -10,6 +10,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Events
   alias Ysc.Events.Event
   alias Ysc.Repo
+  alias Ysc.Tickets.DonationDisplay
 
   alias Ysc.Agendas
 
@@ -39,6 +40,7 @@ defmodule YscWeb.EventDetailsLive do
               id={"event-cover-#{@event.id}"}
               module={YscWeb.Components.Image}
               image_id={@event.image_id}
+              image={@event.cover_image}
               preferred_type={:optimized}
               class="w-full h-[50vh] lg:h-[60vh] object-cover"
               loading="eager"
@@ -3048,6 +3050,8 @@ defmodule YscWeb.EventDetailsLive do
         <!-- Tickets List -->
         <div class="w-full max-w-md bg-white border rounded-xl p-6">
           <h3 class="text-lg font-semibold text-zinc-900 mb-4">Your Tickets</h3>
+          <% donation_amounts =
+            DonationDisplay.amounts_by_ticket_id(@ticket_order) %>
           <div class="space-y-3">
             <%= for ticket <- @ticket_order.tickets do %>
               <% ticket_discount_amount =
@@ -3067,7 +3071,7 @@ defmodule YscWeb.EventDetailsLive do
                     <p class="font-semibold text-zinc-900">
                       <%= cond do %>
                         <% ticket.ticket_tier.type == "donation" || ticket.ticket_tier.type == :donation -> %>
-                          {get_donation_amount_for_single_ticket(ticket)}
+                          {Map.get(donation_amounts, ticket.id, "Donation")}
                         <% ticket.ticket_tier.price == nil -> %>
                           Free
                         <% Money.zero?(ticket.ticket_tier.price) -> %>
@@ -3364,8 +3368,8 @@ defmodule YscWeb.EventDetailsLive do
 
   # Minimal assigns for fast initial static render (SEO-friendly)
   defp mount_minimal_assigns(socket, event, _event_id) do
-    # Preload only ticket_tiers for pricing display (single query)
-    event = Repo.preload(event, :ticket_tiers)
+    # Preload ticket tiers for pricing display and cover image to avoid per-component queries
+    event = Repo.preload(event, [:ticket_tiers, :cover_image])
 
     # Convert preloaded tiers to map format expected by pricing functions
     # Add sold_tickets_count: 0 as placeholder (will be updated after async load)
@@ -3452,15 +3456,8 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:event_updates, [])
     # Track async loading state
     |> assign(:async_data_loaded, false)
-    # Save-the-date notification subscription state
-    |> assign(
-      :subscribed_to_save_the_date,
-      Events.subscribed_to_event_notification?(
-        event_with_pricing,
-        socket.assigns[:current_user] && socket.assigns.current_user.id,
-        "save_the_date"
-      )
-    )
+    # Save-the-date subscription loads after WebSocket connect (see load_event_data_async)
+    |> assign(:subscribed_to_save_the_date, false)
   end
 
   # Load expensive data asynchronously after WebSocket connection
@@ -3491,7 +3488,19 @@ defmodule YscWeb.EventDetailsLive do
        fn -> load_attendees(active_membership?, current_user, event_id) end},
       {:user_reservations,
        fn -> load_user_reservations(current_user, event_id) end},
-      {:event_updates, fn -> Events.list_visible_event_updates(event_id) end}
+      {:event_updates, fn -> Events.list_visible_event_updates(event_id) end},
+      {:save_the_date_subscription,
+       fn ->
+         if current_user do
+           Events.subscribed_to_event_notification?(
+             event,
+             current_user.id,
+             "save_the_date"
+           )
+         else
+           false
+         end
+       end}
     ]
 
     results =
@@ -3781,6 +3790,10 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:user_reservations, user_reservations)
      |> assign(:reservations_by_tier, reservations_by_tier)
      |> assign(:event_updates, Map.get(results, :event_updates, []))
+     |> assign(
+       :subscribed_to_save_the_date,
+       Map.get(results, :save_the_date_subscription, false)
+     )
      |> assign(:async_data_loaded, true)}
   end
 
@@ -4349,7 +4362,7 @@ defmodule YscWeb.EventDetailsLive do
       ) do
     # Only update if this is the event we're viewing
     if event.id == socket.assigns.event.id do
-      event = Repo.preload(event, :ticket_tiers)
+      event = Repo.preload(event, [:ticket_tiers, :cover_image])
       event_with_pricing = add_pricing_info(event)
 
       subscribed =
@@ -7431,71 +7444,6 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:show_ticket_modal, false)
            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")}
       end
-    end
-  end
-
-  # Helper function to calculate donation amount for a single ticket
-  defp get_donation_amount_for_single_ticket(ticket) do
-    if ticket.ticket_order do
-      # Reload the ticket order with all tickets to calculate donation amount
-      ticket_order = Ysc.Tickets.get_ticket_order(ticket.ticket_order.id)
-
-      if ticket_order && ticket_order.tickets do
-        # Calculate non-donation ticket costs
-        non_donation_total =
-          ticket_order.tickets
-          |> Enum.filter(fn t ->
-            t.ticket_tier.type != "donation" && t.ticket_tier.type != :donation
-          end)
-          |> Enum.reduce(Money.new(0, :USD), fn t, acc ->
-            case t.ticket_tier.price do
-              nil ->
-                acc
-
-              price when is_struct(price, Money) ->
-                case Money.add(acc, price) do
-                  {:ok, new_total} -> new_total
-                  _ -> acc
-                end
-
-              _ ->
-                acc
-            end
-          end)
-
-        # Calculate donation total
-        donation_total =
-          case Money.sub(ticket_order.total_amount, non_donation_total) do
-            {:ok, amount} -> amount
-            _ -> Money.new(0, :USD)
-          end
-
-        # Count donation tickets
-        donation_tickets =
-          ticket_order.tickets
-          |> Enum.filter(fn t ->
-            t.ticket_tier.type == "donation" || t.ticket_tier.type == :donation
-          end)
-
-        donation_count = length(donation_tickets)
-
-        if donation_count > 0 && Money.positive?(donation_total) do
-          # Calculate per-ticket donation amount
-          {:ok, per_ticket_amount} = Money.div(donation_total, donation_count)
-
-          # Format and display
-          case Money.to_string(per_ticket_amount) do
-            {:ok, amount} -> amount
-            _ -> "Donation"
-          end
-        else
-          "Donation"
-        end
-      else
-        "Donation"
-      end
-    else
-      "Donation"
     end
   end
 
