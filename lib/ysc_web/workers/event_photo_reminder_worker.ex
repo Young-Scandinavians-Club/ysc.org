@@ -45,7 +45,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
 
     if recipients == [] do
       Ysc.Logging.info("No photo reminder recipients", event_id: event.id)
-      EventPhotos.mark_reminder_sent(collection)
+      EventPhotos.mark_reminder_sent(collection, 0)
       :ok
     else
       event = Repo.preload(event, [:organizer, :cover_image])
@@ -76,7 +76,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
       )
 
       if success_count == recipient_count do
-        EventPhotos.mark_reminder_sent(collection)
+        EventPhotos.mark_reminder_sent(collection, recipient_count)
         :ok
       else
         Ysc.Logging.warning("Event photo reminders partially failed",

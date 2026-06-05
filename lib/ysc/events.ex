@@ -2902,6 +2902,18 @@ defmodule Ysc.Events do
     end
   end
 
+  @doc """
+  Marks an event's publication notification as sent with the given recipient count.
+  """
+  def mark_event_notification_sent(%Event{} = event, recipient_count) do
+    event
+    |> Ecto.Changeset.change(%{
+      notification_sent_at: DateTime.truncate(DateTime.utc_now(), :second),
+      notification_recipient_count: recipient_count
+    })
+    |> Repo.update()
+  end
+
   defp broadcast(event) do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, event})
   end

@@ -47,13 +47,14 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
 
       updated = Repo.get!(EventPhotos.Collection, collection.id)
       assert updated.reminder_sent_at != nil
+      assert updated.reminder_recipient_count == 1
     end
 
     test "skips when reminder already sent", %{
       event: event,
       collection: collection
     } do
-      {:ok, _} = EventPhotos.mark_reminder_sent(collection)
+      {:ok, _} = EventPhotos.mark_reminder_sent(collection, 1)
 
       job = %Oban.Job{
         args: %{"event_id" => event.id},

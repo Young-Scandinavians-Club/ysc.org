@@ -58,6 +58,8 @@ defmodule Ysc.Events.Event do
     field :state, Ysc.Events.EventState
     field :published_at, :utc_datetime
     field :publish_at, :utc_datetime
+    field :notification_sent_at, :utc_datetime
+    field :notification_recipient_count, :integer
 
     # Who created the event (organizer)
     belongs_to :organizer, Ysc.Accounts.User,

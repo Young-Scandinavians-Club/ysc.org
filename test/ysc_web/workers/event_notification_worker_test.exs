@@ -374,6 +374,10 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       assert :ok = EventNotificationWorker.send_event_notifications(event)
 
+      updated = Repo.get!(Event, event.id)
+      assert updated.notification_sent_at != nil
+      assert updated.notification_recipient_count >= 2
+
       import Ecto.Query
 
       expected_keys = [
