@@ -1070,6 +1070,59 @@ defmodule YscWeb.OrderConfirmationLiveTest do
   end
 
   describe "discounts and order totals" do
+    test "donation amount excludes per-ticket discounts from paid ticket subtotal",
+         %{conn: conn} do
+      user = create_user_with_membership()
+      event = create_event(%{})
+
+      paid_tier =
+        create_ticket_tier(event, %{
+          name: "General Admission",
+          price: Money.new(5000, :USD)
+        })
+
+      donation_tier =
+        create_ticket_tier(event, %{
+          name: "Donation",
+          type: :donation,
+          price: nil
+        })
+
+      order =
+        create_ticket_order(user, event, %{
+          total_amount: Money.new(5500, :USD)
+        })
+
+      _paid =
+        create_ticket(order, paid_tier, %{
+          discount_amount: Money.new(1000, :USD)
+        })
+
+      donation = create_ticket(order, donation_tier)
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/orders/#{order.id}/confirmation")
+
+      assert has_element?(
+               view,
+               "#donation-not-event-ticket-#{donation.id}",
+               "Not an event ticket"
+             )
+
+      assert has_element?(
+               view,
+               "#order-confirmation-items-section",
+               "$15.00"
+             )
+
+      refute has_element?(
+               view,
+               "#order-confirmation-items-section",
+               "$5.00"
+             )
+    end
+
     test "order with discount shows subtotal and discount lines", %{conn: conn} do
       user = create_user_with_membership()
       event = create_event(%{})
