@@ -413,6 +413,62 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert regular_ticket_count == 9
     end
 
+    test "allows donation-only atomic booking when event is sold out on regular tickets", %{
+      organizer: organizer
+    } do
+      donor = user_fixture() |> with_lifetime_membership()
+
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Sold out donations",
+          description: "donations after sellout",
+          state: :published,
+          organizer_id: organizer.id,
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          max_attendees: 2,
+          published_at: DateTime.truncate(DateTime.utc_now(), :second)
+        })
+
+      {:ok, paid_tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(10, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Support",
+          type: :donation,
+          price: nil,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      for _ <- 1..2 do
+        buyer = user_fixture() |> with_lifetime_membership()
+
+        assert {:ok, _} =
+                 BookingLocker.atomic_booking(buyer.id, event.id, %{
+                   paid_tier.id => 1
+                 })
+      end
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(donor.id, event.id, %{
+                 donation_tier.id => 2500
+               })
+
+      assert order.event_id == event.id
+    end
+
     test "donation tier accepts cents amount and creates one ticket", %{
       user: user,
       event: event

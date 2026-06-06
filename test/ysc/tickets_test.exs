@@ -722,6 +722,43 @@ defmodule Ysc.TicketsTest do
       assert {:error, :tier_capacity_exceeded} ==
                Tickets.validate_booking_capacity(event.id, %{tier1.id => 10_000})
     end
+
+    test "allows donation-only selections when event is at max_attendees", %{
+      event: event,
+      tier1: tier1,
+      user: user
+    } do
+      {:ok, donation_tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Support",
+          type: :donation,
+          price: nil,
+          quantity: 50,
+          event_id: event.id
+        })
+
+      for _i <- 1..event.max_attendees do
+        %Ysc.Events.Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier1.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(
+              DateTime.utc_now() |> DateTime.truncate(:second),
+              1,
+              :day
+            )
+        }
+        |> Ysc.Repo.insert!()
+      end
+
+      assert Tickets.event_at_capacity?(event)
+
+      assert :ok ==
+               Tickets.validate_booking_capacity(event.id, %{donation_tier.id => 1})
+    end
   end
 
   describe "list_user_ticket_orders_paginated/2 errors" do
