@@ -498,76 +498,54 @@ defmodule YscWeb.AdminUsersLive do
         </div>
         <div class="py-6 w-full">
           <div id="admin-user-filters" class="pb-4 flex">
-            <.dropdown
+            <.admin_filter_dropdown
               id="filter-state-dropdown"
-              class="group hover:bg-zinc-100"
-              wide={false}
+              clear_patch={~p"/admin/users"}
+              clear_id="admin-users-filter-clear"
             >
-              <:button_block>
-                <.icon
-                  name="hero-funnel"
-                  class="mr-1 text-zinc-600 w-5 h-5 group-hover:text-zinc-800 -mt-0.5"
-                /> Filters
-              </:button_block>
-
-              <div class="w-full px-4 py-3">
-                <.filter_form
-                  fields={[
-                    state: [
-                      label: "Account Status",
-                      type: "checkgroup",
-                      multiple: true,
-                      op: :in,
-                      options: [
-                        {"Active", :active},
-                        {"Pending Approval", :pending_approval},
-                        {"Suspended", :suspended},
-                        {"Rejected", :rejected},
-                        {"Deleted", :deleted}
-                      ]
-                    ],
-                    role: [
-                      label: "Role",
-                      type: "checkgroup",
-                      multiple: true,
-                      op: :in,
-                      options: [
-                        {"Member", :member},
-                        {"Admin", :admin},
-                        {"Volunteer", :volunteer}
-                      ]
-                    ],
-                    membership_type: [
-                      label: "Membership",
-                      type: "checkgroup",
-                      multiple: true,
-                      op: :in,
-                      options: [
-                        {"Single", :single},
-                        {"Family", :family},
-                        {"Lifetime", :lifetime},
-                        {"No Active Membership", :none}
-                      ]
+              <.filter_form
+                fields={[
+                  state: [
+                    label: "Account Status",
+                    type: "checkgroup",
+                    multiple: true,
+                    op: :in,
+                    options: [
+                      {"Active", :active},
+                      {"Pending Approval", :pending_approval},
+                      {"Suspended", :suspended},
+                      {"Rejected", :rejected},
+                      {"Deleted", :deleted}
                     ]
-                  ]}
-                  meta={@meta}
-                  id="user-filter-form"
-                />
-              </div>
-
-              <div class="px-4 py-4">
-                <.button
-                  id="admin-users-filter-clear"
-                  patch={~p"/admin/users"}
-                  variant="outline"
-                  color="zinc"
-                  class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
-                >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                  Clear filters
-                </.button>
-              </div>
-            </.dropdown>
+                  ],
+                  role: [
+                    label: "Role",
+                    type: "checkgroup",
+                    multiple: true,
+                    op: :in,
+                    options: [
+                      {"Member", :member},
+                      {"Admin", :admin},
+                      {"Volunteer", :volunteer}
+                    ]
+                  ],
+                  membership_type: [
+                    label: "Membership",
+                    type: "checkgroup",
+                    multiple: true,
+                    op: :in,
+                    options: [
+                      {"Single", :single},
+                      {"Family", :family},
+                      {"Lifetime", :lifetime},
+                      {"No Active Membership", :none}
+                    ]
+                  ]
+                ]}
+                meta={@meta}
+                id="user-filter-form"
+              />
+            </.admin_filter_dropdown>
           </div>
           <!-- Mobile Card View -->
           <div class="block md:hidden space-y-4">

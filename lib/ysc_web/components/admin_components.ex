@@ -1653,6 +1653,72 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_filter_dropdown
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Renders the standard admin Flop filter dropdown: funnel trigger, filter form slot,
+  and a full-width "Clear filters" footer button.
+
+  Put a `<.filter_form>` (and optional extra fields) in the default slot.
+
+  ## Examples
+
+      <.admin_filter_dropdown
+        id="filter-events-dropdown"
+        clear_patch={~p"/admin/events"}
+        clear_id="admin-events-clear-filters"
+      >
+        <.filter_form fields={[...]} meta={@meta} id="events-filter-form">
+          ...
+        </.filter_form>
+      </.admin_filter_dropdown>
+  """
+  attr :id, :string, required: true
+
+  attr :clear_patch, :any,
+    required: true,
+    doc: "Verified route to reset filters"
+
+  attr :clear_id, :string,
+    default: nil,
+    doc: "DOM id for the clear-filters button"
+
+  attr :wide, :boolean, default: false, doc: "Passed through to `<.dropdown>`"
+
+  slot :inner_block, required: true
+
+  def admin_filter_dropdown(assigns) do
+    ~H"""
+    <.dropdown id={@id} class="group hover:bg-zinc-100" wide={@wide}>
+      <:button_block>
+        <.icon
+          name="hero-funnel"
+          class="mr-1 text-zinc-600 w-5 h-5 group-hover:text-zinc-800 -mt-0.5"
+        /> Filters
+      </:button_block>
+
+      <div class="w-full px-4 py-3">
+        {render_slot(@inner_block)}
+      </div>
+
+      <div class="px-4 py-4">
+        <.button
+          id={@clear_id}
+          patch={@clear_patch}
+          variant="outline"
+          color="zinc"
+          class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
+        >
+          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
+          Clear filters
+        </.button>
+      </div>
+    </.dropdown>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # filter_form
   # ---------------------------------------------------------------------------
 

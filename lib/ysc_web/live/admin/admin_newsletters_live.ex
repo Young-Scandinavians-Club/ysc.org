@@ -224,80 +224,61 @@ defmodule YscWeb.AdminNewslettersLive do
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
               <div id="admin-newsletter-filters">
-                <.dropdown
+                <.admin_filter_dropdown
                   id="filter-newsletters-dropdown"
-                  class="group hover:bg-zinc-100"
+                  clear_patch={~p"/admin/newsletters"}
+                  clear_id="admin-newsletters-clear-filters"
                 >
-                  <:button_block>
-                    <.icon
-                      name="hero-funnel"
-                      class="mr-1 text-zinc-600 w-5 h-5 group-hover:text-zinc-800 -mt-0.5"
-                    /> Filters
-                  </:button_block>
-
-                  <div :if={@meta} class="w-full px-4 py-3">
-                    <.filter_form
-                      fields={[
-                        status: [
-                          label: "Status",
-                          type: "checkgroup",
-                          multiple: true,
-                          op: :in,
-                          options: [
-                            {"Draft", :draft},
-                            {"Scheduled", :scheduled},
-                            {"Sent", :sent}
-                          ]
-                        ],
-                        creator_id: [
-                          label: "Creator",
-                          type: "checkgroup",
-                          multiple: true,
-                          op: :in,
-                          options: @creator_filter
+                  <.filter_form
+                    :if={@meta}
+                    fields={[
+                      status: [
+                        label: "Status",
+                        type: "checkgroup",
+                        multiple: true,
+                        op: :in,
+                        options: [
+                          {"Draft", :draft},
+                          {"Scheduled", :scheduled},
+                          {"Sent", :sent}
                         ]
-                      ]}
-                      meta={@meta}
-                      id="newsletters-filter-form"
-                    >
-                      <div class="mt-4">
-                        <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
-                          Date Created
-                        </p>
-                        <div class="space-y-2">
-                          <.input
-                            type="date"
-                            name="date_from"
-                            value={@date_from}
-                            label="From"
-                            id="filter-newsletters-date-from"
-                            phx-debounce="300"
-                          />
-                          <.input
-                            type="date"
-                            name="date_to"
-                            value={@date_to}
-                            label="To"
-                            id="filter-newsletters-date-to"
-                            phx-debounce="300"
-                          />
-                        </div>
+                      ],
+                      creator_id: [
+                        label: "Creator",
+                        type: "checkgroup",
+                        multiple: true,
+                        op: :in,
+                        options: @creator_filter
+                      ]
+                    ]}
+                    meta={@meta}
+                    id="newsletters-filter-form"
+                  >
+                    <div class="mt-4">
+                      <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
+                        Date Created
+                      </p>
+                      <div class="space-y-2">
+                        <.input
+                          type="date"
+                          name="date_from"
+                          value={@date_from}
+                          label="From"
+                          id="filter-newsletters-date-from"
+                          phx-debounce="300"
+                        />
+                        <.input
+                          type="date"
+                          name="date_to"
+                          value={@date_to}
+                          label="To"
+                          id="filter-newsletters-date-to"
+                          phx-debounce="300"
+                        />
                       </div>
-                    </.filter_form>
-                  </div>
-
-                  <div class="px-4 py-4">
-                    <.button
-                      patch={~p"/admin/newsletters"}
-                      variant="outline"
-                      color="zinc"
-                      class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
-                    >
-                      <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                      Clear filters
-                    </.button>
-                  </div>
-                </.dropdown>
+                    </div>
+                  </.filter_form>
+                </.admin_filter_dropdown>
               </div>
               <.link navigate={~p"/admin/newsletters/new"} class="inline-flex">
                 <.button>
