@@ -971,7 +971,7 @@ defmodule YscWeb.UserSettingsLive do
                   />
                   <div class="flex-1">
                     <h3 class="text-sm font-semibold text-amber-800">
-                      Downgrade Scheduled
+                      Plan change scheduled
                     </h3>
                     <p class="text-sm text-amber-700 mt-1">
                       <%= if @primary_user do %>
@@ -996,12 +996,12 @@ defmodule YscWeb.UserSettingsLive do
                       <.button
                         id="cancel-scheduled-downgrade-btn"
                         phx-click="cancel-scheduled-downgrade"
-                        phx-disable-with="Cancelling..."
+                        phx-disable-with="Updating..."
                         variant="outline"
                         color="amber"
-                        data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                        data-confirm="Keep your current membership level instead of switching plans on the scheduled date?"
                       >
-                        Cancel downgrade
+                        Keep my current plan
                       </.button>
                     </div>
                   </div>
@@ -1072,7 +1072,7 @@ defmodule YscWeb.UserSettingsLive do
                   />
                   <div class="flex-1">
                     <h3 class="text-sm font-semibold text-amber-800">
-                      Downgrade Scheduled
+                      Plan change scheduled
                     </h3>
                     <p class="text-sm text-amber-700 mt-1">
                       Your membership will change to
@@ -1089,12 +1089,12 @@ defmodule YscWeb.UserSettingsLive do
                       <.button
                         id="cancel-scheduled-downgrade-btn"
                         phx-click="cancel-scheduled-downgrade"
-                        phx-disable-with="Cancelling..."
+                        phx-disable-with="Updating..."
                         variant="outline"
                         color="amber"
-                        data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                        data-confirm="Keep your current membership level instead of switching plans on the scheduled date?"
                       >
-                        Cancel downgrade
+                        Keep my current plan
                       </.button>
                     </div>
                   </div>
@@ -1471,7 +1471,7 @@ defmodule YscWeb.UserSettingsLive do
                     />
                     <div class="flex-1">
                       <h3 class="text-sm font-semibold text-amber-800">
-                        Downgrade Scheduled
+                        Plan change scheduled
                       </h3>
                       <p class="text-sm text-amber-700 mt-1">
                         Your membership will change to
@@ -1488,12 +1488,12 @@ defmodule YscWeb.UserSettingsLive do
                         <.button
                           id="cancel-scheduled-downgrade-btn"
                           phx-click="cancel-scheduled-downgrade"
-                          phx-disable-with="Cancelling..."
+                          phx-disable-with="Updating..."
                           variant="outline"
                           color="amber"
-                          data-confirm="Are you sure you want to cancel the scheduled downgrade? Your membership will stay at its current level."
+                          data-confirm="Keep your current membership level instead of switching plans on the scheduled date?"
                         >
-                          Cancel downgrade
+                          Keep my current plan
                         </.button>
                       </div>
                     </div>
@@ -3814,7 +3814,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Family members on a shared plan can't buy a separate membership. Your access comes from the family membership on this account.",
+           "You're on a family membership and can't purchase a separate plan. Ask the main member on the account to make membership changes.",
            title: "Membership"
          )}
       else
@@ -3889,7 +3889,7 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Family members on a shared plan can't buy a separate membership. Your access comes from the family membership on this account.",
+               "You're on a family membership and can't purchase a separate plan. Ask the main member on the account to make membership changes.",
                title: "Membership"
              )}
 
