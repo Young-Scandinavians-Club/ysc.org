@@ -934,8 +934,6 @@ defmodule YscWeb.AdminEventsNewLive do
 
     capacity_changeset = Event.changeset(event, capacity_attrs)
     agendas = Agendas.list_agendas_for_event(event.id)
-    ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
-    tickets = Events.list_tickets_for_event(event.id)
     hosts = Events.list_event_hosts(event)
 
     {:ok,
@@ -952,8 +950,10 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:start_time, event.start_time)
      |> assign(:end_time, event.end_time)
      |> assign(:can_publish, can_publish?(event.start_date, event.title))
-     |> assign(:ticket_count, length(tickets))
-     |> assign(:ticket_tier_count, length(ticket_tiers))
+     |> assign(
+       :ticket_tier_count,
+       Events.count_ticket_tiers_for_event(event.id)
+     )
      |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
      |> assign(trigger_submit: false, check_errors: false)
      |> assign(:hosts, hosts)
@@ -974,7 +974,7 @@ defmodule YscWeb.AdminEventsNewLive do
          as: "update"
        )
      )
-     |> assign_updates_tab_data(event)
+     |> assign_updates_tab_defaults()
      |> assign(:show_update_preview_modal, false)
      |> assign(:update_preview_subject, nil)
      |> assign_check_in_path(event)}
@@ -1035,8 +1035,6 @@ defmodule YscWeb.AdminEventsNewLive do
     capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
     capacity_changeset = Event.changeset(event, capacity_attrs)
     agendas = Agendas.list_agendas_for_event(event.id)
-    ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
-    tickets = Events.list_tickets_for_event(event.id)
     hosts = Events.list_event_hosts(event)
 
     socket
@@ -1052,8 +1050,10 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:start_time, event.start_time)
     |> assign(:end_time, event.end_time)
     |> assign(:can_publish, can_publish?(event.start_date, event.title))
-    |> assign(:ticket_count, length(tickets))
-    |> assign(:ticket_tier_count, length(ticket_tiers))
+    |> assign(
+      :ticket_tier_count,
+      Events.count_ticket_tiers_for_event(event.id)
+    )
     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
     |> assign(trigger_submit: false, check_errors: false)
     |> assign(:hosts, hosts)
@@ -1073,10 +1073,22 @@ defmodule YscWeb.AdminEventsNewLive do
         as: "update"
       )
     )
-    |> assign_updates_tab_data(event)
+    |> assign_updates_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign_check_in_path(event)
+  end
+
+  defp assign_updates_tab_defaults(socket) do
+    dev_routes? = Application.get_env(:ysc, :dev_routes, false)
+
+    socket
+    |> assign(:event_updates, [])
+    |> assign(:recipient_count, 0)
+    |> assign(:photo_collection, nil)
+    |> assign(:photo_upload_url, nil)
+    |> assign(:communication_timeline, [])
+    |> assign(:dev_routes?, dev_routes?)
   end
 
   defp assign_updates_tab_data(socket, event) do
@@ -1162,32 +1174,17 @@ defmodule YscWeb.AdminEventsNewLive do
         case socket.assigns.live_action do
           :updates ->
             event = Events.get_event!(event.id)
-            event_updates = Events.list_event_updates(event.id)
 
             socket
             |> assign(:event, event)
-            |> assign(:event_updates, event_updates)
-            |> assign(
-              :recipient_count,
-              Events.count_event_update_recipients(event.id)
+            |> assign_updates_tab_data(event)
+
+          :edit ->
+            assign(
+              socket,
+              :ticket_tier_count,
+              Events.count_ticket_tiers_for_event(event.id)
             )
-            |> assign_photo_upload(event)
-            |> then(fn socket ->
-              assign_communication_timeline(
-                socket,
-                event,
-                event_updates,
-                socket.assigns.photo_collection
-              )
-            end)
-
-          :tickets ->
-            ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
-            tickets = Events.list_tickets_for_event(event.id)
-
-            socket
-            |> assign(:ticket_tier_count, length(ticket_tiers))
-            |> assign(:ticket_count, length(tickets))
 
           _ ->
             socket
@@ -1896,15 +1893,12 @@ defmodule YscWeb.AdminEventsNewLive do
         socket
       ) do
     if ticket_tier.event_id == socket.assigns[:event].id do
-      ticket_tiers =
-        Events.list_ticket_tiers_for_event(socket.assigns[:event].id)
-
-      tickets = Events.list_tickets_for_event(socket.assigns[:event].id)
-
       {:noreply,
-       socket
-       |> assign(:ticket_tier_count, length(ticket_tiers))
-       |> assign(:ticket_count, length(tickets))}
+       assign(
+         socket,
+         :ticket_tier_count,
+         Events.count_ticket_tiers_for_event(socket.assigns.event.id)
+       )}
     else
       {:noreply, socket}
     end
@@ -1917,15 +1911,12 @@ defmodule YscWeb.AdminEventsNewLive do
         socket
       ) do
     if ticket_tier.event_id == socket.assigns[:event].id do
-      ticket_tiers =
-        Events.list_ticket_tiers_for_event(socket.assigns[:event].id)
-
-      tickets = Events.list_tickets_for_event(socket.assigns[:event].id)
-
       {:noreply,
-       socket
-       |> assign(:ticket_tier_count, length(ticket_tiers))
-       |> assign(:ticket_count, length(tickets))}
+       assign(
+         socket,
+         :ticket_tier_count,
+         Events.count_ticket_tiers_for_event(socket.assigns.event.id)
+       )}
     else
       {:noreply, socket}
     end
