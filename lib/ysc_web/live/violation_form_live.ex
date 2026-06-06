@@ -359,26 +359,20 @@ defmodule YscWeb.ConductViolationReportLive do
   end
 
   @impl true
-  def handle_event("validate", %{"conduct_form" => volunteer_params}, socket) do
-    params = add_user_id(volunteer_params, socket.assigns[:current_user])
-
+  def handle_event("validate", %{"conduct_form" => form_values}, socket) do
     changeset =
-      Ysc.Forms.ConductViolationReport.changeset(
-        %Ysc.Forms.ConductViolationReport{},
-        params
-      )
+      %Ysc.Forms.ConductViolationReport{}
+      |> Ysc.Forms.ConductViolationReport.changeset(form_values)
+      |> Ysc.Forms.ConductViolationReport.put_submitter(socket.assigns[:current_user])
 
     {:noreply, assign_form(socket, changeset)}
   end
 
   def handle_event("save", %{"conduct_form" => form_values} = values, socket) do
-    params = add_user_id(form_values, socket.assigns[:current_user])
-
     changeset =
-      Ysc.Forms.ConductViolationReport.changeset(
-        %Ysc.Forms.ConductViolationReport{},
-        params
-      )
+      %Ysc.Forms.ConductViolationReport{}
+      |> Ysc.Forms.ConductViolationReport.changeset(form_values)
+      |> Ysc.Forms.ConductViolationReport.put_submitter(socket.assigns[:current_user])
 
     summary_text = Map.get(form_values, "summary", "")
 
@@ -449,11 +443,7 @@ defmodule YscWeb.ConductViolationReportLive do
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
-      phone: user.phone_number,
-      user_id: user.id
+      phone: user.phone_number
     }
   end
-
-  defp add_user_id(params, nil), do: params
-  defp add_user_id(params, user), do: Map.put(params, "user_id", user.id)
 end

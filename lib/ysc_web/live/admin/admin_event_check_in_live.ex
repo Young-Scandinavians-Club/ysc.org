@@ -653,7 +653,7 @@ defmodule YscWeb.AdminEventCheckInLive do
   end
 
   defp do_undo_check_in(socket, ticket) do
-    case Scanning.undo_check_in(ticket.id) do
+    case Scanning.undo_check_in(ticket.id, socket.assigns.event.id) do
       {:ok, _updated} ->
         {:noreply, reload_tickets(socket, socket.assigns.search_query)}
 
