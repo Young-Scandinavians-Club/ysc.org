@@ -2553,6 +2553,47 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Full-width amber banner shown when staff preview unpublished content.
+
+  ## Examples
+
+      <.staff_content_preview_banner
+        :if={@content_preview?}
+        id="event-content-preview-banner"
+        kind={:event}
+      />
+  """
+  attr :id, :string, required: true
+  attr :kind, :atom, required: true, values: [:event, :article]
+
+  def staff_content_preview_banner(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :message,
+        staff_content_preview_message(assigns.kind)
+      )
+
+    ~H"""
+    <div
+      id={@id}
+      class="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center"
+    >
+      <p class="text-sm font-semibold text-amber-900">
+        <.icon name="hero-eye" class="w-4 h-4 inline -mt-0.5 me-1" />
+        {@message}
+      </p>
+    </div>
+    """
+  end
+
+  defp staff_content_preview_message(:event),
+    do: "Staff preview — this event is not published yet."
+
+  defp staff_content_preview_message(:article),
+    do: "Staff preview — this article is not published yet."
+
   attr :id, :string, required: true
   attr :text, :string, required: true
   attr :author, :string, required: true

@@ -18,16 +18,11 @@ defmodule YscWeb.EventDetailsLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen">
-      <div
+      <.staff_content_preview_banner
         :if={@content_preview?}
         id="event-content-preview-banner"
-        class="bg-amber-50 border-b border-amber-200 px-4 py-3 text-center"
-      >
-        <p class="text-sm font-semibold text-amber-900">
-          <.icon name="hero-eye" class="w-4 h-4 inline -mt-0.5 me-1" />
-          Staff preview — this event is not published yet.
-        </p>
-      </div>
+        kind={:event}
+      />
       <%!-- Split-Header: Event Cover Image with Floating Card --%>
       <div class="max-w-screen-xl mx-auto px-4 pt-8">
         <div class="relative mb-4 lg:mb-24">
