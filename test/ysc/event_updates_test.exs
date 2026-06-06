@@ -238,7 +238,10 @@ defmodule Ysc.EventUpdatesTest do
   end
 
   describe "count_event_update_recipients/1" do
-    test "matches list_event_update_recipients/1 length", %{event: event, user: user} do
+    test "matches list_event_update_recipients/1 length", %{
+      event: event,
+      user: user
+    } do
       tier =
         ticket_tier_fixture(%{
           event_id: event.id,
