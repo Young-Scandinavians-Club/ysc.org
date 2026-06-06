@@ -467,8 +467,11 @@ defmodule Ysc.Scanning do
   """
   def check_in_single(%ScanSession{} = session, ticket_id) do
     case get_ticket_for_scan(ticket_id) do
-      nil -> {:error, :invalid, "Ticket not found."}
-      ticket -> do_check_in_ticket(session, ticket, :individual)
+      nil ->
+        {:error, :invalid, "Ticket not found."}
+
+      ticket ->
+        validate_manual_check_in(session, ticket)
     end
   end
 
@@ -480,6 +483,9 @@ defmodule Ysc.Scanning do
       nil ->
         {:error, :invalid, "Order not found."}
 
+      %{event_id: event_id} when event_id != session.event_id ->
+        {:error, :invalid, "This order is for a different event."}
+
       order ->
         order = Repo.preload(order, tickets: [:registration])
 
@@ -490,11 +496,50 @@ defmodule Ysc.Scanning do
 
         results =
           Enum.map(unchecked, fn ticket ->
-            do_check_in_ticket(session, ticket, :group)
+            case validate_manual_check_in(session, ticket) do
+              {:ok, result} -> {:ok, result}
+              {:error, _type, _message} = error -> error
+            end
           end)
 
         successes = Enum.filter(results, &match?({:ok, _}, &1))
         {:ok, :group_checked_in, Enum.count(successes)}
+    end
+  end
+
+  defp validate_manual_check_in(session, ticket) do
+    cond do
+      ticket.event_id != session.event_id ->
+        record_scan(session, %{
+          ticket_id: ticket.id,
+          user_id: ticket.user_id,
+          result: :invalid,
+          metadata: %{reason: "wrong_event"}
+        })
+
+        {:error, :invalid, "This ticket is for a different event."}
+
+      ticket.status != :confirmed ->
+        record_scan(session, %{
+          ticket_id: ticket.id,
+          user_id: ticket.user_id,
+          result: :invalid,
+          metadata: %{reason: "not_confirmed", status: ticket.status}
+        })
+
+        {:error, :invalid, "This ticket is #{ticket.status}, not confirmed."}
+
+      ticket.checked_in ->
+        {:error, :already_scanned,
+         %{
+           checked_in_at: ticket.checked_in_at,
+           ticket_id: ticket.id,
+           order_id: ticket.ticket_order_id,
+           user_id: ticket.user_id
+         }}
+
+      true ->
+        do_check_in_ticket(session, ticket, :individual)
     end
   end
 
@@ -842,11 +887,19 @@ defmodule Ysc.Scanning do
   @doc """
   Undoes a check-in for a single ticket by ID, setting checked_in to false and
   clearing checked_in_at. Broadcasts TicketCheckInUndone via PubSub.
+
+  When `expected_event_id` is provided, tickets for other events are rejected.
   """
-  def undo_check_in(ticket_id) do
+  def undo_check_in(ticket_id, expected_event_id \\ nil)
+
+  def undo_check_in(ticket_id, expected_event_id) do
     case Repo.get(Ticket, ticket_id) do
       nil ->
         {:error, :not_found, "Ticket not found."}
+
+      %{event_id: event_id}
+      when not is_nil(expected_event_id) and event_id != expected_event_id ->
+        {:error, :invalid, "This ticket is for a different event."}
 
       ticket ->
         changeset = Ticket.undo_check_in_changeset(ticket)

@@ -113,7 +113,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Your member discount or free night no longer applies to this reservation. Please start a new booking to see updated pricing.",
+           "Your member discount or free night no longer applies to this reservation, so we can't complete checkout at the current price. You'll need to start over and choose your dates again — the same dates may not still be available.",
            title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
