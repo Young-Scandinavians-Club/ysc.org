@@ -72,6 +72,53 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
       assert :ok = EventUpdateNotificationWorker.perform(job)
     end
 
+    test "excludes donation-only ticket holders from update notifications", %{
+      event: event,
+      organizer: organizer
+    } do
+      donor = user_fixture()
+      donation_tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: donor.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      {:ok, update} =
+        Events.create_event_update(event, %{
+          title: "Donation-only",
+          raw_body: "<p>Should not reach donors</p>",
+          rendered_body: "<p>Should not reach donors</p>",
+          sent_by_id: organizer.id
+        })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_update_id" => update.id},
+        worker: "YscWeb.Workers.EventUpdateNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = EventUpdateNotificationWorker.perform(job)
+
+      updated = Repo.get!(Events.EventUpdate, update.id)
+      assert updated.recipient_count == 0
+
+      idempotency_key =
+        "event_update_#{update.id}_#{String.downcase(donor.email)}"
+
+      refute Repo.get_by(Ysc.Messages.MessageIdempotency, idempotency_key: idempotency_key)
+    end
+
     test "handles event with no recipients", %{
       event: event,
       organizer: organizer
