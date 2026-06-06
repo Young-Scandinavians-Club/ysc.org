@@ -413,9 +413,10 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert regular_ticket_count == 9
     end
 
-    test "allows donation-only atomic booking when event is sold out on regular tickets", %{
-      organizer: organizer
-    } do
+    test "allows donation-only atomic booking when event is sold out on regular tickets",
+         %{
+           organizer: organizer
+         } do
       donor = user_fixture() |> with_lifetime_membership()
 
       {:ok, event} =

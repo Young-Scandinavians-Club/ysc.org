@@ -601,11 +601,12 @@ defmodule Ysc.Tickets.BookingValidatorTest do
                })
     end
 
-    test "allows donation-only bookings when event is at max_attendees with regular tickets", %{
-      user: user,
-      event: event,
-      tier1: tier1
-    } do
+    test "allows donation-only bookings when event is at max_attendees with regular tickets",
+         %{
+           user: user,
+           event: event,
+           tier1: tier1
+         } do
       {:ok, donation_tier} =
         Events.create_ticket_tier(%{
           name: "Support",

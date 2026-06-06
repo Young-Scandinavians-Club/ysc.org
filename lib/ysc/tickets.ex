@@ -687,7 +687,8 @@ defmodule Ysc.Tickets do
     event = Ysc.Events.get_event!(event_id)
 
     # Check if event is at capacity (donation-only purchases are still allowed)
-    if non_donation_ticket_quantity(ticket_selections) > 0 and event_at_capacity?(event) do
+    if non_donation_ticket_quantity(ticket_selections) > 0 and
+         event_at_capacity?(event) do
       {:error, :event_at_capacity}
     else
       # Check each ticket tier capacity (donation tiers skip tier/event capacity)

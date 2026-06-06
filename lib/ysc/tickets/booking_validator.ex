@@ -200,7 +200,8 @@ defmodule Ysc.Tickets.BookingValidator do
     user_has_reservations = user_has_reservations_for_event?(user_id, event_id)
 
     # Check if event is already at capacity (unless user has reservations or only donations)
-    if not user_has_reservations and non_donation_ticket_quantity(ticket_selections) > 0 and
+    if not user_has_reservations and
+         non_donation_ticket_quantity(ticket_selections) > 0 and
          event_at_capacity?(event) do
       {:error, :event_at_capacity}
     else

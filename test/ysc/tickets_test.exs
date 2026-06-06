@@ -757,7 +757,9 @@ defmodule Ysc.TicketsTest do
       assert Tickets.event_at_capacity?(event)
 
       assert :ok ==
-               Tickets.validate_booking_capacity(event.id, %{donation_tier.id => 1})
+               Tickets.validate_booking_capacity(event.id, %{
+                 donation_tier.id => 1
+               })
     end
   end
 
