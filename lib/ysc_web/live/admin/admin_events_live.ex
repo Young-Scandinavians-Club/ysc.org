@@ -61,76 +61,61 @@ defmodule YscWeb.AdminEventsLive do
         </div>
         <div class="py-6 w-full">
           <div id="admin-event-filters" class="pb-4 flex">
-            <.dropdown id="filter-events-dropdown" class="group hover:bg-zinc-100">
-              <:button_block>
-                <.icon
-                  name="hero-funnel"
-                  class="mr-1 text-zinc-600 w-5 h-5 group-hover:text-zinc-800 -mt-0.5"
-                /> Filters
-              </:button_block>
-
-              <div class="w-full px-4 py-3">
-                <.filter_form
-                  fields={[
-                    state: [
-                      label: "State",
-                      type: "checkgroup",
-                      multiple: true,
-                      op: :in,
-                      options: [
-                        {"Published", :published},
-                        {"Draft", :draft},
-                        {"Scheduled", :scheduled},
-                        {"Cancelled", :cancelled}
-                      ]
-                    ],
-                    organizer_id: [
-                      label: "Organizer",
-                      type: "checkgroup",
-                      multiple: true,
-                      op: :in,
-                      options: @author_filter
+            <.admin_filter_dropdown
+              id="filter-events-dropdown"
+              clear_patch={~p"/admin/events"}
+              clear_id="admin-events-clear-filters"
+            >
+              <.filter_form
+                fields={[
+                  state: [
+                    label: "State",
+                    type: "checkgroup",
+                    multiple: true,
+                    op: :in,
+                    options: [
+                      {"Published", :published},
+                      {"Draft", :draft},
+                      {"Scheduled", :scheduled},
+                      {"Cancelled", :cancelled}
                     ]
-                  ]}
-                  meta={@meta}
-                  id="events-filter-form"
-                >
-                  <div class="mt-4">
-                    <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
-                      Event Date Range
-                    </p>
-                    <div class="space-y-2">
-                      <.input
-                        type="date"
-                        name="date_from"
-                        value={@date_from}
-                        label="From"
-                        id="filter-date-from"
-                        phx-debounce="300"
-                      />
-                      <.input
-                        type="date"
-                        name="date_to"
-                        value={@date_to}
-                        label="To"
-                        id="filter-date-to"
-                        phx-debounce="300"
-                      />
-                    </div>
+                  ],
+                  organizer_id: [
+                    label: "Organizer",
+                    type: "checkgroup",
+                    multiple: true,
+                    op: :in,
+                    options: @author_filter
+                  ]
+                ]}
+                meta={@meta}
+                id="events-filter-form"
+              >
+                <div class="mt-4">
+                  <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
+                    Event Date Range
+                  </p>
+                  <div class="space-y-2">
+                    <.input
+                      type="date"
+                      name="date_from"
+                      value={@date_from}
+                      label="From"
+                      id="filter-date-from"
+                      phx-debounce="300"
+                    />
+                    <.input
+                      type="date"
+                      name="date_to"
+                      value={@date_to}
+                      label="To"
+                      id="filter-date-to"
+                      phx-debounce="300"
+                    />
                   </div>
-                </.filter_form>
-              </div>
-
-              <div class="px-4 py-4">
-                <.link
-                  patch={~p"/admin/events"}
-                  class="rounded hover:bg-zinc-100 py-2 px-3 transition duration-200 ease-in-out text-sm font-semibold leading-6 text-zinc-800 active:text-zinc-100/80 w-full flex items-center"
-                >
-                  <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-                  Clear filters
-                </.link>
-              </div>
-            </.dropdown>
+                </div>
+              </.filter_form>
+            </.admin_filter_dropdown>
           </div>
           <%!-- Mobile Card View --%>
           <div class="block md:hidden space-y-4">
