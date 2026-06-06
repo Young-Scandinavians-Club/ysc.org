@@ -384,7 +384,7 @@ defmodule YscWeb.UserTicketsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This order can't be resumed.",
+             "This ticket order has expired or was already completed. Browse events to buy tickets again, or contact us if you were charged.",
              title: "Order"
            )}
         end
