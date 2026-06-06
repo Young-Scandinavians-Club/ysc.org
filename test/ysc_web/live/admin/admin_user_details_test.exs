@@ -84,7 +84,11 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      assert has_element?(view, "a.active", "Profile")
+      assert has_element?(
+               view,
+               "#user-detail-tabs a.border-blue-500",
+               "Profile"
+             )
     end
 
     test "can navigate to orders tab", %{conn: conn} do
@@ -139,8 +143,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      # Active tab should have blue styling
-      assert html =~ "text-blue-600 border-blue-600"
+      assert html =~ "border-blue-500 text-blue-600 bg-white"
     end
 
     test "non-active tabs have hover styles", %{conn: conn} do
@@ -148,8 +151,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      # Non-active tabs should have hover styling
-      assert html =~ "hover:text-zinc-600 hover:border-zinc-300"
+      assert html =~ "hover:text-zinc-700 hover:border-zinc-300"
     end
   end
 

@@ -20,6 +20,10 @@ defmodule YscWeb.AdminTabsTest do
 
       assert html =~ ~s(id="tabs")
       assert html =~ ~s(aria-label="Sections")
+      assert html =~ "overflow-x-auto"
+      assert html =~ "min-w-0"
+      assert html =~ "flex-nowrap"
+      assert html =~ "shrink-0"
       assert html =~ "border-blue-500 text-blue-600 bg-white"
       assert html =~ "border-transparent text-zinc-500"
       assert html =~ "rounded-t"
