@@ -2866,9 +2866,49 @@ defmodule Ysc.Events do
 
   @doc """
   Returns the count of unique recipients for an event update.
+
+  Uses a single SQL query with `UNION` and `COUNT(DISTINCT …)` so the admin
+  Updates tab does not load every ticket, user, and ticket detail just to show
+  a recipient count.
   """
   def count_event_update_recipients(event_id) do
-    list_event_update_recipients(event_id) |> length()
+    purchaser_emails =
+      from t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        join: u in User,
+        on: t.user_id == u.id,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        where: not is_nil(u.email) and u.email != "",
+        select: %{email: fragment("lower(?)", u.email)}
+
+    detail_emails =
+      from t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        join: td in TicketDetail,
+        on: td.ticket_id == t.id,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        where: not is_nil(td.email) and td.email != "",
+        select: %{email: fragment("lower(?)", td.email)}
+
+    union_query = union(purchaser_emails, ^detail_emails)
+
+    from(e in subquery(union_query), select: count(e.email, :distinct))
+    |> Repo.one()
+  end
+
+  @doc """
+  Returns the number of ticket tiers configured for an event.
+  """
+  def count_ticket_tiers_for_event(event_id) do
+    TicketTier
+    |> where([tt], tt.event_id == ^event_id)
+    |> Repo.aggregate(:count)
   end
 
   @doc """
