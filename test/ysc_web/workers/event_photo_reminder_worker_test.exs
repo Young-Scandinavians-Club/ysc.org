@@ -71,7 +71,9 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
       collection: collection
     } do
       donor = user_fixture()
-      donation_tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      donation_tier =
+        ticket_tier_fixture(%{event_id: event.id, type: :donation})
 
       %Ticket{
         id: Ecto.ULID.generate(),
@@ -146,7 +148,9 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
       idempotency_key =
         "event_photo_reminder_#{event.id}_#{String.downcase(buyer.email)}"
 
-      assert Repo.get_by(Ysc.Messages.MessageIdempotency, idempotency_key: idempotency_key)
+      assert Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: idempotency_key
+             )
     end
   end
 

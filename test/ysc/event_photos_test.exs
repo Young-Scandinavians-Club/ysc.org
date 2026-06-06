@@ -166,7 +166,9 @@ defmodule Ysc.EventPhotosTest do
   describe "authorized_to_upload?/2 donation exclusion" do
     test "denies donation-only ticket holders", %{event: event} do
       donor = user_fixture()
-      donation_tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      donation_tier =
+        ticket_tier_fixture(%{event_id: event.id, type: :donation})
 
       %Ticket{
         id: Ecto.ULID.generate(),

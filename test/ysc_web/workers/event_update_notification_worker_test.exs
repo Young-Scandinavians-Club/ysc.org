@@ -77,7 +77,9 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
       organizer: organizer
     } do
       donor = user_fixture()
-      donation_tier = ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      donation_tier =
+        ticket_tier_fixture(%{event_id: event.id, type: :donation})
 
       %Ticket{
         id: Ecto.ULID.generate(),
@@ -116,7 +118,9 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
       idempotency_key =
         "event_update_#{update.id}_#{String.downcase(donor.email)}"
 
-      refute Repo.get_by(Ysc.Messages.MessageIdempotency, idempotency_key: idempotency_key)
+      refute Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: idempotency_key
+             )
     end
 
     test "handles event with no recipients", %{
