@@ -363,7 +363,9 @@ defmodule YscWeb.ConductViolationReportLive do
     changeset =
       %Ysc.Forms.ConductViolationReport{}
       |> Ysc.Forms.ConductViolationReport.changeset(form_values)
-      |> Ysc.Forms.ConductViolationReport.put_submitter(socket.assigns[:current_user])
+      |> Ysc.Forms.ConductViolationReport.put_submitter(
+        socket.assigns[:current_user]
+      )
 
     {:noreply, assign_form(socket, changeset)}
   end
@@ -372,7 +374,9 @@ defmodule YscWeb.ConductViolationReportLive do
     changeset =
       %Ysc.Forms.ConductViolationReport{}
       |> Ysc.Forms.ConductViolationReport.changeset(form_values)
-      |> Ysc.Forms.ConductViolationReport.put_submitter(socket.assigns[:current_user])
+      |> Ysc.Forms.ConductViolationReport.put_submitter(
+        socket.assigns[:current_user]
+      )
 
     summary_text = Map.get(form_values, "summary", "")
 

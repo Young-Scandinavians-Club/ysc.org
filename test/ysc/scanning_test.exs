@@ -786,7 +786,10 @@ defmodule Ysc.ScanningTest do
       %{session: session, ticket: hd(order.tickets)}
     end
 
-    test "rejects tickets for a different event", %{session: session, ticket: ticket} do
+    test "rejects tickets for a different event", %{
+      session: session,
+      ticket: ticket
+    } do
       assert {:error, :invalid, "This ticket is for a different event."} =
                Scanning.check_in_single(session, ticket.id)
 
