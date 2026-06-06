@@ -707,6 +707,34 @@ defmodule Ysc.ScanningTest do
       assert {:error, :invalid, _} =
                Scanning.check_in_single(session, nonexistent_id)
     end
+
+    test "rejects non-confirmed tickets", %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(status: :pending)
+      |> Ysc.Repo.update!()
+
+      assert {:error, :invalid, msg} =
+               Scanning.check_in_single(session, ticket.id)
+
+      assert msg =~ "not confirmed"
+      refute Ysc.Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
+    end
+
+    test "rejects already checked-in tickets", %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      ticket
+      |> Ysc.Events.Ticket.check_in_changeset()
+      |> Ysc.Repo.update!()
+
+      assert {:error, :already_scanned, info} =
+               Scanning.check_in_single(session, ticket.id)
+
+      assert info.ticket_id == ticket.id
+      assert info.order_id == ticket.ticket_order_id
+    end
   end
 
   describe "check_in_order/2" do
