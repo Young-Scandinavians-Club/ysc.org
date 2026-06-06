@@ -516,7 +516,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
             <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
             <span class="text-sm font-medium">
-              Card saved. Confirm yearly renewal to finish this step.
+              Payment method saved. You're all set for automatic renewal.
             </span>
           </div>
           <p class="mt-2 text-sm text-zinc-600">
@@ -536,7 +536,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               phx-click="confirm_payment_step"
               phx-disable-with="Saving..."
             >
-              Confirm yearly renewal
+              Save and continue
               <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>

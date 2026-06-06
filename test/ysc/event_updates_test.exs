@@ -238,25 +238,46 @@ defmodule Ysc.EventUpdatesTest do
   end
 
   describe "count_event_update_recipients/1" do
-    test "returns the length of list_event_update_recipients/1", %{
+    test "matches list_event_update_recipients/1 length", %{
       event: event,
       user: user
     } do
-      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          requires_registration: true
+        })
 
-      %Ticket{
+      ticket =
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      %TicketDetail{
         id: Ecto.ULID.generate(),
-        event_id: event.id,
-        user_id: user.id,
-        ticket_tier_id: tier.id,
-        status: :confirmed,
-        expires_at:
-          DateTime.add(DateTime.utc_now(), 1, :day)
-          |> DateTime.truncate(:second)
+        ticket_id: ticket.id,
+        first_name: "Guest",
+        last_name: "User",
+        email: "guest@example.com"
       }
       |> Repo.insert!()
 
-      assert Events.count_event_update_recipients(event.id) == 1
+      assert Events.count_event_update_recipients(event.id) ==
+               length(Events.list_event_update_recipients(event.id))
+    end
+
+    test "returns 0 for event with no tickets" do
+      event = event_fixture()
+      assert Events.count_event_update_recipients(event.id) == 0
     end
   end
 

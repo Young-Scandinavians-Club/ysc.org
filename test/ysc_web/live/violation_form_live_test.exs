@@ -2,6 +2,7 @@
 defmodule YscWeb.ViolationFormLiveTest do
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
@@ -58,6 +59,39 @@ defmodule YscWeb.ViolationFormLiveTest do
 
       assert html =~
                "This is a complete summary of what happened for the report."
+    end
+
+    test "ignores forged status and user_id on logged-in submit", %{conn: conn} do
+      reporter = user_fixture(%{phone_number: "+14155552222"})
+      victim = user_fixture()
+      conn = log_in_user(conn, reporter)
+
+      {:ok, view, _html} = live(conn, ~p"/report-conduct-violation")
+
+      render_submit(view, "save", %{
+        "conduct_form" => %{
+          "first_name" => reporter.first_name,
+          "last_name" => reporter.last_name,
+          "email" => reporter.email,
+          "phone" => reporter.phone_number,
+          "summary" => "LiveView submission with forged privileged fields.",
+          "anonymous" => "false",
+          "status" => "reviewed",
+          "user_id" => victim.id
+        }
+      })
+
+      report =
+        Ysc.Repo.one(
+          from r in Ysc.Forms.ConductViolationReport,
+            where:
+              r.summary == "LiveView submission with forged privileged fields.",
+            order_by: [desc: r.inserted_at],
+            limit: 1
+        )
+
+      assert report.status == :submitted
+      assert report.user_id == reporter.id
     end
 
     test "returns form errors when summary is empty", %{conn: conn} do

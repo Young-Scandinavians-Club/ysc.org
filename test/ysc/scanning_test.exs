@@ -707,6 +707,34 @@ defmodule Ysc.ScanningTest do
       assert {:error, :invalid, _} =
                Scanning.check_in_single(session, nonexistent_id)
     end
+
+    test "rejects non-confirmed tickets", %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(status: :pending)
+      |> Ysc.Repo.update!()
+
+      assert {:error, :invalid, msg} =
+               Scanning.check_in_single(session, ticket.id)
+
+      assert msg =~ "not confirmed"
+      refute Ysc.Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
+    end
+
+    test "rejects already checked-in tickets", %{session: session, order: order} do
+      ticket = hd(order.tickets)
+
+      ticket
+      |> Ysc.Events.Ticket.check_in_changeset()
+      |> Ysc.Repo.update!()
+
+      assert {:error, :already_scanned, info} =
+               Scanning.check_in_single(session, ticket.id)
+
+      assert info.ticket_id == ticket.id
+      assert info.order_id == ticket.ticket_order_id
+    end
   end
 
   describe "check_in_order/2" do
@@ -759,6 +787,41 @@ defmodule Ysc.ScanningTest do
 
       assert {:error, :invalid, _} =
                Scanning.check_in_order(session, nonexistent_id)
+    end
+
+    test "rejects orders for a different event", %{session: session} do
+      other_event = event_fixture(%{organizer_id: session.created_by_id})
+      member = make_active_member()
+      other_order = ticket_order_fixture(%{user: member, event: other_event})
+      other_order = confirm_tickets(other_order)
+
+      assert {:error, :invalid, "This order is for a different event."} =
+               Scanning.check_in_order(session, other_order.id)
+    end
+  end
+
+  describe "check_in_single/2 cross-event guard" do
+    setup do
+      Ysc.Ledgers.ensure_basic_accounts()
+      admin = user_fixture(%{role: "admin"})
+      event_a = event_fixture(%{organizer_id: admin.id})
+      event_b = event_fixture(%{organizer_id: admin.id})
+      session = event_scan_session_fixture(event_a, admin)
+      member = make_active_member()
+      order = ticket_order_fixture(%{user: member, event: event_b})
+      order = confirm_tickets(order)
+
+      %{session: session, ticket: hd(order.tickets)}
+    end
+
+    test "rejects tickets for a different event", %{
+      session: session,
+      ticket: ticket
+    } do
+      assert {:error, :invalid, "This ticket is for a different event."} =
+               Scanning.check_in_single(session, ticket.id)
+
+      refute Ysc.Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
     end
   end
 
@@ -1130,6 +1193,15 @@ defmodule Ysc.ScanningTest do
     test "returns error for non-existent ticket" do
       assert {:error, :not_found, _msg} =
                Scanning.undo_check_in(Ecto.ULID.generate())
+    end
+
+    test "rejects undo when expected_event_id does not match", %{ticket: ticket} do
+      other_event_id = Ecto.ULID.generate()
+
+      assert {:error, :invalid, "This ticket is for a different event."} =
+               Scanning.undo_check_in(ticket.id, other_event_id)
+
+      assert Ysc.Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
     end
   end
 

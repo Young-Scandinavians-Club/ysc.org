@@ -29,21 +29,31 @@ defmodule Ysc.Forms.ConductViolationReport do
     timestamps()
   end
 
+  @user_submittable_fields [
+    :email,
+    :first_name,
+    :last_name,
+    :phone,
+    :summary,
+    :anonymous
+  ]
+
   @doc false
   def changeset(volunteer, attrs) do
     volunteer
-    |> cast(attrs, [
-      :email,
-      :first_name,
-      :last_name,
-      :phone,
-      :summary,
-      :anonymous,
-      :status,
-      :user_id
-    ])
+    |> cast(attrs, @user_submittable_fields)
     |> validate_required([:email, :first_name, :last_name, :phone, :summary])
     # Basic email validation
     |> validate_format(:email, ~r/@/)
+    |> put_change(:status, :submitted)
   end
+
+  @doc """
+  Applies the submitting user's id after public params are validated.
+  """
+  def put_submitter(changeset, %User{id: user_id}) do
+    put_change(changeset, :user_id, user_id)
+  end
+
+  def put_submitter(changeset, _), do: changeset
 end

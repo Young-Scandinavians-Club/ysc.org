@@ -957,6 +957,91 @@ defmodule YscWeb.SecurityAuditTest do
     deep_merge_security_attrs(base, overrides)
   end
 
+  # ---------------------------------------------------------------------------
+  # Conduct violation report: status and user_id must not be mass-assignable
+  # ---------------------------------------------------------------------------
+
+  describe "Conduct violation report mass assignment" do
+    test "public changeset ignores forged status and user_id" do
+      victim = user_fixture()
+
+      attrs = %{
+        "first_name" => "Eve",
+        "last_name" => "Il",
+        "email" => "eve@example.com",
+        "phone" => "555-0100",
+        "summary" => "Attempted status escalation via forged params.",
+        "status" => "reviewed",
+        "user_id" => victim.id
+      }
+
+      changeset =
+        Ysc.Forms.ConductViolationReport.changeset(
+          %Ysc.Forms.ConductViolationReport{},
+          attrs
+        )
+
+      assert Ecto.Changeset.get_field(changeset, :status) == :submitted
+      assert Ecto.Changeset.get_field(changeset, :user_id) == nil
+    end
+
+    test "put_submitter binds the authenticated reporter only" do
+      reporter = user_fixture()
+
+      changeset =
+        %Ysc.Forms.ConductViolationReport{}
+        |> Ysc.Forms.ConductViolationReport.changeset(%{
+          "first_name" => "Rep",
+          "last_name" => "Orter",
+          "email" => reporter.email,
+          "phone" => "555-0101",
+          "summary" => "Logged-in reporter submission."
+        })
+        |> Ysc.Forms.ConductViolationReport.put_submitter(reporter)
+
+      assert Ecto.Changeset.get_field(changeset, :user_id) == reporter.id
+    end
+
+    test "put_submitter leaves user_id unset for anonymous reporters" do
+      changeset =
+        %Ysc.Forms.ConductViolationReport{}
+        |> Ysc.Forms.ConductViolationReport.changeset(%{
+          "first_name" => "Anon",
+          "last_name" => "Ymous",
+          "email" => "anon@example.com",
+          "phone" => "555-0102",
+          "summary" => "Anonymous reporter submission."
+        })
+        |> Ysc.Forms.ConductViolationReport.put_submitter(nil)
+
+      assert Ecto.Changeset.get_field(changeset, :user_id) == nil
+    end
+
+    test "create_conduct_violation_report persists submitted status and reporter only" do
+      reporter = user_fixture()
+      victim = user_fixture()
+
+      changeset =
+        %Ysc.Forms.ConductViolationReport{}
+        |> Ysc.Forms.ConductViolationReport.changeset(%{
+          "first_name" => reporter.first_name,
+          "last_name" => reporter.last_name,
+          "email" => reporter.email,
+          "phone" => reporter.phone_number || "555-0103",
+          "summary" => "Forged privileged fields should not persist.",
+          "status" => "reviewed",
+          "user_id" => victim.id
+        })
+        |> Ysc.Forms.ConductViolationReport.put_submitter(reporter)
+
+      assert {:ok, report} =
+               Ysc.Forms.create_conduct_violation_report(changeset)
+
+      assert report.status == :submitted
+      assert report.user_id == reporter.id
+    end
+  end
+
   defp deep_merge_security_attrs(base, overrides) when is_map(overrides) do
     Map.merge(base, overrides, fn
       :registration_form, base_form, override_form
