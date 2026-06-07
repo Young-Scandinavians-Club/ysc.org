@@ -978,7 +978,9 @@ defmodule YscWeb.ExpenseReportLive do
             "vendor" => get_field_from_item(item, :vendor),
             "description" => get_field_from_item(item, :description),
             "amount" =>
-              Ysc.MoneyHelper.format_money_for_input(get_field_from_item(item, :amount))
+              Ysc.MoneyHelper.format_money_for_input(
+                get_field_from_item(item, :amount)
+              )
           }
 
           item_params =
@@ -1035,7 +1037,9 @@ defmodule YscWeb.ExpenseReportLive do
             "date" => format_date_for_input(item),
             "description" => get_field_from_item(item, :description),
             "amount" =>
-              Ysc.MoneyHelper.format_money_for_input(get_field_from_item(item, :amount))
+              Ysc.MoneyHelper.format_money_for_input(
+                get_field_from_item(item, :amount)
+              )
           }
 
           item_params =
@@ -2011,7 +2015,11 @@ defmodule YscWeb.ExpenseReportLive do
                             type="text"
                             label="Amount"
                             phx-hook="MoneyInput"
-                            value={Ysc.MoneyHelper.format_money_for_input(expense_f[:amount].value)}
+                            value={
+                              Ysc.MoneyHelper.format_money_for_input(
+                                expense_f[:amount].value
+                              )
+                            }
                             placeholder="0.00"
                             required
                           >
@@ -2365,7 +2373,11 @@ defmodule YscWeb.ExpenseReportLive do
                             type="text"
                             label="Amount"
                             phx-hook="MoneyInput"
-                            value={Ysc.MoneyHelper.format_money_for_input(income_f[:amount].value)}
+                            value={
+                              Ysc.MoneyHelper.format_money_for_input(
+                                income_f[:amount].value
+                              )
+                            }
                             placeholder="0.00"
                             required
                           >

@@ -129,5 +129,4 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
   defp expiry_line(%{expires_at: exp}) do
     "Expires: #{Calendar.strftime(exp, "%b %d, %Y %H:%M UTC")}."
   end
-
 end

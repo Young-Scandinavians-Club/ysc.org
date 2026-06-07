@@ -231,5 +231,4 @@ defmodule YscWeb.Emails.ExpenseReportTreasurerNotification do
     do: String.capitalize(method)
 
   defp format_reimbursement_method(_), do: "Not specified"
-
 end

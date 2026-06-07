@@ -97,5 +97,4 @@ defmodule YscWeb.Emails.MembershipRenewalSuccess do
   defp get_membership_type_name("single"), do: "Single"
   defp get_membership_type_name("family"), do: "Family"
   defp get_membership_type_name(_), do: "Membership"
-
 end

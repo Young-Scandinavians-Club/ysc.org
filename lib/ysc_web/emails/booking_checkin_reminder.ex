@@ -180,5 +180,4 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     do: String.capitalize(to_string(mode))
 
   defp get_booking_mode_description(mode), do: to_string(mode)
-
 end

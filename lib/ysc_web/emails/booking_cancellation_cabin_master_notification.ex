@@ -167,5 +167,4 @@ defmodule YscWeb.Emails.BookingCancellationCabinMasterNotification do
     do: String.capitalize(to_string(property))
 
   defp get_property_name(property), do: to_string(property)
-
 end

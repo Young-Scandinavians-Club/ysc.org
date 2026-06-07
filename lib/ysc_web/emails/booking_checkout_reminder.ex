@@ -133,5 +133,4 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     do: "9325 Bass Road, Kelseyville, CA 95451"
 
   defp get_property_address(_), do: "Property Address"
-
 end

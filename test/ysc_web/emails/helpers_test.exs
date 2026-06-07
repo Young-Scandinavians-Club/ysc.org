@@ -70,6 +70,7 @@ defmodule YscWeb.Emails.HelpersTest do
       datetime = ~U[2026-01-15 20:30:00Z]
 
       assert Helpers.format_datetime(datetime) =~ "January 15, 2026"
+
       assert Helpers.format_datetime(datetime) =~ "PST" or
                Helpers.format_datetime(datetime) =~ "PDT"
     end

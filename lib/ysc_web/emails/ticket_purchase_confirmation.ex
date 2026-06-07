@@ -9,7 +9,12 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, member_greeting_name: 1, format_datetime: 1, format_money: 1]
+    only: [
+      absolute_url: 1,
+      member_greeting_name: 1,
+      format_datetime: 1,
+      format_money: 1
+    ]
 
   alias Ysc.Tickets
 
@@ -514,5 +519,4 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
       Money.new(0, :USD)
     end
   end
-
 end

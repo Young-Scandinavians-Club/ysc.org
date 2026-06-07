@@ -204,7 +204,9 @@ defmodule YscWeb.AdminBookingsLive do
             placeholder="0.00"
             id="children_amount_input"
             phx-hook="MoneyInput"
-            value={MoneyHelper.format_money_for_input(@form[:children_amount].value)}
+            value={
+              MoneyHelper.format_money_for_input(@form[:children_amount].value)
+            }
           >
             <div class="text-zinc-800">$</div>
           </.input>

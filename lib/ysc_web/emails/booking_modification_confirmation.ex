@@ -7,7 +7,12 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [absolute_url: 1, member_greeting_name: 1, format_date: 1, format_money: 1]
+    only: [
+      absolute_url: 1,
+      member_greeting_name: 1,
+      format_date: 1,
+      format_money: 1
+    ]
 
   alias Ysc.Repo
 
@@ -117,5 +122,4 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
     do: String.capitalize(to_string(property))
 
   defp get_property_name(property), do: to_string(property)
-
 end
