@@ -2999,6 +2999,69 @@ defmodule Ysc.EventsTest do
     end
   end
 
+  describe "list_*_reservations_for_tiers/1" do
+    test "batch loads active and expired reservations grouped by tier", %{
+      user: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier_a = ticket_tier_fixture(%{event_id: event.id, name: "Tier A"})
+      tier_b = ticket_tier_fixture(%{event_id: event.id, name: "Tier B"})
+      member = user_fixture()
+
+      future_expiry =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(2, :day)
+
+      past_expiry =
+        DateTime.utc_now()
+        |> DateTime.truncate(:second)
+        |> DateTime.add(-1, :hour)
+
+      assert {:ok, active_a} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier_a.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 1,
+                 expires_at: future_expiry
+               })
+
+      assert {:ok, expired_b} =
+               Events.create_ticket_reservation(%{
+                 ticket_tier_id: tier_b.id,
+                 user_id: member.id,
+                 created_by_id: admin.id,
+                 quantity: 2,
+                 expires_at: future_expiry
+               })
+
+      expired_b
+      |> Ecto.Changeset.change(%{expires_at: past_expiry})
+      |> Repo.update!()
+
+      tier_ids = [tier_a.id, tier_b.id]
+
+      active_by_tier = Events.list_active_reservations_for_tiers(tier_ids)
+
+      expired_by_tier =
+        Events.list_expired_active_reservations_for_tiers(tier_ids)
+
+      assert [loaded_a] = Map.fetch!(active_by_tier, tier_a.id)
+      assert loaded_a.id == active_a.id
+      assert Map.fetch!(active_by_tier, tier_b.id) == []
+
+      assert [loaded_b] = Map.fetch!(expired_by_tier, tier_b.id)
+      assert loaded_b.quantity == 2
+      assert Map.fetch!(expired_by_tier, tier_a.id) == []
+    end
+
+    test "returns empty map for empty tier id list" do
+      assert Events.list_active_reservations_for_tiers([]) == %{}
+      assert Events.list_expired_active_reservations_for_tiers([]) == %{}
+    end
+  end
+
   describe "create_ticket_reservation/1 notification email" do
     test "enqueues EmailNotifier job for the member", %{user: admin} do
       event = event_fixture(%{organizer_id: admin.id})

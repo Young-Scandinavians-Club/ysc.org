@@ -12,14 +12,12 @@ defmodule YscWeb.AdminNewslettersLive do
 
     subscriber_count = Newsletter.count_subscribers(subscribed: true)
 
-    creator_filter = Newsletter.get_all_creators()
-
     {:ok,
      socket
      |> assign(:page_title, "Newsletters")
      |> assign(:active_page, :newsletters)
      |> assign(:subscriber_count, subscriber_count)
-     |> assign(:creator_filter, creator_filter)
+     |> assign_new(:creator_filter, &Newsletter.get_all_creators/0)
      |> assign(:empty, false)
      |> assign(:meta, nil)
      |> assign(:params, %{})
