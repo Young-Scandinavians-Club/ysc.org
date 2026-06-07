@@ -1090,6 +1090,82 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert redirected_to(conn) == ~p"/users/log-in"
     end
+
+    test "get_user_by_session_token returns nil for rejected and deleted users" do
+      for blocked_state <- [:rejected, :deleted] do
+        user = user_fixture(%{state: blocked_state})
+        token = Accounts.generate_user_session_token(user)
+
+        refute Accounts.get_user_by_session_token(token),
+               "expected nil for #{blocked_state} users"
+      end
+    end
+
+    test "rejecting a user via update_user revokes existing session tokens" do
+      user = user_fixture(%{state: :active})
+      token = Accounts.generate_user_session_token(user)
+      admin = user_fixture(%{role: :admin})
+
+      {:ok, _} = Accounts.update_user(user, %{"state" => "rejected"}, admin)
+
+      assert Repo.aggregate(
+               from(t in UserToken,
+                 where: t.user_id == ^user.id and t.context == "session"
+               ),
+               :count
+             ) == 0
+
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "login_allowed_state? only permits pending_approval and active users" do
+      assert Accounts.login_allowed_state?(%User{state: :active})
+      assert Accounts.login_allowed_state?(%User{state: :pending_approval})
+      refute Accounts.login_allowed_state?(%User{state: :suspended})
+      refute Accounts.login_allowed_state?(%User{state: :rejected})
+      refute Accounts.login_allowed_state?(%User{state: :deleted})
+      refute Accounts.login_allowed_state?(nil)
+    end
+
+    test "rejecting an application revokes existing session tokens" do
+      applicant =
+        oauth_user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      application = signup_application_fixture(applicant)
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      token = Accounts.generate_user_session_token(applicant)
+
+      assert :ok =
+               Accounts.record_application_outcome(
+                 :rejected,
+                 applicant,
+                 application,
+                 admin
+               )
+
+      assert Repo.aggregate(
+               from(t in UserToken,
+                 where: t.user_id == ^applicant.id and t.context == "session"
+               ),
+               :count
+             ) == 0
+
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "non-blocked user updates keep existing sessions valid" do
+      user = user_fixture(%{state: :active, first_name: "Before"})
+      token = Accounts.generate_user_session_token(user)
+      admin = user_fixture(%{role: :admin})
+
+      {:ok, _} =
+        Accounts.update_user(user, %{"first_name" => "After"}, admin)
+
+      assert Accounts.get_user_by_session_token(token)
+    end
   end
 
   defp deep_merge_security_attrs(base, overrides) when is_map(overrides) do
