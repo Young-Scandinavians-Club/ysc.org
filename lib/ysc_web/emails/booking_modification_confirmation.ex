@@ -6,7 +6,13 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
     mjml_template: "templates/booking_modification_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [
+      absolute_url: 1,
+      member_greeting_name: 1,
+      format_date: 1,
+      format_money: 1
+    ]
 
   alias Ysc.Repo
 
@@ -116,17 +122,4 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
     do: String.capitalize(to_string(property))
 
   defp get_property_name(property), do: to_string(property)
-
-  defp format_date(%Date{} = date), do: Calendar.strftime(date, "%B %d, %Y")
-  defp format_date(_), do: "N/A"
-
-  defp format_money(%Money{} = money) do
-    Money.to_string!(money,
-      separator: ".",
-      delimiter: ",",
-      fractional_digits: 2
-    )
-  end
-
-  defp format_money(_), do: "$0.00"
 end

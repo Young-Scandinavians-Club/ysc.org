@@ -6,9 +6,7 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
     mjml_template: "templates/booking_entitlement_granted.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
-
-  alias Ysc.MoneyHelper
+  import YscWeb.Emails.Helpers, only: [absolute_url: 1, format_money: 1]
 
   def get_template_name, do: "booking_entitlement_granted"
 
@@ -131,7 +129,4 @@ defmodule YscWeb.Emails.BookingEntitlementGranted do
   defp expiry_line(%{expires_at: exp}) do
     "Expires: #{Calendar.strftime(exp, "%b %d, %Y %H:%M UTC")}."
   end
-
-  defp format_money(nil), do: "$0.00"
-  defp format_money(m), do: MoneyHelper.format_money!(m)
 end

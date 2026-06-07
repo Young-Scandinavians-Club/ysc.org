@@ -55,6 +55,15 @@ defmodule Ysc.MoneyHelper do
 
   def format_money(_), do: ""
 
+  @doc """
+  Formats Money for HTML form input values.
+
+  Returns an empty string for nil and non-money values.
+  """
+  def format_money_for_input(nil), do: ""
+  def format_money_for_input(%Money{} = money), do: format_money!(money)
+  def format_money_for_input(_), do: ""
+
   def format_money!(value) do
     case format_money(value) do
       {:ok, str} -> str

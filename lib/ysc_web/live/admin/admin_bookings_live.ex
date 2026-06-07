@@ -191,7 +191,7 @@ defmodule YscWeb.AdminBookingsLive do
             placeholder="0.00"
             id="adult_amount_input"
             phx-hook="MoneyInput"
-            value={format_money_for_input(@form[:amount].value)}
+            value={MoneyHelper.format_money_for_input(@form[:amount].value)}
             required
           >
             <div class="text-zinc-800">$</div>
@@ -204,7 +204,9 @@ defmodule YscWeb.AdminBookingsLive do
             placeholder="0.00"
             id="children_amount_input"
             phx-hook="MoneyInput"
-            value={format_money_for_input(@form[:children_amount].value)}
+            value={
+              MoneyHelper.format_money_for_input(@form[:children_amount].value)
+            }
           >
             <div class="text-zinc-800">$</div>
           </.input>
@@ -6408,13 +6410,6 @@ defmodule YscWeb.AdminBookingsLive do
       {room.name, room.id}
     end)
   end
-
-  defp format_money_for_input(nil), do: ""
-
-  defp format_money_for_input(%Money{} = money),
-    do: MoneyHelper.format_money!(money)
-
-  defp format_money_for_input(_), do: ""
 
   defp format_season_dates(start_date, end_date) do
     start_str = "#{month_name(start_date.month)} #{start_date.day}"

@@ -50,6 +50,62 @@ defmodule YscWeb.Emails.HelpersTest do
     end
   end
 
+  describe "format_date/1" do
+    test "formats dates and datetimes" do
+      assert Helpers.format_date(~D[2026-01-15]) == "January 15, 2026"
+
+      assert Helpers.format_date(~U[2026-01-15 12:00:00Z]) ==
+               "January 15, 2026"
+    end
+
+    test "returns default for nil and unsupported values" do
+      assert Helpers.format_date(nil) == "N/A"
+      assert Helpers.format_date(nil, "—") == "—"
+      assert Helpers.format_date(:invalid) == "N/A"
+    end
+  end
+
+  describe "format_datetime/1" do
+    test "formats datetimes in Pacific time" do
+      datetime = ~U[2026-01-15 20:30:00Z]
+
+      assert Helpers.format_datetime(datetime) =~ "January 15, 2026"
+
+      assert Helpers.format_datetime(datetime) =~ "PST" or
+               Helpers.format_datetime(datetime) =~ "PDT"
+    end
+
+    test "returns default for nil and unsupported values" do
+      assert Helpers.format_datetime(nil) == "N/A"
+      assert Helpers.format_datetime(:invalid) == "N/A"
+    end
+  end
+
+  describe "format_money/1" do
+    test "formats money with comma separators and two decimals" do
+      money = Money.new(:USD, "1234.50")
+      assert Helpers.format_money(money) == "$1,234.50"
+    end
+
+    test "returns default for nil and non-money values" do
+      assert Helpers.format_money(nil) == "$0.00"
+      assert Helpers.format_money("invalid") == "$0.00"
+      assert Helpers.format_money(nil, "N/A") == "N/A"
+    end
+  end
+
+  describe "format_membership_money/1" do
+    test "formats money using Money default string style" do
+      money = Money.new(:USD, "99.00")
+      assert Helpers.format_membership_money(money) == "$99.00"
+    end
+
+    test "returns default for nil and non-money values" do
+      assert Helpers.format_membership_money(nil) == "N/A"
+      assert Helpers.format_membership_money(:invalid) == "N/A"
+    end
+  end
+
   describe "membership_payment_reminder_data/1" do
     test "builds reminder assigns for a user" do
       origin = YscWeb.Endpoint.url()

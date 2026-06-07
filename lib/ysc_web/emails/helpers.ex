@@ -1,9 +1,12 @@
 defmodule YscWeb.Emails.Helpers do
   @moduledoc """
-  Shared helpers for MJML email modules: public URLs and salutation names.
+  Shared helpers for MJML email modules: public URLs, salutation names, and
+  display formatting for money and dates.
   """
 
   @member_default "Valued Member"
+  @email_timezone "America/Los_Angeles"
+  @money_display_opts [separator: ".", delimiter: ",", fractional_digits: 2]
 
   @doc """
   Returns the public site origin (`YscWeb.Endpoint.url/0`), with no trailing slash.
@@ -77,4 +80,67 @@ defmodule YscWeb.Emails.Helpers do
       upcoming_events_url: upcoming_events_url()
     }
   end
+
+  @doc """
+  Formats a date for email copy (`"January 15, 2026"`).
+
+  Returns `default` when the value is nil or not a date/datetime.
+  """
+  def format_date(value, default \\ "N/A")
+
+  def format_date(nil, default), do: default
+
+  def format_date(%Date{} = date, _default),
+    do: Calendar.strftime(date, "%B %d, %Y")
+
+  def format_date(%DateTime{} = datetime, default),
+    do: format_date(DateTime.to_date(datetime), default)
+
+  def format_date(_, default), do: default
+
+  @doc """
+  Formats a datetime in Pacific time for email copy.
+
+  Returns `default` when the value is nil or not a datetime.
+  """
+  def format_datetime(value, default \\ "N/A")
+
+  def format_datetime(nil, default), do: default
+
+  def format_datetime(%DateTime{} = datetime, _default) do
+    datetime
+    |> DateTime.shift_zone!(@email_timezone)
+    |> Calendar.strftime("%B %d, %Y at %I:%M %p %Z")
+  end
+
+  def format_datetime(_, default), do: default
+
+  @doc """
+  Formats money for transactional emails (bookings, tickets, expenses).
+
+  Uses comma thousands separators and two decimal places. Returns `default`
+  for nil and non-money values.
+  """
+  def format_money(value, default \\ "$0.00")
+
+  def format_money(nil, default), do: default
+
+  def format_money(%Money{} = money, _default),
+    do: Money.to_string!(money, @money_display_opts)
+
+  def format_money(_, default), do: default
+
+  @doc """
+  Formats money for membership emails using Money's default string style.
+
+  Returns `default` for nil and non-money values.
+  """
+  def format_membership_money(value, default \\ "N/A")
+
+  def format_membership_money(nil, default), do: default
+
+  def format_membership_money(%Money{} = money, _default),
+    do: Money.to_string!(money)
+
+  def format_membership_money(_, default), do: default
 end
