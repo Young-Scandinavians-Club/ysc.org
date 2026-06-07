@@ -668,6 +668,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
 
       html = render_submit(lv, "save", %{"user" => bad_params})
       assert html =~ "Some required information is missing or incorrect"
+      assert html =~ "Previous step"
     end
 
     test "recover_wizard restores step 1 when account fields are filled but not step 2 questions",

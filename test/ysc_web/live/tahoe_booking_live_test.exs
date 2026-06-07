@@ -447,6 +447,24 @@ defmodule YscWeb.TahoeBookingLiveTest do
       html = render(view)
       assert html =~ "Tahoe"
     end
+
+    test "terms modal shows refund-based cancellation copy", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      render_async(view, 2_000)
+
+      render_click(view, "show-terms-modal")
+
+      html = render(view)
+
+      assert html =~ "📅 Cancellation Policy"
+      assert html =~ "Entire cabin:"
+      assert html =~ "50% refund"
+      assert html =~ "14 days before for no refund"
+      assert html =~ "7 days before for no refund"
+    end
   end
 
   describe "error handling" do

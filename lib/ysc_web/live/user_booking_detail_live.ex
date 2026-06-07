@@ -276,7 +276,8 @@ defmodule YscWeb.UserBookingDetailLive do
                               "Any reservation cancelled less than #{rule.days_before_checkin} days before your arrival date will not receive a refund."
 
                             refund_percentage > 0 and refund_percentage < 100.0 ->
-                              refund_pct = refund_percentage |> Float.round(0) |> trunc()
+                              refund_pct =
+                                refund_percentage |> Float.round(0) |> trunc()
 
                               "Reservations cancelled less than #{rule.days_before_checkin} days before your arrival date receive a #{refund_pct}% refund."
 

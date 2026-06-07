@@ -808,6 +808,101 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       :ok
     end
 
+    test "shows no-refund policy line when rule has zero refund percentage", %{
+      conn: conn
+    } do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      {:ok, refund_policy} =
+        Bookings.create_refund_policy(%{
+          property: :tahoe,
+          booking_mode: :buyout,
+          is_active: true,
+          name: "No refund policy #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: refund_policy.id,
+          days_before_checkin: 14,
+          refund_percentage: 0,
+          priority: 1
+        })
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe,
+          booking_mode: :buyout
+        })
+
+      {:ok, {_payment, _, _}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id: "pi_no_refund_#{booking.id}",
+          stripe_fee: Money.new(50, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
+
+      assert html =~ "Cancellation Policy"
+      assert html =~ "will not receive a refund"
+    end
+
+    test "shows full refund policy line when rule has 100% refund percentage",
+         %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+
+      {:ok, refund_policy} =
+        Bookings.create_refund_policy(%{
+          property: :tahoe,
+          booking_mode: :buyout,
+          is_active: true,
+          name: "Full refund policy #{System.unique_integer([:positive])}"
+        })
+
+      {:ok, _} =
+        Bookings.create_refund_policy_rule(%{
+          refund_policy_id: refund_policy.id,
+          days_before_checkin: 21,
+          refund_percentage: 100,
+          priority: 1
+        })
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe,
+          booking_mode: :buyout
+        })
+
+      {:ok, {_payment, _, _}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: booking.total_price,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id: "pi_full_refund_#{booking.id}",
+          stripe_fee: Money.new(50, :USD),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      {:ok, _view, html} = live_booking_detail(conn, booking.id)
+
+      assert html =~ "Cancellation Policy"
+      assert html =~ "eligible for a full refund"
+    end
+
     test "shows partial refund policy lines when rule has partial refund percentage",
          %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
