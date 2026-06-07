@@ -132,7 +132,11 @@ defmodule Ysc.Tickets.StripeService do
            stripe_client().retrieve_payment_intent(payment_intent_id, %{}),
          {:ok, ticket_order} <-
            get_ticket_order_from_payment_intent(payment_intent) do
-      Tickets.cancel_ticket_order(ticket_order, failure_reason)
+      if ticket_order.status == :completed do
+        {:ok, ticket_order}
+      else
+        Tickets.cancel_ticket_order(ticket_order, failure_reason)
+      end
     end
   end
 
