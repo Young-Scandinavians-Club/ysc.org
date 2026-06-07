@@ -789,6 +789,47 @@ defmodule Ysc.EventsTest do
       end
     end
 
+    test "list_events_paginated/1 capacity_info registrations exclude donation tickets" do
+      user = user_fixture()
+
+      {:ok, event} =
+        create_event_fixture(%{
+          title: "Capacity batch #{System.unique_integer()}",
+          max_attendees: 50,
+          organizer_id: user.id
+        })
+
+      {:ok, paid_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      {:ok, donation_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      for _ <- 1..2 do
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: paid_tier.id,
+          status: :confirmed
+        })
+      end
+
+      for _ <- 1..4 do
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: donation_tier.id,
+          status: :confirmed
+        })
+      end
+
+      assert {:ok, {events, _meta}} =
+               Events.list_events_paginated(%{page: 1, page_size: 50})
+
+      listed = Enum.find(events, &(&1.id == event.id))
+      assert listed.capacity_info.registrations == 2
+    end
+
     test "list_events_paginated/2 filters drafts tab" do
       user = user_fixture()
 

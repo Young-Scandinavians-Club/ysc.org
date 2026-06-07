@@ -237,6 +237,23 @@ defmodule Ysc.EventUpdatesTest do
     end
   end
 
+  describe "count_ticket_tiers_for_event/1" do
+    test "returns tier count for the event", %{event: event} do
+      ticket_tier_fixture(%{event_id: event.id, name: "Tier A"})
+      ticket_tier_fixture(%{event_id: event.id, name: "Tier B"})
+
+      other_event = event_fixture()
+      ticket_tier_fixture(%{event_id: other_event.id, name: "Other"})
+
+      assert Events.count_ticket_tiers_for_event(event.id) == 2
+    end
+
+    test "returns 0 when event has no tiers" do
+      event = event_fixture()
+      assert Events.count_ticket_tiers_for_event(event.id) == 0
+    end
+  end
+
   describe "count_event_update_recipients/1" do
     test "matches list_event_update_recipients/1 length", %{
       event: event,
