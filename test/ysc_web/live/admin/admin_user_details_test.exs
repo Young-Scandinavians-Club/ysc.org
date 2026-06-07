@@ -84,7 +84,11 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      assert has_element?(view, "a.active", "Profile")
+      assert has_element?(
+               view,
+               "#user-detail-tabs a.border-blue-500",
+               "Profile"
+             )
     end
 
     test "can navigate to orders tab", %{conn: conn} do
@@ -92,11 +96,10 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      {:ok, _view, orders_html} =
+      orders_html =
         view
         |> element("a[href$='/details/orders']")
         |> render_click()
-        |> follow_redirect(conn, ~p"/admin/users/#{user.id}/details/orders")
 
       assert orders_html =~ "Tickets"
     end
@@ -106,11 +109,10 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      {:ok, _view, bookings_html} =
+      bookings_html =
         view
         |> element("a[href$='/details/bookings']")
         |> render_click()
-        |> follow_redirect(conn, ~p"/admin/users/#{user.id}/details/bookings")
 
       assert bookings_html =~ "Bookings"
     end
@@ -120,14 +122,10 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      {:ok, _view, application_html} =
+      application_html =
         view
         |> element("a[href$='/details/application']")
         |> render_click()
-        |> follow_redirect(
-          conn,
-          ~p"/admin/users/#{user.id}/details/application"
-        )
 
       assert application_html =~ "Application"
     end
@@ -139,8 +137,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      # Active tab should have blue styling
-      assert html =~ "text-blue-600 border-blue-600"
+      assert html =~ "border-blue-500 text-blue-600 bg-white"
     end
 
     test "non-active tabs have hover styles", %{conn: conn} do
@@ -148,8 +145,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      # Non-active tabs should have hover styling
-      assert html =~ "hover:text-zinc-600 hover:border-zinc-300"
+      assert html =~ "hover:text-zinc-700 hover:border-zinc-300"
     end
   end
 
@@ -230,11 +226,11 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      {:ok, view, html} =
-        view
-        |> element("a[href$='/details/membership']")
-        |> render_click()
-        |> follow_redirect(conn, ~p"/admin/users/#{user.id}/details/membership")
+      view
+      |> element("a[href$='/details/membership']")
+      |> render_click()
+
+      html = render(view)
 
       assert html =~ "Create membership (paid elsewhere)"
       assert html =~ "create-paid-membership-form"
@@ -269,11 +265,10 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-      {:ok, _view, html} =
+      html =
         view
         |> element("a[href$='/details/membership']")
         |> render_click()
-        |> follow_redirect(conn, ~p"/admin/users/#{user.id}/details/membership")
 
       refute html =~ "Create membership (paid elsewhere)"
       assert html =~ "Current Membership"
@@ -315,14 +310,9 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
         {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
-        {:ok, view, _html} =
-          view
-          |> element("a[href$='/details/membership']")
-          |> render_click()
-          |> follow_redirect(
-            conn,
-            ~p"/admin/users/#{user.id}/details/membership"
-          )
+        view
+        |> element("a[href$='/details/membership']")
+        |> render_click()
 
         assert has_element?(view, "#create-paid-membership-form")
 

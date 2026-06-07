@@ -65,151 +65,71 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div class="pt-4">
-          <div class="text-sm font-medium text-center text-zinc-500 border-b border-zinc-200">
-            <ul class="flex flex-wrap -mb-px">
-              <li class="me-2">
-                <.link
-                  navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :profile &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :profile &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Profile
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :orders &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :orders &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Tickets
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :bookings &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :bookings &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Bookings
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/application?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :application &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :application &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Application
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :membership &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :membership &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Membership
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :notifications &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :notifications &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Notifications
-                </.link>
-              </li>
-              <li :if={@is_treasurer} class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :bank_accounts &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :bank_accounts &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Bank Accounts
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/family?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :family &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :family &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Family
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    ~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :logs && "text-blue-600 border-blue-600 active",
-                    @live_action != :logs &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Notes
-                </.link>
-              </li>
-            </ul>
-          </div>
+          <.admin_tabs id="user-detail-tabs" aria_label="User detail sections">
+            <.admin_tab
+              active={@live_action == :profile}
+              patch={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
+            >
+              Profile
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :orders}
+              patch={~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"}
+            >
+              Tickets
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :bookings}
+              patch={~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"}
+            >
+              Bookings
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :application}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/application?#{@list_params}"
+              }
+            >
+              Application
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :membership}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"
+              }
+            >
+              Membership
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :notifications}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"
+              }
+            >
+              Notifications
+            </.admin_tab>
+            <.admin_tab
+              :if={@is_treasurer}
+              active={@live_action == :bank_accounts}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"
+              }
+            >
+              Bank Accounts
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :family}
+              patch={~p"/admin/users/#{@user_id}/details/family?#{@list_params}"}
+            >
+              Family
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :logs}
+              patch={~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"}
+            >
+              Notes
+            </.admin_tab>
+          </.admin_tabs>
         </div>
 
         <div :if={@live_action == :profile} class="max-w-lg px-2 space-y-8">
