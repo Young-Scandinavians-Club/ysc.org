@@ -57,7 +57,7 @@ defmodule YscWeb.UserRegistrationLive do
           <div class="space-y-4 min-h-[28rem]">
             <p class="text-right text-xs text-zinc-400">* Required fields</p>
             <.error :if={@check_errors}>
-              Some required information is missing or incorrect. Review the highlighted fields — you may need to go back to an earlier step.
+              Some required information is missing or incorrect. Use <strong>Previous step</strong> to check each section — look for fields marked in red.
             </.error>
 
             <div id="step-0-content" class={if @current_step !== 0, do: "hidden"}>

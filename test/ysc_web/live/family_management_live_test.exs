@@ -57,8 +57,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
       html = render_loaded(view)
 
-      assert html =~ "cannot send invites" or
-               html =~ "cannot send invites at this time"
+      assert html =~ "can't send family invites right now"
     end
 
     test "validate_invite updates form fields", %{conn: conn} do

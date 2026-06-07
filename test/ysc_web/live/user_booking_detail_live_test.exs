@@ -808,7 +808,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       :ok
     end
 
-    test "shows partial forfeiture policy lines when rule has partial refund percentage",
+    test "shows partial refund policy lines when rule has partial refund percentage",
          %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
 
@@ -853,7 +853,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       {:ok, _view, html} = live_booking_detail(conn, booking.id)
 
       assert html =~ "Cancellation Policy"
-      assert html =~ "forfeiture" and html =~ "50"
+      assert html =~ "50% refund"
     end
 
     test "shows generic refund copy when no rule matches yet policy lists rules",

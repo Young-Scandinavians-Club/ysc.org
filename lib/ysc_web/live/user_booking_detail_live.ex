@@ -266,24 +266,22 @@ defmodule YscWeb.UserBookingDetailLive do
                             :asc
                           )
 
-                        # Calculate forfeiture percentage (100 - refund_percentage)
                         for rule <- sorted_rules do
-                          forfeiture_percentage =
-                            Decimal.sub(Decimal.new(100), rule.refund_percentage)
+                          refund_percentage =
+                            rule.refund_percentage
                             |> Decimal.to_float()
 
                           cond do
-                            forfeiture_percentage == 100.0 ->
-                              # 100% forfeiture (0% refund)
-                              "Any reservation cancelled less than #{rule.days_before_checkin} days prior to date of arrival will result in forfeiture of 100% of the cost."
+                            refund_percentage == 0.0 ->
+                              "Any reservation cancelled less than #{rule.days_before_checkin} days before your arrival date will not receive a refund."
 
-                            forfeiture_percentage > 0 ->
-                              # Partial forfeiture
-                              "Reservations cancelled less than #{rule.days_before_checkin} days prior to date of arrival are subject to forfeiture of #{forfeiture_percentage |> Float.round(0) |> trunc()}% of the cost."
+                            refund_percentage > 0 and refund_percentage < 100.0 ->
+                              refund_pct = refund_percentage |> Float.round(0) |> trunc()
+
+                              "Reservations cancelled less than #{rule.days_before_checkin} days before your arrival date receive a #{refund_pct}% refund."
 
                             true ->
-                              # 0% forfeiture (100% refund) - shouldn't happen but handle it
-                              "Reservations cancelled #{rule.days_before_checkin} or more days prior to date of arrival are eligible for a full refund."
+                              "Reservations cancelled #{rule.days_before_checkin} or more days before your arrival date are eligible for a full refund."
                           end
                         end
                         |> Enum.map(fn text -> "<p>#{text}</p>" end)
