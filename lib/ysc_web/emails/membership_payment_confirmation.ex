@@ -8,7 +8,8 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
     mjml_template: "templates/membership_payment_confirmation.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [member_greeting_name: 1, format_date: 1, format_membership_money: 1]
 
   def get_template_name() do
     "membership_payment_confirmation"
@@ -32,7 +33,7 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
     paid_elsewhere = Keyword.get(opts, :paid_elsewhere, false)
     first_name = member_greeting_name(user)
     membership_type_name = get_membership_type_name(membership_type)
-    amount_str = format_money(amount)
+    amount_str = format_membership_money(amount)
     payment_date_str = format_date(payment_date)
 
     %{
@@ -50,19 +51,4 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmation do
   defp get_membership_type_name("family"), do: "Family"
   defp get_membership_type_name(_), do: "Membership"
 
-  defp format_money(%Money{} = money) do
-    Money.to_string!(money)
-  end
-
-  defp format_money(_), do: "N/A"
-
-  defp format_date(%Date{} = date) do
-    Calendar.strftime(date, "%B %d, %Y")
-  end
-
-  defp format_date(%DateTime{} = datetime) do
-    datetime |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
-  end
-
-  defp format_date(_), do: "N/A"
 end

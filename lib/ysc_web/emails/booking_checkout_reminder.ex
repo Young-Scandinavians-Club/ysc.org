@@ -8,7 +8,8 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
     mjml_template: "templates/booking_checkout_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [absolute_url: 1, member_greeting_name: 1, format_date: 1]
 
   alias Ysc.Repo
   alias YscWeb.Emails.OutageNotification
@@ -133,7 +134,4 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
 
   defp get_property_address(_), do: "Property Address"
 
-  defp format_date(date) do
-    Calendar.strftime(date, "%B %d, %Y")
-  end
 end

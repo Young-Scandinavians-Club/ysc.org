@@ -9,7 +9,8 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
       "templates/booking_cancellation_treasurer_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers,
+    only: [absolute_url: 1, format_date: 1, format_datetime: 1, format_money: 1]
 
   alias Ysc.Repo
   alias Ysc.Bookings.Booking
@@ -167,23 +168,4 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
 
   defp get_property_name(property), do: to_string(property)
 
-  defp format_date(date) do
-    Calendar.strftime(date, "%B %d, %Y")
-  end
-
-  defp format_datetime(datetime) do
-    # Convert to PST
-    pst_datetime = DateTime.shift_zone!(datetime, "America/Los_Angeles")
-    Calendar.strftime(pst_datetime, "%B %d, %Y at %I:%M %p %Z")
-  end
-
-  defp format_money(%Money{} = money) do
-    Money.to_string!(money,
-      separator: ".",
-      delimiter: ",",
-      fractional_digits: 2
-    )
-  end
-
-  defp format_money(_), do: "$0.00"
 end
