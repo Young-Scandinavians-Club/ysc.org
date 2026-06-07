@@ -538,12 +538,12 @@ defmodule YscWeb.AdminEventsNewLive do
                             </p>
                           </div>
                           <.icon
-                            :if={Enum.any?(@hosts, &(&1.id == user.id))}
+                            :if={MapSet.member?(@host_ids, user.id)}
                             name="hero-check-circle"
                             class="host-status-icon w-4 h-4 text-green-500 flex-shrink-0"
                           />
                           <.icon
-                            :if={!Enum.any?(@hosts, &(&1.id == user.id))}
+                            :if={!MapSet.member?(@host_ids, user.id)}
                             name="hero-plus-circle"
                             class="host-status-icon w-4 h-4 text-blue-400 flex-shrink-0"
                           />
@@ -915,8 +915,6 @@ defmodule YscWeb.AdminEventsNewLive do
     }
 
     capacity_changeset = Event.changeset(event, capacity_attrs)
-    agendas = Agendas.list_agendas_for_event(event.id)
-    hosts = Events.list_event_hosts(event)
 
     {:ok,
      socket
@@ -938,10 +936,11 @@ defmodule YscWeb.AdminEventsNewLive do
      )
      |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
      |> assign(trigger_submit: false, check_errors: false)
-     |> assign(:hosts, hosts)
+     |> assign(:hosts, [])
+     |> assign(:host_ids, MapSet.new())
      |> assign(:host_search_query, "")
      |> assign(:host_search_results, [])
-     |> stream(:agendas, agendas)
+     |> stream(:agendas, [])
      |> assign(:list_params, Map.drop(params, ["id"]))
      |> assign(form: to_form(event_changeset, as: "event"))
      |> assign(
@@ -1016,8 +1015,6 @@ defmodule YscWeb.AdminEventsNewLive do
 
     capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
     capacity_changeset = Event.changeset(event, capacity_attrs)
-    agendas = Agendas.list_agendas_for_event(event.id)
-    hosts = Events.list_event_hosts(event)
 
     socket
     |> assign(:event, event)
@@ -1038,10 +1035,11 @@ defmodule YscWeb.AdminEventsNewLive do
     )
     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
     |> assign(trigger_submit: false, check_errors: false)
-    |> assign(:hosts, hosts)
+    |> assign(:hosts, [])
+    |> assign(:host_ids, MapSet.new())
     |> assign(:host_search_query, "")
     |> assign(:host_search_results, [])
-    |> stream(:agendas, agendas, reset: true)
+    |> stream(:agendas, [], reset: true)
     |> assign(form: to_form(event_changeset, as: "event"))
     |> assign(
       :update_form,
@@ -1073,6 +1071,20 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:dev_routes?, dev_routes?)
   end
 
+  defp assign_edit_tab_data(socket, event) do
+    agendas = Agendas.list_agendas_for_event(event.id)
+    hosts = Events.list_event_hosts(event)
+
+    socket
+    |> assign(:hosts, hosts)
+    |> assign(:host_ids, host_ids_from(hosts))
+    |> stream(:agendas, agendas, reset: true)
+    |> assign(
+      :ticket_tier_count,
+      Events.count_ticket_tiers_for_event(event.id)
+    )
+  end
+
   defp assign_updates_tab_data(socket, event) do
     event_updates = Events.list_event_updates(event.id)
 
@@ -1089,6 +1101,8 @@ defmodule YscWeb.AdminEventsNewLive do
       )
     end)
   end
+
+  defp host_ids_from(hosts), do: hosts |> Enum.map(& &1.id) |> MapSet.new()
 
   defp assign_communication_timeline(
          socket,
@@ -1124,12 +1138,7 @@ defmodule YscWeb.AdminEventsNewLive do
     {collection, upload_url} =
       if event.state in [:published, "published"] do
         collection =
-          cached_collection ||
-            EventPhotos.get_by_event_id(event.id) ||
-            case EventPhotos.ensure_collection_for_event(event) do
-              {:ok, collection} -> collection
-              _ -> nil
-            end
+          cached_collection || EventPhotos.get_by_event_id(event.id)
 
         {collection,
          if(collection, do: EventPhotos.upload_url(collection), else: nil)}
@@ -1155,18 +1164,10 @@ defmodule YscWeb.AdminEventsNewLive do
       event ->
         case socket.assigns.live_action do
           :updates ->
-            event = Events.get_event!(event.id)
-
-            socket
-            |> assign(:event, event)
-            |> assign_updates_tab_data(event)
+            assign_updates_tab_data(socket, event)
 
           :edit ->
-            assign(
-              socket,
-              :ticket_tier_count,
-              Events.count_ticket_tiers_for_event(event.id)
-            )
+            assign_edit_tab_data(socket, event)
 
           _ ->
             socket
@@ -1751,6 +1752,7 @@ defmodule YscWeb.AdminEventsNewLive do
             {:noreply,
              socket
              |> assign(:hosts, hosts)
+             |> assign(:host_ids, host_ids_from(hosts))
              |> assign(:host_search_query, "")
              |> assign(:host_search_results, [])}
 
@@ -1767,7 +1769,11 @@ defmodule YscWeb.AdminEventsNewLive do
     case Events.remove_event_host(event, user_id) do
       {:ok, _} ->
         hosts = Events.list_event_hosts(event)
-        {:noreply, assign(socket, :hosts, hosts)}
+
+        {:noreply,
+         socket
+         |> assign(:hosts, hosts)
+         |> assign(:host_ids, host_ids_from(hosts))}
 
       {:error, _} ->
         {:noreply, socket}
@@ -1862,7 +1868,11 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     if event_id == socket.assigns[:event].id do
       hosts = Events.list_event_hosts_by_event_id(event_id)
-      {:noreply, assign(socket, :hosts, hosts)}
+
+      {:noreply,
+       socket
+       |> assign(:hosts, hosts)
+       |> assign(:host_ids, host_ids_from(hosts))}
     else
       {:noreply, socket}
     end

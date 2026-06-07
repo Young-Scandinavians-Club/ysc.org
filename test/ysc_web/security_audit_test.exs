@@ -16,6 +16,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 16 (HIGH)     Family invite accept allowed a different email than the invite
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
+  Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -23,6 +24,7 @@ defmodule YscWeb.SecurityAuditTest do
   """
   use YscWeb.ConnCase, async: true
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Mox
@@ -1039,6 +1041,130 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert report.status == :submitted
       assert report.user_id == reporter.id
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 19 (MEDIUM): Suspended/rejected users must not keep session access
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 19: blocked account states revoke existing sessions" do
+    test "get_user_by_session_token returns nil for suspended users" do
+      user = user_fixture(%{state: :active})
+      token = Accounts.generate_user_session_token(user)
+      admin = user_fixture(%{role: :admin})
+
+      assert Accounts.get_user_by_session_token(token)
+
+      {:ok, _} = Accounts.update_user(user, %{"state" => "suspended"}, admin)
+
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "suspending a user deletes all session tokens from the database" do
+      user = user_fixture(%{state: :active})
+      token = Accounts.generate_user_session_token(user)
+      admin = user_fixture(%{role: :admin})
+
+      {:ok, _} = Accounts.update_user(user, %{"state" => "suspended"}, admin)
+
+      assert Repo.aggregate(
+               from(t in UserToken,
+                 where: t.user_id == ^user.id and t.context == "session"
+               ),
+               :count
+             ) == 0
+
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "suspended user with an old cookie is redirected away from authenticated routes",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      admin = user_fixture(%{role: :admin})
+      conn = log_in_user(conn, user)
+
+      {:ok, _} = Accounts.update_user(user, %{"state" => "suspended"}, admin)
+
+      conn = get(conn, ~p"/users/tickets")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+
+    test "get_user_by_session_token returns nil for rejected and deleted users" do
+      for blocked_state <- [:rejected, :deleted] do
+        user = user_fixture(%{state: blocked_state})
+        token = Accounts.generate_user_session_token(user)
+
+        refute Accounts.get_user_by_session_token(token),
+               "expected nil for #{blocked_state} users"
+      end
+    end
+
+    test "rejecting a user via update_user revokes existing session tokens" do
+      user = user_fixture(%{state: :active})
+      token = Accounts.generate_user_session_token(user)
+      admin = user_fixture(%{role: :admin})
+
+      {:ok, _} = Accounts.update_user(user, %{"state" => "rejected"}, admin)
+
+      assert Repo.aggregate(
+               from(t in UserToken,
+                 where: t.user_id == ^user.id and t.context == "session"
+               ),
+               :count
+             ) == 0
+
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "login_allowed_state? only permits pending_approval and active users" do
+      assert Accounts.login_allowed_state?(%User{state: :active})
+      assert Accounts.login_allowed_state?(%User{state: :pending_approval})
+      refute Accounts.login_allowed_state?(%User{state: :suspended})
+      refute Accounts.login_allowed_state?(%User{state: :rejected})
+      refute Accounts.login_allowed_state?(%User{state: :deleted})
+      refute Accounts.login_allowed_state?(nil)
+    end
+
+    test "rejecting an application revokes existing session tokens" do
+      applicant =
+        oauth_user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      application = signup_application_fixture(applicant)
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+      token = Accounts.generate_user_session_token(applicant)
+
+      assert :ok =
+               Accounts.record_application_outcome(
+                 :rejected,
+                 applicant,
+                 application,
+                 admin
+               )
+
+      assert Repo.aggregate(
+               from(t in UserToken,
+                 where: t.user_id == ^applicant.id and t.context == "session"
+               ),
+               :count
+             ) == 0
+
+      refute Accounts.get_user_by_session_token(token)
+    end
+
+    test "non-blocked user updates keep existing sessions valid" do
+      user = user_fixture(%{state: :active, first_name: "Before"})
+      token = Accounts.generate_user_session_token(user)
+      admin = user_fixture(%{role: :admin})
+
+      {:ok, _} =
+        Accounts.update_user(user, %{"first_name" => "After"}, admin)
+
+      assert Accounts.get_user_by_session_token(token)
     end
   end
 

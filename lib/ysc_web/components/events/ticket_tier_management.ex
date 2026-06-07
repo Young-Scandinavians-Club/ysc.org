@@ -818,21 +818,12 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   defp load_reservations_maps(ticket_tiers) do
-    reservations_by_tier =
-      ticket_tiers
-      |> Enum.map(fn tier ->
-        {tier.id, Events.list_active_reservations_for_tier(tier.id)}
-      end)
-      |> Map.new()
+    tier_ids = Enum.map(ticket_tiers, & &1.id)
 
-    expired_reservations_by_tier =
-      ticket_tiers
-      |> Enum.map(fn tier ->
-        {tier.id, Events.list_expired_active_reservations_for_tier(tier.id)}
-      end)
-      |> Map.new()
-
-    {reservations_by_tier, expired_reservations_by_tier}
+    {
+      Events.list_active_reservations_for_tiers(tier_ids),
+      Events.list_expired_active_reservations_for_tiers(tier_ids)
+    }
   end
 
   defp get_reserved_count(tier_id, reservations_by_tier) do

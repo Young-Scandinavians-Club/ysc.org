@@ -558,8 +558,9 @@ defmodule YscWeb.FamilyManagementLive do
       <%= if not @can_send_invite do %>
         <div class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p class="text-sm text-amber-800">
-            You cannot send invites at this time. Please ensure you have an active family or
-            lifetime membership and have not reached the limit of 10 family members with accounts.
+            You can't send family invites right now. Invites require an active Family or Lifetime
+            membership, and you can link up to 10 people who have their own login. If you have a
+            Single membership or unpaid dues, update your membership first.
           </p>
         </div>
       <% end %>
@@ -759,7 +760,8 @@ defmodule YscWeb.FamilyManagementLive do
         <%= if @pending_invites == [] do %>
           <p class="text-zinc-500 text-sm italic">No pending invitations.</p>
           <p class="text-xs text-zinc-400 mt-2">
-            Invitations awaiting acceptance. Includes invites to both new and existing users.
+            When you send an invite, it will appear here until the person accepts or the invite
+            expires.
           </p>
         <% else %>
           <p class="text-xs text-zinc-500 mb-3">

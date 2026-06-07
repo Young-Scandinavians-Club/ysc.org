@@ -2431,13 +2431,36 @@ defmodule Ysc.Events do
   Excludes `status: "active"` rows whose `expires_at` is in the past (those remain
   in the database until fulfilled or cancelled; see `list_expired_active_reservations_for_tier/1`).
   """
+  @ticket_reservation_detail_preloads [:ticket_tier, :user, :created_by]
+
   def list_active_reservations_for_tier(tier_id) do
-    TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id)
-    |> where_ticket_reservation_hold_active()
-    |> order_by([tr], desc: tr.inserted_at)
-    |> Repo.all()
-    |> Repo.preload([:ticket_tier, :user, :created_by])
+    tier_id
+    |> List.wrap()
+    |> list_active_reservations_for_tiers()
+    |> Map.get(tier_id, [])
+  end
+
+  @doc """
+  Batch version of `list_active_reservations_for_tier/1`.
+
+  Returns a map of `tier_id => [reservations]` so the admin tickets tab can load
+  holds for every tier in two queries instead of 2×N per-tier round trips.
+  """
+  def list_active_reservations_for_tiers(tier_ids) when is_list(tier_ids) do
+    tier_ids = Enum.uniq(tier_ids)
+
+    if tier_ids == [] do
+      %{}
+    else
+      TicketReservation
+      |> where([tr], tr.ticket_tier_id in ^tier_ids)
+      |> where_ticket_reservation_hold_active()
+      |> order_by([tr], desc: tr.inserted_at)
+      |> Repo.all()
+      |> Repo.preload(@ticket_reservation_detail_preloads)
+      |> Enum.group_by(& &1.ticket_tier_id)
+      |> reservations_by_tier(tier_ids)
+    end
   end
 
   @doc """
@@ -2446,14 +2469,38 @@ defmodule Ysc.Events do
   Used so admins can see lapsed holds that still occupy a row until cancelled or fulfilled.
   """
   def list_expired_active_reservations_for_tier(tier_id) do
+    tier_id
+    |> List.wrap()
+    |> list_expired_active_reservations_for_tiers()
+    |> Map.get(tier_id, [])
+  end
+
+  @doc """
+  Batch version of `list_expired_active_reservations_for_tier/1`.
+
+  See `list_active_reservations_for_tiers/1`.
+  """
+  def list_expired_active_reservations_for_tiers(tier_ids)
+      when is_list(tier_ids) do
+    tier_ids = Enum.uniq(tier_ids)
     now = DateTime.utc_now()
 
-    TicketReservation
-    |> where([tr], tr.ticket_tier_id == ^tier_id and tr.status == "active")
-    |> where([tr], not is_nil(tr.expires_at) and tr.expires_at <= ^now)
-    |> order_by([tr], desc: tr.inserted_at)
-    |> Repo.all()
-    |> Repo.preload([:ticket_tier, :user, :created_by])
+    if tier_ids == [] do
+      %{}
+    else
+      TicketReservation
+      |> where([tr], tr.ticket_tier_id in ^tier_ids and tr.status == "active")
+      |> where([tr], not is_nil(tr.expires_at) and tr.expires_at <= ^now)
+      |> order_by([tr], desc: tr.inserted_at)
+      |> Repo.all()
+      |> Repo.preload(@ticket_reservation_detail_preloads)
+      |> Enum.group_by(& &1.ticket_tier_id)
+      |> reservations_by_tier(tier_ids)
+    end
+  end
+
+  defp reservations_by_tier(grouped, tier_ids) do
+    Map.new(tier_ids, fn tier_id -> {tier_id, Map.get(grouped, tier_id, [])} end)
   end
 
   @doc """
