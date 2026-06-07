@@ -853,8 +853,10 @@ defmodule YscWeb.AdminComponents do
   Place `<.admin_tab>` children inside the default slot. Set `role="tablist"` when tabs
   use WAI-ARIA tab semantics on each `<.admin_tab>`.
 
+  The bar scrolls horizontally on narrow viewports instead of widening the page.
+
   - `density={:compact}` — `py-3 px-4`, rounded top, active tab has white background
-    (newsletters, events).
+    (newsletters, events, user detail).
   - `density={:spacious}` — `py-4 px-1`, no rounded top (bookings property/section tabs).
   """
   attr :id, :string, default: nil
@@ -870,10 +872,13 @@ defmodule YscWeb.AdminComponents do
 
   def admin_tabs(assigns) do
     ~H"""
-    <div class={["border-b border-zinc-200 mb-6", @class]}>
+    <div class={[
+      "border-b border-zinc-200 mb-6 w-full min-w-0 overflow-x-auto",
+      @class
+    ]}>
       <nav
         id={@id}
-        class={admin_tabs_nav_class(@density)}
+        class={[admin_tabs_nav_class(@density), "flex-nowrap"]}
         aria-label={@aria_label}
         role={@role}
       >
@@ -926,7 +931,7 @@ defmodule YscWeb.AdminComponents do
     """
   end
 
-  defp admin_tabs_nav_class(:compact), do: "flex gap-0"
+  defp admin_tabs_nav_class(:compact), do: "-mb-px flex gap-0"
   defp admin_tabs_nav_class(:spacious), do: "-mb-px flex space-x-8"
 
   defp admin_tab_class(active, density, extra) do
@@ -935,11 +940,11 @@ defmodule YscWeb.AdminComponents do
 
   defp admin_tab_base(:compact),
     do:
-      "whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t"
+      "shrink-0 whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t"
 
   defp admin_tab_base(:spacious),
     do:
-      "whitespace-nowrap py-4 px-1 -mb-px border-b-2 font-medium text-sm transition-colors"
+      "shrink-0 whitespace-nowrap py-4 px-1 -mb-px border-b-2 font-medium text-sm transition-colors"
 
   defp admin_tab_state(true, :compact),
     do: "border-blue-500 text-blue-600 bg-white"
@@ -1519,7 +1524,10 @@ defmodule YscWeb.AdminComponents do
       </div>
     </aside>
 
-    <main id="admin-main" class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen">
+    <main
+      id="admin-main"
+      class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen min-w-0 overflow-x-hidden"
+    >
       {render_slot(@inner_block)}
     </main>
 

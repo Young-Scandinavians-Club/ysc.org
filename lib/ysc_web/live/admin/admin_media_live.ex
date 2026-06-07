@@ -33,8 +33,11 @@ defmodule YscWeb.AdminMediaLive do
           <%!-- Left Column: Image Preview --%>
           <div>
             <%!-- Image Version Tabs --%>
-            <div class="border-b border-zinc-200 mb-4">
-              <nav class="-mb-px flex space-x-2" aria-label="Image Versions">
+            <div class="border-b border-zinc-200 mb-4 w-full min-w-0 overflow-x-auto">
+              <nav
+                class="-mb-px flex space-x-2 flex-nowrap"
+                aria-label="Image Versions"
+              >
                 <button
                   phx-click="select-image-version"
                   phx-value-version="optimized"

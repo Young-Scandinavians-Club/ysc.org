@@ -216,57 +216,39 @@ defmodule YscWeb.AdminEventsNewLive do
             </div>
           </div>
 
-          <div class="event-header-tabs pt-3 text-sm font-medium text-center text-zinc-500 border-b border-zinc-200">
-            <ul class="flex flex-wrap -mb-px">
-              <li class="me-2">
-                <.link
-                  navigate={~p"/admin/events/#{@event.id}/edit"}
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :edit && "text-blue-600 border-blue-600 active",
-                    @live_action != :edit &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Event Details
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={
-                    if @partiful_link_present,
-                      do: "#",
-                      else: ~p"/admin/events/#{@event.id}/tickets"
-                  }
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @partiful_link_present && "opacity-50 cursor-not-allowed",
-                    !@partiful_link_present && @live_action == :tickets &&
-                      "text-blue-600 border-blue-600 active",
-                    !@partiful_link_present && @live_action != :tickets &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Tickets {if @partiful_link_present,
-                    do: "(Disabled - Using Partiful)"}
-                </.link>
-              </li>
-              <li class="me-2">
-                <.link
-                  navigate={~p"/admin/events/#{@event.id}/updates"}
-                  class={[
-                    "inline-block p-4 border-b-2 rounded-t-lg",
-                    @live_action == :updates &&
-                      "text-blue-600 border-blue-600 active",
-                    @live_action != :updates &&
-                      "hover:text-zinc-600 hover:border-zinc-300 border-transparent"
-                  ]}
-                >
-                  Updates
-                </.link>
-              </li>
-            </ul>
-          </div>
+          <.admin_tabs
+            id="event-detail-tabs"
+            aria_label="Event sections"
+            class="event-header-tabs pt-3 text-sm font-medium text-zinc-500 !mb-0"
+          >
+            <.admin_tab
+              active={@live_action == :edit}
+              patch={~p"/admin/events/#{@event.id}/edit"}
+            >
+              Event Details
+            </.admin_tab>
+            <.admin_tab
+              active={!@partiful_link_present && @live_action == :tickets}
+              patch={
+                if @partiful_link_present,
+                  do: "#",
+                  else: ~p"/admin/events/#{@event.id}/tickets"
+              }
+              class={
+                if @partiful_link_present,
+                  do: "opacity-50 cursor-not-allowed pointer-events-none",
+                  else: nil
+              }
+            >
+              Tickets {if @partiful_link_present, do: "(Disabled - Using Partiful)"}
+            </.admin_tab>
+            <.admin_tab
+              active={@live_action == :updates}
+              patch={~p"/admin/events/#{@event.id}/updates"}
+            >
+              Updates
+            </.admin_tab>
+          </.admin_tabs>
         </div>
 
         <div :if={@live_action == :edit} class="relative py-8">
