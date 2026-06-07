@@ -80,32 +80,42 @@ defmodule YscWeb.AdminUserDetailsLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :bookings}
-              patch={~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"
+              }
             >
               Bookings
             </.admin_tab>
             <.admin_tab
               active={@live_action == :application}
-              patch={~p"/admin/users/#{@user_id}/details/application?#{@list_params}"}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/application?#{@list_params}"
+              }
             >
               Application
             </.admin_tab>
             <.admin_tab
               active={@live_action == :membership}
-              patch={~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"
+              }
             >
               Membership
             </.admin_tab>
             <.admin_tab
               active={@live_action == :notifications}
-              patch={~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"
+              }
             >
               Notifications
             </.admin_tab>
             <.admin_tab
               :if={@is_treasurer}
               active={@live_action == :bank_accounts}
-              patch={~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"}
+              patch={
+                ~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"
+              }
             >
               Bank Accounts
             </.admin_tab>
