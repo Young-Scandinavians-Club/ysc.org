@@ -3027,19 +3027,25 @@ defmodule Ysc.EventsTest do
                  expires_at: future_expiry
                })
 
-      assert {:ok, _expired_b} =
+      assert {:ok, expired_b} =
                Events.create_ticket_reservation(%{
                  ticket_tier_id: tier_b.id,
                  user_id: member.id,
                  created_by_id: admin.id,
                  quantity: 2,
-                 expires_at: past_expiry
+                 expires_at: future_expiry
                })
+
+      expired_b
+      |> Ecto.Changeset.change(%{expires_at: past_expiry})
+      |> Repo.update!()
 
       tier_ids = [tier_a.id, tier_b.id]
 
       active_by_tier = Events.list_active_reservations_for_tiers(tier_ids)
-      expired_by_tier = Events.list_expired_active_reservations_for_tiers(tier_ids)
+
+      expired_by_tier =
+        Events.list_expired_active_reservations_for_tiers(tier_ids)
 
       assert [loaded_a] = Map.fetch!(active_by_tier, tier_a.id)
       assert loaded_a.id == active_a.id
