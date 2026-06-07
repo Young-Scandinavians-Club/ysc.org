@@ -403,6 +403,28 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       assert html =~ "Ticket not found"
     end
 
+    test "rejects check-in for a ticket belonging to a different event", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_a = event_fixture(%{organizer_id: admin.id, state: :published})
+      %{event: event_b, order: other_order} = setup_event_with_tickets(admin)
+      other_ticket = List.first(other_order.tickets)
+
+      assert other_ticket.event_id == event_b.id
+      assert event_a.id != event_b.id
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event_a.id}/check-in")
+
+      html =
+        render_click(view, "toggle-check-in", %{
+          "ticket-id" => other_ticket.id
+        })
+
+      assert html =~ "different event"
+      refute Repo.get!(Ysc.Events.Ticket, other_ticket.id).checked_in
+    end
+
     test "checking in a ticket moves it to the checked-in section", %{
       conn: conn,
       admin: admin
