@@ -7,6 +7,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
   import Ysc.ScanningFixtures
 
   alias Ysc.Agendas
+  alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.MessagePassingEvents
 
@@ -132,6 +133,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
            admin: admin
          } do
       event = event_fixture(%{organizer_id: admin.id, state: :published})
+      assert {:ok, _} = EventPhotos.ensure_collection_for_event(event)
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
       html = render_patch(view, ~p"/admin/events/#{event.id}/updates")
@@ -146,6 +148,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       admin: admin
     } do
       event = event_fixture(%{organizer_id: admin.id, state: :published})
+      assert {:ok, _} = EventPhotos.ensure_collection_for_event(event)
       {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/updates")
 
       assert html =~ "Event photo uploads"

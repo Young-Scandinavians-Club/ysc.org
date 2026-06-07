@@ -2933,11 +2933,13 @@ defmodule YscWeb.TahoeBookingLive do
                       <div class="space-y-1 ml-4">
                         <p>
                           <strong>Entire cabin:</strong>
-                          50% forfeiture &lt; 21 days; 100% forfeiture &lt; 14 days.
+                          Cancel fewer than 21 days before check-in for a 50% refund. Cancel fewer than
+                          14 days before for no refund.
                         </p>
                         <p>
                           <strong>Rooms:</strong>
-                          50% forfeiture &lt; 14 days; 100% forfeiture &lt; 7 days.
+                          Cancel fewer than 14 days before check-in for a 50% refund. Cancel fewer than
+                          7 days before for no refund.
                         </p>
                         <p class="mt-2">
                           <strong>Note:</strong>

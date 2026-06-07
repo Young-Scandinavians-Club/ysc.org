@@ -5,7 +5,7 @@ defmodule Ysc.EventPhotosTest do
   import Ysc.EventsFixtures
 
   alias Ysc.EventPhotos
-  alias Ysc.Events.Ticket
+  alias Ysc.Events.{Ticket, TicketDetail}
   alias Ysc.Repo
 
   setup do
@@ -80,6 +80,45 @@ defmodule Ysc.EventPhotosTest do
     test "denies unrelated users", %{event: event} do
       other = user_fixture()
       refute EventPhotos.authorized_to_upload?(event, other)
+    end
+
+    test "allows registrant email from ticket details", %{event: event} do
+      buyer = user_fixture()
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          requires_registration: true
+        })
+
+      ticket =
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      guest_email = "guest-registrant-#{System.unique_integer()}@example.com"
+
+      %TicketDetail{
+        id: Ecto.ULID.generate(),
+        ticket_id: ticket.id,
+        first_name: "Guest",
+        last_name: "Registrant",
+        email: guest_email
+      }
+      |> Repo.insert!()
+
+      guest = user_fixture(%{email: guest_email})
+
+      assert EventPhotos.authorized_to_upload?(event, guest)
     end
   end
 
