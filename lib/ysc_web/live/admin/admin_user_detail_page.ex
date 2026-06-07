@@ -80,9 +80,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :bookings}
-              patch={
-                ~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"
-              }
+              patch={~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"}
             >
               Bookings
             </.admin_tab>
