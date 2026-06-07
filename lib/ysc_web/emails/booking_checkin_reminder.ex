@@ -8,7 +8,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     mjml_template: "templates/booking_checkin_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [absolute_url: 1, member_greeting_name: 1, format_date: 1]
 
   alias Ysc.Repo
   alias Ysc.Bookings
@@ -179,8 +180,4 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     do: String.capitalize(to_string(mode))
 
   defp get_booking_mode_description(mode), do: to_string(mode)
-
-  defp format_date(date) do
-    Calendar.strftime(date, "%B %d, %Y")
-  end
 end

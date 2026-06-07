@@ -46,6 +46,18 @@ defmodule Ysc.MoneyHelperTest do
     end
   end
 
+  describe "format_money_for_input/1" do
+    test "formats Money for form inputs" do
+      money = Money.new(:USD, "10.99")
+      assert MoneyHelper.format_money_for_input(money) == "$10.99"
+    end
+
+    test "returns empty string for nil and non-money values" do
+      assert MoneyHelper.format_money_for_input(nil) == ""
+      assert MoneyHelper.format_money_for_input("invalid") == ""
+    end
+  end
+
   describe "format_money!/1" do
     test "returns formatted string for Money" do
       money = Money.new(:USD, "10.99")
