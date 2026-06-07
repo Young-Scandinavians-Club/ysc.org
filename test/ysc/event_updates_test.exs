@@ -281,6 +281,16 @@ defmodule Ysc.EventUpdatesTest do
     end
   end
 
+  describe "mark_event_notification_sent/2" do
+    test "sets notification_sent_at and notification_recipient_count", %{
+      event: event
+    } do
+      assert {:ok, updated} = Events.mark_event_notification_sent(event, 25)
+      assert updated.notification_sent_at != nil
+      assert updated.notification_recipient_count == 25
+    end
+  end
+
   describe "mark_event_update_sent/2" do
     test "sets sent_at and recipient_count", %{event: event, user: user} do
       {:ok, update} =
