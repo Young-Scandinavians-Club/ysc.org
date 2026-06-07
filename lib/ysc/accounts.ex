@@ -29,6 +29,8 @@ defmodule Ysc.Accounts do
   alias Ysc.Newsletter
   alias Ysc.Subscriptions.Subscription
 
+  @blocked_session_states [:suspended, :rejected, :deleted]
+
   ## Database getters
 
   @doc """
@@ -1623,6 +1625,7 @@ defmodule Ysc.Accounts do
 
       case user |> User.update_user_changeset(params) |> Repo.update() do
         {:ok, updated_user} ->
+          revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1648,6 +1651,7 @@ defmodule Ysc.Accounts do
            |> User.update_user_with_address_changeset(params)
            |> Repo.update() do
         {:ok, updated_user} ->
+          revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1703,6 +1707,7 @@ defmodule Ysc.Accounts do
 
       case result do
         {:ok, updated_user} ->
+          revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
           Task.start(fn ->
@@ -1719,6 +1724,13 @@ defmodule Ysc.Accounts do
       end
     end
   end
+
+  defp revoke_sessions_if_blocked(%User{state: state} = user)
+       when state in @blocked_session_states do
+    revoke_all_user_sessions(user)
+  end
+
+  defp revoke_sessions_if_blocked(_user), do: :ok
 
   defp maybe_update_board_position_history(user, params) do
     new_val =
@@ -2044,13 +2056,34 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Returns whether the user may keep an authenticated session.
+
+  Matches login eligibility: only `:pending_approval` and `:active` users.
+  """
+  def login_allowed_state?(%User{state: state}),
+    do: state in [:pending_approval, :active]
+
+  def login_allowed_state?(_), do: false
+
+  @doc """
+  Deletes all session tokens for the given user.
+
+  Used when an account is suspended, rejected, or deleted so existing cookies
+  stop working immediately instead of remaining valid for up to 60 days.
+  """
+  def revoke_all_user_sessions(%User{} = user) do
+    Repo.delete_all(UserToken.by_user_and_contexts_query(user, ["session"]))
+    :ok
+  end
+
+  @doc """
   Gets the user with the given signed token.
   """
   def get_user_by_session_token(token) do
     {:ok, query} = UserToken.verify_session_token_query(token)
     user = Repo.one(query)
 
-    if user do
+    if user && login_allowed_state?(user) do
       if user_subscriptions_fully_loaded?(user) do
         Repo.preload(user, :current_avatar)
       else
@@ -2478,8 +2511,16 @@ defmodule Ysc.Accounts do
         )
         |> Repo.transaction()
         |> case do
-          {:ok, _} -> :ok
-          {:error, _, changeset, _} -> {:error, changeset}
+          {:ok, %{user: updated_user}} ->
+            revoke_sessions_if_blocked(updated_user)
+            :ok
+
+          {:ok, _} ->
+            revoke_sessions_if_blocked(user)
+            :ok
+
+          {:error, _, changeset, _} ->
+            {:error, changeset}
         end
       end
     end
