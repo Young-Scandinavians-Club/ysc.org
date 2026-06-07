@@ -68,19 +68,19 @@ defmodule YscWeb.AdminUserDetailsLive do
           <.admin_tabs id="user-detail-tabs" aria_label="User detail sections">
             <.admin_tab
               active={@live_action == :profile}
-              navigate={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
+              patch={~p"/admin/users/#{@user_id}/details?#{@list_params}"}
             >
               Profile
             </.admin_tab>
             <.admin_tab
               active={@live_action == :orders}
-              navigate={~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"}
+              patch={~p"/admin/users/#{@user_id}/details/orders?#{@list_params}"}
             >
               Tickets
             </.admin_tab>
             <.admin_tab
               active={@live_action == :bookings}
-              navigate={
+              patch={
                 ~p"/admin/users/#{@user_id}/details/bookings?#{@list_params}"
               }
             >
@@ -88,7 +88,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :application}
-              navigate={
+              patch={
                 ~p"/admin/users/#{@user_id}/details/application?#{@list_params}"
               }
             >
@@ -96,7 +96,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :membership}
-              navigate={
+              patch={
                 ~p"/admin/users/#{@user_id}/details/membership?#{@list_params}"
               }
             >
@@ -104,7 +104,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :notifications}
-              navigate={
+              patch={
                 ~p"/admin/users/#{@user_id}/details/notifications?#{@list_params}"
               }
             >
@@ -113,7 +113,7 @@ defmodule YscWeb.AdminUserDetailsLive do
             <.admin_tab
               :if={@is_treasurer}
               active={@live_action == :bank_accounts}
-              navigate={
+              patch={
                 ~p"/admin/users/#{@user_id}/details/bank-accounts?#{@list_params}"
               }
             >
@@ -121,13 +121,13 @@ defmodule YscWeb.AdminUserDetailsLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :family}
-              navigate={~p"/admin/users/#{@user_id}/details/family?#{@list_params}"}
+              patch={~p"/admin/users/#{@user_id}/details/family?#{@list_params}"}
             >
               Family
             </.admin_tab>
             <.admin_tab
               active={@live_action == :logs}
-              navigate={~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"}
+              patch={~p"/admin/users/#{@user_id}/details/logs?#{@list_params}"}
             >
               Notes
             </.admin_tab>

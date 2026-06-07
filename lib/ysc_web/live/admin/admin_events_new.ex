@@ -223,13 +223,13 @@ defmodule YscWeb.AdminEventsNewLive do
           >
             <.admin_tab
               active={@live_action == :edit}
-              navigate={~p"/admin/events/#{@event.id}/edit"}
+              patch={~p"/admin/events/#{@event.id}/edit"}
             >
               Event Details
             </.admin_tab>
             <.admin_tab
               active={!@partiful_link_present && @live_action == :tickets}
-              navigate={
+              patch={
                 if @partiful_link_present,
                   do: "#",
                   else: ~p"/admin/events/#{@event.id}/tickets"
@@ -244,7 +244,7 @@ defmodule YscWeb.AdminEventsNewLive do
             </.admin_tab>
             <.admin_tab
               active={@live_action == :updates}
-              navigate={~p"/admin/events/#{@event.id}/updates"}
+              patch={~p"/admin/events/#{@event.id}/updates"}
             >
               Updates
             </.admin_tab>
