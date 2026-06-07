@@ -21,6 +21,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ecto.Query
 
   alias Ysc.Repo
   alias Ysc.Tickets
@@ -144,6 +145,8 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
   describe "mount/3 - successful payment with ticket order" do
     setup %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+
       user =
         user_fixture()
         |> Ecto.Changeset.change(%{
@@ -173,7 +176,21 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         })
 
       {:ok, order} =
-        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+        end)
+
+      cancel_timeout_jobs_for_order!(order.id)
+
+      order =
+        order
+        |> Ecto.Changeset.change(
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(1, :hour)
+            |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
 
       {:module, client_module, _, _} =
         defmodule :"TestStripeClientTicket#{System.unique_integer()}" do
@@ -188,11 +205,14 @@ defmodule YscWeb.PaymentSuccessLiveTest do
           def retrieve_payment_method(_id), do: {:error, :not_implemented}
 
           def retrieve_payment_intent(id, _opts) do
+            amount_cents = Process.get(:test_amount_cents, 5000)
+
             {:ok,
              %Stripe.PaymentIntent{
                id: id,
                metadata: Process.get(:test_metadata, %{}),
-               status: Process.get(:test_status, "succeeded")
+               status: Process.get(:test_status, "succeeded"),
+               amount: amount_cents
              }}
           end
         end
@@ -214,6 +234,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
       payment_intent_id = "pi_ticket_success_#{order.id}"
 
       Process.put(:test_metadata, %{"ticket_order_id" => order.id})
+      Process.put(:test_amount_cents, 5000)
       original_client = Application.get_env(:ysc, :stripe_client)
       Application.put_env(:ysc, :stripe_client, client_module)
 
@@ -229,6 +250,46 @@ defmodule YscWeb.PaymentSuccessLiveTest do
       after
         Application.put_env(:ysc, :stripe_client, original_client)
         Process.delete(:test_metadata)
+        Process.delete(:test_amount_cents)
+      end
+    end
+
+    test "completes pending ticket order after redirect payment", %{
+      conn: conn,
+      order: order,
+      client_module: client_module
+    } do
+      payment_intent_id = "pi_ticket_complete_#{order.id}"
+      pending_order = Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+      assert pending_order.status == :pending
+
+      Process.put(:test_metadata, %{"ticket_order_id" => order.id})
+      Process.put(:test_amount_cents, 5000)
+      original_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, client_module)
+
+      try do
+        assert {:error, {:redirect, _}} =
+                 live(
+                   conn,
+                   ~p"/payment/success?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+                 )
+
+        completed = Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        assert completed.status == :completed
+        assert completed.payment_id
+
+        assert Enum.all?(
+                 Repo.all(
+                   from t in Ysc.Events.Ticket,
+                     where: t.ticket_order_id == ^order.id
+                 ),
+                 &(&1.status == :confirmed)
+               )
+      after
+        Application.put_env(:ysc, :stripe_client, original_client)
+        Process.delete(:test_metadata)
+        Process.delete(:test_amount_cents)
       end
     end
   end
@@ -576,5 +637,16 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
       assert html_string =~ "Processing your payment"
     end
+  end
+
+  defp cancel_timeout_jobs_for_order!(ticket_order_id) do
+    import Ecto.Query
+
+    from(j in Oban.Job,
+      where: j.worker == "Ysc.Tickets.TimeoutWorker",
+      where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Repo.delete_all()
   end
 end

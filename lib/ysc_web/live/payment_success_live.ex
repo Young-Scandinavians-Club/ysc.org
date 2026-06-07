@@ -24,6 +24,7 @@ defmodule YscWeb.PaymentSuccessLive do
 
   alias Ysc.Bookings
   alias Ysc.Tickets
+  alias Ysc.Tickets.StripeService
   alias Ysc.Repo
   import Ecto.Query
   require Ysc.Logging
@@ -263,10 +264,28 @@ defmodule YscWeb.PaymentSuccessLive do
             end
 
           not is_nil(ticket_order_id) ->
-            # Verify ticket order belongs to user and redirect to order confirmation
-            case verify_and_redirect_ticket_order(ticket_order_id, user) do
-              {:ok, redirect_path} -> {:ok, redirect_path}
-              error -> error
+            # Verify ticket order belongs to user, complete the order, then redirect.
+            # Redirect-based methods (Amazon Pay, CashApp, etc.) never fire the
+            # event-page payment-success handler, so this is the only completion path.
+            with {:ok, _event_id} <-
+                   verify_ticket_order_access(ticket_order_id, user),
+                 {:ok, _order} <-
+                   StripeService.process_successful_payment(payment_intent_id) do
+              {:ok, ~p"/orders/#{ticket_order_id}/confirmation?confetti=true"}
+            else
+              {:error, :ticket_order_not_found} = error ->
+                error
+
+              {:error, reason} ->
+                Ysc.Logging.error(
+                  "Failed to complete ticket order after redirect payment",
+                  payment_intent_id: payment_intent_id,
+                  ticket_order_id: ticket_order_id,
+                  user_id: user.id,
+                  error: reason
+                )
+
+                {:error, reason}
             end
 
           true ->
@@ -296,14 +315,6 @@ defmodule YscWeb.PaymentSuccessLive do
 
       _booking ->
         {:ok, ~p"/bookings/#{booking_id}/receipt?confetti=true"}
-    end
-  end
-
-  defp verify_and_redirect_ticket_order(ticket_order_id, user) do
-    if Tickets.get_user_ticket_order_event_id(user.id, ticket_order_id) do
-      {:ok, ~p"/orders/#{ticket_order_id}/confirmation?confetti=true"}
-    else
-      {:error, :ticket_order_not_found}
     end
   end
 

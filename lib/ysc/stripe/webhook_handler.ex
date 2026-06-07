@@ -1442,15 +1442,43 @@ defmodule Ysc.Stripe.WebhookHandler do
 
   defp handle("payment_intent.succeeded", payment_intent)
        when is_map(payment_intent) do
-    require Ysc.Logging
+    payment_intent_id = payment_intent_id_from_map(payment_intent)
 
-    Ysc.Logging.info("Payment intent succeeded",
-      payment_intent_id: payment_intent.id,
-      payment_intent_status: payment_intent.status,
-      customer_id: payment_intent.customer
+    if ticket_order_id_from_payment_intent(payment_intent) do
+      Ysc.Tickets.WebhookHandler.handle_webhook_event(
+        "payment_intent.succeeded",
+        %{"id" => payment_intent_id}
+      )
+    else
+      require Ysc.Logging
+
+      Ysc.Logging.info("Payment intent succeeded",
+        payment_intent_id: payment_intent_id,
+        payment_intent_status:
+          Map.get(payment_intent, :status) || Map.get(payment_intent, "status"),
+        customer_id:
+          Map.get(payment_intent, :customer) ||
+            Map.get(payment_intent, "customer")
+      )
+
+      :ok
+    end
+  end
+
+  defp handle("payment_intent.payment_failed", payment_intent)
+       when is_map(payment_intent) do
+    maybe_handle_ticket_payment_webhook(
+      "payment_intent.payment_failed",
+      payment_intent
     )
+  end
 
-    :ok
+  defp handle("payment_intent.canceled", payment_intent)
+       when is_map(payment_intent) do
+    maybe_handle_ticket_payment_webhook(
+      "payment_intent.canceled",
+      payment_intent
+    )
   end
 
   defp handle("payout.paid", %Stripe.Payout{} = payout) do
@@ -4107,5 +4135,29 @@ defmodule Ysc.Stripe.WebhookHandler do
       where: s.subscription_id == ^subscription_id,
       where: s.stripe_id not in ^["ci_stripe_item"]
     )
+  end
+
+  defp ticket_order_id_from_payment_intent(payment_intent) do
+    payment_intent
+    |> Map.get(:metadata, Map.get(payment_intent, "metadata", %{}))
+    |> then(fn metadata ->
+      Map.get(metadata, "ticket_order_id") ||
+        Map.get(metadata, :ticket_order_id)
+    end)
+  end
+
+  defp payment_intent_id_from_map(%{id: id}) when is_binary(id), do: id
+  defp payment_intent_id_from_map(%{"id" => id}) when is_binary(id), do: id
+  defp payment_intent_id_from_map(_), do: nil
+
+  defp maybe_handle_ticket_payment_webhook(event_type, payment_intent) do
+    if ticket_order_id_from_payment_intent(payment_intent) do
+      Ysc.Tickets.WebhookHandler.handle_webhook_event(
+        event_type,
+        %{"id" => payment_intent_id_from_map(payment_intent)}
+      )
+    else
+      :ok
+    end
   end
 end

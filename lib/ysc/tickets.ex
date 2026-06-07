@@ -757,7 +757,7 @@ defmodule Ysc.Tickets do
     result =
       with {:ok, payment_intent} <-
              Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               Stripe.PaymentIntent.retrieve(payment_intent_id, %{})
+               stripe_client().retrieve_payment_intent(payment_intent_id, %{})
              end),
            :ok <- validate_payment_intent(payment_intent, ticket_order),
            {:ok, {payment, _transaction, _entries}} <-
@@ -1648,5 +1648,9 @@ defmodule Ysc.Tickets do
       order_by: [desc: to.inserted_at],
       preload: [:tickets, :event, tickets: :ticket_tier]
     )
+  end
+
+  defp stripe_client do
+    Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
   end
 end
