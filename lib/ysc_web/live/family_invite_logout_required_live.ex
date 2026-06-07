@@ -79,10 +79,10 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
             You're currently logged in as <strong>{@current_user.email}</strong>.
           </p>
           <p :if={@existing_user} class="text-zinc-600 mb-6">
-            To accept this invitation for <strong>{@invite.email}</strong>, log out, then sign in with
-            <strong>{@invite.email}</strong>. After you sign in, you'll be taken to your
+            To accept this invitation for <strong>{@invite.email}</strong>, log out, then sign in with <strong>{@invite.email}</strong>. After you sign in, you'll be taken to your
             <strong>Membership</strong>
-            page — click <strong>Accept invitation</strong> there.
+            page — click <strong>Accept invitation</strong>
+            there.
           </p>
           <p :if={!@existing_user} class="text-zinc-600 mb-6">
             To accept this invitation for <strong>{@invite.email}</strong>, log out of this account first.
