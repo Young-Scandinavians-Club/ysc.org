@@ -178,12 +178,7 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      # Git ref for Elixir 1.20.0 sigil end-position tokens (Hex 1.7.18 still crashes in to_col_end/3)
-      {:credo,
-       github: "rrrene/credo",
-       ref: "d4d33fdab14beb55139f1c7d7b97bd0034d48ad9",
-       only: [:dev, :test],
-       runtime: false},
+      {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
