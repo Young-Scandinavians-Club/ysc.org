@@ -82,8 +82,7 @@ defmodule YscWeb.UserRegistrationLive do
                         },
                         family: %{
                           option: "family",
-                          subtitle:
-                            "You, your partner, and children age 18 or younger",
+                          subtitle: "You, your partner, and children under 18",
                           icon: "user-group"
                         }
                       ]}
@@ -181,7 +180,7 @@ defmodule YscWeb.UserRegistrationLive do
                 <div class="pb-2">
                   <h2 class="font-semibold leading-6 text-zinc-800">Family</h2>
                   <p class="text-sm leading-6 text-zinc-600">
-                    List your spouse or partner and children age 18 or younger who will be on this family membership.
+                    List your spouse or partner and children under 18 who will be included on this family membership.
                   </p>
                 </div>
 
@@ -622,8 +621,8 @@ defmodule YscWeb.UserRegistrationLive do
              socket
              |> YscWeb.Flash.put_toast(
                :info,
-               "Application submitted! Check your email for a verification code, then finish setup (payment method and password). We'll email you when the board reviews your application.",
-               title: "Registration"
+               "Check your email for a verification code. Use it to finish account setup (verify email, add a payment method, and create a password). We'll email you separately when the board has reviewed your application.",
+               title: "Application submitted"
              )
              |> redirect(
                to:
