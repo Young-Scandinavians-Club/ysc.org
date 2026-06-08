@@ -1,6 +1,8 @@
 defmodule YscWeb.PageHTML do
   use YscWeb, :html
 
+  import YscWeb.Components.History.HistoryComponents
+
   embed_templates "page_html/*"
 
   defp atom_to_readable(atom) when is_binary(atom) do
