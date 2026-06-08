@@ -286,6 +286,45 @@ defmodule Ysc.LedgersTest do
       assert payment2.external_payment_id == external_id
     end
 
+    @tag :capture_log
+    test "process_payment/1 handles concurrent duplicate external_payment_id (race condition)",
+         %{user: user, sandbox_owner: owner} do
+      amount = Money.new(5000, :USD)
+      stripe_fee = Money.new(175, :USD)
+      external_id = "pi_race_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        amount: amount,
+        entity_type: :membership,
+        entity_id: Ecto.ULID.generate(),
+        external_payment_id: external_id,
+        stripe_fee: stripe_fee,
+        description: "Concurrent payment",
+        property: nil,
+        payment_method_id: nil
+      }
+
+      results =
+        1..2
+        |> Task.async_stream(
+          fn _ ->
+            Ysc.DataCase.allow_sandbox(self(), owner)
+            Ledgers.process_payment(attrs)
+          end,
+          max_concurrency: 2,
+          timeout: 5_000
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      assert length(results) == 2
+      assert Enum.all?(results, &match?({:ok, {_payment, _tx, _entries}}, &1))
+
+      [{:ok, {payment1, _, _}}, {:ok, {payment2, _, _}}] = results
+      assert payment1.id == payment2.id
+      assert payment1.external_payment_id == external_id
+    end
+
     test "process_payment/1 returns error when payment exists but not completed",
          %{
            user: user
