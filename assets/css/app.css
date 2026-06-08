@@ -8,11 +8,7 @@
 /* Admin event editor — sticky action bar */
 
 #event-header-bar {
-    transition:
-        background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-        box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-        padding 0.24s cubic-bezier(0.4, 0, 0.2, 1),
-        margin 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.24s cubic-bezier(0.4, 0, 0.2, 1), margin 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 #event-header-bar.is-sticky {
@@ -35,15 +31,14 @@
     }
 }
 
+
 /* Collapse date row with motion (display:none cannot transition). */
+
 #event-header-bar .event-header-date {
     max-height: 10rem;
     opacity: 1;
     overflow: visible;
-    transition:
-        max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.22s ease,
-        margin 0.22s ease;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, margin 0.22s ease;
 }
 
 #event-header-bar:not(.is-sticky) .event-header-date {
@@ -132,56 +127,46 @@ html {
 }
 
 
-/* Archival Artifact Styling for History Page */
+/* History page styling */
 
-.archival-photo {
-    background-color: #f9f7f2;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), inset 0 0 40px rgba(0, 0, 0, 0.02);
+.history-serif {
+    font-family: Georgia, "Times New Roman", serif;
 }
 
 .archival-photo img {
-    filter: sepia(0.05) contrast(0.95);
+    filter: sepia(0.05) contrast(0.98);
+    transition: filter 0.3s ease;
 }
 
 .archival-photo:hover img {
     filter: sepia(0) contrast(1);
 }
 
-
-/* Ledger-style financial callouts */
-
 .ledger-callout {
     font-family: "Courier New", monospace;
-    background: linear-gradient(to right, #f9f7f2 0%, #ffffff 100%);
-    border-left: 3px solid #d97706;
+    border-left: 2px solid #d4d4d8;
     padding: 0.75rem 1rem;
     font-size: 0.875rem;
-    color: #78716c;
-    letter-spacing: 0.05em;
+    color: #71717a;
+    letter-spacing: 0.03em;
 }
-
-
-/* Era-based photo treatments - sepia transitions by decade */
 
 .era-1950s img,
 .era-1960s img {
-    filter: sepia(0.25) contrast(1.08);
+    filter: sepia(0.2) contrast(1.05);
     transition: filter 0.3s ease;
 }
 
 .era-1970s img,
 .era-1980s img {
-    filter: sepia(0.15) contrast(1.05);
+    filter: sepia(0.12) contrast(1.03);
     transition: filter 0.3s ease;
 }
 
 .era-1990s img {
-    filter: sepia(0.08) contrast(1.02);
+    filter: sepia(0.06) contrast(1.01);
     transition: filter 0.3s ease;
 }
-
-
-/* Hover removes sepia for all eras */
 
 .era-1950s:hover img,
 .era-1960s:hover img,
@@ -191,51 +176,14 @@ html {
     filter: sepia(0) contrast(1);
 }
 
-
-/* Stacked paper effect for oldest archival documents */
-
-.stacked-paper {
-    position: relative;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 4px 6px rgba(0, 0, 0, 0.08), 0 8px 12px rgba(0, 0, 0, 0.05), 0 12px 20px rgba(0, 0, 0, 0.03);
-}
-
-.stacked-paper::before {
-    content: "";
-    position: absolute;
-    bottom: -4px;
-    left: 8px;
-    right: 8px;
-    height: 100%;
-    background: #f5f5f0;
-    border-radius: inherit;
-    z-index: -1;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.stacked-paper::after {
-    content: "";
-    position: absolute;
-    bottom: -8px;
-    left: 16px;
-    right: 16px;
-    height: 100%;
-    background: #eeede8;
-    border-radius: inherit;
-    z-index: -2;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-}
-
-
-/* Decade watermark styling */
-
 .decade-watermark {
-    font-size: 15rem;
-    font-weight: 900;
-    opacity: 0.03;
-    color: #3b82f6;
+    font-size: 8rem;
+    font-weight: 400;
+    opacity: 0.04;
+    color: #18181b;
     position: absolute;
     left: 50%;
-    top: 2rem;
+    top: 0;
     transform: translateX(-50%);
     pointer-events: none;
     user-select: none;
@@ -306,7 +254,6 @@ html {
         transform: translateY(-100%);
     }
 }
-
 
 .tmp-element {
     visibility: hidden;
@@ -440,7 +387,7 @@ html {
 
 /* Keep links/menus above the ::before/::after layers */
 
-#site-header.hero-mode #rootNavbar > * {
+#site-header.hero-mode #rootNavbar>* {
     position: relative;
     z-index: 1;
 }
@@ -470,12 +417,7 @@ html {
 
 #site-header.hero-mode .nav-icon span {
     background: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
-    transition:
-        transform 0.25s ease-in-out,
-        opacity 0.25s ease-in-out,
-        top 0.25s ease-in-out,
-        left 0.25s ease-in-out,
-        width 0.25s ease-in-out !important;
+    transition: transform 0.25s ease-in-out, opacity 0.25s ease-in-out, top 0.25s ease-in-out, left 0.25s ease-in-out, width 0.25s ease-in-out !important;
 }
 
 #site-header.hero-mode .hamburger-btn:hover {
@@ -3441,12 +3383,7 @@ body.overflow-hidden {
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(
-        90deg,
-        transparent,
-        rgba(255, 255, 255, 0.65),
-        transparent
-    );
+    background: linear-gradient( 90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
     animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
@@ -3550,7 +3487,9 @@ input[type="search"][list] {
     display: none;
 }
 
+
 /* Avatar cropper modal */
+
 cropper-canvas {
     height: 400px;
 }
@@ -3561,14 +3500,18 @@ cropper-canvas {
     }
 }
 
+
 /* Check-in desk keyboard navigation highlight — shared between membership and event views */
+
 [data-checkin-index].keyboard-focused,
 [data-checkin-row].keyboard-focused {
     @apply bg-emerald-50 relative z-10 rounded;
     box-shadow: 0 0 0 2px theme('colors.emerald.400'), 0 0 0 5px theme('colors.emerald.100');
 }
 
+
 /* Red variant when the highlighted row would undo a check-in */
+
 [data-checkin-index][data-checked-in].keyboard-focused {
     @apply bg-red-50;
     box-shadow: 0 0 0 2px theme('colors.red.400'), 0 0 0 5px theme('colors.red.100');
