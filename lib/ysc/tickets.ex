@@ -751,48 +751,50 @@ defmodule Ysc.Tickets do
   @doc """
   Processes payment for a ticket order using Stripe.
   """
-  def process_ticket_order_payment(ticket_order, payment_intent_id) do
+  def process_ticket_order_payment(ticket_order, payment_intent_id)
+      when is_binary(payment_intent_id) do
+    with {:ok, payment_intent} <-
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_client().retrieve_payment_intent(payment_intent_id, %{})
+           end) do
+      process_ticket_order_payment(ticket_order, payment_intent)
+    end
+  end
+
+  def process_ticket_order_payment(ticket_order, %Stripe.PaymentIntent{} = payment_intent) do
     start_time = System.monotonic_time()
-    ticket_order = get_ticket_order(ticket_order.id)
+    ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
     result =
       if ticket_order.status == :completed do
         {:ok, ticket_order}
       else
-        do_process_ticket_order_payment(ticket_order, payment_intent_id)
+        do_process_ticket_order_payment(ticket_order, payment_intent)
       end
 
-    # Emit telemetry event for payment processing
-    duration = System.monotonic_time() - start_time
-    duration_ms = System.convert_time_unit(duration, :native, :millisecond)
-
-    :telemetry.execute(
-      [:ysc, :tickets, :payment_processed],
-      %{duration: duration_ms, count: 1},
-      %{
-        ticket_order_id: ticket_order.id,
-        event_id: ticket_order.event_id,
-        user_id: ticket_order.user_id,
-        status: if(match?({:ok, _}, result), do: "success", else: "failure"),
-        payment_intent_id: payment_intent_id
-      }
+    emit_payment_processed_telemetry(
+      start_time,
+      ticket_order,
+      payment_intent.id,
+      result
     )
 
     result
   end
 
-  defp do_process_ticket_order_payment(ticket_order, payment_intent_id) do
-    with {:ok, payment_intent} <-
-           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             stripe_client().retrieve_payment_intent(payment_intent_id, %{})
-           end),
-         :ok <- validate_payment_intent(payment_intent, ticket_order),
+  defp do_process_ticket_order_payment(ticket_order, payment_intent) do
+    with :ok <- validate_payment_intent(payment_intent, ticket_order),
          {:ok, {payment, _transaction, _entries}} <-
            process_ledger_payment(ticket_order, payment_intent),
          {:ok, completed_order, completion_status} <-
            complete_ticket_order_if_pending(ticket_order, payment.id),
          :ok <- confirm_tickets(completed_order) do
-      reloaded_order = get_ticket_order(completed_order.id)
+      reloaded_order =
+        if completion_status == :newly_completed do
+          get_ticket_order(completed_order.id)
+        else
+          completed_order
+        end
 
       if completion_status == :newly_completed do
         send_ticket_confirmation_email(reloaded_order)
@@ -819,18 +821,65 @@ defmodule Ysc.Tickets do
         ]
       )
 
-    order = get_ticket_order(ticket_order.id)
-
     cond do
       count == 1 ->
-        {:ok, order, :newly_completed}
+        {:ok,
+         %{
+           ticket_order
+           | status: :completed,
+             payment_id: payment_id,
+             completed_at: now,
+             updated_at: now
+         }, :newly_completed}
 
-      order.status == :completed ->
-        {:ok, order, :already_completed}
+      ticket_order.status == :completed ->
+        {:ok, ticket_order, :already_completed}
 
       true ->
-        {:error, :cannot_complete_order}
+        case get_ticket_order(ticket_order.id) do
+          %{status: :completed} = order ->
+            {:ok, order, :already_completed}
+
+          _ ->
+            {:error, :cannot_complete_order}
+        end
     end
+  end
+
+  defp ensure_ticket_order_for_payment(%TicketOrder{} = ticket_order) do
+    if ticket_order_ready_for_payment?(ticket_order) do
+      ticket_order
+    else
+      get_ticket_order(ticket_order.id)
+    end
+  end
+
+  defp ticket_order_ready_for_payment?(%TicketOrder{} = ticket_order) do
+    Ecto.assoc_loaded?(ticket_order.user) and
+      Ecto.assoc_loaded?(ticket_order.tickets) and
+      Enum.all?(ticket_order.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+  end
+
+  defp emit_payment_processed_telemetry(
+         start_time,
+         ticket_order,
+         payment_intent_id,
+         result
+       ) do
+    duration = System.monotonic_time() - start_time
+    duration_ms = System.convert_time_unit(duration, :native, :millisecond)
+
+    :telemetry.execute(
+      [:ysc, :tickets, :payment_processed],
+      %{duration: duration_ms, count: 1},
+      %{
+        ticket_order_id: ticket_order.id,
+        event_id: ticket_order.event_id,
+        user_id: ticket_order.user_id,
+        status: if(match?({:ok, _}, result), do: "success", else: "failure"),
+        payment_intent_id: payment_intent_id
+      }
+    )
   end
 
   @doc """
@@ -1225,13 +1274,11 @@ defmodule Ysc.Tickets do
         payment_intent
       )
 
-    # Load ticket order with tickets and ticket tiers to check for donations
-    ticket_order_with_tickets =
-      get_ticket_order(ticket_order.id)
+    ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
     # Calculate donation vs regular ticket amounts (returns gross amount, donation, discount)
     {gross_event_amount, donation_amount, discount_amount} =
-      calculate_event_and_donation_amounts(ticket_order_with_tickets)
+      calculate_event_and_donation_amounts(ticket_order)
 
     # If there are donations or discounts, use the mixed payment processor
     if Money.positive?(donation_amount) || Money.positive?(discount_amount) do
@@ -1456,21 +1503,12 @@ defmodule Ysc.Tickets do
   end
 
   defp confirm_tickets(ticket_order) do
-    # Query for tickets directly to avoid association loading issues
-    # Only update tickets that are not already confirmed (idempotency)
-    tickets =
-      Repo.all(
-        from t in Ticket,
-          where:
-            t.ticket_order_id == ^ticket_order.id and t.status != :confirmed
-      )
+    now = DateTime.utc_now()
 
-    tickets
-    |> Enum.each(fn ticket ->
-      ticket
-      |> Ticket.changeset(%{status: :confirmed})
-      |> Repo.update()
-    end)
+    from(t in Ticket,
+      where: t.ticket_order_id == ^ticket_order.id and t.status != :confirmed
+    )
+    |> Repo.update_all(set: [status: :confirmed, updated_at: now])
 
     :ok
   end
