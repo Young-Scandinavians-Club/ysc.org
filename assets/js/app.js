@@ -50,7 +50,6 @@ import ReceiptLightbox from "./receipt_lightbox";
 import ScrollToSection from "./scroll_to_section";
 import PasskeyAuth from "./passkey_auth";
 import ConfirmCloseModal from "./confirm_close_modal";
-import DecadeIndicator from "./decade_indicator";
 import FooterRotator from "./footer_rotator";
 import HeroVideoControls from "./hero_video_controls";
 import AdminFloatingButton from "./admin_floating_button";
@@ -88,7 +87,6 @@ let Hooks = {
     ScrollToSection,
     PasskeyAuth,
     ConfirmCloseModal,
-    DecadeIndicator,
     FooterRotator,
     HeroVideoControls,
     AdminFloatingButton,

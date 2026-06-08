@@ -130,44 +130,6 @@ defmodule YscWeb.Components.History.HistoryComponents do
     """
   end
 
-  attr :years, :integer, required: true
-
-  def decade_navigator(assigns) do
-    ~H"""
-    <div
-      id="decade-navigator"
-      phx-hook="DecadeIndicator"
-      class="sticky top-24 z-30 mb-8 bg-white/95 backdrop-blur-sm border-b border-zinc-200 py-3"
-    >
-      <div class="flex items-center justify-center gap-3 text-sm font-medium text-zinc-600">
-        <.icon name="hero-clock" class="w-4 h-4 text-blue-600" />
-        <span
-          id="current-decade-indicator"
-          class="min-w-[120px] text-center history-serif"
-        >
-          Exploring {@years} Years
-        </span>
-        <div class="flex gap-1 ml-2 border-l border-zinc-300 pl-3">
-          <a
-            href="#key-events"
-            class="px-2 py-1 text-blue-600 hover:text-blue-700 transition-colors"
-            title="Jump to top"
-          >
-            ↑ Top
-          </a>
-          <a
-            href="#presidents"
-            class="px-2 py-1 text-blue-600 hover:text-blue-700 transition-colors"
-            title="Jump to presidents"
-          >
-            ↓ Presidents
-          </a>
-        </div>
-      </div>
-    </div>
-    """
-  end
-
   slot :inner_block, required: true
 
   def timeline(assigns) do
