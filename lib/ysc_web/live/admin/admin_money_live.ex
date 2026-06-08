@@ -1329,36 +1329,14 @@ defmodule YscWeb.AdminMoneyLive do
             </tr>
           </tbody>
         </table>
-        <!-- Pagination Controls for Payments -->
-        <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
-          <div class="text-sm text-zinc-600">
-            Page {@payments_page} • Showing {length(@recent_payments)} entries
-          </div>
-          <div class="flex gap-2">
-            <.button
-              phx-click="payments_prev-page"
-              disabled={@payments_page == 1}
-              class={
-                if @payments_page == 1,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Previous
-            </.button>
-            <.button
-              phx-click="payments_next-page"
-              disabled={@payments_end?}
-              class={
-                if @payments_end?,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Next
-            </.button>
-          </div>
-        </div>
+        <.admin_prev_next_pagination
+          page={@payments_page}
+          entry_count={length(@recent_payments)}
+          prev_event="payments_prev-page"
+          next_event="payments_next-page"
+          prev_disabled?={@payments_page == 1}
+          next_disabled?={@payments_end?}
+        />
       </.admin_collapsible_section>
       <!-- Ledger Entries -->
       <.admin_collapsible_section
@@ -1470,36 +1448,14 @@ defmodule YscWeb.AdminMoneyLive do
             </tr>
           </tbody>
         </table>
-        <!-- Pagination Controls for Ledger Entries -->
-        <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
-          <div class="text-sm text-zinc-600">
-            Page {@ledger_entries_page} • Showing {length(@ledger_entries)} entries
-          </div>
-          <div class="flex gap-2">
-            <.button
-              phx-click="ledger_entries_prev-page"
-              disabled={@ledger_entries_page == 1}
-              class={
-                if @ledger_entries_page == 1,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Previous
-            </.button>
-            <.button
-              phx-click="ledger_entries_next-page"
-              disabled={@ledger_entries_end?}
-              class={
-                if @ledger_entries_end?,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Next
-            </.button>
-          </div>
-        </div>
+        <.admin_prev_next_pagination
+          page={@ledger_entries_page}
+          entry_count={length(@ledger_entries)}
+          prev_event="ledger_entries_prev-page"
+          next_event="ledger_entries_next-page"
+          prev_disabled?={@ledger_entries_page == 1}
+          next_disabled?={@ledger_entries_end?}
+        />
       </.admin_collapsible_section>
       <!-- Stripe Webhooks -->
       <.admin_collapsible_section
@@ -1565,36 +1521,14 @@ defmodule YscWeb.AdminMoneyLive do
             </tr>
           </tbody>
         </table>
-        <!-- Pagination Controls for Webhooks -->
-        <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
-          <div class="text-sm text-zinc-600">
-            Page {@webhooks_page} • Showing {length(@webhook_events)} entries
-          </div>
-          <div class="flex gap-2">
-            <.button
-              phx-click="webhooks_prev-page"
-              disabled={@webhooks_page == 1}
-              class={
-                if @webhooks_page == 1,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Previous
-            </.button>
-            <.button
-              phx-click="webhooks_next-page"
-              disabled={@webhooks_end?}
-              class={
-                if @webhooks_end?,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Next
-            </.button>
-          </div>
-        </div>
+        <.admin_prev_next_pagination
+          page={@webhooks_page}
+          entry_count={length(@webhook_events)}
+          prev_event="webhooks_prev-page"
+          next_event="webhooks_next-page"
+          prev_disabled?={@webhooks_page == 1}
+          next_disabled?={@webhooks_end?}
+        />
       </.admin_collapsible_section>
       <!-- Expense Reports -->
       <.admin_collapsible_section
@@ -1703,36 +1637,14 @@ defmodule YscWeb.AdminMoneyLive do
             </tr>
           </tbody>
         </table>
-        <!-- Pagination Controls for Expense Reports -->
-        <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
-          <div class="text-sm text-zinc-600">
-            Page {@expense_reports_page} • Showing {length(@expense_reports)} entries
-          </div>
-          <div class="flex gap-2">
-            <.button
-              phx-click="expense_reports_prev-page"
-              disabled={@expense_reports_page == 1}
-              class={
-                if @expense_reports_page == 1,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Previous
-            </.button>
-            <.button
-              phx-click="expense_reports_next-page"
-              disabled={@expense_reports_end?}
-              class={
-                if @expense_reports_end?,
-                  do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50",
-                  else: "bg-blue-600 hover:bg-blue-700"
-              }
-            >
-              Next
-            </.button>
-          </div>
-        </div>
+        <.admin_prev_next_pagination
+          page={@expense_reports_page}
+          entry_count={length(@expense_reports)}
+          prev_event="expense_reports_prev-page"
+          next_event="expense_reports_next-page"
+          prev_disabled?={@expense_reports_page == 1}
+          next_disabled?={@expense_reports_end?}
+        />
       </.admin_collapsible_section>
       <!-- Refund Modal -->
       <.modal

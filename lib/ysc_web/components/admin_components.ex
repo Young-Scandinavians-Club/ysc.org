@@ -1835,6 +1835,53 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_prev_next_pagination
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Previous/Next footer for offset-paginated admin tables (e.g. Money Management).
+
+  Fires `phx-click` on the parent LiveView with `prev_event` / `next_event`.
+  """
+  attr :page, :integer, required: true
+  attr :entry_count, :integer, required: true
+  attr :prev_event, :string, required: true
+  attr :next_event, :string, required: true
+  attr :prev_disabled?, :boolean, required: true
+  attr :next_disabled?, :boolean, required: true
+
+  def admin_prev_next_pagination(assigns) do
+    ~H"""
+    <div class="flex items-center justify-between px-6 py-4 border-t border-zinc-200">
+      <div class="text-sm text-zinc-600">
+        Page {@page} • Showing {@entry_count} entries
+      </div>
+      <div class="flex gap-2">
+        <.button
+          phx-click={@prev_event}
+          disabled={@prev_disabled?}
+          class={prev_next_button_class(@prev_disabled?)}
+        >
+          Previous
+        </.button>
+        <.button
+          phx-click={@next_event}
+          disabled={@next_disabled?}
+          class={prev_next_button_class(@next_disabled?)}
+        >
+          Next
+        </.button>
+      </div>
+    </div>
+    """
+  end
+
+  defp prev_next_button_class(true),
+    do: "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50"
+
+  defp prev_next_button_class(false), do: "bg-blue-600 hover:bg-blue-700"
+
+  # ---------------------------------------------------------------------------
   # admin_magic_search_section / admin_magic_search_link
   # ---------------------------------------------------------------------------
 

@@ -226,6 +226,67 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "admin_prev_next_pagination/1" do
+    test "renders page summary and navigation buttons" do
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &admin_prev_next_pagination/1,
+          %{
+            page: 2,
+            entry_count: 15,
+            prev_event: "items_prev-page",
+            next_event: "items_next-page",
+            prev_disabled?: false,
+            next_disabled?: false
+          }
+        )
+
+      assert html =~ "Page 2"
+      assert html =~ "Showing 15 entries"
+      assert html =~ ~s(phx-click="items_prev-page")
+      assert html =~ ~s(phx-click="items_next-page")
+      assert html =~ "Previous"
+      assert html =~ "Next"
+    end
+
+    test "disables previous button on first page" do
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &admin_prev_next_pagination/1,
+          %{
+            page: 1,
+            entry_count: 0,
+            prev_event: "items_prev-page",
+            next_event: "items_next-page",
+            prev_disabled?: true,
+            next_disabled?: true
+          }
+        )
+
+      assert html =~ "disabled"
+      assert html =~ "bg-zinc-300"
+      refute html =~ "bg-blue-600 hover:bg-blue-700"
+    end
+
+    test "uses active button styles when navigation is enabled" do
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &admin_prev_next_pagination/1,
+          %{
+            page: 3,
+            entry_count: 25,
+            prev_event: "items_prev-page",
+            next_event: "items_next-page",
+            prev_disabled?: false,
+            next_disabled?: false
+          }
+        )
+
+      assert html =~ "bg-blue-600 hover:bg-blue-700"
+      refute html =~ "bg-zinc-300 text-zinc-500 cursor-not-allowed opacity-50"
+    end
+  end
+
   describe "admin_dashed_more_button/1" do
     test "renders a dashed full-width button with label and phx-click" do
       assigns = %{}
