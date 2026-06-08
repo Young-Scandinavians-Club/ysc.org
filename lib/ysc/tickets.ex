@@ -761,7 +761,10 @@ defmodule Ysc.Tickets do
     end
   end
 
-  def process_ticket_order_payment(ticket_order, %Stripe.PaymentIntent{} = payment_intent) do
+  def process_ticket_order_payment(
+        ticket_order,
+        %Stripe.PaymentIntent{} = payment_intent
+      ) do
     start_time = System.monotonic_time()
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
