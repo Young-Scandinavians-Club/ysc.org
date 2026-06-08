@@ -54,9 +54,6 @@ defmodule Ysc.Credo.NoSleepInTests do
     ]
 
   @impl Credo.Check
-  def scheduled_in_group, do: 1
-
-  @impl Credo.Check
   def run(%Credo.SourceFile{} = source_file, params) do
     issue_meta = IssueMeta.for(source_file, params)
 
