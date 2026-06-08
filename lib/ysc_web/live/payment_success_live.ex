@@ -270,7 +270,7 @@ defmodule YscWeb.PaymentSuccessLive do
             with {:ok, _event_id} <-
                    verify_ticket_order_access(ticket_order_id, user),
                  {:ok, _order} <-
-                   StripeService.process_successful_payment(payment_intent_id) do
+                   StripeService.process_successful_payment(payment_intent) do
               {:ok, ~p"/orders/#{ticket_order_id}/confirmation?confetti=true"}
             else
               {:error, :ticket_order_not_found} = error ->

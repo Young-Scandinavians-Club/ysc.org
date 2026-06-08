@@ -51,7 +51,7 @@ defmodule YscWeb.Emails.TicketOrderRefund do
       raise ArgumentError, "Ticket order cannot be nil"
     end
 
-    # Ensure we have all necessary preloaded data
+    # Always reload so callers that updated related records in the DB see fresh data.
     ticket_order =
       case Tickets.get_ticket_order(ticket_order.id) do
         nil ->

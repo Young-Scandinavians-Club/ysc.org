@@ -6468,9 +6468,6 @@ defmodule YscWeb.EventDetailsLive do
     # Process the free ticket order directly without payment
     case Ysc.Tickets.process_free_ticket_order(socket.assigns.ticket_order) do
       {:ok, updated_order} ->
-        # Get the completed order with tickets for the completion screen
-        order_with_tickets = Ysc.Tickets.get_ticket_order(updated_order.id)
-
         # Update user tickets for this event
         updated_user_tickets =
           Ysc.Tickets.list_user_tickets_for_event(
@@ -6482,13 +6479,13 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> assign(:show_free_ticket_confirmation, false)
          |> assign(:show_order_completion, true)
-         |> assign(:ticket_order, order_with_tickets)
+         |> assign(:ticket_order, updated_order)
          |> assign(:user_tickets, updated_user_tickets)
          |> assign(:selected_tickets, %{})
          |> assign(:tickets_requiring_registration, [])
          |> assign(:ticket_details_form, %{})
          |> redirect(
-           to: ~p"/orders/#{order_with_tickets.id}/confirmation?confetti=true"
+           to: ~p"/orders/#{updated_order.id}/confirmation?confetti=true"
          )}
 
       {:error, reason} ->
@@ -6513,9 +6510,6 @@ defmodule YscWeb.EventDetailsLive do
     # Process the successful payment
     case Ysc.Tickets.StripeService.process_successful_payment(payment_intent_id) do
       {:ok, completed_order} ->
-        # Get the completed order with tickets for the completion screen
-        order_with_tickets = Ysc.Tickets.get_ticket_order(completed_order.id)
-
         # Update user tickets for this event
         updated_user_tickets =
           Ysc.Tickets.list_user_tickets_for_event(
@@ -6528,14 +6522,14 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:show_payment_modal, false)
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:show_order_completion, true)
-         |> assign(:ticket_order, order_with_tickets)
+         |> assign(:ticket_order, completed_order)
          |> assign(:user_tickets, updated_user_tickets)
          |> assign(:payment_intent, nil)
          |> assign(:selected_tickets, %{})
          |> assign(:tickets_requiring_registration, [])
          |> assign(:ticket_details_form, %{})
          |> redirect(
-           to: ~p"/orders/#{order_with_tickets.id}/confirmation?confetti=true"
+           to: ~p"/orders/#{completed_order.id}/confirmation?confetti=true"
          )}
 
       {:error, _reason} ->
