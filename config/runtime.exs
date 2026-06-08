@@ -228,9 +228,22 @@ if config_env() == :prod do
     System.get_env("ENVIRONMENT") == "sandbox" ||
       System.get_env("APP_ENV") == "sandbox"
 
-  # Sandbox VMs are small and scale to zero; skip headless Chrome (TV poster /image → 503).
-  if sandbox? do
-    config :ysc, :chromic_pdf_enabled, false
+  # Headless Chrome for TV poster capture. Disabled only when CHROMIC_PDF_ENABLED is explicitly
+  # false (e.g. local prod release without Chromium). Docker images ship with Chromium on Alpine.
+  chromic_pdf_enabled =
+    case System.get_env("CHROMIC_PDF_ENABLED") do
+      nil -> true
+      v -> String.downcase(String.trim(v)) not in ["false", "0", "no", "off"]
+    end
+
+  config :ysc, :chromic_pdf_enabled, chromic_pdf_enabled
+
+  if chromic_pdf_enabled do
+    config :ysc, ChromicPDF,
+      chrome_executable:
+        System.get_env("CHROME_EXECUTABLE") || "/usr/bin/chromium-browser"
+  else
+    config :ysc, :tv_poster_image_module, Ysc.Events.TvPosterImage.ErrorStub
   end
 
   missing_public =
