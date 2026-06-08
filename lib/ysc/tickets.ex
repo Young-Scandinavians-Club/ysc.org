@@ -753,11 +753,17 @@ defmodule Ysc.Tickets do
   """
   def process_ticket_order_payment(ticket_order, payment_intent_id)
       when is_binary(payment_intent_id) do
-    with {:ok, payment_intent} <-
-           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-             stripe_client().retrieve_payment_intent(payment_intent_id, %{})
-           end) do
-      process_ticket_order_payment(ticket_order, payment_intent)
+    ticket_order = get_ticket_order(ticket_order.id)
+
+    if ticket_order.status == :completed do
+      {:ok, ticket_order}
+    else
+      with {:ok, payment_intent} <-
+             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               stripe_client().retrieve_payment_intent(payment_intent_id, %{})
+             end) do
+        process_ticket_order_payment(ticket_order, payment_intent)
+      end
     end
   end
 
@@ -766,7 +772,11 @@ defmodule Ysc.Tickets do
         %Stripe.PaymentIntent{} = payment_intent
       ) do
     start_time = System.monotonic_time()
-    ticket_order = ensure_ticket_order_for_payment(ticket_order)
+
+    ticket_order =
+      ticket_order.id
+      |> get_ticket_order()
+      |> ensure_ticket_order_for_payment()
 
     result =
       if ticket_order.status == :completed do
