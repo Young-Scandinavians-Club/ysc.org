@@ -106,7 +106,8 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         payment_intent_id = "pi_dup_#{ticket_order.id}"
-        payment_intent = payment_intent_for_order(ticket_order, payment_intent_id)
+        payment_intent =
+          payment_intent_for_order(ticket_order, payment_intent_id)
 
         expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                             _opts ->
@@ -141,7 +142,8 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         payment_intent_id = "pi_race_#{ticket_order.id}"
-        payment_intent = payment_intent_for_order(ticket_order, payment_intent_id)
+        payment_intent =
+          payment_intent_for_order(ticket_order, payment_intent_id)
 
         stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
                                                           _opts ->
@@ -153,7 +155,11 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
           |> Task.async_stream(
             fn _ ->
               Ysc.DataCase.allow_sandbox(self(), owner)
-              Tickets.process_ticket_order_payment(ticket_order, payment_intent_id)
+
+              Tickets.process_ticket_order_payment(
+                ticket_order,
+                payment_intent_id
+              )
             end,
             max_concurrency: 2,
             timeout: 10_000
@@ -161,7 +167,11 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
           |> Enum.map(fn {:ok, result} -> result end)
 
         assert length(results) == 2
-        assert Enum.all?(results, &match?({:ok, %TicketOrder{status: :completed}}, &1))
+
+        assert Enum.all?(
+                 results,
+                 &match?({:ok, %TicketOrder{status: :completed}}, &1)
+               )
 
         [{:ok, order1}, {:ok, order2}] = results
         assert order1.id == order2.id
