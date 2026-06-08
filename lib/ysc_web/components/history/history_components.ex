@@ -103,8 +103,16 @@ defmodule YscWeb.Components.History.HistoryComponents do
   attr :active, :boolean, default: false
 
   defp filter_button(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :filter_id,
+        "timeline-filter-" <> String.replace(assigns.filter, " ", "-")
+      )
+
     ~H"""
     <button
+      id={@filter_id}
       data-filter={@filter}
       data-active={to_string(@active)}
       class={[
@@ -332,23 +340,19 @@ defmodule YscWeb.Components.History.HistoryComponents do
   def archival_photo(assigns) do
     ~H"""
     <figure class={["archival-photo", @era && "era-#{@era}"]}>
-      <a
-        href={@src}
-        class={[
-          "block cursor-zoom-in overflow-hidden rounded",
-          aspect_class(@aspect)
-        ]}
-      >
-        <img
-          src={@src}
-          alt={@alt}
-          class="w-full h-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-        <%= if @caption do %>
+      <a href={@src} class="block cursor-zoom-in">
+        <div class={["overflow-hidden rounded", aspect_class(@aspect)]}>
+          <img
+            src={@src}
+            alt={@alt}
+            class="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <figcaption :if={@caption} class="text-sm text-zinc-500 italic mt-2">
           {@caption}
-        <% end %>
+        </figcaption>
       </a>
     </figure>
     """

@@ -5,9 +5,10 @@ export default {
     mounted() {
         this.filterButtons = this.el.querySelectorAll("[data-filter]");
         this.timelineItems = document.querySelectorAll("[data-timeline-item]");
+        this._clickHandlers = [];
 
         this.filterButtons.forEach((button) => {
-            button.addEventListener("click", (e) => {
+            const handler = (e) => {
                 e.preventDefault();
                 const filter = button.getAttribute("data-filter");
 
@@ -43,7 +44,10 @@ export default {
                         }, 300);
                     }
                 });
-            });
+            };
+
+            button.addEventListener("click", handler);
+            this._clickHandlers.push({ button, handler });
         });
     },
 
@@ -58,6 +62,14 @@ export default {
     },
 
     destroyed() {
-        // Cleanup if needed
+        if (this._clickHandlers) {
+            this._clickHandlers.forEach(({ button, handler }) => {
+                button.removeEventListener("click", handler);
+            });
+            this._clickHandlers = null;
+        }
+
+        this.filterButtons = null;
+        this.timelineItems = null;
     }
 };

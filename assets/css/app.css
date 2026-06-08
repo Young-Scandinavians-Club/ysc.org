@@ -3505,6 +3505,7 @@ cropper-canvas {
 
 [data-checkin-index].keyboard-focused,
 [data-checkin-row].keyboard-focused {
+
     @apply bg-emerald-50 relative z-10 rounded;
     box-shadow: 0 0 0 2px theme('colors.emerald.400'), 0 0 0 5px theme('colors.emerald.100');
 }
