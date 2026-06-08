@@ -158,31 +158,19 @@ defmodule Ysc.Ledgers do
     # Check if payment already exists (idempotency check)
     case get_payment_by_external_id(external_payment_id) do
       nil ->
-        # Payment doesn't exist, create it
-        Repo.transaction(fn ->
-          # Create payment record
-          {:ok, payment} =
-            create_payment(%{
-              user_id: user_id,
-              amount: amount,
-              external_provider: :stripe,
-              external_payment_id: external_payment_id,
-              status: :completed,
-              payment_date: DateTime.utc_now(),
-              payment_method_id: payment_method_id
-            })
-
-          # Create ledger transaction
-          {:ok, transaction} =
-            create_transaction(%{
-              type: :payment,
-              payment_id: payment.id,
-              total_amount: amount,
-              status: :completed
-            })
-
-          # Create double-entry entries
-          entries =
+        insert_payment_with_ledger_entries(%{
+          external_payment_id: external_payment_id,
+          payment_attrs: %{
+            user_id: user_id,
+            amount: amount,
+            external_provider: :stripe,
+            external_payment_id: external_payment_id,
+            status: :completed,
+            payment_date: DateTime.utc_now(),
+            payment_method_id: payment_method_id
+          },
+          transaction_amount: amount,
+          create_entries: fn payment, transaction ->
             create_payment_entries(%{
               payment: payment,
               transaction: transaction,
@@ -193,38 +181,11 @@ defmodule Ysc.Ledgers do
               description: description,
               property: property
             })
+          end
+        })
 
-          {payment, transaction, entries}
-        end)
-
-      existing_payment ->
-        # Payment already exists - this is a duplicate request (e.g., from CashApp retry)
-        # If payment is completed, return existing payment with its transaction and entries
-        require Ysc.Logging
-
-        Ysc.Logging.info("Payment already exists, returning existing payment",
-          external_payment_id: external_payment_id,
-          payment_id: existing_payment.id,
-          status: existing_payment.status
-        )
-
-        if existing_payment.status == :completed do
-          # Get existing transaction and entries
-          transaction =
-            from(t in LedgerTransaction,
-              where: t.payment_id == ^existing_payment.id,
-              limit: 1
-            )
-            |> Repo.one()
-
-          entries = get_entries_by_payment(existing_payment.id)
-
-          # Return existing payment data
-          {:ok, {existing_payment, transaction, entries}}
-        else
-          # Payment exists but isn't completed - this is unexpected, return error
-          {:error, :payment_exists_but_not_completed}
-        end
+      _existing_payment ->
+        return_existing_completed_payment(external_payment_id)
     end
     |> case do
       {:ok, {payment, transaction, entries}} ->
@@ -299,45 +260,39 @@ defmodule Ysc.Ledgers do
 
     ensure_basic_accounts()
 
-    Repo.transaction(fn ->
-      # Create payment record
-      {:ok, payment} =
-        create_payment(%{
-          user_id: user_id,
-          amount: total_amount,
-          external_provider: :stripe,
+    case get_payment_by_external_id(external_payment_id) do
+      nil ->
+        insert_payment_with_ledger_entries(%{
           external_payment_id: external_payment_id,
-          status: :completed,
-          payment_date: DateTime.utc_now(),
-          payment_method_id: payment_method_id
+          payment_attrs: %{
+            user_id: user_id,
+            amount: total_amount,
+            external_provider: :stripe,
+            external_payment_id: external_payment_id,
+            status: :completed,
+            payment_date: DateTime.utc_now(),
+            payment_method_id: payment_method_id
+          },
+          transaction_amount: total_amount,
+          create_entries: fn payment, transaction ->
+            create_mixed_event_donation_discount_entries(%{
+              payment: payment,
+              transaction: transaction,
+              total_amount: total_amount,
+              gross_event_amount: gross_event_amount,
+              donation_amount: donation_amount,
+              discount_amount: discount_amount,
+              event_id: event_id,
+              stripe_fee: stripe_fee,
+              description: description,
+              ticket_order_id: ticket_order_id
+            })
+          end
         })
 
-      # Create ledger transaction
-      {:ok, transaction} =
-        create_transaction(%{
-          type: :payment,
-          payment_id: payment.id,
-          total_amount: total_amount,
-          status: :completed
-        })
-
-      # Create double-entry entries for mixed event/donation/discount payment
-      entries =
-        create_mixed_event_donation_discount_entries(%{
-          payment: payment,
-          transaction: transaction,
-          total_amount: total_amount,
-          gross_event_amount: gross_event_amount,
-          donation_amount: donation_amount,
-          discount_amount: discount_amount,
-          event_id: event_id,
-          stripe_fee: stripe_fee,
-          description: description,
-          ticket_order_id: ticket_order_id
-        })
-
-      {payment, transaction, entries}
-    end)
+      _existing_payment ->
+        return_existing_completed_payment(external_payment_id)
+    end
     |> case do
       {:ok, {payment, transaction, entries}} ->
         # Enqueue QuickBooks sync job after successful payment creation
@@ -396,43 +351,37 @@ defmodule Ysc.Ledgers do
 
     ensure_basic_accounts()
 
-    Repo.transaction(fn ->
-      # Create payment record
-      {:ok, payment} =
-        create_payment(%{
-          user_id: user_id,
-          amount: total_amount,
-          external_provider: :stripe,
+    case get_payment_by_external_id(external_payment_id) do
+      nil ->
+        insert_payment_with_ledger_entries(%{
           external_payment_id: external_payment_id,
-          status: :completed,
-          payment_date: DateTime.utc_now(),
-          payment_method_id: payment_method_id
+          payment_attrs: %{
+            user_id: user_id,
+            amount: total_amount,
+            external_provider: :stripe,
+            external_payment_id: external_payment_id,
+            status: :completed,
+            payment_date: DateTime.utc_now(),
+            payment_method_id: payment_method_id
+          },
+          transaction_amount: total_amount,
+          create_entries: fn payment, transaction ->
+            create_mixed_event_donation_entries(%{
+              payment: payment,
+              transaction: transaction,
+              total_amount: total_amount,
+              event_amount: event_amount,
+              donation_amount: donation_amount,
+              event_id: event_id,
+              stripe_fee: stripe_fee,
+              description: description
+            })
+          end
         })
 
-      # Create ledger transaction
-      {:ok, transaction} =
-        create_transaction(%{
-          type: :payment,
-          payment_id: payment.id,
-          total_amount: total_amount,
-          status: :completed
-        })
-
-      # Create double-entry entries for mixed event/donation payment
-      entries =
-        create_mixed_event_donation_entries(%{
-          payment: payment,
-          transaction: transaction,
-          total_amount: total_amount,
-          event_amount: event_amount,
-          donation_amount: donation_amount,
-          event_id: event_id,
-          stripe_fee: stripe_fee,
-          description: description
-        })
-
-      {payment, transaction, entries}
-    end)
+      _existing_payment ->
+        return_existing_completed_payment(external_payment_id)
+    end
     |> case do
       {:ok, {payment, transaction, entries}} ->
         # Enqueue QuickBooks sync job after successful payment creation
@@ -456,6 +405,93 @@ defmodule Ysc.Ledgers do
 
         error
     end
+  end
+
+  defp insert_payment_with_ledger_entries(opts) do
+    %{
+      external_payment_id: external_payment_id,
+      payment_attrs: payment_attrs,
+      transaction_amount: transaction_amount,
+      create_entries: create_entries
+    } = opts
+
+    case Repo.transaction(fn ->
+           case create_payment(payment_attrs) do
+             {:ok, payment} ->
+               {:ok, transaction} =
+                 create_transaction(%{
+                   type: :payment,
+                   payment_id: payment.id,
+                   total_amount: transaction_amount,
+                   status: :completed
+                 })
+
+               entries = create_entries.(payment, transaction)
+               {payment, transaction, entries}
+
+             {:error, %Ecto.Changeset{} = changeset} ->
+               if duplicate_external_payment_id_error?(changeset) do
+                 Repo.rollback(:duplicate_external_payment_id)
+               else
+                 Repo.rollback(changeset)
+               end
+           end
+         end) do
+      {:ok, result} ->
+        {:ok, result}
+
+      {:error, :duplicate_external_payment_id} ->
+        return_existing_completed_payment(external_payment_id)
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp return_existing_completed_payment(external_payment_id) do
+    require Ysc.Logging
+
+    case get_payment_by_external_id(external_payment_id) do
+      nil ->
+        {:error, :payment_not_found_after_duplicate}
+
+      %Payment{status: :completed} = existing_payment ->
+        Ysc.Logging.info("Payment already exists, returning existing payment",
+          external_payment_id: external_payment_id,
+          payment_id: existing_payment.id,
+          status: existing_payment.status
+        )
+
+        transaction =
+          from(t in LedgerTransaction,
+            where: t.payment_id == ^existing_payment.id,
+            limit: 1
+          )
+          |> Repo.one()
+
+        entries = get_entries_by_payment(existing_payment.id)
+        {:ok, {existing_payment, transaction, entries}}
+
+      %Payment{} = existing_payment ->
+        Ysc.Logging.warning(
+          "Payment already exists but is not completed",
+          external_payment_id: external_payment_id,
+          payment_id: existing_payment.id,
+          status: existing_payment.status
+        )
+
+        {:error, :payment_exists_but_not_completed}
+    end
+  end
+
+  defp duplicate_external_payment_id_error?(%Ecto.Changeset{errors: errors}) do
+    Enum.any?(errors, fn
+      {:external_payment_id, {"has already been taken", opts}} ->
+        Keyword.get(opts, :constraint) == :unique
+
+      _ ->
+        false
+    end)
   end
 
   defp enqueue_quickbooks_sync_payment(%Payment{} = payment) do

@@ -753,25 +753,13 @@ defmodule Ysc.Tickets do
   """
   def process_ticket_order_payment(ticket_order, payment_intent_id) do
     start_time = System.monotonic_time()
+    ticket_order = get_ticket_order(ticket_order.id)
 
     result =
-      with {:ok, payment_intent} <-
-             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               stripe_client().retrieve_payment_intent(payment_intent_id, %{})
-             end),
-           :ok <- validate_payment_intent(payment_intent, ticket_order),
-           {:ok, {payment, _transaction, _entries}} <-
-             process_ledger_payment(ticket_order, payment_intent),
-           {:ok, completed_order} <-
-             complete_ticket_order(ticket_order, payment.id),
-           :ok <- confirm_tickets(completed_order) do
-        # Reload the completed order with all necessary associations for email
-        reloaded_order = get_ticket_order(completed_order.id)
-        # Send confirmation email
-        send_ticket_confirmation_email(reloaded_order)
-        # Broadcast ticket availability update
-        broadcast_ticket_availability_update(ticket_order.event_id)
-        {:ok, reloaded_order}
+      if ticket_order.status == :completed do
+        {:ok, ticket_order}
+      else
+        do_process_ticket_order_payment(ticket_order, payment_intent_id)
       end
 
     # Emit telemetry event for payment processing
@@ -791,6 +779,58 @@ defmodule Ysc.Tickets do
     )
 
     result
+  end
+
+  defp do_process_ticket_order_payment(ticket_order, payment_intent_id) do
+    with {:ok, payment_intent} <-
+           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_client().retrieve_payment_intent(payment_intent_id, %{})
+           end),
+         :ok <- validate_payment_intent(payment_intent, ticket_order),
+         {:ok, {payment, _transaction, _entries}} <-
+           process_ledger_payment(ticket_order, payment_intent),
+         {:ok, completed_order, completion_status} <-
+           complete_ticket_order_if_pending(ticket_order, payment.id),
+         :ok <- confirm_tickets(completed_order) do
+      reloaded_order = get_ticket_order(completed_order.id)
+
+      if completion_status == :newly_completed do
+        send_ticket_confirmation_email(reloaded_order)
+        broadcast_ticket_availability_update(ticket_order.event_id)
+      end
+
+      {:ok, reloaded_order}
+    end
+  end
+
+  defp complete_ticket_order_if_pending(ticket_order, payment_id) do
+    now = DateTime.utc_now()
+
+    {count, _} =
+      from(to in TicketOrder,
+        where: to.id == ^ticket_order.id and to.status == :pending
+      )
+      |> Repo.update_all(
+        set: [
+          status: :completed,
+          payment_id: payment_id,
+          completed_at: now,
+          updated_at: now
+        ]
+      )
+
+    order = get_ticket_order(ticket_order.id)
+
+    cond do
+      count == 1 ->
+        {:ok, order, :newly_completed}
+
+      order.status == :completed ->
+        {:ok, order, :already_completed}
+
+      true ->
+        {:error, :cannot_complete_order}
+    end
   end
 
   @doc """

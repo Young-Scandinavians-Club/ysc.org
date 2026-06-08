@@ -1,5 +1,7 @@
 defmodule YscWeb.PostMigrationOnboardingLiveTest do
-  use YscWeb.ConnCase, async: true
+  # Multi-step LiveView onboarding is sensitive to parallel suite load (stepper
+  # buttons and family form assigns can race with other async tests).
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -206,27 +208,50 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
     defp live_onboarding!(conn) do
       {:ok, view, _html} = live(conn, ~p"/onboarding")
       render_async(view, @onboarding_async_timeout)
+      refute has_element?(view, "#onboarding-loading")
       assert has_element?(view, "#onboarding-profile-form")
       view
     end
 
-    defp last_stepper_index(view) do
-      0..10
-      |> Enum.filter(&has_element?(view, ~s|button[phx-value-step="#{&1}"]|))
-      |> Enum.max()
+    defp family_step_stepper_index(view) do
+      case 0..10
+           |> Enum.filter(
+             &has_element?(view, ~s|button[phx-value-step="#{&1}"]|)
+           ) do
+        [] -> flunk("No navigable onboarding steps found in stepper")
+        indices -> Enum.max(indices)
+      end
     end
 
     defp go_to_family_step!(view) do
       assert has_element?(view, "#onboarding-profile-form")
 
+      assert has_element?(view, "button", "Family"),
+             "expected Family step in onboarding stepper"
+
       render_click(view, "set-step", %{
-        "step" => to_string(last_stepper_index(view))
+        "step" => to_string(family_step_stepper_index(view))
       })
 
       assert has_element?(view, "#family-member-entries")
     end
 
-    defp family_member_change_params(idx, overrides \\ %{}) do
+    defp fill_family_member_form!(view, idx, overrides \\ %{}) do
+      member_params =
+        family_member_change_params(idx, overrides)
+        |> get_in(["family_members", to_string(idx)])
+
+      view
+      |> form("#family-member-form-#{idx}", %{
+        "family_members" => %{to_string(idx) => member_params}
+      })
+      |> render_change()
+
+      assert render(view) =~ member_params["first_name"]
+      view
+    end
+
+    defp family_member_change_params(idx, overrides) do
       base = %{
         "first_name" => "Family#{idx}",
         "last_name" => "Member",
@@ -264,11 +289,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
         |> Date.add(1)
         |> Date.to_iso8601()
 
-      render_change(
-        view,
-        "validate_family_member",
-        family_member_change_params(0, %{"birth_date" => tomorrow})
-      )
+      fill_family_member_form!(view, 0, %{"birth_date" => tomorrow})
 
       html = render_click(view, "complete_family_step")
 
@@ -298,21 +319,16 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       view = live_onboarding!(conn)
       go_to_family_step!(view)
+      fill_family_member_form!(view, 0)
 
-      render_change(
-        view,
-        "validate_family_member",
-        family_member_change_params(0)
-      )
-
-      render_click(view, "complete_family_step")
+      html = render_click(view, "complete_family_step")
+      assert html =~ "all set"
 
       user = Accounts.get_user!(user.id, [:family_members])
 
       assert length(user.family_members) == 1
       assert user.family_members |> hd() |> Map.get(:first_name) == "Family0"
       refute Accounts.needs_post_migration_onboarding?(user)
-      assert render(view) =~ "all set"
     end
 
     test "complete_family_step requires at least one family member", %{
