@@ -21,6 +21,8 @@ defmodule YscWeb.AdminTabsTest do
       assert html =~ ~s(id="tabs")
       assert html =~ ~s(aria-label="Sections")
       assert html =~ "overflow-x-auto"
+      assert html =~ "admin-tabs-nav"
+      assert html =~ "overflow-y-hidden"
       assert html =~ "min-w-0"
       assert html =~ "flex-nowrap"
       assert html =~ "shrink-0"
@@ -43,6 +45,8 @@ defmodule YscWeb.AdminTabsTest do
       assert html =~ "space-x-8"
       assert html =~ "py-4 px-1"
       assert html =~ "overflow-x-auto"
+      assert html =~ "admin-tabs-nav"
+      assert html =~ "overflow-y-hidden"
       assert html =~ "min-w-0"
       assert html =~ "flex-nowrap"
       assert html =~ "shrink-0"

@@ -753,10 +753,10 @@ defmodule Ysc.Tickets do
   """
   def process_ticket_order_payment(ticket_order, payment_intent_id)
       when is_binary(payment_intent_id) do
-    ticket_order = get_ticket_order(ticket_order.id)
+    ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
-    if ticket_order.status == :completed do
-      {:ok, ticket_order}
+    if ticket_order_completed?(ticket_order) do
+      {:ok, completed_ticket_order_for_return(ticket_order)}
     else
       with {:ok, payment_intent} <-
              Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -779,8 +779,8 @@ defmodule Ysc.Tickets do
       |> ensure_ticket_order_for_payment()
 
     result =
-      if ticket_order.status == :completed do
-        {:ok, ticket_order}
+      if ticket_order_completed?(ticket_order) do
+        {:ok, completed_ticket_order_for_return(ticket_order)}
       else
         do_process_ticket_order_payment(ticket_order, payment_intent)
       end
@@ -867,6 +867,24 @@ defmodule Ysc.Tickets do
     else
       get_ticket_order(ticket_order.id)
     end
+  end
+
+  defp ticket_order_completed?(%TicketOrder{status: :completed}), do: true
+
+  defp ticket_order_completed?(%TicketOrder{id: id}) do
+    TicketOrder
+    |> where([t], t.id == ^id and t.status == :completed)
+    |> Repo.exists?()
+  end
+
+  defp completed_ticket_order_for_return(
+         %TicketOrder{status: :completed} = ticket_order
+       ) do
+    ticket_order
+  end
+
+  defp completed_ticket_order_for_return(%TicketOrder{id: id}) do
+    get_ticket_order(id)
   end
 
   defp ticket_order_ready_for_payment?(%TicketOrder{} = ticket_order) do

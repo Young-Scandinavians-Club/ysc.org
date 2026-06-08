@@ -872,13 +872,13 @@ defmodule YscWeb.AdminComponents do
 
   def admin_tabs(assigns) do
     ~H"""
-    <div class={[
-      "border-b border-zinc-200 mb-6 w-full min-w-0 overflow-x-auto",
-      @class
-    ]}>
+    <div class={["border-b border-zinc-200 mb-6 w-full min-w-0", @class]}>
       <nav
         id={@id}
-        class={[admin_tabs_nav_class(@density), "flex-nowrap"]}
+        class={[
+          admin_tabs_nav_class(@density),
+          "admin-tabs-nav flex-nowrap min-w-0 overflow-x-auto overflow-y-hidden"
+        ]}
         aria-label={@aria_label}
         role={@role}
       >
@@ -940,11 +940,11 @@ defmodule YscWeb.AdminComponents do
 
   defp admin_tab_base(:compact),
     do:
-      "shrink-0 whitespace-nowrap py-3 px-4 -mb-px border-b-2 font-medium text-sm transition-colors rounded-t"
+      "shrink-0 whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm transition-colors rounded-t"
 
   defp admin_tab_base(:spacious),
     do:
-      "shrink-0 whitespace-nowrap py-4 px-1 -mb-px border-b-2 font-medium text-sm transition-colors"
+      "shrink-0 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
 
   defp admin_tab_state(true, :compact),
     do: "border-blue-500 text-blue-600 bg-white"
@@ -1595,7 +1595,7 @@ defmodule YscWeb.AdminComponents do
       |> assign(:show_badge, assigns.count && assigns.count > 0)
 
     ~H"""
-    <div class={["relative inline-flex -mb-px", @class]}>
+    <div class={["relative inline-flex shrink-0", @class]}>
       {render_slot(@inner_block)}
       <div
         :if={@show_badge}
