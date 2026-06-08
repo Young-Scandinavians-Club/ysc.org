@@ -106,6 +106,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         payment_intent_id = "pi_dup_#{ticket_order.id}"
+
         payment_intent =
           payment_intent_for_order(ticket_order, payment_intent_id)
 
@@ -142,6 +143,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
         payment_intent_id = "pi_race_#{ticket_order.id}"
+
         payment_intent =
           payment_intent_for_order(ticket_order, payment_intent_id)
 
