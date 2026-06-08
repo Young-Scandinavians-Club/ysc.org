@@ -340,19 +340,18 @@ defmodule YscWeb.Components.History.HistoryComponents do
   def archival_photo(assigns) do
     ~H"""
     <figure class={["archival-photo", @era && "era-#{@era}"]}>
+      <%!-- img must be a direct child of <a>; GLightboxHook moves caption to a single figcaption --%>
       <a href={@src} class="block cursor-zoom-in">
-        <div class={["overflow-hidden rounded", aspect_class(@aspect)]}>
-          <img
-            src={@src}
-            alt={@alt}
-            class="w-full h-full object-cover"
-            loading="lazy"
-            decoding="async"
-          />
-        </div>
-        <figcaption :if={@caption} class="text-sm text-zinc-500 italic mt-2">
+        <img
+          src={@src}
+          alt={@alt}
+          class={["w-full object-cover rounded", aspect_class(@aspect)]}
+          loading="lazy"
+          decoding="async"
+        />
+        <span :if={@caption} class="text-sm text-zinc-500 italic mt-2 block">
           {@caption}
-        </figcaption>
+        </span>
       </a>
     </figure>
     """
