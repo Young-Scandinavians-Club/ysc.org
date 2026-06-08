@@ -21,39 +21,41 @@ defmodule Ysc.TicketsTest do
   defp with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fun) do
     unique = System.unique_integer([:positive])
     module_name = :"TestStripeClientTickets#{unique}"
+    amount = amount_cents
 
-    {:module, client_module, _, _} =
-      defmodule module_name do
-        @behaviour Ysc.StripeBehaviour
+    mod =
+      quote do
+        defmodule unquote(module_name) do
+          @behaviour Ysc.StripeBehaviour
+          @mock_amount unquote(amount)
 
-        def create_payment_intent(_params, _opts),
-          do: {:error, :not_implemented}
+          def create_payment_intent(_params, _opts), do: {:error, :not_implemented}
+          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+          def create_customer(_params), do: {:error, :not_implemented}
+          def update_customer(_id, _params), do: {:error, :not_implemented}
+          def retrieve_payment_method(_id), do: {:error, :not_implemented}
 
-        def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
-        def create_customer(_params), do: {:error, :not_implemented}
-        def update_customer(_id, _params), do: {:error, :not_implemented}
-        def retrieve_payment_method(_id), do: {:error, :not_implemented}
-
-        def retrieve_payment_intent(id, _opts) do
-          {:ok,
-           %Stripe.PaymentIntent{
-             id: id,
-             status: "succeeded",
-             amount: Process.get(:test_amount_cents, 5000),
-             metadata: %{}
-           }}
+          def retrieve_payment_intent(id, _opts) do
+            {:ok,
+             %Stripe.PaymentIntent{
+               id: id,
+               status: "succeeded",
+               amount: @mock_amount,
+               metadata: %{}
+             }}
+          end
         end
       end
 
+    Code.eval_quoted(mod, [], __ENV__)
+
     original_client = Application.get_env(:ysc, :stripe_client)
-    Application.put_env(:ysc, :stripe_client, client_module)
-    Process.put(:test_amount_cents, amount_cents)
+    Application.put_env(:ysc, :stripe_client, module_name)
 
     try do
       fun.(payment_intent_id)
     after
       Application.put_env(:ysc, :stripe_client, original_client)
-      Process.delete(:test_amount_cents)
     end
   end
 
@@ -893,6 +895,8 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "process_ticket_order_payment/2" do
+    @moduletag :async, false
+
     setup do
       tickets_setup()
     end
@@ -911,8 +915,9 @@ defmodule Ysc.TicketsTest do
       assert expired.status == :expired
 
       payment_intent_id = "pi_expired_race_#{order.id}"
+      amount_cents = Ysc.MoneyHelper.money_to_cents(expired.total_amount)
 
-      with_stripe_payment_intent_mock(payment_intent_id, 5000, fn pi_id ->
+      with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fn pi_id ->
         assert {:ok, completed} =
                  Tickets.process_ticket_order_payment(expired, pi_id)
 
@@ -942,8 +947,9 @@ defmodule Ysc.TicketsTest do
                Tickets.cancel_ticket_order(order, "changed mind")
 
       payment_intent_id = "pi_cancelled_#{order.id}"
+      amount_cents = Ysc.MoneyHelper.money_to_cents(cancelled.total_amount)
 
-      with_stripe_payment_intent_mock(payment_intent_id, 5000, fn pi_id ->
+      with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fn pi_id ->
         assert {:error, :cannot_complete_order} =
                  Tickets.process_ticket_order_payment(cancelled, pi_id)
       end)
