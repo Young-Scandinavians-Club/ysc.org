@@ -51,7 +51,15 @@ defmodule YscWeb.Emails.TicketOrderRefund do
       raise ArgumentError, "Ticket order cannot be nil"
     end
 
-    ticket_order = ensure_ticket_order_loaded(ticket_order)
+    # Always reload so callers that updated related records in the DB see fresh data.
+    ticket_order =
+      case Tickets.get_ticket_order(ticket_order.id) do
+        nil ->
+          raise ArgumentError, "Ticket order not found: #{ticket_order.id}"
+
+        loaded_order ->
+          loaded_order
+      end
 
     # Validate required associations
     if is_nil(ticket_order.user) do
@@ -229,27 +237,6 @@ defmodule YscWeb.Emails.TicketOrderRefund do
       _ ->
         Money.new(0, :USD)
     end
-  end
-
-  defp ensure_ticket_order_loaded(ticket_order) do
-    if ticket_order_email_data_loaded?(ticket_order) do
-      ticket_order
-    else
-      case Tickets.get_ticket_order(ticket_order.id) do
-        nil ->
-          raise ArgumentError, "Ticket order not found: #{ticket_order.id}"
-
-        loaded_order ->
-          loaded_order
-      end
-    end
-  end
-
-  defp ticket_order_email_data_loaded?(ticket_order) do
-    Ecto.assoc_loaded?(ticket_order.user) and
-      Ecto.assoc_loaded?(ticket_order.event) and
-      Ecto.assoc_loaded?(ticket_order.tickets) and
-      ticket_order.tickets != []
   end
 
   defp format_event_datetime(event) do
