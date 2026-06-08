@@ -1079,10 +1079,6 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:hosts, hosts)
     |> assign(:host_ids, host_ids_from(hosts))
     |> stream(:agendas, agendas, reset: true)
-    |> assign(
-      :ticket_tier_count,
-      Events.count_ticket_tiers_for_event(event.id)
-    )
   end
 
   defp assign_updates_tab_data(socket, event) do
@@ -2115,7 +2111,7 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp refresh_event_updates(socket, event_id) do
-    event = Events.get_event!(event_id)
+    event = socket.assigns.event
     event_updates = Events.list_event_updates(event_id)
 
     photo_collection = socket.assigns[:photo_collection]

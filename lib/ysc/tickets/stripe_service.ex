@@ -103,13 +103,19 @@ defmodule Ysc.Tickets.StripeService do
   - `{:ok, %TicketOrder{}}` on success
   - `{:error, reason}` on failure
   """
-  def process_successful_payment(payment_intent_id) do
+  def process_successful_payment(payment_intent_id)
+      when is_binary(payment_intent_id) do
     with {:ok, payment_intent} <-
-           stripe_client().retrieve_payment_intent(payment_intent_id, %{}),
-         {:ok, ticket_order} <-
+           stripe_client().retrieve_payment_intent(payment_intent_id, %{}) do
+      process_successful_payment(payment_intent)
+    end
+  end
+
+  def process_successful_payment(%Stripe.PaymentIntent{} = payment_intent) do
+    with {:ok, ticket_order} <-
            get_ticket_order_from_payment_intent(payment_intent),
          :ok <- validate_payment_intent(payment_intent, ticket_order) do
-      Tickets.process_ticket_order_payment(ticket_order, payment_intent_id)
+      Tickets.process_ticket_order_payment(ticket_order, payment_intent)
     end
   end
 
