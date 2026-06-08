@@ -18,6 +18,45 @@ defmodule Ysc.TicketsTest do
     user_fixture(Map.put(attrs, :email, email))
   end
 
+  defp with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fun) do
+    unique = System.unique_integer([:positive])
+    module_name = :"TestStripeClientTickets#{unique}"
+
+    {:module, client_module, _, _} =
+      defmodule module_name do
+        @behaviour Ysc.StripeBehaviour
+
+        def create_payment_intent(_params, _opts),
+          do: {:error, :not_implemented}
+
+        def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
+        def create_customer(_params), do: {:error, :not_implemented}
+        def update_customer(_id, _params), do: {:error, :not_implemented}
+        def retrieve_payment_method(_id), do: {:error, :not_implemented}
+
+        def retrieve_payment_intent(id, _opts) do
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: id,
+             status: "succeeded",
+             amount: Process.get(:test_amount_cents, 5000),
+             metadata: %{}
+           }}
+        end
+      end
+
+    original_client = Application.get_env(:ysc, :stripe_client)
+    Application.put_env(:ysc, :stripe_client, client_module)
+    Process.put(:test_amount_cents, amount_cents)
+
+    try do
+      fun.(payment_intent_id)
+    after
+      Application.put_env(:ysc, :stripe_client, original_client)
+      Process.delete(:test_amount_cents)
+    end
+  end
+
   defp tickets_setup do
     Ysc.Ledgers.ensure_basic_accounts()
     user = user_fixture_unique()
@@ -850,6 +889,64 @@ defmodule Ysc.TicketsTest do
 
       assert {:ok, expired} = Tickets.expire_ticket_order(order)
       assert expired.status == :expired
+    end
+  end
+
+  describe "process_ticket_order_payment/2" do
+    setup do
+      tickets_setup()
+    end
+
+    test "completes expired order when payment succeeds after timeout race", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+        end)
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+
+      payment_intent_id = "pi_expired_race_#{order.id}"
+
+      with_stripe_payment_intent_mock(payment_intent_id, 5000, fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(expired, pi_id)
+
+        assert completed.status == :completed
+        assert completed.payment_id
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id
+          )
+
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end)
+    end
+
+    test "does not complete cancelled orders when payment succeeds", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+        end)
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(order, "changed mind")
+
+      payment_intent_id = "pi_cancelled_#{order.id}"
+
+      with_stripe_payment_intent_mock(payment_intent_id, 5000, fn pi_id ->
+        assert {:error, :cannot_complete_order} =
+                 Tickets.process_ticket_order_payment(cancelled, pi_id)
+      end)
     end
   end
 
