@@ -82,8 +82,7 @@ defmodule YscWeb.UserRegistrationLive do
                         },
                         family: %{
                           option: "family",
-                          subtitle:
-                            "You, your partner, and children under 18",
+                          subtitle: "You, your partner, and children under 18",
                           icon: "user-group"
                         }
                       ]}
