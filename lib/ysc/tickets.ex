@@ -811,9 +811,11 @@ defmodule Ysc.Tickets do
   defp complete_ticket_order_if_pending(ticket_order, payment_id) do
     now = DateTime.utc_now()
 
+    # Allow :expired so a succeeded Stripe payment can still fulfill tickets when
+    # TimeoutWorker wins the race against payment_intent.succeeded / redirect return.
     {count, _} =
       from(to in TicketOrder,
-        where: to.id == ^ticket_order.id and to.status == :pending
+        where: to.id == ^ticket_order.id and to.status in [:pending, :expired]
       )
       |> Repo.update_all(
         set: [
