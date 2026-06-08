@@ -395,7 +395,7 @@ Verify: `make query-explain-staged` or `mix ci.query_explain.suggest`. Full guid
 - Test suite runs with `MIX_ENV=test mix test` (7256 tests); no external services needed beyond PostgreSQL
 - Docker containers must be started with `sudo docker compose` since the daemon runs as root in this environment
 - `.tool-versions` specifies `elixir 1.20.0-otp-28` and `erlang 28.3`; CI pins Elixir `1.20.0` with OTP `27.3`
-- **Credo** is pinned to `github: "rrrene/credo", branch: "master"` until a Hex release fully supports Elixir 1.20 sigil tokens; custom checks in `dev/ysc/credo/` must implement `scheduled_in_group/0`
+- Custom Credo checks in `dev/ysc/credo/` must implement `scheduled_in_group/0`
 - Lint: `mix format --check-formatted && mix credo --all` plus `shellcheck` and `shfmt -d -i 2 -ci` on shell scripts (see Makefile `lint` target)
 - The seeded admin account is `admin@ysc.org` / `very_secure_password`
 - After login, the app may redirect to an onboarding page; navigate to `/admin` directly to access the admin dashboard
