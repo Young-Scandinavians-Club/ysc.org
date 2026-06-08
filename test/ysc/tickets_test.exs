@@ -29,7 +29,9 @@ defmodule Ysc.TicketsTest do
           @behaviour Ysc.StripeBehaviour
           @mock_amount unquote(amount)
 
-          def create_payment_intent(_params, _opts), do: {:error, :not_implemented}
+          def create_payment_intent(_params, _opts),
+            do: {:error, :not_implemented}
+
           def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
           def create_customer(_params), do: {:error, :not_implemented}
           def update_customer(_id, _params), do: {:error, :not_implemented}
