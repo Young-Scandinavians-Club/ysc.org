@@ -325,6 +325,108 @@ defmodule Ysc.LedgersTest do
       assert payment1.external_payment_id == external_id
     end
 
+    test "process_event_payment_with_donations/1 returns existing payment on duplicate external_payment_id",
+         %{user: user} do
+      total_amount = Money.new(10_000, :USD)
+      event_amount = Money.new(6_000, :USD)
+      donation_amount = Money.new(4_000, :USD)
+      external_id = "pi_event_don_idem_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        total_amount: total_amount,
+        event_amount: event_amount,
+        donation_amount: donation_amount,
+        event_id: Ecto.ULID.generate(),
+        external_payment_id: external_id,
+        stripe_fee: Money.new(320, :USD),
+        description: "Event with donation",
+        payment_method_id: nil
+      }
+
+      assert {:ok, {payment1, _tx1, _entries1}} =
+               Ledgers.process_event_payment_with_donations(attrs)
+
+      assert {:ok, {payment2, _tx2, _entries2}} =
+               Ledgers.process_event_payment_with_donations(attrs)
+
+      assert payment1.id == payment2.id
+      assert payment2.external_payment_id == external_id
+    end
+
+    test "process_event_payment_with_donations_and_discounts/1 returns existing payment on duplicate external_payment_id",
+         %{user: user} do
+      total_amount = Money.new(10_000, :USD)
+      gross_event_amount = Money.new(6_000, :USD)
+      donation_amount = Money.new(4_000, :USD)
+      discount_amount = Money.new(1_000, :USD)
+      external_id = "pi_event_disc_idem_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        total_amount: total_amount,
+        gross_event_amount: gross_event_amount,
+        event_amount: gross_event_amount,
+        donation_amount: donation_amount,
+        discount_amount: discount_amount,
+        event_id: Ecto.ULID.generate(),
+        external_payment_id: external_id,
+        stripe_fee: Money.new(320, :USD),
+        description: "Event with donation and discount",
+        payment_method_id: nil,
+        ticket_order_id: Ecto.ULID.generate()
+      }
+
+      assert {:ok, {payment1, _tx1, _entries1}} =
+               Ledgers.process_event_payment_with_donations_and_discounts(attrs)
+
+      assert {:ok, {payment2, _tx2, _entries2}} =
+               Ledgers.process_event_payment_with_donations_and_discounts(attrs)
+
+      assert payment1.id == payment2.id
+      assert payment2.external_payment_id == external_id
+    end
+
+    @tag :capture_log
+    test "process_event_payment_with_donations/1 handles concurrent duplicate external_payment_id",
+         %{user: user, sandbox_owner: owner} do
+      total_amount = Money.new(10_000, :USD)
+      event_amount = Money.new(6_000, :USD)
+      donation_amount = Money.new(4_000, :USD)
+      external_id = "pi_event_don_race_#{System.unique_integer([:positive])}"
+
+      attrs = %{
+        user_id: user.id,
+        total_amount: total_amount,
+        event_amount: event_amount,
+        donation_amount: donation_amount,
+        event_id: Ecto.ULID.generate(),
+        external_payment_id: external_id,
+        stripe_fee: Money.new(320, :USD),
+        description: "Concurrent event donation payment",
+        payment_method_id: nil
+      }
+
+      results =
+        1..2
+        |> Task.async_stream(
+          fn _ ->
+            Ysc.DataCase.allow_sandbox(self(), owner)
+            Ledgers.process_event_payment_with_donations(attrs)
+          end,
+          max_concurrency: 2,
+          timeout: 5_000
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      assert length(results) == 2
+      assert Enum.all?(results, &match?({:ok, {_payment, _tx, _entries}}, &1))
+
+      [{:ok, {payment1, _, _}}, {:ok, {payment2, _, _}}] = results
+      assert payment1.id == payment2.id
+      assert payment1.external_payment_id == external_id
+    end
+
     test "process_payment/1 returns error when payment exists but not completed",
          %{
            user: user
