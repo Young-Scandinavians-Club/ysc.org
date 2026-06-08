@@ -81,5 +81,12 @@ defmodule Ysc.Events.TvPosterImage.Chromic do
       )
 
       {:error, error}
+
+    error in RuntimeError ->
+      if Exception.message(error) =~ "Can't find a running ChromicPDF instance" do
+        {:error, :chromic_pdf_not_started}
+      else
+        reraise error, __STACKTRACE__
+      end
   end
 end

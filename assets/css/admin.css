@@ -42,6 +42,19 @@ html.sidebar-collapsed #admin-collapse-chevron {
     background-color: rgba(59, 130, 246, 0.55);
 }
 
+/* Admin tab bars: horizontal scroll without visible scrollbars or vertical wheel/trackpad drift */
+.admin-tabs-nav {
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: none;
+    overscroll-behavior-y: none;
+    touch-action: pan-x;
+    scrollbar-width: none;
+}
+
+.admin-tabs-nav::-webkit-scrollbar {
+    display: none;
+}
+
 @media (min-width: 1024px) {
     /* --- Sidebar & main content width transition --- */
     #admin-navigation {
