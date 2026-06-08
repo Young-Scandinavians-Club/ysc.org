@@ -1038,9 +1038,7 @@ defmodule YscWeb.EventDetailsLive do
                 :if={!event_in_past?(@event)}
                 class="p-6 rounded-xl border border-zinc-100 flex items-center justify-between"
               >
-                <span class="text-sm font-bold text-zinc-900">
-                  Add to your calendar
-                </span>
+                <span class="text-sm font-bold text-zinc-900">Don't forget.</span>
                 <add-to-calendar-button
                   name={@event.title}
                   startDate={date_for_add_to_cal(@event.start_date)}
