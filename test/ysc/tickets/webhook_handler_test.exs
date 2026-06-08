@@ -47,7 +47,12 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       # Mock StripeService calls - return metadata without ticket_order_id to avoid ULID cast error
       # The handler will return :ok even if processing fails
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn _id, _opts ->
-        {:ok, %{id: payment_intent_id, status: "succeeded", metadata: %{}}}
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           metadata: %{}
+         }}
       end)
 
       pin_stripe_mock!()
@@ -68,7 +73,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
       # Mock StripeService calls - return metadata without ticket_order_id to avoid ULID cast error
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn _id, _opts ->
         {:ok,
-         %{
+         %Stripe.PaymentIntent{
            id: payment_intent_id,
            status: "requires_payment_method",
            metadata: %{}
@@ -92,7 +97,12 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
 
       # Mock StripeService calls - return metadata without ticket_order_id to avoid ULID cast error
       expect(Ysc.StripeMock, :retrieve_payment_intent, fn _id, _opts ->
-        {:ok, %{id: payment_intent_id, status: "canceled", metadata: %{}}}
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "canceled",
+           metadata: %{}
+         }}
       end)
 
       pin_stripe_mock!()
@@ -151,7 +161,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
           assert id == payment_intent_id
 
           {:ok,
-           %{
+           %Stripe.PaymentIntent{
              id: id,
              status: "requires_payment_method",
              metadata: %{"ticket_order_id" => ticket_order.id}
@@ -183,7 +193,7 @@ defmodule Ysc.Tickets.WebhookHandlerTest do
           assert id == payment_intent_id
 
           {:ok,
-           %{
+           %Stripe.PaymentIntent{
              id: id,
              status: "canceled",
              metadata: %{"ticket_order_id" => ticket_order.id}
