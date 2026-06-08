@@ -897,7 +897,7 @@ defmodule Ysc.TicketsTest do
   end
 
   describe "process_ticket_order_payment/2" do
-    @moduletag :async, false
+    @moduletag async: false
 
     setup do
       tickets_setup()
@@ -919,20 +919,24 @@ defmodule Ysc.TicketsTest do
       payment_intent_id = "pi_expired_race_#{order.id}"
       amount_cents = Ysc.MoneyHelper.money_to_cents(expired.total_amount)
 
-      with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fn pi_id ->
-        assert {:ok, completed} =
-                 Tickets.process_ticket_order_payment(expired, pi_id)
+      with_stripe_payment_intent_mock(
+        payment_intent_id,
+        amount_cents,
+        fn pi_id ->
+          assert {:ok, completed} =
+                   Tickets.process_ticket_order_payment(expired, pi_id)
 
-        assert completed.status == :completed
-        assert completed.payment_id
+          assert completed.status == :completed
+          assert completed.payment_id
 
-        tickets =
-          Ysc.Repo.all(
-            from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id
-          )
+          tickets =
+            Ysc.Repo.all(
+              from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id
+            )
 
-        assert Enum.all?(tickets, &(&1.status == :confirmed))
-      end)
+          assert Enum.all?(tickets, &(&1.status == :confirmed))
+        end
+      )
     end
 
     test "does not complete cancelled orders when payment succeeds", %{
@@ -951,10 +955,14 @@ defmodule Ysc.TicketsTest do
       payment_intent_id = "pi_cancelled_#{order.id}"
       amount_cents = Ysc.MoneyHelper.money_to_cents(cancelled.total_amount)
 
-      with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fn pi_id ->
-        assert {:error, :cannot_complete_order} =
-                 Tickets.process_ticket_order_payment(cancelled, pi_id)
-      end)
+      with_stripe_payment_intent_mock(
+        payment_intent_id,
+        amount_cents,
+        fn pi_id ->
+          assert {:error, :cannot_complete_order} =
+                   Tickets.process_ticket_order_payment(cancelled, pi_id)
+        end
+      )
     end
   end
 
