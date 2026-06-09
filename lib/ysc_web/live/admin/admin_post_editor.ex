@@ -159,6 +159,13 @@ defmodule YscWeb.AdminPostEditorLive do
                 {String.capitalize("#{@post.state}")}
               </.badge>
 
+              <.admin_help_link
+                topic="posts/publish"
+                label="Publishing help"
+                role={@admin_role}
+                class="self-center"
+              />
+
               <p class={[
                 "inline-flex shrink-0 items-center text-sm text-zinc-600 transition duration-200 ease-in-out",
                 @saving? && "opacity-100",

@@ -46,6 +46,12 @@ defmodule YscWeb.AdminEventsNewLive do
                   {String.capitalize("#{@state}")}
                 </.badge>
 
+                <.admin_help_link
+                  topic={event_help_topic(@live_action)}
+                  label="Guide for this tab"
+                  role={@admin_role}
+                />
+
                 <.link
                   :if={@event.state == :published}
                   href={~p"/events/#{@event.id}"}
@@ -2246,4 +2252,8 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp schedule_button_text(:scheduled), do: "Scheduled"
   defp schedule_button_text(_), do: "Schedule"
+
+  defp event_help_topic(:tickets), do: "events/tickets"
+  defp event_help_topic(:updates), do: "events/updates"
+  defp event_help_topic(_), do: "events/create"
 end

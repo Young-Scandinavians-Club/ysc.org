@@ -383,9 +383,17 @@ document.addEventListener("paste", (event) => {
     }
 });
 
-// Handle print-page event for PDF download
-window.addEventListener("phx:print-page", () => {
-    window.print();
+// Handle print-page event for PDF download (optional detail.title for the saved PDF name)
+window.addEventListener("phx:print-page", (event) => {
+    const title = event.detail?.title;
+    if (title) {
+        const previousTitle = document.title;
+        document.title = title;
+        window.print();
+        document.title = previousTitle;
+    } else {
+        window.print();
+    }
 });
 
 // Handle copy to clipboard for Report ID
