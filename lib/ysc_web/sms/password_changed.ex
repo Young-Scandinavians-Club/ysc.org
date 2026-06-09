@@ -5,6 +5,8 @@ defmodule YscWeb.Sms.PasswordChanged do
   Sends a security notification to users when their password has been changed.
   """
 
+  alias YscWeb.Sms.Template
+
   @doc """
   Gets the template name.
   """
@@ -22,13 +24,10 @@ defmodule YscWeb.Sms.PasswordChanged do
   - String with SMS message body
   """
   def render(variables) do
-    first_name = Map.get(variables, :first_name, "Valued Member")
-
-    """
-    [YSC] Hej #{first_name}! Your account password was changed. If this wasn't you, please contact us right away.
-    """
-    |> String.trim()
-    |> String.replace(~r/\s+/, " ")
+    Template.security_notification_body(
+      Template.first_name(variables),
+      "Your account password was changed. If this wasn't you, please contact us right away."
+    )
   end
 
   @doc """
@@ -41,8 +40,6 @@ defmodule YscWeb.Sms.PasswordChanged do
   - Map with all necessary data for the SMS template
   """
   def prepare_sms_data(user) do
-    %{
-      first_name: if(user, do: user.first_name, else: nil)
-    }
+    %{first_name: Template.user_first_name(user)}
   end
 end

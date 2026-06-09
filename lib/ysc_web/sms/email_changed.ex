@@ -5,6 +5,8 @@ defmodule YscWeb.Sms.EmailChanged do
   Sends a security notification to users when their email address has been changed.
   """
 
+  alias YscWeb.Sms.Template
+
   @doc """
   Gets the template name.
   """
@@ -22,14 +24,12 @@ defmodule YscWeb.Sms.EmailChanged do
   - String with SMS message body
   """
   def render(variables) do
-    first_name = Map.get(variables, :first_name, "Valued Member")
     new_email = Map.get(variables, :new_email, "your email")
 
-    """
-    [YSC] Hej #{first_name}! Your account email was changed to #{new_email}. If this wasn't you, please contact us right away.
-    """
-    |> String.trim()
-    |> String.replace(~r/\s+/, " ")
+    Template.security_notification_body(
+      Template.first_name(variables),
+      "Your account email was changed to #{new_email}. If this wasn't you, please contact us right away."
+    )
   end
 
   @doc """
@@ -44,7 +44,7 @@ defmodule YscWeb.Sms.EmailChanged do
   """
   def prepare_sms_data(user, new_email) when is_binary(new_email) do
     %{
-      first_name: if(user, do: user.first_name, else: nil),
+      first_name: Template.user_first_name(user),
       new_email: new_email
     }
   end

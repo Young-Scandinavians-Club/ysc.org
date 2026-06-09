@@ -5,8 +5,9 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
   Sends a check-in reminder SMS with door code to users before their booking check-in.
   """
 
-  alias Ysc.Repo
   alias Ysc.Bookings
+  alias Ysc.Repo
+  alias YscWeb.Sms.Template
 
   @doc """
   Gets the template name.
@@ -25,17 +26,15 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
   - String with SMS message body
   """
   def render(variables) do
-    first_name = Map.get(variables, :first_name, "Valued Member")
+    first_name = Template.first_name(variables)
     property_name = Map.get(variables, :property_name, "Property")
     checkin_date = Map.get(variables, :checkin_date, "")
     door_code = Map.get(variables, :door_code, "Not Available")
     checkin_time = Map.get(variables, :checkin_time, "3:00 PM")
 
-    """
-    [YSC] Hej #{first_name}! Your check-in at #{property_name} is on #{checkin_date} at #{checkin_time}. Your door code is: #{door_code}. See you soon!
-    """
-    |> String.trim()
-    |> String.replace(~r/\s+/, " ")
+    Template.format(
+      "Hej #{first_name}! Your check-in at #{property_name} is on #{checkin_date} at #{checkin_time}. Your door code is: #{door_code}. See you soon!"
+    )
   end
 
   @doc """
