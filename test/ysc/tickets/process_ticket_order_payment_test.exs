@@ -137,11 +137,12 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     )
   end
 
-  test "rejects expired order fulfillment when capacity was taken after expiry", %{
-    user: user,
-    event: event,
-    tier1: tier1
-  } do
+  test "rejects expired order fulfillment when capacity was taken after expiry",
+       %{
+         user: user,
+         event: event,
+         tier1: tier1
+       } do
     {:ok, limited_event} =
       Ysc.Events.update_event(event, %{max_attendees: 1})
 
@@ -186,14 +187,19 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
         assert {:error, reason} =
                  Tickets.process_ticket_order_payment(expired, pi_id)
 
-        assert reason in [:event_capacity_exceeded, :tier_validation_failed, :insufficient_capacity]
+        assert reason in [
+                 :event_capacity_exceeded,
+                 :tier_validation_failed,
+                 :insufficient_capacity
+               ]
 
         reloaded = Ysc.Repo.get!(Ysc.Tickets.TicketOrder, expired_order.id)
         assert reloaded.status == :expired
 
         tickets =
           Ysc.Repo.all(
-            from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^expired_order.id
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^expired_order.id
           )
 
         assert Enum.all?(tickets, &(&1.status == :expired))
