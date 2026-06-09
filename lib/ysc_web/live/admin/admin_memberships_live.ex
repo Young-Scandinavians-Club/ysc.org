@@ -22,30 +22,44 @@ defmodule YscWeb.AdminMembershipsLive do
      |> assign(:page_title, "Memberships")
      |> assign(:stats, %{total: 0, single: 0, family: 0, lifetime: 0})
      |> assign(:memberships, [])
-     |> assign(:type_filter, nil)}
+     |> assign(:type_filter, nil)
+     |> assign(:loading_memberships?, true)}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    type_filter =
-      case params["type"] do
-        "single" -> :single
-        "family" -> :family
-        "lifetime" -> :lifetime
-        _ -> nil
-      end
+    type_filter = membership_type_filter(params)
 
-    {stats, memberships} =
-      Accounts.load_admin_memberships_page(
-        limit: 200,
-        type: type_filter
-      )
+    socket =
+      socket
+      |> assign(:type_filter, type_filter)
+      |> assign(:loading_memberships?, true)
 
+    if connected?(socket) do
+      {:noreply,
+       start_async(socket, :load_memberships, fn ->
+         Accounts.load_admin_memberships_page(
+           limit: 200,
+           type: type_filter
+         )
+       end)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_async(:load_memberships, {:ok, {stats, memberships}}, socket) do
     {:noreply,
      socket
      |> assign(:stats, stats)
-     |> assign(:type_filter, type_filter)
-     |> assign(:memberships, memberships)}
+     |> assign(:memberships, memberships)
+     |> assign(:loading_memberships?, false)}
+  end
+
+  @impl true
+  def handle_async(:load_memberships, {:exit, _}, socket) do
+    {:noreply, assign(socket, :loading_memberships?, false)}
   end
 
   @impl true
@@ -74,25 +88,25 @@ defmodule YscWeb.AdminMembershipsLive do
           <.admin_stat_card
             id="memberships-stat-total"
             label="Total Memberships"
-            value={@stats.total}
+            value={stat_value(@stats.total, @loading_memberships?)}
             subtitle="Active primary accounts"
           />
           <.admin_stat_card
             id="memberships-stat-single"
             label="Single"
-            value={@stats.single}
+            value={stat_value(@stats.single, @loading_memberships?)}
             subtitle="Individual memberships"
           />
           <.admin_stat_card
             id="memberships-stat-family"
             label="Family"
-            value={@stats.family}
+            value={stat_value(@stats.family, @loading_memberships?)}
             subtitle="Family plan memberships"
           />
           <.admin_stat_card
             id="memberships-stat-lifetime"
             label="Lifetime"
-            value={@stats.lifetime}
+            value={stat_value(@stats.lifetime, @loading_memberships?)}
             subtitle="Lifetime memberships"
           />
         </div>
@@ -137,7 +151,15 @@ defmodule YscWeb.AdminMembershipsLive do
             </div>
           </div>
 
-          <div class="overflow-x-auto">
+          <div :if={@loading_memberships?} class="py-16 text-center">
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
+            <p class="text-zinc-500 font-medium">Loading memberships…</p>
+          </div>
+
+          <div :if={not @loading_memberships?} class="overflow-x-auto">
             <table class="min-w-full divide-y divide-zinc-200">
               <thead class="bg-zinc-50">
                 <tr>
@@ -222,7 +244,10 @@ defmodule YscWeb.AdminMembershipsLive do
             </table>
           </div>
 
-          <div :if={@memberships == []} class="py-16 text-center">
+          <div
+            :if={not @loading_memberships? and @memberships == []}
+            class="py-16 text-center"
+          >
             <.icon
               name="hero-user-group"
               class="w-12 h-12 text-zinc-300 mx-auto mb-4"
@@ -240,6 +265,18 @@ defmodule YscWeb.AdminMembershipsLive do
       </div>
     </.side_menu>
     """
+  end
+
+  defp stat_value(_value, true), do: "—"
+  defp stat_value(value, false), do: value
+
+  defp membership_type_filter(params) do
+    case params["type"] do
+      "single" -> :single
+      "family" -> :family
+      "lifetime" -> :lifetime
+      _ -> nil
+    end
   end
 
   defp membership_type_badge(:single), do: :sky

@@ -12,6 +12,10 @@ defmodule Ysc.Application do
 
   @impl true
   def start(_type, _args) do
+    # Req 0.6+ disables automatic gzip/brotli/zstd decompression by default; keep prior
+    # behavior for external API and asset downloads (Google, GitHub, SNS certs, etc.).
+    Req.default_options(compressed: true)
+
     :logger.add_handler(:ysc_sentry_handler, Sentry.LoggerHandler, %{
       config: %{metadata: [:file, :line]}
     })
