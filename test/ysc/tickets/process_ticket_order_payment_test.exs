@@ -137,6 +137,94 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     )
   end
 
+  test "rejects expired order fulfillment when capacity was taken after expiry",
+       %{
+         user: user,
+         event: event,
+         tier1: tier1
+       } do
+    {:ok, limited_event} =
+      Ysc.Events.update_event(event, %{max_attendees: 1})
+
+    {:ok, limited_tier} =
+      Ysc.Events.update_ticket_tier(tier1, %{quantity: 1})
+
+    other_user =
+      user_fixture_unique()
+      |> then(fn u ->
+        u
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+      end)
+
+    {:ok, expired_order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, limited_event.id, %{
+          limited_tier.id => 1
+        })
+      end)
+
+    assert {:ok, expired} = Tickets.expire_ticket_order(expired_order)
+    assert expired.status == :expired
+
+    assert {:ok, _other_order} =
+             Oban.Testing.with_testing_mode(:manual, fn ->
+               Tickets.create_ticket_order(other_user.id, limited_event.id, %{
+                 limited_tier.id => 1
+               })
+             end)
+
+    payment_intent_id = "pi_expired_overbook_#{expired_order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(expired.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      fn pi_id ->
+        assert {:error, reason} =
+                 Tickets.process_ticket_order_payment(expired, pi_id)
+
+        assert reason in [
+                 :event_capacity_exceeded,
+                 :tier_validation_failed,
+                 :insufficient_capacity
+               ]
+
+        reloaded = Ysc.Repo.get!(Ysc.Tickets.TicketOrder, expired_order.id)
+        assert reloaded.status == :expired
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^expired_order.id
+          )
+
+        assert Enum.all?(tickets, &(&1.status == :expired))
+
+        confirmed_count =
+          Ysc.Repo.aggregate(
+            from(t in Ysc.Events.Ticket,
+              where: t.event_id == ^limited_event.id and t.status == :confirmed
+            ),
+            :count
+          )
+
+        pending_count =
+          Ysc.Repo.aggregate(
+            from(t in Ysc.Events.Ticket,
+              where: t.event_id == ^limited_event.id and t.status == :pending
+            ),
+            :count
+          )
+
+        assert confirmed_count + pending_count == 1
+      end
+    )
+  end
+
   test "does not complete cancelled orders when payment succeeds", %{
     user: user,
     event: event,

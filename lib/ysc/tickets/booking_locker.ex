@@ -79,6 +79,30 @@ defmodule Ysc.Tickets.BookingLocker do
   end
 
   @doc """
+  Validates that ticket selections can still be fulfilled after inventory was released.
+
+  Used when completing an expired order after a late Stripe success so we do not
+  confirm tickets that would exceed tier or event capacity.
+  """
+  def validate_fulfillment_capacity(user_id, event_id, ticket_selections) do
+    Repo.transaction(fn ->
+      with {:ok, event} <- lock_and_validate_event(event_id),
+           {:ok, tiers} <-
+             lock_and_validate_tiers(event_id, ticket_selections, user_id),
+           :ok <-
+             validate_event_capacity(event, tiers, ticket_selections, user_id) do
+        :ok
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, :ok} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
   Checks availability with proper locking for real-time display.
 
   This is used for UI display and should not be used for final booking validation.
