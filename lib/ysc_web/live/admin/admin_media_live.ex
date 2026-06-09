@@ -620,30 +620,30 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:stream_initialized?, false)
       |> assign(:last_image_date, nil)
       |> assign(:images_empty?, true)
-     |> assign(:years_set, MapSet.new())
-     |> assign(:years_list, [])
-     |> assign(:uploaded_files, [])
-     |> assign(:active_image, nil)
-     |> assign(:image_uploader, nil)
-     |> assign(:selected_image_version, :optimized)
-     |> assign(:layout_mode, :masonry)
-     |> assign(:show_drop_zone, false)
-     |> assign(:pending_upload_submit?, false)
-     |> assign(form: nil)
-     |> stream(:images, [], dom_id: &get_dom_id/1)
-     |> allow_upload(:media_uploads,
-       accept: ~w(.jpg .jpeg .png .gif .webp),
-       max_entries: 10,
-       external: &presign_upload/2,
-       progress: &handle_media_upload_progress/3
-     )
-     |> allow_upload(:media_drop_uploads,
-       accept: ~w(.jpg .jpeg .png .gif .webp),
-       max_entries: 10,
-       auto_upload: true,
-       external: &presign_upload/2,
-       progress: &handle_media_upload_progress/3
-     )
+      |> assign(:years_set, MapSet.new())
+      |> assign(:years_list, [])
+      |> assign(:uploaded_files, [])
+      |> assign(:active_image, nil)
+      |> assign(:image_uploader, nil)
+      |> assign(:selected_image_version, :optimized)
+      |> assign(:layout_mode, :masonry)
+      |> assign(:show_drop_zone, false)
+      |> assign(:pending_upload_submit?, false)
+      |> assign(form: nil)
+      |> stream(:images, [], dom_id: &get_dom_id/1)
+      |> allow_upload(:media_uploads,
+        accept: ~w(.jpg .jpeg .png .gif .webp),
+        max_entries: 10,
+        external: &presign_upload/2,
+        progress: &handle_media_upload_progress/3
+      )
+      |> allow_upload(:media_drop_uploads,
+        accept: ~w(.jpg .jpeg .png .gif .webp),
+        max_entries: 10,
+        auto_upload: true,
+        external: &presign_upload/2,
+        progress: &handle_media_upload_progress/3
+      )
 
     {:ok, socket, temporary_assigns: [form: nil]}
   end
@@ -710,7 +710,8 @@ defmodule YscWeb.AdminMediaLive do
     {:noreply, socket}
   end
 
-  defp ensure_timeline_loaded(%{assigns: %{timeline_loaded?: true}} = socket), do: socket
+  defp ensure_timeline_loaded(%{assigns: %{timeline_loaded?: true}} = socket),
+    do: socket
 
   defp ensure_timeline_loaded(socket) do
     timeline = Media.get_timeline_indices()

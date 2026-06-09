@@ -152,7 +152,10 @@ defmodule YscWeb.AdminMembershipsLive do
           </div>
 
           <div :if={@loading_memberships?} class="py-16 text-center">
-            <.icon name="hero-arrow-path" class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin" />
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
             <p class="text-zinc-500 font-medium">Loading memberships…</p>
           </div>
 

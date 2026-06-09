@@ -17,22 +17,24 @@ defmodule YscWeb.AdminNewslettersLive do
       |> assign(:subscriber_count, nil)
       |> assign(:creator_filter, [])
       |> assign(:empty, false)
-     |> assign(:meta, nil)
-     |> assign(:params, %{})
-     |> assign(:search_query, "")
-     |> assign(:date_from, "")
-     |> assign(:date_to, "")
-     |> assign(:current_tab, "editions")
-     |> assign(:sub_meta, nil)
-     |> assign(:sub_search, "")
-     |> assign(:sub_filter, "all")
-     |> assign(
-       :add_subscriber_form,
-       to_form(%{"email" => ""}, as: :add_subscriber)
-     )
-     |> assign(:show_add_subscriber_modal, false)
-     |> stream_configure(:editions, dom_id: &"edition-#{&1.id}")
-     |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}")
+      |> assign(:meta, nil)
+      |> assign(:params, %{})
+      |> assign(:search_query, "")
+      |> assign(:date_from, "")
+      |> assign(:date_to, "")
+      |> assign(:current_tab, "editions")
+      |> assign(:sub_meta, nil)
+      |> assign(:sub_search, "")
+      |> assign(:sub_filter, "all")
+      |> assign(
+        :add_subscriber_form,
+        to_form(%{"email" => ""}, as: :add_subscriber)
+      )
+      |> assign(:show_add_subscriber_modal, false)
+      |> stream_configure(:editions, dom_id: &"edition-#{&1.id}")
+      |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}")
+      |> stream(:editions, [])
+      |> stream(:subscribers, [])
 
     socket =
       if connected?(socket) do
@@ -338,23 +340,109 @@ defmodule YscWeb.AdminNewslettersLive do
           </div>
 
           <%!-- Editions content --%>
-          <%!-- Mobile Card View --%>
-          <div class="block md:hidden space-y-4">
-            <%= for {_, edition} <- @streams.editions do %>
-              <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-                <.link
-                  navigate={~p"/admin/newsletters/#{edition.id}/edit"}
-                  class="block"
-                >
-                  <h3 class="text-base font-semibold text-zinc-900 truncate">
-                    {edition.title}
-                  </h3>
-                  <p class="text-sm text-zinc-500 truncate mt-0.5">
-                    {edition.subject}
-                  </p>
-                </.link>
+          <div :if={is_nil(@meta)} class="py-16 text-center">
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
+            <p class="text-zinc-500 font-medium">Loading editions…</p>
+          </div>
 
-                <div class="flex items-center gap-3 mt-2 flex-wrap">
+          <div :if={@meta} class="space-y-6">
+            <%!-- Mobile Card View --%>
+            <div class="block md:hidden space-y-4">
+              <%= for {_, edition} <- @streams.editions do %>
+                <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
+                  <.link
+                    navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                    class="block"
+                  >
+                    <h3 class="text-base font-semibold text-zinc-900 truncate">
+                      {edition.title}
+                    </h3>
+                    <p class="text-sm text-zinc-500 truncate mt-0.5">
+                      {edition.subject}
+                    </p>
+                  </.link>
+
+                  <div class="flex items-center gap-3 mt-2 flex-wrap">
+                    <%= if edition.status == :sending do %>
+                      <.admin_sending_badge />
+                    <% else %>
+                      <.badge type={edition_status_badge(edition.status)}>
+                        {format_status(edition.status)}
+                      </.badge>
+                    <% end %>
+                    <span class="text-sm text-zinc-500">
+                      <%= cond do %>
+                        <% edition.sent_at -> %>
+                          Sent {format_datetime(edition.sent_at)}
+                        <% edition.scheduled_at -> %>
+                          Scheduled {format_datetime(edition.scheduled_at)}
+                        <% true -> %>
+                          Created {format_datetime(edition.inserted_at)}
+                      <% end %>
+                    </span>
+                    <span
+                      :if={edition.status == :sent && edition.sent_count > 0}
+                      class="text-sm text-zinc-500"
+                    >
+                      {edition.sent_count} sent
+                    </span>
+                    <span :if={edition.creator} class="text-sm text-zinc-500">
+                      by {creator_name(edition.creator)}
+                    </span>
+                  </div>
+
+                  <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
+                    <.edition_actions_dropdown
+                      edition={edition}
+                      menu_id={"newsletter-actions-mob-#{edition.id}"}
+                    />
+                  </div>
+                </div>
+              <% end %>
+
+              <.admin_list_empty_state
+                :if={@empty}
+                title="No newsletters yet"
+                suggestion="Create one to get started."
+              />
+
+              <div :if={!@empty} class="pt-4">
+                <.admin_flop_pagination
+                  meta={@meta}
+                  path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
+                  density={:compact}
+                />
+              </div>
+            </div>
+            <%!-- Desktop Table View --%>
+            <div class="hidden md:block py-6 w-full">
+              <Flop.Phoenix.table
+                id="admin_newsletters_list"
+                items={@streams.editions}
+                meta={@meta}
+                path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
+                row_click={
+                  fn {_, edition} ->
+                    JS.navigate(~p"/admin/newsletters/#{edition.id}/edit")
+                  end
+                }
+                opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
+              >
+                <:col :let={{_, edition}} label="Title" field={:title}>
+                  <.link
+                    navigate={~p"/admin/newsletters/#{edition.id}/edit"}
+                    class="font-semibold text-zinc-900 hover:underline"
+                  >
+                    {edition.title}
+                  </.link>
+                </:col>
+                <:col :let={{_, edition}} label="Subject" field={:subject}>
+                  <span class="text-zinc-600">{edition.subject}</span>
+                </:col>
+                <:col :let={{_, edition}} label="Status" field={:status}>
                   <%= if edition.status == :sending do %>
                     <.admin_sending_badge />
                   <% else %>
@@ -362,132 +450,62 @@ defmodule YscWeb.AdminNewslettersLive do
                       {format_status(edition.status)}
                     </.badge>
                   <% end %>
-                  <span class="text-sm text-zinc-500">
-                    <%= cond do %>
-                      <% edition.sent_at -> %>
-                        Sent {format_datetime(edition.sent_at)}
-                      <% edition.scheduled_at -> %>
-                        Scheduled {format_datetime(edition.scheduled_at)}
-                      <% true -> %>
-                        Created {format_datetime(edition.inserted_at)}
-                    <% end %>
+                </:col>
+                <:col :let={{_, edition}} label="Created" field={:inserted_at}>
+                  <span class="text-zinc-600">
+                    {format_date(edition.inserted_at)}
                   </span>
-                  <span
-                    :if={edition.status == :sent && edition.sent_count > 0}
-                    class="text-sm text-zinc-500"
-                  >
-                    {edition.sent_count} sent
-                  </span>
-                  <span :if={edition.creator} class="text-sm text-zinc-500">
-                    by {creator_name(edition.creator)}
-                  </span>
-                </div>
-
-                <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
+                </:col>
+                <:col :let={{_, edition}} label="Sent" field={:sent_at}>
+                  <%= cond do %>
+                    <% edition.sent_at -> %>
+                      <div class="text-zinc-600">
+                        {format_date(edition.sent_at)}
+                      </div>
+                      <div
+                        :if={edition.sent_count > 0}
+                        class="text-xs text-zinc-400"
+                      >
+                        {edition.sent_count} recipients
+                      </div>
+                    <% edition.scheduled_at -> %>
+                      <div class="text-zinc-500 text-xs font-medium">Scheduled</div>
+                      <div class="text-zinc-600 text-xs">
+                        {format_datetime(edition.scheduled_at)}
+                      </div>
+                    <% true -> %>
+                      <span class="text-zinc-400">—</span>
+                  <% end %>
+                </:col>
+                <:col :let={{_, edition}} label="Creator">
+                  <%= if edition.creator do %>
+                    <span class="text-zinc-600">
+                      {creator_name(edition.creator)}
+                    </span>
+                  <% else %>
+                    <span class="text-zinc-400">—</span>
+                  <% end %>
+                </:col>
+                <:action :let={{_, edition}}>
                   <.edition_actions_dropdown
                     edition={edition}
-                    menu_id={"newsletter-actions-mob-#{edition.id}"}
+                    menu_id={"newsletter-actions-dt-#{edition.id}"}
                   />
-                </div>
-              </div>
-            <% end %>
+                </:action>
+              </Flop.Phoenix.table>
 
-            <.admin_list_empty_state
-              :if={@empty}
-              title="No newsletters yet"
-              suggestion="Create one to get started."
-            />
+              <.admin_list_empty_state
+                :if={@empty}
+                title="No newsletters yet"
+                suggestion="Create one to get started."
+              />
 
-            <div :if={@meta && !@empty} class="pt-4">
               <.admin_flop_pagination
                 meta={@meta}
                 path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
-                density={:compact}
+                density={:comfortable}
               />
             </div>
-          </div>
-          <%!-- Desktop Table View --%>
-          <div class="hidden md:block py-6 w-full">
-            <Flop.Phoenix.table
-              id="admin_newsletters_list"
-              items={@streams.editions}
-              meta={@meta}
-              path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
-              row_click={
-                fn {_, edition} ->
-                  JS.navigate(~p"/admin/newsletters/#{edition.id}/edit")
-                end
-              }
-              opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
-            >
-              <:col :let={{_, edition}} label="Title" field={:title}>
-                <.link
-                  navigate={~p"/admin/newsletters/#{edition.id}/edit"}
-                  class="font-semibold text-zinc-900 hover:underline"
-                >
-                  {edition.title}
-                </.link>
-              </:col>
-              <:col :let={{_, edition}} label="Subject" field={:subject}>
-                <span class="text-zinc-600">{edition.subject}</span>
-              </:col>
-              <:col :let={{_, edition}} label="Status" field={:status}>
-                <%= if edition.status == :sending do %>
-                  <.admin_sending_badge />
-                <% else %>
-                  <.badge type={edition_status_badge(edition.status)}>
-                    {format_status(edition.status)}
-                  </.badge>
-                <% end %>
-              </:col>
-              <:col :let={{_, edition}} label="Created" field={:inserted_at}>
-                <span class="text-zinc-600">
-                  {format_date(edition.inserted_at)}
-                </span>
-              </:col>
-              <:col :let={{_, edition}} label="Sent" field={:sent_at}>
-                <%= cond do %>
-                  <% edition.sent_at -> %>
-                    <div class="text-zinc-600">{format_date(edition.sent_at)}</div>
-                    <div :if={edition.sent_count > 0} class="text-xs text-zinc-400">
-                      {edition.sent_count} recipients
-                    </div>
-                  <% edition.scheduled_at -> %>
-                    <div class="text-zinc-500 text-xs font-medium">Scheduled</div>
-                    <div class="text-zinc-600 text-xs">
-                      {format_datetime(edition.scheduled_at)}
-                    </div>
-                  <% true -> %>
-                    <span class="text-zinc-400">—</span>
-                <% end %>
-              </:col>
-              <:col :let={{_, edition}} label="Creator">
-                <%= if edition.creator do %>
-                  <span class="text-zinc-600">{creator_name(edition.creator)}</span>
-                <% else %>
-                  <span class="text-zinc-400">—</span>
-                <% end %>
-              </:col>
-              <:action :let={{_, edition}}>
-                <.edition_actions_dropdown
-                  edition={edition}
-                  menu_id={"newsletter-actions-dt-#{edition.id}"}
-                />
-              </:action>
-            </Flop.Phoenix.table>
-
-            <.admin_list_empty_state
-              :if={@empty}
-              title="No newsletters yet"
-              suggestion="Create one to get started."
-            />
-
-            <.admin_flop_pagination
-              :if={@meta}
-              meta={@meta}
-              path={~p"/admin/newsletters?#{non_flop_params(@params)}"}
-              density={:comfortable}
-            />
           </div>
         </div>
 
