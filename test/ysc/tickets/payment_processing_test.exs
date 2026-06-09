@@ -105,12 +105,17 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
     test "accepts a preloaded payment intent struct without refetching from Stripe" do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
-        payment_intent = payment_intent_for_order(ticket_order, "pi_struct_#{ticket_order.id}")
+
+        payment_intent =
+          payment_intent_for_order(ticket_order, "pi_struct_#{ticket_order.id}")
 
         deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
 
         assert {:ok, completed} =
-                 Tickets.process_ticket_order_payment(ticket_order, payment_intent)
+                 Tickets.process_ticket_order_payment(
+                   ticket_order,
+                   payment_intent
+                 )
 
         assert completed.status == :completed
         assert completed.payment_id
