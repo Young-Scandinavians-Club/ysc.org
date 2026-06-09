@@ -25,6 +25,12 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     edition
   end
 
+  defp live_newsletters(conn, path \\ ~p"/admin/newsletters") do
+    {:ok, view, _html} = live(conn, path)
+    html = render_async(view, 5000)
+    {view, html}
+  end
+
   # ---------------------------------------------------------------------------
   # Access control
   # ---------------------------------------------------------------------------
@@ -61,7 +67,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     test "lists existing editions", %{conn: conn, admin: admin} do
       edition_fixture(admin, %{"title" => "Spring Update"})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+      {_view, html} = live_newsletters(conn)
 
       assert html =~ "Spring Update"
     end
@@ -77,7 +83,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     } do
       edition_fixture(admin, %{"title" => "Draft Ed"})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+      {_view, html} = live_newsletters(conn)
 
       assert html =~ "Draft"
     end
@@ -95,7 +101,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       {:ok, _} =
         Newsletter.update_edition(edition, %{"sent_at" => DateTime.utc_now()})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/newsletters")
+      {_view, html} = live_newsletters(conn)
 
       assert html =~ "Sent"
     end
@@ -112,12 +118,13 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       edition_fixture(admin, %{"title" => "Searchable Title"})
       edition_fixture(admin, %{"title" => "Other Title"})
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+      {view, _html} = live_newsletters(conn)
 
       html =
         view
         |> form("#newsletters-search-form", %{q: "Searchable"})
         |> render_submit()
+        |> then(fn _ -> render_async(view, 5000) end)
 
       assert html =~ "Searchable Title"
       refute html =~ "Other Title"
@@ -130,12 +137,16 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       edition_fixture(admin, %{"title" => "Alpha"})
       edition_fixture(admin, %{"title" => "Beta"})
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+      {view, _html} = live_newsletters(conn)
 
       view |> form("#newsletters-search-form", %{q: "Alpha"}) |> render_submit()
+      render_async(view, 5000)
 
       html =
-        view |> form("#newsletters-search-form", %{q: ""}) |> render_submit()
+        view
+        |> form("#newsletters-search-form", %{q: ""})
+        |> render_submit()
+        |> then(fn _ -> render_async(view, 5000) end)
 
       assert html =~ "Alpha"
       assert html =~ "Beta"
@@ -152,7 +163,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     test "removes the edition from the list", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin, %{"title" => "To Delete"})
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+      {view, _html} = live_newsletters(conn)
 
       assert has_element?(view, "#edition-#{edition.id}")
 
@@ -179,7 +190,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+      {view, _html} = live_newsletters(conn)
 
       # Two send-now buttons exist (mobile card + desktop table); target the desktop dropdown action.
       view
@@ -235,7 +246,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       edition = edition_fixture(admin, %{"title" => "Broadcast Edition"})
       edition = Newsletter.get_edition!(edition.id)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+      {view, _html} = live_newsletters(conn)
 
       :ok = Newsletter.broadcast_edition_sent(edition)
 
@@ -264,7 +275,7 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     setup [:create_admin]
 
     test "new newsletter link navigates to editor", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters")
+      {view, _html} = live_newsletters(conn)
 
       {:ok, _editor_view, html} =
         view

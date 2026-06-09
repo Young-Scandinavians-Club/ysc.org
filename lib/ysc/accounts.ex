@@ -3459,37 +3459,50 @@ defmodule Ysc.Accounts do
   """
   def get_membership_stats do
     active_primary_users_for_membership_stats()
-    |> Enum.filter(&has_active_membership?/1)
     |> Enum.map(&get_membership_type_for_primary/1)
     |> membership_stats_from_types()
   end
 
-  defp active_primary_users_for_membership_stats do
+  defp active_membership_primary_users_query do
+    now = DateTime.utc_now()
+
+    valid_subscription_user_ids =
+      from(s in Subscription,
+        where: s.stripe_status in ["active", "trialing"],
+        where: s.current_period_end > ^now,
+        where: is_nil(s.ends_at) or s.ends_at > ^now,
+        select: s.user_id,
+        distinct: true
+      )
+
     from(u in User,
       where: is_nil(u.primary_user_id),
       where: u.state == :active,
-      preload: [:sub_accounts, subscriptions: :subscription_items]
+      where:
+        not is_nil(u.lifetime_membership_awarded_at) or
+          u.id in subquery(valid_subscription_user_ids)
     )
+  end
+
+  defp active_primary_users_for_membership_stats do
+    active_membership_primary_users_query()
+    |> preload([:sub_accounts, subscriptions: :subscription_items])
     |> Repo.all()
   end
 
   defp active_primary_users_for_memberships do
-    from(u in User,
-      where: is_nil(u.primary_user_id),
-      where: u.state == :active,
-      order_by: [asc: u.last_name, asc: u.first_name],
-      preload: [
-        {:sub_accounts, :current_avatar},
-        :current_avatar,
-        subscriptions: :subscription_items
-      ]
-    )
+    active_membership_primary_users_query()
+    |> order_by([u], asc: u.last_name, asc: u.first_name)
+    |> preload([
+      {:sub_accounts, :current_avatar},
+      :current_avatar,
+      subscriptions: :subscription_items
+    ])
     |> Repo.all()
   end
 
   defp membership_rows_from_primaries(primary_users) do
     primary_users
-    |> Enum.filter(&has_active_membership?/1)
     |> Enum.map(fn primary ->
       associated = get_family_group(primary)
 
