@@ -20,7 +20,13 @@ defmodule YscWeb.BookingUserMessagesTest do
              "check the box at the bottom"
 
     assert BookingUserMessages.modification_forfeiture_title() =~
-             "changing your dates affects refunds"
+             "will not get a refund"
+
+    assert BookingUserMessages.modification_forfeiture_body() =~
+             "cannot get a refund later"
+
+    assert BookingUserMessages.modification_forfeiture_acknowledgment() =~
+             "will not receive a refund"
   end
 
   test "clear lake blackout message" do

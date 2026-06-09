@@ -462,7 +462,7 @@ defmodule YscWeb.BookingChangeLive do
           {YscWeb.BookingUserMessages.modification_forfeiture_title()}
         </p>
         <p class="text-sm leading-relaxed">
-          By changing this reservation, you forfeit all refund eligibility — even if you would normally receive a full refund under our cancellation policy. This cannot be undone. You may still cancel later, but you will not receive a refund.
+          {YscWeb.BookingUserMessages.modification_forfeiture_body()}
         </p>
       </div>
 
@@ -605,7 +605,7 @@ defmodule YscWeb.BookingChangeLive do
             for="acknowledge-forfeiture"
             class="text-sm text-zinc-700 leading-relaxed"
           >
-            I understand that changing this reservation forfeits all refund eligibility, including any cancellation refund I might otherwise receive.
+            {YscWeb.BookingUserMessages.modification_forfeiture_acknowledgment()}
           </label>
         </div>
 
