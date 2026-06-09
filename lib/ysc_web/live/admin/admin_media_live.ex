@@ -605,24 +605,21 @@ defmodule YscWeb.AdminMediaLive do
   def mount(_params, _session, socket) do
     if connected?(socket), do: Media.subscribe_images()
 
-    timeline = Media.get_timeline_indices()
-    media_count = Media.total_image_count_from_timeline(timeline)
-    available_years = Enum.map(timeline, & &1.year)
-
-    {:ok,
-     socket
-     |> assign(:media_count, media_count)
-     |> assign(:page_title, "Media")
-     |> assign(:active_page, :media)
-     |> assign(:timeline, timeline)
-     |> assign(:available_years, available_years)
-     |> assign(:selected_year, nil)
-     |> assign(:search_query, "")
-     |> assign(:per_page, 30)
-     |> assign(:end_of_timeline?, false)
-     |> assign(:stream_initialized?, false)
-     |> assign(:last_image_date, nil)
-     |> assign(:images_empty?, media_count == 0)
+    socket =
+      socket
+      |> assign(:media_count, 0)
+      |> assign(:page_title, "Media")
+      |> assign(:active_page, :media)
+      |> assign(:timeline, [])
+      |> assign(:available_years, [])
+      |> assign(:timeline_loaded?, false)
+      |> assign(:selected_year, nil)
+      |> assign(:search_query, "")
+      |> assign(:per_page, 30)
+      |> assign(:end_of_timeline?, false)
+      |> assign(:stream_initialized?, false)
+      |> assign(:last_image_date, nil)
+      |> assign(:images_empty?, true)
      |> assign(:years_set, MapSet.new())
      |> assign(:years_list, [])
      |> assign(:uploaded_files, [])
@@ -646,7 +643,9 @@ defmodule YscWeb.AdminMediaLive do
        auto_upload: true,
        external: &presign_upload/2,
        progress: &handle_media_upload_progress/3
-     ), temporary_assigns: [form: nil]}
+     )
+
+    {:ok, socket, temporary_assigns: [form: nil]}
   end
 
   @impl true
@@ -693,12 +692,13 @@ defmodule YscWeb.AdminMediaLive do
       "Year param: #{inspect(year_param)}, Search query: #{inspect(search_query)}"
     )
 
-    # Load images after the WebSocket connects so the first HTML response avoids the
-    # gallery query; timeline + totals still load in mount (single grouped query).
+    # Load timeline totals and gallery only after the WebSocket connects so the
+    # first HTML response avoids database work.
     socket =
       if connected?(socket) do
-        load_media_gallery_for_params(
-          socket,
+        socket
+        |> ensure_timeline_loaded()
+        |> load_media_gallery_for_params(
           year_param,
           search_query,
           previous_search_query
@@ -708,6 +708,21 @@ defmodule YscWeb.AdminMediaLive do
       end
 
     {:noreply, socket}
+  end
+
+  defp ensure_timeline_loaded(%{assigns: %{timeline_loaded?: true}} = socket), do: socket
+
+  defp ensure_timeline_loaded(socket) do
+    timeline = Media.get_timeline_indices()
+    media_count = Media.total_image_count_from_timeline(timeline)
+    available_years = Enum.map(timeline, & &1.year)
+
+    socket
+    |> assign(:timeline, timeline)
+    |> assign(:available_years, available_years)
+    |> assign(:media_count, media_count)
+    |> assign(:images_empty?, media_count == 0)
+    |> assign(:timeline_loaded?, true)
   end
 
   defp load_media_gallery_for_params(

@@ -10,15 +10,13 @@ defmodule YscWeb.AdminNewslettersLive do
   def mount(_params, _session, socket) do
     if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
 
-    subscriber_count = Newsletter.count_subscribers(subscribed: true)
-
-    {:ok,
-     socket
-     |> assign(:page_title, "Newsletters")
-     |> assign(:active_page, :newsletters)
-     |> assign(:subscriber_count, subscriber_count)
-     |> assign_new(:creator_filter, &Newsletter.get_all_creators/0)
-     |> assign(:empty, false)
+    socket =
+      socket
+      |> assign(:page_title, "Newsletters")
+      |> assign(:active_page, :newsletters)
+      |> assign(:subscriber_count, nil)
+      |> assign(:creator_filter, [])
+      |> assign(:empty, false)
      |> assign(:meta, nil)
      |> assign(:params, %{})
      |> assign(:search_query, "")
@@ -34,57 +32,105 @@ defmodule YscWeb.AdminNewslettersLive do
      )
      |> assign(:show_add_subscriber_modal, false)
      |> stream_configure(:editions, dom_id: &"edition-#{&1.id}")
-     |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}")}
+     |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}")
+
+    socket =
+      if connected?(socket) do
+        start_async(socket, :load_subscriber_count, fn ->
+          Newsletter.count_subscribers(subscribed: true)
+        end)
+      else
+        socket
+      end
+
+    {:ok, socket}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     current_tab = allowed_tab(Map.get(params, "tab"))
-    socket = assign(socket, :current_tab, current_tab)
 
     socket =
-      if current_tab == "subscribers" do
-        sub_search = Map.get(params, "sub_q", "")
-        sub_filter = Map.get(params, "subscribed_filter", "all")
+      socket
+      |> assign(:current_tab, current_tab)
+      |> assign_newsletter_filter_params(params, current_tab)
 
-        socket
-        |> assign(:params, params)
-        |> assign(:sub_search, sub_search)
-        |> assign(:sub_filter, sub_filter)
-        |> stream(:subscribers, [], reset: true)
-        |> then(fn s ->
+    socket =
+      if connected?(socket) do
+        if current_tab == "subscribers" do
           subscriber_params = build_subscriber_flop_params(params)
 
-          start_async(s, :load_subscribers, fn ->
+          socket
+          |> stream(:subscribers, [], reset: true)
+          |> start_async(:load_subscribers, fn ->
             Newsletter.list_paginated_subscribers(subscriber_params)
           end)
-        end)
-      else
-        date_from = Map.get(params, "date_from", "")
-        date_to = Map.get(params, "date_to", "")
+        else
+          date_from = Map.get(params, "date_from", "")
+          date_to = Map.get(params, "date_to", "")
 
-        case Newsletter.list_paginated_editions(params,
-               date_from: date_from,
-               date_to: date_to
-             ) do
-          {:ok, {editions, meta}} ->
-            title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
-            search_query = if title_filter, do: title_filter.value, else: ""
-
-            socket
-            |> assign(:meta, meta)
-            |> assign(:empty, editions == [])
-            |> assign(:params, params)
-            |> assign(:search_query, search_query)
-            |> assign(:date_from, date_from)
-            |> assign(:date_to, date_to)
-            |> stream(:editions, editions, reset: true)
-
-          {:error, _meta} ->
-            push_patch(socket, to: ~p"/admin/newsletters")
+          socket
+          |> stream(:editions, [], reset: true)
+          |> start_async(:load_editions, fn ->
+            Newsletter.list_paginated_editions(params,
+              date_from: date_from,
+              date_to: date_to
+            )
+          end)
         end
+      else
+        socket
       end
 
+    {:noreply, socket}
+  end
+
+  defp assign_newsletter_filter_params(socket, params, "subscribers") do
+    socket
+    |> assign(:params, params)
+    |> assign(:sub_search, Map.get(params, "sub_q", ""))
+    |> assign(:sub_filter, Map.get(params, "subscribed_filter", "all"))
+  end
+
+  defp assign_newsletter_filter_params(socket, params, _current_tab) do
+    socket
+    |> assign(:params, params)
+    |> assign(:search_query, "")
+    |> assign(:date_from, Map.get(params, "date_from", ""))
+    |> assign(:date_to, Map.get(params, "date_to", ""))
+  end
+
+  @impl true
+  def handle_async(:load_subscriber_count, {:ok, count}, socket) do
+    {:noreply, assign(socket, :subscriber_count, count)}
+  end
+
+  @impl true
+  def handle_async(:load_subscriber_count, {:exit, _}, socket) do
+    {:noreply, assign(socket, :subscriber_count, 0)}
+  end
+
+  @impl true
+  def handle_async(:load_editions, {:ok, {:ok, {editions, meta}}}, socket) do
+    title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
+    search_query = if title_filter, do: title_filter.value, else: ""
+
+    {:noreply,
+     socket
+     |> assign(:meta, meta)
+     |> assign(:empty, editions == [])
+     |> assign(:search_query, search_query)
+     |> assign(:creator_filter, Newsletter.get_all_creators())
+     |> stream(:editions, editions, reset: true)}
+  end
+
+  @impl true
+  def handle_async(:load_editions, {:ok, {:error, _meta}}, socket) do
+    {:noreply, push_patch(socket, to: ~p"/admin/newsletters")}
+  end
+
+  @impl true
+  def handle_async(:load_editions, {:exit, _}, socket) do
     {:noreply, socket}
   end
 
@@ -174,9 +220,13 @@ defmodule YscWeb.AdminNewslettersLive do
       <div class="py-6">
         <.admin_page_title>Newsletters</.admin_page_title>
         <p class="mt-0.5 text-sm text-zinc-500">
-          {@subscriber_count} subscriber{if @subscriber_count == 1,
-            do: "",
-            else: "s"}
+          <%= if is_nil(@subscriber_count) do %>
+            Loading subscribers…
+          <% else %>
+            {@subscriber_count} subscriber{if @subscriber_count == 1,
+              do: "",
+              else: "s"}
+          <% end %>
         </p>
       </div>
 
