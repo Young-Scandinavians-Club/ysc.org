@@ -93,7 +93,8 @@ defmodule YscWeb.AdminScannerLive do
                 <.link
                   :if={
                     session.type == :event_membership &&
-                      not is_nil(session.closed_at)
+                      not is_nil(session.closed_at) &&
+                      session.created_by_id == @current_user.id
                   }
                   navigate={~p"/admin/membership-check-in/#{session.id}"}
                   class="text-sm text-violet-600 hover:text-violet-800 font-medium"
