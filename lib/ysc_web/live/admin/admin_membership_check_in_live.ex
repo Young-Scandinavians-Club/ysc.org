@@ -345,15 +345,16 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def mount(%{"session_id" => session_id}, _session, socket) do
     user_id = socket.assigns.current_user.id
 
-    with :ok <- Scanning.authorize_membership_checkin_access!(session_id, user_id) do
-      session = Scanning.get_session!(session_id)
+    case Scanning.authorize_membership_checkin_access!(session_id, user_id) do
+      :ok ->
+        session = Scanning.get_session!(session_id)
 
-      if session.type != :event_membership do
-        {:error, {:redirect, %{to: ~p"/admin/scanner/sessions"}}}
-      else
-        mount_desk(session, socket)
-      end
-    else
+        if session.type != :event_membership do
+          {:error, {:redirect, %{to: ~p"/admin/scanner/sessions"}}}
+        else
+          mount_desk(session, socket)
+        end
+
       {:error, :unauthorized} ->
         {:ok,
          socket
@@ -507,7 +508,10 @@ defmodule YscWeb.AdminMembershipCheckInLive do
           "membership_checkin_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
 
         {:noreply,
-         push_event(socket, "download-csv", %{content: encoded, filename: filename})}
+         push_event(socket, "download-csv", %{
+           content: encoded,
+           filename: filename
+         })}
 
       {:error, :unauthorized} ->
         {:noreply,

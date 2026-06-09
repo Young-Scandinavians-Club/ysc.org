@@ -884,6 +884,25 @@ defmodule YscWeb.AdminScannerLiveTest do
       assert_redirect(view, ~p"/admin/membership-check-in/#{session.id}")
       assert is_nil(Scanning.get_session!(session.id).closed_at)
     end
+
+    test "closed event_membership desk link is visible only to the session creator",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      other_admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions")
+      assert html =~ "View Desk"
+      assert html =~ ~p"/admin/membership-check-in/#{session.id}"
+
+      conn2 = log_in_user(build_conn(), other_admin)
+      {:ok, _view, html2} = live(conn2, ~p"/admin/scanner/sessions")
+      refute html2 =~ ~p"/admin/membership-check-in/#{session.id}"
+    end
   end
 
   describe "additional scanner handlers and edge UI" do

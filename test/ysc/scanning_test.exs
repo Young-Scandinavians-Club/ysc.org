@@ -131,7 +131,11 @@ defmodule Ysc.ScanningTest do
       session = event_membership_session_fixture(event, owner)
       {:ok, _} = Scanning.close_session(session.id)
 
-      assert :ok = Scanning.authorize_membership_checkin_access!(session.id, owner.id)
+      assert :ok =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 owner.id
+               )
     end
 
     test "denies another admin access to a closed event_membership session" do
@@ -142,7 +146,10 @@ defmodule Ysc.ScanningTest do
       {:ok, _} = Scanning.close_session(session.id)
 
       assert {:error, :unauthorized} =
-               Scanning.authorize_membership_checkin_access!(session.id, other.id)
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 other.id
+               )
     end
 
     test "allows another admin to access an open event_membership session" do
@@ -151,7 +158,32 @@ defmodule Ysc.ScanningTest do
       event = event_fixture(%{organizer_id: owner.id})
       session = event_membership_session_fixture(event, owner)
 
-      assert :ok = Scanning.authorize_membership_checkin_access!(session.id, other.id)
+      assert :ok =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 other.id
+               )
+    end
+
+    test "returns not_found for a missing session" do
+      admin = user_fixture(%{role: "admin"})
+
+      assert {:error, :not_found} =
+               Scanning.authorize_membership_checkin_access!(
+                 Ecto.ULID.generate(),
+                 admin.id
+               )
+    end
+
+    test "returns unauthorized for non event_membership sessions" do
+      owner = user_fixture(%{role: "admin"})
+      session = scan_session_fixture(created_by: owner)
+
+      assert {:error, :unauthorized} =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 owner.id
+               )
     end
   end
 
