@@ -5,6 +5,8 @@ defmodule YscWeb.Sms.PhoneVerification do
   Sends a verification code to users for verifying their phone number.
   """
 
+  alias YscWeb.Sms.Template
+
   @doc """
   Gets the template name.
   """
@@ -23,21 +25,10 @@ defmodule YscWeb.Sms.PhoneVerification do
   """
   def render(variables) do
     code = Map.get(variables, :code, "")
-    first_name = Map.get(variables, :first_name)
 
-    base_message =
-      "Your phone verification code is: #{code}. Enter this code to verify your phone number."
-
-    message =
-      if first_name do
-        "Hej #{first_name}! #{base_message}"
-      else
-        base_message
-      end
-
-    "[YSC] #{message}"
-    |> String.trim()
-    |> String.replace(~r/\s+/, " ")
+    "Your phone verification code is: #{code}. Enter this code to verify your phone number."
+    |> Template.greeting(Template.optional_first_name(variables))
+    |> Template.format()
   end
 
   @doc """
@@ -51,16 +42,10 @@ defmodule YscWeb.Sms.PhoneVerification do
   - Map with all necessary data for the SMS template
   """
   def prepare_sms_data(user, code) when is_binary(code) do
-    %{
-      code: code,
-      first_name: if(user, do: user.first_name, else: nil)
-    }
+    Template.verification_variables(user, code)
   end
 
   def prepare_sms_data(user, code) when is_integer(code) do
-    prepare_sms_data(
-      user,
-      Integer.to_string(code) |> String.pad_leading(6, "0")
-    )
+    prepare_sms_data(user, Template.verification_code(code))
   end
 end
