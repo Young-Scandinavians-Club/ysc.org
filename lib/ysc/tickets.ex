@@ -793,6 +793,7 @@ defmodule Ysc.Tickets do
 
   defp do_process_ticket_order_payment(ticket_order, payment_intent) do
     with :ok <- validate_payment_intent(payment_intent, ticket_order),
+         :ok <- validate_expired_order_fulfillment_capacity(ticket_order),
          {:ok, {payment, _transaction, _entries}} <-
            process_ledger_payment(ticket_order, payment_intent),
          {:ok, completed_order, completion_status} <-
@@ -1279,6 +1280,36 @@ defmodule Ysc.Tickets do
        ) do
     current_attendees = count_confirmed_tickets_for_event(event.id)
     current_attendees + requested_quantity <= max_attendees
+  end
+
+  defp validate_expired_order_fulfillment_capacity(ticket_order) do
+    case Repo.get(TicketOrder, ticket_order.id) do
+      %{status: :expired, user_id: user_id, event_id: event_id} = expired_order ->
+        ticket_selections = expired_ticket_selections(expired_order.id)
+
+        if map_size(ticket_selections) == 0 do
+          :ok
+        else
+          BookingLocker.validate_fulfillment_capacity(
+            user_id,
+            event_id,
+            ticket_selections
+          )
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp expired_ticket_selections(ticket_order_id) do
+    from(t in Ticket,
+      where: t.ticket_order_id == ^ticket_order_id and t.status == :expired,
+      select: {t.ticket_tier_id, count(t.id)},
+      group_by: t.ticket_tier_id
+    )
+    |> Repo.all()
+    |> Map.new()
   end
 
   defp validate_payment_intent(payment_intent, ticket_order) do
