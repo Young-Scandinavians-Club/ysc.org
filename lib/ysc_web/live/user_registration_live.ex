@@ -226,7 +226,10 @@ defmodule YscWeb.UserRegistrationLive do
                         />
                       </div>
                       <%!-- Delete button: always absolute top-right --%>
-                      <label class="absolute top-2.5 right-2.5 cursor-pointer">
+                      <label
+                        class="absolute top-2.5 right-2.5 cursor-pointer"
+                        aria-label="Remove this family member"
+                      >
                         <input
                           type="checkbox"
                           name="user[family_members_delete][]"

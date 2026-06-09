@@ -344,7 +344,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Verify Your Phone Number
         <:subtitle>
-          We sent a 6-digit code to <strong>{@user.phone_number}</strong>. Enter it below to verify your number.
+          We sent a 6-digit code to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@user.phone_number) || @user.phone_number %></strong>. Enter it below to verify your number.
         </:subtitle>
       </.header>
 
