@@ -31,7 +31,8 @@ defmodule YscWeb.Sms.Template do
   @doc """
   Reads `:first_name` from template variables, falling back to the default greeting.
   """
-  def first_name(variables, default \\ @default_first_name) when is_map(variables) do
+  def first_name(variables, default \\ @default_first_name)
+      when is_map(variables) do
     Map.get(variables, :first_name, default)
   end
 
