@@ -106,6 +106,38 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Renders a consistent heading inside `<.modal>` panels.
+
+  Matches the default admin modal title style (`admin_page_title` level 2 with `mb-6`).
+  Set `id` to `"<modal-id>-title"` when the parent modal has `id="<modal-id>"` so
+  `aria-labelledby` on the dialog can reference the heading.
+
+  ## Examples
+
+      <.modal id="verify-phone-modal" show>
+        <.modal_title id="verify-phone-modal-title">Verify Your Phone Number</.modal_title>
+        ...
+      </.modal>
+
+      <.modal_title class="mb-4">Custom spacing</.modal_title>
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged with the default title styles"
+
+  slot :inner_block, required: true
+
+  def modal_title(assigns) do
+    ~H"""
+    <h2 id={@id} class={["text-2xl font-semibold leading-8 text-zinc-800 mb-6", @class]}>
+      {render_slot(@inner_block)}
+    </h2>
+    """
+  end
+
+  @doc """
   Renders flash notices.
 
   ## Examples

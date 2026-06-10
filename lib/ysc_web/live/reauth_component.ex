@@ -234,9 +234,9 @@ defmodule YscWeb.ReauthComponent do
         on_cancel={JS.push("cancel_reauth", target: @myself)}
         show
       >
-        <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+        <.modal_title id="reauth-modal-title">
           Verify Your Identity
-        </h2>
+        </.modal_title>
 
         <p class="text-sm text-zinc-600 mb-6">{@description}</p>
 
