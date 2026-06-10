@@ -149,7 +149,7 @@ defmodule YscWeb.AdminHelp.Hotspot do
   end
 
   @doc """
-  CSS custom properties for hotspot positioning (rules live in app.css).
+  CSS custom properties for hotspot positioning (rules live in admin.css).
 
   Sets `-expanded` and `-collapsed` variables; the active set is chosen by
   `html.sidebar-collapsed` on `.admin-help-sidebar-aware` containers.
