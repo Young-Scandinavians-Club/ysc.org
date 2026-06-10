@@ -1183,7 +1183,8 @@ defmodule YscWeb.SecurityAuditTest do
 
       victim =
         user_fixture(%{
-          email: "security_enum_#{System.unique_integer([:positive])}@gmail.com",
+          email:
+            "security_enum_#{System.unique_integer([:positive])}@gmail.com",
           state: :active
         })
 

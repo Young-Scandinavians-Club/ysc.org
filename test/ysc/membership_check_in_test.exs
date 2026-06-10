@@ -324,7 +324,9 @@ defmodule Ysc.MembershipCheckInTest do
     test "does not match email substrings like @gmail", %{session: session} do
       user =
         make_active_member()
-        |> Ecto.Changeset.change(email: "enum_test_#{System.unique_integer([:positive])}@gmail.com")
+        |> Ecto.Changeset.change(
+          email: "enum_test_#{System.unique_integer([:positive])}@gmail.com"
+        )
         |> Repo.update!()
 
       assert [] = Scanning.search_users_for_checkin(session.id, "@gmail")
