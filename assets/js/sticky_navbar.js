@@ -1,3 +1,21 @@
+/** Sets --nav-height from the live navbar; safe to call before LiveView connects. */
+let lastSyncedNavHeight = null;
+
+function isHeroNavMode(nav) {
+    return nav?.closest("#site-header")?.classList.contains("hero-mode") === true;
+}
+
+export function syncNavHeight() {
+    const nav = document.getElementById("rootNavbar");
+    if (!nav || !isHeroNavMode(nav)) return;
+
+    const height = Math.ceil(nav.getBoundingClientRect().height);
+    if (height === lastSyncedNavHeight) return;
+
+    lastSyncedNavHeight = height;
+    document.documentElement.style.setProperty("--nav-height", `${height}px`);
+}
+
 export default StickyNavbar = {
     mounted() {
         this.isSticky = false;
@@ -71,13 +89,14 @@ export default StickyNavbar = {
     },
 
     bindNavHeightObserver() {
+        if (!this.isHeroMode) return;
+
         this.resizeObserver = new ResizeObserver(() => this.syncNavHeight());
         this.resizeObserver.observe(this.el);
     },
 
     syncNavHeight() {
-        const height = Math.ceil(this.el.getBoundingClientRect().height);
-        document.documentElement.style.setProperty("--nav-height", `${height}px`);
+        syncNavHeight();
     },
 
     initState() {
