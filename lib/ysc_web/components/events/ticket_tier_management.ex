@@ -473,45 +473,57 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     """
   end
 
+  @reservation_update_keys [:id, :reservation_epoch, :close_reserve_modal]
+
   @impl true
-  def update(assigns, socket) do
-    # Parent send_update/2 only passes a few keys; merge with prior component assigns
-    # so required fields (e.g. event_id) are always present.
-    assigns =
-      socket.assigns
-      |> Map.take([
-        :event_id,
-        :event,
-        :current_user,
-        :show_add_modal,
-        :show_edit_modal,
-        :show_reserve_modal,
-        :reserving_tier,
-        :editing_ticket_tier
-      ])
-      |> Map.merge(assigns)
-
-    # Check if this is an update to close the reserve modal
-    close_modal = Map.get(assigns, :close_reserve_modal, false)
-
-    event = Map.get(assigns, :event) || Events.get_event!(assigns.event_id)
-    ticket_tiers = Events.list_ticket_tiers_for_event(assigns.event_id)
-    ticket_purchases = Events.get_ticket_purchase_summary(assigns.event_id)
-
-    # Load reservations for each tier (valid holds vs lapsed `active` rows)
-    {reservations_by_tier, expired_reservations_by_tier} =
-      load_reservations_maps(ticket_tiers)
+  def update(incoming_assigns, socket) do
+    close_modal = Map.get(incoming_assigns, :close_reserve_modal, false)
 
     socket =
-      socket
-      |> assign(assigns)
-      |> assign(:event, event)
-      |> assign(:ticket_tiers, ticket_tiers)
-      |> assign(:ticket_purchases, ticket_purchases)
-      |> assign(:reservations_by_tier, reservations_by_tier)
-      |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
-      |> assign(:editing_ticket_tier, nil)
-      |> assign(:current_user, assigns[:current_user])
+      if reservation_only_update?(incoming_assigns) and
+           socket.assigns[:ticket_tiers] != nil do
+        ticket_tiers = socket.assigns.ticket_tiers
+
+        {reservations_by_tier, expired_reservations_by_tier} =
+          load_reservations_maps(ticket_tiers)
+
+        socket
+        |> assign(:reservations_by_tier, reservations_by_tier)
+        |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
+      else
+        # Parent send_update/2 only passes a few keys; merge with prior component assigns
+        # so required fields (e.g. event_id) are always present.
+        assigns =
+          socket.assigns
+          |> Map.take([
+            :event_id,
+            :event,
+            :current_user,
+            :show_add_modal,
+            :show_edit_modal,
+            :show_reserve_modal,
+            :reserving_tier,
+            :editing_ticket_tier
+          ])
+          |> Map.merge(incoming_assigns)
+
+        event = Map.get(assigns, :event) || Events.get_event!(assigns.event_id)
+        ticket_tiers = Events.list_ticket_tiers_for_event(assigns.event_id)
+        ticket_purchases = Events.get_ticket_purchase_summary(assigns.event_id)
+
+        {reservations_by_tier, expired_reservations_by_tier} =
+          load_reservations_maps(ticket_tiers)
+
+        socket
+        |> assign(assigns)
+        |> assign(:event, event)
+        |> assign(:ticket_tiers, ticket_tiers)
+        |> assign(:ticket_purchases, ticket_purchases)
+        |> assign(:reservations_by_tier, reservations_by_tier)
+        |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
+        |> assign(:editing_ticket_tier, nil)
+        |> assign(:current_user, assigns[:current_user])
+      end
 
     socket =
       if close_modal do
@@ -527,7 +539,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         |> assign(
           :show_add_modal,
           Map.get(
-            assigns,
+            incoming_assigns,
             :show_add_modal,
             socket.assigns[:show_add_modal] || false
           )
@@ -535,7 +547,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         |> assign(
           :show_edit_modal,
           Map.get(
-            assigns,
+            incoming_assigns,
             :show_edit_modal,
             socket.assigns[:show_edit_modal] || false
           )
@@ -543,7 +555,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         |> assign(
           :show_reserve_modal,
           Map.get(
-            assigns,
+            incoming_assigns,
             :show_reserve_modal,
             socket.assigns[:show_reserve_modal] || false
           )
@@ -551,6 +563,17 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       end
 
     {:ok, socket}
+  end
+
+  defp reservation_only_update?(assigns) do
+    extra_keys =
+      assigns
+      |> Map.keys()
+      |> Enum.reject(&(&1 in @reservation_update_keys or &1 == :__changed__))
+
+    extra_keys == [] and
+      (Map.has_key?(assigns, :reservation_epoch) or
+         Map.get(assigns, :close_reserve_modal) == true)
   end
 
   @impl true

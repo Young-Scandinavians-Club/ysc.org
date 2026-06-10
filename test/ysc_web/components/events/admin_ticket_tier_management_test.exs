@@ -321,4 +321,33 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
       assert html =~ "Export" or html =~ "CSV"
     end
   end
+
+  describe "reservation-only updates" do
+    test "send_update with reservation_epoch reloads reservations only" do
+      event = event_fixture()
+      user = user_fixture()
+      _tier = ticket_tier_fixture(%{event_id: event.id, name: "Reserved Tier"})
+
+      {:ok, socket} =
+        TicketTierManagement.update(
+          %{
+            id: "tier-management",
+            event_id: event.id,
+            current_user: user
+          },
+          %Phoenix.LiveView.Socket{assigns: %{}}
+        )
+
+      initial_tiers = socket.assigns.ticket_tiers
+
+      {:ok, updated_socket} =
+        TicketTierManagement.update(
+          %{id: "tier-management", reservation_epoch: 1},
+          socket
+        )
+
+      assert updated_socket.assigns.ticket_tiers == initial_tiers
+      assert is_map(updated_socket.assigns.reservations_by_tier)
+    end
+  end
 end

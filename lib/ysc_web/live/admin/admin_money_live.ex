@@ -1004,10 +1004,7 @@ defmodule YscWeb.AdminMoneyLive do
      |> assign(:ledger_entries_page, 1)
      |> assign(:webhooks_page, 1)
      |> assign(:expense_reports_page, 1)
-     |> paginate_payments(1)
-     |> paginate_ledger_entries(1)
-     |> paginate_webhooks(1)
-     |> paginate_expense_reports(1)}
+     |> paginate_loaded_sections()}
   end
 
   # Pagination helpers
@@ -1122,6 +1119,24 @@ defmodule YscWeb.AdminMoneyLive do
 
   defp load_section_data(socket, _section) do
     socket
+  end
+
+  defp paginate_loaded_sections(socket) do
+    sections_loaded = socket.assigns.sections_loaded
+
+    socket
+    |> then(fn s ->
+      if sections_loaded[:payments], do: paginate_payments(s, 1), else: s
+    end)
+    |> then(fn s ->
+      if sections_loaded[:ledger_entries], do: paginate_ledger_entries(s, 1), else: s
+    end)
+    |> then(fn s ->
+      if sections_loaded[:webhooks], do: paginate_webhooks(s, 1), else: s
+    end)
+    |> then(fn s ->
+      if sections_loaded[:expense_reports], do: paginate_expense_reports(s, 1), else: s
+    end)
   end
 
   @impl true
