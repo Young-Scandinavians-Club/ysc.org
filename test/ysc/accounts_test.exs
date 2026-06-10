@@ -2065,15 +2065,23 @@ defmodule Ysc.AccountsTest do
         user_with_expired_subscription(%{phone_number: unique_user_phone()})
 
       ended =
-        user_with_past_ends_at_subscription(%{phone_number: unique_user_phone()})
+        user_with_past_ends_at_subscription(%{
+          phone_number: unique_user_phone()
+        })
 
       active =
         user_with_single_subscription(%{phone_number: unique_user_phone()})
 
       memberships = Accounts.list_memberships(limit: 500)
 
-      refute Enum.any?(memberships, fn m -> m.primary_user.id == cancelled.id end)
-      refute Enum.any?(memberships, fn m -> m.primary_user.id == expired_period.id end)
+      refute Enum.any?(memberships, fn m ->
+               m.primary_user.id == cancelled.id
+             end)
+
+      refute Enum.any?(memberships, fn m ->
+               m.primary_user.id == expired_period.id
+             end)
+
       refute Enum.any?(memberships, fn m -> m.primary_user.id == ended.id end)
 
       refute Accounts.has_active_membership?(cancelled)
