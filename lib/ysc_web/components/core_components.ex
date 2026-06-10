@@ -131,7 +131,10 @@ defmodule YscWeb.CoreComponents do
 
   def modal_title(assigns) do
     ~H"""
-    <h2 id={@id} class={["text-2xl font-semibold leading-8 text-zinc-800 mb-6", @class]}>
+    <h2
+      id={@id}
+      class={["text-2xl font-semibold leading-8 text-zinc-800 mb-6", @class]}
+    >
       {render_slot(@inner_block)}
     </h2>
     """
