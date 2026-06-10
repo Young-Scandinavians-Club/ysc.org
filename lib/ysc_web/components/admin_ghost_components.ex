@@ -323,8 +323,8 @@ defmodule YscWeb.AdminGhostComponents do
                   </div>
                   <div class="w-full bg-zinc-200/80 h-2 rounded-full overflow-hidden">
                     <div
-                      class="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full"
-                      style={"width: #{div(tier.sold * 100, tier.total)}%"}
+                      class="admin-ghost-tier-progress-fill bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full"
+                      style={"--admin-ghost-tier-progress: #{tier_progress_pct(tier)}%"}
                     >
                     </div>
                   </div>
@@ -2096,4 +2096,9 @@ defmodule YscWeb.AdminGhostComponents do
   defp event_tab_class(false),
     do:
       "shrink-0 whitespace-nowrap py-3 border-b-2 border-transparent text-zinc-500 font-medium"
+
+  defp tier_progress_pct(%{sold: sold, total: total}) when total > 0,
+    do: div(sold * 100, total)
+
+  defp tier_progress_pct(_), do: 0
 end

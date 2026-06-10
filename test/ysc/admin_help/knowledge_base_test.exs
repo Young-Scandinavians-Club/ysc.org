@@ -45,6 +45,12 @@ defmodule Ysc.AdminHelp.KnowledgeBaseTest do
     assert content =~ "#"
   end
 
+  test "visible_to_role?/2 checks a single document without building the full index" do
+    assert KnowledgeBase.visible_to_role?("posts", :volunteer)
+    refute KnowledgeBase.visible_to_role?("nope-does-not-exist", :admin)
+    refute KnowledgeBase.visible_to_role?("../config/runtime", :admin)
+  end
+
   test "fetch/1 rejects unknown and unsafe slugs" do
     assert :error = KnowledgeBase.fetch("nope-does-not-exist")
     assert :error = KnowledgeBase.fetch("../config/runtime")

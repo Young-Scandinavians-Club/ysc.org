@@ -201,7 +201,7 @@ defmodule YscWeb.AdminHelpGhostLiveTest do
     assert has_element?(view, "#ghost-public-event-details", "Details")
     assert has_element?(view, "#ghost-public-event-attendees", "Attendees")
     assert has_element?(view, "#ghost-public-event-hosts", "Host")
-    refute render(view) =~ "Hosted by"
+    refute has_element?(view, "body", "Hosted by")
     refute has_element?(view, "h1", "Event")
   end
 

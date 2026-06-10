@@ -420,8 +420,8 @@ defmodule YscWeb.AdminHelpComponents do
         Describe your task and we will suggest the right guide.
       </p>
       <.form for={@form} id={"#{@id}-form"} phx-submit="find-guide" class="mt-4">
-        <div class="flex flex-col sm:flex-row gap-2">
-          <div class="flex-1">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div class="flex-1 [&_input]:mt-0 [&_input]:h-10">
             <.input
               field={@form[:query]}
               type="text"
@@ -431,7 +431,11 @@ defmodule YscWeb.AdminHelpComponents do
               autocomplete="off"
             />
           </div>
-          <.button type="submit" disabled={@loading?}>
+          <.button
+            type="submit"
+            class="!min-h-10 h-10 shrink-0 py-0"
+            disabled={@loading?}
+          >
             Find guide
           </.button>
         </div>

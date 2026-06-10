@@ -56,7 +56,7 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
 
   @doc "Whether a knowledge-base document is visible to the given staff role."
   def visible_to_role?(slug, role) when is_binary(slug) do
-    case Enum.find(index(), &(&1.slug == slug)) do
+    case index_entry(slug) do
       nil -> false
       entry -> doc_visible_to_role?(entry, role)
     end
@@ -106,6 +106,10 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
         :error -> []
       end
     end)
+  end
+
+  defp index_entry(slug) when is_binary(slug) do
+    if valid_slug?(slug), do: entry_for_file(slug <> ".md"), else: nil
   end
 
   defp entry_for_file(file) when is_binary(file) do

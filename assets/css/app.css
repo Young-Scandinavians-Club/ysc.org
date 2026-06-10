@@ -470,6 +470,10 @@ html {
     }
 }
 
+.admin-ghost-tier-progress-fill {
+    width: var(--admin-ghost-tier-progress, 0%);
+}
+
 /* Sidebar width as % of the 1280px ghost viewport — toggled on <html> */
 .admin-help-sidebar-aware {
     --admin-help-sidebar-pct: 22.5%;

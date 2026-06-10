@@ -1097,9 +1097,10 @@ defmodule YscWeb.AdminHelp.Guides do
           image: "ghost:events-list",
           hotspots: [
             %{
-              expanded: %{x: 85, y: 22, w: 12, h: 14},
-              collapsed: %{x: 80, y: 62, w: 12, h: 18},
-              label: "⋮ actions menu with options"
+              expanded: %{x: 77, y: 44, w: 18, h: 27},
+              collapsed: %{x: 80, y: 44, w: 15, h: 27},
+              label: "⋮ actions menu with options",
+              style: :hint
             }
           ]
         }
