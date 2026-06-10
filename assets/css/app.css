@@ -3517,3 +3517,78 @@ cropper-canvas {
     @apply bg-red-50;
     box-shadow: 0 0 0 2px theme('colors.red.400'), 0 0 0 5px theme('colors.red.100');
 }
+
+
+/* Admin bookings calendar — continuation zigzag when booking extends past view range */
+
+.calendar-scroll-area {
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+.calendar-booking-bar {
+    overflow: visible;
+}
+
+.calendar-booking-continues-left {
+    margin-left: -12px;
+    padding-left: 12px;
+    border-left-width: 0;
+}
+
+.calendar-booking-continues-right {
+    margin-right: -12px;
+    padding-right: 12px;
+    border-right-width: 0;
+}
+
+.calendar-continuation-edge {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 12px;
+    pointer-events: none;
+}
+
+.calendar-continuation-edge--left {
+    left: -12px;
+    clip-path: polygon(100% 0%, 0% 16.66%, 100% 33.33%, 0% 50%, 100% 66.66%, 0% 83.33%, 100% 100%);
+}
+
+.calendar-continuation-edge--right {
+    right: -12px;
+    clip-path: polygon(0% 0%, 100% 16.66%, 0% 33.33%, 100% 50%, 0% 66.66%, 100% 83.33%, 0% 100%);
+}
+
+.calendar-continuation-edge--blue {
+    background-color: theme('colors.blue.100');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M12 0 L0 8 L12 16' fill='none' stroke='%2360a5fa' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: repeat-y;
+    background-size: 12px 16px;
+}
+
+.calendar-continuation-edge--green {
+    background-color: theme('colors.green.100');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M12 0 L0 8 L12 16' fill='none' stroke='%234ade80' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: repeat-y;
+    background-size: 12px 16px;
+}
+
+.calendar-continuation-edge--red {
+    background-color: theme('colors.red.100');
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M12 0 L0 8 L12 16' fill='none' stroke='%23f87171' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: repeat-y;
+    background-size: 12px 16px;
+}
+
+.calendar-continuation-edge--right.calendar-continuation-edge--blue {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M0 0 L12 8 L0 16' fill='none' stroke='%2360a5fa' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+.calendar-continuation-edge--right.calendar-continuation-edge--green {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M0 0 L12 8 L0 16' fill='none' stroke='%234ade80' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+.calendar-continuation-edge--right.calendar-continuation-edge--red {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M0 0 L12 8 L0 16' fill='none' stroke='%23f87171' stroke-width='1.5'/%3E%3C/svg%3E");
+}
