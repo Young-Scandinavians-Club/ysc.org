@@ -336,6 +336,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           {edition_status_label(@edition.status)}
         </.badge>
         <.badge :if={!@edition} type="yellow">Draft</.badge>
+        <.admin_help_link
+          topic="newsletters/compose"
+          label="Compose help"
+          role={@admin_role}
+          class="ms-auto"
+        />
       </div>
 
       <%!-- Sent stats banner (readonly editions only) --%>

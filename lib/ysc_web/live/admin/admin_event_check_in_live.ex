@@ -25,6 +25,11 @@ defmodule YscWeb.AdminEventCheckInLive do
           <h1 class="text-base font-semibold text-zinc-900 truncate hidden sm:block">
             {@event.title}
           </h1>
+          <.admin_help_link
+            topic="day-of/check-in"
+            label="Check-in help"
+            role={@admin_role}
+          />
         </div>
 
         <.admin_check_in_counter count={@checked_in_count} total={@total_count} />

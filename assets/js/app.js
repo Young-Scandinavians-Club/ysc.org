@@ -389,8 +389,24 @@ document.addEventListener("paste", (event) => {
     }
 });
 
-// Handle print-page event for PDF download
-window.addEventListener("phx:print-page", () => {
+// Handle print-page event for PDF download (optional detail.title for the saved PDF name)
+window.addEventListener("phx:print-page", (event) => {
+    const title = event.detail?.title;
+
+    if (!title) {
+        window.print();
+        return;
+    }
+
+    const previousTitle = document.title;
+    document.title = title;
+
+    const restoreTitle = () => {
+        document.title = previousTitle;
+        window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    window.addEventListener("afterprint", restoreTitle);
     window.print();
 });
 

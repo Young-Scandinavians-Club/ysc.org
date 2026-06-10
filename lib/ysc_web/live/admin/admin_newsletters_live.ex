@@ -220,7 +220,14 @@ defmodule YscWeb.AdminNewslettersLive do
       role={@admin_role}
     >
       <div class="py-6">
-        <.admin_page_title>Newsletters</.admin_page_title>
+        <div class="flex items-center gap-2">
+          <.admin_page_title>Newsletters</.admin_page_title>
+          <.admin_help_link
+            topic="newsletters/compose"
+            label="How to compose a newsletter"
+            role={@admin_role}
+          />
+        </div>
         <p class="mt-0.5 text-sm text-zinc-500">
           <%= if is_nil(@subscriber_count) do %>
             Loading subscribers…

@@ -9,6 +9,7 @@ defmodule YscWeb.Authorization.Policy do
   object :post do
     action :create do
       allow role: :admin
+      allow role: :volunteer
     end
 
     action :read do
@@ -17,6 +18,7 @@ defmodule YscWeb.Authorization.Policy do
 
     action :update do
       allow role: :admin
+      allow role: :volunteer
     end
 
     action :delete do

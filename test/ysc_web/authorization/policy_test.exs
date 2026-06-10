@@ -12,12 +12,17 @@ defmodule YscWeb.Authorization.PolicyTest do
     setup do
       %{
         admin: user_fixture(%{role: "admin"}),
+        volunteer: user_fixture(%{role: "volunteer"}),
         member: user_fixture(%{role: "member"})
       }
     end
 
     test "admin can create posts", %{admin: admin} do
       assert :ok = Policy.authorize(:post_create, admin)
+    end
+
+    test "volunteer can create posts", %{volunteer: volunteer} do
+      assert :ok = Policy.authorize(:post_create, volunteer)
     end
 
     test "regular member cannot create posts", %{member: member} do
@@ -31,6 +36,10 @@ defmodule YscWeb.Authorization.PolicyTest do
 
     test "admin can update posts", %{admin: admin} do
       assert :ok = Policy.authorize(:post_update, admin)
+    end
+
+    test "volunteer can update posts", %{volunteer: volunteer} do
+      assert :ok = Policy.authorize(:post_update, volunteer)
     end
 
     test "regular member cannot update posts", %{member: member} do

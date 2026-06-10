@@ -10,11 +10,15 @@ defmodule YscWeb.Plugs.AdminSidebarState do
   def call(conn, _opts) do
     conn = fetch_cookies(conn)
 
-    Plug.Conn.assign(
-      conn,
-      :sidebar_collapsed,
-      conn.cookies[@cookie_name] == "1"
-    )
+    Plug.Conn.assign(conn, :sidebar_collapsed, sidebar_collapsed?(conn))
+  end
+
+  defp sidebar_collapsed?(conn) do
+    case conn.query_params do
+      %{"sidebar_collapsed" => "1"} -> true
+      %{"sidebar_collapsed" => "0"} -> false
+      _ -> conn.cookies[@cookie_name] == "1"
+    end
   end
 
   def on_mount(:mount_sidebar_state, _params, _session, socket) do

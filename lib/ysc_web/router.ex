@@ -521,6 +521,11 @@ defmodule YscWeb.Router do
       live "/bookings/rooms/new", AdminBookingsLive, :new_room
       live "/bookings/rooms/:id/edit", AdminBookingsLive, :edit_room
 
+      # Admin help (interactive guides)
+      live "/help", AdminHelpLive, :index
+      live "/help/ghost/:name", AdminHelpGhostLive, :show
+      live "/help/*parts", AdminHelpGuideLive, :show
+
       # News and notices
       live "/posts", AdminPostsLive, :index
       live "/posts/new", AdminPostEditorLive, :new

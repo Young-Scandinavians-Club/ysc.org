@@ -80,6 +80,7 @@ defmodule YscWeb do
 
       unquote(html_helpers())
       import YscWeb.AdminComponents
+      import YscWeb.AdminHelpComponents
 
       # Global event: "clear" is sent by the client-error flash in the layout when dismissed.
       # No-op on the server; the UI is updated via JS. Prevents FunctionClauseError in any LiveView.
