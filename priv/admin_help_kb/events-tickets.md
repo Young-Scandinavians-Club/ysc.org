@@ -10,7 +10,7 @@ Found on the **Tickets** tab of the event editor. The whole tab is disabled when
 ## Event capacity
 
 - **Event Capacity** offers an "Unlimited capacity" checkbox or a **Maximum Attendees** number (minimum 1).
-- Leaving max attendees empty/0 means no global cap — only per-tier quantity limits apply.
+- Leaving the **Maximum Attendees** field blank (with "Unlimited capacity" unchecked) or checking **Unlimited capacity** both remove any global cap — only per-tier quantity limits apply.
 - Capacity is the hard ceiling across all tiers combined; sales stop when either the event capacity or a tier's quantity runs out.
 - The events list shows capacity/registration info in the Registrations column.
 
@@ -34,6 +34,7 @@ Found on the **Tickets** tab of the event editor. The whole tab is disabled when
 ## Reservations
 
 - Admins can reserve tickets in a tier for a specific member without payment — for comp tickets, performers, or board holds.
+- **Donation tiers do not support reservations.** The reserve action is blocked with "Reservations are not available for donation tiers", and donation tiers never show the "{n} reserved" label or the Active/Expired Reservations sections (those UI elements are only rendered for free and paid tiers).
 - Non-donation tiers show "{n} reserved" when reservations exist; the tier row expands to show active and expired reservation details.
 - Reservations count against capacity and can be cancelled to release the seats.
 

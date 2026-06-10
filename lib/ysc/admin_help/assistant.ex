@@ -43,23 +43,27 @@ defmodule Ysc.AdminHelp.Assistant do
          {:ok, parsed} <-
            chat_json(find_guide_messages(query, catalog, role), role),
          {:ok, result} <- validate_finder_result(parsed, role) do
-      {:ok, locate_in_guide(result, query)}
+      {:ok, locate_in_guide(result, query, role)}
     end
   end
 
   # Second pass: given the matched guide's full content, ask which step
   # answers the query and for a verbatim quote to highlight. Best-effort —
   # any failure falls back to plain guide-level navigation.
-  defp locate_in_guide(%{guide_slug: nil} = result, _query) do
+  defp locate_in_guide(%{guide_slug: nil} = result, _query, _role) do
     Map.merge(result, %{step: nil, highlight: nil})
   end
 
-  defp locate_in_guide(%{guide_slug: slug} = result, query) do
+  defp locate_in_guide(%{guide_slug: slug} = result, query, role) do
     location =
       with {:ok, guide_mod} <- Registry.fetch(slug),
            {:ok, parsed} <-
              chat_json(
-               locate_messages(Registry.guide_context_for_llm(guide_mod), query)
+               locate_messages(
+                 Registry.guide_context_for_llm(guide_mod),
+                 query
+               ),
+               role
              ) do
         validate_location(parsed, guide_mod)
       else
@@ -90,7 +94,7 @@ defmodule Ysc.AdminHelp.Assistant do
     end
   end
 
-  defp check_rate(nil), do: :ok
+  defp check_rate(nil), do: {:error, :rate_limited}
 
   defp check_rate(user_id) do
     case AdminHelpRateLimit.check(user_id) do
@@ -102,7 +106,7 @@ defmodule Ysc.AdminHelp.Assistant do
   # Sends the messages and parses the JSON reply. If the model asks for
   # reference documents ({"read_docs": [...]}), loads them from the knowledge
   # base and runs one follow-up turn with the documents included.
-  defp chat_json(messages, role \\ nil) do
+  defp chat_json(messages, role) do
     with {:ok, raw} <- chat(messages),
          {:ok, parsed} <- parse_json(raw) do
       case parsed do
@@ -167,13 +171,15 @@ defmodule Ysc.AdminHelp.Assistant do
 
   defp fetch_source("live-" <> _ = slug, _role), do: LiveExamples.fetch(slug)
 
-  defp fetch_source(slug, role) do
-    if is_nil(role) or KnowledgeBase.visible_to_role?(slug, role) do
+  defp fetch_source(slug, role) when role in [:admin, :volunteer] do
+    if KnowledgeBase.visible_to_role?(slug, role) do
       KnowledgeBase.fetch(slug)
     else
       :error
     end
   end
+
+  defp fetch_source(_slug, _role), do: :error
 
   defp chat(messages) do
     case OpenRouter.chat(messages) do

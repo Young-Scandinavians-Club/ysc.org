@@ -19,7 +19,7 @@ defmodule YscWeb.AdminHelpGuideLive do
      |> assign(:step_labels, [])
      |> assign(:current_step, 0)
      |> assign(:clarifier_expanded?, false)
-     |> assign(:clarifier_question, "")
+     |> assign(:clarifier_form, to_form(%{"question" => ""}, as: :clarifier))
      |> assign(:clarifier_answer, nil)
      |> assign(:clarifier_suggested_step, nil)
      |> assign(:clarifier_loading?, false)
@@ -64,28 +64,18 @@ defmodule YscWeb.AdminHelpGuideLive do
 
   @impl true
   def handle_event("set-step", %{"step" => step}, socket) do
-    step =
-      String.to_integer(step) |> max(0) |> min(length(socket.assigns.steps) - 1)
-
-    {:noreply, socket |> assign(:current_step, step) |> assign(:highlight, nil)}
+    step = String.to_integer(step)
+    {:noreply, patch_step(socket, step)}
   end
 
   @impl true
   def handle_event("prev-step", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:current_step, max(0, socket.assigns.current_step - 1))
-     |> assign(:highlight, nil)}
+    {:noreply, patch_step(socket, socket.assigns.current_step - 1)}
   end
 
   @impl true
   def handle_event("next-step", _params, socket) do
-    max_idx = length(socket.assigns.steps) - 1
-
-    {:noreply,
-     socket
-     |> assign(:current_step, min(max_idx, socket.assigns.current_step + 1))
-     |> assign(:highlight, nil)}
+    {:noreply, patch_step(socket, socket.assigns.current_step + 1)}
   end
 
   @impl true
@@ -102,7 +92,11 @@ defmodule YscWeb.AdminHelpGuideLive do
   end
 
   @impl true
-  def handle_event("ask-clarifier", %{"question" => question}, socket) do
+  def handle_event(
+        "ask-clarifier",
+        %{"clarifier" => %{"question" => question}},
+        socket
+      ) do
     question = String.trim(question)
 
     if question == "" do
@@ -110,7 +104,10 @@ defmodule YscWeb.AdminHelpGuideLive do
     else
       socket =
         socket
-        |> assign(:clarifier_question, question)
+        |> assign(
+          :clarifier_form,
+          to_form(%{"question" => question}, as: :clarifier)
+        )
         |> assign(:clarifier_loading?, true)
         |> assign(:clarifier_error, nil)
         |> assign(:clarifier_answer, nil)
@@ -199,7 +196,7 @@ defmodule YscWeb.AdminHelpGuideLive do
           <.admin_help_clarifier
             id="admin-help-clarifier"
             expanded?={@clarifier_expanded?}
-            question={@clarifier_question}
+            form={@clarifier_form}
             answer={@clarifier_answer}
             loading?={@clarifier_loading?}
             error={@clarifier_error}
@@ -270,4 +267,19 @@ defmodule YscWeb.AdminHelpGuideLive do
        do: String.slice(highlight, 0, 200)
 
   defp highlight_from_params(_), do: nil
+
+  defp patch_step(socket, step_index) do
+    max_idx = length(socket.assigns.steps) - 1
+    step_index = step_index |> max(0) |> min(max_idx)
+
+    socket
+    |> assign(:current_step, step_index)
+    |> assign(:highlight, nil)
+    |> push_patch(to: guide_step_path(socket.assigns.guide_slug, step_index))
+  end
+
+  defp guide_step_path(slug, step_index) do
+    # ?step= is 1-based so URLs match the finder and printed guides.
+    ~p"/admin/help/#{slug}?#{%{step: step_index + 1}}"
+  end
 end

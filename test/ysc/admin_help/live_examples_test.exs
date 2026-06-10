@@ -82,6 +82,9 @@ defmodule Ysc.AdminHelp.LiveExamplesTest do
   end
 
   test "assistant loads live data on the fly" do
+    prev_open_router = Application.get_env(:ysc, :open_router)
+    prev_client = Application.get_env(:ysc, :open_router_client)
+
     Application.put_env(:ysc, :open_router,
       api_key: "test-key",
       model: "test-model"
@@ -90,8 +93,17 @@ defmodule Ysc.AdminHelp.LiveExamplesTest do
     Application.put_env(:ysc, :open_router_client, Ysc.OpenRouter.Mock)
 
     on_exit(fn ->
-      Application.delete_env(:ysc, :open_router)
-      Application.delete_env(:ysc, :open_router_client)
+      if prev_open_router do
+        Application.put_env(:ysc, :open_router, prev_open_router)
+      else
+        Application.delete_env(:ysc, :open_router)
+      end
+
+      if prev_client do
+        Application.put_env(:ysc, :open_router_client, prev_client)
+      else
+        Application.delete_env(:ysc, :open_router_client)
+      end
     end)
 
     create_post(%{title: "Live Example Post"})

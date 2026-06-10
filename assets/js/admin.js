@@ -25,6 +25,7 @@ import MediaLayoutPreference from "./media_layout_preference";
 import { applyPlatformKeyLabels } from "./platform_keys";
 import AdminHelpHotspots from "./admin_help_hotspots";
 import AdminHelpGhostFrame from "./admin_help_ghost_frame";
+import AdminHelpGhostScroll from "./admin_help_ghost_scroll";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
@@ -64,6 +65,7 @@ window.__adminHooks = {
     MediaLayoutPreference,
     AdminHelpHotspots,
     AdminHelpGhostFrame,
+    AdminHelpGhostScroll,
 };
 
 // Apply platform-aware key labels on initial load and after every LiveView patch.

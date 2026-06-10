@@ -42,7 +42,14 @@ skeleton bars (`YscWeb.AdminGhostComponents`).
    `<.admin_page_title>`, etc.).
 3. Preview locally: `http://localhost:4000/admin/help/ghost/posts-list?embed=1`
 4. Hotspot coordinates are **percentages** (`x`, `y`, `w`, `h`) of the 1280×800
-   embed viewport. Adjust after changing a preview layout.
+   embed viewport. Each hotspot can define separate `expanded:` and `collapsed:`
+   layouts (sidebar open vs collapsed); omit `collapsed:` to reuse `expanded:`.
+   Shorthand `%{x, y, w, h, label}` sets both. Toggle the sidebar in a guide to
+   tune each layout. Set `style: :hint` for a light dashed frame (good on large
+   public previews); default is `:highlight`. Long ghost pages can set
+   `image_scroll` / `public_image_scroll` on a step to an element id from
+   `ghost/previews.ex` (e.g. `ghost-event-agenda-section`) so the iframe frames
+   the right section. See `YscWeb.AdminHelp.Hotspot`.
 5. **Print / PDF** still uses static images from `priv/static/images/admin-help/`
    (`.svg` or `.png` if captured). Run `etc/scripts/capture_admin_help_ghosts.sh`
    (dev server on port 4000) to refresh PNGs from the ghost pages.

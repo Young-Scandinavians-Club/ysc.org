@@ -21,11 +21,15 @@ defmodule Ysc.AdminHelp.KnowledgeBaseTest do
     assert "posts" in slugs
   end
 
-  test "index_for_llm/0 renders one line per document" do
-    listing = KnowledgeBase.index_for_llm()
+  test "index_for_llm/1 renders one line per visible document for a role" do
+    listing = KnowledgeBase.index_for_llm(:admin)
 
     assert length(String.split(listing, "\n")) == length(KnowledgeBase.index())
     assert listing =~ "- posts:"
+  end
+
+  test "index_for_llm/1 returns nothing when role is nil" do
+    assert KnowledgeBase.index_for_llm(nil) == ""
   end
 
   test "index_for_llm/1 includes volunteer-relevant docs for volunteers" do

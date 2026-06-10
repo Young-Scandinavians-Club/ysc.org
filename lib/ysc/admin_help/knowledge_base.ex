@@ -16,6 +16,8 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
   the context window unless it is actually relevant.
   """
 
+  alias Ysc.SafeFile
+
   @doc "Directory containing the knowledge base markdown files."
   def dir do
     Application.app_dir(:ysc, "priv/admin_help_kb")
@@ -70,9 +72,7 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
   """
   def fetch(slug) when is_binary(slug) do
     if valid_slug?(slug) do
-      path = Path.join(dir(), slug <> ".md")
-
-      case File.read(path) do
+      case read_doc(slug <> ".md") do
         {:ok, raw} ->
           {_meta, body} = split_front_matter(raw)
           {:ok, String.trim(body)}
@@ -108,11 +108,14 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
     end)
   end
 
-  defp entry_for_file(file) do
-    slug = Path.rootname(file)
+  defp entry_for_file(file) when is_binary(file) do
+    basename = Path.basename(file)
 
-    with true <- valid_slug?(slug),
-         {:ok, raw} <- File.read(Path.join(dir(), file)) do
+    with true <- basename == file,
+         true <- String.ends_with?(basename, ".md"),
+         slug = Path.rootname(basename),
+         true <- valid_slug?(slug),
+         {:ok, raw} <- read_doc(basename) do
       {meta, _body} = split_front_matter(raw)
 
       %{
@@ -128,6 +131,11 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
 
   defp valid_slug?(slug) do
     Regex.match?(~r/^[a-z0-9][a-z0-9-]*$/, slug)
+  end
+
+  defp read_doc(basename) when is_binary(basename) do
+    root = dir()
+    SafeFile.read_under_root(root, Path.join(root, basename))
   end
 
   # Parses the minimal `key: value` front matter block delimited by `---` lines.
@@ -166,17 +174,15 @@ defmodule Ysc.AdminHelp.KnowledgeBase do
     end)
     |> Enum.reject(&is_nil/1)
     |> case do
-      [] -> [:admin, :volunteer]
+      [] -> []
       roles -> roles
     end
   end
-
-  defp doc_visible_to_role?(_entry, nil), do: true
 
   defp doc_visible_to_role?(%{audience: audience}, role)
        when role in [:admin, :volunteer] do
     role in audience
   end
 
-  defp doc_visible_to_role?(_, _), do: true
+  defp doc_visible_to_role?(_, _), do: false
 end

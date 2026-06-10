@@ -14,6 +14,7 @@ const AdminHelpGhostFrame = {
       this.syncIframeSidebar = this.syncIframeSidebar.bind(this);
       this.onSidebarToggle = this.onSidebarToggle.bind(this);
 
+      this.syncIframeNavigation();
       this.syncIframeSidebar();
       this.scaleFrame();
       this._resizeObserver = new ResizeObserver(() => this.scaleFrame());
@@ -21,31 +22,61 @@ const AdminHelpGhostFrame = {
       document.addEventListener("admin:toggle-sidebar", this.onSidebarToggle);
     }
 
-    this.hotspots = this.el.querySelectorAll(".admin-help-hotspot");
-    this.hotspots.forEach((btn) => {
-      btn.addEventListener("mouseenter", () => this.showTooltip(btn));
-      btn.addEventListener("focus", () => this.showTooltip(btn));
-      btn.addEventListener("mouseleave", () => this.hideTooltip());
-      btn.addEventListener("blur", () => this.hideTooltip());
-    });
+    this._hotspotAbort = new AbortController();
+    this.wireHotspots();
   },
 
   updated() {
     if (this.viewport && this.iframe) {
+      this.syncIframeNavigation();
       this.syncIframeSidebar();
       this.scaleFrame();
     }
+
+    this._hotspotAbort?.abort();
+    this._hotspotAbort = new AbortController();
+    this.wireHotspots();
   },
 
   destroyed() {
     this._resizeObserver?.disconnect();
     document.removeEventListener("admin:toggle-sidebar", this.onSidebarToggle);
+    this._hotspotAbort?.abort();
     this.hideTooltip();
+  },
+
+  wireHotspots() {
+    const signal = this._hotspotAbort.signal;
+
+    this.el.querySelectorAll(".admin-help-hotspot").forEach((btn) => {
+      btn.addEventListener("mouseenter", () => this.showTooltip(btn), { signal });
+      btn.addEventListener("focus", () => this.showTooltip(btn), { signal });
+      btn.addEventListener("mouseleave", () => this.hideTooltip(), { signal });
+      btn.addEventListener("blur", () => this.hideTooltip(), { signal });
+    });
   },
 
   onSidebarToggle() {
     // Wait for the html class toggle from admin:toggle-sidebar to apply.
     requestAnimationFrame(() => this.syncIframeSidebar());
+  },
+
+  syncIframeNavigation() {
+    const desired =
+      this.iframe.dataset.ghostSrc || this.iframe.getAttribute("src");
+    if (!desired) return;
+
+    const desiredUrl = new URL(desired, window.location.origin);
+    const currentUrl = new URL(this.iframe.src, window.location.origin);
+
+    const scrollChanged =
+      desiredUrl.searchParams.get("scroll_to") !==
+      currentUrl.searchParams.get("scroll_to");
+    const pathChanged = desiredUrl.pathname !== currentUrl.pathname;
+
+    if (pathChanged || scrollChanged) {
+      this.iframe.src = desired;
+    }
   },
 
   syncIframeSidebar() {

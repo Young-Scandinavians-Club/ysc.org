@@ -184,7 +184,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
 
   defp public_event_page(assigns) do
     ~H"""
-    <.public_page_shell label="Event">
+    <.public_page_shell show_header?={false} wide?={true}>
       <div class="relative mb-16 lg:mb-24">
         <div class="rounded-2xl overflow-hidden">
           <.admin_ghost_image ratio="aspect-[21/9]" class="rounded-2xl" />
@@ -201,17 +201,15 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
               <.icon name="hero-map-pin" class="w-4 h-4 shrink-0" />
               <span>Clear Lake Clubhouse</span>
             </div>
-            <div class="flex flex-wrap items-center gap-2 pt-1">
-              <.admin_ghost_avatar size="h-8 w-8" />
-              <span class="text-sm text-zinc-600">Hosted by Alex Volunteer</span>
-            </div>
           </div>
         </div>
       </div>
 
       <div class="max-w-screen-xl mx-auto px-2 grid lg:grid-cols-12 gap-6 -mt-6">
         <div class="lg:col-span-8 max-w-3xl space-y-10 pt-4">
-          <section class="space-y-3">
+          <.admin_ghost_public_agenda_timeline />
+
+          <section id="ghost-public-event-details" class="space-y-3">
             <h3 class="text-xl font-black text-zinc-900 flex items-center gap-3">
               <span class="w-8 h-px bg-zinc-200"></span> Details
             </h3>
@@ -220,7 +218,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
             <.admin_ghost_bar width="w-4/5" height="h-3" />
           </section>
 
-          <.admin_ghost_public_agenda_timeline />
+          <.admin_ghost_public_attendees_section />
         </div>
         <div class="lg:col-span-4">
           <.admin_ghost_public_ticket_sidebar pricing_text="From $20" />
@@ -289,7 +287,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
 
   defp public_event_agenda(assigns) do
     ~H"""
-    <.public_page_shell label="Event">
+    <.public_page_shell show_header?={false} wide?={true}>
       <div class="max-w-3xl mx-auto mb-6">
         <.admin_ghost_bar width="w-2/3" height="h-5" class="mb-2" />
         <p class="text-sm text-zinc-500">
@@ -305,22 +303,45 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
 
   defp public_event_updates(assigns) do
     ~H"""
-    <.public_page_shell label="Event">
-      <.admin_ghost_bar width="w-1/2" height="h-5" class="mb-6" />
-      <section id="ghost-event-updates-section" class="max-w-3xl mx-auto space-y-4">
-        <h3 class="text-xl font-black text-zinc-900 flex items-center gap-3">
-          <span class="w-8 h-px bg-zinc-200"></span> Updates
-        </h3>
-        <div class="rounded-xl border-2 border-blue-300 bg-blue-50/30 p-5 space-y-3">
-          <div class="flex justify-between gap-4">
-            <.admin_ghost_bar width="w-48" height="h-4" />
-            <.admin_ghost_bar width="w-16" height="h-3" />
-          </div>
-          <.admin_ghost_bar width="w-full" height="h-3" />
-          <.admin_ghost_bar width="w-[92%]" height="h-3" />
-          <.admin_ghost_bar width="w-4/5" height="h-3" />
+    <.public_page_shell show_header?={false} wide?={true}>
+      <div class="relative mb-12 lg:mb-20">
+        <div class="rounded-2xl overflow-hidden">
+          <.admin_ghost_image ratio="aspect-[21/9]" class="rounded-2xl" />
         </div>
-      </section>
+        <div class="relative -mt-10 mx-2 lg:-mt-14 lg:mx-4 z-10">
+          <div class="bg-white rounded-xl shadow-md border border-zinc-100 p-5 lg:p-7 space-y-2">
+            <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">
+              Sat, Jun 21 · 5:00 PM
+            </p>
+            <h2 class="text-xl lg:text-2xl font-black text-zinc-900 tracking-tight">
+              Summer Cabin Weekend
+            </h2>
+            <div class="flex items-center gap-2 text-sm text-zinc-500">
+              <.icon name="hero-map-pin" class="w-4 h-4 shrink-0" />
+              <span>Clear Lake Clubhouse</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="max-w-screen-xl mx-auto px-2 grid lg:grid-cols-12 gap-6 -mt-4">
+        <div class="lg:col-span-8 max-w-3xl space-y-10 pt-2">
+          <.admin_ghost_public_agenda_timeline class="space-y-6" />
+
+          <.admin_ghost_public_event_updates_section />
+
+          <section class="space-y-3 opacity-60">
+            <h3 class="text-2xl font-black text-zinc-900 tracking-tight flex items-center gap-3">
+              <span class="w-8 h-px bg-zinc-200"></span> Details
+            </h3>
+            <.admin_ghost_bar width="w-full" height="h-3" />
+            <.admin_ghost_bar width="w-11/12" height="h-3" />
+          </section>
+        </div>
+        <div class="lg:col-span-4">
+          <.admin_ghost_public_ticket_sidebar pricing_text="From $20" />
+        </div>
+      </div>
     </.public_page_shell>
     """
   end
@@ -401,14 +422,30 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
   # Shared public chrome
   # ---------------------------------------------------------------------------
 
-  attr :label, :string, required: true
+  attr :label, :string, default: nil
   attr :subtitle, :string, default: nil
+  attr :show_header?, :boolean, default: true
+  attr :wide?, :boolean, default: false
   slot :inner_block, required: true
 
   defp public_page_shell(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :content_width,
+        if(assigns.wide?, do: "max-w-screen-xl", else: "max-w-4xl")
+      )
+
     ~H"""
-    <div class="admin-help-ghost-public min-h-full bg-white py-6 px-4">
-      <header class="max-w-4xl mx-auto mb-8 text-center border-y border-zinc-200 py-8">
+    <div class={[
+      "admin-help-ghost-public min-h-full bg-white px-4",
+      @show_header? && "py-6",
+      !@show_header? && "pt-8 pb-6"
+    ]}>
+      <header
+        :if={@show_header? && @label}
+        class="max-w-4xl mx-auto mb-8 text-center border-y border-zinc-200 py-8"
+      >
         <p
           :if={@subtitle}
           class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-2"
@@ -419,7 +456,7 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviews do
           {@label}
         </h1>
       </header>
-      <div class="max-w-4xl mx-auto">
+      <div class={[@content_width, "mx-auto"]}>
         {render_slot(@inner_block)}
       </div>
     </div>

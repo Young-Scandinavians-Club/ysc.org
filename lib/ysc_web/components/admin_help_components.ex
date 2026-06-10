@@ -131,6 +131,7 @@ defmodule YscWeb.AdminHelpComponents do
         :if={@step[:image]}
         id={"#{@id}-screenshot"}
         image={@step.image}
+        image_scroll={Map.get(@step, :image_scroll)}
         hotspots={Map.get(@step, :hotspots, [])}
         sidebar_collapsed={@sidebar_collapsed}
         alt={@step.title}
@@ -140,6 +141,7 @@ defmodule YscWeb.AdminHelpComponents do
         :if={@step[:public_image]}
         id={"#{@id}-public"}
         image={@step.public_image}
+        image_scroll={Map.get(@step, :public_image_scroll)}
         hotspots={Map.get(@step, :public_hotspots, [])}
         sidebar_collapsed={@sidebar_collapsed}
         label={Map.get(@step, :public_label, "What members see on the website")}
@@ -161,6 +163,7 @@ defmodule YscWeb.AdminHelpComponents do
   """
   attr :id, :string, required: true
   attr :image, :string, required: true
+  attr :image_scroll, :string, default: nil
   attr :hotspots, :list, default: []
   attr :sidebar_collapsed, :boolean, default: false
   attr :label, :string, default: "What members see on the website"
@@ -175,6 +178,7 @@ defmodule YscWeb.AdminHelpComponents do
       <.admin_help_screenshot
         id={@id}
         image={@image}
+        image_scroll={@image_scroll}
         hotspots={@hotspots}
         sidebar_collapsed={@sidebar_collapsed}
         alt={@label}
@@ -185,6 +189,7 @@ defmodule YscWeb.AdminHelpComponents do
 
   attr :id, :string, required: true
   attr :image, :string, required: true
+  attr :image_scroll, :string, default: nil
   attr :hotspots, :list, default: []
   attr :sidebar_collapsed, :boolean, default: false
   attr :alt, :string, required: true
@@ -197,7 +202,11 @@ defmodule YscWeb.AdminHelpComponents do
       |> assign(:ghost_slug, ghost_slug)
       |> assign(
         :image_src,
-        screenshot_src(assigns.image, assigns.sidebar_collapsed)
+        screenshot_src(
+          assigns.image,
+          assigns.sidebar_collapsed,
+          assigns.image_scroll
+        )
       )
       |> assign(:hotspots, Hotspot.normalize(assigns.hotspots, ghost_slug))
 
@@ -219,7 +228,9 @@ defmodule YscWeb.AdminHelpComponents do
           data-ghost-slug={@ghost_slug}
         >
           <iframe
+            id={"#{@id}-iframe"}
             src={@image_src}
+            data-ghost-src={@image_src}
             title={@alt}
             class="admin-help-ghost-iframe"
             tabindex="-1"
@@ -236,13 +247,30 @@ defmodule YscWeb.AdminHelpComponents do
         <button
           type="button"
           id={"#{@id}-hotspot-#{idx}"}
-          class="admin-help-hotspot"
-          style={Hotspot.style(hotspot)}
+          class={["admin-help-hotspot", Hotspot.style_class(hotspot)]}
+          style={Hotspot.css_vars(hotspot)}
           aria-label={hotspot.label}
           data-hotspot-label={hotspot.label}
         >
-          <span class="admin-help-hotspot-ping" aria-hidden="true"></span>
-          <span class="admin-help-hotspot-dot" aria-hidden="true"></span>
+          <span
+            :if={Hotspot.hint?(hotspot)}
+            class="admin-help-hotspot-beacon-wrap"
+            aria-hidden="true"
+          >
+            <span class="admin-help-hotspot-beacon"></span>
+            <span class="admin-help-hotspot-ping admin-help-hotspot-ping--hint">
+            </span>
+          </span>
+          <span
+            :if={!Hotspot.hint?(hotspot)}
+            class="admin-help-hotspot-ping"
+            aria-hidden="true"
+          />
+          <span
+            :if={!Hotspot.hint?(hotspot)}
+            class="admin-help-hotspot-dot"
+            aria-hidden="true"
+          />
         </button>
       </div>
     </div>
@@ -290,7 +318,7 @@ defmodule YscWeb.AdminHelpComponents do
 
   attr :id, :string, required: true
   attr :expanded?, :boolean, default: false
-  attr :question, :string, default: ""
+  attr :form, Phoenix.HTML.Form, required: true
   attr :answer, :string, default: nil
   attr :loading?, :boolean, default: false
   attr :error, :string, default: nil
@@ -321,21 +349,21 @@ defmodule YscWeb.AdminHelpComponents do
         <p class="text-xs text-zinc-500">
           AI-assisted — follow the steps and screenshots above if anything conflicts.
         </p>
-        <form id={"#{@id}-form"} phx-submit="ask-clarifier">
-          <textarea
+        <.form for={@form} id={"#{@id}-form"} phx-submit="ask-clarifier">
+          <.input
+            field={@form[:question]}
+            type="textarea"
             id={"#{@id}-input"}
-            name="question"
             rows="2"
             placeholder="e.g. What if I don't have a cover image yet?"
             disabled={@loading?}
-            class="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60"
-          >{@question}</textarea>
+          />
           <div class="mt-2 flex items-center gap-3">
             <.button type="submit" disabled={@loading?}>
               Ask
             </.button>
           </div>
-        </form>
+        </.form>
         <div
           :if={@loading?}
           id={"#{@id}-loading"}
@@ -371,7 +399,7 @@ defmodule YscWeb.AdminHelpComponents do
   end
 
   attr :id, :string, required: true
-  attr :query, :string, default: ""
+  attr :form, Phoenix.HTML.Form, required: true
   attr :result, :map, default: nil
   attr :loading?, :boolean, default: false
   attr :error, :string, default: nil
@@ -391,23 +419,23 @@ defmodule YscWeb.AdminHelpComponents do
       <p class="text-sm text-zinc-600 mt-1">
         Describe your task and we will suggest the right guide.
       </p>
-      <form id={"#{@id}-form"} phx-submit="find-guide" class="mt-4">
+      <.form for={@form} id={"#{@id}-form"} phx-submit="find-guide" class="mt-4">
         <div class="flex flex-col sm:flex-row gap-2">
-          <input
-            type="text"
-            name="query"
-            id={"#{@id}-input"}
-            value={@query}
-            placeholder='e.g. "send the monthly email" or "check people in at the door"'
-            disabled={@loading?}
-            class="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
-            autocomplete="off"
-          />
+          <div class="flex-1">
+            <.input
+              field={@form[:query]}
+              type="text"
+              id={"#{@id}-input"}
+              placeholder='e.g. "send the monthly email" or "check people in at the door"'
+              disabled={@loading?}
+              autocomplete="off"
+            />
+          </div>
           <.button type="submit" disabled={@loading?}>
             Find guide
           </.button>
         </div>
-      </form>
+      </.form>
       <div
         :if={@loading?}
         id={"#{@id}-loading"}
@@ -517,11 +545,13 @@ defmodule YscWeb.AdminHelpComponents do
 
   defp ghost_slug(_), do: nil
 
-  defp screenshot_src("ghost:" <> slug, sidebar_collapsed?)
+  defp screenshot_src("ghost:" <> slug, sidebar_collapsed?, scroll_to)
        when is_binary(slug),
-       do: Hotspot.ghost_src(slug, sidebar_collapsed?)
+       do: Hotspot.ghost_src(slug, sidebar_collapsed?, scroll_to)
 
-  defp screenshot_src(path, _sidebar_collapsed?) when is_binary(path), do: path
+  defp screenshot_src(path, _sidebar_collapsed?, _scroll_to)
+       when is_binary(path),
+       do: path
 
   # Deep-links a finder result to the matched step (and highlight quote)
   # when the assistant pinpointed one.
@@ -658,8 +688,8 @@ defmodule YscWeb.AdminHelpComponents do
         <img src={@image_src} alt={@alt} />
         <span
           :for={{hotspot, idx} <- Enum.with_index(@hotspots)}
-          class="admin-help-print-marker"
-          style={Hotspot.print_style(hotspot)}
+          class={["admin-help-print-marker", Hotspot.print_marker_class(hotspot)]}
+          style={Hotspot.print_css_vars(hotspot)}
           aria-hidden="true"
         >
           {idx + 1}

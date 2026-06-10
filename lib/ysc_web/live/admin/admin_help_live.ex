@@ -19,6 +19,7 @@ defmodule YscWeb.AdminHelpLive do
      |> assign(:active_page, :help)
      |> assign(:page_title, "Help")
      |> assign(:finder_query, "")
+     |> assign(:finder_form, to_form(%{"query" => ""}, as: :finder))
      |> assign(:finder_result, nil)
      |> assign(:finder_loading?, false)
      |> assign(:finder_error, nil)
@@ -27,7 +28,7 @@ defmodule YscWeb.AdminHelpLive do
   end
 
   @impl true
-  def handle_event("find-guide", %{"query" => query}, socket) do
+  def handle_event("find-guide", %{"finder" => %{"query" => query}}, socket) do
     query = String.trim(query)
 
     if query == "" do
@@ -37,6 +38,7 @@ defmodule YscWeb.AdminHelpLive do
       socket =
         socket
         |> assign(:finder_query, query)
+        |> assign(:finder_form, to_form(%{"query" => query}, as: :finder))
         |> assign(:finder_loading?, true)
         |> assign(:finder_error, nil)
         |> assign(:finder_result, nil)
@@ -51,15 +53,17 @@ defmodule YscWeb.AdminHelpLive do
   def handle_info({:find_guide, query, user_id}, socket) do
     role = socket.assigns.admin_role
 
-    result =
+    socket =
       case Assistant.find_guide(query, role, user_id) do
         {:ok, data} ->
-          %{
+          socket
+          |> assign(:finder_loading?, false)
+          |> assign(:finder_result, %{
             explanation: data.explanation,
             guide_slug: data.guide_slug,
             step: data.step,
             highlight: data.highlight
-          }
+          })
 
         {:error, :rate_limited} ->
           assign(socket,
@@ -73,15 +77,6 @@ defmodule YscWeb.AdminHelpLive do
             finder_error:
               "Assistant unavailable right now. Browse the guides below."
           )
-      end
-
-    socket =
-      if match?(%{explanation: _}, result) do
-        socket
-        |> assign(:finder_loading?, false)
-        |> assign(:finder_result, result)
-      else
-        result
       end
 
     {:noreply, socket}
@@ -105,7 +100,7 @@ defmodule YscWeb.AdminHelpLive do
 
         <.admin_help_finder
           id="admin-help-finder"
-          query={@finder_query}
+          form={@finder_form}
           result={@finder_result}
           loading?={@finder_loading?}
           error={@finder_error}

@@ -386,14 +386,22 @@ document.addEventListener("paste", (event) => {
 // Handle print-page event for PDF download (optional detail.title for the saved PDF name)
 window.addEventListener("phx:print-page", (event) => {
     const title = event.detail?.title;
-    if (title) {
-        const previousTitle = document.title;
-        document.title = title;
+
+    if (!title) {
         window.print();
-        document.title = previousTitle;
-    } else {
-        window.print();
+        return;
     }
+
+    const previousTitle = document.title;
+    document.title = title;
+
+    const restoreTitle = () => {
+        document.title = previousTitle;
+        window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    window.addEventListener("afterprint", restoreTitle);
+    window.print();
 });
 
 // Handle copy to clipboard for Report ID

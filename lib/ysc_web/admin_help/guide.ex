@@ -8,21 +8,44 @@ defmodule YscWeb.AdminHelp.Guide do
 
   @type hotspot_area :: :content | :sidebar | :viewport
 
-  @type hotspot :: %{
-          x: number(),
-          y: number(),
-          w: number(),
-          h: number(),
-          label: String.t(),
-          area: hotspot_area()
+  @type hotspot_style :: :highlight | :hint
+
+  @type hotspot_layout :: %{
+          required(:x) => number(),
+          required(:y) => number(),
+          required(:w) => number(),
+          required(:h) => number(),
+          optional(:area) => hotspot_area()
         }
+
+  @type hotspot ::
+          hotspot_layout()
+          | %{
+              required(:label) => String.t(),
+              optional(:style) => hotspot_style(),
+              optional(:expanded) => hotspot_layout(),
+              optional(:collapsed) => hotspot_layout()
+            }
+          | %{
+              required(:label) => String.t(),
+              required(:x) => number(),
+              required(:y) => number(),
+              required(:w) => number(),
+              required(:h) => number(),
+              optional(:area) => hotspot_area(),
+              optional(:style) => hotspot_style(),
+              optional(:expanded) => hotspot_layout(),
+              optional(:collapsed) => hotspot_layout()
+            }
 
   @type step :: %{
           required(:title) => String.t(),
           required(:body) => String.t(),
           optional(:image) => String.t(),
+          optional(:image_scroll) => String.t(),
           optional(:hotspots) => [hotspot()],
           optional(:public_image) => String.t(),
+          optional(:public_image_scroll) => String.t(),
           optional(:public_hotspots) => [hotspot()],
           optional(:cta) => %{label: String.t(), path: String.t()}
         }

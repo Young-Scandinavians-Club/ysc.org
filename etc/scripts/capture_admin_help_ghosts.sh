@@ -5,8 +5,14 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
 OUT_DIR="priv/static/images/admin-help"
-EMAIL="${ADMIN_EMAIL:-admin@ysc.org}"
-PASSWORD="${ADMIN_PASSWORD:-very_secure_password}"
+
+if [[ -z "${ADMIN_EMAIL:-}" || -z "${ADMIN_PASSWORD:-}" ]]; then
+  echo "ADMIN_EMAIL and ADMIN_PASSWORD must be set (no embedded defaults)." >&2
+  exit 1
+fi
+
+EMAIL="$ADMIN_EMAIL"
+PASSWORD="$ADMIN_PASSWORD"
 
 mkdir -p "$OUT_DIR"
 
@@ -17,8 +23,14 @@ const { chromium } = require('playwright');
 
 const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
 const outDir = process.env.OUT_DIR || 'priv/static/images/admin-help';
-const email = process.env.ADMIN_EMAIL || 'admin@ysc.org';
-const password = process.env.ADMIN_PASSWORD || 'very_secure_password';
+const email = process.env.ADMIN_EMAIL;
+const password = process.env.ADMIN_PASSWORD;
+
+if (!email || !password) {
+  console.error('ADMIN_EMAIL and ADMIN_PASSWORD must be set (no embedded defaults).');
+  process.exit(1);
+}
+
 const slugs = process.env.SLUGS ? process.env.SLUGS.split(',') : [
   'getting-started-dashboard','getting-started-sidebar','posts-list','posts-editor',
   'posts-settings','posts-publish','newsletter-compose','newsletter-subscribers',
@@ -40,14 +52,11 @@ const slugs = process.env.SLUGS ? process.env.SLUGS.split(',') : [
   for (const slug of slugs) {
     const url = `${baseUrl}/admin/help/ghost/${slug}?embed=1`;
     await page.goto(url, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(800);
-    const path = `${outDir}/${slug}.png`;
-    await page.locator('#admin-help-ghost-root').screenshot({ path });
-    console.log(`Wrote ${path}`);
+    await page.waitForSelector('.admin-help-ghost-embed, .admin-help-ghost-public', { timeout: 10000 });
+    await page.screenshot({ path: `${outDir}/${slug}.png`, fullPage: false });
+    console.log(`Wrote ${outDir}/${slug}.png`);
   }
 
   await browser.close();
 })();
 NODE
-
-echo "Done. PNGs written to ${OUT_DIR}/"

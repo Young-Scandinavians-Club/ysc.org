@@ -50,17 +50,7 @@ defmodule YscWeb.AdminHelp.Guides do
           title: "Open Admin",
           body:
             "Log in with your YSC account, then click the round **Admin** floating button in the corner of any page, or go directly to **/admin**.\n\nBoth admins and volunteers land on the dashboard. What you see there depends on your role — volunteers get a focused view with shortcuts to the content tools, while full admins also see membership, revenue, and application stats.",
-          image: "ghost:getting-started-dashboard",
-          hotspots: [
-            %{
-              area: :viewport,
-              x: 88,
-              y: 82,
-              w: 10,
-              h: 8,
-              label: "Admin floating button"
-            }
-          ],
+          image: "ghost:getting-started-login",
           cta: %{label: "Open dashboard", path: "/admin"}
         },
         %{
@@ -78,9 +68,9 @@ defmodule YscWeb.AdminHelp.Guides do
             %{
               area: :sidebar,
               x: 4,
-              y: 18,
+              y: 12,
               w: 96,
-              h: 55,
+              h: 72,
               label: "Admin sidebar"
             }
           ]
@@ -251,27 +241,40 @@ defmodule YscWeb.AdminHelp.Guides do
           title: "Set the title and URL",
           body:
             "Click the title to edit it. The public URL slug (e.g. /posts/midsummer-recap-2026) is generated from the title automatically and keeps following it until you edit the slug by hand.\n\nKeep titles short and specific — they appear on /news cards, in the newsletter, and in browser tabs. \"Midsummer 2026 — photos and thanks\" beats \"Update\".",
-          image: "ghost:posts-editor"
+          image: "ghost:posts-editor",
+          hotspots: [
+            %{
+              expanded: %{x: 27, y: 4, w: 46, h: 7},
+              collapsed: %{x: 26, y: 4, w: 44, h: 7},
+              label: "Post title"
+            },
+            %{
+              expanded: %{x: 40, y: 13, w: 24, h: 5},
+              collapsed: %{x: 36, y: 12, w: 22, h: 6},
+              label: "URL slug"
+            }
+          ]
         },
         %{
           title: "Write the body",
           body:
             "Write in the rich-text editor below the title. The toolbar gives you **bold**, *italic*, headings, quotes, links, and bulleted or numbered lists.\n\nTo add photos inside the article, use the image button in the toolbar — it opens the shared media library, so upload your photos there first (or drop them straight into the picker). Images are resized and optimized automatically.\n\nA good club article: a short opening paragraph saying what happened or what's coming, a few photos, and clear details (dates, places, names) members might search for later.",
           image: "ghost:posts-editor",
-          hotspots: [%{x: 8, y: 12, w: 84, h: 50, label: "Rich-text editor"}]
+          image_scroll: "ghost-post-editor-body",
+          hotspots: [
+            %{
+              expanded: %{x: 30, y: 32, w: 60, h: 70},
+              collapsed: %{x: 30, y: 26, w: 60, h: 70},
+              label: "Rich-text editor"
+            }
+          ]
         },
         %{
           title: "Add the featured image",
           body:
             "Open the **⋮** menu in the top-right of the editor and choose **Post Settings**, then pick a **Featured Image** from the media library.\n\nThis image is the post's \"face\" — it shows on the /news listing, on the featured hero if the post gets pinned, and in newsletters. Choose a landscape photo that still reads well when cropped small. This step is required: the Publish button won't complete without it.",
           image: "ghost:posts-settings",
-          hotspots: [
-            %{x: 35, y: 25, w: 30, h: 40, label: "Featured image picker"}
-          ],
-          public_image: "ghost:public-news-article",
-          public_hotspots: [
-            %{x: 8, y: 30, w: 84, h: 32, label: "Featured image on the article"}
-          ]
+          public_image: "ghost:public-news-article"
         },
         %{
           title: "Preview before publishing",
@@ -284,11 +287,14 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Click **Publish**. The post goes live immediately at /news and its own URL, appears in the site's news feed, and members can comment on it.\n\nYour name appears as the byline, along with your board position if you hold one at publish time. After publishing you can still edit (changes are live immediately), **pin** the post to feature it at the top of /news, or share its URL in the next newsletter.",
           image: "ghost:posts-publish",
-          hotspots: [%{x: 70, y: 4, w: 12, h: 6, label: "Publish"}],
-          public_image: "ghost:public-news-list",
-          public_hotspots: [
-            %{x: 4, y: 38, w: 46, h: 38, label: "New post on /news"}
+          hotspots: [
+            %{
+              expanded: %{x: 88, y: 2, w: 7, h: 8},
+              collapsed: %{x: 90, y: 2, w: 7, h: 8},
+              label: "Publish"
+            }
           ],
+          public_image: "ghost:public-news-list",
           cta: %{label: "Start a new post", path: "/admin/posts/new"}
         }
       ]
@@ -345,17 +351,15 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "On the Posts list, open the **⋮** menu on any **published** post and choose **Pin post**. It becomes the large hero article at the top of /news.\n\nOnly one post is pinned at a time — pinning a new one silently unpins the previous, so you never need to unpin first. Use the pin for the most timely or important article: an upcoming AGM, Midsummer recap, or a big announcement.",
           image: "ghost:posts-list",
-          hotspots: [%{x: 85, y: 20, w: 8, h: 6, label: "⋮ actions menu"}],
-          public_image: "ghost:public-news-pinned",
-          public_hotspots: [
+          hotspots: [
             %{
-              x: 4,
-              y: 18,
-              w: 92,
-              h: 48,
-              label: "Pinned hero at the top of /news"
+              expanded: %{x: 79, y: 32, w: 15, h: 24},
+              collapsed: %{x: 82, y: 32, w: 14, h: 24},
+              label: "⋮ actions menu with pin option",
+              style: :hint
             }
           ],
+          public_image: "ghost:public-news-pinned",
           cta: %{label: "Open Posts", path: "/admin/posts"}
         },
         %{
@@ -431,8 +435,18 @@ defmodule YscWeb.AdminHelp.Guides do
             "Go to **Newsletters** in the sidebar and click **New Newsletter**.\n\nOn desktop the screen splits in two: the editor on the left and a **live preview of the actual email** on the right. On a phone or narrow window, switch between Editor and Preview tabs at the top. Everything auto-saves — the first save creates the edition and pins down its URL.",
           image: "ghost:newsletter-compose",
           hotspots: [
-            %{x: 5, y: 12, w: 42, h: 72, label: "Editor (left)"},
-            %{x: 52, y: 12, w: 45, h: 72, label: "Email preview (right)"}
+            %{
+              expanded: %{x: 26, y: 8, w: 35, h: 92},
+              collapsed: %{x: 26, y: 8, w: 35, h: 92},
+              label: "Editor (left)",
+              style: :hint
+            },
+            %{
+              expanded: %{x: 62, y: 8, w: 35, h: 92},
+              collapsed: %{x: 62, y: 8, w: 35, h: 92},
+              label: "Email preview (right)",
+              style: :hint
+            }
           ],
           cta: %{label: "New newsletter", path: "/admin/newsletters/new"}
         },
@@ -458,28 +472,18 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Below the intro are two pickers: **Latest news** (the 50 most recent published posts) and **Upcoming events**. Click a card to include it; click again to remove it.\n\n**The order you click is the order in the email**, so click your lead story first. Each included post or event becomes a styled card in the email linking back to the site — recipients click through, and those clicks are tracked in the stats.",
           image: "ghost:newsletter-compose",
+          image_scroll: "ghost-newsletter-post-picker",
           hotspots: [
-            %{x: 5, y: 58, w: 42, h: 28, label: "Post and event pickers"}
+            %{x: 26, y: 28, w: 36, h: 80, label: "Post and event pickers"}
           ],
-          public_image: "ghost:public-newsletter-edition",
-          public_hotspots: [
-            %{
-              x: 12,
-              y: 52,
-              w: 76,
-              h: 32,
-              label: "Post and event cards on the archive page"
-            }
-          ]
+          public_image: "ghost:public-newsletter-edition"
         },
         %{
           title: "Check the preview",
           body:
             "The preview pane renders the **real email** exactly as subscribers will receive it, shown from a subscriber's perspective.\n\nScroll the whole thing top to bottom: cover, headline, intro, every card, footer. Check for typos in the subject especially — it's the one thing you can't fix after sending. When it looks right, continue to the send guide.",
           image: "ghost:newsletter-compose",
-          hotspots: [
-            %{x: 52, y: 14, w: 45, h: 68, label: "Live email preview"}
-          ],
+          image_scroll: "ghost-newsletter-preview-panel",
           cta: %{
             label: "Next: send or schedule",
             path: "/admin/help/newsletters/send"
@@ -548,27 +552,45 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Send a test to yourself",
           body:
-            "Click **Send test**. A real copy of the email goes to **your own address** — the one on your admin account.\n\nOpen it on your phone, not just your computer: most subscribers read on mobile. Check the subject, the cover image, every link, and how the post/event cards look. Fix anything in the editor and send another test; there's no limit.",
+            "In the **Email Preview** panel on the right, click **Send test** (top-right of the preview header). A real copy of the email goes to **your own address** — the one on your admin account.\n\nOpen it on your phone, not just your computer: most subscribers read on mobile. Check the subject, the cover image, every link, and how the post/event cards look. Fix anything in the editor and send another test; there's no limit.",
           image: "ghost:newsletter-compose",
-          hotspots: [%{x: 58, y: 16, w: 18, h: 7, label: "Send test"}]
+          image_scroll: "ghost-newsletter-preview-panel",
+          hotspots: [
+            %{
+              expanded: %{x: 84, y: 2, w: 11, h: 6},
+              collapsed: %{x: 87, y: 2, w: 9, h: 6},
+              label: "Send test"
+            }
+          ]
         },
         %{
           title: "Send now…",
           body:
             "**Send now** opens a confirmation dialog — this is the point of no return. On confirm, the edition is queued and emailed to **every active subscriber**, the status moves through *sending* to *sent*, and the edition becomes permanently read-only.\n\nThe newsletters list updates live when sending completes. The sent edition is also archived publicly on the site's newsletter archive.",
           image: "ghost:newsletter-compose",
-          hotspots: [%{x: 58, y: 86, w: 14, h: 8, label: "Send now"}],
-          public_image: "ghost:public-newsletter-archive",
-          public_hotspots: [
-            %{x: 2, y: 22, w: 96, h: 24, label: "New edition on /newsletters"}
-          ]
+          image_scroll: "ghost-newsletter-action-bar",
+          hotspots: [
+            %{
+              expanded: %{x: 74, y: 90, w: 10, h: 7},
+              collapsed: %{x: 78, y: 90, w: 10, h: 8},
+              label: "Send now"
+            }
+          ],
+          public_image: "ghost:public-newsletter-archive"
         },
         %{
           title: "…or schedule for later",
           body:
             "**Schedule** lets you pick a date and time in your local timezone — the edition shows as *Scheduled* and goes out automatically.\n\nScheduled editions remain **editable until they send**, so you can schedule Friday's newsletter on Tuesday and keep polishing. Weekday mornings tend to get the best open rates.",
           image: "ghost:newsletter-compose",
-          hotspots: [%{x: 74, y: 86, w: 14, h: 8, label: "Schedule"}]
+          image_scroll: "ghost-newsletter-action-bar",
+          hotspots: [
+            %{
+              expanded: %{x: 83, y: 90, w: 12, h: 8},
+              collapsed: %{x: 86, y: 90, w: 10, h: 8},
+              label: "Schedule"
+            }
+          ]
         },
         %{
           title: "Read the stats",
@@ -709,7 +731,13 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "On the **Events** list, click **New Event**. A draft is created instantly and you're taken to its editor.\n\nThe editor has three tabs: **Event Details** (this guide), **Tickets**, and **Updates**. Drafts are invisible to members until you publish, so nothing here is public yet.\n\nRunning a repeat of an earlier event? Use **Copy** on the old event instead — it duplicates tiers, agenda, and FAQs into a fresh draft.",
           image: "ghost:events-list",
-          hotspots: [%{x: 78, y: 6, w: 18, h: 8, label: "New Event"}],
+          hotspots: [
+            %{
+              expanded: %{x: 84, y: 5, w: 11, h: 8},
+              collapsed: %{x: 87, y: 5, w: 10, h: 8},
+              label: "New Event"
+            }
+          ],
           cta: %{label: "Create new event", path: "/admin/events/new"}
         },
         %{
@@ -717,13 +745,27 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Pick a **cover image** from the media library — it headlines the public event page, the events listing, and newsletter cards.\n\nWrite a clear **title** and a **summary** of at most 200 characters. The summary is the teaser members see on cards, so make it sell the event: \"Sauna, swimming and BBQ at Clear Lake — members and guests welcome.\"\n\nIf the event is organised on **Partiful**, paste the link here instead of using the Tickets tab — the two are mutually exclusive.",
           image: "ghost:events-edit",
+          image_scroll: "ghost-event-cover-section",
           hotspots: [
-            %{x: 6, y: 14, w: 88, h: 10, label: "Title, badge, and Publish"},
-            %{x: 6, y: 26, w: 88, h: 14, label: "Cover image and basics"}
+            %{
+              expanded: %{x: 28, y: 89, w: 52, h: 11},
+              collapsed: %{x: 26, y: 89, w: 52, h: 11},
+              label: "Partiful link"
+            },
+            %{
+              expanded: %{x: 28, y: 4, w: 44, h: 50},
+              collapsed: %{x: 26, y: 4, w: 44, h: 50},
+              label: "Cover image"
+            },
+            %{
+              expanded: %{x: 28, y: 65, w: 52, h: 23},
+              collapsed: %{x: 26, y: 65, w: 52, h: 23},
+              label: "Basic details"
+            }
           ],
           public_image: "ghost:public-event-page",
           public_hotspots: [
-            %{x: 8, y: 38, w: 84, h: 22, label: "Hero card on the event page"}
+            %{x: 1, y: 2, w: 99, h: 84, label: "Hero card on the event page"}
           ]
         },
         %{
@@ -731,8 +773,9 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Set the **date** (single day or a range for multi-day events like cabin weekends), plus start and end times.\n\nEnter the **location** and drop the **map pin** so members get accurate directions — the pin powers the map on the public page. For venues with tricky entrances, add arrival notes in the Overview.",
           image: "ghost:events-edit",
+          image_scroll: "ghost-event-date-section",
           hotspots: [
-            %{x: 6, y: 42, w: 88, h: 18, label: "Date, time, and map"}
+            %{x: 27, y: 4, w: 48, h: 18, label: "Date, time, and map"}
           ]
         },
         %{
@@ -740,25 +783,49 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "The **Overview** is the full description on the public page, written in the rich-text editor — headings, lists, links, and inline photos from the media library all work.\n\nCover what attendees actually ask: what's included, what to bring, parking and transit, guest policy, and food/drink arrangements. A thorough overview saves you from answering the same questions by email.",
           image: "ghost:events-edit",
+          image_scroll: "ghost-event-overview-section",
           hotspots: [
-            %{x: 6, y: 52, w: 88, h: 14, label: "Overview editor"}
+            %{
+              expanded: %{x: 28, y: 1, w: 60, h: 80},
+              collapsed: %{x: 26, y: 1, w: 50, h: 80},
+              label: "Overview editor"
+            }
           ],
           public_image: "ghost:public-event-page",
+          public_image_scroll: "ghost-public-event-details",
           public_hotspots: [
-            %{x: 8, y: 62, w: 84, h: 12, label: "Details section"}
+            %{
+              x: 1,
+              y: 62,
+              w: 64,
+              h: 22,
+              label: "Details section"
+            }
           ]
         },
         %{
           title: "Add hosts",
           body:
-            "Search for members by name and add them as **hosts**. Hosts are displayed on the public event page, giving attendees a familiar face and a point of contact.\n\nAdd everyone who's actually organising — it's also a nice way to credit volunteers.",
+            "Search for members by name and add them as **hosts**. On the public event page, hosts appear at the top of the **Attendees** section at the bottom of the page — with an amber ring and a **Host** label under their name.\n\nAdd everyone who's actually organising — it's also a nice way to credit volunteers.",
           image: "ghost:events-edit",
+          image_scroll: "ghost-event-hosts-section",
           hotspots: [
-            %{x: 6, y: 64, w: 88, h: 10, label: "Hosts search"}
+            %{
+              expanded: %{x: 28, y: 53, w: 60, h: 10},
+              collapsed: %{x: 27, y: 53, w: 49, h: 10},
+              label: "Hosts search"
+            }
           ],
           public_image: "ghost:public-event-page",
+          public_image_scroll: "ghost-public-event-hosts",
           public_hotspots: [
-            %{x: 10, y: 48, w: 50, h: 6, label: "Hosted by line"}
+            %{
+              x: 1,
+              y: 82,
+              w: 44,
+              h: 20,
+              label: "Host in Attendees"
+            }
           ]
         },
         %{
@@ -766,12 +833,21 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "For events with a schedule, add **agenda** sections with timed items — e.g. \"17:00 Doors open\", \"18:00 Dinner\", \"20:00 Singing\". Items can be reordered or deleted as plans firm up.\n\nThe agenda renders as a clean timeline on the public page. Skip it for unstructured socials; use it for anything with a programme.\n\nNext: set up tickets and capacity.",
           image: "ghost:events-edit",
+          image_scroll: "ghost-event-agenda-section",
           hotspots: [
-            %{x: 6, y: 72, w: 88, h: 16, label: "Agenda cards and Add Agenda"}
+            %{x: 26, y: 36, w: 40, h: 60, label: "Agenda cards and Add Agenda"}
           ],
           public_image: "ghost:public-event-agenda",
+          public_image_scroll: "ghost-public-event-agenda",
           public_hotspots: [
-            %{x: 6, y: 22, w: 88, h: 62, label: "Agenda timeline on the site"}
+            %{
+              x: 6,
+              y: 12,
+              w: 88,
+              h: 42,
+              label: "Agenda timeline on the site",
+              style: :hint
+            }
           ],
           cta: %{
             label: "Next: tickets and capacity",
@@ -838,8 +914,7 @@ defmodule YscWeb.AdminHelp.Guides do
             "From the event editor, switch to the **Tickets** tab.\n\nIf it's greyed out, the event has a Partiful link on the Details tab — built-in ticketing and Partiful are mutually exclusive. Remove the link if you want to sell tickets here.",
           image: "ghost:events-tickets",
           hotspots: [
-            %{x: 6, y: 10, w: 88, h: 8, label: "Editor header and tabs"},
-            %{x: 24, y: 18, w: 18, h: 5, label: "Tickets tab"}
+            %{x: 26, y: 6, w: 44, h: 18, label: "Editor header and tabs"}
           ]
         },
         %{
@@ -847,13 +922,20 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Choose **unlimited** attendance or set a **maximum number of attendees** for the whole event.\n\nCapacity is the hard ceiling across all tiers combined. For venue-limited events (cabin dinners, boat trips), set this first so overselling is impossible no matter how tiers are configured.",
           image: "ghost:events-tickets",
-          hotspots: [%{x: 6, y: 22, w: 88, h: 14, label: "Event capacity"}],
+          image_scroll: "ghost-event-capacity-section",
+          hotspots: [
+            %{
+              expanded: %{x: 26, y: 22, w: 64, h: 34},
+              collapsed: %{x: 26, y: 20, w: 52, h: 36},
+              label: "Event capacity"
+            }
+          ],
           public_image: "ghost:public-event-tickets",
           public_hotspots: [
             %{
-              x: 58,
-              y: 18,
-              w: 38,
+              x: 66,
+              y: 10,
+              w: 34,
               h: 52,
               label: "Spots available and pricing headline"
             }
@@ -864,20 +946,30 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Add one or more **tiers**. Each tier has a type — **Free**, **Paid** (fixed price), or **Donation** (attendee picks the amount) — plus an optional quantity limit and a **sales window** (start/end dates for when it can be bought).\n\nTypical setups: \"Member — free\" + \"Guest — $20\"; or an \"Early bird\" paid tier whose window closes two weeks out, followed by a regular tier. Enable **requires registration** to collect each attendee's details at checkout.\n\nOn the public event page, the sidebar shows a summary price (e.g. **From $20**), and **Get Tickets** opens a modal listing every tier you configured.",
           image: "ghost:events-tickets",
+          image_scroll: "ghost-event-ticket-tiers-section",
           hotspots: [
-            %{x: 6, y: 38, w: 88, h: 48, label: "Ticket tiers list"},
-            %{x: 72, y: 36, w: 20, h: 6, label: "Add Ticket Tier"}
+            %{
+              expanded: %{x: 28, y: 56, w: 60, h: 36},
+              collapsed: %{x: 28, y: 57, w: 48, h: 36},
+              label: "Ticket tiers list"
+            },
+            %{
+              expanded: %{x: 73, y: 48, w: 14, h: 8},
+              collapsed: %{x: 63, y: 48, w: 12, h: 8},
+              label: "Add Ticket Tier"
+            }
           ],
           public_image: "ghost:public-event-ticket-tiers",
           public_hotspots: [
             %{
-              x: 4,
-              y: 12,
-              w: 58,
-              h: 78,
-              label: "Each tier name, price, and availability"
+              x: 10,
+              y: 8,
+              w: 53,
+              h: 55,
+              label: "Each tier name, price, and availability",
+              style: :hint
             },
-            %{x: 64, y: 20, w: 32, h: 55, label: "Order summary"}
+            %{x: 64, y: 8, w: 26, h: 55, label: "Order summary", style: :hint}
           ]
         },
         %{
@@ -885,14 +977,16 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "If the event should be announced before pricing is final, toggle **Tickets TBD**. The event can be published showing \"tickets to be announced\", and you add real tiers when ready.\n\nThis beats delaying the announcement — members can save the date while you sort out costs.",
           image: "ghost:events-tickets",
+          image_scroll: "ghost-event-ticket-tiers-section",
           public_image: "ghost:public-event-tickets-tbd",
           public_hotspots: [
             %{
               x: 8,
-              y: 22,
+              y: 8,
               w: 84,
-              h: 62,
-              label: "Tickets coming soon on the event page"
+              h: 46,
+              label: "Tickets coming soon on the event page",
+              style: :hint
             }
           ]
         },
@@ -965,23 +1059,30 @@ defmodule YscWeb.AdminHelp.Guides do
             "Click **Publish** in the editor header. The public page goes live, the event appears in listings, **members receive a notification email**, and ticket sales open according to each tier's sales window.\n\nA photo-upload collection is also created so attendees can share pictures after the event (see the Updates tab guide).",
           image: "ghost:events-edit",
           hotspots: [
-            %{x: 52, y: 10, w: 18, h: 7, label: "Publish"},
-            %{x: 6, y: 10, w: 40, h: 8, label: "Title and Draft badge"}
+            %{
+              expanded: %{x: 69, y: 6, w: 10, h: 8},
+              collapsed: %{x: 75, y: 7, w: 8, h: 7},
+              label: "Publish"
+            },
+            %{
+              expanded: %{x: 27, y: 7, w: 28, h: 10},
+              collapsed: %{x: 26, y: 7, w: 24, h: 10},
+              label: "Title and Draft badge"
+            }
           ],
-          public_image: "ghost:public-event-page",
-          public_hotspots: [
-            %{x: 6, y: 32, w: 88, h: 28, label: "Live event page with tickets"}
-          ]
+          public_image: "ghost:public-event-page"
         },
         %{
           title: "Or schedule the publish",
           body:
             "Click **Schedule** and pick a date and time. The event sits in the **Scheduled** state and publishes itself automatically at that moment — notifications, ticket sales and all.\n\nUse this when the announcement time is part of the plan (\"tickets drop Monday at 9\"). Scheduled events remain fully editable until they go live.",
           image: "ghost:events-edit",
-          hotspots: [%{x: 70, y: 10, w: 16, h: 7, label: "Schedule"}],
-          public_image: "ghost:public-events-list",
-          public_hotspots: [
-            %{x: 4, y: 42, w: 44, h: 36, label: "Event card on /events"}
+          hotspots: [
+            %{
+              expanded: %{x: 78, y: 6, w: 13, h: 9},
+              collapsed: %{x: 82, y: 6, w: 11, h: 9},
+              label: "Schedule Event"
+            }
           ]
         },
         %{
@@ -992,7 +1093,15 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Copy and delete",
           body:
-            "**Copy** (from the editor or the list's ⋮ menu) duplicates any event into a new draft, including its ticket tiers, agenda, and FAQs — the fastest way to set up recurring events. Always update the dates on the copy.\n\n**Delete** is available for drafts and scheduled events and is a soft delete. Published events should be cancelled rather than deleted."
+            "**Copy** (from the editor or the list's ⋮ menu) duplicates any event into a new draft, including its ticket tiers, agenda, and FAQs — the fastest way to set up recurring events. Always update the dates on the copy.\n\n**Delete** is available for drafts and scheduled events and is a soft delete. Published events should be cancelled rather than deleted.",
+          image: "ghost:events-list",
+          hotspots: [
+            %{
+              expanded: %{x: 85, y: 22, w: 12, h: 14},
+              collapsed: %{x: 80, y: 62, w: 12, h: 18},
+              label: "⋮ actions menu with options"
+            }
+          ]
         }
       ]
     end
@@ -1052,8 +1161,11 @@ defmodule YscWeb.AdminHelp.Guides do
             "Edit a **published** event and switch to the **Updates** tab. This is the communication hub for the event: attendee emails, the photo upload link, and the full history of what has been sent.",
           image: "ghost:events-updates",
           hotspots: [
-            %{x: 6, y: 10, w: 88, h: 8, label: "Published header and tabs"},
-            %{x: 58, y: 18, w: 16, h: 5, label: "Updates tab"}
+            %{
+              expanded: %{x: 42, y: 16, w: 8, h: 8},
+              collapsed: %{x: 39, y: 16, w: 6, h: 8},
+              label: "Updates tab"
+            }
           ]
         },
         %{
@@ -1061,25 +1173,38 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Published events get a shareable **photo upload link** where attendees can contribute their pictures without needing an account.\n\nCopy it and share it during or after the event — in an update email, the event WhatsApp group, or on a sign at the venue. Attendees also get an automatic photo reminder email after the event ends.",
           image: "ghost:events-updates",
-          hotspots: [%{x: 6, y: 22, w: 62, h: 14, label: "Photo upload link"}]
+          image_scroll: "ghost-event-photo-upload",
+          hotspots: [
+            %{
+              expanded: %{x: 28, y: 24, w: 38, h: 24},
+              collapsed: %{x: 26, y: 24, w: 42, h: 24},
+              label: "Photo upload link"
+            }
+          ]
         },
         %{
           title: "Compose and send an update",
           body:
             "Write the update in the rich-text composer. Before sending, choose the audience: **email all attendees**, **show on the public event page**, or both.\n\nThe recipient count is shown so you know exactly how many inboxes you're reaching. Typical updates: \"parking entrance has changed\", \"bring swimwear\", \"doors now open 17:30\". Confirm to send — there is no unsend, so re-read first.",
           image: "ghost:events-updates",
+          image_scroll: "ghost-event-update-composer",
           hotspots: [
-            %{x: 6, y: 38, w: 62, h: 42, label: "Update composer"},
-            %{x: 72, y: 24, w: 24, h: 50, label: "Communication timeline"}
+            %{
+              expanded: %{x: 26, y: 24, w: 42, h: 70},
+              collapsed: %{x: 26, y: 24, w: 42, h: 70},
+              label: "Update composer"
+            }
           ],
           public_image: "ghost:public-event-updates",
+          public_image_scroll: "ghost-event-updates-section",
           public_hotspots: [
             %{
-              x: 6,
-              y: 28,
-              w: 88,
-              h: 42,
-              label: "Updates section on the event page"
+              x: 1,
+              y: 7,
+              w: 62,
+              h: 76,
+              label: "Updates section on the event page",
+              style: :hint
             }
           ]
         },
@@ -1154,11 +1279,12 @@ defmodule YscWeb.AdminHelp.Guides do
           image: "ghost:media-gallery",
           hotspots: [
             %{
-              x: 5,
-              y: 15,
-              w: 90,
-              h: 70,
-              label: "Drop files anywhere on the gallery"
+              x: 25,
+              y: 18,
+              w: 72,
+              h: 80,
+              label: "Drop files anywhere on the gallery",
+              style: :hint
             }
           ]
         },
@@ -1236,7 +1362,9 @@ defmodule YscWeb.AdminHelp.Guides do
           body:
             "Type a **name**, **email**, **order reference** (ORD-…), or **ticket reference** (TKT-…) — the references are in every confirmation email, so an attendee can just show you their phone.\n\nResults group tickets by order, so a family of four shows as one order with four tickets.",
           image: "ghost:check-in-desk",
-          hotspots: [%{x: 5, y: 8, w: 50, h: 8, label: "Search bar"}]
+          hotspots: [
+            %{x: 2, y: 8, w: 97, h: 9, label: "Search bar"}
+          ]
         },
         %{
           title: "Check people in",

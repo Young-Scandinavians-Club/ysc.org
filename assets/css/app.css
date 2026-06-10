@@ -497,16 +497,34 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
 .admin-help-ghost-embed {
     width: 1280px;
     height: 800px;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background: #fafafa;
+    scroll-behavior: auto;
 }
 
 .admin-help-ghost-embed .admin-help-ghost-content {
     max-width: none;
 }
 
-.admin-help-hotspot {
+.admin-help-hotspot,
+.admin-help-print-marker {
     position: absolute;
+    left: var(--admin-help-hotspot-left-expanded);
+    top: var(--admin-help-hotspot-top-expanded);
+    width: var(--admin-help-hotspot-width-expanded);
+    height: var(--admin-help-hotspot-height-expanded);
+}
+
+html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-hotspot,
+html.sidebar-collapsed .admin-help-sidebar-aware .admin-help-print-marker {
+    left: var(--admin-help-hotspot-left-collapsed);
+    top: var(--admin-help-hotspot-top-collapsed);
+    width: var(--admin-help-hotspot-width-collapsed);
+    height: var(--admin-help-hotspot-height-collapsed);
+}
+
+.admin-help-hotspot {
     border: 2px solid rgba(37, 99, 235, 0.85);
     border-radius: 0.375rem;
     background: rgba(37, 99, 235, 0.12);
@@ -514,6 +532,41 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     padding: 0;
     min-width: 0;
     min-height: 0;
+}
+
+/* Subtle callout — frames the area without obscuring content (public previews) */
+.admin-help-hotspot--hint {
+    border: none;
+    background: transparent;
+}
+
+.admin-help-hotspot--hint::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px dashed rgba(37, 99, 235, 0.5);
+    border-radius: 0.375rem;
+    pointer-events: none;
+}
+
+.admin-help-hotspot-beacon-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    width: 1.125rem;
+    height: 1.125rem;
+    transform: translate(-35%, -35%);
+    pointer-events: none;
+}
+
+.admin-help-hotspot-beacon {
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(37, 99, 235, 0.9);
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .admin-help-hotspot-dot {
@@ -529,6 +582,12 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     border-radius: inherit;
     border: 2px solid rgba(37, 99, 235, 0.5);
     animation: admin-help-hotspot-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.admin-help-hotspot-ping--hint {
+    border-radius: 9999px;
+    border-style: solid;
+    background: transparent;
 }
 
 @keyframes admin-help-hotspot-ping {
@@ -560,7 +619,8 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .admin-help-hotspot-ping {
+    .admin-help-hotspot-ping,
+    .admin-help-hotspot--hint .admin-help-hotspot-ping--hint {
         animation: none;
         opacity: 0.5;
     }
@@ -582,7 +642,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     margin-bottom: 1.75rem;
     padding-bottom: 1.25rem;
     border-bottom: 2px solid #18181b;
-    page-break-after: avoid;
     break-after: avoid;
 }
 
@@ -628,7 +687,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     padding: 1rem 1.25rem;
     border: 1px solid #d4d4d8;
     border-radius: 0.5rem;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
@@ -650,7 +708,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     margin-bottom: 1.75rem;
     padding-bottom: 1.5rem;
     border-bottom: 1px solid #e4e4e7;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
@@ -684,7 +741,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
 
 .admin-help-print-figure {
     margin: 1rem 0 0;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
@@ -706,7 +762,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
 }
 
 .admin-help-print-marker {
-    position: absolute;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -720,6 +775,19 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     min-width: 1.35rem;
     min-height: 1.35rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.admin-help-print-marker--hint {
+    align-items: flex-start;
+    justify-content: flex-start;
+    border-style: dashed;
+    border-radius: 0.375rem;
+    background: transparent;
+    min-width: 0;
+    min-height: 0;
+    box-shadow: none;
+    font-size: 8pt;
+    padding: 0.15rem 0.4rem;
 }
 
 .admin-help-print-hotspot-legend {
@@ -743,7 +811,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     margin-top: 1.5rem;
     padding-top: 1rem;
     border-top: 1px solid #d4d4d8;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
@@ -774,7 +841,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
 
 .admin-help-print-category {
     margin-bottom: 1.5rem;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
@@ -787,7 +853,6 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     padding: 0.75rem 1rem;
     border: 1px solid #e4e4e7;
     border-radius: 0.375rem;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
@@ -816,13 +881,12 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     border-top: 1px solid #d4d4d8;
     font-size: 9pt;
     color: #71717a;
-    page-break-inside: avoid;
     break-inside: avoid;
 }
 
 @media print {
     @page {
-        size: A4;
+        size: a4;
         margin: 14mm 16mm 18mm;
     }
 
@@ -859,12 +923,11 @@ html.sidebar-collapsed .admin-help-sidebar-aware {
     }
 
     .admin-help-print-step {
-        page-break-inside: avoid;
         break-inside: avoid-page;
     }
 
     .admin-help-print-step + .admin-help-print-step {
-        page-break-before: auto;
+        break-before: auto;
     }
 
     a[href^="http"]:after,

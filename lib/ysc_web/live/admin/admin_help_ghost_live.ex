@@ -16,13 +16,15 @@ defmodule YscWeb.AdminHelpGhostLive do
      |> assign(:page_title, "Help preview")
      |> assign(:embed?, false)
      |> assign(:preview_slug, nil)
-     |> assign(:active_page, :dashboard)}
+     |> assign(:active_page, :dashboard)
+     |> assign(:scroll_to, nil)}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
     slug = slug_from_params(params)
     embed? = Map.get(params, "embed") == "1"
+    scroll_to = scroll_to_from_params(params)
 
     case Registry.fetch(slug) do
       {:ok, %{active_page: active_page} = meta} ->
@@ -31,7 +33,12 @@ defmodule YscWeb.AdminHelpGhostLive do
          |> assign(:embed?, embed?)
          |> assign(:preview_slug, slug)
          |> assign(:active_page, active_page || :dashboard)
-         |> assign(:public_preview?, Map.get(meta, :public?, false))}
+         |> assign(:public_preview?, Map.get(meta, :public?, false))
+         |> assign(
+           :standalone_preview?,
+           Map.get(meta, :sidebar?, true) == false
+         )
+         |> assign(:scroll_to, scroll_to)}
 
       :error ->
         {:noreply,
@@ -50,8 +57,10 @@ defmodule YscWeb.AdminHelpGhostLive do
         @embed? && "admin-help-ghost-embed",
         !@embed? && "min-h-screen"
       ]}
+      phx-hook={@embed? && @scroll_to && "AdminHelpGhostScroll"}
+      data-scroll-to={@scroll_to}
     >
-      <%= if @public_preview? do %>
+      <%= if @public_preview? || @standalone_preview? do %>
         <Previews.preview slug={@preview_slug} />
       <% else %>
         <.side_menu
@@ -68,4 +77,12 @@ defmodule YscWeb.AdminHelpGhostLive do
 
   defp slug_from_params(%{"name" => name}) when is_binary(name), do: name
   defp slug_from_params(_), do: ""
+
+  defp scroll_to_from_params(%{"scroll_to" => target}) do
+    if YscWeb.AdminHelp.Hotspot.valid_scroll_target?(target),
+      do: target,
+      else: nil
+  end
+
+  defp scroll_to_from_params(_), do: nil
 end

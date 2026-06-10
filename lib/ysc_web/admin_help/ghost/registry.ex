@@ -4,7 +4,8 @@ defmodule YscWeb.AdminHelp.Ghost.Registry do
   """
 
   @previews %{
-    "getting-started-dashboard" => %{active_page: nil, public?: true},
+    "getting-started-login" => %{active_page: nil, public?: true},
+    "getting-started-dashboard" => %{active_page: :dashboard},
     "getting-started-sidebar" => %{active_page: :dashboard},
     "posts-list" => %{active_page: :news},
     "posts-editor" => %{active_page: :news},
@@ -17,8 +18,8 @@ defmodule YscWeb.AdminHelp.Ghost.Registry do
     "events-tickets" => %{active_page: :events},
     "events-updates" => %{active_page: :events},
     "media-gallery" => %{active_page: :media},
-    "check-in-desk" => %{active_page: :events},
-    "scanner" => %{active_page: :scanner},
+    "check-in-desk" => %{active_page: :events, sidebar?: false},
+    "scanner" => %{active_page: :scanner, sidebar?: false},
     "public-news-list" => %{active_page: nil, public?: true},
     "public-news-pinned" => %{active_page: nil, public?: true},
     "public-news-article" => %{active_page: nil, public?: true},

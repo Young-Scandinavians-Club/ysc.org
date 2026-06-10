@@ -21,6 +21,8 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
   defp admin_preview(assigns) do
     ~H"""
     <%= case @slug do %>
+      <% "getting-started-login" -> %>
+        <.getting_started_login />
       <% "getting-started-dashboard" -> %>
         <.getting_started_dashboard />
       <% "getting-started-sidebar" -> %>
@@ -62,6 +64,14 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
   # ---------------------------------------------------------------------------
 
   defp getting_started_dashboard(assigns) do
+    ~H"""
+    <.ghost_admin_shell active_page={:dashboard}>
+      <.admin_ghost_dashboard />
+    </.ghost_admin_shell>
+    """
+  end
+
+  defp getting_started_login(assigns) do
     ~H"""
     <div class="min-h-full bg-zinc-50">
       <header class="bg-white border-b border-zinc-200 px-6 py-4 flex items-center justify-between">
@@ -147,7 +157,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
         <.ghost_filter_button />
       </div>
       <div class="mt-4">
-        <.admin_ghost_table count={6} cols={5} />
+        <.admin_ghost_posts_table />
       </div>
     </.ghost_admin_shell>
     """
@@ -156,29 +166,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
   defp posts_editor(assigns) do
     ~H"""
     <.ghost_admin_shell active_page={:news}>
-      <.admin_ghost_bar width="w-1/2" height="h-6" class="mb-2" />
-      <.admin_ghost_bar width="w-1/3" height="h-3" class="mb-6" />
-      <div class="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-        <div class="flex gap-1 p-3 border-b border-zinc-100">
-          <.admin_ghost_bar
-            :for={_ <- 1..6}
-            width="w-8"
-            height="h-8"
-            rounded="rounded-md"
-          />
-        </div>
-        <.admin_ghost_editor_body />
-      </div>
-      <div class="mt-6 grid md:grid-cols-2 gap-4">
-        <div class="bg-white rounded-xl border border-zinc-200 p-4 space-y-3">
-          <.admin_ghost_bar width="w-28" height="h-3" />
-          <.admin_ghost_bar width="w-full" height="h-10" />
-        </div>
-        <div class="bg-white rounded-xl border border-zinc-200 p-4 space-y-3">
-          <.admin_ghost_bar width="w-28" height="h-3" />
-          <.admin_ghost_pill width="w-24" />
-        </div>
-      </div>
+      <.admin_ghost_post_editor />
     </.ghost_admin_shell>
     """
   end
@@ -349,40 +337,48 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
   defp newsletter_subscribers(assigns) do
     ~H"""
     <.ghost_admin_shell active_page={:newsletters}>
-      <.admin_page_title>Newsletters</.admin_page_title>
-      <div class="mt-4 flex gap-4 border-b border-zinc-200">
-        <span class="pb-3 text-sm text-zinc-500">Editions</span>
-        <span class="pb-3 text-sm font-semibold text-blue-600 border-b-2 border-blue-600">
-          Subscribers
-        </span>
+      <div class="py-2">
+        <.admin_page_title>Newsletters</.admin_page_title>
+        <p class="mt-0.5 text-sm text-zinc-500">1,248 subscribers</p>
       </div>
-      <div class="mt-6 grid md:grid-cols-3 gap-4">
+
+      <.admin_tabs id="ghost-newsletter-tabs" aria_label="Newsletter sections">
+        <.admin_tab active={false}>Editions</.admin_tab>
+        <.admin_tab active={true}>Subscribers</.admin_tab>
+      </.admin_tabs>
+
+      <div class="space-y-6">
         <div
-          :for={_ <- 1..3}
-          class="bg-white rounded-xl border border-zinc-200 p-4 space-y-2"
+          id="ghost-subscribers-toolbar"
+          class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-3"
         >
-          <.admin_ghost_bar width="w-20" height="h-2.5" />
-          <.admin_ghost_bar width="w-12" height="h-6" />
+          <div id="ghost-subscribers-search" class="min-w-0 flex-1">
+            <.ghost_search placeholder="Search by email..." />
+          </div>
+          <div
+            id="ghost-subscribers-filters"
+            class="flex items-center gap-2 flex-shrink-0 flex-wrap"
+          >
+            <span class="text-sm font-medium text-zinc-600 sr-only sm:not-sr-only">
+              Status:
+            </span>
+            <span class="rounded px-3 py-1.5 text-sm font-medium bg-zinc-200 text-zinc-800">
+              All
+            </span>
+            <span class="rounded px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-600">
+              Active
+            </span>
+            <span class="rounded px-3 py-1.5 text-sm font-medium bg-zinc-100 text-zinc-600">
+              Inactive
+            </span>
+            <.button id="ghost-add-subscriber" class="ms-0 sm:ms-2 text-sm">
+              <.icon name="hero-user-plus" class="w-5 h-5 -mt-0.5" />
+              <span class="ms-1.5">Add subscriber</span>
+            </.button>
+          </div>
         </div>
-      </div>
-      <div class="mt-6">
-        <.ghost_search placeholder="Search by email..." />
-      </div>
-      <div class="mt-4 space-y-0 bg-white rounded-xl border border-zinc-200 overflow-hidden">
-        <div
-          :for={_ <- 1..5}
-          class="flex items-center gap-4 px-4 py-4 border-b border-zinc-100 last:border-0"
-        >
-          <.admin_ghost_avatar />
-          <.admin_ghost_bar width="w-48" height="h-3.5" class="flex-1" />
-          <.admin_ghost_pill width="w-16" />
-        </div>
-      </div>
-      <div class="mt-4 flex justify-end">
-        <.button>
-          <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
-          <span class="ms-1">Add subscriber</span>
-        </.button>
+
+        <.admin_ghost_subscribers_table />
       </div>
     </.ghost_admin_shell>
     """
@@ -395,34 +391,39 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
   defp events_list(assigns) do
     ~H"""
     <.ghost_admin_shell active_page={:events}>
-      <div class="flex justify-between items-center">
+      <div class="flex justify-between py-6">
         <.admin_page_title>Events</.admin_page_title>
-        <.button id="ghost-new-event">
-          <.icon name="hero-calendar-days" class="w-5 h-5 -mt-0.5" />
-          <span class="ms-1">New Event</span>
-        </.button>
+        <div class="flex items-center gap-3">
+          <.button>
+            <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5" />
+            <span class="ms-1">Check-in &amp; Scan</span>
+          </.button>
+          <.button id="ghost-new-event">
+            <.icon name="hero-calendar" class="w-5 h-5 -mt-0.5" />
+            <span class="ms-1">New Event</span>
+          </.button>
+        </div>
       </div>
-      <div class="mt-4 flex gap-2 text-sm">
-        <span class="font-semibold text-blue-600 border-b-2 border-blue-600 pb-2">
-          Upcoming
-        </span>
-        <span class="text-zinc-500 pb-2 px-2">Drafts</span>
-        <span class="text-zinc-500 pb-2 px-2">Past</span>
-      </div>
-      <div class="mt-4 space-y-3">
-        <div
-          :for={_ <- 1..4}
-          class="bg-white rounded-xl border border-zinc-200 p-4 flex gap-4"
-        >
-          <.admin_ghost_image
-            class="w-20 shrink-0 rounded-lg"
-            ratio="aspect-square"
-          />
-          <div class="flex-1 space-y-2 min-w-0">
-            <.admin_ghost_bar width="w-2/3" height="h-4" />
-            <.admin_ghost_bar width="w-1/2" height="h-2.5" />
+
+      <div class="w-full pt-4">
+        <div class="flex gap-6 border-b border-zinc-200 text-sm">
+          <span class="font-semibold text-blue-600 border-b-2 border-blue-600 pb-3 -mb-px">
+            Upcoming
+          </span>
+          <span class="text-zinc-500 pb-3">Drafts</span>
+          <span class="text-zinc-500 pb-3">Past</span>
+          <span class="text-zinc-500 pb-3">All</span>
+        </div>
+
+        <div class="pt-4">
+          <.ghost_search placeholder="Search by event name..." />
+        </div>
+
+        <div class="py-6 w-full">
+          <div class="pb-4 flex">
+            <.ghost_filter_button />
           </div>
-          <.admin_ghost_pill width="w-20" />
+          <.admin_ghost_events_table />
         </div>
       </div>
     </.ghost_admin_shell>
@@ -492,17 +493,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           title="Overview"
           subtitle="Add more details about the event to help attendees understand what to expect."
         >
-          <div class="border border-zinc-200 rounded-lg overflow-hidden">
-            <div class="flex gap-1 p-2 border-b border-zinc-100 bg-zinc-50">
-              <.admin_ghost_bar
-                :for={_ <- 1..6}
-                width="w-8"
-                height="h-8"
-                rounded="rounded-md"
-              />
-            </div>
-            <.admin_ghost_editor_body />
-          </div>
+          <.admin_ghost_trix_editor id="ghost-event-overview-editor" />
         </.admin_ghost_event_section>
 
         <.admin_ghost_event_section
@@ -543,6 +534,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
 
       <div class="max-w-3xl space-y-6 pb-8">
         <.admin_ghost_event_section
+          id="ghost-event-capacity-section"
           title="Event Capacity"
           subtitle="Set the maximum number of attendees for this event. This limit applies across all ticket tiers."
         >
@@ -559,7 +551,10 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           </div>
         </.admin_ghost_event_section>
 
-        <div class="border border-zinc-200 rounded-lg p-4 sm:p-6 bg-white space-y-4">
+        <div
+          id="ghost-event-ticket-tiers-section"
+          class="border border-zinc-200 rounded-lg p-4 sm:p-6 bg-white space-y-4"
+        >
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h3 class="text-lg font-semibold text-zinc-900">Ticket Tiers</h3>
             <.button id="ghost-add-ticket-tier">
@@ -610,6 +605,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           </.admin_ghost_event_section>
 
           <.admin_ghost_event_section
+            id="ghost-event-update-composer"
             title="Send Update to Attendees"
             subtitle="Send a branded email notification to everyone who has a ticket for this event."
           >
@@ -648,7 +644,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
           </.admin_ghost_event_section>
         </div>
 
-        <aside class="lg:col-span-5">
+        <aside id="ghost-event-communication-timeline" class="lg:col-span-5">
           <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-4">
             <h3 class="text-sm font-semibold text-zinc-800">
               Communication timeline
@@ -706,58 +702,13 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
 
   defp check_in_desk(assigns) do
     ~H"""
-    <.ghost_admin_shell active_page={:events}>
-      <.admin_page_title>Check-in</.admin_page_title>
-      <.admin_ghost_bar width="w-56" height="h-4" class="mt-1 mb-6" />
-      <div class="flex flex-wrap gap-4 items-center justify-between mb-4">
-        <.ghost_search
-          placeholder="Search by name, email, ORD-xxx, or TKT-xxx…"
-          class="flex-1 min-w-[240px]"
-        />
-        <div class="text-sm text-zinc-600">
-          Checked in: <span class="font-semibold text-zinc-900">12 / 48</span>
-        </div>
-      </div>
-      <div class="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100">
-        <div :for={idx <- 1..6} class="flex items-center gap-4 px-4 py-3">
-          <.admin_ghost_avatar />
-          <div class="flex-1 space-y-1.5 min-w-0">
-            <.admin_ghost_bar width="w-40" height="h-3.5" />
-            <.admin_ghost_bar width="w-28" height="h-2.5" />
-          </div>
-          <.admin_ghost_pill width="w-20" />
-          <%= if idx == 2 do %>
-            <.button>Check in</.button>
-          <% else %>
-            <.admin_ghost_pill width="w-24" />
-          <% end %>
-        </div>
-      </div>
-    </.ghost_admin_shell>
+    <.admin_ghost_event_check_in_desk />
     """
   end
 
   defp scanner(assigns) do
     ~H"""
-    <.ghost_admin_shell active_page={:scanner}>
-      <.admin_page_title>Check-in & Scan</.admin_page_title>
-      <p class="text-sm text-zinc-500 mt-1 mb-6">
-        Start a new session or resume an open one
-      </p>
-      <div class="max-w-sm mx-auto">
-        <div class="bg-zinc-900 rounded-2xl p-4 aspect-[9/16] max-h-[420px] flex flex-col">
-          <div class="flex-1 relative border-2 border-blue-400/60 rounded-xl m-2 flex items-center justify-center">
-            <div class="w-24 h-24 bg-white rounded-lg p-2 grid grid-cols-3 gap-0.5">
-              <div :for={_ <- 1..9} class="bg-zinc-800 rounded-sm"></div>
-            </div>
-          </div>
-          <div class="bg-green-100 rounded-lg p-3 mx-2 mb-2 flex items-center gap-2">
-            <.icon name="hero-check-circle" class="w-5 h-5 text-green-600 shrink-0" />
-            <.admin_ghost_bar width="w-32" height="h-3" class="bg-green-200/80" />
-          </div>
-        </div>
-      </div>
-    </.ghost_admin_shell>
+    <.admin_ghost_scanner />
     """
   end
 

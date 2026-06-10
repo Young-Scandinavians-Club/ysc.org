@@ -63,8 +63,8 @@ defmodule Ysc.OpenRouter do
       {:ok, %{status: 200, body: body}} ->
         Ysc.Logging.warning(
           "OpenRouter unexpected response shape (model=#{model}): " <>
-            inspect(body, limit: :infinity, printable_limit: :infinity),
-          extra: %{body: body, model: model}
+            response_summary(body),
+          extra: %{model: model, response_bytes: response_byte_size(body)}
         )
 
         {:error, :invalid_response}
@@ -81,8 +81,12 @@ defmodule Ysc.OpenRouter do
       {:ok, %{status: status, body: body}} ->
         Ysc.Logging.warning(
           "OpenRouter HTTP error (status=#{status} model=#{model}): " <>
-            inspect(body, limit: :infinity, printable_limit: :infinity),
-          extra: %{status: status, body: body, model: model}
+            response_summary(body),
+          extra: %{
+            status: status,
+            model: model,
+            response_bytes: response_byte_size(body)
+          }
         )
 
         {:error, {:http_error, status}}
@@ -95,6 +99,18 @@ defmodule Ysc.OpenRouter do
 
         {:error, :request_failed}
     end
+  end
+
+  defp response_summary(body) do
+    inspect(body, limit: 100, printable_limit: 100)
+  end
+
+  defp response_byte_size(body) when is_binary(body), do: byte_size(body)
+
+  defp response_byte_size(body) do
+    body
+    |> inspect(limit: 100, printable_limit: 100)
+    |> byte_size()
   end
 
   defp config do

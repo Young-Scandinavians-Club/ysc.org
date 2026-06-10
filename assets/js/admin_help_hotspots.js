@@ -3,17 +3,30 @@
 
 const AdminHelpHotspots = {
   mounted() {
-    this.hotspots = this.el.querySelectorAll(".admin-help-hotspot");
-    this.hotspots.forEach((btn) => {
-      btn.addEventListener("mouseenter", () => this.showTooltip(btn));
-      btn.addEventListener("focus", () => this.showTooltip(btn));
-      btn.addEventListener("mouseleave", () => this.hideTooltip());
-      btn.addEventListener("blur", () => this.hideTooltip());
-    });
+    this._hotspotAbort = new AbortController();
+    this.wireHotspots();
+  },
+
+  updated() {
+    this._hotspotAbort?.abort();
+    this._hotspotAbort = new AbortController();
+    this.wireHotspots();
   },
 
   destroyed() {
+    this._hotspotAbort?.abort();
     this.hideTooltip();
+  },
+
+  wireHotspots() {
+    const signal = this._hotspotAbort.signal;
+
+    this.el.querySelectorAll(".admin-help-hotspot").forEach((btn) => {
+      btn.addEventListener("mouseenter", () => this.showTooltip(btn), { signal });
+      btn.addEventListener("focus", () => this.showTooltip(btn), { signal });
+      btn.addEventListener("mouseleave", () => this.hideTooltip(), { signal });
+      btn.addEventListener("blur", () => this.hideTooltip(), { signal });
+    });
   },
 
   showTooltip(btn) {
