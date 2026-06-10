@@ -741,4 +741,61 @@ defmodule Ysc.Tickets.BookingLockerTest do
                      1_000
     end
   end
+
+  describe "validate_fulfillment_capacity/3" do
+    test "returns :ok when requested tickets fit remaining capacity", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      assert :ok =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "returns {:error, :event_capacity_exceeded} when event is full", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, limited_event} = Events.update_event(event, %{max_attendees: 1})
+      other = user_fixture() |> with_lifetime_membership()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(other.id, limited_event.id, %{
+                 tier.id => 1
+               })
+
+      assert {:error, :event_capacity_exceeded} =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 limited_event.id,
+                 %{tier.id => 1}
+               )
+    end
+
+    test "returns {:error, :insufficient_capacity} when tier is sold out", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, limited_tier} = Events.update_ticket_tier(tier, %{quantity: 1})
+      other = user_fixture() |> with_lifetime_membership()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(other.id, event.id, %{
+                 limited_tier.id => 1
+               })
+
+      assert {:error, :insufficient_capacity} =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 event.id,
+                 %{limited_tier.id => 1}
+               )
+    end
+  end
 end
