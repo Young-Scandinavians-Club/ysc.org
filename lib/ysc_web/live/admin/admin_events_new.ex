@@ -1159,21 +1159,25 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp maybe_refresh_tab_data(socket) do
-    case socket.assigns[:event] do
-      nil ->
-        socket
+    if connected?(socket) do
+      case socket.assigns[:event] do
+        nil ->
+          socket
 
-      event ->
-        case socket.assigns.live_action do
-          :updates ->
-            assign_updates_tab_data(socket, event)
+        event ->
+          case socket.assigns.live_action do
+            :updates ->
+              assign_updates_tab_data(socket, event)
 
-          :edit ->
-            assign_edit_tab_data(socket, event)
+            :edit ->
+              assign_edit_tab_data(socket, event)
 
-          _ ->
-            socket
-        end
+            _ ->
+              socket
+          end
+      end
+    else
+      socket
     end
   end
 
