@@ -2054,7 +2054,7 @@ defmodule YscWeb.AdminBookingsLive do
               <% end %>
             </div>
             <!-- Scrollable Right Area: Date Columns -->
-            <div class="flex-1 overflow-x-auto">
+            <div class="flex-1 overflow-x-auto calendar-scroll-area">
               <!-- Header: Date columns -->
               <div>
                 <div
@@ -6533,13 +6533,21 @@ defmodule YscWeb.AdminBookingsLive do
     # - Booking starts on second half of check-in day = column 12
     # - Booking ends on first half of checkout day = column 13
     # - So we want: col_start = 12, col_end = 14 (exclusive, so spans 12-13)
-    # Second half of check-in day
-    col_start = checkin_idx * 2 + 2
-    # Just after first half of checkout day
-    col_end = checkout_idx * 2 + 2
+    # Second half of check-in day (or first column when booking started before the view)
+    col_start =
+      if extends_before do
+        1
+      else
+        checkin_idx * 2 + 2
+      end
 
-    # Ensure col_end doesn't exceed total columns
-    col_end = min(col_end, total_cols + 1)
+    # Just after first half of checkout day (or past last column when booking ends after the view)
+    col_end =
+      if extends_after do
+        total_cols + 1
+      else
+        min(checkout_idx * 2 + 2, total_cols + 1)
+      end
 
     {col_start, col_end, extends_before, extends_after}
   end
@@ -6587,6 +6595,49 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
+  defp calendar_continuation_classes(extends_before, extends_after, _scheme) do
+    rounded =
+      cond do
+        extends_before && extends_after -> "rounded-none"
+        extends_before -> "rounded-r"
+        extends_after -> "rounded-l"
+        true -> "rounded"
+      end
+
+    [
+      "calendar-booking-bar",
+      rounded,
+      extends_before && "calendar-booking-continues-left",
+      extends_after && "calendar-booking-continues-right"
+    ]
+    |> Enum.reject(&(!&1))
+    |> Enum.join(" ")
+  end
+
+  defp calendar_continuation_title(extends_before, extends_after, base_title) do
+    prefix = if extends_before, do: "← Continues before view • ", else: ""
+    suffix = if extends_after, do: " • Continues after view →", else: ""
+    prefix <> base_title <> suffix
+  end
+
+  defp calendar_continuation_edges(extends_before, extends_after, scheme) do
+    left =
+      if extends_before do
+        "<span class=\"calendar-continuation-edge calendar-continuation-edge--left calendar-continuation-edge--#{scheme}\" aria-hidden=\"true\"></span>"
+      else
+        ""
+      end
+
+    right =
+      if extends_after do
+        "<span class=\"calendar-continuation-edge calendar-continuation-edge--right calendar-continuation-edge--#{scheme}\" aria-hidden=\"true\"></span>"
+      else
+        ""
+      end
+
+    {left, right}
+  end
+
   # Render a blackout div for the grid calendar
   # Uses the same half-day column span as bookings (second half of start, first half of end)
   # sobelow_skip ["XSS.Raw"]
@@ -6604,48 +6655,33 @@ defmodule YscWeb.AdminBookingsLive do
       "grid-column: #{col_start} / #{col_end}; grid-row: 1; align-self: center; margin: 2px 1px; position: relative; z-index: 5;"
 
     title_val =
-      "Blackout: #{blackout.reason} • #{blackout.start_date} → #{blackout.end_date}"
+      calendar_continuation_title(
+        extends_before,
+        extends_after,
+        "Blackout: #{blackout.reason} • #{blackout.start_date} → #{blackout.end_date}"
+      )
 
     {:safe, escaped_reason_str} = Phoenix.HTML.html_escape(blackout.reason)
     {:safe, escaped_title_str} = Phoenix.HTML.html_escape(title_val)
 
-    # Add fade effect if blackout extends beyond visible range
-    fade_class =
-      cond do
-        extends_before && extends_after ->
-          "bg-gradient-to-r from-transparent via-red-100 to-transparent"
+    continuation_classes =
+      calendar_continuation_classes(extends_before, extends_after, "red")
 
-        extends_before ->
-          "bg-gradient-to-r from-transparent to-red-100"
-
-        extends_after ->
-          "bg-gradient-to-l from-transparent to-red-100"
-
-        true ->
-          ""
-      end
-
-    # Add arrow indicator if extends past view
-    right_indicator =
-      if extends_after do
-        "<div class=\"absolute right-1 top-1/2 -translate-y-1/2 text-red-600 opacity-75\">
-        <span class=\"hero-arrow-right w-3 h-3\"></span>
-      </div>"
-      else
-        ""
-      end
+    {left_edge, right_edge} =
+      calendar_continuation_edges(extends_before, extends_after, "red")
 
     """
     <div
-      class="h-12 rounded shadow-sm border text-xs font-medium flex flex-col items-start justify-center bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{fade_class}"
+      class="h-12 shadow-sm border text-xs font-medium flex flex-col items-start justify-center bg-red-100 border-red-400/50 text-red-900 cursor-pointer hover:bg-red-200 transition-colors duration-200 relative #{continuation_classes}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-blackout"
       phx-value-blackout-id="#{blackout.id}"
       phx-disable-with="Opening..."
     >
+      #{left_edge}
       <div class="truncate px-2 font-semibold">#{escaped_reason_str}</div>
-      #{right_indicator}
+      #{right_edge}
     </div>
     """
     |> Phoenix.HTML.raw()
@@ -6674,7 +6710,11 @@ defmodule YscWeb.AdminBookingsLive do
     guests_str = format_calendar_guests(booking)
 
     title_val =
-      "#{user_name} - #{booking.checkin_date} - #{booking.checkout_date} (#{guests_str})"
+      calendar_continuation_title(
+        extends_before,
+        extends_after,
+        "#{user_name} - #{booking.checkin_date} - #{booking.checkout_date} (#{guests_str})"
+      )
 
     checkin_str = Calendar.strftime(booking.checkin_date, "%m/%d")
     checkout_str = Calendar.strftime(booking.checkout_date, "%m/%d")
@@ -6698,41 +6738,13 @@ defmodule YscWeb.AdminBookingsLive do
          "hover:bg-blue-200"}
       end
 
-    # Add fade effect if booking extends beyond visible range
-    fade_class =
-      cond do
-        extends_before && extends_after ->
-          if is_buyout,
-            do:
-              "bg-gradient-to-r from-transparent via-green-100 to-transparent",
-            else:
-              "bg-gradient-to-r from-transparent via-blue-100 to-transparent"
+    scheme = if is_buyout, do: "green", else: "blue"
 
-        extends_before ->
-          if is_buyout,
-            do: "bg-gradient-to-r from-transparent to-green-100",
-            else: "bg-gradient-to-r from-transparent to-blue-100"
+    continuation_classes =
+      calendar_continuation_classes(extends_before, extends_after, scheme)
 
-        extends_after ->
-          if is_buyout,
-            do: "bg-gradient-to-l from-transparent to-green-100",
-            else: "bg-gradient-to-l from-transparent to-blue-100"
-
-        true ->
-          ""
-      end
-
-    # Add arrow indicator if extends past view
-    right_indicator =
-      if extends_after do
-        arrow_color = if is_buyout, do: "text-green-600", else: "text-blue-600"
-
-        "<div class=\"absolute right-1 top-1/2 -translate-y-1/2 #{arrow_color} opacity-75\">
-        <span class=\"hero-arrow-right w-3 h-3\"></span>
-      </div>"
-      else
-        ""
-      end
+    {left_edge, right_edge} =
+      calendar_continuation_edges(extends_before, extends_after, scheme)
 
     # Add checkmark if checked in (to the right of the name)
     checked_in_indicator =
@@ -6746,13 +6758,14 @@ defmodule YscWeb.AdminBookingsLive do
 
     """
     <div
-      class="h-12 rounded shadow-sm border text-xs font-medium flex flex-row items-center gap-1.5 px-1.5 #{bg_color} #{border_color} #{text_color} cursor-pointer #{hover_color} transition-colors duration-200 relative #{fade_class}"
+      class="h-12 shadow-sm border text-xs font-medium flex flex-row items-center gap-1.5 px-1.5 #{bg_color} #{border_color} #{text_color} cursor-pointer #{hover_color} transition-colors duration-200 relative #{continuation_classes}"
       style="#{style_val}"
       title="#{escaped_title_str}"
       phx-click="view-booking"
       phx-value-booking-id="#{booking.id}"
       phx-disable-with="Opening..."
     >
+      #{left_edge}
       <img
         src="#{escaped_avatar_src}"
         alt=""
@@ -6767,7 +6780,7 @@ defmodule YscWeb.AdminBookingsLive do
         <div class="truncate text-[10px] opacity-90 leading-tight">#{escaped_checkin_str} - #{escaped_checkout_str}</div>
         <div class="truncate text-[10px] opacity-75 leading-tight">#{escaped_guests_str}</div>
       </div>
-      #{right_indicator}
+      #{right_edge}
     </div>
     """
     |> Phoenix.HTML.raw()

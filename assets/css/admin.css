@@ -910,3 +910,189 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 }
 
 
+/* Admin event editor — sticky action bar */
+
+#event-header-bar {
+    transition: background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.24s cubic-bezier(0.4, 0, 0.2, 1), margin 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#event-header-bar.is-sticky {
+    background-color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+    padding-top: 0.5rem;
+    padding-bottom: 0;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+@media (min-width: 1024px) {
+    #event-header-bar.is-sticky {
+        margin-left: -2.5rem;
+        margin-right: -2.5rem;
+        padding-left: 2.5rem;
+        padding-right: 2.5rem;
+    }
+}
+
+/* Collapse date row with motion (display:none cannot transition). */
+
+#event-header-bar .event-header-date {
+    max-height: 10rem;
+    opacity: 1;
+    overflow: visible;
+    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, margin 0.22s ease;
+}
+
+#event-header-bar:not(.is-sticky) .event-header-date {
+    max-height: none;
+    overflow: visible;
+}
+
+#event-header-bar.is-sticky .event-header-date {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    margin-top: 0;
+    margin-bottom: 0;
+    pointer-events: none;
+}
+
+#event-header-bar .event-header-title {
+    transition: font-size 0.24s cubic-bezier(0.4, 0, 0.2, 1), line-height 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#event-header-bar.is-sticky .event-header-title {
+    font-size: 1rem;
+    line-height: 1.5rem;
+}
+
+#event-header-bar .event-header-tabs {
+    transition: padding-top 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#event-header-bar.is-sticky .event-header-tabs {
+    padding-top: 0;
+}
+
+#event-header-bar .event-header-tabs a {
+    transition: padding 0.22s cubic-bezier(0.4, 0, 0.2, 1), font-size 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#event-header-bar.is-sticky .event-header-tabs a {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #event-header-bar,
+    #event-header-bar .event-header-date,
+    #event-header-bar .event-header-title,
+    #event-header-bar .event-header-tabs,
+    #event-header-bar .event-header-tabs a {
+        transition: none !important;
+        animation: none !important;
+    }
+}
+
+
+/* Admin dropdown chevron rotation */
+
+.dropdown-open .hero-chevron-down,
+.dropdown-open .hero-chevron-up {
+    transform: rotate(180deg);
+}
+
+
+/* Check-in desk keyboard navigation highlight */
+
+[data-checkin-index].keyboard-focused,
+[data-checkin-row].keyboard-focused {
+    position: relative;
+    z-index: 10;
+    border-radius: 0.25rem;
+    background-color: #ecfdf5;
+    box-shadow: 0 0 0 2px #34d399, 0 0 0 5px #d1fae5;
+}
+
+[data-checkin-index][data-checked-in].keyboard-focused {
+    background-color: #fef2f2;
+    box-shadow: 0 0 0 2px #f87171, 0 0 0 5px #fee2e2;
+}
+
+
+/* Admin bookings calendar — continuation zigzag when booking extends past view range */
+
+.calendar-scroll-area {
+    padding-left: 14px;
+    padding-right: 14px;
+}
+
+.calendar-booking-bar {
+    overflow: visible;
+}
+
+.calendar-booking-continues-left {
+    margin-left: -12px;
+    padding-left: 12px;
+    border-left-width: 0;
+}
+
+.calendar-booking-continues-right {
+    margin-right: -12px;
+    padding-right: 12px;
+    border-right-width: 0;
+}
+
+.calendar-continuation-edge {
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    width: 12px;
+    pointer-events: none;
+}
+
+.calendar-continuation-edge--left {
+    left: -12px;
+    clip-path: polygon(100% 0%, 0% 16.66%, 100% 33.33%, 0% 50%, 100% 66.66%, 0% 83.33%, 100% 100%);
+}
+
+.calendar-continuation-edge--right {
+    right: -12px;
+    clip-path: polygon(0% 0%, 100% 16.66%, 0% 33.33%, 100% 50%, 0% 66.66%, 100% 83.33%, 0% 100%);
+}
+
+.calendar-continuation-edge--blue {
+    background-color: #dbeafe;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M12 0 L0 8 L12 16' fill='none' stroke='%2360a5fa' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: repeat-y;
+    background-size: 12px 16px;
+}
+
+.calendar-continuation-edge--green {
+    background-color: #dcfce7;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M12 0 L0 8 L12 16' fill='none' stroke='%234ade80' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: repeat-y;
+    background-size: 12px 16px;
+}
+
+.calendar-continuation-edge--red {
+    background-color: #fee2e2;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M12 0 L0 8 L12 16' fill='none' stroke='%23f87171' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: repeat-y;
+    background-size: 12px 16px;
+}
+
+.calendar-continuation-edge--right.calendar-continuation-edge--blue {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M0 0 L12 8 L0 16' fill='none' stroke='%2360a5fa' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+.calendar-continuation-edge--right.calendar-continuation-edge--green {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M0 0 L12 8 L0 16' fill='none' stroke='%234ade80' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+.calendar-continuation-edge--right.calendar-continuation-edge--red {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='16' viewBox='0 0 12 16'%3E%3Cpath d='M0 0 L12 8 L0 16' fill='none' stroke='%23f87171' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
