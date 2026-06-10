@@ -216,8 +216,8 @@ defmodule Ysc.MixProject do
       {:image, "~> 0.68"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
-      # Pin below 1.11.11: jose 1.11.11+ uses OTP 26+ `dynamic()` in Erlang specs and fails on OTP 25.
-      {:jose, "1.11.10", override: true},
+      # Pin 1.11.x: jose 2.x is not yet adopted; 1.11.12 fixes OTP 28 EC/EdDSA key handling.
+      {:jose, "1.11.12", override: true},
       {:joken, "~> 2.6"},
       {:let_me, "~> 1.2.3"},
       {:live_toast, "~> 0.8"},
