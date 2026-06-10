@@ -1168,6 +1168,33 @@ defmodule YscWeb.SecurityAuditTest do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Membership check-in: block club-wide email enumeration via search
+  # ---------------------------------------------------------------------------
+
+  describe "Membership check-in search blocks email enumeration" do
+    import Ysc.EventsFixtures
+    import Ysc.ScanningFixtures
+
+    test "short and email-substring queries return no members" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      victim =
+        user_fixture(%{
+          email: "security_enum_#{System.unique_integer([:positive])}@gmail.com",
+          state: :active
+        })
+
+      assert [] = Ysc.Scanning.search_users_for_checkin(session.id, "jo")
+      assert [] = Ysc.Scanning.search_users_for_checkin(session.id, "@gmail")
+
+      results = Ysc.Scanning.search_users_for_checkin(session.id, victim.email)
+      assert Enum.any?(results, &(&1.user.id == victim.id))
+    end
+  end
+
   defp deep_merge_security_attrs(base, overrides) when is_map(overrides) do
     Map.merge(base, overrides, fn
       :registration_form, base_form, override_form

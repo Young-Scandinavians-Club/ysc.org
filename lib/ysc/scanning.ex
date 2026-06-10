@@ -1123,11 +1123,16 @@ defmodule Ysc.Scanning do
     |> Repo.exists?()
   end
 
+  @min_checkin_name_search_length 3
+
   @doc """
   Searches active users and enriches each result with:
   - `membership_status`: :active | :inactive
   - `membership_type`: plan atom or nil
   - `checked_in?`: whether the user is already checked in to this session
+
+  Name search requires at least #{@min_checkin_name_search_length} characters and
+  does not match email substrings. A full email address may be used for lookup.
   """
   def search_users_for_checkin(_session_id, query)
       when is_binary(query) and byte_size(query) == 0,
@@ -1136,26 +1141,55 @@ defmodule Ysc.Scanning do
   def search_users_for_checkin(session_id, query) when is_binary(query) do
     trimmed = String.trim(query)
 
-    if trimmed == "" do
-      []
-    else
-      users = Accounts.search_users(trimmed, limit: 20)
-      user_ids = Enum.map(users, & &1.id)
-      checked_in_ids = checked_in_user_ids(session_id, user_ids)
+    users =
+      cond do
+        trimmed == "" ->
+          []
 
-      Enum.map(users, fn user ->
-        membership = MembershipCache.get_active_membership(user)
-        active? = YscWeb.UserAuth.membership_active?(membership)
-        plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+        full_email_checkin_query?(trimmed) ->
+          lookup_active_user_by_email(trimmed)
 
-        %{
-          user: user,
-          membership_status: if(active?, do: :active, else: :inactive),
-          membership_type: plan_type,
-          checked_in?: user.id in checked_in_ids
-        }
-      end)
+        String.length(trimmed) < @min_checkin_name_search_length ->
+          []
+
+        true ->
+          Accounts.search_active_users_by_name(trimmed, limit: 20)
+      end
+
+    enrich_checkin_search_results(session_id, users)
+  end
+
+  defp full_email_checkin_query?(query) do
+    String.contains?(query, "@") and
+      String.match?(query, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+  end
+
+  defp lookup_active_user_by_email(email) do
+    case Accounts.get_user_by_email(email) do
+      %Accounts.User{state: :active} = user ->
+        [Ysc.Repo.preload(user, :current_avatar)]
+
+      _ ->
+        []
     end
+  end
+
+  defp enrich_checkin_search_results(session_id, users) do
+    user_ids = Enum.map(users, & &1.id)
+    checked_in_ids = checked_in_user_ids(session_id, user_ids)
+
+    Enum.map(users, fn user ->
+      membership = MembershipCache.get_active_membership(user)
+      active? = YscWeb.UserAuth.membership_active?(membership)
+      plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+
+      %{
+        user: user,
+        membership_status: if(active?, do: :active, else: :inactive),
+        membership_type: plan_type,
+        checked_in?: user.id in checked_in_ids
+      }
+    end)
   end
 
   defp checked_in_user_ids(_session_id, []), do: []

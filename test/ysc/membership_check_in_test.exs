@@ -316,6 +316,24 @@ defmodule Ysc.MembershipCheckInTest do
       assert result.membership_status == :inactive
     end
 
+    test "rejects short name queries to limit enumeration", %{session: session} do
+      _member = make_active_member()
+      assert [] = Scanning.search_users_for_checkin(session.id, "ab")
+    end
+
+    test "does not match email substrings like @gmail", %{session: session} do
+      user =
+        make_active_member()
+        |> Ecto.Changeset.change(email: "enum_test_#{System.unique_integer([:positive])}@gmail.com")
+        |> Repo.update!()
+
+      assert [] = Scanning.search_users_for_checkin(session.id, "@gmail")
+      assert [] = Scanning.search_users_for_checkin(session.id, "gmail.com")
+
+      results = Scanning.search_users_for_checkin(session.id, user.email)
+      assert Enum.any?(results, &(&1.user.id == user.id))
+    end
+
     test "batch-loads checked_in? for multiple users in one search", %{
       admin: admin,
       session: session

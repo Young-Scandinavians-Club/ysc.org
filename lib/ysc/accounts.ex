@@ -415,6 +415,32 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Searches active users by name only (first, last, or full name).
+
+  Used by membership check-in desks where email substring search would allow
+  harvesting member addresses (e.g. `%@gmail%`).
+  """
+  def search_active_users_by_name(query, opts \\ []) when is_binary(query) do
+    limit = Keyword.get(opts, :limit, 10)
+    search_term = "%#{query}%"
+
+    from(u in User,
+      where: u.state == :active,
+      where:
+        ilike(u.first_name, ^search_term) or
+          ilike(u.last_name, ^search_term) or
+          ilike(
+            fragment("? || ' ' || ?", u.first_name, u.last_name),
+            ^search_term
+          ),
+      order_by: [asc: u.last_name, asc: u.first_name],
+      limit: ^limit,
+      preload: [:current_avatar]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Checks if a user has an active membership.
   Includes lifetime membership which never expires.
 
