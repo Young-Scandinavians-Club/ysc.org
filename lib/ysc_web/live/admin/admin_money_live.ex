@@ -1129,13 +1129,17 @@ defmodule YscWeb.AdminMoneyLive do
       if sections_loaded[:payments], do: paginate_payments(s, 1), else: s
     end)
     |> then(fn s ->
-      if sections_loaded[:ledger_entries], do: paginate_ledger_entries(s, 1), else: s
+      if sections_loaded[:ledger_entries],
+        do: paginate_ledger_entries(s, 1),
+        else: s
     end)
     |> then(fn s ->
       if sections_loaded[:webhooks], do: paginate_webhooks(s, 1), else: s
     end)
     |> then(fn s ->
-      if sections_loaded[:expense_reports], do: paginate_expense_reports(s, 1), else: s
+      if sections_loaded[:expense_reports],
+        do: paginate_expense_reports(s, 1),
+        else: s
     end)
   end
 
