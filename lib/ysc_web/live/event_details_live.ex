@@ -931,7 +931,7 @@ defmodule YscWeb.EventDetailsLive do
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-6 h-6 me-1 -mt-0.5"
                         />
-                        You need to be signed in and have an active membership to purchase tickets
+                        Sign in to buy tickets. Member tickets require approved YSC membership with paid dues.
                       </div>
                       <.button
                         class="w-full py-4 uppercase tracking-widest"
@@ -939,7 +939,7 @@ defmodule YscWeb.EventDetailsLive do
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6 me-2 -mt-0.5" />Sign In to Continue
+                        <.icon name="hero-ticket" class="w-6 h-6 me-2 -mt-0.5" />Sign in
                       </.button>
                     </div>
 

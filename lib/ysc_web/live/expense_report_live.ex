@@ -77,7 +77,7 @@ defmodule YscWeb.ExpenseReportLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "You must be an active user to access this page.",
+         "Expense reports are only available after your YSC membership is approved and active. If you're waiting on board review, check your application status. Otherwise contact info@ysc.org for help.",
          title: "Expense report"
        )
        |> redirect(to: ~p"/")}

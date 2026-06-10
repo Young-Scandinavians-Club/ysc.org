@@ -1153,10 +1153,10 @@ defmodule YscWeb.UserSettingsLive do
             }>
               <div class="mb-6">
                 <h2 class="text-2xl font-bold text-zinc-900">
-                  Get Your YSC Membership
+                  Complete your membership
                 </h2>
                 <p class="text-zinc-500 mt-1">
-                  Access exclusive events, cabin access, and all membership benefits.
+                  After the board approves your application, pay annual dues here to unlock cabin bookings and member tickets.
                 </p>
               </div>
 
@@ -1206,7 +1206,7 @@ defmodule YscWeb.UserSettingsLive do
                       Account Pending Approval
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
-                      Your account must be approved by the board before you can purchase a membership. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
+                      Your application is with the board for review (usually within 14 days). We'll email you when there's a decision. You can pay dues here after approval. {" "}
                       <.link
                         navigate={~p"/pending-review"}
                         class="font-semibold text-yellow-900 underline underline-offset-2"

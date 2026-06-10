@@ -603,7 +603,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       do: "Guest",
                       else: "Guests"} • {if booking.booking_mode == :buyout,
                       do: "Entire cabin",
-                      else: "Group booking"}
+                      else: "Shared cabin"}
                   </p>
                   <.link
                     navigate={~p"/bookings/#{booking.id}/receipt"}
@@ -692,11 +692,11 @@ defmodule YscWeb.ClearLakeBookingLive do
                             </svg>
                           </div>
                           <span class="text-lg font-semibold text-zinc-900">
-                            Group booking
+                            Shared cabin stay
                           </span>
                         </div>
                         <p class="text-sm text-zinc-600 ml-9">
-                          Reserve space for your group. Other YSC members may also stay at the cabin during the same dates.
+                          Book for your group, but other YSC members may be at the cabin on the same dates. You are not reserving the whole property.
                         </p>
                       </label>
                       <label class={[
@@ -786,7 +786,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       }
                       class="text-amber-600 font-medium"
                     >
-                      Group bookings are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
+                      Shared cabin stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open.
                     </span>
                     <span
                       :if={
@@ -1172,7 +1172,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       Booking Type
                     </p>
                     <div class="text-sm text-zinc-700 font-medium">
-                      Group booking
+                      Shared cabin stay
                     </div>
                   </div>
                   <!-- Sunday Morning Parking Tip -->
@@ -1694,7 +1694,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                         to check availability and select your dates.
                       </li>
                       <li>
-                        Choose <strong>Group booking</strong>
+                        Choose <strong>Shared cabin stay</strong>
                         or <strong>Reserve the whole cabin</strong>
                         and enter your guest count.
                       </li>
@@ -3870,7 +3870,7 @@ defmodule YscWeb.ClearLakeBookingLive do
        ) do
     cond do
       booking_mode == :day && !day_booking_allowed ->
-        "Group bookings are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
+        "Shared cabin stays are not available for the selected dates. Try different dates or reserve the whole cabin if that option is open."
 
       booking_mode == :buyout && !buyout_booking_allowed ->
         "Reserving the whole cabin is not available for the selected dates. Try different dates or choose a group booking if that option is open."
