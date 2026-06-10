@@ -26,7 +26,7 @@ import { LiveSocket } from "phoenix_live_view";
 import topbar from "../vendor/topbar";
 import "../vendor/add-to-calendar-button@2.js";
 import LivePhone from "./live_phone";
-import StickyNavbar from "./sticky_navbar";
+import StickyNavbar, { syncNavHeight } from "./sticky_navbar";
 import Uploaders from "./uploaders";
 import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
@@ -222,6 +222,12 @@ window.addEventListener("phx:focus-first-input", (e) => {
         if (input) input.focus();
     }, 150);
 });
+
+// Measure navbar before LiveView connects so the spacer matches on first paint.
+syncNavHeight();
+if (document.fonts?.ready) {
+    document.fonts.ready.then(syncNavHeight);
+}
 
 // connect if there are any LiveViews on the page
 liveSocket.connect();

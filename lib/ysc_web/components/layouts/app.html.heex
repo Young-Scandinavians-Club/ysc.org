@@ -37,7 +37,7 @@
         )
       ]}
     >
-      <div class="flex flex-row items-center justify-between max-w-screen-xl mx-auto py-4 lg:py-0 px-4">
+      <div class="nav-bar-inner flex flex-row items-center justify-between max-w-screen-xl mx-auto py-4 lg:py-0 px-4">
         <!-- Logo - hidden on mobile -->
         <.link
           navigate={~p"/"}
@@ -88,7 +88,7 @@
                 <li>
                   <.dropdown
                     id="navbar-about-desktop"
-                    class="nav-link text-zinc-900 hover:bg-zinc-100 hover:text-black py-[0.595rem]"
+                    class="nav-link text-zinc-900 hover:bg-zinc-100 hover:text-black py-3"
                   >
                     <:button_block>
                       Club Info
@@ -334,14 +334,14 @@
                   <.link
                     href={~p"/users/log-in"}
                     phx-click={hide_mobile_menu("navbar-dropdown")}
-                    class="nav-link px-2 py-2 lg:px-3 lg:py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                    class="nav-link inline-flex items-center h-10 px-2 lg:px-3 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
                   >
                     Sign In
                   </.link>
                   <.link
                     navigate={~p"/users/register"}
                     phx-click={hide_mobile_menu("navbar-dropdown")}
-                    class="px-3 py-2 lg:px-4 lg:py-2.5 text-sm font-bold text-center text-zinc-100 transition ease-in-out bg-blue-700 rounded duration-150 hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                    class="inline-flex items-center h-10 px-3 lg:px-4 text-sm font-bold text-center text-zinc-100 transition ease-in-out bg-blue-700 rounded duration-150 hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
                   >
                     Become a Member
                   </.link>

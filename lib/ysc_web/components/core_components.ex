@@ -1811,7 +1811,7 @@ defmodule YscWeb.CoreComponents do
       <button
         data-dropdown-toggle="avatar-menu"
         id="avatar-menu-link"
-        class="flex flex-row rounded hover:bg-zinc-100 pl-3"
+        class="flex flex-row items-center h-10 rounded hover:bg-zinc-100 pl-3"
         phx-click={show_dropdown("#avatar-menu")}
       >
         <.user_card

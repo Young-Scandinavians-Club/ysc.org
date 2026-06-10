@@ -105,8 +105,17 @@
 
 html {
     scroll-behavior: smooth;
-    /* Measured by StickyNavbar hook; fallback until first paint. */
-    --nav-height: 5.5rem;
+    /* Bar content height; --nav-height adds the 1px reserved border on #rootNavbar. */
+    --nav-bar-height: 4.5rem;
+    --nav-height: calc(var(--nav-bar-height) + 1px);
+}
+
+@media (min-width: 1024px) {
+    html {
+        /* Desktop: logo row + lg:py-4 inner padding + py-3 nav links = 5rem. */
+        --nav-bar-height: 5rem;
+        --nav-height: calc(var(--nav-bar-height) + 1px);
+    }
 }
 
 
@@ -210,10 +219,20 @@ html {
 #rootNavbar {
     /* Reserve border space so .nav-sticky does not change layout height. */
     border-bottom: 1px solid transparent;
+    box-sizing: border-box;
     /* Shadow animates smoothly so the nav "lifts up" on scroll and
        "sits down" when the user returns to the top.
        Transform handles the mobile slide-in/out. */
     transition: background-color 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.25s ease-out, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#rootNavbar .nav-bar-inner {
+    box-sizing: border-box;
+}
+
+/* Non-hero: lock bar height in CSS so JS measurement cannot resize the spacer. */
+#site-header:not(.hero-mode) #rootNavbar .nav-bar-inner {
+    height: var(--nav-bar-height);
 }
 
 
