@@ -328,6 +328,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
       user = user_fixture()
       _tier = ticket_tier_fixture(%{event_id: event.id, name: "Reserved Tier"})
 
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}, flash: %{}}
+      }
+
       {:ok, socket} =
         TicketTierManagement.update(
           %{
@@ -335,7 +339,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
             event_id: event.id,
             current_user: user
           },
-          %Phoenix.LiveView.Socket{assigns: %{}}
+          socket
         )
 
       initial_tiers = socket.assigns.ticket_tiers
