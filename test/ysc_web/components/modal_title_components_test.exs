@@ -8,6 +8,8 @@ defmodule YscWeb.ModalTitleComponentsTest do
 
   describe "modal_title/1" do
     test "renders default modal heading styles" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.modal_title>Verify Your Phone Number</.modal_title>
@@ -19,6 +21,8 @@ defmodule YscWeb.ModalTitleComponentsTest do
     end
 
     test "renders optional id for aria-labelledby wiring" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.modal_title id="verify-phone-modal-title">Verify</.modal_title>
@@ -28,6 +32,8 @@ defmodule YscWeb.ModalTitleComponentsTest do
     end
 
     test "merges custom classes onto the default styles" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.modal_title class="mb-4">Custom spacing</.modal_title>
