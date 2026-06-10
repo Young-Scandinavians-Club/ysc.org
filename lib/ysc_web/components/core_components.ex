@@ -3342,6 +3342,15 @@ defmodule YscWeb.CoreComponents do
           else: "background-image: url('#{@image}'); min-height: #{@height};"
       }
     >
+      <img
+        :if={@video && @poster}
+        src={@poster}
+        alt=""
+        aria-hidden="true"
+        class="absolute inset-0 w-full h-full object-cover"
+        fetchpriority="high"
+        loading="eager"
+      />
       <video
         :if={@video}
         id="hero-video"
@@ -3350,8 +3359,8 @@ defmodule YscWeb.CoreComponents do
         loop
         playsinline
         poster={@poster}
+        preload="auto"
         class="absolute inset-0 w-full h-full object-cover"
-        fetchpriority="high"
       >
         <source src={@video} type="video/mp4" />
         <track

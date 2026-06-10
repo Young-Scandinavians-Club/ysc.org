@@ -1155,11 +1155,11 @@ defmodule YscWeb.HomeLive do
               <.icon name="hero-check-circle" class="w-5 h-5 mr-2" />
               <span>Thank you for subscribing!</span>
             </div>
-            <p class="mt-4 text-sm text-zinc-500">
+            <p class="mt-4 text-sm text-zinc-600">
               We don't spam! Read our
               <.link
                 navigate={~p"/privacy-policy"}
-                class="text-blue-600 hover:underline"
+                class="font-medium text-blue-700 underline hover:text-blue-800"
               >
                 privacy policy
               </.link>
