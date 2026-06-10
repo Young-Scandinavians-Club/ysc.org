@@ -756,7 +756,7 @@ defmodule Ysc.Tickets do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
     if ticket_order_completed?(ticket_order) do
-      {:ok, completed_ticket_order_for_return(ticket_order)}
+      finalize_already_completed_ticket_order(ticket_order)
     else
       with {:ok, payment_intent} <-
              Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -776,7 +776,7 @@ defmodule Ysc.Tickets do
 
     result =
       if ticket_order_completed?(ticket_order) do
-        {:ok, completed_ticket_order_for_return(ticket_order)}
+        finalize_already_completed_ticket_order(ticket_order)
       else
         do_process_ticket_order_payment(ticket_order, payment_intent)
       end
@@ -882,6 +882,13 @@ defmodule Ysc.Tickets do
 
   defp completed_ticket_order_for_return(%TicketOrder{id: id}) do
     get_ticket_order(id)
+  end
+
+  # Idempotent recovery when the order row is already :completed but ticket
+  # confirmation did not finish (e.g. crash between complete and confirm).
+  defp finalize_already_completed_ticket_order(ticket_order) do
+    confirm_tickets(ticket_order)
+    {:ok, completed_ticket_order_for_return(ticket_order)}
   end
 
   defp ticket_order_ready_for_payment?(%TicketOrder{} = ticket_order) do
