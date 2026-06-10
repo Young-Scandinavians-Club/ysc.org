@@ -102,6 +102,38 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
       assert returned.id == ticket_order.id
     end
 
+    test "confirms pending tickets when order is already completed" do
+      ticket_order =
+        ticket_order_fixture(%{status: :completed})
+
+      pending_tickets =
+        from(t in Ysc.Events.Ticket,
+          where: t.ticket_order_id == ^ticket_order.id and t.status == :pending
+        )
+        |> Repo.all()
+
+      assert pending_tickets != []
+
+      payment_intent_id = "pi_recover_tickets_#{ticket_order.id}"
+
+      deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+
+      assert {:ok, returned} =
+               Tickets.process_ticket_order_payment(
+                 ticket_order,
+                 payment_intent_id
+               )
+
+      assert returned.status == :completed
+
+      assert Repo.all(
+               from(t in Ysc.Events.Ticket,
+                 where: t.ticket_order_id == ^ticket_order.id
+               )
+             )
+             |> Enum.all?(&(&1.status == :confirmed))
+    end
+
     test "accepts a preloaded payment intent struct without refetching from Stripe" do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
