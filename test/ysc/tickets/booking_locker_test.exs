@@ -777,7 +777,7 @@ defmodule Ysc.Tickets.BookingLockerTest do
                )
     end
 
-    test "returns {:error, :insufficient_capacity} when tier is sold out", %{
+    test "returns {:error, :tier_validation_failed} when tier is sold out", %{
       user: user,
       event: event,
       tier: tier
@@ -790,7 +790,7 @@ defmodule Ysc.Tickets.BookingLockerTest do
                  limited_tier.id => 1
                })
 
-      assert {:error, :insufficient_capacity} =
+      assert {:error, :tier_validation_failed} =
                BookingLocker.validate_fulfillment_capacity(
                  user.id,
                  event.id,
