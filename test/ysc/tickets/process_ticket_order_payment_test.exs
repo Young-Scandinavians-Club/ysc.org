@@ -9,6 +9,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
   import Ecto.Query
   import Ysc.AccountsFixtures
 
+  alias Ysc.Ledgers
   alias Ysc.Tickets
 
   defp user_fixture_unique(attrs \\ %{}) do
@@ -247,6 +248,46 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
       fn pi_id ->
         assert {:error, :cannot_complete_order} =
                  Tickets.process_ticket_order_payment(cancelled, pi_id)
+
+        refute Ledgers.get_payment_by_external_id(pi_id)
+      end
+    )
+  end
+
+  test "does not expire completed orders when timeout worker races payment", %{
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      end)
+
+    payment_intent_id = "pi_timeout_race_#{order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(order, pi_id)
+
+        assert completed.status == :completed
+
+        stale_pending = %{order | status: :pending}
+
+        assert {:ok, returned} = Tickets.expire_ticket_order(stale_pending)
+        assert returned.status == :completed
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^order.id
+          )
+
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
       end
     )
   end
