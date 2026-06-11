@@ -87,5 +87,56 @@ defmodule YscWeb.Components.FormNoticeTest do
 
       refute html =~ "mb-4"
     end
+
+    test "renders success with default check icon and alert role" do
+      assigns = %{}
+
+      heex = ~H"""
+      <.form_notice kind={:success} id="notice-ok">
+        All set
+      </.form_notice>
+      """
+
+      html = rendered_to_string(heex)
+
+      assert html =~ ~s|id="notice-ok"|
+      assert html =~ ~s|role="alert"|
+      assert html =~ "bg-green-50"
+      assert html =~ "border-green-200"
+      assert html =~ "text-green-800"
+      assert html =~ "hero-check-circle"
+      assert html =~ "All set"
+    end
+
+    test "renders comfortable size with larger padding and rounded-lg" do
+      assigns = %{}
+
+      heex = ~H"""
+      <.form_notice kind={:error} id="notice-large" size={:comfortable}>
+        Big box
+      </.form_notice>
+      """
+
+      html = rendered_to_string(heex)
+
+      assert html =~ "p-4"
+      assert html =~ "mb-6"
+      assert html =~ "rounded-lg"
+      refute html =~ "rounded-md"
+    end
+
+    test "merges extra class onto the wrapper" do
+      assigns = %{}
+
+      heex = ~H"""
+      <.form_notice kind={:success} id="notice-extra" class="not-prose">
+        Styled
+      </.form_notice>
+      """
+
+      html = rendered_to_string(heex)
+
+      assert html =~ "not-prose"
+    end
   end
 end
