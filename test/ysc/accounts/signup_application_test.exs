@@ -935,10 +935,8 @@ defmodule Ysc.Accounts.SignupApplicationTest do
     end
 
     test "blocks email with no MX records in production environment" do
-      user =
-        user_fixture(%{
-          email: "user@mx-reject-#{System.unique_integer([:positive])}.example.org"
-        })
+      domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
+      user = user_fixture(%{email: "user@#{domain}"})
 
       attrs =
         valid_application_attrs(%{
@@ -946,22 +944,18 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         })
 
       Ysc.Test.EnvHelper.with_environment("production", fn ->
-        Process.put(@email_validator_mx_override_key, fn _domain ->
-          {:error, :no_mx_records}
-        end)
+        # Registration may cache a successful MX lookup via the test mx_resolver stub.
+        Process.delete({:mx_cache, domain})
+        stub_mx_no_records()
 
-        try do
-          changeset =
-            SignupApplication.application_changeset(%SignupApplication{}, attrs)
+        changeset =
+          SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
-          refute changeset.valid?
+        refute changeset.valid?
 
-          assert "Email domain cannot receive mail. Please check your email address." in errors_on(
-                   changeset
-                 ).base
-        after
-          Process.delete(@email_validator_mx_override_key)
-        end
+        assert "Email domain cannot receive mail. Please check your email address." in errors_on(
+                 changeset
+               ).base
       end)
     end
 
