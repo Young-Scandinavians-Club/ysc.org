@@ -740,7 +740,11 @@ defmodule Ysc.Tickets do
         %Stripe.PaymentIntent{} = payment_intent
       ) do
     start_time = System.monotonic_time()
-    ticket_order = ensure_ticket_order_for_payment(ticket_order)
+
+    ticket_order =
+      ticket_order.id
+      |> get_ticket_order()
+      |> ensure_ticket_order_for_payment()
 
     result =
       if ticket_order_completed?(ticket_order) do
