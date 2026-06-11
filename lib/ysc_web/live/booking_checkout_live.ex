@@ -907,14 +907,14 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "text-blue-700"
               )
             ]}>
-              Your dates are saved for
+              We've temporarily held these dates for
               <span
                 class="font-bold tabular-nums"
                 id="hold-countdown"
               >
                 {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
-              . Finish checkout before the timer runs out, or someone else may book these dates.
+              . Complete payment before time runs out, or the hold will expire and the dates may be booked by someone else.
             </p>
           </div>
           <!-- Price Details -->

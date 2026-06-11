@@ -931,7 +931,7 @@ defmodule YscWeb.EventDetailsLive do
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-6 h-6 me-1 -mt-0.5"
                         />
-                        You need to be signed in and have an active membership to purchase tickets
+                        Sign in to buy tickets. An active YSC membership is required.
                       </div>
                       <.button
                         class="w-full py-4 uppercase tracking-widest"
@@ -1023,7 +1023,7 @@ defmodule YscWeb.EventDetailsLive do
                         <%= if !@event.tickets_tbd do %>
                           <div class="w-full text-center py-2">
                             <p class="font-bold text-green-700 text-sm">
-                              No registration required
+                              No YSC ticket purchase needed
                             </p>
                           </div>
                         <% end %>
@@ -1200,7 +1200,7 @@ defmodule YscWeb.EventDetailsLive do
                         <% else %>
                           <%= if !@event.tickets_tbd do %>
                             <span class="text-xs font-black text-green-700 uppercase tracking-widest">
-                              No registration required
+                              No YSC ticket purchase needed
                             </span>
                           <% else %>
                             <%= if @current_user == nil do %>
@@ -5802,7 +5802,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "An active membership is required to purchase tickets. Please ensure your membership is active and try again.",
+           "You need an active YSC membership to buy tickets. Go to Membership to check your status or pay dues, then try again.",
            title: "Membership"
          )
          |> assign(:show_ticket_modal, false)}
@@ -5812,7 +5812,7 @@ defmodule YscWeb.EventDetailsLive do
         error_message =
           case changeset.errors do
             [user_id: {"active membership required to purchase tickets", _}] ->
-              "An active membership is required to purchase tickets. Please ensure your membership is active and try again."
+              "You need an active YSC membership to buy tickets. Go to Membership to check your status or pay dues, then try again."
 
             _ ->
               "There was an error processing your ticket order. Please try again."
