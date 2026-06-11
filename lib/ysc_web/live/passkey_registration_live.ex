@@ -27,11 +27,21 @@ defmodule YscWeb.PasskeyRegistrationLive do
         </.header>
 
         <div id="passkey-registration" class="space-y-3 pt-8" phx-hook="PasskeyAuth">
-          <.form_notice :if={@error} kind={:error} id="passkey-error" size={:comfortable}>
+          <.form_notice
+            :if={@error}
+            kind={:error}
+            id="passkey-error"
+            size={:comfortable}
+          >
             {@error}
           </.form_notice>
 
-          <.form_notice :if={@success} kind={:success} id="passkey-success" size={:comfortable}>
+          <.form_notice
+            :if={@success}
+            kind={:success}
+            id="passkey-success"
+            size={:comfortable}
+          >
             Passkey added successfully! You can now use it to sign in.
           </.form_notice>
 

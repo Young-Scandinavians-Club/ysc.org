@@ -2515,7 +2515,9 @@ defmodule YscWeb.CoreComponents do
     values: [:default, :comfortable],
     doc: ":comfortable uses p-4 mb-6 rounded-lg instead of p-3 mb-4 rounded-md"
 
-  attr :class, :any, default: nil, doc: "Additional Tailwind classes merged onto the wrapper"
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the wrapper"
 
   attr :margin_bottom, :boolean, default: true
 
@@ -2556,8 +2558,11 @@ defmodule YscWeb.CoreComponents do
   defp form_notice_wrapper_classes(assigns) do
     size_classes =
       case assigns.size do
-        :comfortable -> ["p-4 border rounded-lg", assigns.margin_bottom && "mb-6"]
-        :default -> ["p-3 border rounded-md", assigns.margin_bottom && "mb-4"]
+        :comfortable ->
+          ["p-4 border rounded-lg", assigns.margin_bottom && "mb-6"]
+
+        :default ->
+          ["p-3 border rounded-md", assigns.margin_bottom && "mb-4"]
       end
 
     kind_classes =
