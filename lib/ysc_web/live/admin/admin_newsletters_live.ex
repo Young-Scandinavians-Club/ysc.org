@@ -767,8 +767,7 @@ defmodule YscWeb.AdminNewslettersLive do
             </li>
             <li :if={@edition.status == :sending}>
               <span class="flex w-full items-center gap-2 px-4 py-2 text-left text-blue-600">
-                <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin">
-                </span>
+                <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></span>
                 <span>Sending…</span>
               </span>
             </li>

@@ -56,8 +56,7 @@ defmodule YscWeb.EventsListLive do
                   src={get_blur_hash(@hero_event.image)}
                   class="absolute inset-0 z-0 w-full h-full object-cover"
                   phx-hook="BlurHashCanvas"
-                >
-                </canvas>
+                ></canvas>
                 <img
                   src={event_image_url(@hero_event.image)}
                   id={"image-hero-#{@hero_event.id}"}
@@ -129,8 +128,7 @@ defmodule YscWeb.EventsListLive do
                     <span
                       :if={@hero_event.location_name}
                       class="h-3 w-px bg-white/40"
-                    >
-                    </span>
+                    ></span>
                     <span
                       :if={@hero_event.location_name}
                       class="text-sm font-bold uppercase tracking-widest flex items-center gap-1"

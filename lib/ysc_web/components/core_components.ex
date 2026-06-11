@@ -622,8 +622,7 @@ defmodule YscWeb.CoreComponents do
         <span
           class="block w-6 h-6 bg-white rounded-full shadow-md"
           style={"transform: translateX(#{if @checked, do: "1.5rem", else: "0"}); transition: transform 0.3s ease-in-out;"}
-        >
-        </span>
+        ></span>
       </span>
     </label>
     """
