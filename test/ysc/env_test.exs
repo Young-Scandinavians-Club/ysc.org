@@ -12,25 +12,15 @@ defmodule Ysc.EnvTest do
     end
 
     test "handles string environment configuration" do
-      original = Application.get_env(:ysc, :environment)
-
-      try do
-        Application.put_env(:ysc, :environment, "dev")
+      Ysc.Test.EnvHelper.with_environment("dev", fn ->
         assert Ysc.Env.current() == :dev
-      after
-        Application.put_env(:ysc, :environment, original)
-      end
+      end)
     end
 
     test "handles atom environment configuration" do
-      original = Application.get_env(:ysc, :environment)
-
-      try do
-        Application.put_env(:ysc, :environment, :dev)
+      Ysc.Test.EnvHelper.with_environment(:dev, fn ->
         assert Ysc.Env.current() == :dev
-      after
-        Application.put_env(:ysc, :environment, original)
-      end
+      end)
     end
   end
 
