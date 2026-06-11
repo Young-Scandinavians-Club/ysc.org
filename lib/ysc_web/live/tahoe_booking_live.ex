@@ -245,9 +245,10 @@ defmodule YscWeb.TahoeBookingLive do
         booking_step: if(booking_mode, do: :details, else: :mode_selection)
       )
 
-    # If dates are present and user can book, initialize validation and room availability
+    # If dates are present and user can book, initialize validation and room availability.
+    # Only run availability queries after connect (same pattern as ClearLakeBookingLive).
     socket =
-      if checkin_date && checkout_date && can_book do
+      if connected?(socket) && checkin_date && checkout_date && can_book do
         socket
         |> enforce_season_booking_mode()
         |> validate_dates()
@@ -337,7 +338,7 @@ defmodule YscWeb.TahoeBookingLive do
         )
         |> then(fn s ->
           # Only run validation/room updates if dates changed, not just tab
-          if should_update_rooms(socket, parsed_params) do
+          if connected?(socket) && should_update_rooms(socket, parsed_params) do
             s
             |> enforce_season_booking_mode()
             |> validate_dates()
