@@ -1202,9 +1202,9 @@ defmodule YscWeb.BookingReceiptLive do
           on_cancel={JS.push("hide-cancel-modal")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="cancel-booking-modal-title">
             Cancel Booking
-          </h2>
+          </.modal_title>
 
           <div class="space-y-4">
             <p class="text-zinc-600">
