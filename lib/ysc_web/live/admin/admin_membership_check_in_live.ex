@@ -343,12 +343,32 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
   @impl true
   def mount(%{"session_id" => session_id}, _session, socket) do
-    session = Scanning.get_session!(session_id)
+    user_id = socket.assigns.current_user.id
 
-    if session.type != :event_membership do
-      {:error, {:redirect, %{to: ~p"/admin/scanner/sessions"}}}
-    else
-      mount_desk(session, socket)
+    case Scanning.authorize_membership_checkin_access!(session_id, user_id) do
+      :ok ->
+        session = Scanning.get_session!(session_id)
+
+        if session.type != :event_membership do
+          {:error, {:redirect, %{to: ~p"/admin/scanner/sessions"}}}
+        else
+          mount_desk(session, socket)
+        end
+
+      {:error, :unauthorized} ->
+        {:ok,
+         socket
+         |> put_flash(
+           :error,
+           "You can only view closed membership check-in sessions you created."
+         )
+         |> push_navigate(to: ~p"/admin/scanner/sessions")}
+
+      {:error, :not_found} ->
+        {:ok,
+         socket
+         |> put_flash(:error, "Check-in session not found.")
+         |> push_navigate(to: ~p"/admin/scanner/sessions")}
     end
   end
 
@@ -477,14 +497,33 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
   def handle_event("export-csv", _params, socket) do
     session_id = socket.assigns.session.id
-    csv_content = Scanning.export_membership_checkins_csv(session_id)
-    encoded = Base.encode64(csv_content)
+    user_id = socket.assigns.current_user.id
 
-    filename =
-      "membership_checkin_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+    case Scanning.authorize_membership_checkin_access!(session_id, user_id) do
+      :ok ->
+        csv_content = Scanning.export_membership_checkins_csv(session_id)
+        encoded = Base.encode64(csv_content)
 
-    {:noreply,
-     push_event(socket, "download-csv", %{content: encoded, filename: filename})}
+        filename =
+          "membership_checkin_#{session_id}_#{DateTime.utc_now() |> DateTime.to_unix()}.csv"
+
+        {:noreply,
+         push_event(socket, "download-csv", %{
+           content: encoded,
+           filename: filename
+         })}
+
+      {:error, :unauthorized} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "You can only export membership check-in sessions you created after they are closed."
+         )}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Check-in session not found.")}
+    end
   end
 
   # ---------------------------------------------------------------------------
