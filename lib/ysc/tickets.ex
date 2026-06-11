@@ -609,7 +609,8 @@ defmodule Ysc.Tickets do
           end
 
           from(t in Ticket,
-            where: t.ticket_order_id == ^ticket_order.id and t.status == :pending
+            where:
+              t.ticket_order_id == ^ticket_order.id and t.status == :pending
           )
           |> Repo.update_all(set: [status: :expired, updated_at: now])
 
