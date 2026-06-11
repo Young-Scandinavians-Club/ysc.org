@@ -34,6 +34,7 @@ defmodule Ysc.DataCase do
   end
 
   setup tags do
+    Ysc.Test.EnvHelper.reset_environment!()
     owner = Ysc.DataCase.setup_sandbox(tags)
     # Ensure basic site settings exist, unless the test explicitly opts out.
     # Skip the DB round-trip when settings already exist (e.g. same sandbox process).

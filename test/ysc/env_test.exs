@@ -1,6 +1,11 @@
 defmodule Ysc.EnvTest do
   use ExUnit.Case, async: true
 
+  setup do
+    Ysc.Test.EnvHelper.reset_environment!()
+    :ok
+  end
+
   describe "current/0" do
     test "returns the configured environment as an atom" do
       assert Ysc.Env.current() == :test
