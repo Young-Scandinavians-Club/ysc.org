@@ -52,6 +52,8 @@ defmodule YscWeb.ConnCase do
       import Mox
 
       setup tags do
+        Ysc.Test.EnvHelper.reset_environment!()
+
         if unquote(mox_global_first_flag) do
           Mox.set_mox_global()
           on_exit(fn -> Mox.set_mox_private() end)
