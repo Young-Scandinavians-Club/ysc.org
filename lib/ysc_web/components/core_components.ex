@@ -2475,11 +2475,15 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Compact bordered notice for forms (info or error), used in modals and inline forms.
+  Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another
   hero icon name or `icon={false}` is passed to omit the icon. For `:error`, no icon
-  is shown unless `:icon` is set explicitly.
+  is shown unless `:icon` is set explicitly. For `:success`, a check-circle icon is
+  shown by default.
+
+  Use `size={:comfortable}` for the larger `p-4 mb-6 rounded-lg` variant common on
+  full-page forms (checkout, contact, passkey registration).
 
   ## Examples
 
@@ -2494,13 +2498,24 @@ defmodule YscWeb.CoreComponents do
       <.form_notice kind={:error} margin_bottom={false} id="inline-error">
         Invalid password.
       </.form_notice>
+
+      <.form_notice :if={@success} kind={:success} id="passkey-success" size={:comfortable}>
+        Passkey added successfully!
+      </.form_notice>
   """
-  attr :kind, :atom, values: [:info, :error], required: true
+  attr :kind, :atom, values: [:info, :error, :success], required: true
   attr :id, :string, default: nil
 
   attr :icon, :any,
     default: :default,
     doc: "hero icon name, false to hide, or :default for kind-based default"
+
+  attr :size, :atom,
+    default: :default,
+    values: [:default, :comfortable],
+    doc: ":comfortable uses p-4 mb-6 rounded-lg instead of p-3 mb-4 rounded-md"
+
+  attr :class, :any, default: nil, doc: "Additional Tailwind classes merged onto the wrapper"
 
   attr :margin_bottom, :boolean, default: true
 
@@ -2508,22 +2523,24 @@ defmodule YscWeb.CoreComponents do
 
   def form_notice(assigns) do
     icon_name = form_notice_icon(assigns.kind, assigns.icon)
-    assigns = assign(assigns, :icon_name, icon_name)
+    role = if assigns.kind in [:error, :success], do: "alert", else: nil
+
+    assigns =
+      assigns
+      |> assign(:icon_name, icon_name)
+      |> assign(:role, role)
 
     ~H"""
     <div
       id={@id}
-      class={[
-        "p-3 border rounded-md",
-        @kind == :info && "bg-blue-50 border-blue-200",
-        @kind == :error && "bg-red-50 border-red-200",
-        @margin_bottom && "mb-4"
-      ]}
+      role={@role}
+      class={form_notice_wrapper_classes(assigns)}
     >
       <p class={[
         "text-sm",
         @kind == :info && "text-blue-800",
-        @kind == :error && "text-red-800"
+        @kind == :error && "text-red-800",
+        @kind == :success && "text-green-800"
       ]}>
         <.icon
           :if={@icon_name}
@@ -2536,8 +2553,26 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  defp form_notice_wrapper_classes(assigns) do
+    size_classes =
+      case assigns.size do
+        :comfortable -> ["p-4 border rounded-lg", assigns.margin_bottom && "mb-6"]
+        :default -> ["p-3 border rounded-md", assigns.margin_bottom && "mb-4"]
+      end
+
+    kind_classes =
+      case assigns.kind do
+        :info -> "bg-blue-50 border-blue-200"
+        :error -> "bg-red-50 border-red-200"
+        :success -> "bg-green-50 border-green-200"
+      end
+
+    [size_classes, kind_classes, assigns.class]
+  end
+
   defp form_notice_icon(:info, :default), do: "hero-information-circle"
   defp form_notice_icon(:error, :default), do: nil
+  defp form_notice_icon(:success, :default), do: "hero-check-circle"
   defp form_notice_icon(_kind, false), do: nil
   defp form_notice_icon(_kind, icon) when is_binary(icon), do: icon
 

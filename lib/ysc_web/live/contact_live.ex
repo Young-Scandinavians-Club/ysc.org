@@ -16,17 +16,17 @@ defmodule YscWeb.ContactLive do
             We are a community of volunteers. We usually respond within 24–48 hours.
           </p>
 
-          <div
+          <.form_notice
             :if={@submitted}
-            class="not-prose mb-6 p-4 bg-green-50 border border-green-200 rounded-lg"
+            kind={:success}
+            id="contact-success"
+            size={:comfortable}
+            class="not-prose"
           >
-            <div class="flex items-center">
-              <.icon name="hero-check-circle" class="text-green-600 w-6 h-6 me-2" />
-              <span class="text-green-800 font-semibold">
-                Thank you! Your message has been sent. We'll get back to you soon.
-              </span>
-            </div>
-          </div>
+            <span class="font-semibold">
+              Thank you! Your message has been sent. We'll get back to you soon.
+            </span>
+          </.form_notice>
 
           <div class="not-prose">
             <div
