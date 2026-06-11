@@ -1729,12 +1729,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("search-hosts", %{"value" => query}, socket) do
     query = String.trim(query)
 
-    results =
-      if query == "" do
-        []
-      else
-        Ysc.Accounts.search_users(query, limit: 8)
-      end
+    results = Ysc.Accounts.search_users_for_staff_lookup(query, limit: 8)
 
     {:noreply,
      socket

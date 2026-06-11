@@ -17,6 +17,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
+  Finding 20 (MEDIUM)   Event admin host/reservation search enables club-wide email enumeration
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -27,6 +28,7 @@ defmodule YscWeb.SecurityAuditTest do
   import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
   import Mox
 
   alias Ysc.Accounts
@@ -1165,6 +1167,34 @@ defmodule YscWeb.SecurityAuditTest do
         Accounts.update_user(user, %{"first_name" => "After"}, admin)
 
       assert Accounts.get_user_by_session_token(token)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 20 (MEDIUM): Volunteer event admin search must not enumerate emails
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 20: event admin user search blocks email enumeration" do
+    test "search_users_for_staff_lookup does not match partial email domains" do
+      user_fixture(%{email: "roster.member@gmail.com", phone_number: "+14159098271"})
+
+      assert Accounts.search_users_for_staff_lookup("@gmail") == []
+      assert Accounts.search_users_for_staff_lookup("member@gmail") == []
+    end
+
+    test "volunteer event host search does not return members for @gmail query", %{
+      conn: conn
+    } do
+      user_fixture(%{email: "visible.member@gmail.com", phone_number: "+14159098272"})
+      volunteer = user_fixture(%{role: :volunteer, phone_number: "+14159098273"})
+      event = event_fixture(%{organizer_id: volunteer.id})
+
+      conn = log_in_user(conn, volunteer)
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      element(view, "#host-search-input") |> render_keyup(%{"value" => "@gmail"})
+
+      refute has_element?(view, "#host-search-results")
     end
   end
 
