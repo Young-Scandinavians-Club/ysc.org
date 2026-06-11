@@ -124,6 +124,69 @@ defmodule Ysc.ScanningTest do
     end
   end
 
+  describe "authorize_membership_checkin_access!/2" do
+    test "allows the creator to access a closed event_membership session" do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      assert :ok =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 owner.id
+               )
+    end
+
+    test "denies another admin access to a closed event_membership session" do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      assert {:error, :unauthorized} =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 other.id
+               )
+    end
+
+    test "allows another admin to access an open event_membership session" do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+
+      assert :ok =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 other.id
+               )
+    end
+
+    test "returns not_found for a missing session" do
+      admin = user_fixture(%{role: "admin"})
+
+      assert {:error, :not_found} =
+               Scanning.authorize_membership_checkin_access!(
+                 Ecto.ULID.generate(),
+                 admin.id
+               )
+    end
+
+    test "returns unauthorized for non event_membership sessions" do
+      owner = user_fixture(%{role: "admin"})
+      session = scan_session_fixture(created_by: owner)
+
+      assert {:error, :unauthorized} =
+               Scanning.authorize_membership_checkin_access!(
+                 session.id,
+                 owner.id
+               )
+    end
+  end
+
   describe "close_session/1" do
     test "sets closed_at on the session" do
       session = scan_session_fixture()

@@ -557,6 +557,20 @@ defmodule YscWeb.AdminScannerLiveTest do
       {:ok, view, _html} = live(conn, ~p"/admin/scanner/sessions/#{session.id}")
       assert has_element?(view, "a[href='/admin/scanner/sessions']")
     end
+
+    test "rejects viewing another admin's session detail", %{conn: conn} do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+      member = make_active_member()
+
+      session = scan_session_fixture(%{created_by: owner, name: "Owner scans"})
+      Scanning.process_scan(session, QrToken.sign_membership(member.id))
+
+      conn = log_in_user(conn, other)
+
+      assert {:error, {:live_redirect, %{to: "/admin/scanner/sessions"}}} =
+               live(conn, ~p"/admin/scanner/sessions/#{session.id}")
+    end
   end
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -586,6 +600,38 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
       assert html =~ "1 scan"
+    end
+
+    test "resume param rejects another admin's open session", %{conn: conn} do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+
+      {:ok, session} =
+        Scanning.create_session(%{
+          name: "Private session",
+          type: :membership,
+          created_by_id: owner.id
+        })
+
+      conn = log_in_user(conn, other)
+
+      {:ok, view, html} = live(conn, ~p"/admin/scanner?resume=#{session.id}")
+
+      assert html =~ "You can only resume scan sessions you created."
+      assert has_element?(view, "#scan-setup-form")
+      refute html =~ "Private session"
+    end
+
+    test "resume param with unknown session id shows not found flash", %{
+      conn: conn,
+      admin: admin
+    } do
+      missing_id = Ecto.ULID.generate()
+
+      {:ok, view, html} = live(conn, ~p"/admin/scanner?resume=#{missing_id}")
+
+      assert html =~ "Scan session not found."
+      assert has_element?(view, "#scan-setup-form")
     end
 
     test "resume param on closed session stays in setup and shows flash", %{
@@ -883,6 +929,25 @@ defmodule YscWeb.AdminScannerLiveTest do
 
       assert_redirect(view, ~p"/admin/membership-check-in/#{session.id}")
       assert is_nil(Scanning.get_session!(session.id).closed_at)
+    end
+
+    test "closed event_membership desk link is visible only to the session creator",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      other_admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      {:ok, _view, html} = live(conn, ~p"/admin/scanner/sessions")
+      assert html =~ "View Desk"
+      assert html =~ ~p"/admin/membership-check-in/#{session.id}"
+
+      conn2 = log_in_user(build_conn(), other_admin)
+      {:ok, _view, html2} = live(conn2, ~p"/admin/scanner/sessions")
+      refute html2 =~ ~p"/admin/membership-check-in/#{session.id}"
     end
   end
 

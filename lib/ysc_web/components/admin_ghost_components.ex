@@ -27,8 +27,7 @@ defmodule YscWeb.AdminGhostComponents do
         @class
       ]}
       aria-hidden="true"
-    >
-    </span>
+    ></span>
     """
   end
 
@@ -41,8 +40,7 @@ defmodule YscWeb.AdminGhostComponents do
     <span
       class={["admin-ghost-bar shrink-0 rounded-full", @size, @class]}
       aria-hidden="true"
-    >
-    </span>
+    ></span>
     """
   end
 
@@ -55,8 +53,7 @@ defmodule YscWeb.AdminGhostComponents do
     <span
       class={["admin-ghost-bar inline-block h-6 rounded-full", @width, @class]}
       aria-hidden="true"
-    >
-    </span>
+    ></span>
     """
   end
 
@@ -283,8 +280,7 @@ defmodule YscWeb.AdminGhostComponents do
             id={if(idx == 0, do: "ghost-dashboard-event-primary", else: nil)}
             class="relative pl-6 sm:pl-8 pb-8 last:pb-0"
           >
-            <span class="absolute -left-[7px] sm:-left-[9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm bg-blue-600 z-10">
-            </span>
+            <span class="absolute -left-[7px] sm:-left-[9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm bg-blue-600 z-10"></span>
             <div class="rounded-xl border border-zinc-200 p-4 sm:p-5 bg-zinc-50/40">
               <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                 <div class="min-w-0 flex-1">
@@ -820,8 +816,7 @@ defmodule YscWeb.AdminGhostComponents do
                   <span
                     class="w-5 h-5 rounded border-2 border-zinc-300 flex items-center justify-center"
                     aria-hidden="true"
-                  >
-                  </span>
+                  ></span>
                 </div>
                 <div class="col-span-3">
                   <p class="text-sm font-medium text-zinc-900">{ticket.name}</p>
@@ -1915,84 +1910,71 @@ defmodule YscWeb.AdminGhostComponents do
               type="button"
               class="trix-button trix-button--icon trix-button--icon-bold"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-italic"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-strike"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-link"
               tabindex="-1"
-            >
-            </button>
+            ></button>
           </span>
           <span class="trix-button-group trix-button-group--block-tools">
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-heading-1"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-quote"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-code"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-bullet-list"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-number-list"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-decrease-nesting-level"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-increase-nesting-level"
               tabindex="-1"
-            >
-            </button>
+            ></button>
           </span>
           <span class="trix-button-group trix-button-group--file-tools">
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-attach"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-library"
               tabindex="-1"
-            >
-            </button>
+            ></button>
           </span>
           <span class="trix-button-group-spacer"></span>
           <span class="trix-button-group trix-button-group--history-tools">
@@ -2000,14 +1982,12 @@ defmodule YscWeb.AdminGhostComponents do
               type="button"
               class="trix-button trix-button--icon trix-button--icon-undo"
               tabindex="-1"
-            >
-            </button>
+            ></button>
             <button
               type="button"
               class="trix-button trix-button--icon trix-button--icon-redo"
               tabindex="-1"
-            >
-            </button>
+            ></button>
           </span>
         </div>
       </trix-toolbar>

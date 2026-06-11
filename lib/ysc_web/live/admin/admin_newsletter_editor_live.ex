@@ -877,8 +877,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 style="height: 800px;"
                 title="Email preview"
                 phx-hook="EmailPreview"
-              >
-              </iframe>
+              ></iframe>
             </div>
           </div>
         </div>

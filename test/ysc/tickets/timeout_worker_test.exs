@@ -216,6 +216,29 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
 
       assert Tickets.get_ticket_order(order.id).status == :completed
     end
+
+    test "batch expiration does not revert completed orders", %{
+      user: user,
+      event: event
+    } do
+      order =
+        %TicketOrder{
+          user_id: user.id,
+          event_id: event.id,
+          status: :completed,
+          total_amount: Money.new(1000, :USD),
+          reference_id: "TO-BATCH-COMPLETED",
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(-3600, :second)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert {:ok, _message} = TimeoutWorker.perform(%Oban.Job{args: %{}})
+
+      assert Tickets.get_ticket_order(order.id).status == :completed
+    end
   end
 
   describe "worker timeout" do

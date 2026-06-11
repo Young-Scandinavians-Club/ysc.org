@@ -971,8 +971,7 @@ defmodule YscWeb.AdminComponents do
   def admin_sending_badge(assigns) do
     ~H"""
     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
-      </span>
+      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
       {@label}
     </span>
     """

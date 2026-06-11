@@ -2351,7 +2351,14 @@ defmodule YscWeb.AdminBookingsLive do
                 clear_event="clear-reservation-search"
               />
             </div>
-            <div class="py-6 w-full overflow-x-auto">
+            <div
+              :if={is_nil(@reservation_meta)}
+              id="reservations-loading"
+              class="py-16 text-center text-sm text-zinc-500"
+            >
+              Loading reservations…
+            </div>
+            <div :if={@reservation_meta} class="py-6 w-full overflow-x-auto">
               <Flop.Phoenix.table
                 id="admin_reservations_list"
                 items={@streams.reservations}
@@ -3438,6 +3445,8 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:filtered_seasons, [])
       |> assign(:filtered_pricing_rules, [])
       |> assign(:filtered_refund_policies, [])
+      # Empty stream so reservations section renders on dead connect before data loads
+      |> stream(:reservations, [], reset: true)
 
     # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do
@@ -3644,124 +3653,130 @@ defmodule YscWeb.AdminBookingsLive do
         {socket, false}
       end
 
-    # Reload door codes when property changes (tabs use JS.patch, not select-property event)
+    # Defer database work until the WebSocket connects so the first HTML response
+    # avoids duplicate queries (mount already schedules :load_bookings_data).
     socket =
-      if property_changed do
-        door_codes = Bookings.list_door_codes(socket.assigns.selected_property)
+      if connected?(socket) do
+        socket =
+          if property_changed do
+            door_codes =
+              Bookings.list_door_codes(socket.assigns.selected_property)
 
-        active_door_code =
-          Bookings.get_active_door_code(socket.assigns.selected_property)
+            active_door_code =
+              Bookings.get_active_door_code(socket.assigns.selected_property)
 
-        door_code_form =
-          %Ysc.Bookings.DoorCode{}
-          |> Ysc.Bookings.DoorCode.changeset(%{})
-          |> to_form(as: "door_code")
+            door_code_form =
+              %Ysc.Bookings.DoorCode{}
+              |> Ysc.Bookings.DoorCode.changeset(%{})
+              |> to_form(as: "door_code")
 
-        socket
-        |> assign(:door_codes, door_codes)
-        |> assign(:active_door_code, active_door_code)
-        |> assign(:door_code_warning, nil)
-        |> assign(:door_code_form, door_code_form)
-      else
-        socket
-      end
-
-    # Update calendar view only if dates or property changed (avoid duplicate queries on initial mount)
-    socket =
-      if (dates_changed || property_changed) &&
-           socket.assigns.live_action == :index do
-        update_calendar_view(socket, socket.assigns.selected_property)
-      else
-        socket
-      end
-
-    # Load reservations for the table only if on reservations section.
-    # Opening a booking modal only changes `live_action`; skip the list refetch
-    # (same pattern as AdminUsersLive after PR #419).
-    socket =
-      if socket.assigns[:current_section] == :reservations &&
-           not skip_reservations_refetch?(
-             socket,
-             params,
-             dates_changed,
-             property_changed
-           ) do
-        load_reservations(socket, params)
-      else
-        socket
-      end
-
-    # Load pending refunds count and list if on pending_refunds section.
-    # Tab badge counts are cached across modal-only patches.
-    selected_property = socket.assigns.selected_property
-
-    refresh_pending_refund_badges? =
-      not skip_pending_refund_badges?(
-        socket,
-        dates_changed,
-        property_changed,
-        section_changed
-      )
-
-    {pending_refunds_count_task, property_counts_task} =
-      if refresh_pending_refund_badges? do
-        pending_refunds_count_task =
-          if socket.assigns[:current_section] == :pending_refunds do
-            nil
+            socket
+            |> assign(:door_codes, door_codes)
+            |> assign(:active_door_code, active_door_code)
+            |> assign(:door_code_warning, nil)
+            |> assign(:door_code_form, door_code_form)
           else
-            Task.async(fn ->
-              from(pr in Ysc.Bookings.PendingRefund,
-                join: b in assoc(pr, :booking),
-                where: pr.status == :pending,
-                where: b.property == ^selected_property,
-                select: count(pr.id)
-              )
-              |> Repo.one() || 0
-            end)
+            socket
           end
 
-        property_counts_task =
-          Task.async(fn -> load_property_pending_refunds_counts_data() end)
+        # Update calendar view only if dates or property changed (avoid duplicate queries on initial mount)
+        socket =
+          if (dates_changed || property_changed) &&
+               socket.assigns.live_action == :index do
+            update_calendar_view(socket, socket.assigns.selected_property)
+          else
+            socket
+          end
 
-        {pending_refunds_count_task, property_counts_task}
-      else
-        {nil, nil}
-      end
+        # Load reservations for the table only if on reservations section.
+        # Opening a booking modal only changes `live_action`; skip the list refetch
+        # (same pattern as AdminUsersLive after PR #419).
+        socket =
+          if socket.assigns[:current_section] == :reservations &&
+               not skip_reservations_refetch?(
+                 socket,
+                 params,
+                 dates_changed,
+                 property_changed
+               ) do
+            load_reservations(socket, params)
+          else
+            socket
+          end
 
-    # Load full pending refunds list if on that section
-    socket =
-      if socket.assigns[:current_section] == :pending_refunds do
-        load_pending_refunds(socket)
-      else
-        socket
-      end
+        # Load pending refunds count and list if on pending_refunds section.
+        # Tab badge counts are cached across modal-only patches.
+        selected_property = socket.assigns.selected_property
 
-    socket =
-      if property_counts_task do
-        property_counts = Task.await(property_counts_task, :infinity)
+        refresh_pending_refund_badges? =
+          not skip_pending_refund_badges?(
+            socket,
+            dates_changed,
+            property_changed,
+            section_changed
+          )
 
-        socket
-        |> assign(
-          :tahoe_pending_refunds_count,
-          Map.get(property_counts, :tahoe, 0)
-        )
-        |> assign(
-          :clear_lake_pending_refunds_count,
-          Map.get(property_counts, :clear_lake, 0)
-        )
-        |> assign(:pending_refund_badges_loaded?, true)
-      else
-        socket
-      end
+        {pending_refunds_count_task, property_counts_task} =
+          if refresh_pending_refund_badges? do
+            pending_refunds_count_task =
+              if socket.assigns[:current_section] == :pending_refunds do
+                nil
+              else
+                Task.async(fn ->
+                  from(pr in Ysc.Bookings.PendingRefund,
+                    join: b in assoc(pr, :booking),
+                    where: pr.status == :pending,
+                    where: b.property == ^selected_property,
+                    select: count(pr.id)
+                  )
+                  |> Repo.one() || 0
+                end)
+              end
 
-    socket =
-      if pending_refunds_count_task do
-        pending_refunds_count =
-          Task.await(pending_refunds_count_task, :infinity)
+            property_counts_task =
+              Task.async(fn -> load_property_pending_refunds_counts_data() end)
 
-        socket
-        |> assign(:pending_refunds_count, pending_refunds_count)
-        |> assign(:pending_refund_badges_loaded?, true)
+            {pending_refunds_count_task, property_counts_task}
+          else
+            {nil, nil}
+          end
+
+        # Load full pending refunds list if on that section
+        socket =
+          if socket.assigns[:current_section] == :pending_refunds do
+            load_pending_refunds(socket)
+          else
+            socket
+          end
+
+        socket =
+          if property_counts_task do
+            property_counts = Task.await(property_counts_task, :infinity)
+
+            socket
+            |> assign(
+              :tahoe_pending_refunds_count,
+              Map.get(property_counts, :tahoe, 0)
+            )
+            |> assign(
+              :clear_lake_pending_refunds_count,
+              Map.get(property_counts, :clear_lake, 0)
+            )
+            |> assign(:pending_refund_badges_loaded?, true)
+          else
+            socket
+          end
+
+        if pending_refunds_count_task do
+          pending_refunds_count =
+            Task.await(pending_refunds_count_task, :infinity)
+
+          socket
+          |> assign(:pending_refunds_count, pending_refunds_count)
+          |> assign(:pending_refund_badges_loaded?, true)
+        else
+          socket
+        end
       else
         socket
       end
@@ -6812,11 +6827,7 @@ defmodule YscWeb.AdminBookingsLive do
           end),
           Task.async(fn ->
             Bookings.list_bookings(property, start_date, end_date,
-              preload: [
-                :rooms,
-                {:user, :current_avatar},
-                check_ins: :check_in_vehicles
-              ]
+              preload: [:rooms, {:user, :current_avatar}, :check_ins]
             )
           end)
         ],

@@ -42,9 +42,9 @@ defmodule YscWeb.UserSettingsLive do
           on_cancel={JS.push("confirm_cancel_phone_verification")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="phone-verification-modal-title">
             Verify Your Phone Number
-          </h2>
+          </.modal_title>
 
           <.simple_form
             for={@phone_verification_form}
@@ -133,9 +133,9 @@ defmodule YscWeb.UserSettingsLive do
           on_cancel={JS.push("confirm_cancel_email_verification")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="email-verification-modal-title">
             Verify Your New Email Address
-          </h2>
+          </.modal_title>
 
           <.simple_form
             for={@email_verification_form}
@@ -227,9 +227,9 @@ defmodule YscWeb.UserSettingsLive do
           on_cancel={JS.patch(~p"/users/membership")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="update-payment-method-modal-title">
             Payment Method
-          </h2>
+          </.modal_title>
           <%!-- Loading state --%>
           <.async_section_loader
             :if={assigns[:loading_payment_methods]}

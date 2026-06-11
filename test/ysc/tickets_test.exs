@@ -851,6 +851,28 @@ defmodule Ysc.TicketsTest do
       assert {:ok, expired} = Tickets.expire_ticket_order(order)
       assert expired.status == :expired
     end
+
+    test "does not expire an already completed order", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      now = DateTime.utc_now()
+
+      {1, _} =
+        from(to in Ysc.Tickets.TicketOrder, where: to.id == ^order.id)
+        |> Repo.update_all(
+          set: [status: :completed, completed_at: now, updated_at: now]
+        )
+
+      stale_pending = %{order | status: :pending}
+
+      assert {:ok, returned} = Tickets.expire_ticket_order(stale_pending)
+      assert returned.status == :completed
+    end
   end
 
   describe "refund_tickets/3" do

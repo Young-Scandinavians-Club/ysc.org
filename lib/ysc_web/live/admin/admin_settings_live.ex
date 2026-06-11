@@ -345,8 +345,7 @@ defmodule YscWeb.AdminSettingsLive do
                         <span
                           class="inline-block w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"
                           aria-hidden="true"
-                        >
-                        </span>
+                        ></span>
                       <% end %>
                       {job.state}
                     </span>
@@ -510,8 +509,7 @@ defmodule YscWeb.AdminSettingsLive do
                     <span
                       class="inline-block w-3 h-3 border-2 border-orange-600 border-t-transparent rounded-full animate-spin"
                       aria-hidden="true"
-                    >
-                    </span>
+                    ></span>
                   <% end %>
                   {@selected_job.state}
                 </span>
