@@ -3659,7 +3659,8 @@ defmodule YscWeb.AdminBookingsLive do
       if connected?(socket) do
         socket =
           if property_changed do
-            door_codes = Bookings.list_door_codes(socket.assigns.selected_property)
+            door_codes =
+              Bookings.list_door_codes(socket.assigns.selected_property)
 
             active_door_code =
               Bookings.get_active_door_code(socket.assigns.selected_property)
