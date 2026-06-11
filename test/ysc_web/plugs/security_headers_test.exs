@@ -1,5 +1,5 @@
 defmodule YscWeb.Plugs.SecurityHeadersTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   import Plug.Conn
   import Plug.Test
@@ -12,9 +12,7 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
     old_s3_base = Application.get_env(:ysc, :s3_base_url)
 
     on_exit(fn ->
-      if is_nil(old_env),
-        do: Application.delete_env(:ysc, :environment),
-        else: Application.put_env(:ysc, :environment, old_env)
+      Ysc.Test.EnvHelper.restore_environment!(old_env)
 
       if is_nil(old_endpoint),
         do: Application.delete_env(:ysc, YscWeb.Endpoint),
@@ -29,228 +27,239 @@ defmodule YscWeb.Plugs.SecurityHeadersTest do
   end
 
   test "sets CSP header including nonce" do
-    Application.put_env(:ysc, :environment, :dev)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
+    Ysc.Test.EnvHelper.with_environment(:dev, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
 
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "abc123")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "abc123")
+        |> SecurityHeaders.call([])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert String.contains?(csp, "'nonce-abc123'")
-    assert String.contains?(csp, "script-src")
-    assert String.contains?(csp, "script-src-elem")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert String.contains?(csp, "'nonce-abc123'")
+      assert String.contains?(csp, "script-src")
+      assert String.contains?(csp, "script-src-elem")
 
-    # script-src-elem: nonces required for inline <script> blocks; no strict-dynamic.
-    # External: Cloudflare Web Analytics, same-origin + CDNs.
-    assert String.contains?(csp, "script-src-elem 'self' 'nonce-abc123'")
-    assert String.contains?(csp, "https://static.cloudflareinsights.com")
-    assert String.contains?(csp, "connect-src")
-    assert String.contains?(csp, "img-src")
+      # script-src-elem: nonces required for inline <script> blocks; no strict-dynamic.
+      # External: Cloudflare Web Analytics, same-origin + CDNs.
+      assert String.contains?(csp, "script-src-elem 'self' 'nonce-abc123'")
+      assert String.contains?(csp, "https://static.cloudflareinsights.com")
+      assert String.contains?(csp, "connect-src")
+      assert String.contains?(csp, "img-src")
+    end)
   end
 
   test "adds HSTS header only in production and only for https" do
-    # production (anything other than :dev) + https
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
 
-    https_conn =
-      conn(:get, "/")
-      |> Map.put(:scheme, :https)
-      |> SecurityHeaders.call([])
+      https_conn =
+        conn(:get, "/")
+        |> Map.put(:scheme, :https)
+        |> SecurityHeaders.call([])
 
-    assert get_resp_header(https_conn, "strict-transport-security") != []
+      assert get_resp_header(https_conn, "strict-transport-security") != []
 
-    http_conn =
-      conn(:get, "/")
-      |> Map.put(:scheme, :http)
-      |> SecurityHeaders.call([])
+      http_conn =
+        conn(:get, "/")
+        |> Map.put(:scheme, :http)
+        |> SecurityHeaders.call([])
 
-    assert get_resp_header(http_conn, "strict-transport-security") == []
+      assert get_resp_header(http_conn, "strict-transport-security") == []
+    end)
   end
 
   test "in production, CSP includes upgrade-insecure-requests" do
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
 
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "n")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "n")
+        |> SecurityHeaders.call([])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert String.contains?(csp, "upgrade-insecure-requests")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert String.contains?(csp, "upgrade-insecure-requests")
+    end)
   end
 
   test "in dev, CSP does not include upgrade-insecure-requests" do
-    Application.put_env(:ysc, :environment, :dev)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
+    Ysc.Test.EnvHelper.with_environment(:dev, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
 
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "n")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "n")
+        |> SecurityHeaders.call([])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    refute String.contains?(csp, "upgrade-insecure-requests")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      refute String.contains?(csp, "upgrade-insecure-requests")
+    end)
   end
 
   test "skips CSP on LiveDashboard paths but still sets other security headers" do
-    Application.put_env(:ysc, :environment, :dev)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
+    Ysc.Test.EnvHelper.with_environment(:dev, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
 
-    conn = SecurityHeaders.call(conn(:get, "/admin/dashboard/live"), [])
+      conn = SecurityHeaders.call(conn(:get, "/admin/dashboard/live"), [])
 
-    assert get_resp_header(conn, "content-security-policy") == []
-    assert get_resp_header(conn, "referrer-policy") != []
-    assert get_resp_header(conn, "x-frame-options") != []
+      assert get_resp_header(conn, "content-security-policy") == []
+      assert get_resp_header(conn, "referrer-policy") != []
+      assert get_resp_header(conn, "x-frame-options") != []
+    end)
   end
 
   test "uses empty nonce when csp_nonce assign is missing" do
-    Application.put_env(:ysc, :environment, :dev)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
+    Ysc.Test.EnvHelper.with_environment(:dev, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: true)
 
-    conn = SecurityHeaders.call(conn(:get, "/"), [])
+      conn = SecurityHeaders.call(conn(:get, "/"), [])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert String.contains?(csp, "'nonce-'")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert String.contains?(csp, "'nonce-'")
+    end)
   end
 
   test "in production, sets HSTS when x-forwarded-proto is https even if scheme is http" do
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
 
-    conn =
-      conn(:get, "/")
-      |> Map.put(:scheme, :http)
-      |> put_req_header("x-forwarded-proto", "https")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> Map.put(:scheme, :http)
+        |> put_req_header("x-forwarded-proto", "https")
+        |> SecurityHeaders.call([])
 
-    assert get_resp_header(conn, "strict-transport-security") != []
+      assert get_resp_header(conn, "strict-transport-security") != []
+    end)
   end
 
   test "includes connect-src and frame rules for production without dev localhost" do
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
 
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "n")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "n")
+        |> SecurityHeaders.call([])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    refute String.contains?(csp, "http://localhost:*")
-    assert String.contains?(csp, "connect-src")
-    assert String.contains?(csp, "frame-ancestors 'self'")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      refute String.contains?(csp, "http://localhost:*")
+      assert String.contains?(csp, "connect-src")
+      assert String.contains?(csp, "frame-ancestors 'self'")
+    end)
   end
 
   test "adds custom S3 base URL hosts to img-src and connect-src" do
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
-    Application.put_env(:ysc, :s3_base_url, "https://cdn.example.com")
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+      Application.put_env(:ysc, :s3_base_url, "https://cdn.example.com")
 
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "x")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "x")
+        |> SecurityHeaders.call([])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert String.contains?(csp, "https://cdn.example.com")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert String.contains?(csp, "https://cdn.example.com")
+    end)
   end
 
   test "omits Tigris virtual-host wildcard from connect-src when all S3 public URLs are set" do
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
-    Application.put_env(:ysc, :s3_base_url, "https://fly.storage.tigris.dev")
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+      Application.put_env(:ysc, :s3_base_url, "https://fly.storage.tigris.dev")
 
-    keys = [
-      :s3_media_public_url,
-      :s3_avatars_public_url,
-      :s3_expense_reports_public_url
-    ]
+      keys = [
+        :s3_media_public_url,
+        :s3_avatars_public_url,
+        :s3_expense_reports_public_url
+      ]
 
-    previous = Enum.map(keys, &Application.get_env(:ysc, &1))
+      previous = Enum.map(keys, &Application.get_env(:ysc, &1))
 
-    on_exit(fn ->
-      Enum.zip(keys, previous)
-      |> Enum.each(fn {k, v} ->
-        if v == nil,
-          do: Application.delete_env(:ysc, k),
-          else: Application.put_env(:ysc, k, v)
+      on_exit(fn ->
+        Enum.zip(keys, previous)
+        |> Enum.each(fn {k, v} ->
+          if v == nil,
+            do: Application.delete_env(:ysc, k),
+            else: Application.put_env(:ysc, k, v)
+        end)
       end)
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://assets.example.com"
+      )
+
+      Application.put_env(
+        :ysc,
+        :s3_avatars_public_url,
+        "https://avatars.example.com"
+      )
+
+      Application.put_env(
+        :ysc,
+        :s3_expense_reports_public_url,
+        "https://expenses.example.com"
+      )
+
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "x")
+        |> SecurityHeaders.call([])
+
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert String.contains?(csp, "https://assets.example.com")
+      assert String.contains?(csp, "https://avatars.example.com")
+      assert String.contains?(csp, "https://expenses.example.com")
+      refute String.contains?(csp, "fly.storage.tigris.dev")
     end)
-
-    Application.put_env(
-      :ysc,
-      :s3_media_public_url,
-      "https://assets.example.com"
-    )
-
-    Application.put_env(
-      :ysc,
-      :s3_avatars_public_url,
-      "https://avatars.example.com"
-    )
-
-    Application.put_env(
-      :ysc,
-      :s3_expense_reports_public_url,
-      "https://expenses.example.com"
-    )
-
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "x")
-      |> SecurityHeaders.call([])
-
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert String.contains?(csp, "https://assets.example.com")
-    assert String.contains?(csp, "https://avatars.example.com")
-    assert String.contains?(csp, "https://expenses.example.com")
-    refute String.contains?(csp, "fly.storage.tigris.dev")
   end
 
   test "adds S3 public storage URLs to connect-src for custom Tigris domains" do
-    Application.put_env(:ysc, :environment, :prod)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
-    old_media = Application.get_env(:ysc, :s3_media_public_url)
+    Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+      old_media = Application.get_env(:ysc, :s3_media_public_url)
 
-    on_exit(fn ->
-      if old_media == nil do
-        Application.delete_env(:ysc, :s3_media_public_url)
-      else
-        Application.put_env(:ysc, :s3_media_public_url, old_media)
-      end
+      on_exit(fn ->
+        if old_media == nil do
+          Application.delete_env(:ysc, :s3_media_public_url)
+        else
+          Application.put_env(:ysc, :s3_media_public_url, old_media)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :s3_media_public_url,
+        "https://assets.example.com"
+      )
+
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "x")
+        |> SecurityHeaders.call([])
+
+      [csp] = get_resp_header(conn, "content-security-policy")
+      assert String.contains?(csp, "connect-src")
+      assert String.contains?(csp, "https://assets.example.com")
     end)
-
-    Application.put_env(
-      :ysc,
-      :s3_media_public_url,
-      "https://assets.example.com"
-    )
-
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "x")
-      |> SecurityHeaders.call([])
-
-    [csp] = get_resp_header(conn, "content-security-policy")
-    assert String.contains?(csp, "connect-src")
-    assert String.contains?(csp, "https://assets.example.com")
   end
 
   test "omits MinIO connect host when code_reloader is false" do
-    Application.put_env(:ysc, :environment, :dev)
-    Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
-    Application.put_env(:ysc, :s3_base_url, "https://cdn.example.com")
+    Ysc.Test.EnvHelper.with_environment(:dev, fn ->
+      Application.put_env(:ysc, YscWeb.Endpoint, code_reloader: false)
+      Application.put_env(:ysc, :s3_base_url, "https://cdn.example.com")
 
-    conn =
-      conn(:get, "/")
-      |> assign(:csp_nonce, "n")
-      |> SecurityHeaders.call([])
+      conn =
+        conn(:get, "/")
+        |> assign(:csp_nonce, "n")
+        |> SecurityHeaders.call([])
 
-    [csp] = get_resp_header(conn, "content-security-policy")
-    refute String.contains?(csp, "http://localhost:9000")
+      [csp] = get_resp_header(conn, "content-security-policy")
+      refute String.contains?(csp, "http://localhost:9000")
+    end)
   end
 end

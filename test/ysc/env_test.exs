@@ -1,5 +1,10 @@
 defmodule Ysc.EnvTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+
+  setup do
+    Ysc.Test.EnvHelper.reset_environment!()
+    :ok
+  end
 
   setup do
     Ysc.Test.EnvHelper.reset_environment!()
