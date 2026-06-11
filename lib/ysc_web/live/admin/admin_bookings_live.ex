@@ -2351,7 +2351,14 @@ defmodule YscWeb.AdminBookingsLive do
                 clear_event="clear-reservation-search"
               />
             </div>
-            <div class="py-6 w-full overflow-x-auto">
+            <div
+              :if={is_nil(@reservation_meta)}
+              id="reservations-loading"
+              class="py-16 text-center text-sm text-zinc-500"
+            >
+              Loading reservations…
+            </div>
+            <div :if={@reservation_meta} class="py-6 w-full overflow-x-auto">
               <Flop.Phoenix.table
                 id="admin_reservations_list"
                 items={@streams.reservations}
@@ -3438,6 +3445,8 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:filtered_seasons, [])
       |> assign(:filtered_pricing_rules, [])
       |> assign(:filtered_refund_policies, [])
+      # Empty stream so reservations section renders on dead connect before data loads
+      |> stream(:reservations, [], reset: true)
 
     # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do
@@ -3757,24 +3766,21 @@ defmodule YscWeb.AdminBookingsLive do
             socket
           end
 
-        socket =
-          if pending_refunds_count_task do
-            pending_refunds_count =
-              Task.await(pending_refunds_count_task, :infinity)
+        if pending_refunds_count_task do
+          pending_refunds_count =
+            Task.await(pending_refunds_count_task, :infinity)
 
-            socket
-            |> assign(:pending_refunds_count, pending_refunds_count)
-            |> assign(:pending_refund_badges_loaded?, true)
-          else
-            socket
-          end
-
-        apply_action(socket, socket.assigns.live_action, params)
+          socket
+          |> assign(:pending_refunds_count, pending_refunds_count)
+          |> assign(:pending_refund_badges_loaded?, true)
+        else
+          socket
+        end
       else
         socket
       end
 
-    {:noreply, socket}
+    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
   end
 
   # Parse query parameters, handling malformed/double-encoded URLs
