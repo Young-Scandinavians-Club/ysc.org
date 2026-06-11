@@ -17,8 +17,7 @@ defmodule YscWeb.Components.Image do
         src={Image.blur_hash_for_display(@image)}
         class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
         phx-hook="BlurHashCanvas"
-      >
-      </canvas>
+      ></canvas>
 
       <img
         src={image_url(@image, @preferred_type)}

@@ -654,8 +654,7 @@ defmodule YscWeb.AdminHelp.Ghost.Previews do
                 "mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full",
                 idx == 1 && "bg-blue-600",
                 idx != 1 && "bg-zinc-300"
-              ]}>
-              </span>
+              ]}></span>
               <div class="flex-1 space-y-1.5 pb-3 border-b border-zinc-100 last:border-0">
                 <.admin_ghost_bar width="w-40" height="h-3" />
                 <.admin_ghost_bar width="w-full" height="h-2.5" />

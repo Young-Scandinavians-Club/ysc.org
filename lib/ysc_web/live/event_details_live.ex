@@ -383,8 +383,7 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
                 <%= if !event_in_past?(@event) && @event.state != :cancelled do %>
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
-                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse">
-                    </span>
+                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
                     <span class="text-xs font-black text-blue-600 uppercase tracking-widest">
                       Upcoming
                     </span>
@@ -1050,8 +1049,7 @@ defmodule YscWeb.EventDetailsLive do
                   location={@event.location_name}
                   size="4"
                   lightMode="bodyScheme"
-                >
-                </add-to-calendar-button>
+                ></add-to-calendar-button>
               </div>
             </div>
 

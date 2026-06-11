@@ -1633,8 +1633,7 @@ defmodule YscWeb.AdminMediaLive do
                 src={Media.Image.blur_hash_for_display(item)}
                 class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
                 phx-hook="BlurHashCanvas"
-              >
-              </canvas>
+              ></canvas>
 
               <img
                 class={[

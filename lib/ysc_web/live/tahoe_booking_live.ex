@@ -1782,8 +1782,7 @@ defmodule YscWeb.TahoeBookingLive do
                                 }
                                 class="absolute inset-0 z-0 w-full h-full object-cover"
                                 phx-hook="BlurHashCanvas"
-                              >
-                              </canvas>
+                              ></canvas>
                               <img
                                 src={get_room_image_url(room.image)}
                                 id={"image-room-#{room.id}"}
@@ -1986,8 +1985,7 @@ defmodule YscWeb.TahoeBookingLive do
                                 }
                                 class="absolute inset-0 z-0 w-full h-full object-cover"
                                 phx-hook="BlurHashCanvas"
-                              >
-                              </canvas>
+                              ></canvas>
                               <img
                                 src={get_room_image_url(room.image)}
                                 id={"image-room-disabled-#{room.id}"}

@@ -796,8 +796,7 @@ defmodule YscWeb.HomeLive do
                   src={Image.blur_hash_for_display(event.image)}
                   class="absolute inset-0 z-0 w-full h-full object-cover"
                   phx-hook="BlurHashCanvas"
-                >
-                </canvas>
+                ></canvas>
                 <img
                   src={event_image_url(event.image)}
                   id={"image-event-#{event.id}"}
@@ -937,8 +936,7 @@ defmodule YscWeb.HomeLive do
                   src={Image.blur_hash_for_display(post.featured_image)}
                   class="absolute inset-0 z-0 w-full h-full object-cover"
                   phx-hook="BlurHashCanvas"
-                >
-                </canvas>
+                ></canvas>
                 <img
                   src={featured_image_url_for_news(post.featured_image)}
                   id={"image-news-#{post.id}"}
@@ -1925,8 +1923,7 @@ defmodule YscWeb.HomeLive do
                             src={Image.blur_hash_for_display(post.featured_image)}
                             class="absolute inset-0 z-0 w-full h-full object-cover"
                             phx-hook="BlurHashCanvas"
-                          >
-                          </canvas>
+                          ></canvas>
                           <img
                             src={thumbnail_image_url(post.featured_image)}
                             id={"image-sidebar-#{post.id}"}

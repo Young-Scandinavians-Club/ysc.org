@@ -55,8 +55,7 @@ defmodule YscWeb.AdminHelpComponents do
             <span class={[
               "block h-1.5 rounded-full transition-colors duration-150",
               stepper_bar_class(idx, @active_step)
-            ]}>
-            </span>
+            ]}></span>
             <span class={[
               "mt-2 hidden items-center gap-1.5 text-xs leading-5 md:flex",
               stepper_label_class(idx, @active_step)
@@ -258,8 +257,7 @@ defmodule YscWeb.AdminHelpComponents do
             aria-hidden="true"
           >
             <span class="admin-help-hotspot-beacon"></span>
-            <span class="admin-help-hotspot-ping admin-help-hotspot-ping--hint">
-            </span>
+            <span class="admin-help-hotspot-ping admin-help-hotspot-ping--hint"></span>
           </span>
           <span
             :if={!Hotspot.hint?(hotspot)}

@@ -1686,8 +1686,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           class="w-full border-0"
                           style="min-height: 400px; height: 600px;"
                           phx-hook="EmailPreview"
-                        >
-                        </iframe>
+                        ></iframe>
                       <% else %>
                         <div class="p-4">
                           <p class="text-sm text-zinc-400 italic">

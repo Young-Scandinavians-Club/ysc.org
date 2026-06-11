@@ -373,8 +373,7 @@ defmodule LivePhone do
       phx-value-country={@country.code}
       role="option"
     >
-      <span class={"live_phone-country-item-flag rounded-full w-6 h-6 fi fi-" <>  String.downcase(@country.code)}>
-      </span>
+      <span class={"live_phone-country-item-flag rounded-full w-6 h-6 fi fi-" <>  String.downcase(@country.code)}></span>
       <span class="live_phone-country-item-name text-zinc-600 inline-block text-sm px-2 whitespace-nowrap text-ellipsis overflow-hidden">
         {@country.name}
       </span>
