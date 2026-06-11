@@ -229,6 +229,84 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     end
   end
 
+  describe "calendar booking continuation indicators" do
+    setup [:create_admin]
+
+    # Bypass season/advance-booking rules so dates are fully deterministic.
+    defp insert_tahoe_buyout_booking!(user_id, checkin, checkout) do
+      %Ysc.Bookings.Booking{}
+      |> Ysc.Bookings.Booking.changeset(
+        %{
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 2,
+          property: :tahoe,
+          booking_mode: :buyout,
+          user_id: user_id,
+          status: :complete,
+          total_price: Money.new(200, :USD)
+        },
+        skip_validation: true
+      )
+      |> Repo.insert!()
+    end
+
+    defp calendar_view(conn, from_date, to_date) do
+      live(
+        conn,
+        ~p"/admin/bookings?property=tahoe&from_date=#{from_date}&to_date=#{to_date}"
+      )
+    end
+
+    test "shows left continuation when booking started before the visible range",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{first_name: "Spill", last_name: "Before"})
+      insert_tahoe_buyout_booking!(user.id, ~D[2030-06-05], ~D[2030-06-15])
+
+      {:ok, view, _html} = calendar_view(conn, "2030-06-10", "2030-06-20")
+
+      html = render(view)
+      assert html =~ "calendar-booking-continues-left"
+      refute html =~ "calendar-booking-continues-right"
+      assert html =~ "Continues before view"
+      refute html =~ "Continues after view"
+    end
+
+    test "shows right continuation when booking ends after the visible range",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{first_name: "Spill", last_name: "After"})
+      insert_tahoe_buyout_booking!(user.id, ~D[2030-07-10], ~D[2030-07-25])
+
+      {:ok, view, _html} = calendar_view(conn, "2030-07-10", "2030-07-20")
+
+      html = render(view)
+      assert html =~ "calendar-booking-continues-right"
+      refute html =~ "calendar-booking-continues-left"
+      assert html =~ "Continues after view"
+      refute html =~ "Continues before view"
+    end
+
+    test "shows both continuation edges when booking spans the entire visible range",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{first_name: "Spill", last_name: "Both"})
+      insert_tahoe_buyout_booking!(user.id, ~D[2030-08-01], ~D[2030-08-31])
+
+      {:ok, view, _html} = calendar_view(conn, "2030-08-10", "2030-08-20")
+
+      html = render(view)
+      assert html =~ "calendar-booking-continues-left"
+      assert html =~ "calendar-booking-continues-right"
+      assert html =~ "Continues before view"
+      assert html =~ "Continues after view"
+    end
+  end
+
   describe "calendar date selection" do
     setup [:create_admin]
 
