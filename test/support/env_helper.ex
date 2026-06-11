@@ -35,5 +35,10 @@ defmodule Ysc.Test.EnvHelper do
   defp restore(nil), do: Application.delete_env(:ysc, :environment)
   defp restore(value), do: Application.put_env(:ysc, :environment, value)
 
+  @doc false
+  def restore_environment!(original) do
+    trans(fn -> restore(original) end)
+  end
+
   defp trans(fun), do: :global.trans(@lock, fun, [Node.self()], :infinity)
 end
