@@ -1176,23 +1176,34 @@ defmodule YscWeb.SecurityAuditTest do
 
   describe "Finding 20: event admin user search blocks email enumeration" do
     test "search_users_for_staff_lookup does not match partial email domains" do
-      user_fixture(%{email: "roster.member@gmail.com", phone_number: "+14159098271"})
+      user_fixture(%{
+        email: "roster.member@gmail.com",
+        phone_number: "+14159098271"
+      })
 
       assert Accounts.search_users_for_staff_lookup("@gmail") == []
       assert Accounts.search_users_for_staff_lookup("member@gmail") == []
     end
 
-    test "volunteer event host search does not return members for @gmail query", %{
-      conn: conn
-    } do
-      user_fixture(%{email: "visible.member@gmail.com", phone_number: "+14159098272"})
-      volunteer = user_fixture(%{role: :volunteer, phone_number: "+14159098273"})
+    test "volunteer event host search does not return members for @gmail query",
+         %{
+           conn: conn
+         } do
+      user_fixture(%{
+        email: "visible.member@gmail.com",
+        phone_number: "+14159098272"
+      })
+
+      volunteer =
+        user_fixture(%{role: :volunteer, phone_number: "+14159098273"})
+
       event = event_fixture(%{organizer_id: volunteer.id})
 
       conn = log_in_user(conn, volunteer)
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
 
-      element(view, "#host-search-input") |> render_keyup(%{"value" => "@gmail"})
+      element(view, "#host-search-input")
+      |> render_keyup(%{"value" => "@gmail"})
 
       refute has_element?(view, "#host-search-results")
     end

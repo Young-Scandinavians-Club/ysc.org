@@ -641,7 +641,11 @@ defmodule Ysc.AccountsTest do
           phone_number: "+14159098268"
         })
 
-      assert Enum.any?(Accounts.search_users_for_staff_lookup("Ast"), &(&1.id == user.id))
+      assert Enum.any?(
+               Accounts.search_users_for_staff_lookup("Ast"),
+               &(&1.id == user.id)
+             )
+
       assert Accounts.search_users_for_staff_lookup("As") == []
     end
 
@@ -662,7 +666,9 @@ defmodule Ysc.AccountsTest do
           phone_number: "+14159098270"
         })
 
-      assert [%{id: id}] = Accounts.search_users_for_staff_lookup("host.lookup@example.com")
+      assert [%{id: id}] =
+               Accounts.search_users_for_staff_lookup("host.lookup@example.com")
+
       assert id == user.id
     end
   end
