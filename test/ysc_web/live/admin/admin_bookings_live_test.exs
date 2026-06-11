@@ -19,6 +19,11 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     %{conn: log_in_user(conn, user), admin: user}
   end
 
+  defp section_label("calendar"), do: "Calendar"
+  defp section_label("config"), do: "Configuration"
+  defp section_label("pending_refunds"), do: "Pending Refunds"
+  defp section_label("reservations"), do: "Reservations"
+
   defp insert_pending_refund!(property) do
     user = user_fixture()
     booking = booking_fixture(%{user_id: user.id, property: property})
@@ -520,6 +525,39 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert_patch(view)
       assert has_element?(view, "#booking-modal")
       assert render(view) =~ "Booking Details"
+      assert render(view) =~ unique
+    end
+
+    test "keeps reservations table populated after switching section tabs", %{
+      conn: conn
+    } do
+      unique = "TabSwitch#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      assert render(view) =~ unique
+
+      for section <- ["calendar", "config", "pending_refunds", "reservations"] do
+        view
+        |> element(
+          "button[phx-value-section=#{section}]",
+          section_label(section)
+        )
+        |> render_click()
+
+        assert_patch(view)
+      end
+
+      assert has_element?(view, "#admin_reservations_list")
       assert render(view) =~ unique
     end
 

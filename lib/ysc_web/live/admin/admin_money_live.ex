@@ -1157,7 +1157,11 @@ defmodule YscWeb.AdminMoneyLive do
       <!-- Date Range Filter -->
       <div class="mb-6 bg-white p-4 rounded border">
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Date Range Filter</h3>
-        <form phx-submit="update_date_range" class="flex gap-4 items-end">
+        <form
+          id="money-date-range-form"
+          phx-submit="update_date_range"
+          class="flex gap-4 items-end"
+        >
           <div>
             <label
               for="start_date"
@@ -1688,6 +1692,7 @@ defmodule YscWeb.AdminMoneyLive do
 
         <.form
           for={@refund_form}
+          id="refund-form"
           phx-submit="process_refund"
           phx-change="validate_refund"
         >
@@ -1849,6 +1854,7 @@ defmodule YscWeb.AdminMoneyLive do
 
         <.form
           for={@credit_form}
+          id="credit-form"
           phx-submit="process_credit"
           phx-change="validate_credit"
         >

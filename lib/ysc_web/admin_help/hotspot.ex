@@ -102,9 +102,6 @@ defmodule YscWeb.AdminHelp.Hotspot do
   def style_class(%{style: :hint}), do: "admin-help-hotspot--hint"
   def style_class(_), do: nil
 
-  def print_marker_class(%{style: :hint}), do: "admin-help-print-marker--hint"
-  def print_marker_class(_), do: nil
-
   def hint?(%{style: :hint}), do: true
   def hint?(_), do: false
 
@@ -160,20 +157,6 @@ defmodule YscWeb.AdminHelp.Hotspot do
       layout_css_vars(collapsed, "collapsed")
     ]
     |> Enum.join(" ")
-  end
-
-  @doc "Print layout uses the expanded sidebar baseline (no live toggle)."
-  def print_css_vars(%{expanded: expanded}) do
-    expanded
-    |> layout_css_vars("expanded")
-    |> String.replace(
-      "var(--admin-help-sidebar-pct)",
-      "#{@expanded_sidebar_pct}%"
-    )
-    |> String.replace(
-      "var(--admin-help-content-pct)",
-      "#{@expanded_content_pct}%"
-    )
   end
 
   defp layout_css_vars(%{area: :content, x: x, y: y, w: w, h: h}, suffix) do

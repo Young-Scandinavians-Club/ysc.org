@@ -1098,6 +1098,7 @@ defmodule YscWeb.HomeLive do
           </p>
 
           <form
+            id="home-newsletter-form"
             phx-submit="subscribe_newsletter"
             class="mt-8"
             aria-labelledby="newsletter-heading"

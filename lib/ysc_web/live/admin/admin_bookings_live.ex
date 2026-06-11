@@ -1949,6 +1949,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div class="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-4">
               <!-- Date Range Inputs -->
               <form
+                id="calendar-range-form"
                 phx-change="update-calendar-range"
                 phx-debounce="300"
                 class="flex flex-row items-center gap-2"
@@ -3697,7 +3698,8 @@ defmodule YscWeb.AdminBookingsLive do
                  socket,
                  params,
                  dates_changed,
-                 property_changed
+                 property_changed,
+                 section_changed
                ) do
             load_reservations(socket, params)
           else
@@ -4902,19 +4904,15 @@ defmodule YscWeb.AdminBookingsLive do
       end
 
     socket =
-      socket
-      |> assign(:current_section, section_atom)
-      |> then(fn s ->
-        if section_atom == :reservations do
-          assign(
-            s,
-            :reservations_path,
-            build_reservations_path(s, query_params)
-          )
-        else
-          s
-        end
-      end)
+      if section_atom == :reservations do
+        assign(
+          socket,
+          :reservations_path,
+          build_reservations_path(socket, query_params)
+        )
+      else
+        socket
+      end
 
     # Flatten nested maps before encoding
     flattened_params = flatten_query_params(query_params)
@@ -7270,11 +7268,13 @@ defmodule YscWeb.AdminBookingsLive do
          socket,
          params,
          dates_changed,
-         property_changed
+         property_changed,
+         section_changed
        ) do
     match?(%Flop.Meta{}, socket.assigns[:reservation_meta]) &&
       not dates_changed &&
       not property_changed &&
+      not section_changed &&
       not reservation_params_changed?(
         socket.assigns[:reservation_params],
         params

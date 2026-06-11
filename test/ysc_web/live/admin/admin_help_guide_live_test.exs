@@ -103,6 +103,45 @@ defmodule YscWeb.AdminHelpGuideLiveTest do
            )
   end
 
+  test "FAQ and troubleshooting live on a separate help tab", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/admin/help/posts/publish")
+
+    assert has_element?(view, "#admin-help-guide-tabs")
+    refute has_element?(view, "#admin-help-appendix-faq")
+
+    view |> element("#admin-help-guide-tabs-help") |> render_click()
+    assert_patch(view, "/admin/help/posts%2Fpublish?step=1&view=help")
+
+    assert has_element?(view, "#admin-help-appendix-faq", "featured image")
+
+    assert has_element?(
+             view,
+             "#admin-help-appendix-troubleshooting",
+             "settings modal"
+           )
+
+    refute has_element?(view, "#admin-help-step-0")
+
+    view |> element("#admin-help-guide-tabs-steps") |> render_click()
+    assert_patch(view, "/admin/help/posts%2Fpublish?step=1")
+    assert has_element?(view, "#admin-help-step-0")
+    refute has_element?(view, "#admin-help-appendix-faq")
+  end
+
+  test "help tab deep-links from the URL", %{conn: conn} do
+    {:ok, view, _html} =
+      live(conn, ~p"/admin/help/posts/publish?view=help&step=3")
+
+    assert has_element?(view, "#admin-help-appendix-faq")
+
+    assert has_element?(
+             view,
+             "#admin-help-guide-tabs-help[aria-current='page']"
+           )
+
+    refute has_element?(view, "#admin-help-step-2")
+  end
+
   test "print button triggers print-page event", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/admin/help/posts/publish")
 

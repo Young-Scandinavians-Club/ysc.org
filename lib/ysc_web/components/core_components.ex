@@ -284,17 +284,21 @@ defmodule YscWeb.CoreComponents do
     default: nil,
     doc: "the server side parameter to collect all input under"
 
+  attr :id, :string, default: nil
+
   attr :rest, :global,
     include:
-      ~w(autocomplete name rel action enctype method novalidate target multipart),
+      ~w(autocomplete name rel action enctype method novalidate target multipart phx-change phx-submit phx-target phx-auto-recover phx-hook phx-update class),
     doc: "the arbitrary HTML attributes to apply to the form tag"
 
   slot :inner_block, required: true
   slot :actions, doc: "the slot for form actions, such as a submit button"
 
   def simple_form(assigns) do
+    assigns = ensure_simple_form_id(assigns)
+
     ~H"""
-    <.form :let={f} for={@for} as={@as} {@rest}>
+    <.form :let={f} for={@for} as={@as} id={@id} {@rest}>
       <div class="space-y-8 bg-white">
         {render_slot(@inner_block, f)}
         <div
@@ -307,6 +311,35 @@ defmodule YscWeb.CoreComponents do
     </.form>
     """
   end
+
+  defp ensure_simple_form_id(assigns) do
+    if is_nil(assigns.id) && simple_form_has_phx_change?(assigns) do
+      assign(assigns, :id, infer_simple_form_id(assigns))
+    else
+      assigns
+    end
+  end
+
+  defp simple_form_has_phx_change?(assigns) do
+    rest_has_phx_change?(assigns.rest)
+  end
+
+  defp rest_has_phx_change?(rest) when is_map(rest) do
+    Map.has_key?(rest, "phx-change") || Map.has_key?(rest, :"phx-change")
+  end
+
+  defp rest_has_phx_change?(_), do: false
+
+  defp infer_simple_form_id(%{for: %Phoenix.HTML.Form{id: id}})
+       when is_binary(id) and id != "",
+       do: id
+
+  defp infer_simple_form_id(%{for: %Phoenix.HTML.Form{name: name}})
+       when is_binary(name) and name != "",
+       do: "#{name}-form"
+
+  defp infer_simple_form_id(%{as: as}) when not is_nil(as), do: "#{as}-form"
+  defp infer_simple_form_id(_), do: "form-#{System.unique_integer([:positive])}"
 
   @doc """
   Renders a `<button>` or a LiveView `<.link>` styled as a button.

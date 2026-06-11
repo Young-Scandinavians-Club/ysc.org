@@ -1045,7 +1045,7 @@ defmodule YscWeb.TahoeBookingLive do
                   Select how you'd like to book the Tahoe cabin:
                 </p>
                 <fieldset>
-                  <form phx-change="booking-mode-changed">
+                  <form id="booking-mode-form" phx-change="booking-mode-changed">
                     <div
                       class="grid grid-cols-1 md:grid-cols-2 gap-4"
                       role="radiogroup"

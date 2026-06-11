@@ -1859,6 +1859,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   Search by email. Link an existing user or invite a new one.
                 </p>
                 <form
+                  id="add-family-user-search-form"
                   phx-change="search_add_family_user"
                   phx-debounce="200"
                   class="space-y-3"

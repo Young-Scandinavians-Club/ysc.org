@@ -623,8 +623,7 @@ defmodule YscWeb.AdminScannerLiveTest do
     end
 
     test "resume param with unknown session id shows not found flash", %{
-      conn: conn,
-      admin: admin
+      conn: conn
     } do
       missing_id = Ecto.ULID.generate()
 

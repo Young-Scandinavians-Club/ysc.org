@@ -13,7 +13,12 @@ defmodule YscWeb.AdminSearchComponent do
   def render(assigns) do
     ~H"""
     <div id={"admin-search-#{@id}"} class="relative w-full" phx-hook="AdminSearch">
-      <form phx-change="search" phx-target={@myself} class="relative">
+      <form
+        id={"admin-search-#{@id}-form"}
+        phx-change="search"
+        phx-target={@myself}
+        class="relative"
+      >
         <div class="absolute inset-y-0 rtl:inset-r-0 start-0 flex items-center ps-3 pointer-events-none">
           <.icon name="hero-magnifying-glass" class="w-5 h-5 text-zinc-500" />
         </div>

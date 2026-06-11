@@ -2125,7 +2125,11 @@ defmodule YscWeb.EventDetailsLive do
                       end) %>
 
                     <%!-- Streamlined Dropdown for "Who is this ticket for?" --%>
-                    <form phx-change="select-ticket-attendee" phx-debounce="100">
+                    <form
+                      id={"ticket-#{ticket.id}-attendee-form"}
+                      phx-change="select-ticket-attendee"
+                      phx-debounce="100"
+                    >
                       <input
                         type="hidden"
                         name="ticket_id"
@@ -2186,7 +2190,11 @@ defmodule YscWeb.EventDetailsLive do
                     </form>
 
                     <%!-- Manual Entry Form (shown when "Someone else" is selected) --%>
-                    <form phx-change="update-registration-field" phx-debounce="500">
+                    <form
+                      id={"ticket-#{ticket.id}-registration-form"}
+                      phx-change="update-registration-field"
+                      phx-debounce="500"
+                    >
                       <div
                         id={"ticket_#{ticket.id}_registration_fields"}
                         class={[
@@ -2571,7 +2579,11 @@ defmodule YscWeb.EventDetailsLive do
           </p>
         </div>
 
-        <form phx-submit="submit-registration" class="space-y-6">
+        <form
+          id="ticket-registration-form"
+          phx-submit="submit-registration"
+          class="space-y-6"
+        >
           <%= for ticket <- @tickets_requiring_registration do %>
             <% ticket_id_str = to_string(ticket.id)
             ticket_detail = Map.get(@ticket_registration_details_by_id, ticket.id)
@@ -2826,7 +2838,11 @@ defmodule YscWeb.EventDetailsLive do
                   end) %>
 
                 <%!-- Streamlined Dropdown for "Who is this ticket for?" --%>
-                <form phx-change="select-ticket-attendee" phx-debounce="100">
+                <form
+                  id={"ticket-#{ticket.id}-attendee-form"}
+                  phx-change="select-ticket-attendee"
+                  phx-debounce="100"
+                >
                   <input
                     type="hidden"
                     name="ticket_id"
@@ -2887,7 +2903,11 @@ defmodule YscWeb.EventDetailsLive do
                 </form>
 
                 <%!-- Manual Entry Form (shown when "Someone else" is selected) --%>
-                <form phx-change="update-registration-field" phx-debounce="500">
+                <form
+                  id={"ticket-#{ticket.id}-registration-form"}
+                  phx-change="update-registration-field"
+                  phx-debounce="500"
+                >
                   <div
                     id={"ticket_#{ticket.id}_registration_fields"}
                     class={[

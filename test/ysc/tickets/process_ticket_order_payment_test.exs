@@ -39,6 +39,12 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
           def create_customer(_params), do: {:error, :not_implemented}
           def update_customer(_id, _params), do: {:error, :not_implemented}
           def retrieve_payment_method(_id), do: {:error, :not_implemented}
+          def list_events(_params, _opts), do: {:error, :not_implemented}
+          def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+          def list_balance_transactions(_params, _opts),
+            do: {:error, :not_implemented}
 
           def retrieve_payment_intent(id, _opts) do
             {:ok,
