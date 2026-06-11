@@ -638,7 +638,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       <.link
                         phx-click="delete-agenda"
                         phx-value-id={agenda.id}
-                        alt="delete agenda"
+                        aria-label="delete agenda"
                       >
                         <.icon
                           name="hero-trash"
