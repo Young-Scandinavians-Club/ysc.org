@@ -16,7 +16,13 @@ defmodule YscWeb.UserConfirmationInstructionsLive do
         id="resend_confirmation_form"
         phx-submit="send_instructions"
       >
-        <.input field={@form[:email]} type="email" placeholder="Email" required />
+        <.input
+          field={@form[:email]}
+          type="email"
+          label="Email address"
+          placeholder="you@example.com"
+          required
+        />
         <:actions>
           <.button phx-disable-with="Sending..." class="w-full">
             Send verification email

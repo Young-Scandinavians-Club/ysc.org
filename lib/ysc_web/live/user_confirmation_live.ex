@@ -77,7 +77,7 @@ defmodule YscWeb.UserConfirmationLive do
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "This confirmation link is invalid or has expired. Request a new one from the sign-in page.",
+               "This confirmation link is invalid or has expired. Visit our resend page to request a new one.",
                title: "Email confirmation"
              )
              |> redirect(to: ~p"/")}

@@ -675,7 +675,7 @@ defmodule YscWeb.FamilyManagementLive do
                     phx-click="delete_family_member"
                     phx-value-id={member.id}
                     phx-disable-with="Removing..."
-                    data-confirm="Remove this family member from your account? This does not affect linked accounts."
+                    data-confirm="Remove this family member from your list? This only removes their details from your account. It does not remove anyone who has already accepted an invitation and appears under Linked Family Members."
                     class="text-red-600 hover:text-red-800"
                   >
                     Remove
