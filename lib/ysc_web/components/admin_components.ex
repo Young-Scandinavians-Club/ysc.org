@@ -1028,6 +1028,9 @@ defmodule YscWeb.AdminComponents do
 
   - `variant={:muted}` — zinc active state (default; newsletter subscriber filters).
   - `variant={:primary}` — blue active state (URL patch filters such as membership type).
+  - `variant={:dark}` — dark active state (compact media-library year filters).
+  - `size={:compact}` — smaller text and padding (media-library year pills).
+  - `shape={:pill}` — fully rounded pill shape.
 
   Use `patch` or `navigate` for LiveView URL-driven filters; pass `phx-click` and
   `phx-value-*` via `rest` for event-driven filters.
@@ -1037,8 +1040,18 @@ defmodule YscWeb.AdminComponents do
 
   attr :variant, :atom,
     default: :muted,
-    values: [:muted, :primary],
+    values: [:muted, :primary, :dark],
     doc: ":primary uses blue background when active (patch-based list filters)"
+
+  attr :size, :atom,
+    default: :default,
+    values: [:default, :compact],
+    doc: ":compact for smaller media-library year pills"
+
+  attr :shape, :atom,
+    default: :rounded,
+    values: [:rounded, :pill],
+    doc: ":pill for fully rounded filter pills"
 
   attr :patch, :any, default: nil
   attr :navigate, :any, default: nil
@@ -1049,7 +1062,7 @@ defmodule YscWeb.AdminComponents do
 
   attr :rest, :global,
     include:
-      ~w(phx-click phx-value-filter phx-value-section id disabled aria-label)
+      ~w(phx-click phx-target phx-value-filter phx-value-section phx-value-year id disabled aria-label)
 
   slot :inner_block, required: true
 
@@ -1060,7 +1073,7 @@ defmodule YscWeb.AdminComponents do
         id={@id}
         patch={@patch}
         navigate={@navigate}
-        class={admin_toggle_pill_class(@active, @variant, @class)}
+        class={admin_toggle_pill_class(@active, @variant, @size, @shape, @class)}
       >
         {render_slot(@inner_block)}
       </.link>
@@ -1068,7 +1081,7 @@ defmodule YscWeb.AdminComponents do
       <button
         id={@id}
         type="button"
-        class={admin_toggle_pill_class(@active, @variant, @class)}
+        class={admin_toggle_pill_class(@active, @variant, @size, @shape, @class)}
         {@rest}
       >
         {render_slot(@inner_block)}
@@ -1077,13 +1090,21 @@ defmodule YscWeb.AdminComponents do
     """
   end
 
-  defp admin_toggle_pill_class(active, variant, extra) do
+  defp admin_toggle_pill_class(active, variant, size, shape, extra) do
     [
-      "rounded px-3 py-1.5 text-sm font-medium transition-colors",
+      admin_toggle_pill_shape(shape),
+      admin_toggle_pill_size(size),
+      "font-medium transition-colors",
       admin_toggle_pill_state(active, variant),
       extra
     ]
   end
+
+  defp admin_toggle_pill_shape(:rounded), do: "rounded"
+  defp admin_toggle_pill_shape(:pill), do: "rounded-full"
+
+  defp admin_toggle_pill_size(:default), do: "px-3 py-1.5 text-sm"
+  defp admin_toggle_pill_size(:compact), do: "px-2.5 py-1 text-xs"
 
   defp admin_toggle_pill_state(true, :muted), do: "bg-zinc-200 text-zinc-800"
 
@@ -1094,6 +1115,158 @@ defmodule YscWeb.AdminComponents do
 
   defp admin_toggle_pill_state(false, :primary),
     do: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+
+  defp admin_toggle_pill_state(true, :dark), do: "bg-zinc-800 text-white"
+
+  defp admin_toggle_pill_state(false, :dark),
+    do: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+
+  # ---------------------------------------------------------------------------
+  # admin_media_library_browser
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Searchable, year-filtered media library grid for admin image pickers.
+
+  Used by `YscWeb.MediaPickerComponent` and `YscWeb.TrixImagePickerComponent`.
+  Parent LiveComponents must handle `search-media`, `filter-year`, `load-more-media`,
+  and `select-image` events.
+
+  ## Examples
+
+      <.admin_media_library_browser
+        id={@id}
+        target={@myself}
+        search={@search}
+        selected_year={@selected_year}
+        available_years={@available_years}
+        picker_images={@streams.picker_images}
+        end_of_timeline?={@end_of_timeline?}
+      />
+  """
+  attr :id, :string, required: true
+  attr :grid_id, :string, required: true, doc: "DOM id for the stream grid container"
+  attr :target, :any, required: true, doc: "phx-target (typically @myself)"
+  attr :search, :string, required: true
+  attr :selected_year, :any, default: nil
+  attr :available_years, :list, required: true
+  attr :picker_images, :any, required: true, doc: "LiveView stream of images"
+  attr :end_of_timeline?, :boolean, default: false
+
+  def admin_media_library_browser(assigns) do
+    ~H"""
+    <div class="space-y-4">
+      <div class="flex flex-col sm:flex-row gap-3">
+        <form
+          id={"#{@id}-search-form"}
+          phx-change="search-media"
+          phx-target={@target}
+          class="flex-1"
+        >
+          <.input
+            type="text"
+            name="search"
+            value={@search}
+            placeholder="Search by title or alt text..."
+            phx-debounce="300"
+          />
+        </form>
+
+        <.admin_year_filter_pills
+          target={@target}
+          selected_year={@selected_year}
+          available_years={@available_years}
+        />
+      </div>
+
+      <div
+        id={@grid_id}
+        phx-update="stream"
+        phx-viewport-bottom="load-more-media"
+        phx-target={@target}
+        class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto pr-1"
+      >
+        <button
+          :for={{dom_id, image} <- @picker_images}
+          type="button"
+          id={dom_id}
+          phx-click="select-image"
+          phx-target={@target}
+          phx-value-image-id={image.id}
+          class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
+        >
+          <img
+            src={media_library_thumbnail_url(image)}
+            alt={image.alt_text || image.title || "Image"}
+            loading="lazy"
+            class="absolute inset-0 w-full h-full object-cover"
+          />
+          <div
+            :if={image.title}
+            class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
+          >
+            <p class="text-xs text-white truncate">{image.title}</p>
+          </div>
+        </button>
+      </div>
+
+      <p :if={@end_of_timeline?} class="text-center text-xs text-zinc-400 py-2">
+        No more images
+      </p>
+    </div>
+    """
+  end
+
+  attr :target, :any, required: true
+  attr :selected_year, :any, default: nil
+  attr :available_years, :list, required: true
+
+  defp admin_year_filter_pills(assigns) do
+    ~H"""
+    <div class="flex flex-wrap gap-1.5 items-center">
+      <.admin_toggle_pill
+        active={@selected_year == nil}
+        variant={:dark}
+        size={:compact}
+        shape={:pill}
+        phx-click="filter-year"
+        phx-target={@target}
+        phx-value-year=""
+      >
+        All
+      </.admin_toggle_pill>
+      <.admin_toggle_pill
+        :for={year <- @available_years}
+        active={@selected_year == year}
+        variant={:dark}
+        size={:compact}
+        shape={:pill}
+        phx-click="filter-year"
+        phx-target={@target}
+        phx-value-year={year}
+      >
+        {year}
+      </.admin_toggle_pill>
+    </div>
+    """
+  end
+
+  @doc """
+  Resolves the best available thumbnail URL for a media library image.
+  """
+  def media_library_thumbnail_url(%{thumbnail_path: path})
+      when is_binary(path) and path != "",
+      do: path
+
+  def media_library_thumbnail_url(%{optimized_image_path: path})
+      when is_binary(path) and path != "",
+      do: path
+
+  def media_library_thumbnail_url(%{raw_image_path: path})
+      when is_binary(path) and path != "",
+      do: path
+
+  def media_library_thumbnail_url(_), do: "/images/ysc_logo.webp"
 
   # ---------------------------------------------------------------------------
   # side_menu

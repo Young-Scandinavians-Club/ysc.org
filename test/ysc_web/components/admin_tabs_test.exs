@@ -155,5 +155,39 @@ defmodule YscWeb.AdminTabsTest do
       assert html =~ ~s(href="/admin/memberships?type=single")
       refute html =~ "bg-zinc-200 text-zinc-800"
     end
+
+    test "dark compact pill variant for media-library year filters" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_toggle_pill
+          variant={:dark}
+          size={:compact}
+          shape={:pill}
+          active={true}
+          phx-click="filter-year"
+          phx-value-year=""
+        >
+          All
+        </.admin_toggle_pill>
+        <.admin_toggle_pill
+          variant={:dark}
+          size={:compact}
+          shape={:pill}
+          active={false}
+          phx-click="filter-year"
+          phx-value-year="2024"
+        >
+          2024
+        </.admin_toggle_pill>
+        """)
+
+      assert html =~ "bg-zinc-800 text-white"
+      assert html =~ "rounded-full"
+      assert html =~ "text-xs"
+      assert html =~ "bg-zinc-100 text-zinc-600"
+      assert html =~ ~s(phx-value-year="2024")
+    end
   end
 end
