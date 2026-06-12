@@ -16,7 +16,14 @@ defmodule YscWeb.AdminEventsLive do
       role={@admin_role}
     >
       <div class="flex justify-between py-6">
-        <.admin_page_title>Events</.admin_page_title>
+        <div class="flex items-center gap-2">
+          <.admin_page_title>Events</.admin_page_title>
+          <.admin_help_link
+            topic="events/create"
+            label="How to create an event"
+            role={@admin_role}
+          />
+        </div>
 
         <div class="flex items-center gap-3">
           <.button navigate={~p"/admin/scanner"}>

@@ -707,10 +707,37 @@ defmodule Ysc.ExpenseReports do
   # Calculations
 
   def calculate_totals(%ExpenseReport{} = expense_report) do
+    if preloaded_items?(expense_report) do
+      calculate_totals_from_preloaded(expense_report)
+    else
+      calculate_totals_from_db(expense_report)
+    end
+  end
+
+  defp preloaded_items?(%ExpenseReport{
+         expense_items: expense_items,
+         income_items: income_items
+       }) do
+    Ecto.assoc_loaded?(expense_items) and Ecto.assoc_loaded?(income_items)
+  end
+
+  defp calculate_totals_from_preloaded(%ExpenseReport{} = expense_report) do
+    expense_total = sum_item_amounts(expense_report.expense_items)
+    income_total = sum_item_amounts(expense_report.income_items)
+    net_total = money_sub_or_zero(expense_total, income_total)
+
+    %{
+      expense_total: expense_total,
+      income_total: income_total,
+      net_total: net_total
+    }
+  end
+
+  defp calculate_totals_from_db(%ExpenseReport{id: expense_report_id}) do
     expense_total =
       case Repo.one(
              from ei in ExpenseReportItem,
-               where: ei.expense_report_id == ^expense_report.id,
+               where: ei.expense_report_id == ^expense_report_id,
                select: sum(fragment("(?.amount).amount", ei))
            ) do
         nil -> Money.new(0, :USD)
@@ -720,24 +747,36 @@ defmodule Ysc.ExpenseReports do
     income_total =
       case Repo.one(
              from ii in ExpenseReportIncomeItem,
-               where: ii.expense_report_id == ^expense_report.id,
+               where: ii.expense_report_id == ^expense_report_id,
                select: sum(fragment("(?.amount).amount", ii))
            ) do
         nil -> Money.new(0, :USD)
         amount -> Money.new(amount, :USD)
       end
 
-    net_total =
-      case Money.sub(expense_total, income_total) do
-        {:ok, result} -> result
-        _ -> Money.new(0, :USD)
-      end
+    net_total = money_sub_or_zero(expense_total, income_total)
 
     %{
       expense_total: expense_total,
       income_total: income_total,
       net_total: net_total
     }
+  end
+
+  defp sum_item_amounts(items) do
+    Enum.reduce(items, Money.new(0, :USD), fn item, acc ->
+      case Money.add(acc, item.amount) do
+        {:ok, result} -> result
+        _ -> acc
+      end
+    end)
+  end
+
+  defp money_sub_or_zero(expense_total, income_total) do
+    case Money.sub(expense_total, income_total) do
+      {:ok, result} -> result
+      _ -> Money.new(0, :USD)
+    end
   end
 
   # S3 Upload for Expense Reports

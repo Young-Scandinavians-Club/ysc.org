@@ -30,7 +30,9 @@ defmodule Mix.Tasks.ShellLint do
 
     Path.wildcard(Path.join(root, "**/*.sh"))
     |> Enum.reject(fn path ->
-      String.contains?(path, "/_build/") or String.contains?(path, "/deps/")
+      String.contains?(path, "/_build/") or
+        String.contains?(path, "/deps/") or
+        String.contains?(path, "/node_modules/")
     end)
   end
 

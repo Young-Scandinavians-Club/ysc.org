@@ -168,6 +168,8 @@ defmodule YscWeb.AdminDashboardLiveTest do
 
     test "shows volunteer stats row instead of admin metrics", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
+      assert has_element?(view, "#volunteer-help-banner")
+      assert has_element?(view, "#volunteer-help-banner a[href='/admin/help']")
       assert has_element?(view, "#volunteer-stats-row")
       refute has_element?(view, "#admin-stats-row")
       assert has_element?(view, "#dashboard-events-timeline")

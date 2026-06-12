@@ -317,6 +317,122 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Closed session authorization
+  # ---------------------------------------------------------------------------
+
+  describe "closed session authorization" do
+    test "another admin cannot open a closed membership check-in desk", %{
+      conn: conn
+    } do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      member = make_active_member()
+      {:ok, _} = Scanning.check_in_member(session, member, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      other_admin = user_fixture(%{role: "admin"})
+      conn = log_in_user(conn, other_admin)
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      assert to == ~p"/admin/scanner/sessions"
+    end
+
+    test "session creator can still open a closed membership check-in desk", %{
+      conn: conn
+    } do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      conn = log_in_user(conn, owner)
+
+      assert {:ok, view, _html} =
+               live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      assert has_element?(view, "#export-csv-btn")
+    end
+
+    test "another admin cannot export CSV from a closed membership check-in desk",
+         %{
+           conn: conn
+         } do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      member = make_active_member()
+      {:ok, _} = Scanning.check_in_member(session, member, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      other_admin = user_fixture(%{role: "admin"})
+      conn = log_in_user(conn, other_admin)
+
+      assert {:error, {:live_redirect, _}} =
+               live(conn, ~p"/admin/membership-check-in/#{session.id}")
+    end
+
+    test "redirects when session does not exist", %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      conn = log_in_user(conn, admin)
+      missing_id = Ecto.ULID.generate()
+
+      assert {:error, {:live_redirect, %{to: to}}} =
+               live(conn, ~p"/admin/membership-check-in/#{missing_id}")
+
+      assert to == ~p"/admin/scanner/sessions"
+    end
+
+    test "creator can export CSV from a closed membership check-in desk", %{
+      conn: conn
+    } do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      member = make_active_member()
+      {:ok, _} = Scanning.check_in_member(session, member, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+      conn = log_in_user(conn, owner)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      view
+      |> element("#export-csv-btn")
+      |> render_click()
+
+      assert_push_event(view, "download-csv", %{content: _b64, filename: fname})
+      assert fname =~ "membership_checkin_#{session.id}"
+    end
+
+    test "non-owner gets error flash when exporting CSV after session closes",
+         %{
+           conn: conn
+         } do
+      owner = user_fixture(%{role: "admin"})
+      other_admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      conn = log_in_user(conn, other_admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/membership-check-in/#{session.id}")
+
+      {:ok, _} = Scanning.close_session(session.id)
+
+      html =
+        view
+        |> element("#export-csv-btn")
+        |> render_click()
+
+      assert html =~
+               "You can only export membership check-in sessions you created after they are closed."
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Launch QR scanner
   # ---------------------------------------------------------------------------
 

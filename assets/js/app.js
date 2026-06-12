@@ -26,7 +26,7 @@ import { LiveSocket } from "phoenix_live_view";
 import topbar from "../vendor/topbar";
 import "../vendor/add-to-calendar-button@2.js";
 import LivePhone from "./live_phone";
-import StickyNavbar from "./sticky_navbar";
+import StickyNavbar, { syncNavHeight } from "./sticky_navbar";
 import Uploaders from "./uploaders";
 import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
@@ -223,6 +223,12 @@ window.addEventListener("phx:focus-first-input", (e) => {
     }, 150);
 });
 
+// Measure navbar before LiveView connects so the spacer matches on first paint.
+syncNavHeight();
+if (document.fonts?.ready) {
+    document.fonts.ready.then(syncNavHeight);
+}
+
 // connect if there are any LiveViews on the page
 liveSocket.connect();
 
@@ -383,8 +389,24 @@ document.addEventListener("paste", (event) => {
     }
 });
 
-// Handle print-page event for PDF download
-window.addEventListener("phx:print-page", () => {
+// Handle print-page event for PDF download (optional detail.title for the saved PDF name)
+window.addEventListener("phx:print-page", (event) => {
+    const title = event.detail?.title;
+
+    if (!title) {
+        window.print();
+        return;
+    }
+
+    const previousTitle = document.title;
+    document.title = title;
+
+    const restoreTitle = () => {
+        document.title = previousTitle;
+        window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    window.addEventListener("afterprint", restoreTitle);
     window.print();
 });
 

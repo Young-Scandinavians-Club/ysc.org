@@ -29,10 +29,14 @@ defmodule Ysc.Tickets.BookingValidator do
   - `{:error, reason}` if booking is invalid
   """
   def validate_booking(user_id, event_id, ticket_selections) do
+    tiers_by_id = batch_load_tiers(Map.keys(ticket_selections))
+
     with :ok <- validate_user(user_id),
          :ok <- validate_event(event_id),
-         :ok <- validate_ticket_selections(event_id, ticket_selections),
-         :ok <- validate_capacity(event_id, ticket_selections, user_id) do
+         :ok <-
+           validate_ticket_selections(event_id, ticket_selections, tiers_by_id),
+         :ok <-
+           validate_capacity(event_id, ticket_selections, user_id, tiers_by_id) do
       validate_concurrent_booking(user_id, event_id)
     end
   end
@@ -152,27 +156,26 @@ defmodule Ysc.Tickets.BookingValidator do
     end
   end
 
-  defp validate_ticket_selections(event_id, ticket_selections) do
-    if Enum.empty?(ticket_selections) do
-      {:error, :no_tickets_selected}
-    else
-      # Validate each tier exists and is available for sale
-      tier_validations =
-        ticket_selections
-        |> Enum.map(fn {tier_id, quantity} ->
-          validate_tier_selection(event_id, tier_id, quantity)
-        end)
+  defp validate_ticket_selections(_event_id, ticket_selections, _tiers_by_id)
+       when ticket_selections == %{} do
+    {:error, :no_tickets_selected}
+  end
 
-      if Enum.any?(tier_validations, &(&1 != :ok)) do
-        {:error, :invalid_tier_selection}
-      else
-        :ok
-      end
+  defp validate_ticket_selections(event_id, ticket_selections, tiers_by_id) do
+    tier_validations =
+      Enum.map(ticket_selections, fn {tier_id, quantity} ->
+        validate_tier_selection(event_id, tier_id, quantity, tiers_by_id)
+      end)
+
+    if Enum.any?(tier_validations, &(&1 != :ok)) do
+      {:error, :invalid_tier_selection}
+    else
+      :ok
     end
   end
 
-  defp validate_tier_selection(event_id, tier_id, quantity) do
-    case get_ticket_tier(tier_id) do
+  defp validate_tier_selection(event_id, tier_id, quantity, tiers_by_id) do
+    case Map.get(tiers_by_id, tier_id) do
       nil ->
         {:error, :tier_not_found}
 
@@ -193,28 +196,51 @@ defmodule Ysc.Tickets.BookingValidator do
     end
   end
 
-  defp validate_capacity(event_id, ticket_selections, user_id) do
+  defp validate_capacity(event_id, ticket_selections, user_id, tiers_by_id) do
     event = Events.get_event!(event_id)
 
     # Check if user has reservations that would allow bypassing capacity
     user_has_reservations = user_has_reservations_for_event?(user_id, event_id)
 
+    non_donation_tier_ids =
+      non_donation_tier_ids(ticket_selections, tiers_by_id)
+
+    sold_counts = batch_count_sold_tickets_for_tiers(non_donation_tier_ids)
+
+    reserved_counts =
+      batch_count_reserved_tickets_for_tiers(non_donation_tier_ids)
+
+    user_reserved_counts =
+      if user_id do
+        batch_user_reserved_quantities(non_donation_tier_ids, user_id)
+      else
+        %{}
+      end
+
+    non_donation_qty =
+      non_donation_ticket_quantity(ticket_selections, tiers_by_id)
+
     # Check if event is already at capacity (unless user has reservations or only donations)
-    if not user_has_reservations and
-         non_donation_ticket_quantity(ticket_selections) > 0 and
+    if not user_has_reservations and non_donation_qty > 0 and
          event_at_capacity?(event) do
       {:error, :event_at_capacity}
     else
       # Check each tier capacity (donation tiers skip tier/event capacity)
       tier_capacity_validations =
-        ticket_selections
-        |> Enum.map(fn {tier_id, quantity} ->
-          case get_ticket_tier(tier_id) do
+        Enum.map(ticket_selections, fn {tier_id, quantity} ->
+          case Map.get(tiers_by_id, tier_id) do
             %{type: type} when type in [:donation, "donation"] ->
               :ok
 
-            _ ->
-              check_tier_capacity(tier_id, quantity, user_id)
+            tier ->
+              check_tier_capacity_with_context(
+                tier,
+                quantity,
+                user_id,
+                sold_counts,
+                reserved_counts,
+                user_reserved_counts
+              )
           end
         end)
 
@@ -224,10 +250,8 @@ defmodule Ysc.Tickets.BookingValidator do
          ) do
         {:error, :tier_capacity_exceeded}
       else
-        total_requested = non_donation_ticket_quantity(ticket_selections)
-
         if user_has_reservations or
-             within_event_capacity?(event, total_requested) do
+             within_event_capacity?(event, non_donation_qty) do
           :ok
         else
           {:error, :event_capacity_exceeded}
@@ -377,10 +401,9 @@ defmodule Ysc.Tickets.BookingValidator do
     Events.count_tickets_sold_excluding_donations(event_id)
   end
 
-  defp non_donation_ticket_quantity(ticket_selections) do
-    ticket_selections
-    |> Enum.reduce(0, fn {tier_id, quantity}, acc ->
-      case get_ticket_tier(tier_id) do
+  defp non_donation_ticket_quantity(ticket_selections, tiers_by_id) do
+    Enum.reduce(ticket_selections, 0, fn {tier_id, quantity}, acc ->
+      case Map.get(tiers_by_id, tier_id) do
         %{type: type} when type in [:donation, "donation"] ->
           acc
 
@@ -388,6 +411,126 @@ defmodule Ysc.Tickets.BookingValidator do
           acc + quantity
       end
     end)
+  end
+
+  defp non_donation_tier_ids(ticket_selections, tiers_by_id) do
+    ticket_selections
+    |> Enum.flat_map(fn {tier_id, _quantity} ->
+      case Map.get(tiers_by_id, tier_id) do
+        %{type: type} when type in [:donation, "donation"] -> []
+        _ -> [tier_id]
+      end
+    end)
+  end
+
+  defp check_tier_capacity_with_context(
+         tier,
+         requested_quantity,
+         user_id,
+         sold_counts,
+         reserved_counts,
+         user_reserved_counts
+       ) do
+    available =
+      get_available_tier_quantity_with_counts(
+        tier,
+        user_id,
+        sold_counts,
+        reserved_counts,
+        user_reserved_counts
+      )
+
+    cond do
+      available == :unlimited ->
+        :ok
+
+      requested_quantity <= available ->
+        :ok
+
+      true ->
+        {:error, :insufficient_capacity}
+    end
+  end
+
+  defp get_available_tier_quantity_with_counts(
+         %TicketTier{quantity: nil},
+         _user_id,
+         _sold_counts,
+         _reserved_counts,
+         _user_reserved_counts
+       ),
+       do: :unlimited
+
+  defp get_available_tier_quantity_with_counts(
+         %TicketTier{quantity: 0},
+         _user_id,
+         _sold_counts,
+         _reserved_counts,
+         _user_reserved_counts
+       ),
+       do: :unlimited
+
+  defp get_available_tier_quantity_with_counts(
+         %TicketTier{id: tier_id, quantity: total_quantity},
+         user_id,
+         sold_counts,
+         reserved_counts,
+         user_reserved_counts
+       ) do
+    sold_count = Map.get(sold_counts, tier_id, 0)
+    reserved_count = Map.get(reserved_counts, tier_id, 0)
+    available = max(0, total_quantity - sold_count - reserved_count)
+
+    if user_id do
+      available + Map.get(user_reserved_counts, tier_id, 0)
+    else
+      available
+    end
+  end
+
+  defp batch_load_tiers([]), do: %{}
+
+  defp batch_load_tiers(tier_ids) do
+    from(tt in TicketTier, where: tt.id in ^tier_ids)
+    |> Repo.all()
+    |> Map.new(&{&1.id, &1})
+  end
+
+  defp batch_count_sold_tickets_for_tiers([]), do: %{}
+
+  defp batch_count_sold_tickets_for_tiers(tier_ids) do
+    from(t in Ticket,
+      where:
+        t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
+      group_by: t.ticket_tier_id,
+      select: {t.ticket_tier_id, count(t.id)}
+    )
+    |> Repo.all()
+    |> Map.new()
+  end
+
+  defp batch_count_reserved_tickets_for_tiers([]), do: %{}
+
+  defp batch_count_reserved_tickets_for_tiers(tier_ids) do
+    from(tr in TicketReservation, where: tr.ticket_tier_id in ^tier_ids)
+    |> Events.where_ticket_reservation_hold_active()
+    |> group_by([tr], tr.ticket_tier_id)
+    |> select([tr], {tr.ticket_tier_id, sum(tr.quantity)})
+    |> Repo.all()
+    |> Map.new(fn {tier_id, count} -> {tier_id, count || 0} end)
+  end
+
+  defp batch_user_reserved_quantities([], _user_id), do: %{}
+
+  defp batch_user_reserved_quantities(tier_ids, user_id) do
+    from(tr in TicketReservation,
+      where: tr.ticket_tier_id in ^tier_ids and tr.user_id == ^user_id
+    )
+    |> Events.where_ticket_reservation_hold_active()
+    |> group_by([tr], tr.ticket_tier_id)
+    |> select([tr], {tr.ticket_tier_id, sum(tr.quantity)})
+    |> Repo.all()
+    |> Map.new(fn {tier_id, count} -> {tier_id, count || 0} end)
   end
 
   defp count_sold_tickets_for_tier(tier_id) do

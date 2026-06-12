@@ -96,6 +96,52 @@ defmodule Ysc.AccountsTest do
     Accounts.get_user!(user.id, [:subscriptions])
   end
 
+  defp user_with_cancelled_subscription(attrs) do
+    user = user_fixture(attrs)
+
+    {:ok, _subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_cancelled_#{System.unique_integer()}",
+        stripe_status: "cancelled",
+        name: "Cancelled Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    user
+  end
+
+  defp user_with_expired_subscription(attrs) do
+    user = user_fixture(attrs)
+
+    {:ok, _subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_expired_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Expired Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+      })
+
+    user
+  end
+
+  defp user_with_past_ends_at_subscription(attrs) do
+    user = user_fixture(attrs)
+
+    {:ok, _subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_ended_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Ended Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 30, :day),
+        ends_at: DateTime.add(DateTime.utc_now(), -1, :day)
+      })
+
+    user
+  end
+
   describe "get_user_by_email/1" do
     test "does not return the user if the email does not exist" do
       refute Accounts.get_user_by_email("unknown@example.com")
@@ -2009,6 +2055,44 @@ defmodule Ysc.AccountsTest do
       assert Enum.any?(Accounts.list_memberships(limit: 500), fn m ->
                m.primary_user.id == primary.id and m.type == :single
              end)
+    end
+
+    test "list_memberships and get_membership_stats exclude primaries with only inactive subscriptions" do
+      cancelled =
+        user_with_cancelled_subscription(%{phone_number: unique_user_phone()})
+
+      expired_period =
+        user_with_expired_subscription(%{phone_number: unique_user_phone()})
+
+      ended =
+        user_with_past_ends_at_subscription(%{
+          phone_number: unique_user_phone()
+        })
+
+      active =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      memberships = Accounts.list_memberships(limit: 500)
+
+      refute Enum.any?(memberships, fn m ->
+               m.primary_user.id == cancelled.id
+             end)
+
+      refute Enum.any?(memberships, fn m ->
+               m.primary_user.id == expired_period.id
+             end)
+
+      refute Enum.any?(memberships, fn m -> m.primary_user.id == ended.id end)
+
+      refute Accounts.has_active_membership?(cancelled)
+      refute Accounts.has_active_membership?(expired_period)
+      refute Accounts.has_active_membership?(ended)
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+
+      if membership_plans != [] do
+        assert Enum.any?(memberships, fn m -> m.primary_user.id == active.id end)
+      end
     end
   end
 

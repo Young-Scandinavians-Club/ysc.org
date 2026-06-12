@@ -39,7 +39,12 @@ defmodule YscWeb.AdminUsersLive do
           />
         </div>
 
-        <.simple_form for={@user_edit_form} phx-change="validate" phx-submit="save">
+        <.simple_form
+          for={@user_edit_form}
+          id="user-edit-form"
+          phx-change="validate"
+          phx-submit="save"
+        >
           <.input field={@user_edit_form[:email]} label="Email" />
           <.input field={@user_edit_form[:first_name]} label="First Name" />
           <.input field={@user_edit_form[:last_name]} label="Last Name" />
@@ -403,6 +408,7 @@ defmodule YscWeb.AdminUsersLive do
               Include Fields
             </h3>
             <form
+              id="csv-export-form"
               phx-submit="export-csv"
               class="flex flex-col gap-y-2 justify-between"
             >

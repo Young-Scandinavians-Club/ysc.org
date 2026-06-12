@@ -25,6 +25,8 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
   setup :verify_on_exit!
 
   setup do
+    Ysc.Bookings.RefundPolicyCache.invalidate()
+
     Ledgers.ensure_basic_accounts()
     user = user_fixture()
     original_stripe_client = Application.get_env(:ysc, :stripe_client)

@@ -81,8 +81,7 @@ defmodule YscWeb.AdminPostEditorLive do
                 class={[
                   "h-full w-full"
                 ]}
-              >
-              </iframe>
+              ></iframe>
             </.phone_mockup>
 
             <.tablet_mockup :if={@preview_device == :tablet} class="m-auto">
@@ -91,8 +90,7 @@ defmodule YscWeb.AdminPostEditorLive do
                 class={[
                   "h-full w-full"
                 ]}
-              >
-              </iframe>
+              ></iframe>
             </.tablet_mockup>
 
             <iframe
@@ -101,8 +99,7 @@ defmodule YscWeb.AdminPostEditorLive do
               class={[
                 "h-full w-full"
               ]}
-            >
-            </iframe>
+            ></iframe>
           </div>
         </div>
       </.modal>
@@ -158,6 +155,13 @@ defmodule YscWeb.AdminPostEditorLive do
               >
                 {String.capitalize("#{@post.state}")}
               </.badge>
+
+              <.admin_help_link
+                topic="posts/publish"
+                label="Publishing help"
+                role={@admin_role}
+                class="self-center"
+              />
 
               <p class={[
                 "inline-flex shrink-0 items-center text-sm text-zinc-600 transition duration-200 ease-in-out",

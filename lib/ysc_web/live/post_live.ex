@@ -101,8 +101,7 @@ defmodule YscWeb.PostLive do
           src={Image.blur_hash_for_display(@post.featured_image)}
           class="absolute inset-0 z-0 w-full h-full object-cover"
           phx-hook="BlurHashCanvas"
-        >
-        </canvas>
+        ></canvas>
 
         <img
           src={featured_image_url(@post.featured_image)}

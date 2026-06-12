@@ -65,6 +65,12 @@ config :ysc, :emails,
   tahoe_email: System.get_env("EMAIL_TAHOE") || "tahoe@ysc.org",
   clear_lake_email: System.get_env("EMAIL_CLEAR_LAKE") || "cl@ysc.org"
 
+# OpenRouter — optional; powers admin help guide finder and step clarifier
+config :ysc, :open_router,
+  api_key: System.get_env("OPENROUTER_API_KEY"),
+  model: System.get_env("OPENROUTER_MODEL") || "google/gemma-3-27b-it",
+  referer: System.get_env("OPENROUTER_REFERER")
+
 # ## Apple Wallet Configuration
 #
 # Configure Apple Wallet pass generation for event tickets and membership cards.

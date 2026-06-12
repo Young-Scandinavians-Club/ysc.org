@@ -220,7 +220,14 @@ defmodule YscWeb.AdminNewslettersLive do
       role={@admin_role}
     >
       <div class="py-6">
-        <.admin_page_title>Newsletters</.admin_page_title>
+        <div class="flex items-center gap-2">
+          <.admin_page_title>Newsletters</.admin_page_title>
+          <.admin_help_link
+            topic="newsletters/compose"
+            label="How to compose a newsletter"
+            role={@admin_role}
+          />
+        </div>
         <p class="mt-0.5 text-sm text-zinc-500">
           <%= if is_nil(@subscriber_count) do %>
             Loading subscribers…
@@ -760,8 +767,7 @@ defmodule YscWeb.AdminNewslettersLive do
             </li>
             <li :if={@edition.status == :sending}>
               <span class="flex w-full items-center gap-2 px-4 py-2 text-left text-blue-600">
-                <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin">
-                </span>
+                <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></span>
                 <span>Sending…</span>
               </span>
             </li>

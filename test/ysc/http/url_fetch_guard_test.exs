@@ -34,16 +34,12 @@ defmodule Ysc.Http.UrlFetchGuardTest do
     end
 
     test "in prod mode rejects loopback literal IP" do
-      prev = Application.get_env(:ysc, :environment)
-
-      on_exit(fn -> Application.put_env(:ysc, :environment, prev) end)
-
-      Application.put_env(:ysc, :environment, "prod")
-
-      assert {:error, :blocked_ip} =
-               UrlFetchGuard.validate_url_for_server_fetch(
-                 "http://127.0.0.1:9/x.jpg"
-               )
+      Ysc.Test.EnvHelper.with_environment("prod", fn ->
+        assert {:error, :blocked_ip} =
+                 UrlFetchGuard.validate_url_for_server_fetch(
+                   "http://127.0.0.1:9/x.jpg"
+                 )
+      end)
     end
   end
 end

@@ -1686,8 +1686,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           class="w-full border-0"
                           style="min-height: 400px; height: 600px;"
                           phx-hook="EmailPreview"
-                        >
-                        </iframe>
+                        ></iframe>
                       <% else %>
                         <div class="p-4">
                           <p class="text-sm text-zinc-400 italic">
@@ -1860,6 +1859,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   Search by email. Link an existing user or invite a new one.
                 </p>
                 <form
+                  id="add-family-user-search-form"
                   phx-change="search_add_family_user"
                   phx-debounce="200"
                   class="space-y-3"
@@ -2350,70 +2350,74 @@ defmodule YscWeb.AdminUserDetailsLive do
        )}
     else
       socket =
-        case socket.assigns.live_action do
-          :orders ->
-            socket
-            |> stream(:ticket_orders, [], reset: true)
-            |> start_async(:load_ticket_orders, fn ->
-              Tickets.list_user_ticket_orders_paginated(user_id, params)
-            end)
-
-          :bookings ->
-            socket
-            |> stream(:bookings, [], reset: true)
-            |> start_async(:load_bookings, fn ->
-              Bookings.list_user_bookings_paginated(user_id, params)
-            end)
-            |> start_async(:load_booking_entitlements, fn ->
-              Entitlements.list_all_for_user(user_id)
-            end)
-
-          :notifications ->
-            user_email = socket.assigns.selected_user.email
-
-            start_async(socket, :load_notifications, fn ->
-              Messages.list_user_messages(user_id,
-                limit: 100,
-                email: user_email
-              )
-            end)
-
-          :bank_accounts ->
-            if socket.assigns.is_treasurer do
-              start_async(socket, :load_bank_accounts, fn ->
-                user = Accounts.get_user!(user_id)
-                ExpenseReports.list_bank_accounts(user)
-              end)
-            else
+        if connected?(socket) do
+          case socket.assigns.live_action do
+            :orders ->
               socket
-            end
+              |> stream(:ticket_orders, [], reset: true)
+              |> start_async(:load_ticket_orders, fn ->
+                Tickets.list_user_ticket_orders_paginated(user_id, params)
+              end)
 
-          :family ->
-            selected_user = socket.assigns.selected_user
+            :bookings ->
+              socket
+              |> stream(:bookings, [], reset: true)
+              |> start_async(:load_bookings, fn ->
+                Bookings.list_user_bookings_paginated(user_id, params)
+              end)
+              |> start_async(:load_booking_entitlements, fn ->
+                Entitlements.list_all_for_user(user_id)
+              end)
 
-            start_async(socket, :load_family, fn ->
-              fetch_family_assigns(selected_user)
-            end)
+            :notifications ->
+              user_email = socket.assigns.selected_user.email
 
-          :membership ->
-            selected_user = socket.assigns.selected_user
+              start_async(socket, :load_notifications, fn ->
+                Messages.list_user_messages(user_id,
+                  limit: 100,
+                  email: user_email
+                )
+              end)
 
-            start_async(socket, :load_family, fn ->
-              fetch_family_assigns(selected_user)
-            end)
+            :bank_accounts ->
+              if socket.assigns.is_treasurer do
+                start_async(socket, :load_bank_accounts, fn ->
+                  user = Accounts.get_user!(user_id)
+                  ExpenseReports.list_bank_accounts(user)
+                end)
+              else
+                socket
+              end
 
-          :logs ->
-            start_async(socket, :load_user_notes, fn ->
-              Accounts.list_user_notes(user_id)
-            end)
+            :family ->
+              selected_user = socket.assigns.selected_user
 
-          :application ->
-            start_async(socket, :load_rejection_notes, fn ->
-              Accounts.list_user_notes_by_category(user_id, :rejection)
-            end)
+              start_async(socket, :load_family, fn ->
+                fetch_family_assigns(selected_user)
+              end)
 
-          _ ->
-            socket
+            :membership ->
+              selected_user = socket.assigns.selected_user
+
+              start_async(socket, :load_family, fn ->
+                fetch_family_assigns(selected_user)
+              end)
+
+            :logs ->
+              start_async(socket, :load_user_notes, fn ->
+                Accounts.list_user_notes(user_id)
+              end)
+
+            :application ->
+              start_async(socket, :load_rejection_notes, fn ->
+                Accounts.list_user_notes_by_category(user_id, :rejection)
+              end)
+
+            _ ->
+              socket
+          end
+        else
+          socket
         end
 
       {:noreply, socket}

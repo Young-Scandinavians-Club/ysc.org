@@ -1,5 +1,15 @@
 defmodule Ysc.EnvTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+
+  setup do
+    Ysc.Test.EnvHelper.reset_environment!()
+    :ok
+  end
+
+  setup do
+    Ysc.Test.EnvHelper.reset_environment!()
+    :ok
+  end
 
   describe "current/0" do
     test "returns the configured environment as an atom" do
@@ -7,25 +17,15 @@ defmodule Ysc.EnvTest do
     end
 
     test "handles string environment configuration" do
-      original = Application.get_env(:ysc, :environment)
-
-      try do
-        Application.put_env(:ysc, :environment, "dev")
+      Ysc.Test.EnvHelper.with_environment("dev", fn ->
         assert Ysc.Env.current() == :dev
-      after
-        Application.put_env(:ysc, :environment, original)
-      end
+      end)
     end
 
     test "handles atom environment configuration" do
-      original = Application.get_env(:ysc, :environment)
-
-      try do
-        Application.put_env(:ysc, :environment, :dev)
+      Ysc.Test.EnvHelper.with_environment(:dev, fn ->
         assert Ysc.Env.current() == :dev
-      after
-        Application.put_env(:ysc, :environment, original)
-      end
+      end)
     end
   end
 

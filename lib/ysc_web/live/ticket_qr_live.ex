@@ -100,8 +100,7 @@ defmodule YscWeb.TicketQrLive do
               location={@event.location_name}
               size="4"
               lightMode="dark"
-            >
-            </add-to-calendar-button>
+            ></add-to-calendar-button>
           </div>
       <% end %>
 

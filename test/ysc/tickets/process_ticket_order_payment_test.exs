@@ -9,6 +9,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
   import Ecto.Query
   import Ysc.AccountsFixtures
 
+  alias Ysc.Ledgers
   alias Ysc.Tickets
 
   defp user_fixture_unique(attrs \\ %{}) do
@@ -38,6 +39,12 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
           def create_customer(_params), do: {:error, :not_implemented}
           def update_customer(_id, _params), do: {:error, :not_implemented}
           def retrieve_payment_method(_id), do: {:error, :not_implemented}
+          def list_events(_params, _opts), do: {:error, :not_implemented}
+          def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+          def list_balance_transactions(_params, _opts),
+            do: {:error, :not_implemented}
 
           def retrieve_payment_intent(id, _opts) do
             {:ok,
@@ -247,6 +254,46 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
       fn pi_id ->
         assert {:error, :cannot_complete_order} =
                  Tickets.process_ticket_order_payment(cancelled, pi_id)
+
+        refute Ledgers.get_payment_by_external_id(pi_id)
+      end
+    )
+  end
+
+  test "does not expire completed orders when timeout worker races payment", %{
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      end)
+
+    payment_intent_id = "pi_timeout_race_#{order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(order, pi_id)
+
+        assert completed.status == :completed
+
+        stale_pending = %{order | status: :pending}
+
+        assert {:ok, returned} = Tickets.expire_ticket_order(stale_pending)
+        assert returned.status == :completed
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket,
+              where: t.ticket_order_id == ^order.id
+          )
+
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
       end
     )
   end

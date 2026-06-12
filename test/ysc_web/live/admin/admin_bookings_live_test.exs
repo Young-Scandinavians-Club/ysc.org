@@ -19,6 +19,11 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     %{conn: log_in_user(conn, user), admin: user}
   end
 
+  defp section_label("calendar"), do: "Calendar"
+  defp section_label("config"), do: "Configuration"
+  defp section_label("pending_refunds"), do: "Pending Refunds"
+  defp section_label("reservations"), do: "Reservations"
+
   defp insert_pending_refund!(property) do
     user = user_fixture()
     booking = booking_fixture(%{user_id: user.id, property: property})
@@ -133,6 +138,58 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     end
   end
 
+  describe "deferred data loading" do
+    setup [:create_admin]
+
+    test "reservations section replaces loading placeholder with the table", %{
+      conn: conn
+    } do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      html = render(view)
+
+      refute html =~ "Loading reservations…"
+      assert has_element?(view, "#admin_reservations_list")
+      refute has_element?(view, "#reservations-loading")
+    end
+
+    test "switching to reservations section loads the table after connect", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/bookings?property=tahoe")
+
+      view
+      |> element("button[phx-value-section=reservations]", "Reservations")
+      |> render_click()
+
+      html = render(view)
+
+      refute html =~ "Loading reservations…"
+      assert has_element?(view, "#admin_reservations_list")
+    end
+
+    test "initial calendar mount issues at most one seasons query after connect",
+         %{conn: conn} do
+      seasons_pattern = ~r/FROM "seasons"/i
+
+      {{:ok, view, _initial_html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, initial_html} =
+              live(conn, ~p"/admin/bookings?property=tahoe")
+
+            render(view)
+            {:ok, view, initial_html}
+          end,
+          pattern: seasons_pattern
+        )
+
+      assert query_count <= 1
+      assert render(view) =~ "Calendar"
+    end
+  end
+
   describe "navigation and calendar controls" do
     setup [:create_admin]
 
@@ -226,6 +283,84 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       |> render_change()
 
       assert_patch(view)
+    end
+  end
+
+  describe "calendar booking continuation indicators" do
+    setup [:create_admin]
+
+    # Bypass season/advance-booking rules so dates are fully deterministic.
+    defp insert_tahoe_buyout_booking!(user_id, checkin, checkout) do
+      %Ysc.Bookings.Booking{}
+      |> Ysc.Bookings.Booking.changeset(
+        %{
+          checkin_date: checkin,
+          checkout_date: checkout,
+          guests_count: 2,
+          property: :tahoe,
+          booking_mode: :buyout,
+          user_id: user_id,
+          status: :complete,
+          total_price: Money.new(200, :USD)
+        },
+        skip_validation: true
+      )
+      |> Repo.insert!()
+    end
+
+    defp calendar_view(conn, from_date, to_date) do
+      live(
+        conn,
+        ~p"/admin/bookings?property=tahoe&from_date=#{from_date}&to_date=#{to_date}"
+      )
+    end
+
+    test "shows left continuation when booking started before the visible range",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{first_name: "Spill", last_name: "Before"})
+      insert_tahoe_buyout_booking!(user.id, ~D[2030-06-05], ~D[2030-06-15])
+
+      {:ok, view, _html} = calendar_view(conn, "2030-06-10", "2030-06-20")
+
+      html = render(view)
+      assert html =~ "calendar-booking-continues-left"
+      refute html =~ "calendar-booking-continues-right"
+      assert html =~ "Continues before view"
+      refute html =~ "Continues after view"
+    end
+
+    test "shows right continuation when booking ends after the visible range",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{first_name: "Spill", last_name: "After"})
+      insert_tahoe_buyout_booking!(user.id, ~D[2030-07-10], ~D[2030-07-25])
+
+      {:ok, view, _html} = calendar_view(conn, "2030-07-10", "2030-07-20")
+
+      html = render(view)
+      assert html =~ "calendar-booking-continues-right"
+      refute html =~ "calendar-booking-continues-left"
+      assert html =~ "Continues after view"
+      refute html =~ "Continues before view"
+    end
+
+    test "shows both continuation edges when booking spans the entire visible range",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{first_name: "Spill", last_name: "Both"})
+      insert_tahoe_buyout_booking!(user.id, ~D[2030-08-01], ~D[2030-08-31])
+
+      {:ok, view, _html} = calendar_view(conn, "2030-08-10", "2030-08-20")
+
+      html = render(view)
+      assert html =~ "calendar-booking-continues-left"
+      assert html =~ "calendar-booking-continues-right"
+      assert html =~ "Continues before view"
+      assert html =~ "Continues after view"
     end
   end
 
@@ -442,6 +577,39 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert_patch(view)
       assert has_element?(view, "#booking-modal")
       assert render(view) =~ "Booking Details"
+      assert render(view) =~ unique
+    end
+
+    test "keeps reservations table populated after switching section tabs", %{
+      conn: conn
+    } do
+      unique = "TabSwitch#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      assert render(view) =~ unique
+
+      for section <- ["calendar", "config", "pending_refunds", "reservations"] do
+        view
+        |> element(
+          "button[phx-value-section=#{section}]",
+          section_label(section)
+        )
+        |> render_click()
+
+        assert_patch(view)
+      end
+
+      assert has_element?(view, "#admin_reservations_list")
       assert render(view) =~ unique
     end
 

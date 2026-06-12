@@ -67,6 +67,32 @@ defmodule Ysc.Scanning do
     end
   end
 
+  @doc """
+  Authorizes access to an `event_membership` check-in desk.
+
+  Open sessions are collaborative: any admin or volunteer may join the desk.
+  Closed sessions are restricted to the operator who created them so other
+  volunteers cannot browse or export historical member PII.
+  """
+  def authorize_membership_checkin_access!(session_id, user_id) do
+    case Repo.get(ScanSession, session_id) do
+      %{type: :event_membership, created_by_id: ^user_id} ->
+        :ok
+
+      %{type: :event_membership, closed_at: nil} ->
+        :ok
+
+      %{type: :event_membership} ->
+        {:error, :unauthorized}
+
+      nil ->
+        {:error, :not_found}
+
+      %ScanSession{} ->
+        {:error, :unauthorized}
+    end
+  end
+
   def list_sessions(opts \\ []) do
     type_filter = Keyword.get(opts, :type)
 

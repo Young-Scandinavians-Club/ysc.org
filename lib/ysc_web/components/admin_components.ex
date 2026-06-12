@@ -971,8 +971,7 @@ defmodule YscWeb.AdminComponents do
   def admin_sending_badge(assigns) do
     ~H"""
     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin">
-      </span>
+      <span class="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
       {@label}
     </span>
     """
@@ -1482,6 +1481,39 @@ defmodule YscWeb.AdminComponents do
                   </span>
                 </.link>
               </li>
+
+              <li>
+                <.link
+                  navigate="/admin/help"
+                  title="Help"
+                  class={[
+                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                    if(@active_page == :help,
+                      do:
+                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                    )
+                  ]}
+                  aria-current={@active_page == :help}
+                >
+                  <.icon
+                    :if={@active_page == :help}
+                    name="hero-question-mark-circle"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                  />
+                  <.icon
+                    :if={@active_page != :help}
+                    name="hero-question-mark-circle"
+                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                  />
+                  <span class={[
+                    "admin-nav-label ms-3",
+                    @active_page == :help && "font-semibold"
+                  ]}>
+                    Help
+                  </span>
+                </.link>
+              </li>
             </ul>
           </div>
           <div
@@ -1741,7 +1773,14 @@ defmodule YscWeb.AdminComponents do
   @spec filter_form(map()) :: Phoenix.LiveView.Rendered.t()
   def filter_form(%{meta: meta} = assigns) do
     assigns =
-      assign(assigns, form: Phoenix.Component.to_form(meta), meta: nil)
+      assigns
+      |> assign(:form, Phoenix.Component.to_form(meta))
+      |> assign(:meta, nil)
+      |> then(fn assigns ->
+        if is_nil(assigns.id),
+          do: assign(assigns, :id, filter_form_id(assigns)),
+          else: assigns
+      end)
 
     ~H"""
     <.form
@@ -1782,6 +1821,17 @@ defmodule YscWeb.AdminComponents do
     default: :comfortable,
     doc:
       ":compact is for mobile toolbars (py-4, fewer page links); :comfortable matches desktop tables"
+
+  defp filter_form_id(%{fields: fields}) when is_list(fields) do
+    fields
+    |> Enum.map_join("-", fn
+      {key, _} when is_atom(key) -> Atom.to_string(key)
+      {key, _} when is_binary(key) -> key
+      key when is_atom(key) -> Atom.to_string(key)
+      key when is_binary(key) -> key
+    end)
+    |> then(&"filter-form-#{&1}")
+  end
 
   def admin_flop_pagination(assigns) do
     assigns =
@@ -1941,6 +1991,13 @@ defmodule YscWeb.AdminComponents do
   attr :rest, :global, include: ~w(phx-submit phx-submit-disable phx-hook)
 
   def admin_search_bar(assigns) do
+    assigns =
+      if is_nil(assigns.id) do
+        assign(assigns, :id, "#{assigns.input_id}-form")
+      else
+        assigns
+      end
+
     ~H"""
     <form
       id={@id}

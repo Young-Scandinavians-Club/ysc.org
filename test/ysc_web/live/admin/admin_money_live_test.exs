@@ -105,6 +105,24 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert render(view) =~
                "Showing data from January 01, 2023 to December 31, 2023"
     end
+
+    test "updates date range without loading collapsed sections", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
+
+      refute render(view) =~ "Debit/Credit"
+
+      view
+      |> form("form[phx-submit='update_date_range']", %{
+        "start_date" => "2023-01-01",
+        "end_date" => "2023-12-31"
+      })
+      |> render_submit()
+
+      assert render(view) =~
+               "Showing data from January 01, 2023 to December 31, 2023"
+
+      refute render(view) =~ "Debit/Credit"
+    end
   end
 
   # ---------------------------------------------------------------------------

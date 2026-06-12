@@ -569,99 +569,65 @@ defmodule Ysc.Tickets do
   def expire_ticket_order(ticket_order) do
     require Ysc.Logging
 
+    now = DateTime.utc_now()
+
     result =
       Repo.transaction(fn ->
-        # Cancel PaymentIntent in Stripe if it exists
-        if ticket_order.payment_intent_id do
-          case Ysc.Tickets.StripeService.cancel_payment_intent(
-                 ticket_order.payment_intent_id
-               ) do
-            :ok ->
-              Ysc.Logging.info(
-                "Canceled PaymentIntent for expired ticket order",
-                ticket_order_id: ticket_order.id,
-                payment_intent_id: ticket_order.payment_intent_id
-              )
-
-            {:error, reason} ->
-              Ysc.Logging.warning(
-                "Failed to cancel PaymentIntent for expired ticket order (continuing anyway)",
-                ticket_order_id: ticket_order.id,
-                payment_intent_id: ticket_order.payment_intent_id,
-                error: reason
-              )
-          end
-        end
-
-        # Update ticket order status
-        updated_order =
-          case ticket_order
-               |> TicketOrder.status_changeset(%{
-                 status: :expired,
-                 cancelled_at: DateTime.utc_now(),
-                 cancellation_reason: "Payment timeout"
-               })
-               |> Repo.update() do
-            {:ok, order} ->
-              order
-
-            {:error, changeset} ->
-              Ysc.Logging.error("Failed to update ticket order status",
-                ticket_order_id: ticket_order.id,
-                errors: inspect(changeset.errors)
-              )
-
-              # Raise to rollback transaction
-              Repo.rollback({:error, :failed_to_update_order})
-          end
-
-        # Cancel all associated tickets
-        tickets =
-          Repo.all(
-            from t in Ticket, where: t.ticket_order_id == ^ticket_order.id
+        {count, _} =
+          from(to in TicketOrder,
+            where: to.id == ^ticket_order.id and to.status == :pending
+          )
+          |> Repo.update_all(
+            set: [
+              status: :expired,
+              cancelled_at: now,
+              cancellation_reason: "Payment timeout",
+              updated_at: now
+            ]
           )
 
-        # Update each ticket and collect any errors
-        ticket_update_results =
-          Enum.map(tickets, fn ticket ->
-            case ticket
-                 |> Ticket.status_changeset(%{status: :expired})
-                 |> Repo.update() do
-              {:ok, updated_ticket} ->
-                {:ok, updated_ticket}
-
-              {:error, changeset} ->
-                Ysc.Logging.error("Failed to expire ticket",
-                  ticket_id: ticket.id,
+        if count == 1 do
+          if ticket_order.payment_intent_id do
+            case Ysc.Tickets.StripeService.cancel_payment_intent(
+                   ticket_order.payment_intent_id
+                 ) do
+              :ok ->
+                Ysc.Logging.info(
+                  "Canceled PaymentIntent for expired ticket order",
                   ticket_order_id: ticket_order.id,
-                  errors: inspect(changeset.errors)
+                  payment_intent_id: ticket_order.payment_intent_id
                 )
 
-                {:error, ticket.id, changeset}
+              {:error, reason} ->
+                Ysc.Logging.warning(
+                  "Failed to cancel PaymentIntent for expired ticket order (continuing anyway)",
+                  ticket_order_id: ticket_order.id,
+                  payment_intent_id: ticket_order.payment_intent_id,
+                  error: reason
+                )
             end
-          end)
+          end
 
-        # Check if any ticket updates failed
-        failed_updates =
-          Enum.filter(ticket_update_results, &match?({:error, _, _}, &1))
-
-        if Enum.any?(failed_updates) do
-          Ysc.Logging.error("Failed to expire some tickets",
-            ticket_order_id: ticket_order.id,
-            failed_count: length(failed_updates),
-            total_count: length(tickets)
+          from(t in Ticket,
+            where:
+              t.ticket_order_id == ^ticket_order.id and t.status == :pending
           )
+          |> Repo.update_all(set: [status: :expired, updated_at: now])
 
-          # Rollback transaction if any ticket update failed
-          Repo.rollback({:error, :failed_to_expire_tickets})
+          case get_ticket_order(ticket_order.id) do
+            nil -> Repo.rollback({:error, :not_found})
+            updated_order -> {:expired, updated_order}
+          end
+        else
+          case get_ticket_order(ticket_order.id) do
+            nil -> Repo.rollback({:error, :not_found})
+            order -> {:skipped, order}
+          end
         end
-
-        updated_order
       end)
 
-    # Broadcast the expiration event
     case result do
-      {:ok, updated_order} ->
+      {:ok, {:expired, updated_order}} ->
         event = %Ysc.MessagePassingEvents.CheckoutSessionExpired{
           ticket_order: updated_order,
           user_id: updated_order.user_id,
@@ -669,9 +635,11 @@ defmodule Ysc.Tickets do
         }
 
         broadcast_to_user(updated_order.user_id, event)
-        # Also broadcast to event-level topic for availability updates
         broadcast_ticket_availability_update(updated_order.event_id)
-        result
+        {:ok, updated_order}
+
+      {:ok, {:skipped, order}} ->
+        {:ok, order}
 
       error ->
         error
@@ -685,25 +653,27 @@ defmodule Ysc.Tickets do
   """
   def validate_booking_capacity(event_id, ticket_selections) do
     event = Ysc.Events.get_event!(event_id)
+    tier_ids = Map.keys(ticket_selections)
+    tiers_by_id = batch_load_tiers_for_capacity(tier_ids)
+    sold_counts = batch_count_sold_tickets_for_tiers(tier_ids)
+
+    non_donation_qty =
+      non_donation_ticket_quantity(ticket_selections, tiers_by_id)
 
     # Check if event is at capacity (donation-only purchases are still allowed)
-    if non_donation_ticket_quantity(ticket_selections) > 0 and
-         event_at_capacity?(event) do
+    if non_donation_qty > 0 and event_at_capacity?(event) do
       {:error, :event_at_capacity}
     else
       # Check each ticket tier capacity (donation tiers skip tier/event capacity)
       tier_validations =
-        ticket_selections
-        |> Enum.map(fn {tier_id, quantity} ->
-          validate_tier_capacity(tier_id, quantity, event)
+        Enum.map(ticket_selections, fn {tier_id, quantity} ->
+          validate_tier_capacity(tier_id, quantity, tiers_by_id, sold_counts)
         end)
 
       if Enum.any?(tier_validations, &(&1 == :error)) do
         {:error, :tier_capacity_exceeded}
       else
-        total_requested = non_donation_ticket_quantity(ticket_selections)
-
-        if within_event_capacity?(event, total_requested) do
+        if within_event_capacity?(event, non_donation_qty) do
           :ok
         else
           {:error, :event_capacity_exceeded}
@@ -756,7 +726,7 @@ defmodule Ysc.Tickets do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
     if ticket_order_completed?(ticket_order) do
-      {:ok, completed_ticket_order_for_return(ticket_order)}
+      finalize_already_completed_ticket_order(ticket_order)
     else
       with {:ok, payment_intent} <-
              Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -772,11 +742,15 @@ defmodule Ysc.Tickets do
         %Stripe.PaymentIntent{} = payment_intent
       ) do
     start_time = System.monotonic_time()
-    ticket_order = ensure_ticket_order_for_payment(ticket_order)
+
+    ticket_order =
+      ticket_order.id
+      |> get_ticket_order()
+      |> ensure_ticket_order_for_payment()
 
     result =
       if ticket_order_completed?(ticket_order) do
-        {:ok, completed_ticket_order_for_return(ticket_order)}
+        finalize_already_completed_ticket_order(ticket_order)
       else
         do_process_ticket_order_payment(ticket_order, payment_intent)
       end
@@ -793,6 +767,7 @@ defmodule Ysc.Tickets do
 
   defp do_process_ticket_order_payment(ticket_order, payment_intent) do
     with :ok <- validate_payment_intent(payment_intent, ticket_order),
+         :ok <- validate_fulfillable_order_status(ticket_order),
          :ok <- validate_expired_order_fulfillment_capacity(ticket_order),
          {:ok, {payment, _transaction, _entries}} <-
            process_ledger_payment(ticket_order, payment_intent),
@@ -882,6 +857,13 @@ defmodule Ysc.Tickets do
 
   defp completed_ticket_order_for_return(%TicketOrder{id: id}) do
     get_ticket_order(id)
+  end
+
+  # Idempotent recovery when the order row is already :completed but ticket
+  # confirmation did not finish (e.g. crash between complete and confirm).
+  defp finalize_already_completed_ticket_order(ticket_order) do
+    confirm_tickets(ticket_order)
+    {:ok, completed_ticket_order_for_return(ticket_order)}
   end
 
   defp ticket_order_ready_for_payment?(%TicketOrder{} = ticket_order) do
@@ -1220,8 +1202,13 @@ defmodule Ysc.Tickets do
     Accounts.has_active_membership?(user)
   end
 
-  defp validate_tier_capacity(tier_id, requested_quantity, _event) do
-    case Ysc.Events.get_ticket_tier(tier_id) do
+  defp validate_tier_capacity(
+         tier_id,
+         requested_quantity,
+         tiers_by_id,
+         sold_counts
+       ) do
+    case Map.get(tiers_by_id, tier_id) do
       nil ->
         :error
 
@@ -1229,7 +1216,7 @@ defmodule Ysc.Tickets do
         :ok
 
       tier ->
-        available = get_available_tier_quantity(tier)
+        available = get_available_tier_quantity(tier, sold_counts)
 
         if available == :unlimited or requested_quantity <= available do
           :ok
@@ -1239,10 +1226,9 @@ defmodule Ysc.Tickets do
     end
   end
 
-  defp non_donation_ticket_quantity(ticket_selections) do
-    ticket_selections
-    |> Enum.reduce(0, fn {tier_id, quantity}, acc ->
-      case Ysc.Events.get_ticket_tier(tier_id) do
+  defp non_donation_ticket_quantity(ticket_selections, tiers_by_id) do
+    Enum.reduce(ticket_selections, 0, fn {tier_id, quantity}, acc ->
+      case Map.get(tiers_by_id, tier_id) do
         %{type: type} when type in [:donation, "donation"] ->
           acc
 
@@ -1252,24 +1238,39 @@ defmodule Ysc.Tickets do
     end)
   end
 
-  defp get_available_tier_quantity(%TicketTier{quantity: nil}), do: :unlimited
-  defp get_available_tier_quantity(%TicketTier{quantity: 0}), do: :unlimited
+  defp get_available_tier_quantity(%TicketTier{quantity: nil}, _sold_counts),
+    do: :unlimited
 
-  defp get_available_tier_quantity(%TicketTier{
-         id: tier_id,
-         quantity: total_quantity
-       }) do
-    sold_count = count_sold_tickets_for_tier(tier_id)
+  defp get_available_tier_quantity(%TicketTier{quantity: 0}, _sold_counts),
+    do: :unlimited
+
+  defp get_available_tier_quantity(
+         %TicketTier{id: tier_id, quantity: total_quantity},
+         sold_counts
+       ) do
+    sold_count = Map.get(sold_counts, tier_id, 0)
     max(0, total_quantity - sold_count)
   end
 
-  defp count_sold_tickets_for_tier(tier_id) do
-    Ticket
-    |> where(
-      [t],
-      t.ticket_tier_id == ^tier_id and t.status in [:confirmed, :pending]
+  defp batch_load_tiers_for_capacity([]), do: %{}
+
+  defp batch_load_tiers_for_capacity(tier_ids) do
+    from(tt in TicketTier, where: tt.id in ^tier_ids)
+    |> Repo.all()
+    |> Map.new(&{&1.id, &1})
+  end
+
+  defp batch_count_sold_tickets_for_tiers([]), do: %{}
+
+  defp batch_count_sold_tickets_for_tiers(tier_ids) do
+    from(t in Ticket,
+      where:
+        t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
+      group_by: t.ticket_tier_id,
+      select: {t.ticket_tier_id, count(t.id)}
     )
-    |> Repo.aggregate(:count, :id)
+    |> Repo.all()
+    |> Map.new()
   end
 
   defp within_event_capacity?(%Event{max_attendees: nil}, _), do: true
@@ -1280,6 +1281,16 @@ defmodule Ysc.Tickets do
        ) do
     current_attendees = count_confirmed_tickets_for_event(event.id)
     current_attendees + requested_quantity <= max_attendees
+  end
+
+  defp validate_fulfillable_order_status(ticket_order) do
+    case Repo.get(TicketOrder, ticket_order.id) do
+      %{status: status} when status in [:pending, :expired] ->
+        :ok
+
+      _ ->
+        {:error, :cannot_complete_order}
+    end
   end
 
   defp validate_expired_order_fulfillment_capacity(ticket_order) do
@@ -1566,7 +1577,9 @@ defmodule Ysc.Tickets do
     now = DateTime.utc_now()
 
     from(t in Ticket,
-      where: t.ticket_order_id == ^ticket_order.id and t.status != :confirmed
+      where:
+        t.ticket_order_id == ^ticket_order.id and
+          t.status in [:pending, :expired]
     )
     |> Repo.update_all(set: [status: :confirmed, updated_at: now])
 

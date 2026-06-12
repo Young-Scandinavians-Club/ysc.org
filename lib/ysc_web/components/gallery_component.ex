@@ -28,8 +28,7 @@ defmodule YscWeb.Components.GalleryComponent do
               src={Image.blur_hash_for_display(image)}
               class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
               phx-hook="BlurHashCanvas"
-            >
-            </canvas>
+            ></canvas>
 
             <img
               class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover group-hover:opacity-100"

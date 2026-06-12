@@ -65,7 +65,9 @@ defmodule YscWeb.AdminScannerLive do
               <div class="flex items-center gap-3">
                 <.link
                   :if={
-                    is_nil(session.closed_at) && session.type != :event_membership
+                    is_nil(session.closed_at) &&
+                      session.type != :event_membership &&
+                      session.created_by_id == @current_user.id
                   }
                   navigate={~p"/admin/scanner?resume=#{session.id}"}
                   class="text-sm text-emerald-600 hover:text-emerald-800 font-medium"
@@ -84,7 +86,10 @@ defmodule YscWeb.AdminScannerLive do
                   Open Desk
                 </.link>
                 <.link
-                  :if={session.type != :event_membership}
+                  :if={
+                    session.type != :event_membership &&
+                      session.created_by_id == @current_user.id
+                  }
                   navigate={~p"/admin/scanner/sessions/#{session.id}"}
                   class="text-sm text-blue-600 hover:text-blue-800 font-medium"
                 >
@@ -93,7 +98,8 @@ defmodule YscWeb.AdminScannerLive do
                 <.link
                   :if={
                     session.type == :event_membership &&
-                      not is_nil(session.closed_at)
+                      not is_nil(session.closed_at) &&
+                      session.created_by_id == @current_user.id
                   }
                   navigate={~p"/admin/membership-check-in/#{session.id}"}
                   class="text-sm text-violet-600 hover:text-violet-800 font-medium"
@@ -372,7 +378,16 @@ defmodule YscWeb.AdminScannerLive do
     >
       <div class="py-6">
         <div class="flex items-center justify-between mb-6">
-          <h1 class="text-2xl font-semibold text-zinc-800">Check-in &amp; Scan</h1>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-semibold text-zinc-800">
+              Check-in &amp; Scan
+            </h1>
+            <.admin_help_link
+              topic="day-of/scanner"
+              label="Scanner help"
+              role={@admin_role}
+            />
+          </div>
           <.link
             navigate={~p"/admin/scanner/sessions"}
             class="inline-flex items-center rounded py-2 px-3 text-sm font-semibold leading-6 border border-zinc-200 hover:bg-zinc-50 text-zinc-700 bg-transparent transition duration-150 ease-in-out"
@@ -1258,46 +1273,47 @@ defmodule YscWeb.AdminScannerLive do
   end
 
   defp apply_action(socket, :index, %{"resume" => session_id}) do
-    session = Scanning.get_session!(session_id)
+    current_user_id = socket.assigns.current_user.id
 
-    if is_nil(session.closed_at) do
-      scan_count = Scanning.get_session_scan_count(session_id)
+    case Scanning.authorize_session_owner!(session_id, current_user_id) do
+      :ok ->
+        session = Scanning.get_session!(session_id)
 
-      socket
-      |> assign(:page_title, "Check-in & Scan")
-      |> assign(:phase, :scanning)
-      |> assign(:active_session, session)
-      |> assign(:scan_count, scan_count)
-      |> assign(:scan_result, nil)
-      |> assign(:camera_error, nil)
-      |> assign(:group_prompt, nil)
-      |> assign(:open_sessions, [])
-    else
-      open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
-      joinable_sessions = load_joinable_sessions(socket, open_sessions)
+        if is_nil(session.closed_at) do
+          scan_count = Scanning.get_session_scan_count(session_id)
 
-      socket
-      |> assign(:page_title, "Check-in & Scan")
-      |> assign(:phase, :setup)
-      |> assign(:active_session, nil)
-      |> assign(:scan_result, nil)
-      |> assign(:open_sessions, open_sessions)
-      |> assign(:joinable_sessions, joinable_sessions)
-      |> put_flash(:error, "That session is already closed.")
+          socket
+          |> assign(:page_title, "Check-in & Scan")
+          |> assign(:phase, :scanning)
+          |> assign(:active_session, session)
+          |> assign(:scan_count, scan_count)
+          |> assign(:scan_result, nil)
+          |> assign(:camera_error, nil)
+          |> assign(:group_prompt, nil)
+          |> assign(:open_sessions, [])
+        else
+          socket
+          |> assign_scanner_setup_phase()
+          |> put_flash(:error, "That session is already closed.")
+        end
+
+      {:error, :unauthorized} ->
+        socket
+        |> assign_scanner_setup_phase()
+        |> put_flash(
+          :error,
+          "You can only resume scan sessions you created."
+        )
+
+      {:error, :not_found} ->
+        socket
+        |> assign_scanner_setup_phase()
+        |> put_flash(:error, "Scan session not found.")
     end
   end
 
   defp apply_action(socket, :index, _params) do
-    open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
-    joinable_sessions = load_joinable_sessions(socket, open_sessions)
-
-    socket
-    |> assign(:page_title, "Check-in & Scan")
-    |> assign(:phase, :setup)
-    |> assign(:active_session, nil)
-    |> assign(:scan_result, nil)
-    |> assign(:open_sessions, open_sessions)
-    |> assign(:joinable_sessions, joinable_sessions)
+    assign_scanner_setup_phase(socket)
   end
 
   defp apply_action(socket, :sessions, _params) do
@@ -1314,12 +1330,25 @@ defmodule YscWeb.AdminScannerLive do
     if session.type == :event_membership do
       push_navigate(socket, to: ~p"/admin/membership-check-in/#{id}")
     else
-      records = Scanning.list_scan_records(id)
+      case Scanning.authorize_session_owner!(id, socket.assigns.current_user.id) do
+        :ok ->
+          records = Scanning.list_scan_records(id)
 
-      socket
-      |> assign(:page_title, "Session: #{session.name}")
-      |> assign(:detail_session, session)
-      |> assign(:detail_records, records)
+          socket
+          |> assign(:page_title, "Session: #{session.name}")
+          |> assign(:detail_session, session)
+          |> assign(:detail_records, records)
+
+        {:error, :unauthorized} ->
+          socket
+          |> put_flash(:error, "You can only view scan sessions you created.")
+          |> push_navigate(to: ~p"/admin/scanner/sessions")
+
+        {:error, :not_found} ->
+          socket
+          |> put_flash(:error, "Scan session not found.")
+          |> push_navigate(to: ~p"/admin/scanner/sessions")
+      end
     end
   end
 
@@ -1745,5 +1774,21 @@ defmodule YscWeb.AdminScannerLive do
     |> Enum.reject(fn s ->
       s.created_by_id == current_user_id or MapSet.member?(own_ids, s.id)
     end)
+  end
+
+  defp assign_scanner_setup_phase(socket) do
+    open_sessions = Scanning.get_open_sessions(socket.assigns.current_user.id)
+    joinable_sessions = load_joinable_sessions(socket, open_sessions)
+
+    socket
+    |> assign(:page_title, "Check-in & Scan")
+    |> assign(:phase, :setup)
+    |> assign(:active_session, nil)
+    |> assign(:scan_result, nil)
+    |> assign(:scan_count, 0)
+    |> assign(:camera_error, nil)
+    |> assign(:group_prompt, nil)
+    |> assign(:open_sessions, open_sessions)
+    |> assign(:joinable_sessions, joinable_sessions)
   end
 end

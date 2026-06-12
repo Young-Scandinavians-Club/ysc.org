@@ -303,9 +303,7 @@ defmodule YscWeb.AdminMediaLive do
                         </div>
                         <.live_img_preview
                           entry={entry}
-                          class="group-hover:blur"
-                          width="120"
-                          height="120"
+                          class="group-hover:blur h-[120px] w-[120px]"
                         />
                         <figcaption class="text-sm truncate overflow-hidden bg-zinc-100 text-zinc-600 w-28 z-8 absolute inset-x-0 bottom-0 py-1">
                           {entry.client_name}
@@ -383,7 +381,14 @@ defmodule YscWeb.AdminMediaLive do
       >
         <div class="flex justify-between items-center py-6">
           <div>
-            <.admin_page_title>Media Library</.admin_page_title>
+            <div class="flex items-center gap-2">
+              <.admin_page_title>Media Library</.admin_page_title>
+              <.admin_help_link
+                topic="media/upload"
+                label="Media help"
+                role={@admin_role}
+              />
+            </div>
             <p :if={@media_count > 0} class="text-sm text-zinc-600 mt-1">
               {@media_count} {if @media_count == 1,
                 do: "image",
@@ -1628,8 +1633,7 @@ defmodule YscWeb.AdminMediaLive do
                 src={Media.Image.blur_hash_for_display(item)}
                 class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
                 phx-hook="BlurHashCanvas"
-              >
-              </canvas>
+              ></canvas>
 
               <img
                 class={[

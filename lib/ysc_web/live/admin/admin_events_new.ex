@@ -46,6 +46,12 @@ defmodule YscWeb.AdminEventsNewLive do
                   {String.capitalize("#{@state}")}
                 </.badge>
 
+                <.admin_help_link
+                  topic={event_help_topic(@live_action)}
+                  label="Guide for this tab"
+                  role={@admin_role}
+                />
+
                 <.link
                   :if={@event.state == :published}
                   href={~p"/events/#{@event.id}"}
@@ -632,7 +638,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       <.link
                         phx-click="delete-agenda"
                         phx-value-id={agenda.id}
-                        alt="delete agenda"
+                        aria-label="delete agenda"
                       >
                         <.icon
                           name="hero-trash"
@@ -1153,21 +1159,25 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp maybe_refresh_tab_data(socket) do
-    case socket.assigns[:event] do
-      nil ->
-        socket
+    if connected?(socket) do
+      case socket.assigns[:event] do
+        nil ->
+          socket
 
-      event ->
-        case socket.assigns.live_action do
-          :updates ->
-            assign_updates_tab_data(socket, event)
+        event ->
+          case socket.assigns.live_action do
+            :updates ->
+              assign_updates_tab_data(socket, event)
 
-          :edit ->
-            assign_edit_tab_data(socket, event)
+            :edit ->
+              assign_edit_tab_data(socket, event)
 
-          _ ->
-            socket
-        end
+            _ ->
+              socket
+          end
+      end
+    else
+      socket
     end
   end
 
@@ -2246,4 +2256,8 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp schedule_button_text(:scheduled), do: "Scheduled"
   defp schedule_button_text(_), do: "Schedule"
+
+  defp event_help_topic(:tickets), do: "events/tickets"
+  defp event_help_topic(:updates), do: "events/updates"
+  defp event_help_topic(_), do: "events/create"
 end
