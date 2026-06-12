@@ -13,7 +13,7 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
 
   describe "get_category/1" do
     test "returns correct category for known templates" do
-      assert EmailCategories.get_category("confirm_email") == :account
+      assert EmailCategories.get_category("reset_password") == :account
       assert EmailCategories.get_category("event_notification") == :event
 
       assert EmailCategories.get_category("membership_payment_confirmation") ==
@@ -25,7 +25,7 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
     end
 
     test "returns :account for non-binary template names" do
-      assert EmailCategories.get_category(:confirm_email) == :account
+      assert EmailCategories.get_category(:reset_password) == :account
     end
 
     test "maps newsletter_edition to :newsletter" do
@@ -70,7 +70,7 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
 
     test "returns nil for non-membership templates" do
       assert EmailCategories.get_reply_to("booking_confirmation") == nil
-      assert EmailCategories.get_reply_to("confirm_email") == nil
+      assert EmailCategories.get_reply_to("reset_password") == nil
       assert EmailCategories.get_reply_to("event_notification") == nil
     end
 
@@ -89,7 +89,7 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
       # Account emails ignore user preferences
       user_disabled = %{event_notifications: false}
 
-      assert EmailCategories.should_send_email?(user_disabled, "confirm_email")
+      assert EmailCategories.should_send_email?(user_disabled, "reset_password")
     end
 
     test "respects event preferences" do

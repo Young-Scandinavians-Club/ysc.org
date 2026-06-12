@@ -14,7 +14,7 @@ defmodule YscWeb.UserResetPasswordLive do
       >
         <.ysc_logo class="h-28" width={112} height={112} fetchpriority="high" />
       </.link>
-      <.header class="text-center">
+      <.header class="text-center mb-4">
         Reset Your Password
         <:subtitle>
           Choose a new password for your account. This link expires after a short time for security.

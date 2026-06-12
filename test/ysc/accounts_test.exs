@@ -1333,64 +1333,6 @@ defmodule Ysc.AccountsTest do
     end
   end
 
-  describe "deliver_user_confirmation_instructions/2" do
-    setup do
-      %{user: user_fixture(%{phone_number: "+14159098268"})}
-    end
-
-    test "sends token through notification", %{user: user} do
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_user_confirmation_instructions(user, url)
-        end)
-
-      {:ok, token} = Base.url_decode64(token, padding: false)
-
-      assert user_token =
-               Repo.get_by(UserToken, token: :crypto.hash(:sha256, token))
-
-      assert user_token.user_id == user.id
-      assert user_token.sent_to == user.email
-      assert user_token.context == "confirm"
-    end
-  end
-
-  describe "confirm_user/1" do
-    setup do
-      user = user_fixture(%{phone_number: "+14159098268"})
-
-      token =
-        extract_user_token(fn url ->
-          Accounts.deliver_user_confirmation_instructions(user, url)
-        end)
-
-      %{user: user, token: token}
-    end
-
-    test "confirms the email with a valid token", %{user: user, token: token} do
-      assert {:ok, confirmed_user} = Accounts.confirm_user(token)
-      assert confirmed_user.confirmed_at
-      assert confirmed_user.confirmed_at != user.confirmed_at
-      assert Repo.get!(User, user.id).confirmed_at
-      refute Repo.get_by(UserToken, user_id: user.id)
-    end
-
-    test "does not confirm with invalid token", %{user: user} do
-      assert Accounts.confirm_user("oops") == :error
-      refute Repo.get!(User, user.id).confirmed_at
-      assert Repo.get_by(UserToken, user_id: user.id)
-    end
-
-    test "does not confirm email if token expired", %{user: user, token: token} do
-      {1, nil} =
-        Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
-
-      assert Accounts.confirm_user(token) == :error
-      refute Repo.get!(User, user.id).confirmed_at
-      assert Repo.get_by(UserToken, user_id: user.id)
-    end
-  end
-
   describe "deliver_user_reset_password_instructions/2" do
     setup do
       %{user: user_fixture(%{phone_number: "+14159098268"})}
@@ -2096,23 +2038,7 @@ defmodule Ysc.AccountsTest do
     end
   end
 
-  describe "coverage: confirmation, search state, sessions, family branches" do
-    test "deliver_user_confirmation_instructions/2 returns already_confirmed when user is confirmed" do
-      user = user_fixture(%{phone_number: "+14159098400"})
-
-      user =
-        user
-        |> Ecto.Changeset.change(%{
-          confirmed_at: DateTime.utc_now() |> DateTime.truncate(:second)
-        })
-        |> Repo.update!()
-
-      assert {:error, :already_confirmed} =
-               Accounts.deliver_user_confirmation_instructions(user, fn _ ->
-                 "http://example.test/confirm"
-               end)
-    end
-
+  describe "coverage: search state, sessions, family branches" do
     test "search_users/2 with state: :pending_approval finds pending users only" do
       pending =
         oauth_user_fixture(%{

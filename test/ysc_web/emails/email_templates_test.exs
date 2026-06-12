@@ -9,7 +9,6 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
     ApplicationSubmitted,
     AdminApplicationSubmitted,
     ChangeEmail,
-    ConfirmEmail,
     ResetPassword,
     ConductViolationConfirmation,
     ConductViolationBoardNotification,
@@ -125,23 +124,6 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
 
       # Test that the template name is correct
       assert ChangeEmail.get_template_name() == "change_email"
-    end
-
-    test "ConfirmEmail renders without errors" do
-      user = user_fixture()
-
-      # Test that the template can be rendered
-      assigns = %{
-        first_name: user.first_name,
-        url: "https://example.com/confirm-email?token=abc123"
-      }
-
-      html = ConfirmEmail.render(assigns)
-      assert is_binary(html)
-      assert String.length(html) > 0
-
-      # Test that the template name is correct
-      assert ConfirmEmail.get_template_name() == "confirm_email"
     end
 
     test "ResetPassword renders without errors" do
@@ -271,7 +253,6 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
         "application_rejected",
         "application_approved",
         "application_submitted",
-        "confirm_email",
         "reset_password",
         "change_email",
         "admin_application_submitted",
@@ -321,11 +302,6 @@ defmodule YscWeb.Emails.EmailTemplatesTest do
            review_url: "https://example.com/admin/applications/#{user.id}"
          }},
         {ChangeEmail,
-         %{
-           first_name: user.first_name,
-           url: "https://example.com/confirm-email?token=abc123"
-         }},
-        {ConfirmEmail,
          %{
            first_name: user.first_name,
            url: "https://example.com/confirm-email?token=abc123"

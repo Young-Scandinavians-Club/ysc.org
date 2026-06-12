@@ -390,8 +390,6 @@ defmodule YscWeb.Router do
         {YscWeb.Plugs.SiteSettingsPlugs, :mount_site_settings},
         {YscWeb.Plugs.RequestPath, :set_request_path}
       ] do
-      live "/users/confirm/:token", UserConfirmationLive, :edit
-      live "/users/confirm", UserConfirmationInstructionsLive, :new
       live "/family-invite/:token/accept", FamilyInviteAcceptanceLive, :index
 
       live "/family-invite/:token/logout-required",

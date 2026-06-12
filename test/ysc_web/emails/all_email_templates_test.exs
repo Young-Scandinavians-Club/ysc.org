@@ -19,7 +19,6 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ApplicationSubmitted,
     AdminApplicationSubmitted,
     ChangeEmail,
-    ConfirmEmail,
     ResetPassword,
     PasswordChanged,
     PasskeyAdded,
@@ -122,18 +121,6 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert is_binary(html)
       assert String.length(html) > 0
       assert ChangeEmail.get_template_name() == "change_email"
-    end
-
-    test "ConfirmEmail renders", %{user: user} do
-      assigns = %{
-        first_name: user.first_name,
-        url: "https://example.com/confirm-email?token=abc123"
-      }
-
-      html = ConfirmEmail.render(assigns)
-      assert is_binary(html)
-      assert String.length(html) > 0
-      assert ConfirmEmail.get_template_name() == "confirm_email"
     end
 
     test "ResetPassword renders", %{user: user} do
@@ -981,7 +968,6 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "application_approved" => ApplicationApproved,
         "application_approved_family_linked" => ApplicationApprovedFamilyLinked,
         "application_submitted" => ApplicationSubmitted,
-        "confirm_email" => ConfirmEmail,
         "reset_password" => ResetPassword,
         "password_changed" => PasswordChanged,
         "passkey_added" => PasskeyAdded,
