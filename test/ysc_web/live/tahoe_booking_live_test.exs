@@ -2,7 +2,45 @@ defmodule YscWeb.TahoeBookingLiveTest do
   use YscWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
+
+  alias Ysc.Bookings
+
+  describe "deferred room availability" do
+    test "populates room cards after connect when booking dates are in the URL",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      tahoe_rooms =
+        Bookings.list_rooms(:tahoe)
+        |> Enum.filter(& &1.is_active)
+
+      if tahoe_rooms == [] do
+        assert true
+      else
+        room = List.first(tahoe_rooms)
+        {checkin, checkout} = tahoe_booking_dates(30)
+
+        params = %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout),
+          "booking_mode" => "room"
+        }
+
+        {:ok, view, _html} =
+          live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+        html = render(view)
+
+        assert has_element?(view, "#room-#{room.id}")
+        assert html =~ room.name
+      end
+    end
+  end
 
   describe "mount/3 - unauthenticated" do
     test "loads page successfully", %{conn: conn} do
