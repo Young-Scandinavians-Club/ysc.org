@@ -1263,15 +1263,6 @@ defmodule Ysc.Tickets do
     |> Map.new()
   end
 
-  defp count_sold_tickets_for_tier(tier_id) do
-    Ticket
-    |> where(
-      [t],
-      t.ticket_tier_id == ^tier_id and t.status in [:confirmed, :pending]
-    )
-    |> Repo.aggregate(:count, :id)
-  end
-
   defp within_event_capacity?(%Event{max_attendees: nil}, _), do: true
 
   defp within_event_capacity?(
