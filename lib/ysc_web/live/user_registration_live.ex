@@ -611,14 +611,6 @@ defmodule YscWeb.UserRegistrationLive do
               }
             )
 
-            # Email verification is now handled in the account setup flow with codes
-            # No need to send separate confirmation email with link
-            # {:ok, _} =
-            #   Accounts.deliver_user_confirmation_instructions(
-            #     user,
-            #     &url(~p"/users/confirm/#{&1}")
-            #   )
-
             # After successful registration, redirect to account setup flow
             {:noreply,
              socket
