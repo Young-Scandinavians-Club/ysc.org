@@ -33,8 +33,10 @@ defmodule Ysc.Tickets.BookingValidator do
 
     with :ok <- validate_user(user_id),
          :ok <- validate_event(event_id),
-         :ok <- validate_ticket_selections(event_id, ticket_selections, tiers_by_id),
-         :ok <- validate_capacity(event_id, ticket_selections, user_id, tiers_by_id) do
+         :ok <-
+           validate_ticket_selections(event_id, ticket_selections, tiers_by_id),
+         :ok <-
+           validate_capacity(event_id, ticket_selections, user_id, tiers_by_id) do
       validate_concurrent_booking(user_id, event_id)
     end
   end
@@ -200,10 +202,13 @@ defmodule Ysc.Tickets.BookingValidator do
     # Check if user has reservations that would allow bypassing capacity
     user_has_reservations = user_has_reservations_for_event?(user_id, event_id)
 
-    non_donation_tier_ids = non_donation_tier_ids(ticket_selections, tiers_by_id)
+    non_donation_tier_ids =
+      non_donation_tier_ids(ticket_selections, tiers_by_id)
 
     sold_counts = batch_count_sold_tickets_for_tiers(non_donation_tier_ids)
-    reserved_counts = batch_count_reserved_tickets_for_tiers(non_donation_tier_ids)
+
+    reserved_counts =
+      batch_count_reserved_tickets_for_tiers(non_donation_tier_ids)
 
     user_reserved_counts =
       if user_id do
@@ -212,10 +217,12 @@ defmodule Ysc.Tickets.BookingValidator do
         %{}
       end
 
-    non_donation_qty = non_donation_ticket_quantity(ticket_selections, tiers_by_id)
+    non_donation_qty =
+      non_donation_ticket_quantity(ticket_selections, tiers_by_id)
 
     # Check if event is already at capacity (unless user has reservations or only donations)
-    if not user_has_reservations and non_donation_qty > 0 and event_at_capacity?(event) do
+    if not user_has_reservations and non_donation_qty > 0 and
+         event_at_capacity?(event) do
       {:error, :event_at_capacity}
     else
       # Check each tier capacity (donation tiers skip tier/event capacity)
@@ -243,7 +250,8 @@ defmodule Ysc.Tickets.BookingValidator do
          ) do
         {:error, :tier_capacity_exceeded}
       else
-        if user_has_reservations or within_event_capacity?(event, non_donation_qty) do
+        if user_has_reservations or
+             within_event_capacity?(event, non_donation_qty) do
           :ok
         else
           {:error, :event_capacity_exceeded}
@@ -492,7 +500,8 @@ defmodule Ysc.Tickets.BookingValidator do
 
   defp batch_count_sold_tickets_for_tiers(tier_ids) do
     from(t in Ticket,
-      where: t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
+      where:
+        t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
       group_by: t.ticket_tier_id,
       select: {t.ticket_tier_id, count(t.id)}
     )

@@ -657,7 +657,8 @@ defmodule Ysc.Tickets do
     tiers_by_id = batch_load_tiers_for_capacity(tier_ids)
     sold_counts = batch_count_sold_tickets_for_tiers(tier_ids)
 
-    non_donation_qty = non_donation_ticket_quantity(ticket_selections, tiers_by_id)
+    non_donation_qty =
+      non_donation_ticket_quantity(ticket_selections, tiers_by_id)
 
     # Check if event is at capacity (donation-only purchases are still allowed)
     if non_donation_qty > 0 and event_at_capacity?(event) do
@@ -1201,7 +1202,12 @@ defmodule Ysc.Tickets do
     Accounts.has_active_membership?(user)
   end
 
-  defp validate_tier_capacity(tier_id, requested_quantity, tiers_by_id, sold_counts) do
+  defp validate_tier_capacity(
+         tier_id,
+         requested_quantity,
+         tiers_by_id,
+         sold_counts
+       ) do
     case Map.get(tiers_by_id, tier_id) do
       nil ->
         :error
@@ -1232,8 +1238,11 @@ defmodule Ysc.Tickets do
     end)
   end
 
-  defp get_available_tier_quantity(%TicketTier{quantity: nil}, _sold_counts), do: :unlimited
-  defp get_available_tier_quantity(%TicketTier{quantity: 0}, _sold_counts), do: :unlimited
+  defp get_available_tier_quantity(%TicketTier{quantity: nil}, _sold_counts),
+    do: :unlimited
+
+  defp get_available_tier_quantity(%TicketTier{quantity: 0}, _sold_counts),
+    do: :unlimited
 
   defp get_available_tier_quantity(
          %TicketTier{id: tier_id, quantity: total_quantity},
@@ -1255,7 +1264,8 @@ defmodule Ysc.Tickets do
 
   defp batch_count_sold_tickets_for_tiers(tier_ids) do
     from(t in Ticket,
-      where: t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
+      where:
+        t.ticket_tier_id in ^tier_ids and t.status in [:confirmed, :pending],
       group_by: t.ticket_tier_id,
       select: {t.ticket_tier_id, count(t.id)}
     )

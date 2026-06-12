@@ -714,7 +714,10 @@ defmodule Ysc.ExpenseReports do
     end
   end
 
-  defp preloaded_items?(%ExpenseReport{expense_items: expense_items, income_items: income_items}) do
+  defp preloaded_items?(%ExpenseReport{
+         expense_items: expense_items,
+         income_items: income_items
+       }) do
     Ecto.assoc_loaded?(expense_items) and Ecto.assoc_loaded?(income_items)
   end
 

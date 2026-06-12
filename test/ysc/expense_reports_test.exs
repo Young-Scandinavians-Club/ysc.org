@@ -1681,9 +1681,10 @@ defmodule Ysc.ExpenseReportsTest do
       assert Money.equal?(totals.net_total, Money.new(:USD, "-62.25"))
     end
 
-    test "uses preloaded items without extra SUM queries when associations are loaded", %{
-      user: user
-    } do
+    test "uses preloaded items without extra SUM queries when associations are loaded",
+         %{
+           user: user
+         } do
       {:ok, bank_account} =
         ExpenseReports.create_bank_account(
           %{"routing_number" => "021000021", "account_number" => "1234567890"},
@@ -1721,9 +1722,20 @@ defmodule Ysc.ExpenseReportsTest do
 
       totals_from_preloaded = ExpenseReports.calculate_totals(preloaded_report)
 
-      assert Money.equal?(totals_from_preloaded.expense_total, Money.new(:USD, "30.00"))
-      assert Money.equal?(totals_from_preloaded.income_total, Money.new(:USD, "10.00"))
-      assert Money.equal?(totals_from_preloaded.net_total, Money.new(:USD, "20.00"))
+      assert Money.equal?(
+               totals_from_preloaded.expense_total,
+               Money.new(:USD, "30.00")
+             )
+
+      assert Money.equal?(
+               totals_from_preloaded.income_total,
+               Money.new(:USD, "10.00")
+             )
+
+      assert Money.equal?(
+               totals_from_preloaded.net_total,
+               Money.new(:USD, "20.00")
+             )
     end
 
     test "computes net_total as expense_total minus income_total", %{user: user} do

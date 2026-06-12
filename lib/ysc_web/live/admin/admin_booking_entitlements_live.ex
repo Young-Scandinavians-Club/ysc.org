@@ -420,7 +420,10 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
             Loading entitlements…
           </p>
           <p
-            :if={!@loading_outstanding_entitlements? and @outstanding_entitlements == []}
+            :if={
+              !@loading_outstanding_entitlements? and
+                @outstanding_entitlements == []
+            }
             class="px-4 py-8 text-center text-zinc-500 text-sm"
           >
             No outstanding entitlements for this filter.
