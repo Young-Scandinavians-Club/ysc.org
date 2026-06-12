@@ -235,7 +235,7 @@ defmodule YscWeb.UserLoginLive do
             </h3>
             <div class="mt-2 text-sm text-amber-800">
               <p class="mb-2">
-                You've had multiple failed sign-in attempts. You may want to reset your password.
+                You've had several failed sign-in attempts. Try another sign-in option below, reset your password if you use one, or contact us for help.
               </p>
               <div class="flex flex-col sm:flex-row gap-2">
                 <.link
@@ -279,13 +279,23 @@ defmodule YscWeb.UserLoginLive do
             <.button phx-disable-with="Signing in..." class="w-full">
               Sign in <.icon name="hero-arrow-right" class="w-5 h-5 ms-1 -mt-0.5" />
             </.button>
-            <div class="text-center">
-              <.link
-                href={~p"/users/reset-password"}
-                class="text-sm font-semibold hover:underline text-blue-600"
-              >
-                Forgot your password?
-              </.link>
+            <div class="text-center space-y-2">
+              <div>
+                <.link
+                  href={~p"/users/reset-password"}
+                  class="text-sm font-semibold hover:underline text-blue-600"
+                >
+                  Forgot your password?
+                </.link>
+              </div>
+              <div>
+                <.link
+                  navigate={~p"/users/confirm"}
+                  class="text-sm font-semibold hover:underline text-blue-600"
+                >
+                  Didn't get your verification email?
+                </.link>
+              </div>
             </div>
           </div>
         </:actions>
