@@ -90,7 +90,11 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
             member account with that email. This is a short sign-up for the invited family member. It is
             not a new membership application and does not go to the board for approval.
           </p>
-          <form action={@logout_redirect_url} method="post">
+          <form
+            id="family-invite-logout-form"
+            action={@logout_redirect_url}
+            method="post"
+          >
             <input
               type="hidden"
               name="_csrf_token"

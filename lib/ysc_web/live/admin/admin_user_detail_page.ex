@@ -1686,8 +1686,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           class="w-full border-0"
                           style="min-height: 400px; height: 600px;"
                           phx-hook="EmailPreview"
-                        >
-                        </iframe>
+                        ></iframe>
                       <% else %>
                         <div class="p-4">
                           <p class="text-sm text-zinc-400 italic">
@@ -1860,6 +1859,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   Search by email. Link an existing user or invite a new one.
                 </p>
                 <form
+                  id="add-family-user-search-form"
                   phx-change="search_add_family_user"
                   phx-debounce="200"
                   class="space-y-3"

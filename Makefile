@@ -120,7 +120,7 @@ query-explain-main:  ## EXPLAIN + SQL for CI targets vs main since merge-base (f
 	@MIX_ENV=test bash "$(CURDIR)/etc/scripts/ci/query_explain_local.sh" main
 
 # Shell scripts to lint/format (exclude vendor and build dirs)
-SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' 2>/dev/null)
+SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' -not -path '*/node_modules/*' 2>/dev/null)
 
 .PHONY: format
 format:  ## Format the code (Elixir and shell scripts)

@@ -55,8 +55,7 @@ defmodule YscWeb.AdminHelpComponents do
             <span class={[
               "block h-1.5 rounded-full transition-colors duration-150",
               stepper_bar_class(idx, @active_step)
-            ]}>
-            </span>
+            ]}></span>
             <span class={[
               "mt-2 hidden items-center gap-1.5 text-xs leading-5 md:flex",
               stepper_label_class(idx, @active_step)
@@ -258,8 +257,7 @@ defmodule YscWeb.AdminHelpComponents do
             aria-hidden="true"
           >
             <span class="admin-help-hotspot-beacon"></span>
-            <span class="admin-help-hotspot-ping admin-help-hotspot-ping--hint">
-            </span>
+            <span class="admin-help-hotspot-ping admin-help-hotspot-ping--hint"></span>
           </span>
           <span
             :if={!Hotspot.hint?(hotspot)}
@@ -398,6 +396,139 @@ defmodule YscWeb.AdminHelpComponents do
     """
   end
 
+  attr :id, :string, default: "admin-help-guide-tabs"
+  attr :panel, :atom, required: true, values: [:steps, :help]
+
+  def admin_help_guide_tabs(assigns) do
+    ~H"""
+    <nav
+      id={@id}
+      aria-label="Guide sections"
+      class="mt-8 flex gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1"
+    >
+      <button
+        type="button"
+        phx-click="show-guide-panel"
+        phx-value-panel="steps"
+        id={"#{@id}-steps"}
+        aria-current={if(@panel == :steps, do: "page")}
+        class={guide_tab_class(@panel == :steps)}
+      >
+        <.icon name="hero-list-bullet" class="w-4 h-4 shrink-0" /> Step-by-step
+      </button>
+      <button
+        type="button"
+        phx-click="show-guide-panel"
+        phx-value-panel="help"
+        id={"#{@id}-help"}
+        aria-current={if(@panel == :help, do: "page")}
+        class={guide_tab_class(@panel == :help)}
+      >
+        <.icon name="hero-lifebuoy" class="w-4 h-4 shrink-0" />
+        FAQ & troubleshooting
+      </button>
+    </nav>
+    """
+  end
+
+  defp guide_tab_class(true) do
+    "inline-flex flex-1 items-center justify-center gap-2 rounded-md bg-white px-3 py-2 text-sm font-semibold text-zinc-900 shadow-sm"
+  end
+
+  defp guide_tab_class(false) do
+    "inline-flex flex-1 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-600 hover:text-zinc-900"
+  end
+
+  attr :id, :string, default: "admin-help-appendix"
+  attr :faq, :list, default: []
+  attr :troubleshooting, :list, default: []
+  attr :variant, :atom, default: :web, values: [:web, :print]
+
+  def admin_help_appendix(assigns) do
+    ~H"""
+    <%= if @faq != [] or @troubleshooting != [] do %>
+      <%= if @variant == :web do %>
+        <article
+          id={@id}
+          class="rounded-xl border border-zinc-200 bg-white shadow-sm print:hidden mt-6"
+        >
+          <header class="border-b border-zinc-200 px-6 py-5 md:px-8">
+            <h2 class="text-lg font-semibold text-zinc-900">More help</h2>
+            <p class="mt-1 text-sm text-zinc-600">
+              Answers and fixes for this guide — open a question to read more.
+            </p>
+          </header>
+
+          <section :if={@faq != []} id={"#{@id}-faq"} class="px-6 py-5 md:px-8">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              Frequently asked questions
+            </h3>
+            <div class="mt-3 divide-y divide-zinc-200 rounded-lg border border-zinc-200">
+              <details :for={{question, answer} <- @faq} class="group px-4 py-3">
+                <summary class="cursor-pointer list-none font-medium text-zinc-900 marker:content-none [&::-webkit-details-marker]:hidden">
+                  <span class="flex items-start justify-between gap-3">
+                    <span>{question}</span>
+                    <.icon
+                      name="hero-chevron-down"
+                      class="mt-0.5 w-4 h-4 shrink-0 text-zinc-400 transition-transform group-open:rotate-180"
+                    />
+                  </span>
+                </summary>
+                <p class="mt-2 text-sm leading-relaxed text-zinc-600">{answer}</p>
+              </details>
+            </div>
+          </section>
+
+          <section
+            :if={@troubleshooting != []}
+            id={"#{@id}-troubleshooting"}
+            class={[
+              "border-t border-zinc-200 px-6 py-5 md:px-8",
+              @faq != [] && "bg-zinc-50/80"
+            ]}
+          >
+            <h3 class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+              <.icon name="hero-wrench-screwdriver" class="w-4 h-4" />
+              Troubleshooting
+            </h3>
+            <ul class="mt-3 space-y-2.5 text-sm leading-relaxed text-zinc-700">
+              <li
+                :for={item <- @troubleshooting}
+                class="flex gap-2.5 rounded-lg border border-zinc-200 bg-white px-3 py-2.5"
+              >
+                <.icon
+                  name="hero-arrow-right"
+                  class="mt-0.5 w-4 h-4 shrink-0 text-amber-600"
+                />
+                <span>{item}</span>
+              </li>
+            </ul>
+          </section>
+        </article>
+      <% else %>
+        <section :if={@faq != []} class="admin-help-print-appendix">
+          <h2 class="admin-help-print-section-heading">
+            Frequently asked questions
+          </h2>
+          <dl class="admin-help-print-faq">
+            <div :for={{question, answer} <- @faq}>
+              <dt>{question}</dt>
+              <dd>{answer}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section :if={@troubleshooting != []} class="admin-help-print-appendix">
+          <h2 class="admin-help-print-section-heading">Troubleshooting</h2>
+          <ul class="admin-help-print-troubleshooting">
+            <li :for={item <- @troubleshooting}>{item}</li>
+          </ul>
+        </section>
+      <% end %>
+    <% end %>
+    """
+  end
+
   attr :id, :string, required: true
   attr :form, Phoenix.HTML.Form, required: true
   attr :result, :map, default: nil
@@ -421,7 +552,7 @@ defmodule YscWeb.AdminHelpComponents do
       </p>
       <.form for={@form} id={"#{@id}-form"} phx-submit="find-guide" class="mt-4">
         <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-          <div class="flex-1 [&_input]:mt-0 [&_input]:h-10">
+          <div class="flex-1 [&_input]:!mt-0 [&_input]:!h-11 [&_input]:!min-h-11 [&_input]:!py-0">
             <.input
               field={@form[:query]}
               type="text"
@@ -433,7 +564,7 @@ defmodule YscWeb.AdminHelpComponents do
           </div>
           <.button
             type="submit"
-            class="!min-h-10 h-10 shrink-0 py-0"
+            class="!min-h-11 h-11 shrink-0 !py-0"
             disabled={@loading?}
           >
             Find guide
@@ -638,8 +769,15 @@ defmodule YscWeb.AdminHelpComponents do
         <.admin_help_print_screenshot
           :if={step[:image]}
           image={step.image}
-          hotspots={Map.get(step, :hotspots, [])}
+          image_scroll={Map.get(step, :image_scroll)}
           alt={step.title}
+        />
+
+        <.admin_help_print_public_effect
+          :if={step[:public_image]}
+          image={step.public_image}
+          image_scroll={Map.get(step, :public_image_scroll)}
+          label={Map.get(step, :public_label, "What members see on the website")}
         />
 
         <p :if={step[:cta]} class="admin-help-print-cta">
@@ -647,22 +785,11 @@ defmodule YscWeb.AdminHelpComponents do
         </p>
       </section>
 
-      <section :if={@faq != []} class="admin-help-print-appendix">
-        <h2 class="admin-help-print-section-heading">Frequently asked questions</h2>
-        <dl class="admin-help-print-faq">
-          <div :for={{question, answer} <- @faq}>
-            <dt>{question}</dt>
-            <dd>{answer}</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section :if={@troubleshooting != []} class="admin-help-print-appendix">
-        <h2 class="admin-help-print-section-heading">Troubleshooting</h2>
-        <ul class="admin-help-print-troubleshooting">
-          <li :for={item <- @troubleshooting}>{item}</li>
-        </ul>
-      </section>
+      <.admin_help_appendix
+        variant={:print}
+        faq={@faq}
+        troubleshooting={@troubleshooting}
+      />
 
       <footer class="admin-help-print-footer">
         <p>
@@ -675,36 +802,42 @@ defmodule YscWeb.AdminHelpComponents do
   end
 
   attr :image, :string, required: true
-  attr :hotspots, :list, default: []
+  attr :image_scroll, :string, default: nil
   attr :alt, :string, required: true
 
   def admin_help_print_screenshot(assigns) do
-    ghost_slug = ghost_slug(assigns.image)
-
     assigns =
-      assigns
-      |> assign(:image_src, GhostRegistry.print_image_path(assigns.image))
-      |> assign(:hotspots, Hotspot.normalize(assigns.hotspots, ghost_slug))
+      assign(
+        assigns,
+        :image_src,
+        GhostRegistry.print_image_path(assigns.image,
+          scroll_to: assigns.image_scroll
+        )
+      )
 
     ~H"""
     <figure class="admin-help-print-figure">
       <div class="admin-help-print-screenshot">
         <img src={@image_src} alt={@alt} />
-        <span
-          :for={{hotspot, idx} <- Enum.with_index(@hotspots)}
-          class={["admin-help-print-marker", Hotspot.print_marker_class(hotspot)]}
-          style={Hotspot.print_css_vars(hotspot)}
-          aria-hidden="true"
-        >
-          {idx + 1}
-        </span>
       </div>
-      <figcaption :if={@hotspots != []}>
-        <ol class="admin-help-print-hotspot-legend">
-          <li :for={hotspot <- @hotspots}>{hotspot.label}</li>
-        </ol>
-      </figcaption>
     </figure>
+    """
+  end
+
+  attr :image, :string, required: true
+  attr :image_scroll, :string, default: nil
+  attr :label, :string, default: "What members see on the website"
+
+  def admin_help_print_public_effect(assigns) do
+    ~H"""
+    <div class="admin-help-print-public">
+      <p class="admin-help-print-public-label">{@label}</p>
+      <.admin_help_print_screenshot
+        image={@image}
+        image_scroll={@image_scroll}
+        alt={@label}
+      />
+    </div>
     """
   end
 

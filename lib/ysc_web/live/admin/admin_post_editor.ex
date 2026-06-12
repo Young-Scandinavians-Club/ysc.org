@@ -81,8 +81,7 @@ defmodule YscWeb.AdminPostEditorLive do
                 class={[
                   "h-full w-full"
                 ]}
-              >
-              </iframe>
+              ></iframe>
             </.phone_mockup>
 
             <.tablet_mockup :if={@preview_device == :tablet} class="m-auto">
@@ -91,8 +90,7 @@ defmodule YscWeb.AdminPostEditorLive do
                 class={[
                   "h-full w-full"
                 ]}
-              >
-              </iframe>
+              ></iframe>
             </.tablet_mockup>
 
             <iframe
@@ -101,8 +99,7 @@ defmodule YscWeb.AdminPostEditorLive do
               class={[
                 "h-full w-full"
               ]}
-            >
-            </iframe>
+            ></iframe>
           </div>
         </div>
       </.modal>

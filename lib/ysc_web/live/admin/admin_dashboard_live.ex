@@ -26,24 +26,21 @@ defmodule YscWeb.AdminDashboardLive do
               <span class={[
                 "w-2 h-2 rounded-full",
                 if(@loading_dashboard, do: "bg-amber-500", else: "bg-emerald-500")
-              ]}>
-              </span>
+              ]}></span>
               <span class={[
                 "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:4s]",
                 if(@loading_dashboard,
                   do: "bg-amber-500 animate-ping",
                   else: "bg-emerald-500 animate-ping"
                 )
-              ]}>
-              </span>
+              ]}></span>
               <span class={[
                 "absolute top-0 left-0 w-2 h-2 rounded-full [animation-duration:5s]",
                 if(@loading_dashboard,
                   do: "bg-amber-500 animate-pulse",
                   else: "bg-emerald-500 animate-pulse"
                 )
-              ]}>
-              </span>
+              ]}></span>
             </span>
             <%= if @loading_dashboard do %>
               Loading dashboard...
@@ -289,8 +286,7 @@ defmodule YscWeb.AdminDashboardLive do
                     do: "bg-emerald-500",
                     else: "bg-zinc-300"
                   )
-                ]}>
-                </span>
+                ]}></span>
                 <span class="text-[10px] font-bold text-zinc-400 uppercase">
                   {if(@property_stats.tahoe.staying > 0,
                     do: "Active",
@@ -366,8 +362,7 @@ defmodule YscWeb.AdminDashboardLive do
                     do: "bg-emerald-500",
                     else: "bg-zinc-300"
                   )
-                ]}>
-                </span>
+                ]}></span>
                 <span class="text-[10px] font-bold text-zinc-400 uppercase">
                   {if(@property_stats.clear_lake.staying > 0,
                     do: "Active",
@@ -584,8 +579,7 @@ defmodule YscWeb.AdminDashboardLive do
                 <span class={[
                   "absolute -left-[7px] sm:-left-[9px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10",
                   "bg-blue-600 group-hover:scale-110 transition-transform"
-                ]}>
-                </span>
+                ]}></span>
                 <div class={[
                   "rounded-xl border border-zinc-200 p-4 sm:p-5 bg-zinc-50/40",
                   "group-hover:border-blue-200 group-hover:bg-white group-hover:shadow-md transition-all"
@@ -818,18 +812,15 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
               <div class="flex items-center gap-3 mb-3">
                 <span class="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span class="inline-block w-2 h-2 rounded-sm bg-blue-600 shrink-0">
-                  </span>
+                  <span class="inline-block w-2 h-2 rounded-sm bg-blue-600 shrink-0"></span>
                   Bookings
                 </span>
                 <span class="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span class="inline-block w-2 h-2 rounded-sm bg-purple-500 shrink-0">
-                  </span>
+                  <span class="inline-block w-2 h-2 rounded-sm bg-purple-500 shrink-0"></span>
                   Events
                 </span>
                 <span class="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 shrink-0">
-                  </span>
+                  <span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 shrink-0"></span>
                   Memberships
                 </span>
               </div>
@@ -873,13 +864,11 @@ defmodule YscWeb.AdminDashboardLive do
               </div>
               <div class="flex justify-between text-xs">
                 <span class="text-zinc-600">
-                  <span class="inline-block w-2 h-2 rounded-full bg-sky-600 align-middle mr-1">
-                  </span>
+                  <span class="inline-block w-2 h-2 rounded-full bg-sky-600 align-middle mr-1"></span>
                   Tahoe {format_money(@revenue_tahoe_bookings)}
                 </span>
                 <span class="text-zinc-600">
-                  <span class="inline-block w-2 h-2 rounded-full bg-teal-500 align-middle mr-1">
-                  </span>
+                  <span class="inline-block w-2 h-2 rounded-full bg-teal-500 align-middle mr-1"></span>
                   Clear Lake {format_money(@revenue_clear_lake_bookings)}
                 </span>
               </div>

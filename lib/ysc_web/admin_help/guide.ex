@@ -82,9 +82,18 @@ defmodule YscWeb.AdminHelp.Guide do
     day_of: "Day-of operations"
   }
 
+  @category_order [
+    :getting_started,
+    :posts,
+    :newsletters,
+    :events,
+    :media,
+    :day_of
+  ]
+
   def category_label(category) when is_atom(category) do
     Map.get(@category_labels, category, "Other")
   end
 
-  def categories, do: Map.keys(@category_labels)
+  def categories, do: @category_order
 end

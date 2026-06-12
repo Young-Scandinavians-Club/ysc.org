@@ -50,9 +50,17 @@ skeleton bars (`YscWeb.AdminGhostComponents`).
    `image_scroll` / `public_image_scroll` on a step to an element id from
    `ghost/previews.ex` (e.g. `ghost-event-agenda-section`) so the iframe frames
    the right section. See `YscWeb.AdminHelp.Hotspot`.
-5. **Print / PDF** still uses static images from `priv/static/images/admin-help/`
-   (`.svg` or `.png` if captured). Run `etc/scripts/capture_admin_help_ghosts.sh`
-   (dev server on port 4000) to refresh PNGs from the ghost pages.
+5. **Print / PDF** uses static PNGs from `priv/static/images/admin-help/`
+   (scroll variants: `slug--section-id.png`). Targets come from
+   `YscWeb.AdminHelp.Ghost.Registry.capture_targets/0`. Refresh with the dev
+   server on port 4000:
+
+   ```bash
+   CAPTURE_USE_SEED_LOGIN=1 MIX_ENV=dev etc/scripts/capture_admin_help_ghosts.sh
+   ```
+
+   Or set `ADMIN_EMAIL` / `ADMIN_PASSWORD`. First run installs Playwright under
+   `etc/scripts/admin-help-capture/`.
 
 ## OpenRouter (optional)
 

@@ -185,8 +185,7 @@ defmodule YscWeb.NewsletterArchiveLive do
             phx-hook="AutoResizeIframe"
             phx-update="ignore"
             title={"Newsletter: #{@edition.title}"}
-          >
-          </iframe>
+          ></iframe>
         </div>
       </div>
 

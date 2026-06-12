@@ -45,27 +45,106 @@ defmodule YscWeb.AdminHelp.Ghost.Registry do
 
   def valid?(slug), do: Map.has_key?(@previews, slug)
 
+  @doc """
+  Basename for a print asset file (without extension).
+
+  Scroll variants use `slug--scroll-target`, e.g.
+  `newsletter-compose--ghost-newsletter-preview-panel`.
+  """
+  def print_asset_basename(slug, scroll_to \\ nil)
+
+  def print_asset_basename(slug, scroll_to)
+      when is_binary(slug) and (is_nil(scroll_to) or scroll_to == "") do
+    slug
+  end
+
+  def print_asset_basename(slug, scroll_to)
+      when is_binary(slug) and is_binary(scroll_to) do
+    "#{slug}--#{scroll_to}"
+  end
+
+  @doc """
+  Unique ghost pages to capture for print/PDF, derived from guide steps plus
+  every registered preview slug (base image only).
+  """
+  def capture_targets do
+    guide_targets =
+      YscWeb.AdminHelp.Registry.all()
+      |> Enum.flat_map(& &1.steps())
+      |> Enum.flat_map(&capture_targets_for_step/1)
+
+    base_targets = Enum.map(all(), &%{slug: &1, scroll_to: nil})
+
+    (guide_targets ++ base_targets)
+    |> Enum.uniq_by(fn %{slug: slug, scroll_to: scroll_to} ->
+      {slug, scroll_to}
+    end)
+    |> Enum.sort_by(fn %{slug: slug, scroll_to: scroll_to} ->
+      {slug, scroll_to || ""}
+    end)
+  end
+
   @doc "Maps `ghost:slug` guide images to static print fallbacks."
-  def print_image_path("ghost:" <> slug) when is_binary(slug) do
-    dir =
-      Path.join([
-        Application.app_dir(:ysc, "priv"),
-        "static",
-        "images",
-        "admin-help"
-      ])
+  def print_image_path(image, opts \\ [])
 
-    cond do
-      File.exists?(Path.join(dir, "#{slug}.png")) ->
-        "/images/admin-help/#{slug}.png"
+  def print_image_path("ghost:" <> slug, opts) when is_binary(slug) do
+    scroll_to = Keyword.get(opts, :scroll_to)
+    dir = print_images_dir()
 
-      File.exists?(Path.join(dir, "#{slug}.svg")) ->
-        "/images/admin-help/#{slug}.svg"
+    scroll_to
+    |> print_path_candidates(slug)
+    |> resolve_print_path(dir)
+  end
 
-      true ->
-        "/images/admin-help/#{slug}.svg"
+  def print_image_path(path, _opts) when is_binary(path), do: path
+
+  defp capture_targets_for_step(step) do
+    step_targets(step[:image], step[:image_scroll]) ++
+      step_targets(step[:public_image], step[:public_image_scroll])
+  end
+
+  defp step_targets(nil, _scroll), do: []
+
+  defp step_targets("ghost:" <> slug, scroll) when is_binary(slug) do
+    base = [%{slug: slug, scroll_to: nil}]
+
+    if is_binary(scroll) and scroll != "" do
+      base ++ [%{slug: slug, scroll_to: scroll}]
+    else
+      base
     end
   end
 
-  def print_image_path(path) when is_binary(path), do: path
+  defp step_targets(_image, _scroll), do: []
+
+  defp print_path_candidates(nil, slug), do: [slug]
+  defp print_path_candidates("", slug), do: [slug]
+
+  defp print_path_candidates(scroll_to, slug) do
+    [print_asset_basename(slug, scroll_to), slug]
+  end
+
+  defp resolve_print_path(candidates, dir) do
+    Enum.find_value(candidates, fn basename ->
+      cond do
+        File.exists?(Path.join(dir, "#{basename}.png")) ->
+          "/images/admin-help/#{basename}.png"
+
+        File.exists?(Path.join(dir, "#{basename}.svg")) ->
+          "/images/admin-help/#{basename}.svg"
+
+        true ->
+          nil
+      end
+    end) || "/images/admin-help/#{hd(candidates)}.png"
+  end
+
+  defp print_images_dir do
+    Path.join([
+      Application.app_dir(:ysc, "priv"),
+      "static",
+      "images",
+      "admin-help"
+    ])
+  end
 end

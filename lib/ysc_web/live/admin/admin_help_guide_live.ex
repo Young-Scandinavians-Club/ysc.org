@@ -18,6 +18,8 @@ defmodule YscWeb.AdminHelpGuideLive do
      |> assign(:steps, [])
      |> assign(:step_labels, [])
      |> assign(:current_step, 0)
+     |> assign(:guide_panel, :steps)
+     |> assign(:guide_has_appendix?, false)
      |> assign(:clarifier_expanded?, false)
      |> assign(:clarifier_form, to_form(%{"question" => ""}, as: :clarifier))
      |> assign(:clarifier_answer, nil)
@@ -45,6 +47,8 @@ defmodule YscWeb.AdminHelpGuideLive do
          |> assign(:step_labels, step_labels)
          |> assign(:current_step, initial_step(params, steps))
          |> assign(:highlight, highlight_from_params(params))
+         |> assign(:guide_has_appendix?, guide_has_appendix?(guide_mod))
+         |> assign(:guide_panel, guide_panel_from_params(params, guide_mod))
          |> assign(:clarifier_answer, nil)
          |> assign(:clarifier_error, nil)}
 
@@ -76,6 +80,16 @@ defmodule YscWeb.AdminHelpGuideLive do
   @impl true
   def handle_event("next-step", _params, socket) do
     {:noreply, patch_step(socket, socket.assigns.current_step + 1)}
+  end
+
+  @impl true
+  def handle_event("show-guide-panel", %{"panel" => "help"}, socket) do
+    {:noreply, patch_guide_panel(socket, :help)}
+  end
+
+  @impl true
+  def handle_event("show-guide-panel", %{"panel" => "steps"}, socket) do
+    {:noreply, patch_guide_panel(socket, :steps)}
   end
 
   @impl true
@@ -174,7 +188,12 @@ defmodule YscWeb.AdminHelpGuideLive do
             <.admin_help_print_button id="admin-help-print-guide" class="shrink-0" />
           </div>
 
-          <div class="mt-8 mb-6">
+          <.admin_help_guide_tabs
+            :if={@guide_has_appendix?}
+            panel={@guide_panel}
+          />
+
+          <div :if={@guide_panel == :steps} class="mt-6 mb-6">
             <.admin_help_stepper
               id="admin-help-stepper"
               active_step={@current_step}
@@ -183,7 +202,10 @@ defmodule YscWeb.AdminHelpGuideLive do
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-zinc-200 p-6 md:p-8 shadow-sm print:hidden">
+        <div
+          :if={@guide_panel == :steps}
+          class="bg-white rounded-xl border border-zinc-200 p-6 md:p-8 shadow-sm print:hidden"
+        >
           <.admin_help_step
             id={"admin-help-step-#{@current_step}"}
             step={Enum.at(@steps, @current_step)}
@@ -205,7 +227,16 @@ defmodule YscWeb.AdminHelpGuideLive do
           />
         </div>
 
-        <div class="mt-6 flex justify-between items-center print:hidden">
+        <.admin_help_appendix
+          :if={@guide_panel == :help and @guide_has_appendix?}
+          faq={@guide_mod.faq()}
+          troubleshooting={@guide_mod.troubleshooting()}
+        />
+
+        <div
+          :if={@guide_panel == :steps}
+          class="mt-6 flex justify-between items-center print:hidden"
+        >
           <.button
             :if={@current_step > 0}
             type="button"
@@ -274,12 +305,46 @@ defmodule YscWeb.AdminHelpGuideLive do
 
     socket
     |> assign(:current_step, step_index)
+    |> assign(:guide_panel, :steps)
     |> assign(:highlight, nil)
     |> push_patch(to: guide_step_path(socket.assigns.guide_slug, step_index))
+  end
+
+  defp patch_guide_panel(socket, :help) do
+    socket
+    |> assign(:guide_panel, :help)
+    |> assign(:highlight, nil)
+    |> push_patch(
+      to:
+        guide_help_path(socket.assigns.guide_slug, socket.assigns.current_step)
+    )
+  end
+
+  defp patch_guide_panel(socket, :steps) do
+    socket
+    |> assign(:guide_panel, :steps)
+    |> push_patch(
+      to:
+        guide_step_path(socket.assigns.guide_slug, socket.assigns.current_step)
+    )
+  end
+
+  defp guide_has_appendix?(guide_mod) do
+    guide_mod.faq() != [] or guide_mod.troubleshooting() != []
+  end
+
+  defp guide_panel_from_params(params, guide_mod) do
+    if params["view"] == "help" and guide_has_appendix?(guide_mod),
+      do: :help,
+      else: :steps
   end
 
   defp guide_step_path(slug, step_index) do
     # ?step= is 1-based so URLs match the finder and printed guides.
     ~p"/admin/help/#{slug}?#{%{step: step_index + 1}}"
+  end
+
+  defp guide_help_path(slug, step_index) do
+    ~p"/admin/help/#{slug}?#{%{step: step_index + 1, view: "help"}}"
   end
 end

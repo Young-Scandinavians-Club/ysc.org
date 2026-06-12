@@ -106,6 +106,41 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Renders a consistent heading inside `<.modal>` panels.
+
+  Matches the default admin modal title style (`admin_page_title` level 2 with `mb-6`).
+  Set `id` to `"<modal-id>-title"` when the parent modal has `id="<modal-id>"` so
+  `aria-labelledby` on the dialog can reference the heading.
+
+  ## Examples
+
+      <.modal id="verify-phone-modal" show>
+        <.modal_title id="verify-phone-modal-title">Verify Your Phone Number</.modal_title>
+        ...
+      </.modal>
+
+      <.modal_title class="mb-4">Custom spacing</.modal_title>
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged with the default title styles"
+
+  slot :inner_block, required: true
+
+  def modal_title(assigns) do
+    ~H"""
+    <h2
+      id={@id}
+      class={["text-2xl font-semibold leading-8 text-zinc-800 mb-6", @class]}
+    >
+      {render_slot(@inner_block)}
+    </h2>
+    """
+  end
+
+  @doc """
   Renders flash notices.
 
   ## Examples
@@ -249,17 +284,21 @@ defmodule YscWeb.CoreComponents do
     default: nil,
     doc: "the server side parameter to collect all input under"
 
+  attr :id, :string, default: nil
+
   attr :rest, :global,
     include:
-      ~w(autocomplete name rel action enctype method novalidate target multipart),
+      ~w(autocomplete name rel action enctype method novalidate target multipart phx-change phx-submit phx-target phx-auto-recover phx-hook phx-update class),
     doc: "the arbitrary HTML attributes to apply to the form tag"
 
   slot :inner_block, required: true
   slot :actions, doc: "the slot for form actions, such as a submit button"
 
   def simple_form(assigns) do
+    assigns = ensure_simple_form_id(assigns)
+
     ~H"""
-    <.form :let={f} for={@for} as={@as} {@rest}>
+    <.form :let={f} for={@for} as={@as} id={@id} {@rest}>
       <div class="space-y-8 bg-white">
         {render_slot(@inner_block, f)}
         <div
@@ -272,6 +311,35 @@ defmodule YscWeb.CoreComponents do
     </.form>
     """
   end
+
+  defp ensure_simple_form_id(assigns) do
+    if is_nil(assigns.id) && simple_form_has_phx_change?(assigns) do
+      assign(assigns, :id, infer_simple_form_id(assigns))
+    else
+      assigns
+    end
+  end
+
+  defp simple_form_has_phx_change?(assigns) do
+    rest_has_phx_change?(assigns.rest)
+  end
+
+  defp rest_has_phx_change?(rest) when is_map(rest) do
+    Map.has_key?(rest, "phx-change") || Map.has_key?(rest, :"phx-change")
+  end
+
+  defp rest_has_phx_change?(_), do: false
+
+  defp infer_simple_form_id(%{for: %Phoenix.HTML.Form{id: id}})
+       when is_binary(id) and id != "",
+       do: id
+
+  defp infer_simple_form_id(%{for: %Phoenix.HTML.Form{name: name}})
+       when is_binary(name) and name != "",
+       do: "#{name}-form"
+
+  defp infer_simple_form_id(%{as: as}) when not is_nil(as), do: "#{as}-form"
+  defp infer_simple_form_id(_), do: "form-#{System.unique_integer([:positive])}"
 
   @doc """
   Renders a `<button>` or a LiveView `<.link>` styled as a button.
@@ -587,8 +655,7 @@ defmodule YscWeb.CoreComponents do
         <span
           class="block w-6 h-6 bg-white rounded-full shadow-md"
           style={"transform: translateX(#{if @checked, do: "1.5rem", else: "0"}); transition: transform 0.3s ease-in-out;"}
-        >
-        </span>
+        ></span>
       </span>
     </label>
     """
@@ -2441,11 +2508,15 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Compact bordered notice for forms (info or error), used in modals and inline forms.
+  Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another
   hero icon name or `icon={false}` is passed to omit the icon. For `:error`, no icon
-  is shown unless `:icon` is set explicitly.
+  is shown unless `:icon` is set explicitly. For `:success`, a check-circle icon is
+  shown by default.
+
+  Use `size={:comfortable}` for the larger `p-4 mb-6 rounded-lg` variant common on
+  full-page forms (checkout, contact, passkey registration).
 
   ## Examples
 
@@ -2460,13 +2531,26 @@ defmodule YscWeb.CoreComponents do
       <.form_notice kind={:error} margin_bottom={false} id="inline-error">
         Invalid password.
       </.form_notice>
+
+      <.form_notice :if={@success} kind={:success} id="passkey-success" size={:comfortable}>
+        Passkey added successfully!
+      </.form_notice>
   """
-  attr :kind, :atom, values: [:info, :error], required: true
+  attr :kind, :atom, values: [:info, :error, :success], required: true
   attr :id, :string, default: nil
 
   attr :icon, :any,
     default: :default,
     doc: "hero icon name, false to hide, or :default for kind-based default"
+
+  attr :size, :atom,
+    default: :default,
+    values: [:default, :comfortable],
+    doc: ":comfortable uses p-4 mb-6 rounded-lg instead of p-3 mb-4 rounded-md"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the wrapper"
 
   attr :margin_bottom, :boolean, default: true
 
@@ -2474,22 +2558,24 @@ defmodule YscWeb.CoreComponents do
 
   def form_notice(assigns) do
     icon_name = form_notice_icon(assigns.kind, assigns.icon)
-    assigns = assign(assigns, :icon_name, icon_name)
+    role = if assigns.kind in [:error, :success], do: "alert", else: nil
+
+    assigns =
+      assigns
+      |> assign(:icon_name, icon_name)
+      |> assign(:role, role)
 
     ~H"""
     <div
       id={@id}
-      class={[
-        "p-3 border rounded-md",
-        @kind == :info && "bg-blue-50 border-blue-200",
-        @kind == :error && "bg-red-50 border-red-200",
-        @margin_bottom && "mb-4"
-      ]}
+      role={@role}
+      class={form_notice_wrapper_classes(assigns)}
     >
       <p class={[
         "text-sm",
         @kind == :info && "text-blue-800",
-        @kind == :error && "text-red-800"
+        @kind == :error && "text-red-800",
+        @kind == :success && "text-green-800"
       ]}>
         <.icon
           :if={@icon_name}
@@ -2502,8 +2588,29 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  defp form_notice_wrapper_classes(assigns) do
+    size_classes =
+      case assigns.size do
+        :comfortable ->
+          ["p-4 border rounded-lg", assigns.margin_bottom && "mb-6"]
+
+        :default ->
+          ["p-3 border rounded-md", assigns.margin_bottom && "mb-4"]
+      end
+
+    kind_classes =
+      case assigns.kind do
+        :info -> "bg-blue-50 border-blue-200"
+        :error -> "bg-red-50 border-red-200"
+        :success -> "bg-green-50 border-green-200"
+      end
+
+    [size_classes, kind_classes, assigns.class]
+  end
+
   defp form_notice_icon(:info, :default), do: "hero-information-circle"
   defp form_notice_icon(:error, :default), do: nil
+  defp form_notice_icon(:success, :default), do: "hero-check-circle"
   defp form_notice_icon(_kind, false), do: nil
   defp form_notice_icon(_kind, icon) when is_binary(icon), do: icon
 

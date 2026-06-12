@@ -8,60 +8,49 @@ defmodule YscWeb.Plugs.MetricsAuthTest do
 
   alias YscWeb.Plugs.MetricsAuth
 
-  setup do
-    old_env = Application.get_env(:ysc, :environment)
-
-    on_exit(fn ->
-      if is_nil(old_env),
-        do: Application.delete_env(:ysc, :environment),
-        else: Application.put_env(:ysc, :environment, old_env)
-    end)
-
-    :ok
-  end
-
   describe "call/2 when request path is not /metrics" do
     test "passes through for any path and IP in production" do
-      Application.put_env(:ysc, :environment, :prod)
+      Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+        conn =
+          conn(:get, "/")
+          |> Map.put(:remote_ip, {8, 8, 8, 8})
+          |> MetricsAuth.call([])
 
-      conn =
-        conn(:get, "/")
-        |> Map.put(:remote_ip, {8, 8, 8, 8})
-        |> MetricsAuth.call([])
-
-      refute conn.halted
-      refute conn.status == 404
+        refute conn.halted
+        refute conn.status == 404
+      end)
     end
 
     test "passes through for /dashboard and other paths" do
-      Application.put_env(:ysc, :environment, :prod)
+      Ysc.Test.EnvHelper.with_environment(:prod, fn ->
+        conn =
+          conn(:get, "/dashboard")
+          |> Map.put(:remote_ip, {8, 8, 8, 8})
+          |> MetricsAuth.call([])
 
-      conn =
-        conn(:get, "/dashboard")
-        |> Map.put(:remote_ip, {8, 8, 8, 8})
-        |> MetricsAuth.call([])
-
-      refute conn.halted
+        refute conn.halted
+      end)
     end
   end
 
   describe "call/2 for /metrics in development" do
     test "allows any IP when env is dev" do
-      Application.put_env(:ysc, :environment, :dev)
+      Ysc.Test.EnvHelper.with_environment(:dev, fn ->
+        conn =
+          conn(:get, "/metrics")
+          |> Map.put(:remote_ip, {8, 8, 8, 8})
+          |> MetricsAuth.call([])
 
-      conn =
-        conn(:get, "/metrics")
-        |> Map.put(:remote_ip, {8, 8, 8, 8})
-        |> MetricsAuth.call([])
-
-      refute conn.halted
-      refute conn.status == 404
+        refute conn.halted
+        refute conn.status == 404
+      end)
     end
   end
 
   describe "call/2 for /metrics in production" do
     setup do
-      Application.put_env(:ysc, :environment, :prod)
+      original = Ysc.Test.EnvHelper.capture_environment!(:prod)
+      on_exit(fn -> Ysc.Test.EnvHelper.restore_environment!(original) end)
       :ok
     end
 

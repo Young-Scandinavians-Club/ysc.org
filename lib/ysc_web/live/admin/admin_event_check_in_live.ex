@@ -166,13 +166,11 @@ defmodule YscWeb.AdminEventCheckInLive do
                         data-checkin-btn
                         class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
                         aria-label="Mark as checked in"
-                      >
-                      </button>
+                      ></button>
                       <span
                         class="checkin-kbd-badge hidden select-none gap-0.5"
                         hidden
-                      >
-                      </span>
+                      ></span>
                     </div>
                     <div class="col-span-3">
                       <p class="text-sm font-medium text-zinc-900">

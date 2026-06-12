@@ -190,7 +190,12 @@ defmodule YscWeb.MediaPickerComponent do
           </h2>
 
           <div class="flex flex-col sm:flex-row gap-3">
-            <form phx-change="search-media" phx-target={@myself} class="flex-1">
+            <form
+              id={"#{@id}-search-form"}
+              phx-change="search-media"
+              phx-target={@myself}
+              class="flex-1"
+            >
               <.input
                 type="text"
                 name="search"

@@ -42,9 +42,9 @@ defmodule YscWeb.UserSettingsLive do
           on_cancel={JS.push("confirm_cancel_phone_verification")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="phone-verification-modal-title">
             Verify Your Phone Number
-          </h2>
+          </.modal_title>
 
           <.simple_form
             for={@phone_verification_form}
@@ -133,9 +133,9 @@ defmodule YscWeb.UserSettingsLive do
           on_cancel={JS.push("confirm_cancel_email_verification")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="email-verification-modal-title">
             Verify Your New Email Address
-          </h2>
+          </.modal_title>
 
           <.simple_form
             for={@email_verification_form}
@@ -227,9 +227,9 @@ defmodule YscWeb.UserSettingsLive do
           on_cancel={JS.patch(~p"/users/membership")}
           show
         >
-          <h2 class="text-2xl font-semibold leading-8 text-zinc-800 mb-6">
+          <.modal_title id="update-payment-method-modal-title">
             Payment Method
-          </h2>
+          </.modal_title>
           <%!-- Loading state --%>
           <.async_section_loader
             :if={assigns[:loading_payment_methods]}
@@ -2156,10 +2156,10 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
                     <h2 class="text-lg font-bold text-zinc-900">
-                      Tickets waiting for checkout
+                      Unfinished ticket orders
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
-                      You started buying tickets but did not finish payment. Your tickets and member price are still saved. Finish checkout before the deadline on each item below.
+                      You started buying event tickets but did not finish payment. Your selections and member price are still saved — complete payment before the deadline on each item below.
                     </p>
                   </div>
                   <div class="hidden sm:flex items-center text-zinc-400">
@@ -2179,7 +2179,7 @@ defmodule YscWeb.UserSettingsLive do
                     <div class="flex items-start justify-between gap-3 mb-3">
                       <span class="inline-flex items-center gap-1.5 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-zinc-700 border border-zinc-200 shadow-sm">
                         <.icon name="hero-bolt" class="w-3.5 h-3.5 text-blue-600" />
-                        Saved for checkout
+                        Payment not finished
                       </span>
                       <span class="text-xs font-medium text-zinc-500 mt-1 tabular-nums">
                         Qty {res.quantity}
@@ -2222,7 +2222,7 @@ defmodule YscWeb.UserSettingsLive do
                             "%b %-d, %Y %H:%M PT"
                           )}
                         <% else %>
-                          No timer — finish checkout when you are ready
+                          No deadline — complete payment when you are ready
                         <% end %>
                       </span>
                     </div>

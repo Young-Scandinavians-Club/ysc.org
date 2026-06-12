@@ -80,25 +80,22 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
           |> Enum.reject(fn {key, _} -> key == :general end)
           |> Enum.count() %>
         <%= if error_count > 0 do %>
-          <div
-            id="guest-errors-summary"
-            role="alert"
-            class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
-          >
-            <p class="text-sm font-semibold text-red-800">
+          <.form_notice kind={:error} id="guest-errors-summary" size={:comfortable}>
+            <span class="font-semibold">
               {error_count} {if error_count == 1, do: "guest is", else: "guests are"} missing required information.
-            </p>
-          </div>
+            </span>
+          </.form_notice>
         <% end %>
       <% end %>
 
-      <div
+      <.form_notice
         :if={@guest_info_errors[:general]}
-        class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
-        role="alert"
+        kind={:error}
+        id="guest-error-general"
+        size={:comfortable}
       >
-        <p class="text-sm text-red-800">{@guest_info_errors[:general]}</p>
-      </div>
+        {@guest_info_errors[:general]}
+      </.form_notice>
 
       <.form
         for={@guest_info_form}

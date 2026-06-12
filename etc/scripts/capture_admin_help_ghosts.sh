@@ -5,58 +5,43 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:4000}"
 OUT_DIR="priv/static/images/admin-help"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 
 if [[ -z "${ADMIN_EMAIL:-}" || -z "${ADMIN_PASSWORD:-}" ]]; then
-  echo "ADMIN_EMAIL and ADMIN_PASSWORD must be set (no embedded defaults)." >&2
-  exit 1
+  if [[ "${CAPTURE_USE_SEED_LOGIN:-}" == "1" && "${MIX_ENV:-dev}" == "dev" ]]; then
+    # Local dev only — matches priv/repo/seeds.exs (see docs/SEED_DATA_REFERENCE.md).
+    EMAIL="admin@ysc.org"
+    PASSWORD="very_secure_password"
+  else
+    echo "ADMIN_EMAIL and ADMIN_PASSWORD must be set (no embedded defaults)." >&2
+    echo "For local dev: CAPTURE_USE_SEED_LOGIN=1 MIX_ENV=dev $0" >&2
+    exit 1
+  fi
+else
+  EMAIL="$ADMIN_EMAIL"
+  PASSWORD="$ADMIN_PASSWORD"
 fi
 
-EMAIL="$ADMIN_EMAIL"
-PASSWORD="$ADMIN_PASSWORD"
-
+cd "$ROOT_DIR"
 mkdir -p "$OUT_DIR"
 
-npx --yes playwright install chromium >/dev/null 2>&1 || true
+TARGETS_JSON="$(
+  mix run --no-start -e '
+    targets = YscWeb.AdminHelp.Ghost.Registry.capture_targets()
+    IO.puts(Jason.encode!(targets))
+  '
+)"
 
-BASE_URL="$BASE_URL" OUT_DIR="$OUT_DIR" ADMIN_EMAIL="$EMAIL" ADMIN_PASSWORD="$PASSWORD" node <<'NODE'
-const { chromium } = require('playwright');
+CAPTURE_DIR="$(cd "$(dirname "$0")/admin-help-capture" && pwd)"
 
-const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
-const outDir = process.env.OUT_DIR || 'priv/static/images/admin-help';
-const email = process.env.ADMIN_EMAIL;
-const password = process.env.ADMIN_PASSWORD;
+if [[ ! -d "$CAPTURE_DIR/node_modules/playwright" ]]; then
+  echo "Installing Playwright (first run)…" >&2
+  (cd "$CAPTURE_DIR" && npm install --silent && npx playwright install chromium)
+fi
 
-if (!email || !password) {
-  console.error('ADMIN_EMAIL and ADMIN_PASSWORD must be set (no embedded defaults).');
-  process.exit(1);
-}
-
-const slugs = process.env.SLUGS ? process.env.SLUGS.split(',') : [
-  'getting-started-dashboard','getting-started-sidebar','posts-list','posts-editor',
-  'posts-settings','posts-publish','newsletter-compose','newsletter-subscribers',
-  'events-list','events-edit','events-tickets','events-updates','media-gallery',
-  'check-in-desk','scanner'
-];
-
-(async () => {
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const page = await context.newPage();
-
-  await page.goto(`${baseUrl}/users/log-in`);
-  await page.fill('input[name="user[email]"]', email);
-  await page.fill('input[name="user[password]"]', password);
-  await page.click('button[type="submit"]');
-  await page.waitForURL(/\/(admin|onboarding)/, { timeout: 15000 }).catch(() => {});
-
-  for (const slug of slugs) {
-    const url = `${baseUrl}/admin/help/ghost/${slug}?embed=1`;
-    await page.goto(url, { waitUntil: 'networkidle' });
-    await page.waitForSelector('.admin-help-ghost-embed, .admin-help-ghost-public', { timeout: 10000 });
-    await page.screenshot({ path: `${outDir}/${slug}.png`, fullPage: false });
-    console.log(`Wrote ${outDir}/${slug}.png`);
-  }
-
-  await browser.close();
-})();
-NODE
+BASE_URL="$BASE_URL" \
+  OUT_DIR="$OUT_DIR" \
+  ADMIN_EMAIL="$EMAIL" \
+  ADMIN_PASSWORD="$PASSWORD" \
+  TARGETS_JSON="$TARGETS_JSON" \
+  node "$CAPTURE_DIR/capture.mjs"

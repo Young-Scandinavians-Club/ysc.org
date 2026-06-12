@@ -18,6 +18,8 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
      |> assign(:page_title, "Outstanding booking benefits")
      |> assign(:active_page, :bookings)
      |> assign(:filter_property, nil)
+     |> assign(:outstanding_entitlements, [])
+     |> assign(:loading_outstanding_entitlements?, false)
      |> assign(:entitlement_form, entitlement_form())
      |> assign(:grant_user_search, "")
      |> assign(:grant_user_results, [])
@@ -33,12 +35,26 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
         _ -> nil
       end
 
+    socket =
+      socket
+      |> assign(:filter_property, filter_property)
+      |> assign(:loading_outstanding_entitlements?, true)
+
+    if connected?(socket) do
+      send(self(), {:load_outstanding_entitlements, filter_property})
+    end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:load_outstanding_entitlements, filter_property}, socket) do
     list = Entitlements.list_outstanding(property: filter_property)
 
     {:noreply,
      socket
-     |> assign(:filter_property, filter_property)
-     |> assign(:outstanding_entitlements, list)}
+     |> assign(:outstanding_entitlements, list)
+     |> assign(:loading_outstanding_entitlements?, false)}
   end
 
   @impl true
@@ -398,7 +414,16 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
             </tbody>
           </table>
           <p
-            :if={@outstanding_entitlements == []}
+            :if={@loading_outstanding_entitlements?}
+            class="px-4 py-8 text-center text-zinc-500 text-sm"
+          >
+            Loading entitlements…
+          </p>
+          <p
+            :if={
+              !@loading_outstanding_entitlements? and
+                @outstanding_entitlements == []
+            }
             class="px-4 py-8 text-center text-zinc-500 text-sm"
           >
             No outstanding entitlements for this filter.
