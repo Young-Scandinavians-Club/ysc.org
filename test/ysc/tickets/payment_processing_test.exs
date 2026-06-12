@@ -167,7 +167,8 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
                  "Partial refund"
                )
 
-      assert Repo.get!(Ysc.Events.Ticket, ticket_to_refund.id).status == :cancelled
+      assert Repo.get!(Ysc.Events.Ticket, ticket_to_refund.id).status ==
+               :cancelled
 
       payment_intent_id = "pi_partial_refund_#{ticket_order.id}"
 
@@ -180,11 +181,15 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
                )
 
       assert returned.status == :completed
-      assert Repo.get!(Ysc.Events.Ticket, ticket_to_refund.id).status == :cancelled
+
+      assert Repo.get!(Ysc.Events.Ticket, ticket_to_refund.id).status ==
+               :cancelled
 
       assert Repo.aggregate(
                from(t in Ysc.Events.Ticket,
-                 where: t.ticket_order_id == ^ticket_order.id and t.status == :confirmed
+                 where:
+                   t.ticket_order_id == ^ticket_order.id and
+                     t.status == :confirmed
                ),
                :count
              ) == 1
