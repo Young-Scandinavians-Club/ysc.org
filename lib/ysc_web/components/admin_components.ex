@@ -1145,7 +1145,11 @@ defmodule YscWeb.AdminComponents do
       />
   """
   attr :id, :string, required: true
-  attr :grid_id, :string, required: true, doc: "DOM id for the stream grid container"
+
+  attr :grid_id, :string,
+    required: true,
+    doc: "DOM id for the stream grid container"
+
   attr :target, :any, required: true, doc: "phx-target (typically @myself)"
   attr :search, :string, required: true
   attr :selected_year, :any, default: nil

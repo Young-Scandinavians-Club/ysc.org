@@ -2,14 +2,13 @@ defmodule YscWeb.AdminMediaLibraryBrowserTest do
   use YscWeb.ConnCase, async: true
   use Phoenix.Component
 
-  require Phoenix.LiveViewTest
-
   import Phoenix.LiveViewTest, only: [rendered_to_string: 1]
   import YscWeb.AdminComponents
 
   describe "media_library_thumbnail_url/1" do
     test "prefers thumbnail, then optimized, then raw path" do
-      assert media_library_thumbnail_url(%{thumbnail_path: "/t.jpg"}) == "/t.jpg"
+      assert media_library_thumbnail_url(%{thumbnail_path: "/t.jpg"}) ==
+               "/t.jpg"
 
       assert media_library_thumbnail_url(%{
                thumbnail_path: "",
