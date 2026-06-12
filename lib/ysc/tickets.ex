@@ -1556,7 +1556,9 @@ defmodule Ysc.Tickets do
     now = DateTime.utc_now()
 
     from(t in Ticket,
-      where: t.ticket_order_id == ^ticket_order.id and t.status != :confirmed
+      where:
+        t.ticket_order_id == ^ticket_order.id and
+          t.status in [:pending, :expired]
     )
     |> Repo.update_all(set: [status: :confirmed, updated_at: now])
 
