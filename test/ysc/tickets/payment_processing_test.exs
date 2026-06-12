@@ -134,6 +134,94 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
              |> Enum.all?(&(&1.status == :confirmed))
     end
 
+    test "does not re-confirm cancelled tickets when retrying already-completed order" do
+      event = Ysc.EventsFixtures.event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      ticket_order =
+        ticket_order_fixture(%{
+          event: event,
+          tier: tier,
+          ticket_selections: %{tier.id => 2},
+          status: :completed
+        })
+
+      from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^ticket_order.id)
+      |> Repo.update_all(set: [status: :confirmed])
+
+      [ticket_to_refund | remaining] =
+        from(t in Ysc.Events.Ticket,
+          where: t.ticket_order_id == ^ticket_order.id,
+          order_by: [asc: t.id]
+        )
+        |> Repo.all()
+
+      assert length(remaining) == 1
+
+      ticket_order = Tickets.get_ticket_order(ticket_order.id)
+
+      assert {:ok, _} =
+               Tickets.refund_tickets(
+                 ticket_order,
+                 [ticket_to_refund.id],
+                 "Partial refund"
+               )
+
+      assert Repo.get!(Ysc.Events.Ticket, ticket_to_refund.id).status ==
+               :cancelled
+
+      payment_intent_id = "pi_partial_refund_#{ticket_order.id}"
+
+      deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+
+      assert {:ok, returned} =
+               Tickets.process_ticket_order_payment(
+                 ticket_order,
+                 payment_intent_id
+               )
+
+      assert returned.status == :completed
+
+      assert Repo.get!(Ysc.Events.Ticket, ticket_to_refund.id).status ==
+               :cancelled
+
+      assert Repo.aggregate(
+               from(t in Ysc.Events.Ticket,
+                 where:
+                   t.ticket_order_id == ^ticket_order.id and
+                     t.status == :confirmed
+               ),
+               :count
+             ) == 1
+    end
+
+    test "confirms expired tickets when order is already completed" do
+      ticket_order =
+        ticket_order_fixture(%{status: :completed})
+
+      from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^ticket_order.id)
+      |> Repo.update_all(set: [status: :expired])
+
+      payment_intent_id = "pi_recover_expired_#{ticket_order.id}"
+
+      deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+
+      assert {:ok, returned} =
+               Tickets.process_ticket_order_payment(
+                 ticket_order,
+                 payment_intent_id
+               )
+
+      assert returned.status == :completed
+
+      assert Repo.all(
+               from(t in Ysc.Events.Ticket,
+                 where: t.ticket_order_id == ^ticket_order.id
+               )
+             )
+             |> Enum.all?(&(&1.status == :confirmed))
+    end
+
     test "accepts a preloaded payment intent struct without refetching from Stripe" do
       Oban.Testing.with_testing_mode(:manual, fn ->
         ticket_order = ticket_order_fixture()
