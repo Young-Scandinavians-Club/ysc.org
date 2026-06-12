@@ -138,6 +138,58 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
     end
   end
 
+  describe "deferred data loading" do
+    setup [:create_admin]
+
+    test "reservations section replaces loading placeholder with the table", %{
+      conn: conn
+    } do
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      html = render(view)
+
+      refute html =~ "Loading reservations…"
+      assert has_element?(view, "#admin_reservations_list")
+      refute has_element?(view, "#reservations-loading")
+    end
+
+    test "switching to reservations section loads the table after connect", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live(conn, ~p"/admin/bookings?property=tahoe")
+
+      view
+      |> element("button[phx-value-section=reservations]", "Reservations")
+      |> render_click()
+
+      html = render(view)
+
+      refute html =~ "Loading reservations…"
+      assert has_element?(view, "#admin_reservations_list")
+    end
+
+    test "initial calendar mount issues at most one seasons query after connect",
+         %{conn: conn} do
+      seasons_pattern = ~r/FROM "seasons"/i
+
+      {{:ok, view, _initial_html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, initial_html} =
+              live(conn, ~p"/admin/bookings?property=tahoe")
+
+            render(view)
+            {:ok, view, initial_html}
+          end,
+          pattern: seasons_pattern
+        )
+
+      assert query_count <= 1
+      assert render(view) =~ "Calendar"
+    end
+  end
+
   describe "navigation and calendar controls" do
     setup [:create_admin]
 
