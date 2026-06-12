@@ -6,12 +6,13 @@ defmodule YscWeb.UserLoginLiveTest do
 
   describe "Log in page" do
     test "renders log in page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in")
+      {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Sign in to your YSC account"
       assert html =~ "Apply for membership"
       assert html =~ "Forgot your password?"
-      assert html =~ "Didn't get your verification email?"
+      assert html =~ "verification email"
+      assert has_element?(lv, "a[href='/users/confirm']")
     end
 
     test "renders authentication method buttons", %{conn: conn} do
