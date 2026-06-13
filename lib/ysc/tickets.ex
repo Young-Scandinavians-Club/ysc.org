@@ -357,38 +357,52 @@ defmodule Ysc.Tickets do
 
   @doc """
   Cancels a ticket order and releases the reserved tickets.
+
+  Only transitions orders in `from_statuses` (default `[:pending]`). Pass
+  `from_statuses: [:completed]` when voiding tickets after an admin refund.
   """
-  def cancel_ticket_order(ticket_order, reason \\ "User cancelled") do
+  def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
+    from_statuses = Keyword.get(opts, :from_statuses, [:pending])
+    now = DateTime.utc_now()
+    ticket_statuses = ticket_cancel_statuses(from_statuses)
+
     result =
       Repo.transaction(fn ->
-        # Update ticket order status
-        {:ok, updated_order} =
-          ticket_order
-          |> TicketOrder.status_changeset(%{
-            status: :cancelled,
-            cancelled_at: DateTime.utc_now(),
-            cancellation_reason: reason
-          })
-          |> Repo.update()
-
-        # Cancel all associated tickets
-        tickets =
-          Repo.all(
-            from t in Ticket, where: t.ticket_order_id == ^ticket_order.id
+        {count, _} =
+          from(to in TicketOrder,
+            where: to.id == ^ticket_order.id and to.status in ^from_statuses
+          )
+          |> Repo.update_all(
+            set: [
+              status: :cancelled,
+              cancelled_at: now,
+              cancellation_reason: reason,
+              updated_at: now
+            ]
           )
 
-        Enum.each(tickets, fn ticket ->
-          ticket
-          |> Ticket.changeset(%{status: :cancelled})
-          |> Repo.update()
-        end)
+        if count == 1 do
+          from(t in Ticket,
+            where:
+              t.ticket_order_id == ^ticket_order.id and
+                t.status in ^ticket_statuses
+          )
+          |> Repo.update_all(set: [status: :cancelled, updated_at: now])
 
-        updated_order
+          case get_ticket_order(ticket_order.id) do
+            nil -> Repo.rollback({:error, :not_found})
+            updated_order -> {:cancelled, updated_order}
+          end
+        else
+          case get_ticket_order(ticket_order.id) do
+            nil -> Repo.rollback({:error, :not_found})
+            order -> {:skipped, order}
+          end
+        end
       end)
 
-    # Broadcast the cancellation event
     case result do
-      {:ok, updated_order} ->
+      {:ok, {:cancelled, updated_order}} ->
         event = %Ysc.MessagePassingEvents.CheckoutSessionCancelled{
           ticket_order: updated_order,
           user_id: updated_order.user_id,
@@ -405,12 +419,22 @@ defmodule Ysc.Tickets do
         )
 
         broadcast_to_user(updated_order.user_id, event)
-        # Also broadcast to event-level topic for availability updates
         broadcast_ticket_availability_update(updated_order.event_id)
-        result
+        {:ok, updated_order}
+
+      {:ok, {:skipped, order}} ->
+        {:ok, order}
 
       error ->
         error
+    end
+  end
+
+  defp ticket_cancel_statuses(from_statuses) do
+    if :completed in from_statuses do
+      [:confirmed]
+    else
+      [:pending]
     end
   end
 

@@ -703,6 +703,88 @@ defmodule Ysc.TicketsTest do
 
       assert Enum.all?(tickets, &(&1.status == :cancelled))
     end
+
+    test "cancel_ticket_order does not cancel completed orders by default", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: order.total_amount,
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id: "pi_no_cancel_completed",
+          stripe_fee: Money.new(160, :USD),
+          description: "Complete order",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, completed} = Tickets.complete_ticket_order(order, payment.id)
+
+      from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+      |> Ysc.Repo.update_all(set: [status: :confirmed])
+
+      assert {:ok, returned} =
+               Tickets.cancel_ticket_order(completed, "User cancelled checkout")
+
+      assert returned.status == :completed
+
+      tickets =
+        Ysc.Repo.all(
+          from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+        )
+
+      assert Enum.all?(tickets, &(&1.status == :confirmed))
+    end
+
+    test "cancel_ticket_order can void completed orders after refund", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      {:ok, {payment, _tx, _en}} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: order.total_amount,
+          entity_type: :event,
+          entity_id: event.id,
+          external_payment_id: "pi_refund_cancel",
+          stripe_fee: Money.new(160, :USD),
+          description: "Complete order",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      assert {:ok, completed} = Tickets.complete_ticket_order(order, payment.id)
+
+      from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+      |> Ysc.Repo.update_all(set: [status: :confirmed])
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(
+                 completed,
+                 "Refund processed - tickets released",
+                 from_statuses: [:completed]
+               )
+
+      assert cancelled.status == :cancelled
+
+      tickets =
+        Ysc.Repo.all(
+          from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+        )
+
+      assert Enum.all?(tickets, &(&1.status == :cancelled))
+    end
   end
 
   describe "validate_booking_capacity/2" do
