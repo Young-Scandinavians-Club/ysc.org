@@ -564,161 +564,161 @@ defmodule YscWeb.AdminUsersLive do
           </div>
 
           <div :if={@meta}>
-          <!-- Mobile Card View -->
-          <div class="block md:hidden space-y-4">
-            <%= for {_, user} <- @streams.users do %>
-              <div
-                class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                phx-click={
-                  if user.state == :pending_approval,
-                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
-                    else:
-                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+            <!-- Mobile Card View -->
+            <div class="block md:hidden space-y-4">
+              <%= for {_, user} <- @streams.users do %>
+                <div
+                  class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  phx-click={
+                    if user.state == :pending_approval,
+                      do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
+                      else:
+                        JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                  }
+                >
+                  <div class="flex items-start gap-3 mb-3">
+                    <.user_card user={user} />
+                  </div>
+
+                  <div class="space-y-2 mb-3">
+                    <div :if={user.phone_number} class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Phone:</span>
+                      <span class="text-sm text-zinc-900">
+                        {Ysc.Extensions.PhoneNumber.format_for_display(
+                          user.phone_number
+                        ) || user.phone_number}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Account Status:</span>
+                      <.badge type={
+                        AdminBadgeHelpers.user_state_badge_type(user.state)
+                      }>
+                        {user_state_to_readable(user.state)}
+                      </.badge>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Membership:</span>
+                      <%= case membership_display(user) do %>
+                        <% {nil, _} -> %>
+                          <span class="text-sm text-zinc-400">—</span>
+                        <% {membership_type, inherited?} -> %>
+                          <div class="flex items-center gap-1">
+                            <.badge type="sky">
+                              {String.capitalize("#{membership_type}")}
+                            </.badge>
+                            <%= if inherited? do %>
+                              <.tooltip tooltip_text="Membership inherited from parent account">
+                                <.icon
+                                  name="hero-users"
+                                  class="w-4 h-4 text-zinc-500"
+                                />
+                              </.tooltip>
+                            <% end %>
+                          </div>
+                      <% end %>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end pt-3 border-t border-zinc-200">
+                    <.user_actions_dropdown
+                      user={user}
+                      params={@params}
+                      menu_id={"user-actions-mob-#{user.id}"}
+                    />
+                  </div>
+                </div>
+              <% end %>
+              <.admin_list_empty_state
+                :if={@empty}
+                title="No results found"
+                suggestion="Try adjusting your search term and filters."
+                clear_id="admin-users-clear-filters-empty-mobile"
+                clear_patch={~p"/admin/users"}
+              />
+              <!-- Mobile Pagination -->
+              <div :if={!@empty} class="pt-4">
+                <.admin_flop_pagination
+                  meta={@meta}
+                  path={~p"/admin/users?#{non_flop_params(@params)}"}
+                  density={:compact}
+                />
+              </div>
+            </div>
+            <!-- Desktop Table View -->
+            <div class="hidden md:block">
+              <Flop.Phoenix.table
+                id="admin_users_list"
+                items={@streams.users}
+                meta={@meta}
+                path={~p"/admin/users?#{non_flop_params(@params)}"}
+                row_click={
+                  fn {_, user} ->
+                    if user.state == :pending_approval,
+                      do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
+                      else:
+                        JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                  end
                 }
+                opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
-                <div class="flex items-start gap-3 mb-3">
+                <:col :let={{_, user}} label="Name" field={:first_name}>
                   <.user_card user={user} />
-                </div>
-
-                <div class="space-y-2 mb-3">
-                  <div :if={user.phone_number} class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">Phone:</span>
-                    <span class="text-sm text-zinc-900">
-                      {Ysc.Extensions.PhoneNumber.format_for_display(
-                        user.phone_number
-                      ) || user.phone_number}
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">Account Status:</span>
-                    <.badge type={
-                      AdminBadgeHelpers.user_state_badge_type(user.state)
-                    }>
-                      {user_state_to_readable(user.state)}
-                    </.badge>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">Membership:</span>
-                    <%= case membership_display(user) do %>
-                      <% {nil, _} -> %>
-                        <span class="text-sm text-zinc-400">—</span>
-                      <% {membership_type, inherited?} -> %>
-                        <div class="flex items-center gap-1">
-                          <.badge type="sky">
-                            {String.capitalize("#{membership_type}")}
-                          </.badge>
-                          <%= if inherited? do %>
-                            <.tooltip tooltip_text="Membership inherited from parent account">
-                              <.icon
-                                name="hero-users"
-                                class="w-4 h-4 text-zinc-500"
-                              />
-                            </.tooltip>
-                          <% end %>
-                        </div>
-                    <% end %>
-                  </div>
-                </div>
-
-                <div class="flex justify-end pt-3 border-t border-zinc-200">
+                </:col>
+                <:col :let={{_, user}} label="Phone" field={:phone_number}>
+                  {Ysc.Extensions.PhoneNumber.format_for_display(user.phone_number) ||
+                    user.phone_number}
+                </:col>
+                <:col
+                  :let={{_, user}}
+                  label="Account Status"
+                  field={:state}
+                  thead_th_attrs={[class: "dance"]}
+                >
+                  <.badge type={AdminBadgeHelpers.user_state_badge_type(user.state)}>
+                    {user_state_to_readable(user.state)}
+                  </.badge>
+                </:col>
+                <:col :let={{_, user}} label="Membership" field={:membership_type}>
+                  <%= case membership_display(user) do %>
+                    <% {nil, _} -> %>
+                      <span class="text-zinc-400">—</span>
+                    <% {membership_type, inherited?} -> %>
+                      <div class="flex items-center gap-1">
+                        <.badge type="sky">
+                          {String.capitalize("#{membership_type}")}
+                        </.badge>
+                        <%= if inherited? do %>
+                          <.tooltip tooltip_text="Membership inherited from parent account">
+                            <.icon name="hero-users" class="w-4 h-4 text-zinc-500" />
+                          </.tooltip>
+                        <% end %>
+                      </div>
+                  <% end %>
+                </:col>
+                <:action :let={{_, user}}>
                   <.user_actions_dropdown
                     user={user}
                     params={@params}
-                    menu_id={"user-actions-mob-#{user.id}"}
+                    menu_id={"user-actions-dt-#{user.id}"}
                   />
-                </div>
-              </div>
-            <% end %>
-            <.admin_list_empty_state
-              :if={@empty}
-              title="No results found"
-              suggestion="Try adjusting your search term and filters."
-              clear_id="admin-users-clear-filters-empty-mobile"
-              clear_patch={~p"/admin/users"}
-            />
-            <!-- Mobile Pagination -->
-            <div :if={@meta && !@empty} class="pt-4">
+                </:action>
+              </Flop.Phoenix.table>
+
+              <.admin_list_empty_state
+                :if={@empty}
+                title="No results found"
+                suggestion="Try adjusting your search term and filters."
+                clear_id="admin-users-clear-filters-empty-desktop"
+                clear_patch={~p"/admin/users"}
+              />
+
               <.admin_flop_pagination
                 meta={@meta}
                 path={~p"/admin/users?#{non_flop_params(@params)}"}
-                density={:compact}
+                density={:comfortable}
               />
             </div>
-          </div>
-          <!-- Desktop Table View -->
-          <div class="hidden md:block">
-            <Flop.Phoenix.table
-              id="admin_users_list"
-              items={@streams.users}
-              meta={@meta}
-              path={~p"/admin/users?#{non_flop_params(@params)}"}
-              row_click={
-                fn {_, user} ->
-                  if user.state == :pending_approval,
-                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
-                    else:
-                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
-                end
-              }
-              opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
-            >
-              <:col :let={{_, user}} label="Name" field={:first_name}>
-                <.user_card user={user} />
-              </:col>
-              <:col :let={{_, user}} label="Phone" field={:phone_number}>
-                {Ysc.Extensions.PhoneNumber.format_for_display(user.phone_number) ||
-                  user.phone_number}
-              </:col>
-              <:col
-                :let={{_, user}}
-                label="Account Status"
-                field={:state}
-                thead_th_attrs={[class: "dance"]}
-              >
-                <.badge type={AdminBadgeHelpers.user_state_badge_type(user.state)}>
-                  {user_state_to_readable(user.state)}
-                </.badge>
-              </:col>
-              <:col :let={{_, user}} label="Membership" field={:membership_type}>
-                <%= case membership_display(user) do %>
-                  <% {nil, _} -> %>
-                    <span class="text-zinc-400">—</span>
-                  <% {membership_type, inherited?} -> %>
-                    <div class="flex items-center gap-1">
-                      <.badge type="sky">
-                        {String.capitalize("#{membership_type}")}
-                      </.badge>
-                      <%= if inherited? do %>
-                        <.tooltip tooltip_text="Membership inherited from parent account">
-                          <.icon name="hero-users" class="w-4 h-4 text-zinc-500" />
-                        </.tooltip>
-                      <% end %>
-                    </div>
-                <% end %>
-              </:col>
-              <:action :let={{_, user}}>
-                <.user_actions_dropdown
-                  user={user}
-                  params={@params}
-                  menu_id={"user-actions-dt-#{user.id}"}
-                />
-              </:action>
-            </Flop.Phoenix.table>
-
-            <.admin_list_empty_state
-              :if={@empty}
-              title="No results found"
-              suggestion="Try adjusting your search term and filters."
-              clear_id="admin-users-clear-filters-empty-desktop"
-              clear_patch={~p"/admin/users"}
-            />
-
-            <.admin_flop_pagination
-              meta={@meta}
-              path={~p"/admin/users?#{non_flop_params(@params)}"}
-              density={:comfortable}
-            />
-          </div>
           </div>
         </div>
       </div>

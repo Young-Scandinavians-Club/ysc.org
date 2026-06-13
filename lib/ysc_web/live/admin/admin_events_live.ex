@@ -135,63 +135,136 @@ defmodule YscWeb.AdminEventsLive do
           </div>
 
           <div :if={@meta}>
-          <%!-- Mobile Card View --%>
-          <div class="block md:hidden space-y-4">
-            <%= for {_, event} <- @streams.events do %>
-              <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
-                <.link
-                  navigate={~p"/admin/events/#{event.id}/edit"}
-                  class="mb-3 cursor-pointer block"
-                >
-                  <h3 class="text-base font-semibold text-zinc-900 mb-2">
-                    {event.title}
-                  </h3>
-                  <div class="space-y-1.5">
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Event Date:</span>
-                      <span class="text-sm font-medium text-zinc-900">
-                        {format_date(event.start_date)}
-                      </span>
+            <%!-- Mobile Card View --%>
+            <div class="block md:hidden space-y-4">
+              <%= for {_, event} <- @streams.events do %>
+                <div class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow">
+                  <.link
+                    navigate={~p"/admin/events/#{event.id}/edit"}
+                    class="mb-3 cursor-pointer block"
+                  >
+                    <h3 class="text-base font-semibold text-zinc-900 mb-2">
+                      {event.title}
+                    </h3>
+                    <div class="space-y-1.5">
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm text-zinc-600">Event Date:</span>
+                        <span class="text-sm font-medium text-zinc-900">
+                          {format_date(event.start_date)}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm text-zinc-600">Capacity:</span>
+                        <span class="text-sm font-medium text-zinc-900">
+                          {format_capacity(event)}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm text-zinc-600">Organizer:</span>
+                        <span class="text-sm text-zinc-900">
+                          {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
+                        </span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-sm text-zinc-600">Created:</span>
+                        <span class="text-sm text-zinc-900">
+                          {format_date(event.inserted_at)}
+                        </span>
+                      </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Capacity:</span>
-                      <span class="text-sm font-medium text-zinc-900">
-                        {format_capacity(event)}
-                      </span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Organizer:</span>
-                      <span class="text-sm text-zinc-900">
-                        {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
-                      </span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm text-zinc-600">Created:</span>
-                      <span class="text-sm text-zinc-900">
-                        {format_date(event.inserted_at)}
-                      </span>
-                    </div>
-                  </div>
-                </.link>
+                  </.link>
 
-                <div class="flex items-center justify-between gap-2 pt-3 border-t border-zinc-200">
-                  <div>
-                    <%= if event.state == :scheduled && event.publish_at do %>
-                      <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
+                  <div class="flex items-center justify-between gap-2 pt-3 border-t border-zinc-200">
+                    <div>
+                      <%= if event.state == :scheduled && event.publish_at do %>
+                        <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
+                          <.badge type={event_state_to_badge_style(event.state)}>
+                            {String.capitalize("#{event.state}")}
+                          </.badge>
+                        </.tooltip>
+                      <% else %>
                         <.badge type={event_state_to_badge_style(event.state)}>
                           {String.capitalize("#{event.state}")}
                         </.badge>
-                      </.tooltip>
-                    <% else %>
+                      <% end %>
+                    </div>
+
+                    <.event_actions_dropdown
+                      event={event}
+                      menu_id={"event-actions-mob-#{event.id}"}
+                      check_in_path={
+                        AdminCheckInPaths.path_for_event(
+                          event.id,
+                          @open_check_in_sessions
+                        )
+                      }
+                    />
+                  </div>
+                </div>
+              <% end %>
+              <%!-- Mobile Pagination --%>
+              <div class="pt-4">
+                <.admin_flop_pagination
+                  meta={@meta}
+                  path={~p"/admin/events?#{non_flop_params(@params)}"}
+                  density={:compact}
+                />
+              </div>
+            </div>
+            <%!-- Desktop Table View --%>
+            <div class="hidden md:block">
+              <Flop.Phoenix.table
+                id="admin_events_list"
+                items={@streams.events}
+                meta={@meta}
+                path={~p"/admin/events?#{non_flop_params(@params)}"}
+                row_click={
+                  fn {_, event} ->
+                    JS.navigate(~p"/admin/events/#{event.id}/edit")
+                  end
+                }
+                opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
+              >
+                <:col :let={{_, event}} label="Title" field={:title}>
+                  <p class="text-sm font-semibold">
+                    {event.title}
+                  </p>
+                </:col>
+
+                <:col :let={{_, event}} label="Date" field={:start_date}>
+                  {format_date(event.start_date)}
+                </:col>
+
+                <:col :let={{_, event}} label="Registrations" field={:capacity}>
+                  {format_capacity(event)}
+                </:col>
+
+                <:col :let={{_, event}} label="Author" field={:author_name}>
+                  {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
+                </:col>
+
+                <:col :let={{_, event}} label="State" field={:state}>
+                  <%= if event.state == :scheduled && event.publish_at do %>
+                    <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
                       <.badge type={event_state_to_badge_style(event.state)}>
                         {String.capitalize("#{event.state}")}
                       </.badge>
-                    <% end %>
-                  </div>
+                    </.tooltip>
+                  <% else %>
+                    <.badge type={event_state_to_badge_style(event.state)}>
+                      {String.capitalize("#{event.state}")}
+                    </.badge>
+                  <% end %>
+                </:col>
 
+                <:col :let={{_, event}} label="Created" field={:inserted_at}>
+                  {format_date(event.inserted_at)}
+                </:col>
+
+                <:action :let={{_, event}}>
                   <.event_actions_dropdown
                     event={event}
-                    menu_id={"event-actions-mob-#{event.id}"}
+                    menu_id={"event-actions-dt-#{event.id}"}
                     check_in_path={
                       AdminCheckInPaths.path_for_event(
                         event.id,
@@ -199,80 +272,9 @@ defmodule YscWeb.AdminEventsLive do
                       )
                     }
                   />
-                </div>
-              </div>
-            <% end %>
-            <%!-- Mobile Pagination --%>
-            <div :if={@meta} class="pt-4">
-              <.admin_flop_pagination
-                meta={@meta}
-                path={~p"/admin/events?#{non_flop_params(@params)}"}
-                density={:compact}
-              />
+                </:action>
+              </Flop.Phoenix.table>
             </div>
-          </div>
-          <%!-- Desktop Table View --%>
-          <div class="hidden md:block">
-            <Flop.Phoenix.table
-              id="admin_events_list"
-              items={@streams.events}
-              meta={@meta}
-              path={~p"/admin/events?#{non_flop_params(@params)}"}
-              row_click={
-                fn {_, event} -> JS.navigate(~p"/admin/events/#{event.id}/edit") end
-              }
-              opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
-            >
-              <:col :let={{_, event}} label="Title" field={:title}>
-                <p class="text-sm font-semibold">
-                  {event.title}
-                </p>
-              </:col>
-
-              <:col :let={{_, event}} label="Date" field={:start_date}>
-                {format_date(event.start_date)}
-              </:col>
-
-              <:col :let={{_, event}} label="Registrations" field={:capacity}>
-                {format_capacity(event)}
-              </:col>
-
-              <:col :let={{_, event}} label="Author" field={:author_name}>
-                {"#{Ysc.title_case(event.organizer.first_name)} #{Ysc.title_case(event.organizer.last_name)}"}
-              </:col>
-
-              <:col :let={{_, event}} label="State" field={:state}>
-                <%= if event.state == :scheduled && event.publish_at do %>
-                  <.tooltip tooltip_text={"Publishes on #{format_publish_at(event.publish_at)}"}>
-                    <.badge type={event_state_to_badge_style(event.state)}>
-                      {String.capitalize("#{event.state}")}
-                    </.badge>
-                  </.tooltip>
-                <% else %>
-                  <.badge type={event_state_to_badge_style(event.state)}>
-                    {String.capitalize("#{event.state}")}
-                  </.badge>
-                <% end %>
-              </:col>
-
-              <:col :let={{_, event}} label="Created" field={:inserted_at}>
-                {format_date(event.inserted_at)}
-              </:col>
-
-              <:action :let={{_, event}}>
-                <.event_actions_dropdown
-                  event={event}
-                  menu_id={"event-actions-dt-#{event.id}"}
-                  check_in_path={
-                    AdminCheckInPaths.path_for_event(
-                      event.id,
-                      @open_check_in_sessions
-                    )
-                  }
-                />
-              </:action>
-            </Flop.Phoenix.table>
-          </div>
           </div>
         </div>
       </div>

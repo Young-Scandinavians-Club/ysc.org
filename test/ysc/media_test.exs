@@ -203,7 +203,11 @@ defmodule Ysc.MediaTest do
         |> Repo.insert()
 
       page1 =
-        Media.list_images_cursor(start_at_year: year, limit: 10, search: "in-year")
+        Media.list_images_cursor(
+          start_at_year: year,
+          limit: 10,
+          search: "in-year"
+        )
 
       assert Enum.any?(page1, &(&1.id == in_year.id))
       refute Enum.any?(page1, &(&1.id == older.id))

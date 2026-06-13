@@ -155,30 +155,34 @@ defmodule YscWeb.AdminPostsLiveTest do
     end
 
     test "invalid flop params redirect to default posts list", %{conn: conn} do
-      assert {:error, {:live_redirect, %{to: "/admin/posts"}}} =
-               live(conn, ~p"/admin/posts?order_by=not_a_real_field")
+      {:ok, view, _html} = live(conn, ~p"/admin/posts")
+
+      render_patch(view, ~p"/admin/posts?order_by=not_a_real_field")
+
+      assert_patched(view, ~p"/admin/posts")
     end
 
-    test "initial mount runs posts list query once after connect", %{
+    test "dead render skips posts list query and shows loading state", %{
       conn: conn,
       admin: admin
     } do
-      post_fixture(admin, %{title: "Deferred Load Post"})
+      post_fixture(admin, %{title: "Static Render Post"})
 
       posts_pattern = ~r/FROM "posts"/i
 
-      {{:ok, view, _initial_html}, query_count} =
+      {html, query_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
-            {:ok, view, initial_html} = live(conn, ~p"/admin/posts")
-            render(view)
-            {:ok, view, initial_html}
+            conn
+            |> get("/admin/posts")
+            |> html_response(200)
           end,
           pattern: posts_pattern
         )
 
-      assert query_count <= 1
-      assert render(view) =~ "Deferred Load Post"
+      assert query_count == 0
+      assert html =~ "Loading posts"
+      refute html =~ "Static Render Post"
     end
   end
 end

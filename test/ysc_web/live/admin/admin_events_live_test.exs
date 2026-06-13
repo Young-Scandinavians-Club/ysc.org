@@ -138,8 +138,11 @@ defmodule YscWeb.AdminEventsLiveTest do
     end
 
     test "invalid flop params redirect to default events list", %{conn: conn} do
-      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
-               live(conn, ~p"/admin/events?order_by=not_a_real_field")
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      render_patch(view, ~p"/admin/events?order_by=not_a_real_field")
+
+      assert_patched(view, ~p"/admin/events")
     end
 
     test "check-in link joins open membership session for the event", %{
@@ -203,26 +206,27 @@ defmodule YscWeb.AdminEventsLiveTest do
       assert copied.state == :draft
     end
 
-    test "initial mount runs events list query once after connect", %{
+    test "dead render skips events list query and shows loading state", %{
       conn: conn,
       admin: admin
     } do
-      event_fixture(%{title: "Deferred Load Event", organizer_id: admin.id})
+      event_fixture(%{title: "Static Render Event", organizer_id: admin.id})
 
       events_pattern = ~r/FROM "events"/i
 
-      {{:ok, view, _initial_html}, query_count} =
+      {html, query_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
-            {:ok, view, initial_html} = live(conn, ~p"/admin/events")
-            render(view)
-            {:ok, view, initial_html}
+            conn
+            |> get("/admin/events")
+            |> html_response(200)
           end,
           pattern: events_pattern
         )
 
-      assert query_count <= 1
-      assert render(view) =~ "Deferred Load Event"
+      assert query_count == 0
+      assert html =~ "Loading events"
+      refute html =~ "Static Render Event"
     end
   end
 end
