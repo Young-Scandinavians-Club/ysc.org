@@ -54,6 +54,7 @@ defmodule YscWeb.AdminPostsLive do
               clear_id="admin-posts-clear-filters"
             >
               <.filter_form
+                :if={@meta}
                 fields={[
                   state: [
                     label: "State",
@@ -102,6 +103,16 @@ defmodule YscWeb.AdminPostsLive do
               </.filter_form>
             </.admin_filter_dropdown>
           </div>
+
+          <div :if={is_nil(@meta)} class="py-16 text-center">
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
+            <p class="text-zinc-500 font-medium">Loading posts…</p>
+          </div>
+
+          <div :if={@meta}>
           <%!-- Mobile Card View --%>
           <div class="block md:hidden space-y-4">
             <%= for {_, post} <- @streams.posts do %>
@@ -246,6 +257,7 @@ defmodule YscWeb.AdminPostsLive do
               </:action>
             </Flop.Phoenix.table>
           </div>
+          </div>
         </div>
       </div>
     </.side_menu>
@@ -352,33 +364,44 @@ defmodule YscWeb.AdminPostsLive do
      |> assign(:params, %{})
      |> assign(:search_query, "")
      |> assign(:date_from, "")
-     |> assign(:date_to, "")}
+     |> assign(:date_to, "")
+     |> assign(:meta, nil)
+     |> assign(:author_filter, [])
+     |> stream(:posts, [], reset: true)}
   end
 
   def handle_params(params, _uri, socket) do
     date_from = Map.get(params, "date_from", "")
     date_to = Map.get(params, "date_to", "")
 
-    case Posts.list_posts_paginated(params,
-           date_from: date_from,
-           date_to: date_to
-         ) do
-      {:ok, {posts, meta}} ->
-        title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
-        search_query = if title_filter, do: title_filter.value, else: ""
+    if connected?(socket) do
+      case Posts.list_posts_paginated(params,
+             date_from: date_from,
+             date_to: date_to
+           ) do
+        {:ok, {posts, meta}} ->
+          title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
+          search_query = if title_filter, do: title_filter.value, else: ""
 
-        {:noreply,
-         socket
-         |> assign_new(:author_filter, &Posts.get_all_authors/0)
-         |> assign(:meta, meta)
-         |> assign(:params, params)
-         |> assign(:search_query, search_query)
-         |> assign(:date_from, date_from)
-         |> assign(:date_to, date_to)
-         |> stream(:posts, posts, reset: true)}
+          {:noreply,
+           socket
+           |> assign_new(:author_filter, &Posts.get_all_authors/0)
+           |> assign(:meta, meta)
+           |> assign(:params, params)
+           |> assign(:search_query, search_query)
+           |> assign(:date_from, date_from)
+           |> assign(:date_to, date_to)
+           |> stream(:posts, posts, reset: true)}
 
-      {:error, _meta} ->
-        {:noreply, push_patch(socket, to: ~p"/admin/posts")}
+        {:error, _meta} ->
+          {:noreply, push_patch(socket, to: ~p"/admin/posts")}
+      end
+    else
+      {:noreply,
+       socket
+       |> assign(:params, params)
+       |> assign(:date_from, date_from)
+       |> assign(:date_to, date_to)}
     end
   end
 

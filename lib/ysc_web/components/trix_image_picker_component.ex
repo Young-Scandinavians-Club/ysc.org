@@ -202,6 +202,10 @@ defmodule YscWeb.TrixImagePickerComponent do
   defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: nil}),
     do: Keyword.put(opts, :before_date, date)
 
-  defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: _year}),
-    do: Keyword.put(opts, :before_date, date)
+  defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: year})
+       when not is_nil(year) do
+    opts
+    |> Keyword.put(:before_date, date)
+    |> Keyword.put(:start_at_year, year)
+  end
 end

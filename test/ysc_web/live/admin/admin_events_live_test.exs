@@ -202,5 +202,27 @@ defmodule YscWeb.AdminEventsLiveTest do
 
       assert copied.state == :draft
     end
+
+    test "initial mount runs events list query once after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_fixture(%{title: "Deferred Load Event", organizer_id: admin.id})
+
+      events_pattern = ~r/FROM "events"/i
+
+      {{:ok, view, _initial_html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, initial_html} = live(conn, ~p"/admin/events")
+            render(view)
+            {:ok, view, initial_html}
+          end,
+          pattern: events_pattern
+        )
+
+      assert query_count <= 1
+      assert render(view) =~ "Deferred Load Event"
+    end
   end
 end

@@ -103,7 +103,7 @@ defmodule Ysc.Media do
 
   Options:
   - :before_date - Only return images before this date
-  - :start_at_year - Start from the beginning of this year
+  - :start_at_year - Restrict results to this calendar year (works with :before_date for pagination)
   - :limit - Number of images to return (default: 30)
   - :search - Case-insensitive fuzzy search on title, alt_text, and filename
   """
@@ -119,25 +119,9 @@ defmodule Ysc.Media do
         limit: ^limit
 
     query =
-      cond do
-        before_date ->
-          from i in query,
-            where: i.inserted_at < ^before_date
-
-        start_at_year ->
-          end_date =
-            DateTime.new!(
-              Date.new!(start_at_year, 12, 31),
-              ~T[23:59:59],
-              "Etc/UTC"
-            )
-
-          from i in query,
-            where: i.inserted_at <= ^end_date
-
-        true ->
-          query
-      end
+      query
+      |> apply_images_cursor_year_filter(start_at_year)
+      |> apply_images_cursor_before_date(before_date)
 
     query =
       if search && search != "" do
@@ -159,6 +143,24 @@ defmodule Ysc.Media do
       end
 
     Repo.all(query)
+  end
+
+  defp apply_images_cursor_before_date(query, nil), do: query
+
+  defp apply_images_cursor_before_date(query, before_date) do
+    from i in query, where: i.inserted_at < ^before_date
+  end
+
+  defp apply_images_cursor_year_filter(query, nil), do: query
+
+  defp apply_images_cursor_year_filter(query, year) do
+    start_date = DateTime.new!(Date.new!(year, 1, 1), ~T[00:00:00], "Etc/UTC")
+
+    end_date =
+      DateTime.new!(Date.new!(year, 12, 31), ~T[23:59:59], "Etc/UTC")
+
+    from i in query,
+      where: i.inserted_at >= ^start_date and i.inserted_at <= ^end_date
   end
 
   @doc """

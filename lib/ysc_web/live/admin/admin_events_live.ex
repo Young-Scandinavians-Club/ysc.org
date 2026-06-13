@@ -74,6 +74,7 @@ defmodule YscWeb.AdminEventsLive do
               clear_id="admin-events-clear-filters"
             >
               <.filter_form
+                :if={@meta}
                 fields={[
                   state: [
                     label: "State",
@@ -124,6 +125,16 @@ defmodule YscWeb.AdminEventsLive do
               </.filter_form>
             </.admin_filter_dropdown>
           </div>
+
+          <div :if={is_nil(@meta)} class="py-16 text-center">
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
+            <p class="text-zinc-500 font-medium">Loading events…</p>
+          </div>
+
+          <div :if={@meta}>
           <%!-- Mobile Card View --%>
           <div class="block md:hidden space-y-4">
             <%= for {_, event} <- @streams.events do %>
@@ -262,6 +273,7 @@ defmodule YscWeb.AdminEventsLive do
               </:action>
             </Flop.Phoenix.table>
           </div>
+          </div>
         </div>
       </div>
     </.side_menu>
@@ -358,7 +370,10 @@ defmodule YscWeb.AdminEventsLive do
      |> assign(:search_query, "")
      |> assign(:date_from, "")
      |> assign(:date_to, "")
-     |> assign(:open_check_in_sessions, %{})}
+     |> assign(:open_check_in_sessions, %{})
+     |> assign(:meta, nil)
+     |> assign(:author_filter, [])
+     |> stream(:events, [], reset: true)}
   end
 
   def handle_params(params, _uri, socket) do
@@ -366,34 +381,43 @@ defmodule YscWeb.AdminEventsLive do
     date_to = Map.get(params, "date_to", "")
     active_tab = parse_tab(Map.get(params, "tab", "upcoming"))
 
-    case Events.list_events_paginated(params,
-           date_from: date_from,
-           date_to: date_to,
-           tab: active_tab
-         ) do
-      {:ok, {events, meta}} ->
-        title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
-        search_query = if title_filter, do: title_filter.value, else: ""
+    if connected?(socket) do
+      case Events.list_events_paginated(params,
+             date_from: date_from,
+             date_to: date_to,
+             tab: active_tab
+           ) do
+        {:ok, {events, meta}} ->
+          title_filter = Enum.find(meta.flop.filters, &(&1.field == :title))
+          search_query = if title_filter, do: title_filter.value, else: ""
 
-        event_ids = Enum.map(events, & &1.id)
+          event_ids = Enum.map(events, & &1.id)
 
-        open_check_in_sessions =
-          Scanning.get_open_check_in_sessions_by_event_id(event_ids)
+          open_check_in_sessions =
+            Scanning.get_open_check_in_sessions_by_event_id(event_ids)
 
-        {:noreply,
-         socket
-         |> assign_new(:author_filter, &Events.get_all_authors/0)
-         |> assign(:meta, meta)
-         |> assign(:params, params)
-         |> assign(:active_tab, active_tab)
-         |> assign(:search_query, search_query)
-         |> assign(:date_from, date_from)
-         |> assign(:date_to, date_to)
-         |> assign(:open_check_in_sessions, open_check_in_sessions)
-         |> stream(:events, events, reset: true)}
+          {:noreply,
+           socket
+           |> assign_new(:author_filter, &Events.get_all_authors/0)
+           |> assign(:meta, meta)
+           |> assign(:params, params)
+           |> assign(:active_tab, active_tab)
+           |> assign(:search_query, search_query)
+           |> assign(:date_from, date_from)
+           |> assign(:date_to, date_to)
+           |> assign(:open_check_in_sessions, open_check_in_sessions)
+           |> stream(:events, events, reset: true)}
 
-      {:error, _meta} ->
-        {:noreply, push_patch(socket, to: ~p"/admin/events")}
+        {:error, _meta} ->
+          {:noreply, push_patch(socket, to: ~p"/admin/events")}
+      end
+    else
+      {:noreply,
+       socket
+       |> assign(:params, params)
+       |> assign(:active_tab, active_tab)
+       |> assign(:date_from, date_from)
+       |> assign(:date_to, date_to)}
     end
   end
 

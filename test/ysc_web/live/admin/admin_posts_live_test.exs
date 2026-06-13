@@ -158,5 +158,27 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert {:error, {:live_redirect, %{to: "/admin/posts"}}} =
                live(conn, ~p"/admin/posts?order_by=not_a_real_field")
     end
+
+    test "initial mount runs posts list query once after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      post_fixture(admin, %{title: "Deferred Load Post"})
+
+      posts_pattern = ~r/FROM "posts"/i
+
+      {{:ok, view, _initial_html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, initial_html} = live(conn, ~p"/admin/posts")
+            render(view)
+            {:ok, view, initial_html}
+          end,
+          pattern: posts_pattern
+        )
+
+      assert query_count <= 1
+      assert render(view) =~ "Deferred Load Post"
+    end
   end
 end

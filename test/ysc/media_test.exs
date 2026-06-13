@@ -168,10 +168,58 @@ defmodule Ysc.MediaTest do
       current_year = Date.utc_today().year
       images = Media.list_images_cursor(start_at_year: current_year, limit: 10)
       assert is_list(images)
+
+      assert Enum.all?(images, fn image ->
+               image.inserted_at.year == current_year
+             end)
     end
 
     test "limit 0 returns empty list" do
       assert Media.list_images_cursor(limit: 0) == []
+    end
+
+    test "year pagination keeps results within the selected year", %{user: user} do
+      year = 2020
+      other_year = 2019
+
+      {:ok, in_year} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/in-year.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2020-06-15 12:00:00Z],
+          updated_at: ~U[2020-06-15 12:00:00Z]
+        }
+        |> Repo.insert()
+
+      {:ok, older} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/older.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2019-06-15 12:00:00Z],
+          updated_at: ~U[2019-06-15 12:00:00Z]
+        }
+        |> Repo.insert()
+
+      page1 =
+        Media.list_images_cursor(start_at_year: year, limit: 10, search: "in-year")
+
+      assert Enum.any?(page1, &(&1.id == in_year.id))
+      refute Enum.any?(page1, &(&1.id == older.id))
+
+      cursor = List.last(page1).inserted_at
+
+      page2 =
+        Media.list_images_cursor(
+          start_at_year: year,
+          before_date: cursor,
+          limit: 10,
+          search: "in-year"
+        )
+
+      refute Enum.any?(page2, &(&1.id == older.id))
+      refute Enum.any?(page2, &(&1.inserted_at.year == other_year))
     end
 
     test "filters by search on title", %{user: user} do

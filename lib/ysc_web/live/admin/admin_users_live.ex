@@ -510,6 +510,7 @@ defmodule YscWeb.AdminUsersLive do
               clear_id="admin-users-filter-clear"
             >
               <.filter_form
+                :if={@meta}
                 fields={[
                   state: [
                     label: "Account Status",
@@ -553,6 +554,16 @@ defmodule YscWeb.AdminUsersLive do
               />
             </.admin_filter_dropdown>
           </div>
+
+          <div :if={is_nil(@meta)} class="py-16 text-center">
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
+            <p class="text-zinc-500 font-medium">Loading users…</p>
+          </div>
+
+          <div :if={@meta}>
           <!-- Mobile Card View -->
           <div class="block md:hidden space-y-4">
             <%= for {_, user} <- @streams.users do %>
@@ -708,6 +719,7 @@ defmodule YscWeb.AdminUsersLive do
               density={:comfortable}
             />
           </div>
+          </div>
         </div>
       </div>
     </.side_menu>
@@ -815,7 +827,9 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:file_export_path, "")
      |> assign(:export_error, "Something went wrong")
      |> assign(:form, to_form(%{}, as: "csv_export"))
-     |> assign(:user_edit_form, nil)}
+     |> assign(:user_edit_form, nil)
+     |> assign(:meta, nil)
+     |> stream(:users, [], reset: true)}
   end
 
   @spec handle_params(
@@ -831,7 +845,10 @@ defmodule YscWeb.AdminUsersLive do
             }
         ) :: {:noreply, any()}
   def handle_params(params, _, socket) do
-    socket = assign_user_modal_from_route(socket, params)
+    socket =
+      if connected?(socket),
+        do: assign_user_modal_from_route(socket, params),
+        else: socket
 
     # Opening edit/review from the users table only changes `live_action` and the
     # route id; the list query + subscription preload are unchanged. Skipping the
@@ -854,17 +871,24 @@ defmodule YscWeb.AdminUsersLive do
           _ -> nil
         end
 
-      case Accounts.list_paginated_users(params, search_term) do
-        {:ok, {users, meta}} ->
-          {:noreply,
-           assign(socket, meta: meta)
-           |> assign(:empty, no_results?(users))
-           |> assign(:params, params)
-           |> assign(:focus_search_input, nil)
-           |> stream(:users, users, reset: true)}
+      if connected?(socket) do
+        case Accounts.list_paginated_users(params, search_term) do
+          {:ok, {users, meta}} ->
+            {:noreply,
+             assign(socket, meta: meta)
+             |> assign(:empty, no_results?(users))
+             |> assign(:params, params)
+             |> assign(:focus_search_input, nil)
+             |> stream(:users, users, reset: true)}
 
-        {:error, _meta} ->
-          {:noreply, push_patch(socket, to: ~p"/admin/users")}
+          {:error, _meta} ->
+            {:noreply, push_patch(socket, to: ~p"/admin/users")}
+        end
+      else
+        {:noreply,
+         socket
+         |> assign(:params, params)
+         |> assign(:focus_search_input, nil)}
       end
     end
   end
