@@ -1499,7 +1499,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     |> assign(:current_step, @step_profile)
     |> assign(:steps, [{"Profile", @step_profile}])
     |> assign(:membership_plan, :unknown)
-    |> assign(:membership_plans, Application.get_env(:ysc, :membership_plans, []))
+    |> assign(
+      :membership_plans,
+      Application.get_env(:ysc, :membership_plans, [])
+    )
     |> assign(:needs_plan_selection, true)
     |> assign(:needs_family_members_step, false)
     |> assign(:skip_payment, false)
