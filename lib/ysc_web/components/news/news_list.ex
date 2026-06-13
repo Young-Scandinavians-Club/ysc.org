@@ -17,7 +17,7 @@ defmodule YscWeb.NewsListLive do
             <.live_component
               id={"news-image-#{post.id}"}
               module={YscWeb.Components.Image}
-              image_id={post.featured_image.id}
+              image={post.featured_image}
               aspect_class="aspect-[4/3]"
             />
           </div>

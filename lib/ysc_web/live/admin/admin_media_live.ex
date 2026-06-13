@@ -665,17 +665,21 @@ defmodule YscWeb.AdminMediaLive do
     socket =
       case socket.assigns.live_action do
         :edit ->
-          image = Media.fetch_image(params["id"])
-          image_uploader = Ysc.Accounts.get_user!(image.user_id)
+          if connected?(socket) do
+            image = Media.fetch_image(params["id"])
+            image_uploader = Ysc.Accounts.get_user!(image.user_id)
 
-          form =
-            to_form(Media.Image.edit_image_changeset(image, %{}), as: "image")
+            form =
+              to_form(Media.Image.edit_image_changeset(image, %{}), as: "image")
 
-          socket
-          |> assign(:active_image, image)
-          |> assign(:image_uploader, image_uploader)
-          |> assign(:selected_image_version, :optimized)
-          |> assign(form: form)
+            socket
+            |> assign(:active_image, image)
+            |> assign(:image_uploader, image_uploader)
+            |> assign(:selected_image_version, :optimized)
+            |> assign(form: form)
+          else
+            socket
+          end
 
         _ ->
           socket

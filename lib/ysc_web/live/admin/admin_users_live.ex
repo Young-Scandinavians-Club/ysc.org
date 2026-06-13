@@ -510,6 +510,7 @@ defmodule YscWeb.AdminUsersLive do
               clear_id="admin-users-filter-clear"
             >
               <.filter_form
+                :if={@meta}
                 fields={[
                   state: [
                     label: "Account Status",
@@ -553,160 +554,171 @@ defmodule YscWeb.AdminUsersLive do
               />
             </.admin_filter_dropdown>
           </div>
-          <!-- Mobile Card View -->
-          <div class="block md:hidden space-y-4">
-            <%= for {_, user} <- @streams.users do %>
-              <div
-                class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                phx-click={
-                  if user.state == :pending_approval,
-                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
-                    else:
-                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+
+          <div :if={is_nil(@meta)} class="py-16 text-center">
+            <.icon
+              name="hero-arrow-path"
+              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+            />
+            <p class="text-zinc-500 font-medium">Loading users…</p>
+          </div>
+
+          <div :if={@meta}>
+            <!-- Mobile Card View -->
+            <div class="block md:hidden space-y-4">
+              <%= for {_, user} <- @streams.users do %>
+                <div
+                  class="bg-white rounded-lg border border-zinc-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  phx-click={
+                    if user.state == :pending_approval,
+                      do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
+                      else:
+                        JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                  }
+                >
+                  <div class="flex items-start gap-3 mb-3">
+                    <.user_card user={user} />
+                  </div>
+
+                  <div class="space-y-2 mb-3">
+                    <div :if={user.phone_number} class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Phone:</span>
+                      <span class="text-sm text-zinc-900">
+                        {Ysc.Extensions.PhoneNumber.format_for_display(
+                          user.phone_number
+                        ) || user.phone_number}
+                      </span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Account Status:</span>
+                      <.badge type={
+                        AdminBadgeHelpers.user_state_badge_type(user.state)
+                      }>
+                        {user_state_to_readable(user.state)}
+                      </.badge>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-zinc-600">Membership:</span>
+                      <%= case membership_display(user) do %>
+                        <% {nil, _} -> %>
+                          <span class="text-sm text-zinc-400">—</span>
+                        <% {membership_type, inherited?} -> %>
+                          <div class="flex items-center gap-1">
+                            <.badge type="sky">
+                              {String.capitalize("#{membership_type}")}
+                            </.badge>
+                            <%= if inherited? do %>
+                              <.tooltip tooltip_text="Membership inherited from parent account">
+                                <.icon
+                                  name="hero-users"
+                                  class="w-4 h-4 text-zinc-500"
+                                />
+                              </.tooltip>
+                            <% end %>
+                          </div>
+                      <% end %>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end pt-3 border-t border-zinc-200">
+                    <.user_actions_dropdown
+                      user={user}
+                      params={@params}
+                      menu_id={"user-actions-mob-#{user.id}"}
+                    />
+                  </div>
+                </div>
+              <% end %>
+              <.admin_list_empty_state
+                :if={@empty}
+                title="No results found"
+                suggestion="Try adjusting your search term and filters."
+                clear_id="admin-users-clear-filters-empty-mobile"
+                clear_patch={~p"/admin/users"}
+              />
+              <!-- Mobile Pagination -->
+              <div :if={!@empty} class="pt-4">
+                <.admin_flop_pagination
+                  meta={@meta}
+                  path={~p"/admin/users?#{non_flop_params(@params)}"}
+                  density={:compact}
+                />
+              </div>
+            </div>
+            <!-- Desktop Table View -->
+            <div class="hidden md:block">
+              <Flop.Phoenix.table
+                id="admin_users_list"
+                items={@streams.users}
+                meta={@meta}
+                path={~p"/admin/users?#{non_flop_params(@params)}"}
+                row_click={
+                  fn {_, user} ->
+                    if user.state == :pending_approval,
+                      do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
+                      else:
+                        JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
+                  end
                 }
+                opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
               >
-                <div class="flex items-start gap-3 mb-3">
+                <:col :let={{_, user}} label="Name" field={:first_name}>
                   <.user_card user={user} />
-                </div>
-
-                <div class="space-y-2 mb-3">
-                  <div :if={user.phone_number} class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">Phone:</span>
-                    <span class="text-sm text-zinc-900">
-                      {Ysc.Extensions.PhoneNumber.format_for_display(
-                        user.phone_number
-                      ) || user.phone_number}
-                    </span>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">Account Status:</span>
-                    <.badge type={
-                      AdminBadgeHelpers.user_state_badge_type(user.state)
-                    }>
-                      {user_state_to_readable(user.state)}
-                    </.badge>
-                  </div>
-                  <div class="flex items-center gap-2">
-                    <span class="text-sm text-zinc-600">Membership:</span>
-                    <%= case membership_display(user) do %>
-                      <% {nil, _} -> %>
-                        <span class="text-sm text-zinc-400">—</span>
-                      <% {membership_type, inherited?} -> %>
-                        <div class="flex items-center gap-1">
-                          <.badge type="sky">
-                            {String.capitalize("#{membership_type}")}
-                          </.badge>
-                          <%= if inherited? do %>
-                            <.tooltip tooltip_text="Membership inherited from parent account">
-                              <.icon
-                                name="hero-users"
-                                class="w-4 h-4 text-zinc-500"
-                              />
-                            </.tooltip>
-                          <% end %>
-                        </div>
-                    <% end %>
-                  </div>
-                </div>
-
-                <div class="flex justify-end pt-3 border-t border-zinc-200">
+                </:col>
+                <:col :let={{_, user}} label="Phone" field={:phone_number}>
+                  {Ysc.Extensions.PhoneNumber.format_for_display(user.phone_number) ||
+                    user.phone_number}
+                </:col>
+                <:col
+                  :let={{_, user}}
+                  label="Account Status"
+                  field={:state}
+                  thead_th_attrs={[class: "dance"]}
+                >
+                  <.badge type={AdminBadgeHelpers.user_state_badge_type(user.state)}>
+                    {user_state_to_readable(user.state)}
+                  </.badge>
+                </:col>
+                <:col :let={{_, user}} label="Membership" field={:membership_type}>
+                  <%= case membership_display(user) do %>
+                    <% {nil, _} -> %>
+                      <span class="text-zinc-400">—</span>
+                    <% {membership_type, inherited?} -> %>
+                      <div class="flex items-center gap-1">
+                        <.badge type="sky">
+                          {String.capitalize("#{membership_type}")}
+                        </.badge>
+                        <%= if inherited? do %>
+                          <.tooltip tooltip_text="Membership inherited from parent account">
+                            <.icon name="hero-users" class="w-4 h-4 text-zinc-500" />
+                          </.tooltip>
+                        <% end %>
+                      </div>
+                  <% end %>
+                </:col>
+                <:action :let={{_, user}}>
                   <.user_actions_dropdown
                     user={user}
                     params={@params}
-                    menu_id={"user-actions-mob-#{user.id}"}
+                    menu_id={"user-actions-dt-#{user.id}"}
                   />
-                </div>
-              </div>
-            <% end %>
-            <.admin_list_empty_state
-              :if={@empty}
-              title="No results found"
-              suggestion="Try adjusting your search term and filters."
-              clear_id="admin-users-clear-filters-empty-mobile"
-              clear_patch={~p"/admin/users"}
-            />
-            <!-- Mobile Pagination -->
-            <div :if={@meta && !@empty} class="pt-4">
+                </:action>
+              </Flop.Phoenix.table>
+
+              <.admin_list_empty_state
+                :if={@empty}
+                title="No results found"
+                suggestion="Try adjusting your search term and filters."
+                clear_id="admin-users-clear-filters-empty-desktop"
+                clear_patch={~p"/admin/users"}
+              />
+
               <.admin_flop_pagination
                 meta={@meta}
                 path={~p"/admin/users?#{non_flop_params(@params)}"}
-                density={:compact}
+                density={:comfortable}
               />
             </div>
-          </div>
-          <!-- Desktop Table View -->
-          <div class="hidden md:block">
-            <Flop.Phoenix.table
-              id="admin_users_list"
-              items={@streams.users}
-              meta={@meta}
-              path={~p"/admin/users?#{non_flop_params(@params)}"}
-              row_click={
-                fn {_, user} ->
-                  if user.state == :pending_approval,
-                    do: JS.patch(~p"/admin/users/#{user.id}/review?#{@params}"),
-                    else:
-                      JS.navigate(~p"/admin/users/#{user.id}/details?#{@params}")
-                end
-              }
-              opts={[tbody_tr_attrs: [class: "cursor-pointer"]]}
-            >
-              <:col :let={{_, user}} label="Name" field={:first_name}>
-                <.user_card user={user} />
-              </:col>
-              <:col :let={{_, user}} label="Phone" field={:phone_number}>
-                {Ysc.Extensions.PhoneNumber.format_for_display(user.phone_number) ||
-                  user.phone_number}
-              </:col>
-              <:col
-                :let={{_, user}}
-                label="Account Status"
-                field={:state}
-                thead_th_attrs={[class: "dance"]}
-              >
-                <.badge type={AdminBadgeHelpers.user_state_badge_type(user.state)}>
-                  {user_state_to_readable(user.state)}
-                </.badge>
-              </:col>
-              <:col :let={{_, user}} label="Membership" field={:membership_type}>
-                <%= case membership_display(user) do %>
-                  <% {nil, _} -> %>
-                    <span class="text-zinc-400">—</span>
-                  <% {membership_type, inherited?} -> %>
-                    <div class="flex items-center gap-1">
-                      <.badge type="sky">
-                        {String.capitalize("#{membership_type}")}
-                      </.badge>
-                      <%= if inherited? do %>
-                        <.tooltip tooltip_text="Membership inherited from parent account">
-                          <.icon name="hero-users" class="w-4 h-4 text-zinc-500" />
-                        </.tooltip>
-                      <% end %>
-                    </div>
-                <% end %>
-              </:col>
-              <:action :let={{_, user}}>
-                <.user_actions_dropdown
-                  user={user}
-                  params={@params}
-                  menu_id={"user-actions-dt-#{user.id}"}
-                />
-              </:action>
-            </Flop.Phoenix.table>
-
-            <.admin_list_empty_state
-              :if={@empty}
-              title="No results found"
-              suggestion="Try adjusting your search term and filters."
-              clear_id="admin-users-clear-filters-empty-desktop"
-              clear_patch={~p"/admin/users"}
-            />
-
-            <.admin_flop_pagination
-              meta={@meta}
-              path={~p"/admin/users?#{non_flop_params(@params)}"}
-              density={:comfortable}
-            />
           </div>
         </div>
       </div>
@@ -798,7 +810,9 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:form, to_form(%{}, as: "csv_export"))
      |> assign(:user_edit_form, to_form(user_changeset, as: "user"))
      |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
-     |> assign(:show_reject_form, false)}
+     |> assign(:show_reject_form, false)
+     |> assign(:meta, nil)
+     |> stream(:users, [], reset: true)}
   end
 
   @spec mount(any(), any(), map()) :: {:ok, map()}
@@ -815,7 +829,9 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:file_export_path, "")
      |> assign(:export_error, "Something went wrong")
      |> assign(:form, to_form(%{}, as: "csv_export"))
-     |> assign(:user_edit_form, nil)}
+     |> assign(:user_edit_form, nil)
+     |> assign(:meta, nil)
+     |> stream(:users, [], reset: true)}
   end
 
   @spec handle_params(
@@ -831,7 +847,10 @@ defmodule YscWeb.AdminUsersLive do
             }
         ) :: {:noreply, any()}
   def handle_params(params, _, socket) do
-    socket = assign_user_modal_from_route(socket, params)
+    socket =
+      if connected?(socket),
+        do: assign_user_modal_from_route(socket, params),
+        else: socket
 
     # Opening edit/review from the users table only changes `live_action` and the
     # route id; the list query + subscription preload are unchanged. Skipping the
@@ -854,17 +873,24 @@ defmodule YscWeb.AdminUsersLive do
           _ -> nil
         end
 
-      case Accounts.list_paginated_users(params, search_term) do
-        {:ok, {users, meta}} ->
-          {:noreply,
-           assign(socket, meta: meta)
-           |> assign(:empty, no_results?(users))
-           |> assign(:params, params)
-           |> assign(:focus_search_input, nil)
-           |> stream(:users, users, reset: true)}
+      if connected?(socket) do
+        case Accounts.list_paginated_users(params, search_term) do
+          {:ok, {users, meta}} ->
+            {:noreply,
+             assign(socket, meta: meta)
+             |> assign(:empty, no_results?(users))
+             |> assign(:params, params)
+             |> assign(:focus_search_input, nil)
+             |> stream(:users, users, reset: true)}
 
-        {:error, _meta} ->
-          {:noreply, push_patch(socket, to: ~p"/admin/users")}
+          {:error, _meta} ->
+            {:noreply, push_patch(socket, to: ~p"/admin/users")}
+        end
+      else
+        {:noreply,
+         socket
+         |> assign(:params, params)
+         |> assign(:focus_search_input, nil)}
       end
     end
   end

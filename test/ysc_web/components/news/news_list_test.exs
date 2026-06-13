@@ -143,6 +143,35 @@ defmodule YscWeb.NewsListLiveTest do
       assert html =~ "Active Post"
       refute html =~ "Deleted Post"
     end
+
+    test "uses preloaded featured images without extra image queries" do
+      author = user_fixture()
+
+      {:ok, image} =
+        %Ysc.Media.Image{
+          user_id: author.id,
+          raw_image_path: "https://example.com/news-cover.jpg",
+          processing_state: :completed,
+          title: "Cover"
+        }
+        |> Repo.insert()
+
+      create_post(author, %{
+        title: "Post With Cover",
+        state: :published,
+        featured_image_id: image.id
+      })
+
+      images_pattern = ~r/FROM "images"/i
+
+      {_html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> render_component(YscWeb.NewsListLive, %{id: "news-list"}) end,
+          pattern: images_pattern
+        )
+
+      assert query_count == 0
+    end
   end
 
   # Helper function to create a post
