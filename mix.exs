@@ -248,7 +248,7 @@ defmodule Ysc.MixProject do
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.2"},
       {:swoosh, "~> 1.26.1"},
-      {:tailwind, "~> 0.4", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.3"},
       {:timex, "~> 3.7"},
