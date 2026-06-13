@@ -162,6 +162,7 @@ defmodule YscWeb.AdminPostsLiveTest do
       assert_patched(view, ~p"/admin/posts")
     end
 
+    @tag async: false
     test "dead render skips posts list query and shows loading state", %{
       conn: conn,
       admin: admin

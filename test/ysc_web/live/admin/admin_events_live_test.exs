@@ -206,6 +206,7 @@ defmodule YscWeb.AdminEventsLiveTest do
       assert copied.state == :draft
     end
 
+    @tag async: false
     test "dead render skips events list query and shows loading state", %{
       conn: conn,
       admin: admin

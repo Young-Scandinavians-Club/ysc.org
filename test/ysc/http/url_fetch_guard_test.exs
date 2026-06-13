@@ -33,6 +33,7 @@ defmodule Ysc.Http.UrlFetchGuardTest do
                )
     end
 
+    @tag async: false
     test "in prod mode rejects loopback literal IP" do
       Ysc.Test.EnvHelper.with_environment("prod", fn ->
         assert {:error, :blocked_ip} =
