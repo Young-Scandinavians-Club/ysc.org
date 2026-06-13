@@ -269,89 +269,48 @@ defmodule YscWeb.AdminPostsLive do
 
   def post_actions_dropdown(assigns) do
     ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
-      <.dropdown
-        id={@menu_id}
-        right={true}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+    <.admin_row_actions_dropdown id={@menu_id} label="Post actions">
+      <.admin_dropdown_menu_item
+        :if={@post.state == :published}
+        id={"#{@menu_id}-view-live"}
+        icon="hero-arrow-top-right-on-square"
+        href={~p"/posts/#{@post.id}"}
+        target="_blank"
+        rel="noopener noreferrer"
       >
-        <:button_block>
-          <span class="sr-only">Post actions</span>
-          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
-        </:button_block>
-
-        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
-          <ul class="py-1">
-            <li :if={@post.state == :published}>
-              <.link
-                id={"#{@menu_id}-view-live"}
-                href={~p"/posts/#{@post.id}"}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-arrow-top-right-on-square"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>View live</span>
-              </.link>
-            </li>
-            <li>
-              <.link
-                id={"#{@menu_id}-edit"}
-                navigate={~p"/admin/posts/#{@post.id}"}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-pencil-square"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>Edit</span>
-              </.link>
-            </li>
-            <li>
-              <button
-                id={"#{@menu_id}-toggle-featured"}
-                type="button"
-                phx-click="toggle-featured"
-                phx-value-id={@post.id}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name={
-                    if @post.featured_post, do: "hero-star-solid", else: "hero-star"
-                  }
-                  class={[
-                    "h-5 w-5 shrink-0",
-                    if(@post.featured_post,
-                      do: "text-yellow-500",
-                      else: "text-zinc-500"
-                    )
-                  ]}
-                />
-                <span>
-                  {if @post.featured_post, do: "Unpin post", else: "Pin post"}
-                </span>
-              </button>
-            </li>
-            <li :if={@post.state == :draft}>
-              <button
-                id={"#{@menu_id}-delete"}
-                type="button"
-                phx-click="delete-post"
-                phx-value-id={@post.id}
-                data-confirm="Delete this draft? It will be marked as deleted."
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-red-600 transition hover:bg-zinc-100"
-              >
-                <.icon name="hero-trash" class="h-5 w-5 shrink-0" />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </.dropdown>
-    </div>
+        View live
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-edit"}
+        icon="hero-pencil-square"
+        navigate={~p"/admin/posts/#{@post.id}"}
+      >
+        Edit
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-toggle-featured"}
+        icon={if @post.featured_post, do: "hero-star-solid", else: "hero-star"}
+        icon_class={[
+          "h-5 w-5 shrink-0",
+          if(@post.featured_post, do: "text-yellow-500", else: "text-zinc-500")
+        ]}
+        phx-click="toggle-featured"
+        phx-value-id={@post.id}
+      >
+        {if @post.featured_post, do: "Unpin post", else: "Pin post"}
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={@post.state == :draft}
+        id={"#{@menu_id}-delete"}
+        icon="hero-trash"
+        tone={:danger}
+        phx-click="delete-post"
+        phx-value-id={@post.id}
+        data-confirm="Delete this draft? It will be marked as deleted."
+      >
+        Delete
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
     """
   end
 
