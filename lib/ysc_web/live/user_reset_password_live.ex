@@ -17,7 +17,7 @@ defmodule YscWeb.UserResetPasswordLive do
       <.header class="text-center mb-4">
         Reset Your Password
         <:subtitle>
-          Choose a new password for your account. This link expires after a short time for security.
+          Choose a new password for your account (at least 12 characters). This link expires after a short time for security.
         </:subtitle>
       </.header>
 

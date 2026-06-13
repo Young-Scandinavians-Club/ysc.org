@@ -298,6 +298,9 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
               label="Password"
               required
             />
+            <p class="text-xs text-zinc-500 -mt-2">
+              Must be at least 12 characters.
+            </p>
             <.input
               field={@form[:password_confirmation]}
               type="password-toggle"
