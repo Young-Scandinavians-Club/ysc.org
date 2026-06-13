@@ -22,6 +22,8 @@ defmodule YscWeb.MediaPickerComponent do
   """
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
+
   alias Ysc.Media
 
   @per_page 30
@@ -189,92 +191,16 @@ defmodule YscWeb.MediaPickerComponent do
             Media library
           </h2>
 
-          <div class="flex flex-col sm:flex-row gap-3">
-            <form
-              id={"#{@id}-search-form"}
-              phx-change="search-media"
-              phx-target={@myself}
-              class="flex-1"
-            >
-              <.input
-                type="text"
-                name="search"
-                value={@search}
-                placeholder="Search by title or alt text..."
-                phx-debounce="300"
-              />
-            </form>
-
-            <div class="flex flex-wrap gap-1.5 items-center">
-              <button
-                type="button"
-                phx-click="filter-year"
-                phx-target={@myself}
-                phx-value-year=""
-                class={[
-                  "text-xs font-medium px-2.5 py-1 rounded-full transition",
-                  if(@selected_year == nil,
-                    do: "bg-zinc-800 text-white",
-                    else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                  )
-                ]}
-              >
-                All
-              </button>
-              <%= for year <- @available_years do %>
-                <button
-                  type="button"
-                  phx-click="filter-year"
-                  phx-target={@myself}
-                  phx-value-year={year}
-                  class={[
-                    "text-xs font-medium px-2.5 py-1 rounded-full transition",
-                    if(@selected_year == year,
-                      do: "bg-zinc-800 text-white",
-                      else: "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
-                    )
-                  ]}
-                >
-                  {year}
-                </button>
-              <% end %>
-            </div>
-          </div>
-
-          <div
-            id={"media-picker-grid-#{@id}"}
-            phx-update="stream"
-            phx-viewport-bottom="load-more-media"
-            phx-target={@myself}
-            class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto pr-1"
-          >
-            <button
-              :for={{dom_id, image} <- @streams.picker_images}
-              type="button"
-              id={dom_id}
-              phx-click="select-image"
-              phx-target={@myself}
-              phx-value-image-id={image.id}
-              class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
-            >
-              <img
-                src={thumbnail_url(image)}
-                alt={image.alt_text || image.title || "Image"}
-                loading="lazy"
-                class="absolute inset-0 w-full h-full object-cover"
-              />
-              <div
-                :if={image.title}
-                class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
-              >
-                <p class="text-xs text-white truncate">{image.title}</p>
-              </div>
-            </button>
-          </div>
-
-          <p :if={@end_of_timeline?} class="text-center text-xs text-zinc-400 py-2">
-            No more images
-          </p>
+          <.admin_media_library_browser
+            id={@id}
+            grid_id={"media-picker-grid-#{@id}"}
+            target={@myself}
+            search={@search}
+            selected_year={@selected_year}
+            available_years={@available_years}
+            picker_images={@streams.picker_images}
+            end_of_timeline?={@end_of_timeline?}
+          />
         </div>
       </.modal>
     </div>
@@ -425,17 +351,6 @@ defmodule YscWeb.MediaPickerComponent do
 
   defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: _year}),
     do: Keyword.put(opts, :before_date, date)
-
-  defp thumbnail_url(%{thumbnail_path: path})
-       when is_binary(path) and path != "", do: path
-
-  defp thumbnail_url(%{optimized_image_path: path})
-       when is_binary(path) and path != "", do: path
-
-  defp thumbnail_url(%{raw_image_path: path})
-       when is_binary(path) and path != "", do: path
-
-  defp thumbnail_url(_), do: "/images/ysc_logo.webp"
 
   defp error_to_string(:too_large), do: "Too large"
 
