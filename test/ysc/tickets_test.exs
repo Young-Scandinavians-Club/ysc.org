@@ -688,20 +688,22 @@ defmodule Ysc.TicketsTest do
       event: event,
       tier2: tier2
     } do
-      {:ok, order} =
-        Tickets.create_ticket_order(user.id, event.id, %{tier2.id => 2})
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, order} =
+          Tickets.create_ticket_order(user.id, event.id, %{tier2.id => 2})
 
-      assert {:ok, cancelled} =
-               Tickets.cancel_ticket_order(order, "changed mind")
+        assert {:ok, cancelled} =
+                 Tickets.cancel_ticket_order(order, "changed mind")
 
-      assert cancelled.status == :cancelled
+        assert cancelled.status == :cancelled
 
-      tickets =
-        Ysc.Repo.all(
-          from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
-        )
+        tickets =
+          Ysc.Repo.all(
+            from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+          )
 
-      assert Enum.all?(tickets, &(&1.status == :cancelled))
+        assert Enum.all?(tickets, &(&1.status == :cancelled))
+      end)
     end
 
     test "cancel_ticket_order does not cancel completed orders by default", %{
