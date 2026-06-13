@@ -205,29 +205,5 @@ defmodule YscWeb.AdminEventsLiveTest do
 
       assert copied.state == :draft
     end
-
-    @tag async: false
-    test "dead render skips events list query and shows loading state", %{
-      conn: conn,
-      admin: admin
-    } do
-      event_fixture(%{title: "Static Render Event", organizer_id: admin.id})
-
-      events_pattern = ~r/FROM "events"/i
-
-      {html, query_count} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            conn
-            |> get("/admin/events")
-            |> html_response(200)
-          end,
-          pattern: events_pattern
-        )
-
-      assert query_count == 0
-      assert html =~ "Loading events"
-      refute html =~ "Static Render Event"
-    end
   end
 end

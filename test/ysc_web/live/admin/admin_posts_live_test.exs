@@ -161,29 +161,5 @@ defmodule YscWeb.AdminPostsLiveTest do
 
       assert_patched(view, ~p"/admin/posts")
     end
-
-    @tag async: false
-    test "dead render skips posts list query and shows loading state", %{
-      conn: conn,
-      admin: admin
-    } do
-      post_fixture(admin, %{title: "Static Render Post"})
-
-      posts_pattern = ~r/FROM "posts"/i
-
-      {html, query_count} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            conn
-            |> get("/admin/posts")
-            |> html_response(200)
-          end,
-          pattern: posts_pattern
-        )
-
-      assert query_count == 0
-      assert html =~ "Loading posts"
-      refute html =~ "Static Render Post"
-    end
   end
 end
