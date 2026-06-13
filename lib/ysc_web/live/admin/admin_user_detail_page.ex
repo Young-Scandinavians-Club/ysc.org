@@ -3418,19 +3418,15 @@ defmodule YscWeb.AdminUserDetailsLive do
     relationship = relationship || "child"
 
     results =
-      if String.length(query) >= 2 do
-        primary_user =
-          socket.assigns.primary_user || socket.assigns.selected_user
+      primary_user =
+        socket.assigns.primary_user || socket.assigns.selected_user
 
-        sub_ids = [
-          primary_user.id | Enum.map(socket.assigns.sub_accounts, & &1.id)
-        ]
+      sub_ids = [
+        primary_user.id | Enum.map(socket.assigns.sub_accounts, & &1.id)
+      ]
 
-        Accounts.search_users(query, limit: 8)
-        |> Enum.reject(fn u -> u.id in sub_ids end)
-      else
-        []
-      end
+      Accounts.search_users_for_staff_lookup(query, limit: 8)
+      |> Enum.reject(fn u -> u.id in sub_ids end)
 
     {:noreply,
      socket

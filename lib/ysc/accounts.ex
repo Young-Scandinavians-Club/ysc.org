@@ -414,6 +414,72 @@ defmodule Ysc.Accounts do
     |> Repo.all()
   end
 
+  @min_staff_name_search_length 3
+
+  @doc """
+  Searches active users by name only (first, last, or full name).
+
+  Used by volunteer-facing admin UIs where email substring search would allow
+  harvesting member addresses (e.g. `%@gmail%`).
+  """
+  def search_active_users_by_name(query, opts \\ []) when is_binary(query) do
+    limit = Keyword.get(opts, :limit, 10)
+    search_term = "%#{query}%"
+
+    from(u in User,
+      where: u.state == :active,
+      where:
+        ilike(u.first_name, ^search_term) or
+          ilike(u.last_name, ^search_term) or
+          ilike(
+            fragment("? || ' ' || ?", u.first_name, u.last_name),
+            ^search_term
+          ),
+      order_by: [asc: u.last_name, asc: u.first_name],
+      limit: ^limit,
+      preload: [:current_avatar]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Searches active users for volunteer-facing admin UIs (bookings, entitlements,
+  admin magic search, etc.).
+
+  Name search requires at least #{@min_staff_name_search_length} characters and
+  does not match email substrings. A complete email address may be used for lookup.
+  """
+  def search_users_for_staff_lookup(query, opts \\ []) when is_binary(query) do
+    limit = Keyword.get(opts, :limit, 10)
+    trimmed = String.trim(query)
+
+    cond do
+      trimmed == "" ->
+        []
+
+      staff_lookup_full_email?(trimmed) ->
+        staff_lookup_by_email(trimmed)
+
+      String.length(trimmed) < @min_staff_name_search_length ->
+        []
+
+      true ->
+        search_active_users_by_name(trimmed, limit: limit)
+    end
+  end
+
+  defp staff_lookup_full_email?(query) do
+    String.contains?(query, "@") and
+      String.match?(query, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+  end
+
+  defp staff_lookup_by_email(email) do
+    case get_user_by_email(email) do
+      %User{state: :active} = user -> [Repo.preload(user, :current_avatar)]
+      _ -> []
+    end
+  end
+
   @doc """
   Checks if a user has an active membership.
   Includes lifetime membership which never expires.

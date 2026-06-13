@@ -1168,6 +1168,45 @@ defmodule YscWeb.SecurityAuditTest do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Volunteer admin bookings / magic search email enumeration
+  # ---------------------------------------------------------------------------
+
+  describe "volunteer admin user lookup email enumeration fix" do
+    test "search_users_for_staff_lookup blocks harvesting via email substrings" do
+      _a =
+        user_fixture(%{
+          email: "bookings.enum.a@gmail.com",
+          phone_number: "+14159098280"
+        })
+
+      _b =
+        user_fixture(%{
+          email: "bookings.enum.b@gmail.com",
+          phone_number: "+14159098281"
+        })
+
+      assert [] = Accounts.search_users_for_staff_lookup("@gmail", limit: 20)
+      assert [] = Accounts.search_users_for_staff_lookup("gmail", limit: 20)
+    end
+
+    test "global_search users section does not match email substrings" do
+      user =
+        user_fixture(%{
+          email: "magic.search.enum@gmail.com",
+          first_name: "MagicEnum",
+          last_name: "Probe",
+          phone_number: "+14159098282"
+        })
+
+      %{users: users} = Ysc.Search.global_search("gmail", 5)
+      refute Enum.any?(users, &(&1.id == user.id))
+
+      %{users: users} = Ysc.Search.global_search("MagicEnum", 5)
+      assert Enum.any?(users, &(&1.id == user.id))
+    end
+  end
+
   defp deep_merge_security_attrs(base, overrides) when is_map(overrides) do
     Map.merge(base, overrides, fn
       :registration_form, base_form, override_form

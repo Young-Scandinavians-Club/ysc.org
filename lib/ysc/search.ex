@@ -4,6 +4,7 @@ defmodule Ysc.Search do
   """
   import Ecto.Query, warn: false
 
+  alias Ysc.Accounts
   alias Ysc.Repo
   alias Ysc.Events.{Event, Ticket}
   alias Ysc.Posts.Post
@@ -77,18 +78,7 @@ defmodule Ysc.Search do
   end
 
   defp search_users(search_term, _search_like, limit) do
-    phone_like = "%#{search_term}%"
-
-    from(u in User,
-      where:
-        fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
-          ilike(u.phone_number, ^phone_like),
-      order_by: [desc: u.inserted_at],
-      limit: ^limit
-    )
-    |> Repo.all()
+    Accounts.search_users_for_staff_lookup(search_term, limit: limit)
   end
 
   defp search_bookings(search_term, search_like, limit) do
@@ -149,17 +139,19 @@ defmodule Ysc.Search do
 
   @doc false
   def ci_query_explain_users_query do
-    search_term = "ci"
-    phone_like = "%ci%"
+    search_like = "%ci%"
     limit = 5
 
     from(u in User,
+      where: u.state == :active,
       where:
-        fragment("SIMILARITY(?, ?) > 0.2", u.email, ^search_term) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
-          fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
-          ilike(u.phone_number, ^phone_like),
-      order_by: [desc: u.inserted_at],
+        ilike(u.first_name, ^search_like) or
+          ilike(u.last_name, ^search_like) or
+          ilike(
+            fragment("? || ' ' || ?", u.first_name, u.last_name),
+            ^search_like
+          ),
+      order_by: [asc: u.last_name, asc: u.first_name],
       limit: ^limit
     )
   end

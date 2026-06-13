@@ -632,6 +632,40 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "search_users_for_staff_lookup/2" do
+    test "does not match email substrings" do
+      user =
+        user_fixture(%{
+          email: "staff.lookup@gmail.com",
+          first_name: "StaffLookup",
+          last_name: "Probe",
+          phone_number: "+14159098270"
+        })
+
+      assert [] = Accounts.search_users_for_staff_lookup("@gmail")
+      assert [] = Accounts.search_users_for_staff_lookup("gmail")
+      assert [] = Accounts.search_users_for_staff_lookup("St")
+
+      results = Accounts.search_users_for_staff_lookup("Staff")
+      assert Enum.any?(results, &(&1.id == user.id))
+    end
+
+    test "allows lookup by complete email address" do
+      user =
+        user_fixture(%{
+          email: "staff.lookup.complete@example.com",
+          phone_number: "+14159098271"
+        })
+
+      assert [%{id: id}] =
+               Accounts.search_users_for_staff_lookup(
+                 "staff.lookup.complete@example.com"
+               )
+
+      assert id == user.id
+    end
+  end
+
   describe "get_user_by_email_and_password/2" do
     test "does not return the user if the email does not exist" do
       refute Accounts.get_user_by_email_and_password(

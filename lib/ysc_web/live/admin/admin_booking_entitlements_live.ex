@@ -63,12 +63,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
         %{"value" => query},
         socket
       ) do
-    results =
-      if String.length(query) >= 2 do
-        Accounts.search_users(query, limit: 10)
-      else
-        []
-      end
+    results = Accounts.search_users_for_staff_lookup(query, limit: 10)
 
     {:noreply,
      socket
