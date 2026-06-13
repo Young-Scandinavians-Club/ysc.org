@@ -72,4 +72,44 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     assert html =~ "Loading events"
     refute html =~ "Static Render Event"
   end
+
+  test "dead render skips users list query and shows loading state", %{conn: conn} do
+    user_fixture(%{first_name: "Static", last_name: "User"})
+
+    users_pattern = ~r/FROM "users"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/users")
+          |> html_response(200)
+        end,
+        pattern: users_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Loading users"
+    refute html =~ "Static User"
+  end
+
+  test "dead render loads review route without list meta", %{conn: conn} do
+    pending_user =
+      user_fixture(%{
+        state: "pending_approval",
+        first_name: "Review",
+        last_name: "Render"
+      })
+
+    signup_application_fixture(pending_user)
+
+    html =
+      conn
+      |> get("/admin/users/#{pending_user.id}/review")
+      |> html_response(200)
+
+    assert html =~ "Review Application"
+    assert html =~ "Review Render"
+    assert html =~ "Loading users"
+  end
 end
