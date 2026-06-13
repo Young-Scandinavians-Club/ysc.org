@@ -338,4 +338,16 @@ defmodule YscWeb.UserLoginLiveTest do
       assert render(lv) =~ "error" or render(lv) =~ "authentication"
     end
   end
+
+  describe "removed legacy email confirmation routes" do
+    test "no longer serves /users/confirm", %{conn: conn} do
+      conn = get(conn, "/users/confirm")
+      assert html_response(conn, 404)
+    end
+
+    test "no longer serves /users/confirm/:token", %{conn: conn} do
+      conn = get(conn, "/users/confirm/legacy-token")
+      assert html_response(conn, 404)
+    end
+  end
 end
