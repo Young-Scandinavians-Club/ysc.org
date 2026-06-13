@@ -73,7 +73,9 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static Render Event"
   end
 
-  test "dead render skips users list query and shows loading state", %{conn: conn} do
+  test "dead render skips users list query and shows loading state", %{
+    conn: conn
+  } do
     user_fixture(%{first_name: "Static", last_name: "User"})
 
     users_pattern = ~r/FROM "users"/i
