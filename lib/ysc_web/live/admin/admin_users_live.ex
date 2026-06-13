@@ -810,7 +810,9 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:form, to_form(%{}, as: "csv_export"))
      |> assign(:user_edit_form, to_form(user_changeset, as: "user"))
      |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
-     |> assign(:show_reject_form, false)}
+     |> assign(:show_reject_form, false)
+     |> assign(:meta, nil)
+     |> stream(:users, [], reset: true)}
   end
 
   @spec mount(any(), any(), map()) :: {:ok, map()}
