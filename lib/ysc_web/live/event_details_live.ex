@@ -1340,7 +1340,7 @@ defmodule YscWeb.EventDetailsLive do
                             You have {reserved_quantity} {if reserved_quantity ==
                                                                1,
                                                              do: "ticket",
-                                                             else: "tickets"} saved at the member price. You still need to finish checkout to buy them.
+                                                             else: "tickets"} saved at the member price. You still need to complete payment to buy them.
                             <%= if has_discount do %>
                               <.badge
                                 type="green"

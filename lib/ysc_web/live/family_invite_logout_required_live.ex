@@ -78,12 +78,25 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
           <p class="text-zinc-600 mb-6">
             You're currently logged in as <strong>{@current_user.email}</strong>.
           </p>
-          <p :if={@existing_user} class="text-zinc-600 mb-6">
-            To accept this invitation for <strong>{@invite.email}</strong>, log out, then sign in with <strong>{@invite.email}</strong>. After you sign in, you'll be taken to your
-            <strong>Membership</strong>
-            page — click <strong>Accept invitation</strong>
-            there.
-          </p>
+          <div :if={@existing_user} class="text-zinc-600 mb-6 space-y-4">
+            <p>
+              This invitation is for <strong>{@invite.email}</strong>, but you're signed in as a different account.
+            </p>
+            <div>
+              <p class="font-medium text-zinc-900 mb-2">
+                To accept the invitation:
+              </p>
+              <ol class="list-decimal list-inside space-y-2 text-sm">
+                <li>Click the button below to log out.</li>
+                <li>Sign in with <strong>{@invite.email}</strong>.</li>
+                <li>
+                  On your <strong>Membership</strong>
+                  page, find <strong>Pending Family Invitations</strong>
+                  and click <strong>Accept invitation</strong>.
+                </li>
+              </ol>
+            </div>
+          </div>
           <p :if={!@existing_user} class="text-zinc-600 mb-6">
             To accept this invitation for <strong>{@invite.email}</strong>, log out of this account first.
             After you log out, we will take you to the invitation page where you can create your family
@@ -106,7 +119,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
               class="w-full flex justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
               <%= if @existing_user do %>
-                Log out and log in using {@invite.email} to accept
+                Log out and sign in with {@invite.email}
               <% else %>
                 Log out and continue with {@invite.email}
               <% end %>
