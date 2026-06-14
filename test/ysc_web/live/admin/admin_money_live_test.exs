@@ -3,10 +3,16 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
+  import Ysc.TicketsFixtures
   import Mox
+  import Ecto.Query
 
   alias Ysc.Ledgers
   alias Ysc.LedgersFixtures
+  alias Ysc.Repo
+  alias Ysc.Tickets
+  alias Ysc.Tickets.TicketOrder
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -65,6 +71,43 @@ defmodule YscWeb.AdminMoneyLiveTest do
     end)
 
     :ok
+  end
+
+  defp completed_ticket_order_with_payment! do
+    user = user_fixture()
+
+    user =
+      user
+      |> Ecto.Changeset.change(
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Repo.update!()
+
+    event = event_fixture()
+    tier = ticket_tier_fixture(%{event_id: event.id})
+
+    {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+
+    {:ok, {payment, _transaction, _entries}} =
+      Ledgers.process_event_payment_with_donations(%{
+        user_id: user.id,
+        total_amount: order.total_amount,
+        event_amount: order.total_amount,
+        donation_amount: Money.new(0, :USD),
+        event_id: event.id,
+        external_payment_id: "pi_admin_refund_#{System.unique_integer([:positive])}",
+        stripe_fee: Money.new(320, :USD),
+        description: "Event tickets",
+        payment_method_id: nil
+      })
+
+    {:ok, completed} = Tickets.complete_ticket_order(order, payment.id)
+
+    from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id)
+    |> Repo.update_all(set: [status: :confirmed])
+
+    %{payment: payment, ticket_order: completed}
   end
 
   describe "Admin Money" do
@@ -358,6 +401,43 @@ defmodule YscWeb.AdminMoneyLiveTest do
         live(conn, ~p"/admin/money/payments/#{payment2.id}/refund")
 
       assert has_element?(view2, "#refund-modal")
+    end
+
+    test "full refund with release availability cancels completed ticket order", %{
+      conn: conn
+    } do
+      %{payment: payment, ticket_order: ticket_order} =
+        completed_ticket_order_with_payment!()
+
+      refund_amount =
+        payment.amount
+        |> Money.to_decimal()
+        |> Decimal.to_string(:normal)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payments/#{payment.id}/refund")
+
+      assert has_element?(view, "#refund-form")
+
+      view
+      |> form("#refund-form", %{
+        "refund" => %{
+          "amount" => refund_amount,
+          "reason" => "Customer request",
+          "release_availability" => "true"
+        }
+      })
+      |> render_submit()
+
+      updated_order = Repo.get!(TicketOrder, ticket_order.id)
+      assert updated_order.status == :cancelled
+
+      tickets =
+        Repo.all(
+          from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^ticket_order.id)
+        )
+
+      assert Enum.all?(tickets, &(&1.status == :cancelled))
     end
   end
 end

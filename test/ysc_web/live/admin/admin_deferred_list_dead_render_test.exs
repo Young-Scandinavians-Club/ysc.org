@@ -3,6 +3,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
 
   use YscWeb.ConnCase, async: false
 
+  import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
@@ -113,5 +114,46 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     assert html =~ "Review Application"
     assert html =~ "Review Render"
     assert html =~ "Loading users"
+  end
+
+  describe "connected list loading" do
+    test "events list replaces loading placeholder after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      event_fixture(%{title: "Deferred Load Event", organizer_id: admin.id})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+      html = render(view)
+
+      refute html =~ "Loading events…"
+      assert html =~ "Deferred Load Event"
+      assert has_element?(view, "#admin_events_list")
+    end
+
+    test "posts list replaces loading placeholder after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      post_fixture(admin, %{title: "Deferred Load Post"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/posts")
+      html = render(view)
+
+      refute html =~ "Loading posts"
+      assert html =~ "Deferred Load Post"
+      assert has_element?(view, "#admin_posts_list")
+    end
+
+    test "users list replaces loading placeholder after connect", %{conn: conn} do
+      user_fixture(%{first_name: "Deferred", last_name: "LoadUser"})
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users")
+      html = render(view)
+
+      refute html =~ "Loading users"
+      assert html =~ "Deferred LoadUser"
+      assert has_element?(view, "#admin_users_list")
+    end
   end
 end
