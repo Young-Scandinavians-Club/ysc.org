@@ -5,6 +5,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
+  import Ysc.ScanningFixtures
 
   setup %{conn: conn} do
     user = user_fixture(%{role: "admin"})
@@ -113,5 +114,28 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     assert html =~ "Review Application"
     assert html =~ "Review Render"
     assert html =~ "Loading users"
+  end
+
+  test "dead render skips scanner sessions query and shows loading state", %{
+    conn: conn,
+    admin: admin
+  } do
+    scan_session_fixture(%{created_by_id: admin.id, name: "Static Render Session"})
+
+    sessions_pattern = ~r/FROM "scan_sessions"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/scanner/sessions")
+          |> html_response(200)
+        end,
+        pattern: sessions_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Loading sessions"
+    refute html =~ "Static Render Session"
   end
 end

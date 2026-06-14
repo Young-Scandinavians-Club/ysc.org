@@ -31,14 +31,22 @@ defmodule YscWeb.AdminScannerLive do
           </.link>
         </div>
 
+        <div :if={!@data_loaded?} class="py-16 text-center">
+          <.icon
+            name="hero-arrow-path"
+            class="w-8 h-8 text-zinc-400 animate-spin mx-auto mb-3"
+          />
+          <p class="text-zinc-500 font-medium">Loading sessions…</p>
+        </div>
+
         <.admin_icon_empty_state
-          :if={@sessions == []}
+          :if={@data_loaded? && @sessions == []}
           icon="hero-qr-code"
           title="No scan sessions yet"
           description="Start a new scan session to begin."
         />
 
-        <div :if={@sessions != []} class="space-y-3">
+        <div :if={@data_loaded? && @sessions != []} class="space-y-3">
           <div
             :for={session <- @sessions}
             class="bg-white border border-zinc-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
@@ -143,6 +151,15 @@ defmodule YscWeb.AdminScannerLive do
       role={@admin_role}
     >
       <div class="py-6">
+        <div :if={!@data_loaded?} class="py-16 text-center">
+          <.icon
+            name="hero-arrow-path"
+            class="w-8 h-8 text-zinc-400 animate-spin mx-auto mb-3"
+          />
+          <p class="text-zinc-500 font-medium">Loading session…</p>
+        </div>
+
+        <div :if={@data_loaded?}>
         <div class="flex items-start gap-2 mb-6">
           <.link
             navigate={~p"/admin/scanner/sessions"}
@@ -363,6 +380,7 @@ defmodule YscWeb.AdminScannerLive do
               </tbody>
             </table>
           </div>
+        </div>
         </div>
       </div>
     </.side_menu>
@@ -1256,6 +1274,7 @@ defmodule YscWeb.AdminScannerLive do
       |> assign(:detail_session, nil)
       |> assign(:detail_records, [])
       |> assign(:event_options, [])
+      |> assign(:data_loaded?, false)
 
     socket =
       if connected?(socket) do
@@ -1269,7 +1288,14 @@ defmodule YscWeb.AdminScannerLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+    if connected?(socket) do
+      {:noreply,
+       socket
+       |> apply_action(socket.assigns.live_action, params)
+       |> assign(:data_loaded?, true)}
+    else
+      {:noreply, socket}
+    end
   end
 
   defp apply_action(socket, :index, %{"resume" => session_id}) do
