@@ -1409,6 +1409,40 @@ defmodule Ysc.BookingsTest do
       results = Bookings.search_bookings_by_last_name(last_name, :clear_lake)
       assert Enum.any?(results, &(&1.id == booking.id))
     end
+
+    test "search_bookings_by_last_name/2 batch preloads guests and check-ins without N+1" do
+      suffix = System.unique_integer([:positive])
+      last_name = "BatchSearch#{suffix}"
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+      checkin = Date.add(today, -1)
+      checkout = Date.add(today, 2)
+
+      for _ <- 1..3 do
+        user = user_fixture(%{last_name: last_name})
+
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+      end
+
+      {results, query_count} =
+        Ysc.QueryCounter.with_query_counter(fn ->
+          Bookings.search_bookings_by_last_name(last_name, :tahoe)
+        end)
+
+      assert length(results) == 3
+
+      for booking <- results do
+        assert Ecto.assoc_loaded?(booking.booking_guests)
+        assert Ecto.assoc_loaded?(booking.check_ins)
+      end
+
+      # One main query plus batched association preloads — not one preload per booking.
+      assert query_count <= 6
+    end
   end
 
   describe "get_booking_payment/1" do
