@@ -13,7 +13,9 @@ defmodule Ysc.Stripe.InvoiceHelpersTest do
       assert InvoiceHelpers.charge_id(%{charge: %{id: "ch_expanded"}}) ==
                "ch_expanded"
 
-      assert InvoiceHelpers.charge_id(%{charge: %Stripe.Charge{id: "ch_struct"}}) ==
+      assert InvoiceHelpers.charge_id(%{
+               charge: %Stripe.Charge{id: "ch_struct"}
+             }) ==
                "ch_struct"
     end
 
@@ -78,7 +80,9 @@ defmodule Ysc.Stripe.InvoiceHelpersTest do
 
     test "returns nil for non-map invoices and unsupported payment shapes" do
       assert InvoiceHelpers.payment_intent_id(nil) == nil
-      assert InvoiceHelpers.payment_intent_id(%{payments: %{data: [123]}}) == nil
+
+      assert InvoiceHelpers.payment_intent_id(%{payments: %{data: [123]}}) ==
+               nil
     end
   end
 end
