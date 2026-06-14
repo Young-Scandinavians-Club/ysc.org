@@ -386,23 +386,55 @@ defmodule Ysc.Tickets.BookingLocker do
            ticket_order_id
          ) do
       {:ok, fulfilled} ->
-        {:ok, Enum.group_by(fulfilled, & &1.ticket_tier_id)}
+        {:ok, Enum.group_by(fulfilled, fn {reservation, _qty} -> reservation.ticket_tier_id end)}
 
       {:error, _} = error ->
         error
     end
   end
 
-  defp fulfill_reservations_in_transaction(reservations, ticket_order_id) do
-    Enum.reduce_while(reservations, {:ok, []}, fn reservation, {:ok, acc} ->
-      case Events.fulfill_ticket_reservation(reservation, ticket_order_id) do
-        {:ok, updated} ->
-          {:cont, {:ok, [updated | acc]}}
-
+  defp fulfill_reservations_in_transaction(fulfillment_plans, ticket_order_id) do
+    Enum.reduce_while(fulfillment_plans, {:ok, []}, fn {reservation, fulfill_qty},
+                                                       {:ok, acc} ->
+      with {:ok, reservation_to_fulfill} <-
+             maybe_split_reservation_for_fulfillment(reservation, fulfill_qty),
+           {:ok, updated} <-
+             Events.fulfill_ticket_reservation(reservation_to_fulfill, ticket_order_id) do
+        {:cont, {:ok, [{updated, fulfill_qty} | acc]}}
+      else
         {:error, _} ->
           {:halt, {:error, :reservation_lapsed}}
       end
     end)
+  end
+
+  defp maybe_split_reservation_for_fulfillment(reservation, fulfill_qty)
+       when fulfill_qty >= reservation.quantity do
+    {:ok, reservation}
+  end
+
+  defp maybe_split_reservation_for_fulfillment(reservation, fulfill_qty) do
+    remainder = reservation.quantity - fulfill_qty
+
+    with {:ok, updated} <-
+           reservation
+           |> Ecto.Changeset.change(quantity: fulfill_qty)
+           |> Repo.update(),
+         {:ok, _remainder} <-
+           %TicketReservation{}
+           |> TicketReservation.changeset(%{
+             ticket_tier_id: reservation.ticket_tier_id,
+             user_id: reservation.user_id,
+             quantity: remainder,
+             discount_percentage: reservation.discount_percentage,
+             expires_at: reservation.expires_at,
+             notes: reservation.notes,
+             created_by_id: reservation.created_by_id,
+             status: "active"
+           })
+           |> Repo.insert() do
+      {:ok, updated}
+    end
   end
 
   defp fulfill_reservations_for_tier(
@@ -423,17 +455,23 @@ defmodule Ysc.Tickets.BookingLocker do
           if reservation_qty <= remaining_qty do
             # Fully fulfill this reservation
             {:cont,
-             {[reservation | fulfilled_acc], remaining_qty - reservation_qty}}
+             {[{reservation, reservation_qty} | fulfilled_acc],
+              remaining_qty - reservation_qty}}
           else
-            # This reservation covers more than needed, but we'll fulfill it anyway
-            # (In a more sophisticated system, we could split reservations)
-            {:halt, {[reservation | fulfilled_acc], 0}}
+            # Partially fulfill: only consume the tickets the user selected
+            {:halt, {[{reservation, remaining_qty} | fulfilled_acc], 0}}
           end
         end
       end)
 
-    remaining = reservations -- fulfilled
-    {fulfilled, remaining}
+    fulfilled_ids = MapSet.new(fulfilled, fn {reservation, _} -> reservation.id end)
+
+    still_active =
+      Enum.reject(reservations, fn reservation ->
+        MapSet.member?(fulfilled_ids, reservation.id)
+      end)
+
+    {fulfilled, still_active}
   end
 
   defp count_sold_tickets_for_tier_locked(tier_id) do
@@ -732,19 +770,19 @@ defmodule Ysc.Tickets.BookingLocker do
             _ -> amount_or_quantity
           end
 
-        # Get fulfilled reservations for this tier
+        # Get fulfilled reservations for this tier (each entry is {reservation, fulfill_qty})
         fulfilled_reservations =
           Map.get(fulfilled_reservations_by_tier, tier_id, [])
 
         fulfilled_count =
-          Enum.reduce(fulfilled_reservations, 0, fn r, acc ->
-            acc + r.quantity
+          Enum.reduce(fulfilled_reservations, 0, fn {_reservation, qty}, acc ->
+            acc + qty
           end)
 
         # Create tickets for reserved quantities (with discount)
         reserved_tickets =
           fulfilled_reservations
-          |> Enum.flat_map(fn reservation ->
+          |> Enum.flat_map(fn {reservation, fulfill_qty} ->
             # Calculate discount per ticket for this reservation
             per_ticket_discount =
               if reservation.discount_percentage &&
@@ -752,7 +790,7 @@ defmodule Ysc.Tickets.BookingLocker do
                    tier.price do
                 # Calculate total discount for this reservation
                 reservation_total =
-                  case Money.mult(tier.price, reservation.quantity) do
+                  case Money.mult(tier.price, fulfill_qty) do
                     {:ok, total} -> total
                     {:error, _} -> Money.new(0, :USD)
                   end
@@ -767,7 +805,7 @@ defmodule Ysc.Tickets.BookingLocker do
                   end
 
                 # Divide discount evenly across tickets in this reservation
-                case Money.div(total_discount, reservation.quantity) do
+                case Money.div(total_discount, fulfill_qty) do
                   {:ok, per_ticket} -> per_ticket
                   {:error, _} -> Money.new(0, :USD)
                 end
@@ -775,8 +813,8 @@ defmodule Ysc.Tickets.BookingLocker do
                 Money.new(0, :USD)
               end
 
-            # Create one ticket per quantity in the reservation
-            Enum.map(1..reservation.quantity, fn _ ->
+            # Create one ticket per fulfilled quantity (may be less than the original hold)
+            Enum.map(1..fulfill_qty, fn _ ->
               %Ticket{}
               |> Ticket.changeset(%{
                 event_id: ticket_order.event_id,
