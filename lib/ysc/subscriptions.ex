@@ -8,6 +8,7 @@ defmodule Ysc.Subscriptions do
   alias Ysc.Accounts.UserProfileCache
   alias Ysc.Repo
   alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
+  alias Ysc.Stripe.SubscriptionHelpers
 
   @doc """
   Returns the list of subscriptions for a given user.
@@ -546,7 +547,7 @@ defmodule Ysc.Subscriptions do
                  :gt do
             subscription.trial_ends_at
           else
-            stripe_subscription.current_period_end
+            SubscriptionHelpers.current_period_end(stripe_subscription)
             |> DateTime.from_unix!()
             |> DateTime.truncate(:second)
           end
@@ -619,7 +620,7 @@ defmodule Ysc.Subscriptions do
         update_subscription(subscription, %{
           stripe_status: stripe_subscription.status,
           current_period_end:
-            stripe_subscription.current_period_end
+            SubscriptionHelpers.current_period_end(stripe_subscription)
             |> DateTime.from_unix!()
             |> DateTime.truncate(:second),
           ends_at: nil
@@ -668,7 +669,11 @@ defmodule Ysc.Subscriptions do
         # Update local subscription
         update_subscription(subscription, %{
           stripe_status: stripe_subscription.status,
-          current_period_end: stripe_subscription.current_period_end
+          current_period_end:
+            case SubscriptionHelpers.current_period_end(stripe_subscription) do
+              nil -> nil
+              timestamp -> DateTime.from_unix!(timestamp)
+            end
         })
 
       {:error, _error} ->
@@ -710,10 +715,12 @@ defmodule Ysc.Subscriptions do
           update_subscription(subscription, %{
             stripe_status: updated_stripe_subscription.status,
             current_period_start:
-              updated_stripe_subscription.current_period_start &&
-                DateTime.from_unix!(
-                  updated_stripe_subscription.current_period_start
-                ),
+              case SubscriptionHelpers.current_period_start(
+                     updated_stripe_subscription
+                   ) do
+                nil -> nil
+                timestamp -> DateTime.from_unix!(timestamp)
+              end,
             # Use the schedule's end date or the subscription's current_period_end
             current_period_end: DateTime.from_unix!(end_timestamp)
           })
@@ -771,7 +778,7 @@ defmodule Ysc.Subscriptions do
             }
           end)
 
-        start_timestamp = stripe_sub.current_period_start
+        start_timestamp = SubscriptionHelpers.current_period_start(stripe_sub)
 
         phase = %{
           items: items,
@@ -1007,15 +1014,19 @@ defmodule Ysc.Subscriptions do
                         update_subscription(subscription, %{
                           stripe_status: updated_stripe_subscription.status,
                           current_period_start:
-                            updated_stripe_subscription.current_period_start &&
-                              DateTime.from_unix!(
-                                updated_stripe_subscription.current_period_start
-                              ),
+                            case SubscriptionHelpers.current_period_start(
+                                   updated_stripe_subscription
+                                 ) do
+                              nil -> nil
+                              timestamp -> DateTime.from_unix!(timestamp)
+                            end,
                           current_period_end:
-                            updated_stripe_subscription.current_period_end &&
-                              DateTime.from_unix!(
-                                updated_stripe_subscription.current_period_end
-                              )
+                            case SubscriptionHelpers.current_period_end(
+                                   updated_stripe_subscription
+                                 ) do
+                              nil -> nil
+                              timestamp -> DateTime.from_unix!(timestamp)
+                            end
                         })
                       else
                         # Status is incomplete (or similar); leave DB unchanged so user
@@ -1074,8 +1085,8 @@ defmodule Ysc.Subscriptions do
         do: first_item.price,
         else: first_item.price.id
 
-    current_period_end = stripe_sub.current_period_end
-    current_period_start = stripe_sub.current_period_start
+    current_period_end = SubscriptionHelpers.current_period_end(stripe_sub)
+    current_period_start = SubscriptionHelpers.current_period_start(stripe_sub)
 
     # Phase 1: current plan until period end
     phase1_items = [
@@ -1173,11 +1184,15 @@ defmodule Ysc.Subscriptions do
         stripe_subscription.start_date &&
           DateTime.from_unix!(stripe_subscription.start_date),
       current_period_start:
-        stripe_subscription.current_period_start &&
-          DateTime.from_unix!(stripe_subscription.current_period_start),
+        case SubscriptionHelpers.current_period_start(stripe_subscription) do
+          nil -> nil
+          timestamp -> DateTime.from_unix!(timestamp)
+        end,
       current_period_end:
-        stripe_subscription.current_period_end &&
-          DateTime.from_unix!(stripe_subscription.current_period_end),
+        case SubscriptionHelpers.current_period_end(stripe_subscription) do
+          nil -> nil
+          timestamp -> DateTime.from_unix!(timestamp)
+        end,
       trial_ends_at:
         stripe_subscription.trial_end &&
           DateTime.from_unix!(stripe_subscription.trial_end),
@@ -1508,11 +1523,15 @@ defmodule Ysc.Subscriptions do
             stripe_subscription.start_date &&
               DateTime.from_unix!(stripe_subscription.start_date),
           current_period_start:
-            stripe_subscription.current_period_start &&
-              DateTime.from_unix!(stripe_subscription.current_period_start),
+            case SubscriptionHelpers.current_period_start(stripe_subscription) do
+              nil -> nil
+              timestamp -> DateTime.from_unix!(timestamp)
+            end,
           current_period_end:
-            stripe_subscription.current_period_end &&
-              DateTime.from_unix!(stripe_subscription.current_period_end),
+            case SubscriptionHelpers.current_period_end(stripe_subscription) do
+              nil -> nil
+              timestamp -> DateTime.from_unix!(timestamp)
+            end,
           trial_ends_at:
             stripe_subscription.trial_end &&
               DateTime.from_unix!(stripe_subscription.trial_end),

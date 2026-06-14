@@ -892,27 +892,16 @@ defmodule Ysc.SubscriptionsTest do
   defp build_fake_stripe_subscription(plan, now_unix) do
     period_end = now_unix + 365 * 24 * 60 * 60
 
-    %Stripe.Subscription{
+    Ysc.Stripe.SubscriptionFixtures.subscription(
       id: "sub_fake_#{System.unique_integer()}",
       status: "active",
       start_date: now_unix,
       current_period_start: now_unix,
       current_period_end: period_end,
-      trial_end: nil,
-      ended_at: nil,
-      items: %Stripe.List{
-        data: [
-          %{
-            id: "si_fake_#{System.unique_integer()}",
-            price: %{id: plan.stripe_price_id, product: "prod_fake"},
-            quantity: 1
-          }
-        ],
-        has_more: false,
-        object: "list",
-        url: "/v1/subscription_items"
-      }
-    }
+      price_id: plan.stripe_price_id,
+      product_id: "prod_fake",
+      subscription_item_id: "si_fake_#{System.unique_integer()}"
+    )
   end
 
   describe "change_membership_plan/3" do
@@ -1269,15 +1258,14 @@ defmodule Ysc.SubscriptionsTest do
       now = System.os_time(:second)
       period_end = now + 86_400
 
-      stripe_sub = %Stripe.Subscription{
-        id: "sub_struct_#{System.unique_integer([:positive])}",
-        status: "active",
-        start_date: now,
-        current_period_start: now,
-        current_period_end: period_end,
-        trial_end: nil,
-        ended_at: nil
-      }
+      stripe_sub =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: "sub_struct_#{System.unique_integer([:positive])}",
+          status: "active",
+          start_date: now,
+          current_period_start: now,
+          current_period_end: period_end
+        )
 
       cs =
         Subscriptions.subscription_struct_from_stripe_subscription(
@@ -1331,27 +1319,28 @@ defmodule Ysc.SubscriptionsTest do
       now = System.os_time(:second)
       period_end = now + 365 * 86_400
 
-      stripe_sub = %Stripe.Subscription{
-        id: "sub_from_stripe_#{System.unique_integer([:positive])}",
-        status: "active",
-        start_date: now,
-        current_period_start: now,
-        current_period_end: period_end,
-        trial_end: nil,
-        ended_at: nil,
-        items: %Stripe.List{
-          data: [
-            %{
-              id: "si_new_#{System.unique_integer([:positive])}",
-              price: %{id: "price_from_stripe", product: "prod_from_stripe"},
-              quantity: 1
-            }
-          ],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      stripe_sub =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: "sub_from_stripe_#{System.unique_integer([:positive])}",
+          status: "active",
+          start_date: now,
+          current_period_start: now,
+          current_period_end: period_end,
+          items: %Stripe.List{
+            data: [
+              %{
+                id: "si_new_#{System.unique_integer([:positive])}",
+                price: %{id: "price_from_stripe", product: "prod_from_stripe"},
+                quantity: 1,
+                current_period_start: now,
+                current_period_end: period_end
+              }
+            ],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       assert {:ok, %Subscription{} = sub} =
                Subscriptions.create_subscription_from_stripe(user, stripe_sub)
@@ -1375,19 +1364,20 @@ defmodule Ysc.SubscriptionsTest do
           current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
         })
 
-      stripe_sub = %Stripe.Subscription{
-        id: "sub_dup_check",
-        status: "active",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 1000,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/items"
-        }
-      }
+      stripe_sub =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: "sub_dup_check",
+          status: "active",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 1000,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/items"
+          }
+        )
 
       assert {:ok, returned} =
                Subscriptions.create_subscription_from_stripe(user, stripe_sub)
