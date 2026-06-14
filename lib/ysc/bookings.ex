@@ -836,6 +836,55 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @doc false
+  def verify_booking_payment_intent(payment_intent, %Booking{} = booking) do
+    metadata = payment_intent.metadata || %{}
+
+    metadata_booking_id =
+      Map.get(metadata, "booking_id") || Map.get(metadata, :booking_id)
+
+    metadata_user_id =
+      Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
+    modification_flag =
+      Map.get(metadata, "modification") || Map.get(metadata, :modification)
+
+    expected_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+    cond do
+      payment_intent.status != "succeeded" ->
+        {:error, :payment_not_succeeded}
+
+      modification_flag in ["true", true] ->
+        {:error, :payment_metadata_mismatch}
+
+      to_string(metadata_booking_id || "") != to_string(booking.id) ->
+        {:error, :payment_metadata_mismatch}
+
+      to_string(metadata_user_id || "") != to_string(booking.user_id) ->
+        {:error, :payment_metadata_mismatch}
+
+      payment_intent.amount != expected_cents ->
+        {:error, :payment_amount_mismatch}
+
+      payment_intent_recorded_for_other_booking?(payment_intent.id, booking.id) ->
+        {:error, :payment_already_used}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp payment_intent_recorded_for_other_booking?(payment_intent_id, booking_id) do
+    case Ledgers.get_payment_by_external_id(payment_intent_id) do
+      nil ->
+        false
+
+      _payment ->
+        not modification_ledger_recorded?(booking_id, payment_intent_id)
+    end
+  end
+
   defp modification_payment_amount_from_intent(
          payment_intent_id,
          booking_id,

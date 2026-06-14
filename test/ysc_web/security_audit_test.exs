@@ -17,6 +17,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
+  Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1165,6 +1166,35 @@ defmodule YscWeb.SecurityAuditTest do
         Accounts.update_user(user, %{"first_name" => "After"}, admin)
 
       assert Accounts.get_user_by_session_token(token)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 20 (CRITICAL): Booking checkout accepts foreign PaymentIntents
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 20: booking payment intent validation" do
+    import Ysc.BookingsFixtures
+
+    alias Ysc.Bookings
+
+    test "verify_booking_payment_intent rejects a succeeded intent from another booking" do
+      user = user_fixture()
+      booking_a = booking_fixture(user_id: user.id, status: :hold)
+      booking_b = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_foreign",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking_a.total_price),
+        metadata: %{
+          "booking_id" => booking_a.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking_b)
     end
   end
 

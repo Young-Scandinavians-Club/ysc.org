@@ -316,13 +316,19 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                )
 
       pi_id = "pi_ledger_retry_#{System.unique_integer([:positive])}"
+      booking = Repo.get!(Booking, booking.id)
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
 
       expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
         {:ok,
          %Stripe.PaymentIntent{
            id: pi_id,
            status: "succeeded",
-           amount: 50_000,
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => booking.user_id
+           },
            customer: nil,
            payment_method: nil,
            latest_charge: nil
@@ -632,6 +638,69 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       reloaded = Repo.get!(Bookings.Booking, booking_b.id)
       assert reloaded.status == :hold
       assert booking_ledger_payment_count(booking_b.id) == 0
+
+      Mox.verify!(StripeMock)
+    end
+
+    test "payment-success rejects a succeeded payment intent from another booking",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(50)
+
+      cheap_booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          total_price: Money.new(200, :USD)
+        })
+
+      expensive_booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :hold,
+          checkin_date: Date.add(checkin, 14),
+          checkout_date: Date.add(checkout, 14),
+          total_price: Money.new(500, :USD)
+        })
+
+      cheap_pi_id = "pi_cheap_#{System.unique_integer([:positive])}"
+
+      cheap_amount_cents =
+        Ysc.MoneyHelper.money_to_cents(cheap_booking.total_price)
+
+      expect(StripeMock, :retrieve_payment_intent, fn ^cheap_pi_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: cheap_pi_id,
+           status: "succeeded",
+           amount: cheap_amount_cents,
+           metadata: %{
+             "booking_id" => cheap_booking.id,
+             "user_id" => user.id
+           },
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/checkout/#{expensive_booking.id}")
+
+      html =
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => cheap_pi_id
+        })
+
+      assert html =~ "Something went wrong while confirming your booking"
+
+      reloaded = Repo.get!(Booking, expensive_booking.id)
+      assert reloaded.status == :hold
+      assert booking_ledger_payment_count(expensive_booking.id) == 0
 
       Mox.verify!(StripeMock)
     end

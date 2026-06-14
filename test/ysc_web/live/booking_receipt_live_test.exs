@@ -1111,38 +1111,6 @@ defmodule YscWeb.BookingReceiptLiveTest do
         Application.put_env(:ysc, :stripe_client, original_stripe_client)
       end)
 
-      {:module, test_stripe_client, _, _} =
-        defmodule :"ReceiptLedgerRetryStripe#{System.unique_integer([:positive])}" do
-          @behaviour Ysc.StripeBehaviour
-
-          def create_payment_intent(_params, _opts),
-            do: {:error, :not_implemented}
-
-          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
-          def create_customer(_params), do: {:error, :not_implemented}
-          def update_customer(_id, _params), do: {:error, :not_implemented}
-          def retrieve_payment_method(_id), do: {:error, :not_implemented}
-          def list_events(_params, _opts), do: {:error, :not_implemented}
-          def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
-          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
-
-          def list_balance_transactions(_params, _opts),
-            do: {:error, :not_implemented}
-
-          def retrieve_payment_intent(id, _opts) do
-            {:ok,
-             %Stripe.PaymentIntent{
-               id: id,
-               status: "succeeded",
-               amount: 50_000,
-               customer: nil,
-               payment_method: nil,
-               latest_charge: nil
-             }}
-          end
-        end
-
-      Application.put_env(:ysc, :stripe_client, test_stripe_client)
       ensure_receipt_buyout_base_pricing!()
 
       user = user_fixture()
@@ -1160,7 +1128,59 @@ defmodule YscWeb.BookingReceiptLiveTest do
                  4
                )
 
+      booking = Repo.get!(Booking, booking.id)
       pi_id = "pi_receipt_ledger_retry_#{System.unique_integer([:positive])}"
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      module_name =
+        :"ReceiptLedgerRetryStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            @pi_amount unquote(amount_cents)
+            @booking_id unquote(booking.id)
+            @user_id unquote(booking.user_id)
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: @pi_amount,
+                 metadata: %{
+                   "booking_id" => @booking_id,
+                   "user_id" => @user_id
+                 },
+                 customer: nil,
+                 payment_method: nil,
+                 latest_charge: nil
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
 
       assert {:ok, _confirmed} = BookingLocker.confirm_booking(booking.id)
       assert receipt_ledger_payment_count(booking.id) == 0
