@@ -3412,4 +3412,80 @@ defmodule Ysc.BookingsTest do
       end)
     end
   end
+
+  describe "verify_booking_payment_intent/2" do
+    test "accepts a payment intent that matches booking metadata and amount" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_valid",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking.total_price),
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert :ok =
+               Bookings.verify_booking_payment_intent(payment_intent, booking)
+    end
+
+    test "rejects payment intents bound to another booking" do
+      user = user_fixture()
+      booking_a = booking_fixture(user_id: user.id, status: :hold)
+      booking_b = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_foreign",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking_a.total_price),
+        metadata: %{
+          "booking_id" => booking_a.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking_b)
+    end
+
+    test "rejects underpaid payment intents for the same booking" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_underpaid",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(Money.new(1, :USD)),
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_amount_mismatch} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking)
+    end
+
+    test "rejects modification payment intents during initial checkout" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_modification",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking.total_price),
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id,
+          "modification" => "true"
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking)
+    end
+  end
 end
