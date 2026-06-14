@@ -386,7 +386,10 @@ defmodule Ysc.Tickets.BookingLocker do
            ticket_order_id
          ) do
       {:ok, fulfilled} ->
-        {:ok, Enum.group_by(fulfilled, fn {reservation, _qty} -> reservation.ticket_tier_id end)}
+        {:ok,
+         Enum.group_by(fulfilled, fn {reservation, _qty} ->
+           reservation.ticket_tier_id
+         end)}
 
       {:error, _} = error ->
         error
@@ -394,12 +397,16 @@ defmodule Ysc.Tickets.BookingLocker do
   end
 
   defp fulfill_reservations_in_transaction(fulfillment_plans, ticket_order_id) do
-    Enum.reduce_while(fulfillment_plans, {:ok, []}, fn {reservation, fulfill_qty},
+    Enum.reduce_while(fulfillment_plans, {:ok, []}, fn {reservation,
+                                                        fulfill_qty},
                                                        {:ok, acc} ->
       with {:ok, reservation_to_fulfill} <-
              maybe_split_reservation_for_fulfillment(reservation, fulfill_qty),
            {:ok, updated} <-
-             Events.fulfill_ticket_reservation(reservation_to_fulfill, ticket_order_id) do
+             Events.fulfill_ticket_reservation(
+               reservation_to_fulfill,
+               ticket_order_id
+             ) do
         {:cont, {:ok, [{updated, fulfill_qty} | acc]}}
       else
         {:error, _} ->
@@ -464,7 +471,8 @@ defmodule Ysc.Tickets.BookingLocker do
         end
       end)
 
-    fulfilled_ids = MapSet.new(fulfilled, fn {reservation, _} -> reservation.id end)
+    fulfilled_ids =
+      MapSet.new(fulfilled, fn {reservation, _} -> reservation.id end)
 
     still_active =
       Enum.reject(reservations, fn reservation ->
