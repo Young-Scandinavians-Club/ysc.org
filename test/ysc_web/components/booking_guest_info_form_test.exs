@@ -81,7 +81,7 @@ defmodule YscWeb.Components.BookingGuestInfoFormTest do
       assert html =~ "Child Guest"
       assert html =~ "Continue to Payment"
       assert html =~ ~s|name="guests[1][first_name]"|
-      assert html =~ ~s|name="guests[0][first_name]" type="hidden"|
+      assert html =~ ~s|type="hidden" name="guests[0][first_name]"|
     end
 
     test "renders error summary and action slot" do

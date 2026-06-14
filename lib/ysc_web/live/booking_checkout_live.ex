@@ -659,7 +659,9 @@ defmodule YscWeb.BookingCheckoutLive do
             form="guest-info-form"
             phx-disable-with="Processing..."
             class="flex-1"
-            disabled={!BookingGuestForm.all_guests_valid?(@guest_info_form, @booking)}
+            disabled={
+              !BookingGuestForm.all_guests_valid?(@guest_info_form, @booking)
+            }
           >
             <span class="font-semibold">
               <%= if @complimentary_checkout do %>
@@ -2889,7 +2891,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
   defp checkout_guest_info_intro(booking) do
     room_names =
-      if Ecto.assoc_loaded?(booking.rooms) && length(booking.rooms) > 0,
+      if Ecto.assoc_loaded?(booking.rooms) && booking.rooms != [],
         do: Enum.map_join(booking.rooms, ", ", & &1.name),
         else: "your selected room"
 
