@@ -6,7 +6,9 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Stripe.PaymentIntentHelpers
+  alias YscWeb.BookingGuestForm
   import Ecto.Query
+  import YscWeb.Components.BookingGuestInfoForm
   require Ysc.Logging
 
   @impl true
@@ -327,432 +329,30 @@ defmodule YscWeb.BookingCheckoutLive do
               </div>
             </div>
           </div>
-          <!-- Guest Information Section (for room bookings) -->
-          <div
+          <.booking_guest_info_form
             :if={@checkout_step == :guest_info}
-            class="bg-white rounded-lg border border-zinc-200 p-8 shadow-sm"
+            id="guest-info-form"
+            booking={@booking}
+            guest_info_form={@guest_info_form}
+            guest_info_errors={@guest_info_errors}
+            other_family_members={@other_family_members}
+            selected_family_members_for_guests={@selected_family_members_for_guests}
+            current_user={@current_user}
+            intro_text={checkout_guest_info_intro(@booking)}
+            submit_label={checkout_guest_info_submit_label(@complimentary_checkout)}
           >
-            <h2 class="text-xl font-bold mb-2">Guest Information</h2>
-            <%!-- Capacity Summary --%>
-            <% room_names =
-              if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0,
-                do: Enum.map(@booking.rooms, & &1.name) |> Enum.join(", "),
-                else: "your selected room" %>
-            <p class="text-sm text-zinc-600 mb-4">
-              You are booking {room_names} for {@booking.guests_count || 1} {if (@booking.guests_count ||
-                                                                                   1) ==
-                                                                                  1,
-                                                                                do:
-                                                                                  "adult",
-                                                                                else:
-                                                                                  "adults"}
-              <%= if @booking.children_count && @booking.children_count > 0 do %>
-                and {@booking.children_count} {if @booking.children_count ==
-                                                    1,
-                                                  do: "child",
-                                                  else: "children"}
-              <% end %>.
-            </p>
-            <%!-- Booking Representative Header --%>
-            <% booking_user_guest =
-              if @guest_info_form do
-                Enum.find(@guest_info_form.source, fn {_, guest_data} ->
-                  Map.get(guest_data, "is_booking_user") == true
-                end)
-              end %>
-            <%= if booking_user_guest do %>
-              <% {_, booking_user_data} = booking_user_guest %>
-              <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
-                <div class="flex items-start gap-3">
-                  <div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-200">
-                    <%= if assigns[:current_user] do %>
-                      <.user_avatar_image
-                        user={assigns[:current_user]}
-                        class="w-full h-full object-cover"
-                      />
-                    <% else %>
-                      <.icon
-                        name="hero-user-circle"
-                        class="w-full h-full text-blue-600 p-2"
-                      />
-                    <% end %>
-                  </div>
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-1">
-                      <p class="text-sm font-semibold text-blue-900">
-                        You (the member making this booking)
-                      </p>
-                      <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded">
-                        Required
-                      </span>
-                    </div>
-                    <p class="text-sm text-blue-700 font-medium mb-2">
-                      {Map.get(booking_user_data, "first_name", "")} {Map.get(
-                        booking_user_data,
-                        "last_name",
-                        ""
-                      )}
-                    </p>
-                    <p class="text-xs text-blue-600">
-                      As the member making this reservation, you must stay at the cabin. You are already included in the guest count — only enter the other people staying with you below.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            <% end %>
-            <%!-- Error Summary (visible) --%>
-            <%= if map_size(@guest_info_errors || %{}) > 0 do %>
-              <% error_count =
-                @guest_info_errors
-                |> Enum.reject(fn {key, _} -> key == :general end)
-                |> Enum.count() %>
-              <%= if error_count > 0 do %>
-                <div
-                  id="guest-errors-summary"
-                  role="alert"
-                  aria-live="polite"
-                  aria-atomic="true"
-                  class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
-                >
-                  <p class="text-sm font-semibold text-red-800">
-                    {error_count} {if error_count == 1,
-                      do: "guest is",
-                      else: "guests are"} missing required information.
-                  </p>
-                </div>
-              <% end %>
-            <% end %>
-            <!-- General Errors -->
-            <div
-              :if={@guest_info_errors[:general]}
-              class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg"
-              role="alert"
-            >
-              <p class="text-sm text-red-800">
-                {@guest_info_errors[:general]}
-              </p>
-            </div>
-            <!-- Guest Information Form -->
-            <form
-              phx-change="validate-guest-info"
-              phx-submit="save-guest-info"
-              phx-debounce="300"
-              id="guest-info-form"
-            >
-              <div class="space-y-6">
-                <%= if @guest_info_form do %>
-                  <%!-- Filter to only show guests up to the expected total --%>
-                  <% expected_total =
-                    (@booking.guests_count || 1) + (@booking.children_count || 0) %>
-                  <% guest_entries =
-                    @guest_info_form.source
-                    |> Enum.map(fn {index_str, guest_data} ->
-                      {String.to_integer(index_str), {index_str, guest_data}}
-                    end)
-                    |> Enum.sort_by(fn {order_index, _} -> order_index end)
-                    |> Enum.take(expected_total)
-                    |> Enum.map(fn {_order_index, {index_str, guest_data}} ->
-                      {index_str, guest_data}
-                    end) %>
-                  <%!-- Separate booking user from other guests --%>
-                  <% {booking_user_entries, non_booking_guests} =
-                    Enum.split_with(guest_entries, fn {_, guest_data} ->
-                      Map.get(guest_data, "is_booking_user") == true
-                    end) %>
-                  <%!-- Hidden inputs for booking user (shown in header, but data still needs to be submitted) --%>
-                  <%= for {index_str, guest_data} <- booking_user_entries do %>
-                    <input
-                      type="hidden"
-                      name={"guests[#{index_str}][first_name]"}
-                      value={Map.get(guest_data, "first_name", "")}
-                    />
-                    <input
-                      type="hidden"
-                      name={"guests[#{index_str}][last_name]"}
-                      value={Map.get(guest_data, "last_name", "")}
-                    />
-                    <input
-                      type="hidden"
-                      name={"guests[#{index_str}][is_child]"}
-                      value="false"
-                    />
-                    <input
-                      type="hidden"
-                      name={"guests[#{index_str}][is_booking_user]"}
-                      value="true"
-                    />
-                    <input
-                      type="hidden"
-                      name={"guests[#{index_str}][order_index]"}
-                      value={Map.get(guest_data, "order_index", 0)}
-                    />
-                  <% end %>
-                  <%= for {index_str, guest_data} <- non_booking_guests do %>
-                    <% index = String.to_integer(index_str) %>
-                    <% is_booking_user =
-                      Map.get(guest_data, "is_booking_user") == true %>
-                    <% is_child = Map.get(guest_data, "is_child") == true %>
-                    <% selected_family_members =
-                      @selected_family_members_for_guests || %{} %>
-                    <% selected_family_member_id =
-                      Map.get(selected_family_members, index_str) %>
-                    <% selected_family_member =
-                      if selected_family_member_id,
-                        do:
-                          Enum.find(@other_family_members || [], fn u ->
-                            to_string(u.id) == to_string(selected_family_member_id)
-                          end),
-                        else: nil %>
-                    <% has_selected_family_member =
-                      not is_nil(selected_family_member) %>
-                    <% first_name =
-                      cond do
-                        is_booking_user ->
-                          Map.get(guest_data, "first_name", "")
-
-                        has_selected_family_member ->
-                          selected_family_member.first_name || ""
-
-                        true ->
-                          Map.get(guest_data, "first_name", "")
-                      end %>
-                    <% last_name =
-                      cond do
-                        is_booking_user ->
-                          Map.get(guest_data, "last_name", "")
-
-                        has_selected_family_member ->
-                          selected_family_member.last_name || ""
-
-                        true ->
-                          Map.get(guest_data, "last_name", "")
-                      end %>
-                    <div class={[
-                      "flex items-start gap-4 p-4 rounded-r-lg shadow-sm",
-                      if(is_child,
-                        do: "bg-white border-l-4 border-green-500",
-                        else: "bg-white border-l-4 border-blue-500"
-                      )
-                    ]}>
-                      <div class={[
-                        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
-                        if(is_child,
-                          do: "bg-green-100 text-green-600",
-                          else: "bg-blue-100 text-blue-600"
-                        )
-                      ]}>
-                        {index}
-                      </div>
-                      <div class="flex-1 space-y-3">
-                        <div class="flex justify-between items-center">
-                          <h3 class="font-bold text-zinc-800">
-                            <%= if is_child do %>
-                              Child Guest
-                            <% else %>
-                              Adult Guest
-                            <% end %>
-                          </h3>
-                          <%= if !is_child && length(@other_family_members || []) > 0 do %>
-                            <%!-- Family Member Selection Dropdown (only for adults) --%>
-                            <select
-                              id={"guest-#{index_str}-attendee-select"}
-                              name={"guest-#{index_str}-attendee-select"}
-                              phx-change="select-guest-attendee"
-                              phx-debounce="100"
-                              phx-value-guest-index={index_str}
-                              value={
-                                cond do
-                                  has_selected_family_member ->
-                                    "family_#{selected_family_member.id}"
-
-                                  true ->
-                                    "other"
-                                end
-                              }
-                              class="text-xs border-none bg-zinc-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <%= if length(@other_family_members) > 0 do %>
-                                <optgroup label="Family Members">
-                                  <%= for family_member <- @other_family_members do %>
-                                    <option
-                                      value={"family_#{family_member.id}"}
-                                      selected={
-                                        has_selected_family_member &&
-                                          selected_family_member.id ==
-                                            family_member.id
-                                      }
-                                    >
-                                      {family_member.first_name} {family_member.last_name}
-                                    </option>
-                                  <% end %>
-                                </optgroup>
-                              <% end %>
-                              <option
-                                value="other"
-                                selected={!has_selected_family_member}
-                              >
-                                Someone else (Enter details)
-                              </option>
-                            </select>
-                          <% end %>
-                        </div>
-                        <%!-- Show badge when family member selected (only for adults), otherwise show form inputs --%>
-                        <%= if !is_child && has_selected_family_member do %>
-                          <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
-                            <.icon
-                              name="hero-check-circle"
-                              class="w-5 h-5 text-green-600"
-                            />
-                            <span class="text-xs font-semibold text-green-800">
-                              Guest: {selected_family_member.first_name} {selected_family_member.last_name}
-                            </span>
-                          </div>
-                        <% else %>
-                          <div class="grid grid-cols-2 gap-2">
-                            <div class="relative">
-                              <input
-                                type="text"
-                                id={"guest-#{index_str}-first-name"}
-                                name={"guests[#{index_str}][first_name]"}
-                                value={first_name}
-                                required={true}
-                                placeholder="First Name"
-                                autocapitalize="words"
-                                autocomplete="given-name"
-                                phx-change="validate-guest-info"
-                                phx-debounce="300"
-                                class={[
-                                  "w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-zinc-400",
-                                  if(
-                                    @guest_info_errors[index_str] &&
-                                      @guest_info_errors[index_str][:first_name],
-                                    do: "border-red-300 bg-red-50",
-                                    else:
-                                      if(first_name != "",
-                                        do: "border-green-300 bg-green-50",
-                                        else: "border-zinc-300 bg-white"
-                                      )
-                                  )
-                                ]}
-                              />
-                              <%= if first_name != "" && (!@guest_info_errors[index_str] || !@guest_info_errors[index_str][:first_name]) do %>
-                                <div class="absolute right-2 top-1/2 -translate-y-1/2">
-                                  <.icon
-                                    name="hero-check-circle"
-                                    class="w-4 h-4 text-green-600"
-                                  />
-                                </div>
-                              <% end %>
-                            </div>
-                            <div class="relative">
-                              <input
-                                type="text"
-                                id={"guest-#{index_str}-last-name"}
-                                name={"guests[#{index_str}][last_name]"}
-                                value={last_name}
-                                required={true}
-                                placeholder="Last Name"
-                                autocapitalize="words"
-                                autocomplete="family-name"
-                                phx-change="validate-guest-info"
-                                phx-debounce="300"
-                                class={[
-                                  "w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-zinc-400",
-                                  if(
-                                    @guest_info_errors[index_str] &&
-                                      @guest_info_errors[index_str][:last_name],
-                                    do: "border-red-300 bg-red-50",
-                                    else:
-                                      if(last_name != "",
-                                        do: "border-green-300 bg-green-50",
-                                        else: "border-zinc-300 bg-white"
-                                      )
-                                  )
-                                ]}
-                              />
-                              <%= if last_name != "" && (!@guest_info_errors[index_str] || !@guest_info_errors[index_str][:last_name]) do %>
-                                <div class="absolute right-2 top-1/2 -translate-y-1/2">
-                                  <.icon
-                                    name="hero-check-circle"
-                                    class="w-4 h-4 text-green-600"
-                                  />
-                                </div>
-                              <% end %>
-                            </div>
-                          </div>
-                          <%= if @guest_info_errors[index_str] do %>
-                            <div class="text-xs text-red-600 space-y-0.5">
-                              <%= if @guest_info_errors[index_str][:first_name] do %>
-                                <p>
-                                  First name: {Enum.join(
-                                    @guest_info_errors[index_str][:first_name],
-                                    ", "
-                                  )}
-                                </p>
-                              <% end %>
-                              <%= if @guest_info_errors[index_str][:last_name] do %>
-                                <p>
-                                  Last name: {Enum.join(
-                                    @guest_info_errors[index_str][:last_name],
-                                    ", "
-                                  )}
-                                </p>
-                              <% end %>
-                            </div>
-                          <% end %>
-                        <% end %>
-                      </div>
-                      <!-- Hidden fields for guest metadata -->
-                      <input
-                        type="hidden"
-                        name={"guests[#{index_str}][is_child]"}
-                        value={if is_child, do: "true", else: "false"}
-                      />
-                      <input
-                        type="hidden"
-                        name={"guests[#{index_str}][is_booking_user]"}
-                        value={if is_booking_user, do: "true", else: "false"}
-                      />
-                      <input
-                        type="hidden"
-                        name={"guests[#{index_str}][order_index]"}
-                        value={index}
-                      />
-                    </div>
-                  <% end %>
-                <% end %>
-              </div>
-
-              <div class="pt-6 border-t border-zinc-100 mt-6 space-y-4">
-                <div class="flex flex-col sm:flex-row gap-4">
-                  <.button
-                    type="submit"
-                    phx-disable-with="Processing..."
-                    class="flex-1 w-full text-lg py-3.5"
-                    disabled={!all_guests_valid?(@guest_info_form, @booking)}
-                  >
-                    <span class="text-lg font-semibold">
-                      <%= if @complimentary_checkout do %>
-                        Continue to confirmation
-                      <% else %>
-                        Continue to Payment
-                      <% end %>
-                    </span>
-                    <.icon name="hero-arrow-right" class="w-5 h-5 -mt-0.5 ms-1" />
-                  </.button>
-                  <button
-                    type="button"
-                    phx-click="cancel-booking"
-                    phx-disable-with="Cancelling..."
-                    phx-confirm="Are you sure you want to cancel this booking? The availability will be released immediately."
-                    class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
+            <:actions>
+              <button
+                type="button"
+                phx-click="cancel-booking"
+                phx-disable-with="Cancelling..."
+                phx-confirm="Are you sure you want to cancel this booking? The availability will be released immediately."
+                class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </:actions>
+          </.booking_guest_info_form>
           <!-- Payment Section -->
           <div
             :if={@checkout_step == :payment}
@@ -1059,7 +659,7 @@ defmodule YscWeb.BookingCheckoutLive do
             form="guest-info-form"
             phx-disable-with="Processing..."
             class="flex-1"
-            disabled={!all_guests_valid?(@guest_info_form, @booking)}
+            disabled={!BookingGuestForm.all_guests_valid?(@guest_info_form, @booking)}
           >
             <span class="font-semibold">
               <%= if @complimentary_checkout do %>
@@ -3287,33 +2887,27 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
-  def all_guests_valid?(nil, _booking), do: false
+  defp checkout_guest_info_intro(booking) do
+    room_names =
+      if Ecto.assoc_loaded?(booking.rooms) && length(booking.rooms) > 0,
+        do: Enum.map_join(booking.rooms, ", ", & &1.name),
+        else: "your selected room"
 
-  def all_guests_valid?(guest_info_form, booking) do
-    guests_count = booking.guests_count || 1
-    children_count = booking.children_count || 0
-    total_expected = guests_count + children_count
+    adults = booking.guests_count || 1
+    children = booking.children_count || 0
 
-    # Check if we have the expected number of guests
-    if map_size(guest_info_form.source) != total_expected do
-      false
-    else
-      # Check if all guests have valid first_name and last_name
-      guest_info_form.source
-      |> Enum.all?(fn {_index, guest_data} ->
-        first_name =
-          Map.get(guest_data, "first_name") || Map.get(guest_data, :first_name) ||
-            ""
+    children_text =
+      if children > 0 do
+        " and #{children} #{if children == 1, do: "child", else: "children"}"
+      else
+        ""
+      end
 
-        last_name =
-          Map.get(guest_data, "last_name") || Map.get(guest_data, :last_name) ||
-            ""
-
-        # Both first_name and last_name must be non-empty strings
-        String.trim(first_name) != "" && String.trim(last_name) != ""
-      end)
-    end
+    "You are booking #{room_names} for #{adults} #{if adults == 1, do: "adult", else: "adults"}#{children_text}."
   end
+
+  defp checkout_guest_info_submit_label(true), do: "Continue to confirmation"
+  defp checkout_guest_info_submit_label(false), do: "Continue to Payment"
 
   defp save_guests(booking, guest_changesets) when is_list(guest_changesets) do
     # Delete existing guests first (in case of re-submission)
