@@ -859,20 +859,21 @@ defmodule Ysc.Stripe.WebhookHandler do
             %{stripe_status: event.status}
           end
 
-        attrs = maybe_put_datetime(attrs, :start_date, event.start_date)
+        attrs =
+          maybe_put_datetime(attrs, :start_date, event.start_date)
 
         attrs =
           maybe_put_datetime(
             attrs,
             :current_period_start,
-            event.current_period_start
+            Ysc.Stripe.SubscriptionHelpers.current_period_start(event)
           )
 
         attrs =
           maybe_put_datetime(
             attrs,
             :current_period_end,
-            event.current_period_end
+            Ysc.Stripe.SubscriptionHelpers.current_period_end(event)
           )
 
         attrs = maybe_put_datetime(attrs, :trial_ends_at, event.trial_end)
@@ -1231,7 +1232,7 @@ defmodule Ysc.Stripe.WebhookHandler do
       amount_paid: invoice.amount_paid,
       description: invoice.description,
       number: invoice.number,
-      charge: invoice.charge,
+      charge: Ysc.Stripe.InvoiceHelpers.charge_id(invoice),
       metadata: invoice.metadata,
       billing_reason: Map.get(invoice, :billing_reason)
     }
@@ -2512,7 +2513,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   def extract_stripe_fee_from_invoice(invoice) do
     # Check if fee is provided in metadata first
     metadata = invoice[:metadata] || invoice["metadata"] || %{}
-    charge_id = invoice[:charge] || invoice["charge"]
+
+    charge_id =
+      Ysc.Stripe.InvoiceHelpers.charge_id(invoice) ||
+        invoice[:charge] || invoice["charge"]
 
     case metadata do
       %{"stripe_fee" => fee_str} ->
@@ -2724,7 +2728,10 @@ defmodule Ysc.Stripe.WebhookHandler do
     require Ysc.Logging
 
     # Get the charge ID from the invoice
-    charge_id = invoice[:charge] || invoice["charge"]
+    charge_id =
+      Ysc.Stripe.InvoiceHelpers.charge_id(invoice) ||
+        invoice[:charge] || invoice["charge"]
+
     invoice_id = invoice[:id] || invoice["id"]
     customer_id = invoice[:customer] || invoice["customer"]
 
