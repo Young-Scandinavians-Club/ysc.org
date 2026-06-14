@@ -288,77 +288,43 @@ defmodule YscWeb.AdminEventsLive do
 
   def event_actions_dropdown(assigns) do
     ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
-      <.dropdown
-        id={@menu_id}
-        right={true}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+    <.admin_row_actions_dropdown id={@menu_id} label="Event actions">
+      <.admin_dropdown_menu_item
+        :if={@event.state in [:published, :scheduled]}
+        id={"#{@menu_id}-view-live"}
+        icon="hero-arrow-top-right-on-square"
+        href={~p"/events/#{@event.id}"}
+        target="_blank"
+        rel="noopener noreferrer"
       >
-        <:button_block>
-          <span class="sr-only">Event actions</span>
-          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
-        </:button_block>
-
-        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
-          <ul class="py-1">
-            <li :if={@event.state in [:published, :scheduled]}>
-              <.link
-                id={"#{@menu_id}-view-live"}
-                href={~p"/events/#{@event.id}"}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-arrow-top-right-on-square"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>View live</span>
-              </.link>
-            </li>
-            <li>
-              <button
-                id={"#{@menu_id}-copy"}
-                type="button"
-                phx-click="copy-event"
-                phx-value-id={@event.id}
-                data-confirm="Copy this event?"
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-document-duplicate"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>Copy</span>
-              </button>
-            </li>
-            <li>
-              <.link
-                id={"#{@menu_id}-edit"}
-                navigate={~p"/admin/events/#{@event.id}/edit"}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-pencil-square"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>Edit</span>
-              </.link>
-            </li>
-            <li :if={@event.state in [:published, :scheduled]}>
-              <.link
-                id={"#{@menu_id}-check-in"}
-                navigate={@check_in_path}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
-              >
-                <.icon name="hero-qr-code" class="h-5 w-5 shrink-0" />
-                <span>Check in</span>
-              </.link>
-            </li>
-          </ul>
-        </div>
-      </.dropdown>
-    </div>
+        View live
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-copy"}
+        icon="hero-document-duplicate"
+        phx-click="copy-event"
+        phx-value-id={@event.id}
+        data-confirm="Copy this event?"
+      >
+        Copy
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-edit"}
+        icon="hero-pencil-square"
+        navigate={~p"/admin/events/#{@event.id}/edit"}
+      >
+        Edit
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={@event.state in [:published, :scheduled]}
+        id={"#{@menu_id}-check-in"}
+        icon="hero-qr-code"
+        tone={:success}
+        navigate={@check_in_path}
+      >
+        Check in
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
     """
   end
 

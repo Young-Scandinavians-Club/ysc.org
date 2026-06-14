@@ -732,53 +732,24 @@ defmodule YscWeb.AdminUsersLive do
 
   def user_actions_dropdown(assigns) do
     ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
-      <.dropdown
-        id={@menu_id}
-        right={true}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+    <.admin_row_actions_dropdown id={@menu_id} label="User actions">
+      <.admin_dropdown_menu_item
+        :if={@user.state == :pending_approval}
+        id={"#{@menu_id}-review"}
+        icon="hero-clipboard-document-check"
+        phx-click={JS.patch(~p"/admin/users/#{@user.id}/review?#{@params}")}
       >
-        <:button_block>
-          <span class="sr-only">User actions</span>
-          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
-        </:button_block>
-
-        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
-          <ul class="py-1">
-            <li :if={@user.state == :pending_approval}>
-              <button
-                id={"#{@menu_id}-review"}
-                type="button"
-                phx-click={JS.patch(~p"/admin/users/#{@user.id}/review?#{@params}")}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-clipboard-document-check"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>Review</span>
-              </button>
-            </li>
-            <li :if={@user.state != :pending_approval}>
-              <button
-                id={"#{@menu_id}-edit"}
-                type="button"
-                phx-click={
-                  JS.navigate(~p"/admin/users/#{@user.id}/details?#{@params}")
-                }
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name="hero-pencil-square"
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>Edit</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </.dropdown>
-    </div>
+        Review
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={@user.state != :pending_approval}
+        id={"#{@menu_id}-edit"}
+        icon="hero-pencil-square"
+        phx-click={JS.navigate(~p"/admin/users/#{@user.id}/details?#{@params}")}
+      >
+        Edit
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
     """
   end
 
