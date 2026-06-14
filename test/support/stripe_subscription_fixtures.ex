@@ -27,8 +27,19 @@ defmodule Ysc.Stripe.SubscriptionFixtures do
 
     items =
       case Map.get(attrs, :items) do
-        nil -> default_items(period_start, period_end, attrs)
-        items -> items
+        nil ->
+          default_items(period_start, period_end, attrs)
+
+        %Stripe.List{data: []} = items ->
+          # Webhook payloads often omit expanded items; keep period boundaries on a
+          # synthetic item so SubscriptionHelpers can resolve billing periods.
+          %{items | data: default_items(period_start, period_end, attrs).data}
+
+        %{data: []} = items ->
+          %{items | data: default_items(period_start, period_end, attrs).data}
+
+        items ->
+          items
       end
 
     base = %Stripe.Subscription{
