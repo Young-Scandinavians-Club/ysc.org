@@ -140,19 +140,19 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       {:ok, view, _html} = live(conn, ~p"/admin/posts")
       html = render(view)
 
-      refute html =~ "Loading posts"
+      refute html =~ "Loading posts…"
       assert html =~ "Deferred Load Post"
       assert has_element?(view, "#admin_posts_list")
     end
 
     test "users list replaces loading placeholder after connect", %{conn: conn} do
-      user_fixture(%{first_name: "Deferred", last_name: "LoadUser"})
+      user_fixture(%{first_name: "Deferred", last_name: "Loaduser"})
 
       {:ok, view, _html} = live(conn, ~p"/admin/users")
       html = render(view)
 
-      refute html =~ "Loading users"
-      assert html =~ "Deferred LoadUser"
+      refute html =~ "Loading users…"
+      assert html =~ "Deferred Loaduser"
       assert has_element?(view, "#admin_users_list")
     end
   end

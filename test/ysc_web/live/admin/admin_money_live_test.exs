@@ -4,7 +4,6 @@ defmodule YscWeb.AdminMoneyLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
-  import Ysc.TicketsFixtures
   import Mox
   import Ecto.Query
 
