@@ -1429,9 +1429,9 @@ defmodule Ysc.BookingsTest do
       end
 
       {results, query_count} =
-        Ysc.QueryCounter.with_query_counter(
-          fn -> Bookings.search_bookings_by_last_name(last_name, :tahoe) end
-        )
+        Ysc.QueryCounter.with_query_counter(fn ->
+          Bookings.search_bookings_by_last_name(last_name, :tahoe)
+        end)
 
       assert length(results) == 3
 

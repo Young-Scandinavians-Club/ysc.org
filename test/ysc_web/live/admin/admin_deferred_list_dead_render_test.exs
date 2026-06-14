@@ -120,7 +120,10 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     conn: conn,
     admin: admin
   } do
-    scan_session_fixture(%{created_by_id: admin.id, name: "Static Render Session"})
+    scan_session_fixture(%{
+      created_by_id: admin.id,
+      name: "Static Render Session"
+    })
 
     sessions_pattern = ~r/FROM "scan_sessions"/i
 

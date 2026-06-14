@@ -160,227 +160,230 @@ defmodule YscWeb.AdminScannerLive do
         </div>
 
         <div :if={@data_loaded?}>
-        <div class="flex items-start gap-2 mb-6">
-          <.link
-            navigate={~p"/admin/scanner/sessions"}
-            class="text-zinc-500 hover:text-zinc-700 mt-1 shrink-0"
-          >
-            <.icon name="hero-arrow-left" class="w-5 h-5" />
-          </.link>
-          <div class="flex flex-wrap items-center gap-2 min-w-0">
-            <h1 class="text-2xl font-semibold text-zinc-800 leading-tight">
-              {@detail_session.name}
-            </h1>
-            <span class={[
-              "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0",
-              session_type_badge_class(@detail_session.type)
-            ]}>
-              {session_type_label(@detail_session.type)}
-            </span>
-          </div>
-        </div>
-
-        <%!-- Session meta + export — stacks on mobile, row on desktop --%>
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div class="text-sm text-zinc-500 leading-relaxed">
-            <span :if={@detail_session.event}>
-              Event:
-              <span class="font-medium text-zinc-700">
-                {@detail_session.event.title}
-              </span>
-              &middot;
-            </span>
-            Created by
-            <span class="font-medium text-zinc-700">
-              {@detail_session.created_by.first_name} {@detail_session.created_by.last_name}
-            </span>
-            on
-            <span
-              id="detail-session-time"
-              phx-hook="LocalTime"
-              data-utc-time={DateTime.to_iso8601(@detail_session.inserted_at)}
-              class="whitespace-nowrap"
+          <div class="flex items-start gap-2 mb-6">
+            <.link
+              navigate={~p"/admin/scanner/sessions"}
+              class="text-zinc-500 hover:text-zinc-700 mt-1 shrink-0"
             >
-              {Calendar.strftime(
-                @detail_session.inserted_at,
-                "%b %d, %Y at %H:%M UTC"
-              )}
-            </span>
-          </div>
-          <.button
-            phx-click="export-csv"
-            phx-value-session-id={@detail_session.id}
-            variant="outline"
-            color="blue"
-            class="shrink-0"
-          >
-            <.icon name="hero-arrow-down-tray" class="w-4 h-4 -mt-0.5 me-1" />
-            Export CSV
-          </.button>
-        </div>
-
-        <div :if={@detail_records == []} class="text-center py-12 text-zinc-500">
-          <p>No scan records in this session.</p>
-        </div>
-
-        <div :if={@detail_records != []}>
-          <%!-- Mobile: card list (hidden on sm+) --%>
-          <div class="flex flex-col divide-y divide-zinc-200 sm:hidden">
-            <div :for={record <- @detail_records} class="py-4 flex flex-col gap-1.5">
-              <%!-- Row 1: name + result badge --%>
-              <div class="flex items-center justify-between gap-2">
-                <p class="text-sm font-semibold text-zinc-900 truncate">
-                  {if record.user,
-                    do: "#{record.user.first_name} #{record.user.last_name}",
-                    else: "—"}
-                </p>
-                <span class={[
-                  "shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                  result_badge_class(record.result)
-                ]}>
-                  {to_string(record.result)}
-                </span>
-              </div>
-              <%!-- Row 2: email --%>
-              <p class="text-xs text-zinc-500 truncate">
-                {if record.user, do: record.user.email, else: "—"}
-              </p>
-              <%!-- Row 3: time + optional status/type badges --%>
-              <div class="flex items-center flex-wrap gap-2">
-                <span class="text-xs text-zinc-400">
-                  <span
-                    id={"record-time-#{record.id}"}
-                    phx-hook="LocalTime"
-                    data-utc-time={DateTime.to_iso8601(record.inserted_at)}
-                  >
-                    {Calendar.strftime(record.inserted_at, "%H:%M:%S UTC")}
-                  </span>
-                </span>
-                <span
-                  :if={@detail_session.type == :membership}
-                  class={[
-                    "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                    if(record.membership_status == "active",
-                      do: "bg-emerald-100 text-emerald-800",
-                      else: "bg-red-100 text-red-800"
-                    )
-                  ]}
-                >
-                  {record.membership_status || "—"}
-                </span>
-                <span
-                  :if={
-                    @detail_session.type == :membership && record.membership_type
-                  }
-                  class="text-xs text-zinc-500"
-                >
-                  {record.membership_type}
-                </span>
-                <span
-                  :if={@detail_session.type == :event && record.checkin_type}
-                  class="text-xs text-zinc-500"
-                >
-                  {to_string(record.checkin_type)}
-                </span>
-              </div>
+              <.icon name="hero-arrow-left" class="w-5 h-5" />
+            </.link>
+            <div class="flex flex-wrap items-center gap-2 min-w-0">
+              <h1 class="text-2xl font-semibold text-zinc-800 leading-tight">
+                {@detail_session.name}
+              </h1>
+              <span class={[
+                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shrink-0",
+                session_type_badge_class(@detail_session.type)
+              ]}>
+                {session_type_label(@detail_session.type)}
+              </span>
             </div>
           </div>
 
-          <%!-- Desktop: standard table (hidden below sm) --%>
-          <div class="hidden sm:block overflow-x-auto">
-            <table class="min-w-full divide-y divide-zinc-200">
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
-                    Name
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
-                    Email
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
-                    Time
-                  </th>
-                  <th
-                    :if={@detail_session.type == :membership}
-                    class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
-                  >
-                    Status
-                  </th>
-                  <th
-                    :if={@detail_session.type == :membership}
-                    class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
-                  >
-                    Type
-                  </th>
-                  <th
-                    :if={@detail_session.type == :event}
-                    class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
-                  >
-                    Check-in
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
-                    Result
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={record <- @detail_records} class="hover:bg-zinc-50">
-                  <td class="px-4 py-3 text-sm text-zinc-900">
+          <%!-- Session meta + export — stacks on mobile, row on desktop --%>
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div class="text-sm text-zinc-500 leading-relaxed">
+              <span :if={@detail_session.event}>
+                Event:
+                <span class="font-medium text-zinc-700">
+                  {@detail_session.event.title}
+                </span>
+                &middot;
+              </span>
+              Created by
+              <span class="font-medium text-zinc-700">
+                {@detail_session.created_by.first_name} {@detail_session.created_by.last_name}
+              </span>
+              on
+              <span
+                id="detail-session-time"
+                phx-hook="LocalTime"
+                data-utc-time={DateTime.to_iso8601(@detail_session.inserted_at)}
+                class="whitespace-nowrap"
+              >
+                {Calendar.strftime(
+                  @detail_session.inserted_at,
+                  "%b %d, %Y at %H:%M UTC"
+                )}
+              </span>
+            </div>
+            <.button
+              phx-click="export-csv"
+              phx-value-session-id={@detail_session.id}
+              variant="outline"
+              color="blue"
+              class="shrink-0"
+            >
+              <.icon name="hero-arrow-down-tray" class="w-4 h-4 -mt-0.5 me-1" />
+              Export CSV
+            </.button>
+          </div>
+
+          <div :if={@detail_records == []} class="text-center py-12 text-zinc-500">
+            <p>No scan records in this session.</p>
+          </div>
+
+          <div :if={@detail_records != []}>
+            <%!-- Mobile: card list (hidden on sm+) --%>
+            <div class="flex flex-col divide-y divide-zinc-200 sm:hidden">
+              <div
+                :for={record <- @detail_records}
+                class="py-4 flex flex-col gap-1.5"
+              >
+                <%!-- Row 1: name + result badge --%>
+                <div class="flex items-center justify-between gap-2">
+                  <p class="text-sm font-semibold text-zinc-900 truncate">
                     {if record.user,
                       do: "#{record.user.first_name} #{record.user.last_name}",
                       else: "—"}
-                  </td>
-                  <td class="px-4 py-3 text-sm text-zinc-500">
-                    {if record.user, do: record.user.email, else: "—"}
-                  </td>
-                  <td class="px-4 py-3 text-sm text-zinc-500 whitespace-nowrap">
+                  </p>
+                  <span class={[
+                    "shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                    result_badge_class(record.result)
+                  ]}>
+                    {to_string(record.result)}
+                  </span>
+                </div>
+                <%!-- Row 2: email --%>
+                <p class="text-xs text-zinc-500 truncate">
+                  {if record.user, do: record.user.email, else: "—"}
+                </p>
+                <%!-- Row 3: time + optional status/type badges --%>
+                <div class="flex items-center flex-wrap gap-2">
+                  <span class="text-xs text-zinc-400">
                     <span
-                      id={"record-time-#{record.id}-desktop"}
+                      id={"record-time-#{record.id}"}
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(record.inserted_at)}
                     >
                       {Calendar.strftime(record.inserted_at, "%H:%M:%S UTC")}
                     </span>
-                  </td>
-                  <td
+                  </span>
+                  <span
                     :if={@detail_session.type == :membership}
-                    class="px-4 py-3 text-sm"
-                  >
-                    <span class={[
+                    class={[
                       "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
                       if(record.membership_status == "active",
                         do: "bg-emerald-100 text-emerald-800",
                         else: "bg-red-100 text-red-800"
                       )
-                    ]}>
-                      {record.membership_status || "—"}
-                    </span>
-                  </td>
-                  <td
-                    :if={@detail_session.type == :membership}
-                    class="px-4 py-3 text-sm text-zinc-500"
+                    ]}
                   >
-                    {record.membership_type || "—"}
-                  </td>
-                  <td
-                    :if={@detail_session.type == :event}
-                    class="px-4 py-3 text-sm text-zinc-500"
+                    {record.membership_status || "—"}
+                  </span>
+                  <span
+                    :if={
+                      @detail_session.type == :membership && record.membership_type
+                    }
+                    class="text-xs text-zinc-500"
                   >
-                    {to_string(record.checkin_type || "—")}
-                  </td>
-                  <td class="px-4 py-3 text-sm">
-                    <span class={[
-                      "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
-                      result_badge_class(record.result)
-                    ]}>
-                      {to_string(record.result)}
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                    {record.membership_type}
+                  </span>
+                  <span
+                    :if={@detail_session.type == :event && record.checkin_type}
+                    class="text-xs text-zinc-500"
+                  >
+                    {to_string(record.checkin_type)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Desktop: standard table (hidden below sm) --%>
+            <div class="hidden sm:block overflow-x-auto">
+              <table class="min-w-full divide-y divide-zinc-200">
+                <thead class="bg-zinc-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                      Name
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                      Email
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                      Time
+                    </th>
+                    <th
+                      :if={@detail_session.type == :membership}
+                      class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
+                    >
+                      Status
+                    </th>
+                    <th
+                      :if={@detail_session.type == :membership}
+                      class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
+                    >
+                      Type
+                    </th>
+                    <th
+                      :if={@detail_session.type == :event}
+                      class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase"
+                    >
+                      Check-in
+                    </th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
+                      Result
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-zinc-200">
+                  <tr :for={record <- @detail_records} class="hover:bg-zinc-50">
+                    <td class="px-4 py-3 text-sm text-zinc-900">
+                      {if record.user,
+                        do: "#{record.user.first_name} #{record.user.last_name}",
+                        else: "—"}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-zinc-500">
+                      {if record.user, do: record.user.email, else: "—"}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-zinc-500 whitespace-nowrap">
+                      <span
+                        id={"record-time-#{record.id}-desktop"}
+                        phx-hook="LocalTime"
+                        data-utc-time={DateTime.to_iso8601(record.inserted_at)}
+                      >
+                        {Calendar.strftime(record.inserted_at, "%H:%M:%S UTC")}
+                      </span>
+                    </td>
+                    <td
+                      :if={@detail_session.type == :membership}
+                      class="px-4 py-3 text-sm"
+                    >
+                      <span class={[
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                        if(record.membership_status == "active",
+                          do: "bg-emerald-100 text-emerald-800",
+                          else: "bg-red-100 text-red-800"
+                        )
+                      ]}>
+                        {record.membership_status || "—"}
+                      </span>
+                    </td>
+                    <td
+                      :if={@detail_session.type == :membership}
+                      class="px-4 py-3 text-sm text-zinc-500"
+                    >
+                      {record.membership_type || "—"}
+                    </td>
+                    <td
+                      :if={@detail_session.type == :event}
+                      class="px-4 py-3 text-sm text-zinc-500"
+                    >
+                      {to_string(record.checkin_type || "—")}
+                    </td>
+                    <td class="px-4 py-3 text-sm">
+                      <span class={[
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+                        result_badge_class(record.result)
+                      ]}>
+                        {to_string(record.result)}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
         </div>
       </div>
     </.side_menu>
