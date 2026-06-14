@@ -86,7 +86,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
     event = event_fixture()
     tier = ticket_tier_fixture(%{event_id: event.id})
 
-    {:ok, order} = Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+    {:ok, order} =
+      Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
 
     {:ok, {payment, _transaction, _entries}} =
       Ledgers.process_event_payment_with_donations(%{
@@ -95,7 +96,8 @@ defmodule YscWeb.AdminMoneyLiveTest do
         event_amount: order.total_amount,
         donation_amount: Money.new(0, :USD),
         event_id: event.id,
-        external_payment_id: "pi_admin_refund_#{System.unique_integer([:positive])}",
+        external_payment_id:
+          "pi_admin_refund_#{System.unique_integer([:positive])}",
         stripe_fee: Money.new(320, :USD),
         description: "Event tickets",
         payment_method_id: nil
@@ -402,9 +404,10 @@ defmodule YscWeb.AdminMoneyLiveTest do
       assert has_element?(view2, "#refund-modal")
     end
 
-    test "full refund with release availability cancels completed ticket order", %{
-      conn: conn
-    } do
+    test "full refund with release availability cancels completed ticket order",
+         %{
+           conn: conn
+         } do
       %{payment: payment, ticket_order: ticket_order} =
         completed_ticket_order_with_payment!()
 
@@ -433,7 +436,9 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       tickets =
         Repo.all(
-          from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^ticket_order.id)
+          from(t in Ysc.Events.Ticket,
+            where: t.ticket_order_id == ^ticket_order.id
+          )
         )
 
       assert Enum.all?(tickets, &(&1.status == :cancelled))
