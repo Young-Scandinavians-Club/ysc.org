@@ -83,12 +83,16 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
               This invitation is for <strong>{@invite.email}</strong>, but you're signed in as a different account.
             </p>
             <div>
-              <p class="font-medium text-zinc-900 mb-2">To accept the invitation:</p>
+              <p class="font-medium text-zinc-900 mb-2">
+                To accept the invitation:
+              </p>
               <ol class="list-decimal list-inside space-y-2 text-sm">
                 <li>Click the button below to log out.</li>
                 <li>Sign in with <strong>{@invite.email}</strong>.</li>
                 <li>
-                  On your <strong>Membership</strong> page, find <strong>Pending Family Invitations</strong> and click <strong>Accept invitation</strong>.
+                  On your <strong>Membership</strong>
+                  page, find <strong>Pending Family Invitations</strong>
+                  and click <strong>Accept invitation</strong>.
                 </li>
               </ol>
             </div>
