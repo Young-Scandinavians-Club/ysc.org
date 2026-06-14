@@ -907,14 +907,14 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "text-blue-700"
               )
             ]}>
-              We've temporarily held these dates for
+              We've saved these dates for you for
               <span
                 class="font-bold tabular-nums"
                 id="hold-countdown"
               >
                 {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
-              . Complete payment before time runs out, or the hold will expire and the dates may be booked by someone else.
+              . Pay now to confirm your reservation. If time runs out, your dates will be released and you may need to start a new booking.
             </p>
           </div>
           <!-- Price Details -->

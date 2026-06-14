@@ -14,7 +14,7 @@ defmodule YscWeb.UserTicketsLive do
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <p class="text-teal-600 text-xs font-bold uppercase tracking-[0.2em] mb-2">
-              Member Portal
+              Your account
             </p>
             <h1 class="text-4xl lg:text-5xl font-black text-zinc-900 tracking-tight">
               Your Tickets
