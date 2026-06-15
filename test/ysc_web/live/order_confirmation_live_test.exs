@@ -375,7 +375,13 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
     test "displays event date", %{conn: conn} do
       user = create_user_with_membership()
-      event = create_event(%{start_date: ~U[2026-06-15 10:00:00Z]})
+
+      event =
+        create_event(%{
+          start_date: ~U[2027-06-15 10:00:00Z],
+          end_date: ~U[2027-06-16 10:00:00Z]
+        })
+
       tier = create_ticket_tier(event)
       order = create_ticket_order(user, event)
       _ticket = create_ticket(order, tier)
@@ -384,7 +390,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "June 15, 2026"
+      assert html =~ "June 15, 2027"
     end
 
     test "displays event location", %{conn: conn} do
