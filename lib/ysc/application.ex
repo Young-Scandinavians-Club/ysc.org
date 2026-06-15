@@ -12,6 +12,10 @@ defmodule Ysc.Application do
 
   @impl true
   def start(_type, _args) do
+    # Ensures Stripe uses Req even if an older release omitted http_module in config.
+    Application.put_env(:stripity_stripe, :http_module, Ysc.Stripe.HttpClient)
+    Application.put_env(:stripity_stripe, :use_connection_pool, false)
+
     # Req 0.6+ disables automatic gzip/brotli/zstd decompression by default; keep prior
     # behavior for external API and asset downloads (Google, GitHub, SNS certs, etc.).
     Req.default_options(compressed: true)

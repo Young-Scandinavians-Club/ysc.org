@@ -11,9 +11,10 @@ defmodule YscWeb.Emails.TicketOrderRefund do
   import YscWeb.Emails.Helpers,
     only: [
       absolute_url: 1,
-      member_greeting_name: 1,
       format_datetime: 1,
-      format_money: 1
+      format_event_start_datetime: 3,
+      format_money: 1,
+      member_greeting_name: 1
     ]
 
   alias Ysc.Tickets
@@ -73,7 +74,13 @@ defmodule YscWeb.Emails.TicketOrderRefund do
     end
 
     # Format dates and times
-    event_date_time = format_event_datetime(ticket_order.event)
+    event_date_time =
+      format_event_start_datetime(
+        ticket_order.event.start_date,
+        ticket_order.event.start_time,
+        "TBD"
+      )
+
     refund_date = format_datetime(refund.inserted_at)
 
     # Format money amounts
@@ -236,26 +243,6 @@ defmodule YscWeb.Emails.TicketOrderRefund do
 
       _ ->
         Money.new(0, :USD)
-    end
-  end
-
-  defp format_event_datetime(event) do
-    case {event.start_date, event.start_time} do
-      {nil, _} ->
-        "TBD"
-
-      {date, nil} ->
-        Calendar.strftime(date, "%B %d, %Y")
-
-      {date, time} ->
-        # Convert DateTime to Date if needed
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        datetime = DateTime.new!(date_only, time, "Etc/UTC")
-        # Convert to PST
-        pst_datetime = DateTime.shift_zone!(datetime, "America/Los_Angeles")
-        Calendar.strftime(pst_datetime, "%B %d, %Y at %I:%M %p %Z")
     end
   end
 end
