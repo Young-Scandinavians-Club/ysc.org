@@ -1810,7 +1810,7 @@ defmodule YscWeb.EventDetailsLive do
               Time ran out
             </h2>
             <p class="text-zinc-600 max-w-md">
-              You have 30 minutes to complete your purchase. Time ran out, so your reserved tickets were returned to the pool.
+              You have 30 minutes to complete your purchase. Time ran out, so your ticket selection was released and may no longer be available.
               Please select your tickets again to continue.
             </p>
           </div>
@@ -2438,7 +2438,7 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
                 <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
                   <.icon name="hero-lock-closed" class="w-3 h-3" />
-                  Secure Payments via Stripe
+                  Secure, encrypted payment
                 </p>
               </div>
             </div>

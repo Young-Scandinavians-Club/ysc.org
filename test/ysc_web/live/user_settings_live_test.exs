@@ -1400,10 +1400,11 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/users/membership/payment-method")
+      {:ok, view, html} = live(conn, ~p"/users/membership/payment-method")
       render(view)
 
       assert has_element?(view, "#update-payment-method-modal")
+      assert html =~ "Secure, encrypted payment"
     end
 
     test "renders Stripe Link payment methods with logo and formatted label", %{

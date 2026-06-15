@@ -2536,9 +2536,7 @@ defmodule YscWeb.BookingCheckoutLive do
           Money.positive?(@price_breakdown[:entitlement_discount]) do %>
       <div class="flex justify-between text-sm text-emerald-800 mt-3 pt-3 border-t border-zinc-100">
         <span>
-          Member benefit<%= if @price_breakdown[:entitlement_summary] do %>
-            ({@price_breakdown[:entitlement_summary]})
-          <% end %>
+          {@price_breakdown[:entitlement_summary] || "Member discount"}
         </span>
         <span class="tabular-nums">
           −{MoneyHelper.format_money!(@price_breakdown[:entitlement_discount])}

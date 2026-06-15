@@ -1301,9 +1301,8 @@ defmodule YscWeb.ClearLakeBookingLive do
                         class="flex justify-between text-sm text-emerald-800"
                       >
                         <span>
-                          Member benefit<%= if @price_breakdown[:entitlement_summary] do %>
-                            ({@price_breakdown[:entitlement_summary]})
-                          <% end %>
+                          {@price_breakdown[:entitlement_summary] ||
+                            "Member discount"}
                         </span>
                         <span>
                           −{MoneyHelper.format_money!(

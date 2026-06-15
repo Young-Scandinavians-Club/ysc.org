@@ -231,7 +231,7 @@ defmodule Ysc.Bookings.Entitlements do
 
   defp entitlement_summary(%BookingEntitlement{benefit_kind: :free_nights} = e) do
     n = e.free_nights || 0
-    "Free night#{if n == 1, do: "", else: "s"} (#{n})"
+    "#{n} free night#{if n == 1, do: "", else: "s"}"
   end
 
   defp entitlement_summary(%BookingEntitlement{benefit_kind: :percent_off} = e) do

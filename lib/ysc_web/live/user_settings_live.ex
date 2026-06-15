@@ -1384,7 +1384,7 @@ defmodule YscWeb.UserSettingsLive do
                         </.button>
                         <p class="text-xs text-zinc-400 flex items-center gap-1">
                           <.icon name="hero-lock-closed" class="w-3 h-3" />
-                          Secure payment via Stripe
+                          Secure, encrypted payment
                         </p>
                       </div>
                     </div>
