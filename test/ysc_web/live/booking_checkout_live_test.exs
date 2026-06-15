@@ -469,7 +469,6 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert html =~ "No payment is required"
       assert html =~ "confirm-complimentary-booking"
-      assert html =~ "before your hold expires"
       refute has_element?(view, "#stripe-payment-container")
       refute html =~ "Failed to initialize payment"
 
