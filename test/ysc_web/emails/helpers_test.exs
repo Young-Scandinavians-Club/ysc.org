@@ -81,6 +81,51 @@ defmodule YscWeb.Emails.HelpersTest do
     end
   end
 
+  describe "format_event_start_datetime/2" do
+    test "formats wall-clock Pacific time without UTC conversion" do
+      result =
+        Helpers.format_event_start_datetime(
+          ~U[2026-07-15 00:00:00Z],
+          ~T[17:00:00]
+        )
+
+      assert result =~ "July 15, 2026"
+      assert result =~ "5:00 PM"
+      assert result =~ "PDT"
+      refute result =~ "10:00 AM"
+    end
+
+    test "formats date only when start_time is nil" do
+      result =
+        Helpers.format_event_start_datetime(~U[2026-07-15 00:00:00Z], nil)
+
+      assert result == "July 15, 2026"
+      refute result =~ " at "
+    end
+
+    test "returns default when start_date is nil" do
+      assert Helpers.format_event_start_datetime(nil, ~T[17:00:00]) == nil
+
+      assert Helpers.format_event_start_datetime(nil, ~T[17:00:00], "TBD") ==
+               "TBD"
+    end
+  end
+
+  describe "plain_text_from_html/1" do
+    test "strips tags and decodes HTML entities" do
+      assert Helpers.plain_text_from_html("At Tupper &amp; Reed") ==
+               "At Tupper & Reed"
+
+      assert Helpers.plain_text_from_html("<p>Hello <strong>world</strong></p>") ==
+               "Hello world"
+    end
+
+    test "returns nil for nil and empty input" do
+      assert Helpers.plain_text_from_html(nil) == nil
+      assert Helpers.plain_text_from_html("") == nil
+    end
+  end
+
   describe "format_money/1" do
     test "formats money with comma separators and two decimals" do
       money = Money.new(:USD, "1234.50")

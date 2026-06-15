@@ -32,6 +32,7 @@ import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
 import DaterangeHover from "./daterange-hover";
 import RadarMap from "./radar";
+import RadarLocationAutocomplete from "./radar_location_autocomplete";
 import MoneyInput from "./money_input";
 import Turnstile from "./phoenix_turnstile";
 import StripeInput from "./stripe_payment";
@@ -69,6 +70,7 @@ let Hooks = {
     BlurHashImage,
     DaterangeHover,
     RadarMap,
+    RadarLocationAutocomplete,
     MoneyInput,
     Turnstile,
     StripeInput,
