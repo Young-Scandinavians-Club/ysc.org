@@ -469,6 +469,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert html =~ "No payment is required"
       assert html =~ "confirm-complimentary-booking"
+      assert html =~ "before your hold expires"
       refute has_element?(view, "#stripe-payment-container")
       refute html =~ "Failed to initialize payment"
 
@@ -485,6 +486,43 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       reloaded = Repo.get!(Bookings.Booking, booking.id)
       assert reloaded.status == :complete
+    end
+
+    test "shows entitlement summary on checkout with partial fixed discount",
+         %{conn: conn, user: user} do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, ent} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(5, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> change(%{applied_booking_entitlement_id: ent.id})
+        |> Repo.update!()
+
+      {:ok, _view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "$5.00 off stay"
     end
 
     test "select-guest-attendee without index is ignored", %{
