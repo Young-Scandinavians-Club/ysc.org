@@ -214,7 +214,7 @@ trix-toolbar .trix-button-row {
 [id*="trix-toolbar-"] {
     position: -webkit-sticky;
     position: sticky;
-    top: var(--event-header-height, 0px);
+    top: 0;
     z-index: 10;
     background-color: rgb(250 250 250);
 }
@@ -902,94 +902,6 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 @media (min-width: 1920px) {
     .media-masonry-grid {
         column-count: 7;
-    }
-}
-
-
-/* Admin event editor — sticky action bar */
-
-#event-header-bar {
-    transition: background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.24s cubic-bezier(0.4, 0, 0.2, 1), margin 0.24s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-#event-header-bar.is-sticky {
-    background-color: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-    padding-top: 0.5rem;
-    padding-bottom: 0;
-    margin-left: -1rem;
-    margin-right: -1rem;
-    padding-left: 1rem;
-    padding-right: 1rem;
-}
-
-@media (min-width: 1024px) {
-    #event-header-bar.is-sticky {
-        margin-left: -2.5rem;
-        margin-right: -2.5rem;
-        padding-left: 2.5rem;
-        padding-right: 2.5rem;
-    }
-}
-
-
-/* Collapse date row with motion (display:none cannot transition). */
-
-#event-header-bar .event-header-date {
-    max-height: 10rem;
-    opacity: 1;
-    overflow: visible;
-    transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease, margin 0.22s ease;
-}
-
-#event-header-bar:not(.is-sticky) .event-header-date {
-    max-height: none;
-    overflow: visible;
-}
-
-#event-header-bar.is-sticky .event-header-date {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    margin-top: 0;
-    margin-bottom: 0;
-    pointer-events: none;
-}
-
-#event-header-bar .event-header-title {
-    transition: font-size 0.24s cubic-bezier(0.4, 0, 0.2, 1), line-height 0.24s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-#event-header-bar.is-sticky .event-header-title {
-    font-size: 1rem;
-    line-height: 1.5rem;
-}
-
-#event-header-bar .event-header-tabs {
-    transition: padding-top 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-#event-header-bar.is-sticky .event-header-tabs {
-    padding-top: 0;
-}
-
-#event-header-bar .event-header-tabs a {
-    transition: padding 0.22s cubic-bezier(0.4, 0, 0.2, 1), font-size 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-#event-header-bar.is-sticky .event-header-tabs a {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    #event-header-bar,
-    #event-header-bar .event-header-date,
-    #event-header-bar .event-header-title,
-    #event-header-bar .event-header-tabs,
-    #event-header-bar .event-header-tabs a {
-        transition: none !important;
-        animation: none !important;
     }
 }
 

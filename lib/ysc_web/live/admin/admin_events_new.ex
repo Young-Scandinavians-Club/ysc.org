@@ -30,11 +30,7 @@ defmodule YscWeb.AdminEventsNewLive do
     >
       <div class="flex py-6 flex-col">
         <.back navigate={~p"/admin/events?#{@list_params}"}>Back</.back>
-        <div
-          id="event-header-bar"
-          phx-hook="StickyEventHeader"
-          class="sticky top-0 z-30 pt-4 pb-2"
-        >
+        <div id="event-header-bar" class="pt-4 pb-2">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 flex flex-1 flex-col space-y-1">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
