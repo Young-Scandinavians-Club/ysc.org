@@ -5,9 +5,11 @@ defmodule Ysc.SearchTest do
   use Ysc.DataCase, async: true
 
   import Ysc.AccountsFixtures
+  import Ysc.TicketsFixtures
 
   alias Ysc.Search
   alias Ysc.Events
+  alias Ysc.EventsFixtures
   alias Ysc.Posts
   alias Ysc.Bookings.Booking
   alias Ysc.Repo
@@ -59,11 +61,23 @@ defmodule Ysc.SearchTest do
         guests_count: 2,
         status: :complete,
         total_price: Money.new(500, :USD),
-        reference_id: "BK-SEARCH-#{System.unique_integer([:positive])}"
+        reference_id: "BKG-SEARCH-#{System.unique_integer([:positive])}"
       }
       |> Repo.insert!()
 
-    %{user: user, event: event, post: post, booking: booking}
+    tier = EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+    order = ticket_order_fixture(%{user: user, event: event, tier: tier})
+    order = Repo.preload(order, :tickets)
+    ticket = List.first(order.tickets)
+
+    ticket =
+      ticket
+      |> Ecto.Changeset.change(
+        reference_id: "TKT-SEARCH-#{System.unique_integer([:positive])}"
+      )
+      |> Repo.update!()
+
+    %{user: user, event: event, post: post, booking: booking, ticket: ticket}
   end
 
   describe "global_search/2" do
@@ -140,6 +154,37 @@ defmodule Ysc.SearchTest do
       assert result.users == []
       assert result.tickets == []
       assert result.bookings == []
+    end
+
+    test "finds users, tickets, and bookings by full email address", %{
+      user: user,
+      ticket: ticket
+    } do
+      result = Search.global_search(user.email)
+
+      assert Enum.any?(result.users, &(&1.id == user.id))
+      assert Enum.any?(result.tickets, &(&1.id == ticket.id))
+      assert Enum.any?(result.bookings, &(&1.user_id == user.id))
+    end
+
+    test "finds tickets by TKT- reference prefix", %{ticket: ticket} do
+      result = Search.global_search(ticket.reference_id)
+
+      assert Enum.any?(result.tickets, &(&1.id == ticket.id))
+    end
+
+    test "finds bookings by BKG- reference prefix", %{booking: booking} do
+      result = Search.global_search(booking.reference_id)
+
+      assert Enum.any?(result.bookings, &(&1.id == booking.id))
+    end
+
+    test "returns empty ticket and booking results for short queries" do
+      result = Search.global_search("ab")
+
+      assert result.tickets == []
+      assert result.bookings == []
+      assert result.users == []
     end
   end
 end

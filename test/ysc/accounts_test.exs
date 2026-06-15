@@ -680,6 +680,23 @@ defmodule Ysc.AccountsTest do
                &(&1.id == user.id)
              )
     end
+
+    test "returns empty list for blank query" do
+      assert Accounts.search_users_for_staff_lookup("") == []
+      assert Accounts.search_users_for_staff_lookup("   ") == []
+    end
+
+    test "does not return inactive users for full email lookup" do
+      user =
+        user_fixture(%{
+          email: "inactive.lookup@example.com",
+          first_name: "Inactive",
+          last_name: "Lookup",
+          state: :suspended
+        })
+
+      assert Accounts.search_users_for_staff_lookup(user.email) == []
+    end
   end
 
   describe "get_user_by_email_and_password/2" do
