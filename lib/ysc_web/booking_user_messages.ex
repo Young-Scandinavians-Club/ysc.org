@@ -40,11 +40,11 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_continue_payment do
-    "Continue to payment and complete payment before the timer runs out"
+    "Continue to payment and finish before your hold expires"
   end
 
   def checkout_guest_info_step_continue_complimentary do
-    "Continue to confirm your booking before the timer runs out"
+    "Continue to confirm your booking before your hold expires"
   end
 
   def checkout_payment_step_pay do
