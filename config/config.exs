@@ -165,10 +165,15 @@ config :flop, repo: Ysc.Repo
 # Stripe configuration
 # Note: In production, Stripe is configured at runtime in config/runtime.exs
 # This config is for dev/test environments only
+#
+# stripity_stripe defaults to hackney with Connection: keep-alive, which returns
+# :protocol_error on hackney 4.x. Use Req via Ysc.Stripe.HttpClient instead.
 config :stripity_stripe,
   api_key: System.get_env("STRIPE_SECRET"),
   public_key: System.get_env("STRIPE_PUBLIC_KEY"),
-  webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET")
+  webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET"),
+  http_module: Ysc.Stripe.HttpClient,
+  use_connection_pool: false
 
 config :stripity_stripe, :retries,
   max_attempts: 3,

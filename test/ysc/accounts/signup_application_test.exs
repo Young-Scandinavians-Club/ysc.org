@@ -855,6 +855,11 @@ defmodule Ysc.Accounts.SignupApplicationTest do
   end
 
   describe "email validation in production" do
+    setup do
+      EmailValidator.init_ets_table()
+      :ok
+    end
+
     test "does not validate email in dev environment" do
       Ysc.Test.EnvHelper.with_environment("dev", fn ->
         # Create a user with a disposable email
