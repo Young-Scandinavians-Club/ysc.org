@@ -102,8 +102,7 @@ config :ex_aws,
     port: 9000
   ]
 
-config :ex_aws, :req_opts,
-  connect_options: [protocols: [:http1]]
+config :ex_aws, :req_opts, connect_options: [protocols: [:http1]]
 
 # Relax auth rate limits in test so login/forgot-password tests don't hit them
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
