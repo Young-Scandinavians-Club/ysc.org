@@ -15,15 +15,18 @@ defmodule YscWeb.AgendasLive.FormComponent do
         phx-change="validate"
         phx-submit="save"
         id={"agenda-title-form-#{@agenda_id}"}
+        class="w-full"
       >
-        <.input
+        <input
           id={"#{@id}-title"}
-          field={@form[:title]}
+          name={@form[:title].name}
+          value={@form[:title].value}
           type="text"
-          label="Agenda Title"
           phx-blur={
             JS.dispatch("submit", to: "##{"agenda-title-form-#{@agenda_id}"}")
           }
+          class="block w-full text-sm font-bold text-zinc-800 bg-transparent border-none p-1 focus:ring-2 focus:ring-blue-500 rounded transition-all placeholder:text-zinc-400"
+          placeholder="e.g. Day 1, Main Stage..."
         />
       </.form>
     </div>
