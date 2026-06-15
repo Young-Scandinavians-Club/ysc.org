@@ -184,4 +184,83 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "sm:hidden"
     end
   end
+
+  describe "admin_loading_panel/1" do
+    test "renders centered spinner with default classes" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_loading_panel />
+        """)
+
+      assert html =~ "flex items-center justify-center py-24"
+      assert html =~ "w-8 h-8 text-zinc-400"
+    end
+  end
+
+  describe "admin_event_check_in_table_header/1" do
+    test "renders event check-in column labels" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_table_header />
+        """)
+
+      assert html =~ "Attendee"
+      assert html =~ "Email"
+      assert html =~ "Tier"
+      assert html =~ "Ticket"
+      assert html =~ "Order"
+      assert html =~ "uppercase tracking-wide"
+    end
+  end
+
+  describe "admin_responsive_icon_button/1" do
+    test "renders labeled desktop button and icon-only mobile control" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_responsive_icon_button
+          id="complete-session-btn"
+          icon="hero-check-circle"
+          label="Complete"
+          aria_label="Complete session"
+          phx_click="complete-session"
+          variant="outline"
+          color="zinc"
+          mobile_tone={:zinc}
+          data-confirm="Complete this session?"
+        />
+        """)
+
+      assert html =~ ~s(id="complete-session-btn")
+      assert html =~ "Complete"
+      assert html =~ "hero-check-circle"
+      assert html =~ ~s(aria-label="Complete session")
+      assert html =~ ~s(phx-click="complete-session")
+      assert html =~ "hidden sm:inline-flex"
+      assert html =~ "sm:hidden"
+      assert html =~ "text-zinc-500 hover:text-zinc-700"
+      assert html =~ ~s(data-confirm="Complete this session?")
+    end
+
+    test "uses primary mobile colors by default" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_responsive_icon_button
+          icon="hero-qr-code"
+          label="QR Scanner"
+          aria_label="Open QR Scanner"
+          phx_click="launch-scanner"
+        />
+        """)
+
+      assert html =~ "text-blue-700 hover:text-blue-900"
+    end
+  end
 end

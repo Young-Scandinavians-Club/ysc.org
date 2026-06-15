@@ -65,9 +65,7 @@ defmodule YscWeb.AdminEventCheckInLive do
 
       <.admin_check_in_content width={:wide}>
         <%= if @loading do %>
-          <div class="flex items-center justify-center py-24">
-            <.spinner class="w-8 h-8 text-zinc-400" />
-          </div>
+          <.admin_loading_panel />
         <% else %>
           <%!-- Empty state --%>
           <.admin_icon_empty_state
@@ -112,14 +110,7 @@ defmodule YscWeb.AdminEventCheckInLive do
               :if={@total_count - @checked_in_count > 0}
               class="hidden md:block bg-white rounded border border-zinc-200"
             >
-              <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                <div class="col-span-1"></div>
-                <div class="col-span-3">Attendee</div>
-                <div class="col-span-2">Email</div>
-                <div class="col-span-2">Tier</div>
-                <div class="col-span-2">Ticket</div>
-                <div class="col-span-2">Order</div>
-              </div>
+              <.admin_event_check_in_table_header />
 
               <div id="pending-groups" phx-update="stream">
                 <div :for={{dom_id, group} <- @streams.pending_groups} id={dom_id}>

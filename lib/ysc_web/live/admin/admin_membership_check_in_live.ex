@@ -65,25 +65,17 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             >
               <.icon name="hero-clipboard" class="w-5 h-5 me-1 mt-0.5" /> Share
             </.button>
-            <.button
+            <.admin_responsive_icon_button
               id="complete-session-btn"
-              phx-click="complete-session"
+              icon="hero-check-circle"
+              label="Complete"
+              aria_label="Complete session"
+              phx_click="complete-session"
               variant="outline"
               color="zinc"
-              class="hidden sm:inline-flex"
+              mobile_tone={:zinc}
               data-confirm="Complete this session? It will be locked and no longer appear as active."
-            >
-              <.icon name="hero-check-circle" class="w-5 h-5 me-1 mt-0.5" />
-              Complete
-            </.button>
-            <button
-              phx-click="complete-session"
-              class="sm:hidden p-2 text-zinc-500 hover:text-zinc-700"
-              aria-label="Complete session"
-              data-confirm="Complete this session? It will be locked and no longer appear as active."
-            >
-              <.icon name="hero-check-circle" class="w-6 h-6" />
-            </button>
+            />
           <% end %>
         </div>
       </.admin_check_in_sticky_bar>
@@ -105,9 +97,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
 
       <.admin_check_in_content>
         <%= if @loading do %>
-          <div class="flex items-center justify-center py-24">
-            <.spinner class="w-8 h-8 text-zinc-400" />
-          </div>
+          <.admin_loading_panel />
         <% else %>
           <%!-- Search results (only when searching) --%>
           <%= if searching?(@search_query) do %>

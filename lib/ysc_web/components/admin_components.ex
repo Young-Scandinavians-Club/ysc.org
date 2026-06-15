@@ -536,6 +536,117 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_loading_panel
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Centered loading spinner for admin pages (check-in flows, etc.).
+
+  Use inside content areas while async data is loading.
+  """
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the outer container"
+
+  attr :spinner_class, :any,
+    default: "w-8 h-8 text-zinc-400",
+    doc: "Classes passed to the inner `<.spinner>`"
+
+  def admin_loading_panel(assigns) do
+    ~H"""
+    <div class={["flex items-center justify-center py-24", @class]}>
+      <.spinner class={@spinner_class} />
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_event_check_in_table_header
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Column header row for the event check-in desktop ticket table.
+
+  Shared by `AdminEventCheckInLive` and the check-in help ghost preview.
+  """
+  def admin_event_check_in_table_header(assigns) do
+    ~H"""
+    <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+      <div class="col-span-1"></div>
+      <div class="col-span-3">Attendee</div>
+      <div class="col-span-2">Email</div>
+      <div class="col-span-2">Tier</div>
+      <div class="col-span-2">Ticket</div>
+      <div class="col-span-2">Order</div>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_responsive_icon_button
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Action control with a labeled `<.button>` on `sm+` and an icon-only button on mobile.
+
+  Used in check-in sticky headers (QR scanner, complete session, etc.).
+  Pass LiveView attributes (`data-confirm`, `phx-value-*`, etc.) via `rest`.
+  """
+  attr :id, :string, default: nil
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :aria_label, :string, required: true
+  attr :phx_click, :string, required: true
+
+  attr :variant, :string,
+    default: "solid",
+    values: ["solid", "outline"],
+    doc: "Desktop button variant"
+
+  attr :color, :string,
+    default: "blue",
+    values: ["blue", "zinc"],
+    doc: "Desktop button color"
+
+  attr :mobile_tone, :atom,
+    default: :primary,
+    values: [:primary, :zinc],
+    doc: "Icon-only mobile button text/hover colors"
+
+  attr :rest, :global,
+    include: ~w(data-confirm phx-value-id phx-value-order-id title)
+
+  def admin_responsive_icon_button(assigns) do
+    ~H"""
+    <.button
+      id={@id}
+      phx-click={@phx_click}
+      variant={@variant}
+      color={@color}
+      class="hidden sm:inline-flex"
+      {@rest}
+    >
+      <.icon name={@icon} class="w-5 h-5 me-1 mt-0.5" />
+      {@label}
+    </.button>
+    <button
+      phx-click={@phx_click}
+      class={["sm:hidden p-2", responsive_icon_button_mobile_classes(@mobile_tone)]}
+      aria-label={@aria_label}
+      {@rest}
+    >
+      <.icon name={@icon} class="w-6 h-6" />
+    </button>
+    """
+  end
+
+  defp responsive_icon_button_mobile_classes(:primary),
+    do: "text-blue-700 hover:text-blue-900"
+
+  defp responsive_icon_button_mobile_classes(:zinc),
+    do: "text-zinc-500 hover:text-zinc-700"
+
+  # ---------------------------------------------------------------------------
   # admin_check_in_qr_scanner
   # ---------------------------------------------------------------------------
 
@@ -549,16 +660,13 @@ defmodule YscWeb.AdminComponents do
 
   def admin_check_in_qr_scanner(assigns) do
     ~H"""
-    <.button id={@id} phx-click={@phx_click} class="hidden sm:inline-flex">
-      <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
-    </.button>
-    <button
-      phx-click={@phx_click}
-      class="sm:hidden p-2 text-blue-700 hover:text-blue-900"
-      aria-label="Open QR Scanner"
-    >
-      <.icon name="hero-qr-code" class="w-6 h-6" />
-    </button>
+    <.admin_responsive_icon_button
+      id={@id}
+      icon="hero-qr-code"
+      label="QR Scanner"
+      aria_label="Open QR Scanner"
+      phx_click={@phx_click}
+    />
     """
   end
 
