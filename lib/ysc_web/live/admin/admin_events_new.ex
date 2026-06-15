@@ -5,6 +5,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   require Ysc.Logging
 
+  alias Ysc.EventLocationConfig
   alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.Events.Event
@@ -364,40 +365,64 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <h3 class="text-lg pt-4 font-medium">Location</h3>
               <div class="space-y-4">
-                <.input
-                  type="text"
-                  field={@form[:location_name]}
-                  label="Location Name"
-                  phx-debounce="300"
-                />
-                <.input
-                  type="text"
-                  field={@form[:address]}
-                  label="Address"
-                  phx-debounce="300"
-                />
-                <details class="group">
-                  <summary class="cursor-pointer select-none inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-800 transition-colors list-none">
-                    <.icon
-                      name="hero-chevron-right"
-                      class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-90"
-                    /> Advanced (Coordinates)
-                  </summary>
-                  <div class="mt-3 flex flex-row space-x-4">
-                    <.input
-                      type="number"
-                      step="any"
-                      field={@form[:latitude]}
-                      label="Latitude"
-                    />
-                    <.input
-                      type="number"
-                      step="any"
-                      field={@form[:longitude]}
-                      label="Longitude"
-                    />
+                <div class="space-y-2">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Frequent Venues
+                  </span>
+                  <div class="flex flex-wrap gap-2" id="location-presets">
+                    <button
+                      :for={preset <- @location_presets}
+                      type="button"
+                      id={"location-preset-#{preset.id}"}
+                      phx-click="apply-location-preset"
+                      phx-value-id={preset.id}
+                      class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition"
+                    >
+                      <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+                      {preset.label}
+                    </button>
                   </div>
-                </details>
+                </div>
+
+                <div
+                  id="event-location-search"
+                  phx-update="ignore"
+                  phx-hook="RadarLocationAutocomplete"
+                  data-presets={
+                    Jason.encode!(EventLocationConfig.presets_for_search())
+                  }
+                  class="w-full"
+                />
+
+                <div
+                  :if={location_set?(@form)}
+                  class="bg-zinc-50 border border-zinc-200 rounded-lg p-4 space-y-4"
+                  id="location-display-details"
+                >
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-medium text-zinc-700">
+                      Display Details
+                    </h4>
+                    <p class="text-xs text-zinc-500">Publicly visible</p>
+                  </div>
+
+                  <.input
+                    type="text"
+                    field={@form[:location_name]}
+                    label="Location Name"
+                    phx-debounce="300"
+                  />
+                  <.input
+                    type="text"
+                    field={@form[:address]}
+                    label="Address"
+                    phx-debounce="300"
+                  />
+                </div>
+
+                <.input type="hidden" field={@form[:latitude]} />
+                <.input type="hidden" field={@form[:longitude]} />
+
                 <div class="space-y-2">
                   <.live_component
                     id={"#{@event.id}-map"}
@@ -408,7 +433,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     locked={false}
                   />
                   <p class="text-zinc-700 text-sm">
-                    Click on the map to set marker location.
+                    Double-check the pin on the map.
                   </p>
                 </div>
               </div>
@@ -964,6 +989,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign_updates_tab_defaults()
      |> assign(:show_update_preview_modal, false)
      |> assign(:update_preview_subject, nil)
+     |> assign(:location_presets, EventLocationConfig.presets())
      |> assign_check_in_path(event)}
   end
 
@@ -1062,6 +1088,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign_updates_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
+    |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
   end
 
@@ -1590,31 +1617,23 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
-  def handle_event(
-        "map-new-marker",
-        %{"lat" => latitude, "long" => longitude},
-        socket
-      ) do
-    # Reload event to ensure we have the latest lock_version
-    current_event = Events.get_event!(socket.assigns[:event].id)
+  def handle_event("location-selected", params, socket) do
+    {:noreply, apply_location(socket, params)}
+  end
 
-    changeset =
-      Event.changeset(current_event, %{latitude: latitude, longitude: longitude})
+  def handle_event("apply-location-preset", %{"id" => id}, socket) do
+    case EventLocationConfig.get(id) do
+      {:ok, preset} ->
+        attrs =
+          preset
+          |> Map.drop([:id, :label])
+          |> Map.new(fn {key, value} -> {to_string(key), value} end)
 
-    updated_event =
-      if changeset.valid? do
-        case Events.update_event(current_event, %{
-               latitude: latitude,
-               longitude: longitude
-             }) do
-          {:ok, event} -> event
-          {:error, _} -> current_event
-        end
-      else
-        current_event
-      end
+        {:noreply, apply_location(socket, attrs)}
 
-    {:noreply, assign_form(socket, changeset) |> assign(:event, updated_event)}
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -2218,6 +2237,58 @@ defmodule YscWeb.AdminEventsNewLive do
       assign(socket, form: form, capacity_form: capacity_form)
     end
   end
+
+  defp apply_location(socket, params) do
+    current_event = Events.get_event!(socket.assigns.event.id)
+    attrs = build_location_attrs(params)
+
+    if attrs == %{} do
+      socket
+    else
+      changeset = Event.changeset(current_event, attrs)
+
+      updated_event =
+        if changeset.valid? do
+          case Events.update_event(current_event, attrs) do
+            {:ok, event} -> event
+            {:error, _} -> current_event
+          end
+        else
+          current_event
+        end
+
+      updated_changeset =
+        Event.changeset(updated_event, attrs)
+        |> Map.put(:action, :validate)
+
+      assign_form(socket, updated_changeset)
+      |> assign(:event, updated_event)
+    end
+  end
+
+  defp build_location_attrs(params) do
+    params
+    |> Map.take([
+      "location_name",
+      "address",
+      "latitude",
+      "longitude",
+      "place_id"
+    ])
+    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+    |> Map.new()
+  end
+
+  defp location_set?(form) do
+    form[:location_name].value not in [nil, ""] or
+      form[:address].value not in [nil, ""] or
+      present_coordinate?(form[:latitude].value) or
+      present_coordinate?(form[:longitude].value)
+  end
+
+  defp present_coordinate?(nil), do: false
+  defp present_coordinate?(""), do: false
+  defp present_coordinate?(_), do: true
 
   defp format_date(nil), do: ""
   defp format_date(""), do: ""
