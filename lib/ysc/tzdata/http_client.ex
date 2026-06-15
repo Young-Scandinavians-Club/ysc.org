@@ -44,14 +44,7 @@ defmodule Ysc.Tzdata.HttpClient do
     end
   end
 
-  defp normalize_headers(headers) when is_list(headers) do
-    Enum.map(headers, fn
-      {k, v} when is_binary(k) and is_binary(v) -> {k, v}
-      {k, v} -> {to_string(k), header_value_to_string(v)}
-    end)
-  end
-
-  defp normalize_headers(headers) when is_map(headers) do
+  defp normalize_headers(headers) do
     Enum.map(headers, fn {k, v} ->
       {to_string(k), header_value_to_string(v)}
     end)
