@@ -171,8 +171,8 @@ defmodule Ysc.MixProject do
       # GHSA-rhv4-8758-jx7v: Decimal < 3.0.0 (DoS via unbounded exponent). Override pulls 3.1.x onto
       # transitive ~> 2.x (e.g. retry_on).
       {:decimal, "~> 3.1", override: true},
-      # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17.
-      # hackney:request/5 is unchanged in 4.x, so tzdata polling keeps working.
+      # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
+      # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
       {:hackney, "~> 4.0", override: true},
       {:argon2_elixir, "~> 4.1"},
       {:atomex, "~> 0.5"},

@@ -17,6 +17,11 @@ config :ysc,
 # Configure Elixir's Calendar to use Timex timezone database
 config :elixir, :time_zone_database, Timex.Timezone.Database
 
+# Tzdata polls IANA for timezone DB updates. The built-in Hackney adapter still
+# calls hackney:body/1 on the response tuple, which breaks on hackney 4.x because
+# the body is returned directly in the tuple.
+config :tzdata, :http_client, Ysc.Tzdata.HttpClient
+
 config :ysc, Ysc.Repo,
   migration_timestamps: [type: :utc_datetime],
   pool_size: 8,
