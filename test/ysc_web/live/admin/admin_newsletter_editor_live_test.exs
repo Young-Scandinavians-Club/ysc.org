@@ -29,6 +29,12 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     edition
   end
 
+  defp live_editing_edition(conn, edition) do
+    {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+    render_async(view)
+    view
+  end
+
   # ---------------------------------------------------------------------------
   # Access control
   # ---------------------------------------------------------------------------
@@ -111,7 +117,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       edition =
         edition_fixture(admin, %{"title" => "Existing Ed", "subject" => "Subj"})
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       assert has_element?(view, "#newsletter-editor-form")
       html = render(view)
@@ -125,7 +131,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       assert has_element?(view, "[phx-click='send-test-email']")
     end
@@ -133,7 +139,8 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     test "shows draft status badge", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
+      html = render(view)
 
       assert html =~ "Draft"
     end
@@ -148,7 +155,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
           "subject" => "Old Subj"
         })
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view
       |> form("#newsletter-editor-form", %{
@@ -168,7 +175,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
          } do
       edition = edition_fixture(admin, %{"title" => "Original Title"})
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view
       |> form("#newsletter-editor-form", %{
@@ -195,7 +202,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       refute has_element?(view, "#send-newsletter-modal")
 
@@ -207,7 +214,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     test "closes modal on cancel", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='open-send-modal']") |> render_click()
       assert has_element?(view, "#send-newsletter-modal")
@@ -223,7 +230,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='open-send-modal']") |> render_click()
 
@@ -247,7 +254,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     test "opens schedule modal on button click", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       refute has_element?(view, "#schedule-newsletter-modal")
 
@@ -262,7 +269,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='open-schedule-modal']") |> render_click()
 
@@ -277,7 +284,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     test "closes schedule modal on cancel", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='open-schedule-modal']") |> render_click()
       view |> element("[phx-click='close-schedule-modal']") |> render_click()
@@ -292,7 +299,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
          } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='open-schedule-modal']") |> render_click()
 
@@ -323,7 +330,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     } do
       edition = edition_fixture(admin)
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='open-schedule-modal']") |> render_click()
 
@@ -350,7 +357,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
     } do
       edition = edition_fixture(admin, %{"subject" => "My Subject"})
 
-      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      view = live_editing_edition(conn, edition)
 
       view |> element("[phx-click='send-test-email']") |> render_click()
 

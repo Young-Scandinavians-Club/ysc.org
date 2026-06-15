@@ -171,6 +171,24 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
   end
 
   describe "connected list loading" do
+    test "newsletter editor replaces loading placeholder after connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      {:ok, edition} =
+        Ysc.Newsletter.create_edition(
+          %{"title" => "Deferred Load Edition", "subject" => "Weekly news"},
+          created_by_id: admin.id
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/#{edition.id}/edit")
+      html = render_async(view)
+
+      refute html =~ "Loading newsletter"
+      assert html =~ "Deferred Load Edition"
+      assert has_element?(view, "#newsletter-editor-form")
+    end
+
     test "events list replaces loading placeholder after connect", %{
       conn: conn,
       admin: admin
