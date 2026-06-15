@@ -1238,8 +1238,10 @@ defmodule YscWeb.BookingChangeLive do
     if Money.positive?(preview.delta) do
       booking = socket.assigns.booking
 
+      hold_opts = modification_hold_guest_opts(socket)
+
       with {:ok, _booking} <-
-             Bookings.place_modification_hold(booking, preview.attrs),
+             Bookings.place_modification_hold(booking, preview.attrs, hold_opts),
            {:ok, payment_intent} <-
              create_delta_payment_intent(
                booking,
@@ -1304,48 +1306,22 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp sync_guests_after_modification(socket, booking) do
-    attrs = modification_attrs(socket)
-    original = socket.assigns.booking
-
-    cond do
-      socket.assigns.pending_guest_params ->
-        preview_booking =
-          BookingGuestForm.preview_booking(
-            booking,
-            attrs.guests_count,
-            attrs.children_count
-          )
-
-        BookingGuestForm.save_guests(
-          preview_booking,
-          socket.assigns.pending_guest_params
-        )
-
-      guest_counts_changed?(original, attrs) ->
-        BookingGuestForm.trim_guests_to_counts(
-          booking.id,
-          attrs.guests_count,
-          attrs.children_count
-        )
-
-      true ->
-        :ok
-    end
+    BookingGuestForm.sync_guests_after_modification_apply(
+      booking,
+      socket.assigns.booking.modification_hold_attrs,
+      socket.assigns.booking,
+      guest_params: socket.assigns.pending_guest_params
+    )
   end
 
-  defp modification_attrs(socket) do
-    case socket.assigns.preview do
-      %{attrs: attrs} ->
-        attrs
+  defp modification_hold_guest_opts(socket) do
+    case socket.assigns.pending_guest_params do
+      params when is_map(params) and map_size(params) > 0 ->
+        [guest_params: params]
 
       _ ->
-        %{guests_count: socket.assigns.booking.guests_count, children_count: 0}
+        []
     end
-  end
-
-  defp guest_counts_changed?(booking, attrs) do
-    booking.guests_count != attrs.guests_count ||
-      (booking.children_count || 0) != attrs.children_count
   end
 
   defp guest_index_from_params(params) do
