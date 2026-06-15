@@ -27,9 +27,7 @@ defmodule Ysc.Tzdata.HttpTestPlug do
 
   get "/echo-request-headers" do
     body =
-      conn.req_headers
-      |> Enum.map(fn {k, v} -> "#{k}=#{v}" end)
-      |> Enum.join("\n")
+      Enum.map_join(conn.req_headers, "\n", fn {k, v} -> "#{k}=#{v}" end)
 
     conn
     |> put_resp_content_type("text/plain")
