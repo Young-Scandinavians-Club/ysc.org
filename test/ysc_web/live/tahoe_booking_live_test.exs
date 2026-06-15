@@ -6,6 +6,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
   import Ysc.TestDataFactory
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.Entitlements
 
   describe "deferred room availability" do
     test "populates room cards after connect when booking dates are in the URL",
@@ -101,6 +102,42 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/tahoe")
 
       assert html =~ "Tahoe"
+    end
+
+    test "shows member discount label when an entitlement reduces the preview price",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+
+      {:ok, _entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(5, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      conn = log_in_user(conn, user)
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "buyout",
+        "guests" => "4"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 2_000)
+      html = render(view)
+
+      assert html =~ "Member discount"
     end
 
     test "shows readable essential alerts for members", %{conn: conn} do
