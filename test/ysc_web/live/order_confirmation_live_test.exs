@@ -388,7 +388,7 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/orders/#{order.id}/confirmation")
 
-      assert html =~ "June 15, 2026"
+      assert html =~ "June 15, 2027"
     end
 
     test "displays event location", %{conn: conn} do
