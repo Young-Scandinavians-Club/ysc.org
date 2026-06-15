@@ -143,6 +143,34 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static Render Session"
   end
 
+  test "dead render skips scanner session detail query and shows loading state",
+       %{
+         conn: conn,
+         admin: admin
+       } do
+    session =
+      scan_session_fixture(%{
+        created_by_id: admin.id,
+        name: "Static Detail Session"
+      })
+
+    sessions_pattern = ~r/FROM "scan_sessions"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/scanner/sessions/#{session.id}")
+          |> html_response(200)
+        end,
+        pattern: sessions_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Loading session"
+    refute html =~ "Static Detail Session"
+  end
+
   describe "connected list loading" do
     test "events list replaces loading placeholder after connect", %{
       conn: conn,
