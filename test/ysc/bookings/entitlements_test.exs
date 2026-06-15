@@ -449,6 +449,55 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       assert priced.breakdown_additions.entitlement_summary == "$25.00 off stay"
     end
+
+    test "price_with_locked_entitlement formats free night entitlement summary" do
+      user = user_fixture()
+      admin = user_fixture()
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: admin.id,
+            benefit_kind: :free_nights,
+            property: :tahoe,
+            free_nights: 2,
+            buyout_max_discount: Money.new(500_000, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
+
+      subtotal = Money.new(:USD, 430)
+
+      assert {:ok, priced} =
+               Entitlements.price_with_locked_entitlement(
+                 booking,
+                 subtotal,
+                 :buyout
+               )
+
+      assert priced.breakdown_additions.entitlement_summary == "2 free nights"
+    end
   end
 
   defp duplicate_pricing_rule?(%Ecto.Changeset{} = cs) do
