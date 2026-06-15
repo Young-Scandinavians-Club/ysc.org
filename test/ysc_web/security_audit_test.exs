@@ -17,7 +17,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 17 (MEDIUM)   Account setup email verification without setup token (spam / abuse)
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
-  Finding 20 (MEDIUM)   Event admin host/reservation search enables club-wide email enumeration
+  Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
+  Finding 21 (MEDIUM)   Event admin host/reservation search enables club-wide email enumeration
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1171,10 +1172,10 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Finding 20 (MEDIUM): Volunteer event admin search must not enumerate emails
+  # Finding 21 (MEDIUM): Volunteer event admin search must not enumerate emails
   # ---------------------------------------------------------------------------
 
-  describe "Finding 20: event admin user search blocks email enumeration" do
+  describe "Finding 21: event admin user search blocks email enumeration" do
     test "search_users_for_staff_lookup does not match partial email domains" do
       user_fixture(%{
         email: "roster.member@gmail.com",
@@ -1206,6 +1207,35 @@ defmodule YscWeb.SecurityAuditTest do
       |> render_keyup(%{"value" => "@gmail"})
 
       refute has_element?(view, "#host-search-results")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 20 (CRITICAL): Booking checkout accepts foreign PaymentIntents
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 20: booking payment intent validation" do
+    import Ysc.BookingsFixtures
+
+    alias Ysc.Bookings
+
+    test "verify_booking_payment_intent rejects a succeeded intent from another booking" do
+      user = user_fixture()
+      booking_a = booking_fixture(user_id: user.id, status: :hold)
+      booking_b = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_foreign",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking_a.total_price),
+        metadata: %{
+          "booking_id" => booking_a.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking_b)
     end
   end
 

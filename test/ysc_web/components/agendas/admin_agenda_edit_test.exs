@@ -78,7 +78,7 @@ defmodule YscWeb.AgendaEditComponentTest do
         })
 
       assert html =~ "Opening Remarks"
-      assert html =~ "placeholder=\"Title\""
+      assert html =~ "placeholder=\"Agenda Item Title\""
     end
 
     test "displays start and end time fields", %{agenda: agenda, event: event} do
@@ -100,8 +100,10 @@ defmodule YscWeb.AgendaEditComponentTest do
         })
 
       assert html =~ "type=\"time\""
-      assert html =~ "Start"
-      assert html =~ "End"
+      assert html =~ "name=\"agenda_item[start_time]\""
+      assert html =~ "name=\"agenda_item[end_time]\""
+      assert html =~ "value=\"10:00:00\""
+      assert html =~ "value=\"11:00:00\""
     end
 
     test "displays delete button for agenda item", %{
@@ -277,7 +279,10 @@ defmodule YscWeb.AgendaEditComponentTest do
       assert html =~ "drag-handle"
     end
 
-    test "uses grid layout for agenda items", %{agenda: agenda, event: event} do
+    test "uses timeline layout for agenda items", %{
+      agenda: agenda,
+      event: event
+    } do
       agenda = Agendas.get_agenda!(agenda.id)
 
       html =
@@ -288,7 +293,8 @@ defmodule YscWeb.AgendaEditComponentTest do
           event_id: event.id
         })
 
-      assert html =~ "grid grid-cols-1"
+      assert html =~ "space-y-4"
+      assert html =~ "left-[15px]"
     end
   end
 end

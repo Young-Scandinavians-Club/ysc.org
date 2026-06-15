@@ -3,7 +3,7 @@ defmodule Ysc.Accounts.UserToken do
   User token schema and utilities.
 
   Defines the UserToken database schema for authentication tokens including
-  remember me tokens and email confirmation tokens.
+  remember me tokens and password reset tokens.
   """
   use Ecto.Schema
   import Ecto.Query
@@ -15,7 +15,6 @@ defmodule Ysc.Accounts.UserToken do
   # It is very important to keep the reset password token expiry short,
   # since someone with access to the email may take over the account.
   @reset_password_validity_in_days 1
-  @confirm_validity_in_days 7
   @change_email_validity_in_days 7
   @session_validity_in_days 60
 
@@ -111,9 +110,8 @@ defmodule Ysc.Accounts.UserToken do
   The given token is valid if it matches its hashed counterpart in the
   database and the user email has not changed. This function also checks
   if the token is being used within a certain period, depending on the
-  context. The default contexts supported by this function are either
-  "confirm", for account confirmation emails, and "reset_password",
-  for resetting the password. For verifying requests to change the email,
+  context. The default context supported by this function is
+  "reset_password". For verifying requests to change the email,
   see `verify_change_email_token_query/2`.
   """
   def verify_email_token_query(token, context) do
@@ -186,7 +184,6 @@ defmodule Ysc.Accounts.UserToken do
     end
   end
 
-  defp days_for_context("confirm"), do: @confirm_validity_in_days
   defp days_for_context("reset_password"), do: @reset_password_validity_in_days
 
   @doc """

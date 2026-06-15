@@ -609,6 +609,50 @@ defmodule Ysc.Tickets.BookingLockerTest do
       assert Money.equal?(discount, Money.new(0, :USD))
     end
 
+    test "partial checkout only creates tickets for selected quantity and keeps reservation remainder",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        quantity: 5,
+        created_by_id: organizer.id,
+        discount_percentage: Decimal.new(50),
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 2})
+
+      tickets =
+        from(t in Ticket, where: t.ticket_order_id == ^order.id)
+        |> Repo.all()
+
+      assert length(tickets) == 2
+
+      {:ok, expected_total} =
+        Money.sub(Money.new(50, :USD), Money.new("25.00", :USD))
+
+      assert Money.equal?(order.total_amount, expected_total)
+
+      active_remainder =
+        from(tr in TicketReservation,
+          where:
+            tr.user_id == ^user.id and tr.ticket_tier_id == ^tier.id and
+              tr.status == "active"
+        )
+        |> Repo.all()
+
+      assert length(active_remainder) == 1
+      assert hd(active_remainder).quantity == 3
+    end
+
     test "event capacity check is bypassed when user has an active reservation",
          %{
            organizer: organizer

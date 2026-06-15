@@ -3485,7 +3485,8 @@ defmodule YscWeb.AdminMoneyLive do
       if ticket_order do
         case Tickets.cancel_ticket_order(
                ticket_order,
-               "Refund processed - tickets released"
+               "Refund processed - tickets released",
+               from_statuses: [:completed]
              ) do
           {:ok, _canceled_order} ->
             Ysc.Logging.info(

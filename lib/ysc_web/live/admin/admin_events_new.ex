@@ -5,6 +5,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
   require Ysc.Logging
 
+  alias Ysc.EventLocationConfig
   alias Ysc.EventPhotos
   alias Ysc.Events
   alias Ysc.Events.Event
@@ -30,11 +31,7 @@ defmodule YscWeb.AdminEventsNewLive do
     >
       <div class="flex py-6 flex-col">
         <.back navigate={~p"/admin/events?#{@list_params}"}>Back</.back>
-        <div
-          id="event-header-bar"
-          phx-hook="StickyEventHeader"
-          class="sticky top-0 z-30 pt-4 pb-2"
-        >
+        <div id="event-header-bar" class="pt-4 pb-2">
           <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0 flex flex-1 flex-col space-y-1">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -364,40 +361,64 @@ defmodule YscWeb.AdminEventsNewLive do
 
               <h3 class="text-lg pt-4 font-medium">Location</h3>
               <div class="space-y-4">
-                <.input
-                  type="text"
-                  field={@form[:location_name]}
-                  label="Location Name"
-                  phx-debounce="300"
-                />
-                <.input
-                  type="text"
-                  field={@form[:address]}
-                  label="Address"
-                  phx-debounce="300"
-                />
-                <details class="group">
-                  <summary class="cursor-pointer select-none inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-800 transition-colors list-none">
-                    <.icon
-                      name="hero-chevron-right"
-                      class="w-3.5 h-3.5 transition-transform duration-200 group-open:rotate-90"
-                    /> Advanced (Coordinates)
-                  </summary>
-                  <div class="mt-3 flex flex-row space-x-4">
-                    <.input
-                      type="number"
-                      step="any"
-                      field={@form[:latitude]}
-                      label="Latitude"
-                    />
-                    <.input
-                      type="number"
-                      step="any"
-                      field={@form[:longitude]}
-                      label="Longitude"
-                    />
+                <div class="space-y-2">
+                  <span class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                    Frequent Venues
+                  </span>
+                  <div class="flex flex-wrap gap-2" id="location-presets">
+                    <button
+                      :for={preset <- @location_presets}
+                      type="button"
+                      id={"location-preset-#{preset.id}"}
+                      phx-click="apply-location-preset"
+                      phx-value-id={preset.id}
+                      class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition"
+                    >
+                      <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+                      {preset.label}
+                    </button>
                   </div>
-                </details>
+                </div>
+
+                <div
+                  id="event-location-search"
+                  phx-update="ignore"
+                  phx-hook="RadarLocationAutocomplete"
+                  data-presets={
+                    Jason.encode!(EventLocationConfig.presets_for_search())
+                  }
+                  class="w-full"
+                />
+
+                <div
+                  :if={location_set?(@form)}
+                  class="bg-zinc-50 border border-zinc-200 rounded-lg p-4 space-y-4"
+                  id="location-display-details"
+                >
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-medium text-zinc-700">
+                      Display Details
+                    </h4>
+                    <p class="text-xs text-zinc-500">Publicly visible</p>
+                  </div>
+
+                  <.input
+                    type="text"
+                    field={@form[:location_name]}
+                    label="Location Name"
+                    phx-debounce="300"
+                  />
+                  <.input
+                    type="text"
+                    field={@form[:address]}
+                    label="Address"
+                    phx-debounce="300"
+                  />
+                </div>
+
+                <.input type="hidden" field={@form[:latitude]} />
+                <.input type="hidden" field={@form[:longitude]} />
+
                 <div class="space-y-2">
                   <.live_component
                     id={"#{@event.id}-map"}
@@ -407,8 +428,12 @@ defmodule YscWeb.AdminEventsNewLive do
                     longitude={@form[:longitude].value}
                     locked={false}
                   />
-                  <p class="text-zinc-700 text-sm">
-                    Click on the map to set marker location.
+                  <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
+                    <.icon
+                      name="hero-information-circle"
+                      class="w-4 h-4 flex-shrink-0"
+                    />
+                    Double-check the pin on the map. You can click anywhere on the map to manually adjust it.
                   </p>
                 </div>
               </div>
@@ -570,11 +595,11 @@ defmodule YscWeb.AdminEventsNewLive do
           </div>
 
           <div class="max-w-3xl mt-6">
-            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded p-6 bg-white">
               <div>
                 <h2 class="text-xl font-bold">Agenda</h2>
-                <p class="text-zinc-600 text-sm">
-                  Add schedules or itineraries to help attendees plan their day.
+                <p class="text-zinc-600 text-sm mt-1">
+                  Design your event schedule exactly as attendees will see it.
                 </p>
               </div>
 
@@ -583,79 +608,92 @@ defmodule YscWeb.AdminEventsNewLive do
                 type="button"
                 phx-click="add-agenda"
                 phx-disable-with="Adding..."
+                class="shrink-0"
               >
-                <.icon name="hero-plus" class="-mt-0.5" /> Add Agenda
+                <.icon name="hero-plus" /> Add Agenda Track
               </.button>
+            </div>
 
-              <ul
-                id="agendas"
-                phx-update="stream"
-                phx-hook="Sortable"
-                class="w-full flex gap-3 snap-x overflow-x-auto pb-2"
+            <div class="relative mt-6">
+              <button
+                type="button"
+                data-scroll-left
+                aria-label="Scroll to previous agenda track"
+                class="absolute left-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
               >
-                <li
-                  :for={{id, agenda} <- @streams.agendas}
-                  id={id}
-                  data-id={agenda.id}
-                  class="bg-zinc-100 rounded-lg flex-shrink-0 flex flex-col"
-                >
-                  <div
-                    class="drag-handle flex items-center justify-center py-1.5 rounded-t-lg cursor-grab active:cursor-grabbing hover:bg-zinc-200 transition group"
-                    title="Drag to reorder"
-                  >
-                    <div class="flex flex-col gap-0.5">
-                      <div class="flex gap-0.5">
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                      </div>
-                      <div class="flex gap-0.5">
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <.icon name="hero-chevron-left" class="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                data-scroll-right
+                aria-label="Scroll to next agenda track"
+                class="absolute right-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
+              >
+                <.icon name="hero-chevron-right" class="h-5 w-5" />
+              </button>
 
-                  <div class="mx-auto max-w-7xl px-4 pt-2 pb-4 space-y-4">
-                    <div class="flex flex-row justify-between space-x-4">
-                      <div class="w-full">
-                        <.live_component
-                          id={"edit-agenda-title-#{agenda.id}"}
-                          module={YscWeb.AgendasLive.FormComponent}
-                          agenda_id={agenda.id}
-                          event_id={@event.id}
-                          agenda={agenda}
-                        />
+              <div
+                id="agendas-scroll"
+                phx-hook="AgendaTracksScroller"
+                class="agenda-tracks-scroll overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth"
+              >
+                <ul
+                  id="agendas"
+                  phx-update="stream"
+                  phx-hook="Sortable"
+                  class="flex gap-6 w-max min-w-full"
+                >
+                  <li
+                    :for={{id, agenda} <- @streams.agendas}
+                    id={id}
+                    data-id={agenda.id}
+                    class="group/agenda flex-shrink-0 w-[450px] sm:w-[500px] snap-start flex flex-col bg-white border border-zinc-200 shadow-sm rounded overflow-hidden drag-item:scale-[1.02] drag-item:shadow-xl drag-item:z-10 drag-ghost:opacity-100 drag-ghost:bg-blue-50 drag-ghost:border-2 drag-ghost:border-dashed drag-ghost:border-blue-400"
+                  >
+                    <div class="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 drag-ghost:opacity-0">
+                      <div class="flex items-center gap-2 flex-1">
+                        <div
+                          class="drag-handle cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 p-1"
+                          title="Drag to reorder tracks"
+                        >
+                          <.icon
+                            name="hero-arrows-right-left"
+                            class="w-5 h-5 block"
+                          />
+                        </div>
+
+                        <div class="flex-1">
+                          <.live_component
+                            id={"edit-agenda-title-#{agenda.id}"}
+                            module={YscWeb.AgendasLive.FormComponent}
+                            agenda_id={agenda.id}
+                            event_id={@event.id}
+                            agenda={agenda}
+                          />
+                        </div>
                       </div>
 
                       <.link
                         phx-click="delete-agenda"
                         phx-value-id={agenda.id}
                         aria-label="delete agenda"
+                        class="text-zinc-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-md transition ml-2"
+                        data-confirm="Are you sure you want to delete this agenda?"
                       >
-                        <.icon
-                          name="hero-trash"
-                          class="px-2 py-2 hover:bg-red-600 rounded transition duration-200"
-                        />
+                        <.icon name="hero-trash" class="w-4 h-4 block" />
                       </.link>
                     </div>
 
-                    <.live_component
-                      id={agenda.id}
-                      module={YscWeb.AgendaEditComponent}
-                      agenda={agenda}
-                      event_id={@event.id}
-                    />
-                  </div>
-                </li>
-              </ul>
+                    <div class="p-6 bg-white relative drag-ghost:opacity-0">
+                      <.live_component
+                        id={agenda.id}
+                        module={YscWeb.AgendaEditComponent}
+                        agenda={agenda}
+                        event_id={@event.id}
+                      />
+                    </div>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -964,6 +1002,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign_updates_tab_defaults()
      |> assign(:show_update_preview_modal, false)
      |> assign(:update_preview_subject, nil)
+     |> assign(:location_presets, EventLocationConfig.presets())
      |> assign_check_in_path(event)}
   end
 
@@ -1062,6 +1101,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign_updates_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
+    |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
   end
 
@@ -1590,31 +1630,24 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
-  def handle_event(
-        "map-new-marker",
-        %{"lat" => latitude, "long" => longitude},
-        socket
-      ) do
-    # Reload event to ensure we have the latest lock_version
-    current_event = Events.get_event!(socket.assigns[:event].id)
+  def handle_event("location-selected", params, socket) do
+    {:noreply, apply_location(socket, params)}
+  end
 
-    changeset =
-      Event.changeset(current_event, %{latitude: latitude, longitude: longitude})
+  def handle_event("apply-location-preset", %{"id" => id}, socket) do
+    case EventLocationConfig.get(id) do
+      {:ok, preset} ->
+        attrs =
+          preset
+          |> Map.drop([:id, :label])
+          |> Map.new(fn {key, value} -> {to_string(key), value} end)
+          |> Map.put("place_id", nil)
 
-    updated_event =
-      if changeset.valid? do
-        case Events.update_event(current_event, %{
-               latitude: latitude,
-               longitude: longitude
-             }) do
-          {:ok, event} -> event
-          {:error, _} -> current_event
-        end
-      else
-        current_event
-      end
+        {:noreply, apply_location(socket, attrs)}
 
-    {:noreply, assign_form(socket, changeset) |> assign(:event, updated_event)}
+      :error ->
+        {:noreply, socket}
+    end
   end
 
   @impl true
@@ -1788,7 +1821,8 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     {:noreply,
      socket
-     |> stream_insert(:agendas, agenda)}
+     |> stream_insert(:agendas, agenda)
+     |> push_event("scroll-agenda-into-view", %{id: "agendas-#{agenda.id}"})}
   end
 
   @impl true
@@ -2213,6 +2247,61 @@ defmodule YscWeb.AdminEventsNewLive do
       assign(socket, form: form, capacity_form: capacity_form)
     end
   end
+
+  defp apply_location(socket, params) do
+    current_event = Events.get_event!(socket.assigns.event.id)
+    attrs = build_location_attrs(params)
+
+    if attrs == %{} do
+      socket
+    else
+      changeset = Event.changeset(current_event, attrs)
+
+      updated_event =
+        if changeset.valid? do
+          case Events.update_event(current_event, attrs) do
+            {:ok, event} -> event
+            {:error, _} -> current_event
+          end
+        else
+          current_event
+        end
+
+      updated_changeset =
+        Event.changeset(updated_event, attrs)
+        |> Map.put(:action, :validate)
+
+      assign_form(socket, updated_changeset)
+      |> assign(:event, updated_event)
+    end
+  end
+
+  defp build_location_attrs(params) do
+    params
+    |> Map.take([
+      "location_name",
+      "address",
+      "latitude",
+      "longitude",
+      "place_id"
+    ])
+    |> Enum.reject(fn
+      {"place_id", nil} -> false
+      {_key, value} -> value in [nil, ""]
+    end)
+    |> Map.new()
+  end
+
+  defp location_set?(form) do
+    form[:location_name].value not in [nil, ""] or
+      form[:address].value not in [nil, ""] or
+      present_coordinate?(form[:latitude].value) or
+      present_coordinate?(form[:longitude].value)
+  end
+
+  defp present_coordinate?(nil), do: false
+  defp present_coordinate?(""), do: false
+  defp present_coordinate?(_), do: true
 
   defp format_date(nil), do: ""
   defp format_date(""), do: ""

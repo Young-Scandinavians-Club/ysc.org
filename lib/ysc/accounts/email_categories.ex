@@ -28,7 +28,6 @@ defmodule Ysc.Accounts.EmailCategories do
   # Map of email template names to their notification categories
   @template_categories %{
     # Account notifications (cannot be disabled)
-    "confirm_email" => :account,
     "reset_password" => :account,
     "password_changed" => :account,
     "passkey_added" => :account,
@@ -81,7 +80,7 @@ defmodule Ysc.Accounts.EmailCategories do
 
   ## Examples
 
-      iex> get_category("confirm_email")
+      iex> get_category("reset_password")
       :account
 
       iex> get_category("ticket_purchase_confirmation")
@@ -122,7 +121,7 @@ defmodule Ysc.Accounts.EmailCategories do
 
   ## Examples
 
-      iex> should_send_email?(user, "confirm_email")
+      iex> should_send_email?(user, "reset_password")
       true
 
       iex> should_send_email?(%{event_notifications: false}, "ticket_purchase_confirmation")

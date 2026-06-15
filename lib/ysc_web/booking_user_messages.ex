@@ -40,7 +40,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_continue_payment do
-    "Continue to payment and complete checkout before the timer runs out"
+    "Continue to payment and complete payment before the timer runs out"
   end
 
   def checkout_guest_info_step_continue_complimentary do

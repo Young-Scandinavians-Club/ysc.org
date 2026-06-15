@@ -604,7 +604,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                |> log_in_user(user)
                |> live(~p"/payment/success?redirect_status=succeeded")
 
-      assert flash["error"] == "Invalid payment information."
+      assert flash["error"] =~ "We couldn't confirm your payment from this link"
     end
 
     test "handles missing redirect_status parameter", %{conn: conn} do

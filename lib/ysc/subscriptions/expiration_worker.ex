@@ -19,6 +19,7 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.Subscription
+  alias Ysc.Stripe.SubscriptionHelpers
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
@@ -157,11 +158,15 @@ defmodule Ysc.Subscriptions.ExpirationWorker do
             stripe_subscription.start_date &&
               DateTime.from_unix!(stripe_subscription.start_date),
           current_period_start:
-            stripe_subscription.current_period_start &&
-              DateTime.from_unix!(stripe_subscription.current_period_start),
+            case SubscriptionHelpers.current_period_start(stripe_subscription) do
+              nil -> nil
+              timestamp -> DateTime.from_unix!(timestamp)
+            end,
           current_period_end:
-            stripe_subscription.current_period_end &&
-              DateTime.from_unix!(stripe_subscription.current_period_end),
+            case SubscriptionHelpers.current_period_end(stripe_subscription) do
+              nil -> nil
+              timestamp -> DateTime.from_unix!(timestamp)
+            end,
           trial_ends_at:
             stripe_subscription.trial_end &&
               DateTime.from_unix!(stripe_subscription.trial_end),

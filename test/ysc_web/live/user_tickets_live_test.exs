@@ -50,7 +50,7 @@ defmodule YscWeb.UserTicketsLiveTest do
       html = render(view)
 
       # Check for main page structure
-      assert html =~ "Member Portal"
+      assert html =~ "Your account"
       assert html =~ "Browse Events"
     end
 

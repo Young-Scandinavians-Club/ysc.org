@@ -64,6 +64,15 @@ defmodule Ysc.Tickets.StripeServiceTest do
     %{user: user, ticket_order: ticket_order}
   end
 
+  defp cancel_timeout_jobs_for_order!(ticket_order_id) do
+    from(j in Oban.Job,
+      where: j.worker == "Ysc.Tickets.TimeoutWorker",
+      where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Ysc.Repo.delete_all()
+  end
+
   describe "create_payment_intent/2" do
     test "creates payment intent with correct parameters", %{
       ticket_order: ticket_order
@@ -166,15 +175,6 @@ defmodule Ysc.Tickets.StripeServiceTest do
       }
 
       struct(Stripe.PaymentIntent, Map.merge(defaults, Map.new(overrides)))
-    end
-
-    defp cancel_timeout_jobs_for_order!(ticket_order_id) do
-      from(j in Oban.Job,
-        where: j.worker == "Ysc.Tickets.TimeoutWorker",
-        where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
-        where: j.state in ["available", "scheduled", "retryable"]
-      )
-      |> Ysc.Repo.delete_all()
     end
 
     test "completes pending order when given a payment intent id", %{
@@ -290,25 +290,29 @@ defmodule Ysc.Tickets.StripeServiceTest do
     end
 
     test "cancels a pending ticket order after payment failure" do
-      ticket_order = ticket_order_fixture()
-      payment_intent_id = "pi_fail_cancel_#{ticket_order.id}"
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        ticket_order = ticket_order_fixture()
+        payment_intent_id = "pi_fail_cancel_#{ticket_order.id}"
 
-      payment_intent =
-        failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
+        cancel_timeout_jobs_for_order!(ticket_order.id)
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
-                                                          _opts ->
-        {:ok, payment_intent}
+        payment_intent =
+          failed_payment_intent_for_order(ticket_order, id: payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent}
+        end)
+
+        assert {:ok, cancelled} =
+                 StripeService.handle_failed_payment(
+                   payment_intent_id,
+                   "Card declined"
+                 )
+
+        assert cancelled.status == :cancelled
+        assert cancelled.cancellation_reason == "Card declined"
       end)
-
-      assert {:ok, cancelled} =
-               StripeService.handle_failed_payment(
-                 payment_intent_id,
-                 "Card declined"
-               )
-
-      assert cancelled.status == :cancelled
-      assert cancelled.cancellation_reason == "Card declined"
     end
 
     test "returns completed order without cancelling when payment already succeeded" do

@@ -138,8 +138,11 @@ defmodule YscWeb.AdminEventsLiveTest do
     end
 
     test "invalid flop params redirect to default events list", %{conn: conn} do
-      assert {:error, {:live_redirect, %{to: "/admin/events"}}} =
-               live(conn, ~p"/admin/events?order_by=not_a_real_field")
+      {:ok, view, _html} = live(conn, ~p"/admin/events")
+
+      render_patch(view, ~p"/admin/events?order_by=not_a_real_field")
+
+      assert_patched(view, ~p"/admin/events")
     end
 
     test "check-in link joins open membership session for the event", %{

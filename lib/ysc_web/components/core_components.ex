@@ -85,7 +85,7 @@ defmodule YscWeb.CoreComponents do
                 <button
                   phx-click={JS.exec("data-cancel", to: "##{@id}")}
                   type="button"
-                  class="group flex-none rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 p-2 transition-all duration-200 ease-out hover:scale-110"
+                  class="group inline-flex flex-none items-center justify-center w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm shadow-md hover:shadow-lg hover:bg-white active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 transition-all duration-200 ease-out hover:scale-110"
                   aria-label={gettext("close")}
                 >
                   <.icon

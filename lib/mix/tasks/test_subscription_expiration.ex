@@ -590,7 +590,7 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
                 IO.puts("   New status: #{stripe_subscription.status}")
 
                 IO.puts(
-                  "   Current period end: #{format_date(DateTime.from_unix!(stripe_subscription.current_period_end))}"
+                  "   Current period end: #{format_stripe_period_end(stripe_subscription)}"
                 )
 
                 # Sync local subscription from Stripe
@@ -599,13 +599,17 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
                   |> maybe_put_period(
                     :current_period_start,
                     stripe_unix_to_datetime(
-                      stripe_subscription.current_period_start
+                      Ysc.Stripe.SubscriptionHelpers.current_period_start(
+                        stripe_subscription
+                      )
                     )
                   )
                   |> maybe_put_period(
                     :current_period_end,
                     stripe_unix_to_datetime(
-                      stripe_subscription.current_period_end
+                      Ysc.Stripe.SubscriptionHelpers.current_period_end(
+                        stripe_subscription
+                      )
                     )
                   )
 
@@ -684,6 +688,13 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
     |> NaiveDateTime.to_string()
   end
 
+  defp format_stripe_period_end(stripe_subscription) do
+    case Ysc.Stripe.SubscriptionHelpers.current_period_end(stripe_subscription) do
+      nil -> "n/a"
+      timestamp -> format_date(DateTime.from_unix!(timestamp))
+    end
+  end
+
   defp verify_stripe_config do
     api_key = Application.get_env(:stripity_stripe, :api_key)
 
@@ -713,6 +724,4 @@ defmodule Mix.Tasks.TestSubscriptionExpiration do
 
   defp stripe_unix_to_datetime(unix) when is_integer(unix),
     do: DateTime.from_unix!(unix)
-
-  defp stripe_unix_to_datetime(_), do: nil
 end

@@ -1,5 +1,5 @@
 defmodule Ysc.Http.UrlFetchGuardTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Ysc.Http.UrlFetchGuard
 

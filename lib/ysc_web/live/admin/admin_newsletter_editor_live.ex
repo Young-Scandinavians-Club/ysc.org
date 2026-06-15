@@ -39,7 +39,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:event_visible_count, 10)
      |> assign(:readonly?, false)
      |> assign(:email_stats, nil)
-     |> assign(:click_stats, nil)}
+     |> assign(:click_stats, nil)
+     |> assign(:loading_edition?, false)}
   end
 
   @impl true
@@ -51,6 +52,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     socket
     |> assign(:edition, nil)
     |> assign(:readonly?, false)
+    |> assign(:loading_edition?, false)
     |> assign_form_from_edition(build_new_edition())
     |> assign(:post_results, [])
     |> assign(:event_results, [])
@@ -61,19 +63,45 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
-    edition = Newsletter.get_edition!(id)
+    if connected?(socket) do
+      socket
+      |> assign(:loading_edition?, true)
+      |> assign(:edition, nil)
+      |> assign(:readonly?, false)
+      |> assign(:selected_post_ids, [])
+      |> assign(:selected_event_ids, [])
+      |> assign(:preview_ready?, false)
+      |> assign(:post_results, [])
+      |> assign(:event_results, [])
+      |> assign(:picker_data_loaded?, false)
+      |> assign(:picker_load_started?, false)
+      |> assign_form_from_edition(build_placeholder_edition())
+      |> start_async(:load_edition, fn -> Newsletter.get_edition!(id) end)
+      |> maybe_start_async_load_picker()
+    else
+      socket
+      |> assign(:loading_edition?, true)
+      |> assign(:edition, nil)
+      |> assign(:readonly?, false)
+      |> assign(:selected_post_ids, [])
+      |> assign(:selected_event_ids, [])
+      |> assign(:preview_ready?, false)
+      |> assign(:post_results, [])
+      |> assign(:event_results, [])
+      |> assign(:picker_data_loaded?, false)
+      |> assign(:picker_load_started?, false)
+      |> assign_form_from_edition(build_placeholder_edition())
+    end
+  end
 
+  defp apply_loaded_edition(socket, edition) do
     socket
+    |> assign(:loading_edition?, false)
     |> assign(:edition, edition)
     |> assign(:readonly?, edition.status == :sent)
     |> assign(:selected_post_ids, edition.post_ids || [])
     |> assign(:selected_event_ids, edition.event_ids || [])
     |> assign_form_from_edition(edition)
-    |> assign(:post_results, [])
-    |> assign(:event_results, [])
-    |> assign(:picker_data_loaded?, false)
-    |> assign(:picker_load_started?, false)
-    |> maybe_start_async_load_picker()
     |> maybe_load_email_stats(edition)
     |> assign_preview_data()
   end
@@ -125,6 +153,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       status: :draft
     }
     |> Edition.changeset(%{})
+  end
+
+  defp build_placeholder_edition do
+    %Edition{post_ids: [], event_ids: []}
+    |> Edition.changeset(%{"title" => "", "subject" => "", "intro_text" => ""})
   end
 
   defp assign_form_from_edition(socket, %Ecto.Changeset{} = changeset) do
@@ -553,294 +586,306 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       >
         <%!-- Left: Editor --%>
         <div id="editor-panel" class="space-y-6 pb-24">
-          <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-            <h2 class="text-lg font-semibold text-zinc-800 mb-4">Cover photo</h2>
-            <div :if={@readonly?}>
-              <%= if has_cover_image?(@preview_cover_image_id) do %>
-                <.live_component
-                  module={YscWeb.Components.Image}
-                  id="newsletter-cover-preview"
-                  image_id={@preview_cover_image_id}
-                  preferred_type={:optimized}
-                />
-              <% else %>
-                <p class="text-sm text-zinc-400 italic">No cover photo</p>
-              <% end %>
-            </div>
-            <div :if={!@readonly?}>
-              <.live_component
-                module={YscWeb.MediaPickerComponent}
-                id={:newsletter_cover}
-                user_id={@current_user.id}
-                image_id={@preview_cover_image_id}
-              />
-            </div>
-          </div>
-
-          <.form
-            for={@form}
-            id="newsletter-editor-form"
-            phx-change={if(!@readonly?, do: "validate")}
-            phx-submit={if(!@readonly?, do: "save-draft")}
-            class="space-y-6"
+          <div
+            :if={@loading_edition?}
+            id="newsletter-editor-loading"
+            class="flex items-center justify-center py-24 text-zinc-500 text-sm"
           >
-            <%!-- Hidden field keeps cover_image_id in phx-change params so auto-save never clobbers it --%>
-            <.input type="hidden" field={@form[:cover_image_id]} />
+            <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
+            Loading newsletter…
+          </div>
+          <div :if={!@loading_edition?} class="space-y-6">
             <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-              <h2 class="text-lg font-semibold text-zinc-800 mb-4">
-                Headline & subject
-              </h2>
-              <div class="space-y-4">
-                <.input
-                  field={@form[:title]}
-                  type="text"
-                  label="Title (e.g. Winter Update)"
-                  phx-debounce="600"
-                  disabled={@readonly?}
+              <h2 class="text-lg font-semibold text-zinc-800 mb-4">Cover photo</h2>
+              <div :if={@readonly?}>
+                <%= if has_cover_image?(@preview_cover_image_id) do %>
+                  <.live_component
+                    module={YscWeb.Components.Image}
+                    id="newsletter-cover-preview"
+                    image_id={@preview_cover_image_id}
+                    preferred_type={:optimized}
+                  />
+                <% else %>
+                  <p class="text-sm text-zinc-400 italic">No cover photo</p>
+                <% end %>
+              </div>
+              <div :if={!@readonly?}>
+                <.live_component
+                  module={YscWeb.MediaPickerComponent}
+                  id={:newsletter_cover}
+                  user_id={@current_user.id}
+                  image_id={@preview_cover_image_id}
                 />
-                <div>
+              </div>
+            </div>
+
+            <.form
+              for={@form}
+              id="newsletter-editor-form"
+              phx-change={if(!@readonly?, do: "validate")}
+              phx-submit={if(!@readonly?, do: "save-draft")}
+              class="space-y-6"
+            >
+              <%!-- Hidden field keeps cover_image_id in phx-change params so auto-save never clobbers it --%>
+              <.input type="hidden" field={@form[:cover_image_id]} />
+              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+                <h2 class="text-lg font-semibold text-zinc-800 mb-4">
+                  Headline & subject
+                </h2>
+                <div class="space-y-4">
                   <.input
-                    field={@form[:subject]}
+                    field={@form[:title]}
                     type="text"
-                    label="Email subject line"
+                    label="Title (e.g. Winter Update)"
                     phx-debounce="600"
                     disabled={@readonly?}
                   />
-                  <% subject_len =
-                    String.length(
-                      to_string(
-                        Phoenix.HTML.Form.input_value(@form, :subject) || ""
+                  <div>
+                    <.input
+                      field={@form[:subject]}
+                      type="text"
+                      label="Email subject line"
+                      phx-debounce="600"
+                      disabled={@readonly?}
+                    />
+                    <% subject_len =
+                      String.length(
+                        to_string(
+                          Phoenix.HTML.Form.input_value(@form, :subject) || ""
+                        )
+                      ) %>
+                    <p class={[
+                      "text-xs mt-1 text-right tabular-nums",
+                      if(subject_len > 60,
+                        do: "text-amber-500 font-medium",
+                        else: "text-zinc-400"
                       )
-                    ) %>
-                  <p class={[
-                    "text-xs mt-1 text-right tabular-nums",
-                    if(subject_len > 60,
-                      do: "text-amber-500 font-medium",
-                      else: "text-zinc-400"
-                    )
-                  ]}>
-                    {subject_len} / 60 characters
+                    ]}>
+                      {subject_len} / 60 characters
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
+                <div class="px-4 pt-4 pb-3">
+                  <h2 class="text-lg font-semibold text-zinc-800 mb-1">
+                    Intro text
+                  </h2>
+                  <p class="text-sm text-zinc-500">
+                    Opening section. Use the toolbar for bold, links, lists, and more.
                   </p>
                 </div>
-              </div>
-            </div>
-
-            <div class="border border-zinc-200 rounded-lg overflow-hidden bg-white">
-              <div class="px-4 pt-4 pb-3">
-                <h2 class="text-lg font-semibold text-zinc-800 mb-1">Intro text</h2>
-                <p class="text-sm text-zinc-500">
-                  Opening section. Use the toolbar for bold, links, lists, and more.
-                </p>
-              </div>
-              <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                <.input
-                  type="hidden"
-                  id="edition_intro_text"
-                  field={@form[:intro_text]}
-                  phx-hook="TrixHook"
-                  phx-debounce="800"
-                />
-                <.live_component
-                  module={YscWeb.TrixImagePickerComponent}
-                  id={:newsletter_intro_image_picker}
-                  target_input_id="edition_intro_text"
-                  disabled?={@readonly?}
-                />
-                <div
-                  id="newsletter-intro-richtext"
-                  class="relative"
-                  phx-update="ignore"
-                >
-                  <trix-editor
-                    input="edition_intro_text"
-                    class="trix-content block px-4 py-2 bg-white border-0 border-t border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition text-wrap min-h-[200px]"
-                    placeholder="Write your opening section..."
-                  >
-                  </trix-editor>
-                  <%!-- Transparent overlay prevents all interaction when readonly --%>
-                  <div
-                    :if={@readonly?}
-                    class="absolute inset-0 z-10 cursor-not-allowed"
-                    aria-hidden="true"
+                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
+                  <.input
+                    type="hidden"
+                    id="edition_intro_text"
+                    field={@form[:intro_text]}
+                    phx-hook="TrixHook"
+                    phx-debounce="800"
                   />
+                  <.live_component
+                    module={YscWeb.TrixImagePickerComponent}
+                    id={:newsletter_intro_image_picker}
+                    target_input_id="edition_intro_text"
+                    disabled?={@readonly?}
+                  />
+                  <div
+                    id="newsletter-intro-richtext"
+                    class="relative"
+                    phx-update="ignore"
+                  >
+                    <trix-editor
+                      input="edition_intro_text"
+                      class="trix-content block px-4 py-2 bg-white border-0 border-t border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition text-wrap min-h-[200px]"
+                      placeholder="Write your opening section..."
+                    >
+                    </trix-editor>
+                    <%!-- Transparent overlay prevents all interaction when readonly --%>
+                    <div
+                      :if={@readonly?}
+                      class="absolute inset-0 z-10 cursor-not-allowed"
+                      aria-hidden="true"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-              <h2 class="text-lg font-semibold text-zinc-800 mb-2">
-                Latest news (posts)
-              </h2>
-              <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
-                Click to select or deselect posts to feature. Selected order is preserved.
-              </p>
-              <div
-                :if={!@picker_data_loaded? && !@readonly?}
-                class="flex items-center justify-center py-12 text-zinc-500 text-sm"
-              >
-                <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
-                Loading posts…
-              </div>
-              <div :if={@picker_data_loaded? && !@readonly?}>
-                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                  <%= for post <- Enum.take(@post_results, @post_visible_count) do %>
-                    <% selected? = to_string(post.id) in @selected_post_ids %>
-                    <button
-                      type="button"
-                      phx-click="toggle-post"
-                      phx-value-id={post.id}
-                      class={[
-                        "group text-left transition-all focus:outline-none rounded-xl",
-                        if(selected?,
-                          do: "ring-2 ring-blue-500 ring-offset-2",
-                          else:
-                            "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
-                        )
-                      ]}
-                    >
-                      <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
-                        <%= if post.featured_image do %>
-                          <img
-                            src={image_url(post.featured_image)}
-                            alt=""
-                            class="w-full h-full object-cover"
-                          />
-                        <% end %>
-                        <div class={[
-                          "absolute inset-0 transition-opacity duration-150",
-                          if(selected?, do: "bg-blue-600/20", else: "opacity-0")
-                        ]} />
-                        <span
-                          :if={selected_position(@selected_post_ids, post.id)}
-                          class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
-                        >
-                          {selected_position(@selected_post_ids, post.id)}
-                        </span>
-                      </div>
-                      <p class={[
-                        "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
-                        if(selected?,
-                          do: "font-semibold text-blue-700",
-                          else: "font-medium text-zinc-600"
-                        )
-                      ]}>
-                        {post.title}
-                      </p>
-                    </button>
+              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+                <h2 class="text-lg font-semibold text-zinc-800 mb-2">
+                  Latest news (posts)
+                </h2>
+                <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
+                  Click to select or deselect posts to feature. Selected order is preserved.
+                </p>
+                <div
+                  :if={!@picker_data_loaded? && !@readonly?}
+                  class="flex items-center justify-center py-12 text-zinc-500 text-sm"
+                >
+                  <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
+                  Loading posts…
+                </div>
+                <div :if={@picker_data_loaded? && !@readonly?}>
+                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    <%= for post <- Enum.take(@post_results, @post_visible_count) do %>
+                      <% selected? = to_string(post.id) in @selected_post_ids %>
+                      <button
+                        type="button"
+                        phx-click="toggle-post"
+                        phx-value-id={post.id}
+                        class={[
+                          "group text-left transition-all focus:outline-none rounded-xl",
+                          if(selected?,
+                            do: "ring-2 ring-blue-500 ring-offset-2",
+                            else:
+                              "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
+                          )
+                        ]}
+                      >
+                        <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
+                          <%= if post.featured_image do %>
+                            <img
+                              src={image_url(post.featured_image)}
+                              alt=""
+                              class="w-full h-full object-cover"
+                            />
+                          <% end %>
+                          <div class={[
+                            "absolute inset-0 transition-opacity duration-150",
+                            if(selected?, do: "bg-blue-600/20", else: "opacity-0")
+                          ]} />
+                          <span
+                            :if={selected_position(@selected_post_ids, post.id)}
+                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
+                          >
+                            {selected_position(@selected_post_ids, post.id)}
+                          </span>
+                        </div>
+                        <p class={[
+                          "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
+                          if(selected?,
+                            do: "font-semibold text-blue-700",
+                            else: "font-medium text-zinc-600"
+                          )
+                        ]}>
+                          {post.title}
+                        </p>
+                      </button>
+                    <% end %>
+                  </div>
+                  <.admin_dashed_more_button
+                    :if={length(@post_results) > @post_visible_count}
+                    phx-click="show-more-posts"
+                  >
+                    Show more ({length(@post_results) - @post_visible_count} remaining)
+                  </.admin_dashed_more_button>
+                </div>
+                <div
+                  :if={@selected_post_ids != [] && @picker_data_loaded?}
+                  class="mt-3 pt-3 border-t border-zinc-100 space-y-1.5"
+                >
+                  <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
+                    Selected ({length(@selected_post_ids)})
+                  </p>
+                  <%= for {pos, post} <- selected_items_in_order(@post_results, @selected_post_ids) do %>
+                    <div class="flex items-center gap-2 text-sm text-zinc-700">
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
+                        {pos}
+                      </span>
+                      <span class="truncate">{post.title}</span>
+                    </div>
                   <% end %>
                 </div>
-                <.admin_dashed_more_button
-                  :if={length(@post_results) > @post_visible_count}
-                  phx-click="show-more-posts"
-                >
-                  Show more ({length(@post_results) - @post_visible_count} remaining)
-                </.admin_dashed_more_button>
               </div>
-              <div
-                :if={@selected_post_ids != [] && @picker_data_loaded?}
-                class="mt-3 pt-3 border-t border-zinc-100 space-y-1.5"
-              >
-                <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
-                  Selected ({length(@selected_post_ids)})
-                </p>
-                <%= for {pos, post} <- selected_items_in_order(@post_results, @selected_post_ids) do %>
-                  <div class="flex items-center gap-2 text-sm text-zinc-700">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
-                      {pos}
-                    </span>
-                    <span class="truncate">{post.title}</span>
-                  </div>
-                <% end %>
-              </div>
-            </div>
 
-            <div class="border border-zinc-200 rounded-lg p-4 bg-white">
-              <h2 class="text-lg font-semibold text-zinc-800 mb-2">
-                Upcoming events
-              </h2>
-              <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
-                Click to select or deselect events to feature. Selected order is preserved.
-              </p>
-              <div
-                :if={!@picker_data_loaded? && !@readonly?}
-                class="flex items-center justify-center py-12 text-zinc-500 text-sm"
-              >
-                <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
-                Loading events…
-              </div>
-              <div :if={@picker_data_loaded? && !@readonly?}>
-                <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                  <%= for event <- Enum.take(@event_results, @event_visible_count) do %>
-                    <% selected? = to_string(event.id) in @selected_event_ids %>
-                    <button
-                      type="button"
-                      phx-click="toggle-event"
-                      phx-value-id={event.id}
-                      class={[
-                        "group text-left transition-all focus:outline-none rounded-xl",
-                        if(selected?,
-                          do: "ring-2 ring-blue-500 ring-offset-2",
-                          else:
-                            "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
-                        )
-                      ]}
-                    >
-                      <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
-                        <%= if event.cover_image do %>
-                          <img
-                            src={event_image_url(event)}
-                            alt=""
-                            class="w-full h-full object-cover"
-                          />
-                        <% end %>
-                        <div class={[
-                          "absolute inset-0 transition-opacity duration-150",
-                          if(selected?, do: "bg-blue-600/20", else: "opacity-0")
-                        ]} />
-                        <span
-                          :if={selected_position(@selected_event_ids, event.id)}
-                          class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
-                        >
-                          {selected_position(@selected_event_ids, event.id)}
-                        </span>
-                      </div>
-                      <p class={[
-                        "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
-                        if(selected?,
-                          do: "font-semibold text-blue-700",
-                          else: "font-medium text-zinc-600"
-                        )
-                      ]}>
-                        {event.title}
-                      </p>
-                    </button>
+              <div class="border border-zinc-200 rounded-lg p-4 bg-white">
+                <h2 class="text-lg font-semibold text-zinc-800 mb-2">
+                  Upcoming events
+                </h2>
+                <p :if={!@readonly?} class="text-sm text-zinc-500 mb-3">
+                  Click to select or deselect events to feature. Selected order is preserved.
+                </p>
+                <div
+                  :if={!@picker_data_loaded? && !@readonly?}
+                  class="flex items-center justify-center py-12 text-zinc-500 text-sm"
+                >
+                  <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
+                  Loading events…
+                </div>
+                <div :if={@picker_data_loaded? && !@readonly?}>
+                  <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    <%= for event <- Enum.take(@event_results, @event_visible_count) do %>
+                      <% selected? = to_string(event.id) in @selected_event_ids %>
+                      <button
+                        type="button"
+                        phx-click="toggle-event"
+                        phx-value-id={event.id}
+                        class={[
+                          "group text-left transition-all focus:outline-none rounded-xl",
+                          if(selected?,
+                            do: "ring-2 ring-blue-500 ring-offset-2",
+                            else:
+                              "hover:ring-2 hover:ring-zinc-300 hover:ring-offset-1"
+                          )
+                        ]}
+                      >
+                        <div class="relative aspect-square rounded-lg overflow-hidden bg-zinc-100">
+                          <%= if event.cover_image do %>
+                            <img
+                              src={event_image_url(event)}
+                              alt=""
+                              class="w-full h-full object-cover"
+                            />
+                          <% end %>
+                          <div class={[
+                            "absolute inset-0 transition-opacity duration-150",
+                            if(selected?, do: "bg-blue-600/20", else: "opacity-0")
+                          ]} />
+                          <span
+                            :if={selected_position(@selected_event_ids, event.id)}
+                            class="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white shadow-sm"
+                          >
+                            {selected_position(@selected_event_ids, event.id)}
+                          </span>
+                        </div>
+                        <p class={[
+                          "mt-1.5 px-0.5 text-[11px] leading-tight line-clamp-2",
+                          if(selected?,
+                            do: "font-semibold text-blue-700",
+                            else: "font-medium text-zinc-600"
+                          )
+                        ]}>
+                          {event.title}
+                        </p>
+                      </button>
+                    <% end %>
+                  </div>
+                  <.admin_dashed_more_button
+                    :if={length(@event_results) > @event_visible_count}
+                    phx-click="show-more-events"
+                  >
+                    Show more ({length(@event_results) - @event_visible_count} remaining)
+                  </.admin_dashed_more_button>
+                </div>
+                <div
+                  :if={@selected_event_ids != [] && @picker_data_loaded?}
+                  class="mt-3 pt-3 border-t border-zinc-100 space-y-1.5"
+                >
+                  <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
+                    Selected ({length(@selected_event_ids)})
+                  </p>
+                  <%= for {pos, event} <- selected_items_in_order(@event_results, @selected_event_ids) do %>
+                    <div class="flex items-center gap-2 text-sm text-zinc-700">
+                      <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
+                        {pos}
+                      </span>
+                      <span class="truncate">{event.title}</span>
+                    </div>
                   <% end %>
                 </div>
-                <.admin_dashed_more_button
-                  :if={length(@event_results) > @event_visible_count}
-                  phx-click="show-more-events"
-                >
-                  Show more ({length(@event_results) - @event_visible_count} remaining)
-                </.admin_dashed_more_button>
               </div>
-              <div
-                :if={@selected_event_ids != [] && @picker_data_loaded?}
-                class="mt-3 pt-3 border-t border-zinc-100 space-y-1.5"
-              >
-                <p class="text-xs font-medium text-zinc-500 mb-1.5 uppercase tracking-wide">
-                  Selected ({length(@selected_event_ids)})
-                </p>
-                <%= for {pos, event} <- selected_items_in_order(@event_results, @selected_event_ids) do %>
-                  <div class="flex items-center gap-2 text-sm text-zinc-700">
-                    <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600 text-xs font-bold tabular-nums">
-                      {pos}
-                    </span>
-                    <span class="truncate">{event.title}</span>
-                  </div>
-                <% end %>
-              </div>
-            </div>
-          </.form>
+            </.form>
+          </div>
         </div>
 
         <%!-- Right: Full email preview — sticky, fills viewport minus top anchor (1.5rem) + bottom bar (3.5rem) --%>
@@ -934,8 +979,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           </span>
         </div>
 
-        <%!-- Right: action buttons (hidden when readonly) --%>
-        <div :if={!@readonly?} class="flex items-center gap-2 shrink-0">
+        <%!-- Right: action buttons (hidden when readonly or loading) --%>
+        <div
+          :if={!@readonly? && !@loading_edition?}
+          class="flex items-center gap-2 shrink-0"
+        >
           <.button
             type="button"
             variant="outline"
@@ -1460,6 +1508,17 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   @impl true
+  def handle_async(:load_edition, {:ok, edition}, socket) do
+    {:noreply, apply_loaded_edition(socket, edition)}
+  end
+
+  def handle_async(:load_edition, {:exit, _reason}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:error, "Newsletter edition not found.")
+     |> push_navigate(to: ~p"/admin/newsletters")}
+  end
+
   def handle_async(
         :load_picker_data,
         {:ok, %{posts: posts, events: events}},

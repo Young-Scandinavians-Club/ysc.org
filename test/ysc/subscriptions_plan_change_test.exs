@@ -45,31 +45,33 @@ defmodule Ysc.SubscriptionsPlanChangeTest do
 
       subscription = Repo.preload(subscription, :subscription_items)
 
-      stripe_sub_initial = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        items: %Stripe.List{
-          data: [
-            %{
-              id: "si_incomplete",
-              price: single_plan.stripe_price_id,
-              quantity: 1
-            }
-          ],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        },
-        schedule: nil
-      }
+      stripe_sub_initial =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          items: %Stripe.List{
+            data: [
+              %{
+                id: "si_incomplete",
+                price: single_plan.stripe_price_id,
+                quantity: 1
+              }
+            ],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          },
+          schedule: nil
+        )
 
       ts = System.os_time(:second)
 
-      stripe_sub_incomplete = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        status: "incomplete",
-        current_period_start: ts,
-        current_period_end: ts + 30 * 24 * 60 * 60
-      }
+      stripe_sub_incomplete =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          status: "incomplete",
+          current_period_start: ts,
+          current_period_end: ts + 30 * 24 * 60 * 60
+        )
 
       try do
         Application.put_env(
@@ -156,27 +158,29 @@ defmodule Ysc.SubscriptionsPlanChangeTest do
 
       subscription = Repo.preload(subscription, :subscription_items)
 
-      stripe_sub_initial = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        items: %Stripe.List{
-          data: [
-            %{id: "si_act", price: single_plan.stripe_price_id, quantity: 1}
-          ],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        },
-        schedule: nil
-      }
+      stripe_sub_initial =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          items: %Stripe.List{
+            data: [
+              %{id: "si_act", price: single_plan.stripe_price_id, quantity: 1}
+            ],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          },
+          schedule: nil
+        )
 
       ts = System.os_time(:second)
 
-      stripe_sub_active = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        status: "active",
-        current_period_start: ts,
-        current_period_end: ts + 30 * 24 * 60 * 60
-      }
+      stripe_sub_active =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          status: "active",
+          current_period_start: ts,
+          current_period_end: ts + 30 * 24 * 60 * 60
+        )
 
       try do
         Application.put_env(
