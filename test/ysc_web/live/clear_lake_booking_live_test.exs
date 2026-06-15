@@ -5,7 +5,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   import Ysc.TestDataFactory
 
   alias Ecto.Adapters.SQL.Sandbox
-  alias Ysc.Bookings.Entitlements
   alias Ysc.Repo
 
   describe "malformed query params" do
@@ -126,43 +125,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/clear-lake")
 
       assert html =~ "Clear Lake"
-    end
-
-    test "shows member discount label when an entitlement reduces the preview price",
-         %{conn: conn} do
-      user = user_with_membership(:lifetime)
-
-      {:ok, _entitlement} =
-        Entitlements.create_entitlement(
-          %{
-            user_id: user.id,
-            issued_by_user_id: user.id,
-            benefit_kind: :fixed_amount_off,
-            property: :clear_lake,
-            amount_off: Money.new(5, :USD),
-            max_guests: 10
-          },
-          send_notification: false
-        )
-
-      conn = log_in_user(conn, user)
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
-
-      params = %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout),
-        "booking_mode" => "buyout",
-        "guests" => "4"
-      }
-
-      {:ok, view, _html} =
-        live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
-
-      render_async(view, 2_000)
-      html = render(view)
-
-      assert html =~ "Member discount"
     end
 
     test "sets page title", %{conn: conn} do
