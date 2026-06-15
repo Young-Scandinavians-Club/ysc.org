@@ -54,6 +54,8 @@ import FooterRotator from "./footer_rotator";
 import HeroVideoControls from "./hero_video_controls";
 import AdminFloatingButton from "./admin_floating_button";
 import AutoResizeIframe from "./auto_resize_iframe";
+import AutoResizeTextarea from "./auto_resize_textarea";
+import AgendaTracksScroller from "./agenda_tracks_scroller";
 import TicketSlider from "./ticket_slider";
 import WalletPlatform, { detectWalletPlatform } from "./wallet_platform";
 import AvatarCropper from "./avatar_cropper";
@@ -91,6 +93,8 @@ let Hooks = {
     HeroVideoControls,
     AdminFloatingButton,
     AutoResizeIframe,
+    AutoResizeTextarea,
+    AgendaTracksScroller,
     TicketSlider,
     WalletPlatform,
     AvatarCropper,

@@ -570,11 +570,11 @@ defmodule YscWeb.AdminEventsNewLive do
           </div>
 
           <div class="max-w-3xl mt-6">
-            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded p-6 bg-white">
               <div>
                 <h2 class="text-xl font-bold">Agenda</h2>
-                <p class="text-zinc-600 text-sm">
-                  Add schedules or itineraries to help attendees plan their day.
+                <p class="text-zinc-600 text-sm mt-1">
+                  Design your event schedule exactly as attendees will see it.
                 </p>
               </div>
 
@@ -583,79 +583,92 @@ defmodule YscWeb.AdminEventsNewLive do
                 type="button"
                 phx-click="add-agenda"
                 phx-disable-with="Adding..."
+                class="inline-flex items-center gap-2 rounded-lg py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shrink-0"
               >
-                <.icon name="hero-plus" class="-mt-0.5" /> Add Agenda
+                <.icon name="hero-plus" /> Add Agenda Track
               </.button>
+            </div>
 
-              <ul
-                id="agendas"
-                phx-update="stream"
-                phx-hook="Sortable"
-                class="w-full flex gap-3 snap-x overflow-x-auto pb-2"
+            <div class="relative mt-6">
+              <button
+                type="button"
+                data-scroll-left
+                aria-label="Scroll to previous agenda track"
+                class="absolute left-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
               >
-                <li
-                  :for={{id, agenda} <- @streams.agendas}
-                  id={id}
-                  data-id={agenda.id}
-                  class="bg-zinc-100 rounded-lg flex-shrink-0 flex flex-col"
-                >
-                  <div
-                    class="drag-handle flex items-center justify-center py-1.5 rounded-t-lg cursor-grab active:cursor-grabbing hover:bg-zinc-200 transition group"
-                    title="Drag to reorder"
-                  >
-                    <div class="flex flex-col gap-0.5">
-                      <div class="flex gap-0.5">
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                      </div>
-                      <div class="flex gap-0.5">
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                        <div class="w-1 h-1 rounded-full bg-zinc-400 group-hover:bg-zinc-600 transition">
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <.icon name="hero-chevron-left" class="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                data-scroll-right
+                aria-label="Scroll to next agenda track"
+                class="absolute right-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
+              >
+                <.icon name="hero-chevron-right" class="h-5 w-5" />
+              </button>
 
-                  <div class="mx-auto max-w-7xl px-4 pt-2 pb-4 space-y-4">
-                    <div class="flex flex-row justify-between space-x-4">
-                      <div class="w-full">
-                        <.live_component
-                          id={"edit-agenda-title-#{agenda.id}"}
-                          module={YscWeb.AgendasLive.FormComponent}
-                          agenda_id={agenda.id}
-                          event_id={@event.id}
-                          agenda={agenda}
-                        />
+              <div
+                id="agendas-scroll"
+                phx-hook="AgendaTracksScroller"
+                class="agenda-tracks-scroll overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth"
+              >
+                <ul
+                  id="agendas"
+                  phx-update="stream"
+                  phx-hook="Sortable"
+                  class="flex gap-6 w-max min-w-full"
+                >
+                  <li
+                    :for={{id, agenda} <- @streams.agendas}
+                    id={id}
+                    data-id={agenda.id}
+                    class="group/agenda flex-shrink-0 w-[450px] sm:w-[500px] snap-start flex flex-col bg-white border border-zinc-200 shadow-sm rounded overflow-hidden drag-item:scale-[1.02] drag-item:shadow-xl drag-item:z-10 drag-ghost:opacity-100 drag-ghost:bg-blue-50 drag-ghost:border-2 drag-ghost:border-dashed drag-ghost:border-blue-400"
+                  >
+                    <div class="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 drag-ghost:opacity-0">
+                      <div class="flex items-center gap-2 flex-1">
+                        <div
+                          class="drag-handle cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 p-1"
+                          title="Drag to reorder tracks"
+                        >
+                          <.icon
+                            name="hero-arrows-right-left"
+                            class="w-5 h-5 block"
+                          />
+                        </div>
+
+                        <div class="flex-1">
+                          <.live_component
+                            id={"edit-agenda-title-#{agenda.id}"}
+                            module={YscWeb.AgendasLive.FormComponent}
+                            agenda_id={agenda.id}
+                            event_id={@event.id}
+                            agenda={agenda}
+                          />
+                        </div>
                       </div>
 
                       <.link
                         phx-click="delete-agenda"
                         phx-value-id={agenda.id}
                         aria-label="delete agenda"
+                        class="text-zinc-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-md transition ml-2"
+                        data-confirm="Are you sure you want to delete this agenda?"
                       >
-                        <.icon
-                          name="hero-trash"
-                          class="px-2 py-2 hover:bg-red-600 rounded transition duration-200"
-                        />
+                        <.icon name="hero-trash" class="w-4 h-4 block" />
                       </.link>
                     </div>
 
-                    <.live_component
-                      id={agenda.id}
-                      module={YscWeb.AgendaEditComponent}
-                      agenda={agenda}
-                      event_id={@event.id}
-                    />
-                  </div>
-                </li>
-              </ul>
+                    <div class="p-6 bg-white relative drag-ghost:opacity-0">
+                      <.live_component
+                        id={agenda.id}
+                        module={YscWeb.AgendaEditComponent}
+                        agenda={agenda}
+                        event_id={@event.id}
+                      />
+                    </div>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -1793,7 +1806,8 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     {:noreply,
      socket
-     |> stream_insert(:agendas, agenda)}
+     |> stream_insert(:agendas, agenda)
+     |> push_event("scroll-agenda-into-view", %{id: "agendas-#{agenda.id}"})}
   end
 
   @impl true
