@@ -1,6 +1,7 @@
 defmodule YscWeb.BookingReceiptLive do
   use YscWeb, :live_view
 
+  alias YscWeb.BookingGuestForm
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
@@ -1524,6 +1525,9 @@ defmodule YscWeb.BookingReceiptLive do
          payment_intent_id,
          payment_intent
        ) do
+    hold_attrs = booking.modification_hold_attrs
+    original_booking = booking
+
     cond do
       Bookings.modification_ledger_recorded?(booking.id, payment_intent_id) ->
         {:ok, reload_booking_for_receipt(booking.id), payment_intent}
@@ -1542,7 +1546,13 @@ defmodule YscWeb.BookingReceiptLive do
                    payment_intent_id: payment_intent_id
                  ) do
               {:ok, updated_booking} ->
-                {:ok, updated_booking, payment_intent}
+                sync_guests_after_modification_redirect(
+                  updated_booking,
+                  hold_attrs,
+                  original_booking
+                )
+
+                {:ok, reload_booking_for_receipt(updated_booking.id), payment_intent}
 
               {:error, :no_changes} ->
                 finalize_modification_ledger_only(
@@ -1562,6 +1572,28 @@ defmodule YscWeb.BookingReceiptLive do
                 {:error, reason}
             end
         end
+    end
+  end
+
+  defp sync_guests_after_modification_redirect(
+         updated_booking,
+         hold_attrs,
+         original_booking
+       ) do
+    case BookingGuestForm.sync_guests_after_modification_apply(
+           updated_booking,
+           hold_attrs,
+           original_booking
+         ) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Modification applied but guest details could not be saved",
+          booking_id: updated_booking.id,
+          error: inspect(reason)
+        )
     end
   end
 

@@ -1973,7 +1973,7 @@ defmodule Ysc.Bookings.BookingLocker do
               |> DateTime.truncate(:second)
 
             hold_attrs =
-              encode_modification_hold_attrs(booking, attrs, hold_data)
+              encode_modification_hold_attrs(booking, attrs, hold_data, opts)
 
             case booking
                  |> Booking.changeset(
@@ -2273,13 +2273,13 @@ defmodule Ysc.Bookings.BookingLocker do
     |> Map.new()
   end
 
-  defp encode_modification_hold_attrs(booking, attrs, hold_data) do
+  defp encode_modification_hold_attrs(booking, attrs, hold_data, opts \\ []) do
     overlap_extra_guests =
       hold_data.overlap_extra_guests
       |> Enum.map(fn {day, count} -> {Date.to_iso8601(day), count} end)
       |> Map.new()
 
-    %{
+    base = %{
       "checkin_date" => Date.to_iso8601(attrs.checkin_date),
       "checkout_date" => Date.to_iso8601(attrs.checkout_date),
       "guests_count" => attrs.guests_count,
@@ -2288,6 +2288,14 @@ defmodule Ysc.Bookings.BookingLocker do
       "overlap_extra_guests" => overlap_extra_guests,
       "booking_mode" => Atom.to_string(booking.booking_mode)
     }
+
+    case Keyword.get(opts, :guest_params) do
+      guest_params when is_map(guest_params) and map_size(guest_params) > 0 ->
+        Map.put(base, "guest_params", guest_params)
+
+      _ ->
+        base
+    end
   end
 
   defp compute_modification_hold_data(booking, attrs) do
