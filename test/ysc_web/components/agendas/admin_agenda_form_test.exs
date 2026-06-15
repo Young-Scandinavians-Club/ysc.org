@@ -23,7 +23,7 @@ defmodule YscWeb.AgendasLive.FormComponentTest do
           event_id: event.id
         })
 
-      assert html =~ "Agenda Title"
+      assert html =~ "placeholder=\"e.g. Day 1, Main Stage...\""
       assert html =~ "Test Agenda"
     end
 

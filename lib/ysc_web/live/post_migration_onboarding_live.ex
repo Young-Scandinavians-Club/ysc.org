@@ -121,6 +121,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               <.step_membership_selection
                 form={@membership_selection_form}
                 membership_plan={@membership_plan}
+                membership_plans={@membership_plans}
               />
             <% end %>
             <%= if @current_step == 3 do %>
@@ -276,6 +277,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   attr :form, :any, required: true
   attr :membership_plan, :atom, required: true
+  attr :membership_plans, :list, required: true
 
   defp step_membership_selection(assigns) do
     ~H"""
@@ -303,6 +305,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             checked={@form[:membership_plan].value == "single"}
             label="Single Membership"
             subtitle="Membership for one person. Access to all YSC events and community resources."
+            footer={membership_plan_price_footer(@membership_plans, :single)}
             icon="user"
           />
           <.input
@@ -313,6 +316,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             checked={@form[:membership_plan].value == "family"}
             label="Family Membership"
             subtitle="Covers you, your spouse or partner, and children under 18. Includes family member invitations."
+            footer={membership_plan_price_footer(@membership_plans, :family)}
             icon="user-group"
           />
         </div>
@@ -1495,6 +1499,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     |> assign(:current_step, @step_profile)
     |> assign(:steps, [{"Profile", @step_profile}])
     |> assign(:membership_plan, :unknown)
+    |> assign(
+      :membership_plans,
+      Application.get_env(:ysc, :membership_plans, [])
+    )
     |> assign(:needs_plan_selection, true)
     |> assign(:needs_family_members_step, false)
     |> assign(:skip_payment, false)
@@ -2342,6 +2350,16 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {"Sweden", "SE"},
       {"Other", "other"}
     ]
+  end
+
+  defp membership_plan_price_footer(plans, plan_id) do
+    case Enum.find(plans, &(&1.id == plan_id)) do
+      %{amount: amount} ->
+        "#{Ysc.MoneyHelper.format_money!(Money.new(:USD, amount))} per year"
+
+      _ ->
+        nil
+    end
   end
 
   @impl true

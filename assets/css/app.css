@@ -5,6 +5,40 @@
 /* This file is for your main application CSS */
 
 
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.agenda-tracks-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #d4d4d8 #f4f4f5;
+}
+
+.agenda-tracks-scroll::-webkit-scrollbar {
+    height: 10px;
+}
+
+.agenda-tracks-scroll::-webkit-scrollbar-track {
+    background: #f4f4f5;
+    border-radius: 9999px;
+}
+
+.agenda-tracks-scroll::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border-radius: 9999px;
+}
+
+.agenda-tracks-scroll::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+}
+
 /* Toast container: always on top (nav, modals, overlays). Explicit here to avoid Tailwind purging. */
 
 #toast-group,

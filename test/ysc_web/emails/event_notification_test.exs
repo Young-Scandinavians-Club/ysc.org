@@ -136,10 +136,8 @@ defmodule YscWeb.Emails.EventNotificationTest do
       event =
         event
         |> Event.changeset(%{
-          start_date:
-            DateTime.add(DateTime.utc_now(), 86400, :second)
-            |> DateTime.truncate(:second),
-          start_time: ~T[14:30:00]
+          start_date: ~U[2026-07-15 00:00:00Z],
+          start_time: ~T[17:00:00]
         })
         |> Repo.update!()
         |> Repo.preload([:organizer, :cover_image])
@@ -147,8 +145,27 @@ defmodule YscWeb.Emails.EventNotificationTest do
       email_data = EventNotification.prepare_email_data(event, user)
 
       assert is_binary(email_data.event_date_time)
-      # Should include date, time, and timezone (PST/PDT)
-      assert email_data.event_date_time =~ ~r/\d{1,2}:\d{2} (AM|PM) (PST|PDT)/
+      assert email_data.event_date_time =~ "July 15, 2026"
+      assert email_data.event_date_time =~ "5:00 PM"
+      assert email_data.event_date_time =~ ~r/(PST|PDT)/
+      refute email_data.event_date_time =~ "10:00 AM"
+    end
+
+    test "decodes HTML entities in event description", %{
+      event: event,
+      user: user
+    } do
+      event =
+        event
+        |> Event.changeset(%{
+          description: "July Happy Hour at Tupper &amp; Reed"
+        })
+        |> Repo.update!()
+        |> Repo.preload([:organizer, :cover_image])
+
+      email_data = EventNotification.prepare_email_data(event, user)
+
+      assert email_data.event.description == "July Happy Hour at Tupper & Reed"
     end
 
     test "formats event datetime with date only when no time", %{

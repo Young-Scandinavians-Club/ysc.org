@@ -155,8 +155,11 @@ defmodule YscWeb.AdminPostsLiveTest do
     end
 
     test "invalid flop params redirect to default posts list", %{conn: conn} do
-      assert {:error, {:live_redirect, %{to: "/admin/posts"}}} =
-               live(conn, ~p"/admin/posts?order_by=not_a_real_field")
+      {:ok, view, _html} = live(conn, ~p"/admin/posts")
+
+      render_patch(view, ~p"/admin/posts?order_by=not_a_real_field")
+
+      assert_patched(view, ~p"/admin/posts")
     end
   end
 end

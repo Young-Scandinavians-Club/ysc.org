@@ -1,10 +1,12 @@
 defmodule YscWeb.BookingGuestFormTest do
   use Ysc.DataCase, async: true
 
+  import Ecto.Query
   import Ysc.AccountsFixtures
 
   alias Ysc.Bookings.Booking
   alias Ysc.Bookings.BookingGuest
+  alias Ysc.Repo
   alias YscWeb.BookingGuestForm
 
   describe "guest_info_required_for_modification?/2" do
@@ -108,6 +110,82 @@ defmodule YscWeb.BookingGuestFormTest do
       assert form.source["4"]["is_child"] == true
       assert form.source["5"]["first_name"] == ""
       assert form.source["5"]["is_child"] == true
+    end
+  end
+
+  describe "sync_guests_after_modification_apply/4" do
+    test "saves guests from hold attrs after modification apply" do
+      user = user_fixture()
+
+      booking =
+        %Booking{
+          id: Ecto.ULID.generate(),
+          guests_count: 2,
+          children_count: 0,
+          booking_guests: []
+        }
+
+      updated_booking = %{booking | guests_count: 3, children_count: 0}
+
+      hold_attrs = %{
+        "guest_params" => %{
+          "0" => %{
+            "first_name" => user.first_name || "Ada",
+            "last_name" => user.last_name || "Member",
+            "is_child" => false,
+            "is_booking_user" => true,
+            "order_index" => 0
+          },
+          "1" => %{
+            "first_name" => "Bob",
+            "last_name" => "Guest",
+            "is_child" => false,
+            "is_booking_user" => false,
+            "order_index" => 1
+          },
+          "2" => %{
+            "first_name" => "Cara",
+            "last_name" => "Guest",
+            "is_child" => false,
+            "is_booking_user" => false,
+            "order_index" => 2
+          }
+        }
+      }
+
+      {:ok, inserted} =
+        %Booking{
+          id: booking.id,
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :room,
+          status: :complete,
+          checkin_date: ~D[2026-08-01],
+          checkout_date: ~D[2026-08-05],
+          guests_count: 2,
+          children_count: 0,
+          reference_id: "TEST-#{System.unique_integer([:positive])}",
+          total_price: Money.new(100, :USD)
+        }
+        |> Booking.changeset(%{}, skip_validation: true)
+        |> Repo.insert()
+
+      assert :ok =
+               BookingGuestForm.sync_guests_after_modification_apply(
+                 %{updated_booking | id: inserted.id},
+                 hold_attrs,
+                 inserted
+               )
+
+      guests =
+        Ysc.Repo.all(
+          from g in BookingGuest,
+            where: g.booking_id == ^inserted.id,
+            order_by: g.order_index
+        )
+
+      assert length(guests) == 3
+      assert Enum.at(guests, 2).first_name == "Cara"
     end
   end
 end

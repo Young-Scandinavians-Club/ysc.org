@@ -6,7 +6,8 @@ defmodule YscWeb.Emails.EventPhotoUploadReminder do
     mjml_template: "templates/event_photo_upload_reminder.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers,
+    only: [absolute_url: 1, format_event_start_datetime: 2]
 
   alias Ysc.Events.Event
   alias Ysc.Media.Image
@@ -34,32 +35,12 @@ defmodule YscWeb.Emails.EventPhotoUploadReminder do
     %{
       first_name: recipient[:first_name] || recipient["first_name"] || "there",
       event_title: event.title,
-      event_date_time: format_event_datetime(event),
+      event_date_time:
+        format_event_start_datetime(event.start_date, event.start_time),
       event_image_url: event_image_url(event),
       upload_url: upload_url,
       notification_settings_url: notification_settings_url()
     }
-  end
-
-  defp format_event_datetime(event) do
-    case {event.start_date, event.start_time} do
-      {nil, _} ->
-        nil
-
-      {date, nil} ->
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        Calendar.strftime(date_only, "%B %d, %Y")
-
-      {date, time} ->
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        datetime = DateTime.new!(date_only, time, "Etc/UTC")
-        pst_datetime = DateTime.shift_zone!(datetime, "America/Los_Angeles")
-        Calendar.strftime(pst_datetime, "%B %d, %Y at %I:%M %p %Z")
-    end
   end
 
   defp event_image_url(event) do

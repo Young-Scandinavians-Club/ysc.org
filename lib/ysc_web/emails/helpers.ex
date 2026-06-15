@@ -4,6 +4,8 @@ defmodule YscWeb.Emails.Helpers do
   display formatting for money and dates.
   """
 
+  alias HtmlSanitizeEx
+
   @member_default "Valued Member"
   @email_timezone "America/Los_Angeles"
   @money_display_opts [separator: ".", delimiter: ",", fractional_digits: 2]
@@ -116,6 +118,46 @@ defmodule YscWeb.Emails.Helpers do
   def format_datetime(_, default), do: default
 
   @doc """
+  Formats an event's start date and time for email copy.
+
+  Event `start_date` and `start_time` are stored as Pacific-local wall-clock
+  values, not UTC. Do not apply timezone conversion.
+
+  Returns `default` when `start_date` is nil.
+  """
+  def format_event_start_datetime(start_date, start_time, default \\ nil)
+
+  def format_event_start_datetime(nil, _, default), do: default
+
+  def format_event_start_datetime(date, nil, _default) do
+    date
+    |> event_date()
+    |> Calendar.strftime("%B %d, %Y")
+  end
+
+  def format_event_start_datetime(date, %Time{} = time, _default) do
+    date_only = event_date(date)
+    date_str = Calendar.strftime(date_only, "%B %d, %Y")
+    time_str = Calendar.strftime(time, "%-I:%M %p")
+    tz_abbr = pacific_tz_abbreviation(date_only)
+    "#{date_str} at #{time_str} #{tz_abbr}"
+  end
+
+  @doc """
+  Strips HTML tags and decodes entities for plain-text email copy.
+
+  Returns `nil` for nil or empty input.
+  """
+  def plain_text_from_html(nil), do: nil
+  def plain_text_from_html(""), do: nil
+
+  def plain_text_from_html(html) when is_binary(html) do
+    html
+    |> HtmlSanitizeEx.strip_tags()
+    |> decode_html_entities()
+  end
+
+  @doc """
   Formats money for transactional emails (bookings, tickets, expenses).
 
   Uses comma thousands separators and two decimal places. Returns `default`
@@ -143,4 +185,27 @@ defmodule YscWeb.Emails.Helpers do
     do: Money.to_string!(money)
 
   def format_membership_money(_, default), do: default
+
+  defp event_date(%DateTime{} = datetime), do: DateTime.to_date(datetime)
+  defp event_date(%Date{} = date), do: date
+
+  defp pacific_tz_abbreviation(%Date{} = date) do
+    date
+    |> NaiveDateTime.new!(~T[12:00:00])
+    |> DateTime.from_naive!(@email_timezone)
+    |> Calendar.strftime("%Z")
+  end
+
+  defp decode_html_entities(text) do
+    case Floki.parse_fragment(text) do
+      {:ok, document} ->
+        document |> Floki.text() |> String.trim()
+
+      {:error, _} ->
+        case Floki.parse_fragment("<span>#{text}</span>") do
+          {:ok, document} -> document |> Floki.text() |> String.trim()
+          {:error, _} -> String.trim(text)
+        end
+    end
+  end
 end

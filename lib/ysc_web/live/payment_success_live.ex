@@ -85,7 +85,9 @@ defmodule YscWeb.PaymentSuccessLive do
           else
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, "Invalid payment information.",
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "We couldn't confirm your payment from this link. If you were charged, check your email for a receipt or contact us at #{Ysc.EmailConfig.contact_email()} with the date and amount. Otherwise, try checking out again.",
                title: "Payment"
              )
              |> redirect(to: ~p"/")}

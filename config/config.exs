@@ -17,6 +17,11 @@ config :ysc,
 # Configure Elixir's Calendar to use Timex timezone database
 config :elixir, :time_zone_database, Timex.Timezone.Database
 
+# Tzdata polls IANA for timezone DB updates. The built-in Hackney adapter still
+# calls hackney:body/1 on the response tuple, which breaks on hackney 4.x because
+# the body is returned directly in the tuple.
+config :tzdata, :http_client, Ysc.Tzdata.HttpClient
+
 config :ysc, Ysc.Repo,
   migration_timestamps: [type: :utc_datetime],
   pool_size: 8,
@@ -147,7 +152,8 @@ config :ex_money, default_cldr_backend: Ysc.Cldr
 
 config :ex_aws,
   access_key_id: [{:system, "AWS_ACCESS_KEY_ID"}, :instance_role],
-  secret_access_key: [{:system, "AWS_SECRET_ACCESS_KEY"}, :instance_role]
+  secret_access_key: [{:system, "AWS_SECRET_ACCESS_KEY"}, :instance_role],
+  http_client: ExAws.Request.Req
 
 config :flop, repo: Ysc.Repo
 
@@ -159,10 +165,15 @@ config :flop, repo: Ysc.Repo
 # Stripe configuration
 # Note: In production, Stripe is configured at runtime in config/runtime.exs
 # This config is for dev/test environments only
+#
+# stripity_stripe defaults to hackney with Connection: keep-alive, which returns
+# :protocol_error on hackney 4.x. Use Req via Ysc.Stripe.HttpClient instead.
 config :stripity_stripe,
   api_key: System.get_env("STRIPE_SECRET"),
   public_key: System.get_env("STRIPE_PUBLIC_KEY"),
-  webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET")
+  webhook_secret: System.get_env("STRIPE_WEBHOOK_SECRET"),
+  http_module: Ysc.Stripe.HttpClient,
+  use_connection_pool: false
 
 config :stripity_stripe, :retries,
   max_attempts: 3,
@@ -247,6 +258,34 @@ config :ysc,
       }
     }
   ]
+
+# Common event venue presets for the admin event editor (quick-pick pills)
+config :ysc, :event_location_presets, [
+  %{
+    id: "swedish_american_hall",
+    label: "Swedish American Hall",
+    location_name: "Swedish American Hall",
+    address: "2174 Market St, San Francisco, CA 94114",
+    latitude: 37.76667619093857,
+    longitude: -122.4304435827406
+  },
+  %{
+    id: "clear_lake",
+    label: "Clear Lake",
+    location_name: "Clear Lake Cabin",
+    address: "9325 Bass Road, Kelseyville, CA 95451",
+    latitude: 38.981104,
+    longitude: -122.7355958
+  },
+  %{
+    id: "norwegian_club",
+    label: "Norwegian Club",
+    location_name: "The Norwegian Club of San Francisco",
+    address: "1900 Fell St, San Francisco, CA 94117",
+    latitude: 37.7727715,
+    longitude: -122.4493584
+  }
+]
 
 # Accounting settings
 config :ysc, :accounting,

@@ -30,6 +30,12 @@ unless config_env() == :test do
   config :ysc, process_stripe_payout_webhooks: process_stripe_payout_webhooks
 end
 
+# stripity_stripe sends Connection: keep-alive, which hackney 4.x rejects with
+# :protocol_error. Route all Stripe API calls through Req (see Ysc.Stripe.HttpClient).
+config :stripity_stripe,
+  http_module: Ysc.Stripe.HttpClient,
+  use_connection_pool: false
+
 # ## FlowRoute SMS Configuration
 #
 # Configure FlowRoute API settings for all environments at runtime.
@@ -396,7 +402,9 @@ if config_env() == :prod do
   config :stripity_stripe,
     api_key: stripe_secret,
     public_key: stripe_public_key,
-    webhook_secret: stripe_webhook_secret
+    webhook_secret: stripe_webhook_secret,
+    http_module: Ysc.Stripe.HttpClient,
+    use_connection_pool: false
 
   # ## Membership Plans Configuration
   #
