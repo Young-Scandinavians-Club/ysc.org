@@ -2273,7 +2273,7 @@ defmodule Ysc.Bookings.BookingLocker do
     |> Map.new()
   end
 
-  defp encode_modification_hold_attrs(booking, attrs, hold_data, opts \\ []) do
+  defp encode_modification_hold_attrs(booking, attrs, hold_data, opts) do
     overlap_extra_guests =
       hold_data.overlap_extra_guests
       |> Enum.map(fn {day, count} -> {Date.to_iso8601(day), count} end)
