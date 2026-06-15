@@ -773,14 +773,7 @@ defmodule YscWeb.AdminGhostComponents do
           </div>
 
           <div class="hidden md:block bg-white rounded border border-zinc-200">
-            <div class="grid grid-cols-12 gap-4 px-4 py-2.5 bg-zinc-50 border-b border-zinc-200 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              <div class="col-span-1"></div>
-              <div class="col-span-3">Attendee</div>
-              <div class="col-span-2">Email</div>
-              <div class="col-span-2">Tier</div>
-              <div class="col-span-2">Ticket</div>
-              <div class="col-span-2">Order</div>
-            </div>
+            <.admin_event_check_in_table_header />
 
             <div :for={group <- @pending_groups}>
               <div class="grid grid-cols-12 gap-4 px-4 py-2 bg-zinc-50 border-b border-zinc-100">
