@@ -39,7 +39,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:event_visible_count, 10)
      |> assign(:readonly?, false)
      |> assign(:email_stats, nil)
-     |> assign(:click_stats, nil)}
+     |> assign(:click_stats, nil)
+     |> assign(:loading_edition?, false)}
   end
 
   @impl true
@@ -51,6 +52,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     socket
     |> assign(:edition, nil)
     |> assign(:readonly?, false)
+    |> assign(:loading_edition?, false)
     |> assign_form_from_edition(build_new_edition())
     |> assign(:post_results, [])
     |> assign(:event_results, [])
@@ -61,19 +63,45 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   defp apply_action(socket, :edit, %{"id" => id}) do
-    edition = Newsletter.get_edition!(id)
+    if connected?(socket) do
+      socket
+      |> assign(:loading_edition?, true)
+      |> assign(:edition, nil)
+      |> assign(:readonly?, false)
+      |> assign(:selected_post_ids, [])
+      |> assign(:selected_event_ids, [])
+      |> assign(:preview_ready?, false)
+      |> assign(:post_results, [])
+      |> assign(:event_results, [])
+      |> assign(:picker_data_loaded?, false)
+      |> assign(:picker_load_started?, false)
+      |> assign_form_from_edition(build_placeholder_edition())
+      |> start_async(:load_edition, fn -> Newsletter.get_edition!(id) end)
+      |> maybe_start_async_load_picker()
+    else
+      socket
+      |> assign(:loading_edition?, true)
+      |> assign(:edition, nil)
+      |> assign(:readonly?, false)
+      |> assign(:selected_post_ids, [])
+      |> assign(:selected_event_ids, [])
+      |> assign(:preview_ready?, false)
+      |> assign(:post_results, [])
+      |> assign(:event_results, [])
+      |> assign(:picker_data_loaded?, false)
+      |> assign(:picker_load_started?, false)
+      |> assign_form_from_edition(build_placeholder_edition())
+    end
+  end
 
+  defp apply_loaded_edition(socket, edition) do
     socket
+    |> assign(:loading_edition?, false)
     |> assign(:edition, edition)
     |> assign(:readonly?, edition.status == :sent)
     |> assign(:selected_post_ids, edition.post_ids || [])
     |> assign(:selected_event_ids, edition.event_ids || [])
     |> assign_form_from_edition(edition)
-    |> assign(:post_results, [])
-    |> assign(:event_results, [])
-    |> assign(:picker_data_loaded?, false)
-    |> assign(:picker_load_started?, false)
-    |> maybe_start_async_load_picker()
     |> maybe_load_email_stats(edition)
     |> assign_preview_data()
   end
@@ -125,6 +153,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       status: :draft
     }
     |> Edition.changeset(%{})
+  end
+
+  defp build_placeholder_edition do
+    %Edition{post_ids: [], event_ids: []}
+    |> Edition.changeset(%{"title" => "", "subject" => "", "intro_text" => ""})
   end
 
   defp assign_form_from_edition(socket, %Ecto.Changeset{} = changeset) do
@@ -553,6 +586,15 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       >
         <%!-- Left: Editor --%>
         <div id="editor-panel" class="space-y-6 pb-24">
+          <div
+            :if={@loading_edition?}
+            id="newsletter-editor-loading"
+            class="flex items-center justify-center py-24 text-zinc-500 text-sm"
+          >
+            <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
+            Loading newsletter…
+          </div>
+          <div :if={!@loading_edition?} class="space-y-6">
           <div class="border border-zinc-200 rounded-lg p-4 bg-white">
             <h2 class="text-lg font-semibold text-zinc-800 mb-4">Cover photo</h2>
             <div :if={@readonly?}>
@@ -841,6 +883,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
               </div>
             </div>
           </.form>
+          </div>
         </div>
 
         <%!-- Right: Full email preview — sticky, fills viewport minus top anchor (1.5rem) + bottom bar (3.5rem) --%>
@@ -934,8 +977,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           </span>
         </div>
 
-        <%!-- Right: action buttons (hidden when readonly) --%>
-        <div :if={!@readonly?} class="flex items-center gap-2 shrink-0">
+        <%!-- Right: action buttons (hidden when readonly or loading) --%>
+        <div :if={!@readonly? && !@loading_edition?} class="flex items-center gap-2 shrink-0">
           <.button
             type="button"
             variant="outline"
@@ -1460,6 +1503,17 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   end
 
   @impl true
+  def handle_async(:load_edition, {:ok, edition}, socket) do
+    {:noreply, apply_loaded_edition(socket, edition)}
+  end
+
+  def handle_async(:load_edition, {:exit, _reason}, socket) do
+    {:noreply,
+     socket
+     |> put_flash(:error, "Newsletter edition not found.")
+     |> push_navigate(to: ~p"/admin/newsletters")}
+  end
+
   def handle_async(
         :load_picker_data,
         {:ok, %{posts: posts, events: events}},

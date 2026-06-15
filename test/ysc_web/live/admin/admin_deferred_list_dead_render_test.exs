@@ -143,6 +143,33 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static Render Session"
   end
 
+  test "dead render skips newsletter edition query and shows loading state", %{
+    conn: conn,
+    admin: admin
+  } do
+    {:ok, edition} =
+      Ysc.Newsletter.create_edition(
+        %{"title" => "Static Render Edition", "subject" => "Weekly news"},
+        created_by_id: admin.id
+      )
+
+    editions_pattern = ~r/FROM "newsletter_editions"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/newsletters/#{edition.id}/edit")
+          |> html_response(200)
+        end,
+        pattern: editions_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Loading newsletter"
+    refute html =~ "Static Render Edition"
+  end
+
   describe "connected list loading" do
     test "events list replaces loading placeholder after connect", %{
       conn: conn,
