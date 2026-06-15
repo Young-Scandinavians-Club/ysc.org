@@ -120,7 +120,7 @@ export default RadarLocationAutocomplete = {
             </div>
             <ul
                 id="event-location-search-results"
-                class="hidden absolute z-20 mt-1 w-full bg-white border border-zinc-200 rounded shadow-lg max-h-60 overflow-auto"
+                class="hidden absolute z-20 mt-1 w-full bg-white border border-zinc-200 rounded shadow-lg max-h-60 overflow-auto pt-2"
                 role="listbox"
             ></ul>
         `;

@@ -432,8 +432,12 @@ defmodule YscWeb.AdminEventsNewLive do
                     longitude={@form[:longitude].value}
                     locked={false}
                   />
-                  <p class="text-zinc-700 text-sm">
-                    Double-check the pin on the map.
+                  <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
+                    <.icon
+                      name="hero-information-circle"
+                      class="w-4 h-4 flex-shrink-0"
+                    />
+                    Double-check the pin on the map. You can click anywhere on the map to manually adjust it.
                   </p>
                 </div>
               </div>
@@ -1628,6 +1632,7 @@ defmodule YscWeb.AdminEventsNewLive do
           preset
           |> Map.drop([:id, :label])
           |> Map.new(fn {key, value} -> {to_string(key), value} end)
+          |> Map.put("place_id", nil)
 
         {:noreply, apply_location(socket, attrs)}
 
@@ -2275,7 +2280,10 @@ defmodule YscWeb.AdminEventsNewLive do
       "longitude",
       "place_id"
     ])
-    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+    |> Enum.reject(fn
+      {"place_id", nil} -> false
+      {_key, value} -> value in [nil, ""]
+    end)
     |> Map.new()
   end
 
