@@ -1,5 +1,7 @@
 defmodule Ysc.Tzdata.HttpClient do
-  @moduledoc false
+  @moduledoc """
+  Req-backed HTTP client for tzdata release downloads.
+  """
 
   @behaviour Tzdata.HTTPClient
 

@@ -7,6 +7,61 @@ const RADAR_VERSION = "5.1.0";
 /** Maps plugin — registers `Radar.ui`; required from Radar SDK v5+ (core SDK alone has no `Radar.ui`). */
 const RADAR_MAPS_VERSION = "1.0.0";
 
+function pushLocationSelected(hook, { location_name, address, latitude, longitude, place_id }) {
+    pushEventIfConnected(hook, "location-selected", {
+        location_name: location_name || "",
+        address: address || "",
+        latitude,
+        longitude,
+        place_id: place_id || null,
+    });
+}
+
+function reverseGeocodeAndPush(hook, lat, lng) {
+    if (!window.Radar?.reverseGeocode) {
+        pushLocationSelected(hook, {
+            latitude: lat,
+            longitude: lng,
+            location_name: "",
+            address: "",
+            place_id: null,
+        });
+        return;
+    }
+
+    window.Radar.reverseGeocode({ latitude: lat, longitude: lng })
+        .then((result) => {
+            const address = result?.addresses?.[0];
+
+            if (address) {
+                pushLocationSelected(hook, {
+                    location_name: address.placeLabel || address.addressLabel || "",
+                    address: address.formattedAddress || "",
+                    latitude: lat,
+                    longitude: lng,
+                    place_id: address.placeId || null,
+                });
+            } else {
+                pushLocationSelected(hook, {
+                    latitude: lat,
+                    longitude: lng,
+                    location_name: "",
+                    address: "",
+                    place_id: null,
+                });
+            }
+        })
+        .catch(() => {
+            pushLocationSelected(hook, {
+                latitude: lat,
+                longitude: lng,
+                location_name: "",
+                address: "",
+                place_id: null,
+            });
+        });
+}
+
 /**
  * Radar serves glyph PBFs at paths like `/fonts/Graphik Regular,Noto Sans Regular/0-255.pbf`.
  * Some Radar API deployments return 500 when commas/spaces are left unencoded in the path.
@@ -219,7 +274,7 @@ export default RadarMap = {
                     return;
                 }
 
-                pushEventIfConnected(this, "map-new-marker", { lat: lat, long: lng });
+                reverseGeocodeAndPush(this, lat, lng);
                 map.fitToMarkers({ maxZoom: 14, padding: 80 });
 
                 existingMarker.on("click", () => {

@@ -1186,7 +1186,7 @@ defmodule YscWeb.AdminComponents do
       <div
         id={@grid_id}
         phx-update="stream"
-        phx-viewport-bottom="load-more-media"
+        phx-viewport-bottom={!@end_of_timeline? && "load-more-media"}
         phx-target={@target}
         class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto pr-1"
       >
@@ -1213,10 +1213,6 @@ defmodule YscWeb.AdminComponents do
           </div>
         </button>
       </div>
-
-      <p :if={@end_of_timeline?} class="text-center text-xs text-zinc-400 py-2">
-        No more images
-      </p>
     </div>
     """
   end

@@ -32,6 +32,7 @@ import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
 import DaterangeHover from "./daterange-hover";
 import RadarMap from "./radar";
+import RadarLocationAutocomplete from "./radar_location_autocomplete";
 import MoneyInput from "./money_input";
 import Turnstile from "./phoenix_turnstile";
 import StripeInput from "./stripe_payment";
@@ -54,6 +55,8 @@ import FooterRotator from "./footer_rotator";
 import HeroVideoControls from "./hero_video_controls";
 import AdminFloatingButton from "./admin_floating_button";
 import AutoResizeIframe from "./auto_resize_iframe";
+import AutoResizeTextarea from "./auto_resize_textarea";
+import AgendaTracksScroller from "./agenda_tracks_scroller";
 import TicketSlider from "./ticket_slider";
 import WalletPlatform, { detectWalletPlatform } from "./wallet_platform";
 import AvatarCropper from "./avatar_cropper";
@@ -69,6 +72,7 @@ let Hooks = {
     BlurHashImage,
     DaterangeHover,
     RadarMap,
+    RadarLocationAutocomplete,
     MoneyInput,
     Turnstile,
     StripeInput,
@@ -91,6 +95,8 @@ let Hooks = {
     HeroVideoControls,
     AdminFloatingButton,
     AutoResizeIframe,
+    AutoResizeTextarea,
+    AgendaTracksScroller,
     TicketSlider,
     WalletPlatform,
     AvatarCropper,
