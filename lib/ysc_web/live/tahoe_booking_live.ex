@@ -2417,7 +2417,8 @@ defmodule YscWeb.TahoeBookingLive do
                         class="flex justify-between text-sm text-emerald-800 pt-1"
                       >
                         <span>
-                          {@price_breakdown[:entitlement_summary] || "Member discount"}
+                          {@price_breakdown[:entitlement_summary] ||
+                            "Member discount"}
                         </span>
                         <span>
                           −{MoneyHelper.format_money!(
