@@ -835,10 +835,14 @@ defmodule Ysc.Scanning do
   @doc """
   Lists all confirmed tickets for an event for the check-in management view.
   Optionally filters by a search query matching attendee name, purchaser name,
-  purchaser email, order reference (ORD-xxx), or ticket reference (TKT-xxx).
+  purchaser email (full address only), order reference (ORD-xxx), or ticket reference
+  (TKT-xxx). Name search requires at least three characters and does not match email
+  substrings (e.g. `%@gmail%`).
   Returns tickets preloaded with registration, user, ticket_tier, and ticket_order.
   Sorted: pending (not checked in) alphabetically by attendee/purchaser name, then checked-in.
   """
+  @min_event_checkin_name_search_length 3
+
   def list_event_checkin_tickets(event_id, search \\ nil) do
     base_query =
       Ticket
@@ -859,23 +863,7 @@ defmodule Ysc.Scanning do
 
     query =
       if search && search != "" do
-        search_term = "%#{search}%"
-
-        base_query
-        |> where(
-          [t, registration: td, user: u, ticket_order: o],
-          ilike(
-            fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
-            ^search_term
-          ) or
-            ilike(
-              fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
-              ^search_term
-            ) or
-            ilike(u.email, ^search_term) or
-            ilike(o.reference_id, ^search_term) or
-            ilike(t.reference_id, ^search_term)
-        )
+        apply_event_checkin_search(base_query, search)
       else
         base_query
       end
@@ -892,6 +880,62 @@ defmodule Ysc.Scanning do
         )
     )
     |> Repo.all()
+  end
+
+  defp apply_event_checkin_search(query, search) do
+    trimmed = String.trim(search)
+
+    cond do
+      event_checkin_full_email_query?(trimmed) ->
+        email_lower = String.downcase(trimmed)
+
+        where(
+          query,
+          [t, registration: td, user: u, ticket_order: o],
+          fragment("lower(?)", u.email) == ^email_lower or
+            fragment("lower(?)", td.email) == ^email_lower
+        )
+
+      event_checkin_reference_query?(trimmed) ->
+        search_term = "%#{trimmed}%"
+
+        where(
+          query,
+          [t, registration: td, user: u, ticket_order: o],
+          ilike(o.reference_id, ^search_term) or
+            ilike(t.reference_id, ^search_term)
+        )
+
+      String.length(trimmed) < @min_event_checkin_name_search_length ->
+        where(query, [t], false)
+
+      true ->
+        search_term = "%#{trimmed}%"
+
+        where(
+          query,
+          [t, registration: td, user: u, ticket_order: o],
+          ilike(
+            fragment("concat(?, ' ', ?)", td.first_name, td.last_name),
+            ^search_term
+          ) or
+            ilike(
+              fragment("concat(?, ' ', ?)", u.first_name, u.last_name),
+              ^search_term
+            ) or
+            ilike(o.reference_id, ^search_term) or
+            ilike(t.reference_id, ^search_term)
+        )
+    end
+  end
+
+  defp event_checkin_full_email_query?(query) do
+    String.contains?(query, "@") and
+      String.match?(query, ~r/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
+  end
+
+  defp event_checkin_reference_query?(query) do
+    String.match?(query, ~r/^(?i)(ORD-|TKT-)/)
   end
 
   @doc """

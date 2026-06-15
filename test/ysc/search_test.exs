@@ -126,5 +126,20 @@ defmodule Ysc.SearchTest do
       assert Map.has_key?(result, :users)
       assert Map.has_key?(result, :bookings)
     end
+
+    test "does not match user email substrings in magic search" do
+      _user =
+        user_fixture(%{
+          email: "magic.search.harvest@gmail.com",
+          first_name: "Magic",
+          last_name: "Harvest",
+          state: :active
+        })
+
+      result = Search.global_search("@gmail.com")
+      assert result.users == []
+      assert result.tickets == []
+      assert result.bookings == []
+    end
   end
 end

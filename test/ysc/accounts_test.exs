@@ -632,6 +632,56 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "search_users_for_staff_lookup/2" do
+    test "does not match email substrings" do
+      user =
+        user_fixture(%{
+          email: "staff.lookup@gmail.com",
+          first_name: "StaffLookup",
+          last_name: "Probe",
+          state: :active
+        })
+
+      assert Accounts.search_users_for_staff_lookup("@gmail.com") == []
+      assert Accounts.search_users_for_staff_lookup("%@gmail.com") == []
+
+      refute Enum.any?(
+               Accounts.search_users_for_staff_lookup("gmail.com"),
+               &(&1.id == user.id)
+             )
+    end
+
+    test "matches a full email address" do
+      user =
+        user_fixture(%{
+          email: "full.lookup@example.com",
+          first_name: "Full",
+          last_name: "Lookup",
+          state: :active
+        })
+
+      assert [%{id: id}] = Accounts.search_users_for_staff_lookup(user.email)
+      assert id == user.id
+    end
+
+    test "requires at least three characters for name search" do
+      user =
+        user_fixture(%{
+          email: "name.lookup@example.com",
+          first_name: "Nam",
+          last_name: "Lookup",
+          state: :active
+        })
+
+      assert Accounts.search_users_for_staff_lookup("Na") == []
+
+      assert Enum.any?(
+               Accounts.search_users_for_staff_lookup("Nam"),
+               &(&1.id == user.id)
+             )
+    end
+  end
+
   describe "get_user_by_email_and_password/2" do
     test "does not return the user if the email does not exist" do
       refute Accounts.get_user_by_email_and_password(

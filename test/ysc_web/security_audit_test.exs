@@ -18,6 +18,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
   Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
+  Finding 21 (MEDIUM)   Event check-in search allowed email substring harvesting by volunteers
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1195,6 +1196,48 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:error, :payment_metadata_mismatch} =
                Bookings.verify_booking_payment_intent(payment_intent, booking_b)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 21 (MEDIUM): Event check-in search must not allow email substring harvesting
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 21: event check-in search blocks email substring enumeration" do
+    import Ysc.EventsFixtures
+    import Ysc.TicketsFixtures
+
+    alias Ysc.Scanning
+    alias Ysc.Repo
+
+    test "list_event_checkin_tickets does not match email substrings" do
+      admin = user_fixture(%{role: :admin})
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      buyer =
+        user_fixture(%{
+          email: "event.checkin.harvest@gmail.com",
+          first_name: "Harvest",
+          last_name: "Probe",
+          state: :active
+        })
+
+      order = ticket_order_fixture(%{user: buyer, event: event, tier: tier})
+
+      order = Repo.preload(order, :tickets)
+
+      Enum.each(order.tickets, fn ticket ->
+        ticket
+        |> Ecto.Changeset.change(status: :confirmed)
+        |> Repo.update!()
+      end)
+
+      assert Scanning.list_event_checkin_tickets(event.id, "@gmail.com") == []
+      assert Scanning.list_event_checkin_tickets(event.id, "%@gmail.com") == []
+
+      assert length(Scanning.list_event_checkin_tickets(event.id, buyer.email)) ==
+               1
     end
   end
 

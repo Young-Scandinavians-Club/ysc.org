@@ -1132,6 +1132,34 @@ defmodule Ysc.ScanningTest do
       assert length(results) == 1
     end
 
+    test "does not match email substrings", %{event: event, buyer: buyer} do
+      assert Scanning.list_event_checkin_tickets(event.id, "@gmail.com") == []
+
+      assert Scanning.list_event_checkin_tickets(event.id, "%@#{buyer.email}") ==
+               []
+
+      domain = buyer.email |> String.split("@") |> List.last()
+      assert Scanning.list_event_checkin_tickets(event.id, "@#{domain}") == []
+    end
+
+    test "requires at least three characters for name search", %{
+      event: event,
+      buyer: buyer
+    } do
+      assert Scanning.list_event_checkin_tickets(
+               event.id,
+               String.slice(buyer.first_name, 0, 2)
+             ) ==
+               []
+
+      assert length(
+               Scanning.list_event_checkin_tickets(
+                 event.id,
+                 String.slice(buyer.first_name, 0, 3)
+               )
+             ) == 1
+    end
+
     test "filters by order reference ID", %{event: event, order: order} do
       results =
         Scanning.list_event_checkin_tickets(event.id, order.reference_id)
