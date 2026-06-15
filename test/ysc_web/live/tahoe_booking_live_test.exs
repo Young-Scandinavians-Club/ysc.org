@@ -6,7 +6,6 @@ defmodule YscWeb.TahoeBookingLiveTest do
   import Ysc.TestDataFactory
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.Entitlements
 
   describe "deferred room availability" do
     test "populates room cards after connect when booking dates are in the URL",
