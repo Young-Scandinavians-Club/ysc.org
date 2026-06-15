@@ -302,8 +302,14 @@ defmodule Ysc.Accounts.SignupApplication do
 
       nil ->
         # Default: only validate in production environment
-        environment = Application.get_env(:ysc, :environment, "dev")
-        environment == "production"
+        production_environment?()
+    end
+  end
+
+  defp production_environment? do
+    case Application.get_env(:ysc, :environment, "dev") do
+      env when env in ["production", "prod", :production, :prod] -> true
+      _ -> false
     end
   end
 
