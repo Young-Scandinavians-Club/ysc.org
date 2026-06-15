@@ -1552,7 +1552,8 @@ defmodule YscWeb.BookingReceiptLive do
                   original_booking
                 )
 
-                {:ok, reload_booking_for_receipt(updated_booking.id), payment_intent}
+                {:ok, reload_booking_for_receipt(updated_booking.id),
+                 payment_intent}
 
               {:error, :no_changes} ->
                 finalize_modification_ledger_only(

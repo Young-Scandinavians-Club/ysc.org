@@ -629,7 +629,9 @@ defmodule YscWeb.BookingGuestForm do
     end)
   end
 
-  defp hold_guest_params(%{"guest_params" => params}) when is_map(params), do: params
+  defp hold_guest_params(%{"guest_params" => params}) when is_map(params),
+    do: params
+
   defp hold_guest_params(_), do: nil
 
   defp guest_counts_changed?(%Booking{} = original, %Booking{} = updated) do

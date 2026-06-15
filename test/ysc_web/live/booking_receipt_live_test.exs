@@ -1399,7 +1399,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, room} =
         Bookings.create_room(%{
-          name: "Receipt guest modify room #{System.unique_integer([:positive])}",
+          name:
+            "Receipt guest modify room #{System.unique_integer([:positive])}",
           property: :tahoe,
           room_category_id: category.id,
           capacity_max: 4
