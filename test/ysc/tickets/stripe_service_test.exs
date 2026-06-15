@@ -64,6 +64,15 @@ defmodule Ysc.Tickets.StripeServiceTest do
     %{user: user, ticket_order: ticket_order}
   end
 
+  defp cancel_timeout_jobs_for_order!(ticket_order_id) do
+    from(j in Oban.Job,
+      where: j.worker == "Ysc.Tickets.TimeoutWorker",
+      where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Ysc.Repo.delete_all()
+  end
+
   describe "create_payment_intent/2" do
     test "creates payment intent with correct parameters", %{
       ticket_order: ticket_order
@@ -166,15 +175,6 @@ defmodule Ysc.Tickets.StripeServiceTest do
       }
 
       struct(Stripe.PaymentIntent, Map.merge(defaults, Map.new(overrides)))
-    end
-
-    defp cancel_timeout_jobs_for_order!(ticket_order_id) do
-      from(j in Oban.Job,
-        where: j.worker == "Ysc.Tickets.TimeoutWorker",
-        where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
-        where: j.state in ["available", "scheduled", "retryable"]
-      )
-      |> Ysc.Repo.delete_all()
     end
 
     test "completes pending order when given a payment intent id", %{
@@ -287,15 +287,6 @@ defmodule Ysc.Tickets.StripeServiceTest do
       }
 
       struct(Stripe.PaymentIntent, Map.merge(defaults, Map.new(overrides)))
-    end
-
-    defp cancel_timeout_jobs_for_order!(ticket_order_id) do
-      from(j in Oban.Job,
-        where: j.worker == "Ysc.Tickets.TimeoutWorker",
-        where: fragment("?->>'ticket_order_id' = ?", j.args, ^ticket_order_id),
-        where: j.state in ["available", "scheduled", "retryable"]
-      )
-      |> Ysc.Repo.delete_all()
     end
 
     test "cancels a pending ticket order after payment failure" do

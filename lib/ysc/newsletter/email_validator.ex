@@ -227,13 +227,20 @@ defmodule Ysc.Newsletter.EmailValidator do
           |> String.split("\n", trim: true)
           |> Enum.map(&String.trim/1)
           |> Enum.reject(&(&1 == "" || String.starts_with?(&1, "#")))
+          |> Enum.map(&String.downcase/1)
 
-        # Clear existing entries (if reloading)
-        :ets.delete_all_objects(@ets_table)
+        new_domain_set = MapSet.new(domains)
 
-        # Insert all domains
-        Enum.each(domains, fn domain ->
-          :ets.insert(@ets_table, {String.downcase(domain), true})
+        # Upsert before removing stale keys so concurrent lookups never see an
+        # empty table during reload (async tests reload in parallel with signups).
+        :ets.insert(@ets_table, Enum.map(domains, &{&1, true}))
+
+        @ets_table
+        |> :ets.tab2list()
+        |> Enum.each(fn {domain, _} ->
+          unless MapSet.member?(new_domain_set, domain) do
+            :ets.delete(@ets_table, domain)
+          end
         end)
 
         count = :ets.info(@ets_table, :size)
