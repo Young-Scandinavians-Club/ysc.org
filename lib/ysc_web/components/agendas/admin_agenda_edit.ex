@@ -246,7 +246,8 @@ defmodule YscWeb.AgendaEditComponent do
      |> assign(agenda_items: agenda.agenda_items)
      |> assign(
        chronological_warning: check_chronological_order(agenda.agenda_items)
-     )}
+     )
+     |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}))}
   end
 
   def update(

@@ -14,6 +14,14 @@ function setButtonVisible(button, visible) {
   button.classList.toggle("opacity-0", !visible);
   button.classList.toggle("pointer-events-none", !visible);
   button.classList.toggle("opacity-100", visible);
+
+  if (visible) {
+    button.setAttribute("aria-hidden", "false");
+    button.removeAttribute("tabindex");
+  } else {
+    button.setAttribute("aria-hidden", "true");
+    button.setAttribute("tabindex", "-1");
+  }
 }
 
 function updateControls(el) {
@@ -52,6 +60,14 @@ module.exports = {
         : event.deltaY;
 
       if (delta === 0) return;
+
+      const maxScrollLeft = this.el.scrollWidth - this.el.clientWidth;
+      const nextScrollLeft = Math.min(
+        maxScrollLeft,
+        Math.max(0, this.el.scrollLeft + delta)
+      );
+
+      if (nextScrollLeft === this.el.scrollLeft) return;
 
       event.preventDefault();
       this.el.scrollBy({ left: delta, behavior: "auto" });

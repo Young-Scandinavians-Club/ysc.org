@@ -579,7 +579,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 type="button"
                 phx-click="add-agenda"
                 phx-disable-with="Adding..."
-                class="inline-flex items-center gap-2 rounded-lg py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition shrink-0"
+                class="shrink-0"
               >
                 <.icon name="hero-plus" /> Add Agenda Track
               </.button>
