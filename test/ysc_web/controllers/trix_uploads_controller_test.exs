@@ -329,11 +329,24 @@ defmodule YscWeb.TrixUploadsControllerTest do
 
   defp override_exaws_s3_port(port) do
     original = Application.get_env(:ex_aws, :s3)
+    prev_req_opts = Application.get_env(:ex_aws, :req_opts, [])
 
     Application.put_env(:ex_aws, :s3,
       scheme: "http://",
       host: "localhost",
       port: port
+    )
+
+    Application.put_env(
+      :ex_aws,
+      :req_opts,
+      Keyword.merge(prev_req_opts,
+        connect_options: [protocols: [:http1]],
+        pool_timeout: 60_000,
+        finch_pools: %{
+          :default => [size: 20, count: 1]
+        }
+      )
     )
 
     on_exit(fn ->
@@ -342,6 +355,8 @@ defmodule YscWeb.TrixUploadsControllerTest do
       else
         Application.delete_env(:ex_aws, :s3)
       end
+
+      Application.put_env(:ex_aws, :req_opts, prev_req_opts)
     end)
   end
 
@@ -479,25 +494,22 @@ defmodule YscWeb.TrixUploadsControllerTest do
       count_before = Media.count_images()
       parent = self()
 
-      responses =
-        1..2
-        |> Task.async_stream(
-          fn _ ->
-            Ysc.DataCase.allow_sandbox(self(), parent)
+      upload = fn ->
+        Ysc.DataCase.allow_sandbox(self(), parent)
 
-            conn =
-              user
-              |> build_logged_in_admin_conn()
-              |> post(~p"/admin/trix-uploads", %{
-                "file" => plain_text_upload(path, "concurrent.png")
-              })
+        user
+        |> build_logged_in_admin_conn()
+        |> post(~p"/admin/trix-uploads", %{
+          "file" => plain_text_upload(path, "concurrent.png")
+        })
+      end
 
-            conn
-          end,
-          max_concurrency: 2,
-          timeout: 120_000
-        )
-        |> Enum.map(fn {:ok, conn} -> conn end)
+      # Stagger task start so two ExAws multipart uploads do not exhaust the
+      # shared Req connection pool in CI (pool_not_available flakes).
+      task1 = Task.async(upload)
+      Process.sleep(50)
+      task2 = Task.async(upload)
+      responses = [Task.await(task1, 120_000), Task.await(task2, 120_000)]
 
       for conn <- responses do
         assert %{"url" => url} = json_response(conn, 201)

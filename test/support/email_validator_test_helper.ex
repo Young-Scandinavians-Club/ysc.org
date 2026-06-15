@@ -7,10 +7,56 @@ defmodule Ysc.EmailValidatorTestHelper do
   `@tag :external_dns` integration tests.
   """
 
+  import ExUnit.Assertions, only: [flunk: 1]
+
   alias Ysc.Newsletter.EmailValidator
 
   @mx_overrides_table :ysc_mx_test_overrides
   @process_mx_override_key {EmailValidator, :process_mx_override}
+
+  @doc """
+  Asserts that `domain` is present in the disposable-domain ETS table.
+
+  Reloads the table when missing so async suites cannot leave lookups empty mid-run.
+  """
+  def ensure_disposable_domain!(domain) when is_binary(domain) do
+    domain = String.downcase(domain)
+    table = :disposable_email_domains
+
+    EmailValidator.init_ets_table()
+
+    case :ets.lookup(table, domain) do
+      [{^domain, true}] ->
+        :ok
+
+      _ ->
+        EmailValidator.reload_disposable_domains()
+
+        case :ets.lookup(table, domain) do
+          [{^domain, true}] ->
+            :ok
+
+          _ ->
+            flunk(
+              "expected disposable domain #{domain} to be loaded in #{inspect(table)}"
+            )
+        end
+    end
+  end
+
+  @doc """
+  Runs `fun` with a process-local MX resolver override, then clears it.
+  """
+  def with_mx_resolver_override(resolver_fun, fun)
+      when is_function(resolver_fun, 1) and is_function(fun, 0) do
+    Process.put(@process_mx_override_key, resolver_fun)
+
+    try do
+      fun.()
+    after
+      Process.delete(@process_mx_override_key)
+    end
+  end
 
   @doc """
   Stubs MX resolution to succeed in the current process (or the given pid / LiveView).
