@@ -735,72 +735,50 @@ defmodule YscWeb.AdminNewslettersLive do
 
   def edition_actions_dropdown(assigns) do
     ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
-      <.dropdown
-        id={@menu_id}
-        right={true}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+    <.admin_row_actions_dropdown id={@menu_id} label="Newsletter actions">
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-open"}
+        icon={
+          if @edition.status == :sent, do: "hero-eye", else: "hero-pencil-square"
+        }
+        navigate={~p"/admin/newsletters/#{@edition.id}/edit"}
       >
-        <:button_block>
-          <span class="sr-only">Newsletter actions</span>
-          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
-        </:button_block>
-
-        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
-          <ul class="py-1">
-            <li>
-              <.link
-                id={"#{@menu_id}-open"}
-                navigate={~p"/admin/newsletters/#{@edition.id}/edit"}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100"
-              >
-                <.icon
-                  name={
-                    if @edition.status == :sent,
-                      do: "hero-eye",
-                      else: "hero-pencil-square"
-                  }
-                  class="h-5 w-5 shrink-0 text-zinc-500"
-                />
-                <span>{if @edition.status == :sent, do: "View", else: "Edit"}</span>
-              </.link>
-            </li>
-            <li :if={@edition.status == :sending}>
-              <span class="flex w-full items-center gap-2 px-4 py-2 text-left text-blue-600">
-                <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></span>
-                <span>Sending…</span>
-              </span>
-            </li>
-            <li :if={@edition.status == :draft}>
-              <button
-                id={"#{@menu_id}-send-now"}
-                type="button"
-                phx-click="send-now"
-                phx-value-id={@edition.id}
-                data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
-              >
-                <.icon name="hero-paper-airplane" class="h-5 w-5 shrink-0" />
-                <span>Send now</span>
-              </button>
-            </li>
-            <li :if={@edition.status not in [:sent, :sending]}>
-              <button
-                id={"#{@menu_id}-delete"}
-                type="button"
-                phx-click="delete-edition"
-                phx-value-id={@edition.id}
-                data-confirm="Delete this newsletter? This cannot be undone."
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-red-600 transition hover:bg-zinc-100"
-              >
-                <.icon name="hero-trash" class="h-5 w-5 shrink-0" />
-                <span>Delete</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </.dropdown>
-    </div>
+        {if @edition.status == :sent, do: "View", else: "Edit"}
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={@edition.status == :sending}
+        id={"#{@menu_id}-sending"}
+        static
+        tone={:info}
+      >
+        <:leading>
+          <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></span>
+        </:leading>
+        Sending…
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={@edition.status == :draft}
+        id={"#{@menu_id}-send-now"}
+        icon="hero-paper-airplane"
+        tone={:success}
+        phx-click="send-now"
+        phx-value-id={@edition.id}
+        data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
+      >
+        Send now
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={@edition.status not in [:sent, :sending]}
+        id={"#{@menu_id}-delete"}
+        icon="hero-trash"
+        tone={:danger}
+        phx-click="delete-edition"
+        phx-value-id={@edition.id}
+        data-confirm="Delete this newsletter? This cannot be undone."
+      >
+        Delete
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
     """
   end
 
@@ -809,48 +787,29 @@ defmodule YscWeb.AdminNewslettersLive do
 
   def subscriber_actions_dropdown(assigns) do
     ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
-      <.dropdown
-        id={@menu_id}
-        right={true}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+    <.admin_row_actions_dropdown id={@menu_id} label="Subscriber actions">
+      <.admin_dropdown_menu_item
+        :if={@subscriber.subscribed}
+        id={"#{@menu_id}-remove"}
+        icon="hero-user-minus"
+        tone={:danger}
+        phx-click="remove-subscriber"
+        phx-value-email={@subscriber.email}
+        data-confirm="Remove this subscriber? They will no longer receive newsletters."
       >
-        <:button_block>
-          <span class="sr-only">Subscriber actions</span>
-          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
-        </:button_block>
-
-        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
-          <ul class="py-1">
-            <li :if={@subscriber.subscribed}>
-              <button
-                id={"#{@menu_id}-remove"}
-                type="button"
-                phx-click="remove-subscriber"
-                phx-value-email={@subscriber.email}
-                data-confirm="Remove this subscriber? They will no longer receive newsletters."
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-red-600 transition hover:bg-zinc-100"
-              >
-                <.icon name="hero-user-minus" class="h-5 w-5 shrink-0" />
-                <span>Remove</span>
-              </button>
-            </li>
-            <li :if={!@subscriber.subscribed}>
-              <button
-                id={"#{@menu_id}-re-add"}
-                type="button"
-                phx-click="resubscribe"
-                phx-value-email={@subscriber.email}
-                class="flex w-full items-center gap-2 px-4 py-2 text-left text-emerald-700 transition hover:bg-zinc-100"
-              >
-                <.icon name="hero-user-plus" class="h-5 w-5 shrink-0" />
-                <span>Re-add</span>
-              </button>
-            </li>
-          </ul>
-        </div>
-      </.dropdown>
-    </div>
+        Remove
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        :if={!@subscriber.subscribed}
+        id={"#{@menu_id}-re-add"}
+        icon="hero-user-plus"
+        tone={:success}
+        phx-click="resubscribe"
+        phx-value-email={@subscriber.email}
+      >
+        Re-add
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
     """
   end
 

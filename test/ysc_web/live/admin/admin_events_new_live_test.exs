@@ -635,4 +635,120 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert reloaded_event.title == "Update 2"
     end
   end
+
+  describe "location presets" do
+    setup [:create_admin]
+
+    test "renders preset pill buttons on edit tab", %{conn: conn, admin: admin} do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "#location-presets")
+      assert has_element?(view, "#location-preset-swedish_american_hall")
+      assert has_element?(view, "#location-preset-clear_lake")
+      assert has_element?(view, "#location-preset-norwegian_club")
+      assert has_element?(view, "#event-location-search")
+      assert has_element?(view, "span", "Frequent Venues")
+      assert has_element?(view, "#event-location-search[data-presets]")
+
+      assert has_element?(
+               view,
+               "#location-preset-swedish_american_hall",
+               "Swedish American Hall"
+             )
+    end
+
+    test "renders hidden latitude and longitude inputs", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      assert has_element?(view, "input[name='event[latitude]'][type='hidden']")
+      assert has_element?(view, "input[name='event[longitude]'][type='hidden']")
+      refute has_element?(view, "summary", "Advanced (Coordinates)")
+    end
+
+    test "apply-location-preset updates event location fields", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#location-preset-swedish_american_hall")
+      |> render_click()
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.location_name == "Swedish American Hall"
+      assert reloaded.address == "2174 Market St, San Francisco, CA 94114"
+      assert reloaded.latitude == 37.76667619093857
+      assert reloaded.longitude == -122.4304435827406
+
+      assert has_element?(view, "#location-display-details")
+
+      assert has_element?(
+               view,
+               "input[name='event[location_name]'][value='Swedish American Hall']"
+             )
+
+      assert has_element?(
+               view,
+               "input[name='event[address]'][value='2174 Market St, San Francisco, CA 94114']"
+             )
+    end
+
+    test "apply-location-preset clears stale place_id from prior search", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#event-location-search")
+      |> render_hook("location-selected", %{
+        "location_name" => "Test Venue",
+        "address" => "123 Main St, San Francisco, CA",
+        "latitude" => "37.77",
+        "longitude" => "-122.42",
+        "place_id" => "radar-place-123"
+      })
+
+      view
+      |> element("#location-preset-swedish_american_hall")
+      |> render_click()
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.place_id == nil
+      assert reloaded.location_name == "Swedish American Hall"
+    end
+
+    test "location-selected updates event location fields", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#event-location-search")
+      |> render_hook("location-selected", %{
+        "location_name" => "Test Venue",
+        "address" => "123 Main St, San Francisco, CA",
+        "latitude" => "37.77",
+        "longitude" => "-122.42",
+        "place_id" => "radar-place-123"
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.location_name == "Test Venue"
+      assert reloaded.address == "123 Main St, San Francisco, CA"
+      assert reloaded.latitude == 37.77
+      assert reloaded.longitude == -122.42
+      assert reloaded.place_id == "radar-place-123"
+    end
+  end
 end

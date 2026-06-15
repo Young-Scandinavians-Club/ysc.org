@@ -24,7 +24,13 @@ defmodule YscWeb.UserForgotPasswordLive do
         phx-submit="send_email"
         class="py-8"
       >
-        <.input field={@form[:email]} type="email" placeholder="Email" required />
+        <.input
+          field={@form[:email]}
+          type="email"
+          label="Email address"
+          placeholder="you@example.com"
+          required
+        />
         <:actions>
           <.button phx-disable-with="Sending..." class="w-full">
             Send password reset instructions

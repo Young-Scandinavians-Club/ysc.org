@@ -171,6 +171,9 @@ defmodule Ysc.MixProject do
       # GHSA-rhv4-8758-jx7v: Decimal < 3.0.0 (DoS via unbounded exponent). Override pulls 3.1.x onto
       # transitive ~> 2.x (e.g. retry_on).
       {:decimal, "~> 3.1", override: true},
+      # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
+      # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
+      {:hackney, "~> 4.0", override: true},
       {:argon2_elixir, "~> 4.1"},
       {:atomex, "~> 0.5"},
       {:blurhash, "~> 0.1", hex: :rinpatch_blurhash},
@@ -191,7 +194,7 @@ defmodule Ysc.MixProject do
       {:eqrcode, "~> 0.2"},
       {:esbuild, "~> 0.10", runtime: Mix.env() == :dev},
       {:ex_aws_s3, "~> 2.5"},
-      {:ex_aws, "~> 2.6"},
+      {:ex_aws, "~> 2.7"},
       {:ex_cldr_calendars, "~> 2.4"},
       {:ex_cldr_currencies, "~> 2.17"},
       {:ex_cldr_dates_times, "~> 2.25"},
@@ -246,9 +249,9 @@ defmodule Ysc.MixProject do
       {:retry_on, "~> 0.1"},
       {:sentry, "~> 13.2"},
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
-      {:stripity_stripe, "~> 3.2"},
+      {:stripity_stripe, "~> 3.3"},
       {:swoosh, "~> 1.26.1"},
-      {:tailwind, "~> 0.4", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.3"},
       {:timex, "~> 3.7"},

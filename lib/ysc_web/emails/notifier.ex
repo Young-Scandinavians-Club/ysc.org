@@ -25,7 +25,6 @@ defmodule YscWeb.Emails.Notifier do
     "application_approved_family_linked" =>
       YscWeb.Emails.ApplicationApprovedFamilyLinked,
     "application_submitted" => YscWeb.Emails.ApplicationSubmitted,
-    "confirm_email" => YscWeb.Emails.ConfirmEmail,
     "reset_password" => YscWeb.Emails.ResetPassword,
     "password_changed" => YscWeb.Emails.PasswordChanged,
     "passkey_added" => YscWeb.Emails.PasskeyAdded,

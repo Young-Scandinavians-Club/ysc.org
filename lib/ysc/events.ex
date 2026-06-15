@@ -2035,7 +2035,10 @@ defmodule Ysc.Events do
     |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
     |> where([event: e], e.start_date > ^DateTime.utc_now())
     |> where([event: e], e.state in [:published, :cancelled])
-    |> preload([event: e, ticket_tier: tt], event: e, ticket_tier: tt)
+    |> preload([event: e, ticket_tier: tt],
+      event: {e, :cover_image},
+      ticket_tier: tt
+    )
     |> order_by([event: e], asc: e.start_date)
     |> Repo.all()
   end

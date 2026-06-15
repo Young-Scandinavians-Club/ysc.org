@@ -17,7 +17,6 @@ import FocusSearchInput from "./focus_search_input";
 import ScheduleTimezone from "./schedule_timezone";
 import LocalTime from "./local_time";
 import QrScanner from "./qr_scanner";
-import StickyEventHeader from "./sticky_event_header";
 import MembershipCheckInKeyboard from "./membership_checkin_keyboard";
 import EventCheckInKeyboard from "./event_checkin_keyboard";
 import MediaDropZone from "./media_drop_zone";
@@ -58,7 +57,6 @@ window.__adminHooks = {
     ScheduleTimezone,
     LocalTime,
     QrScanner,
-    StickyEventHeader,
     MembershipCheckInKeyboard,
     EventCheckInKeyboard,
     MediaDropZone,

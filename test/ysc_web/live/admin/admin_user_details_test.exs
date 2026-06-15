@@ -367,27 +367,16 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   defp build_fake_stripe_subscription(plan, now_unix) do
     period_end = now_unix + 365 * 24 * 60 * 60
 
-    %Stripe.Subscription{
+    Ysc.Stripe.SubscriptionFixtures.subscription(
       id: "sub_fake_#{System.unique_integer()}",
       status: "active",
       start_date: now_unix,
       current_period_start: now_unix,
       current_period_end: period_end,
-      trial_end: nil,
-      ended_at: nil,
-      items: %Stripe.List{
-        data: [
-          %{
-            id: "si_fake_#{System.unique_integer()}",
-            price: %{id: plan.stripe_price_id, product: "prod_fake"},
-            quantity: 1
-          }
-        ],
-        has_more: false,
-        object: "list",
-        url: "/v1/subscription_items"
-      }
-    }
+      price_id: plan.stripe_price_id,
+      product_id: "prod_fake",
+      subscription_item_id: "si_fake_#{System.unique_integer()}"
+    )
   end
 
   describe "impersonation" do

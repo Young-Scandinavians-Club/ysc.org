@@ -6,9 +6,14 @@ defmodule YscWeb.Emails.TicketReservationCreated do
     mjml_template: "templates/ticket_reservation_created.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [
+      absolute_url: 1,
+      format_event_start_datetime: 2,
+      member_greeting_name: 1,
+      plain_text_from_html: 1
+    ]
 
-  alias HtmlSanitizeEx
   alias Ysc.Events.TicketReservation
   alias Ysc.Repo
 
@@ -48,8 +53,7 @@ defmodule YscWeb.Emails.TicketReservationCreated do
             "Ticket tier missing event for reservation #{reservation.id}"
     end
 
-    event_description =
-      event.description && HtmlSanitizeEx.strip_tags(event.description)
+    event_description = plain_text_from_html(event.description)
 
     %{
       first_name: member_greeting_name(reservation.user),
@@ -61,7 +65,8 @@ defmodule YscWeb.Emails.TicketReservationCreated do
         address: event.address,
         age_restriction: event.age_restriction
       },
-      event_date_time: format_event_datetime(event),
+      event_date_time:
+        format_event_start_datetime(event.start_date, event.start_time),
       event_url: event_url(event.id),
       ticket_tier_name: reservation.ticket_tier.name,
       quantity: reservation.quantity,
@@ -73,27 +78,6 @@ defmodule YscWeb.Emails.TicketReservationCreated do
       reserved_by_display: format_reserved_by(reservation.created_by),
       notification_settings_url: notification_settings_url()
     }
-  end
-
-  defp format_event_datetime(event) do
-    case {event.start_date, event.start_time} do
-      {nil, _} ->
-        nil
-
-      {date, nil} ->
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        Calendar.strftime(date_only, "%B %d, %Y")
-
-      {date, time} ->
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        datetime = DateTime.new!(date_only, time, "Etc/UTC")
-        pst_datetime = DateTime.shift_zone!(datetime, "America/Los_Angeles")
-        Calendar.strftime(pst_datetime, "%B %d, %Y at %I:%M %p %Z")
-    end
   end
 
   defp format_discount(nil), do: "None"
@@ -137,7 +121,7 @@ defmodule YscWeb.Emails.TicketReservationCreated do
         nil
 
       trimmed ->
-        HtmlSanitizeEx.strip_tags(trimmed)
+        plain_text_from_html(trimmed)
     end
   end
 

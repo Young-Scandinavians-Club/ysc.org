@@ -1111,38 +1111,6 @@ defmodule YscWeb.BookingReceiptLiveTest do
         Application.put_env(:ysc, :stripe_client, original_stripe_client)
       end)
 
-      {:module, test_stripe_client, _, _} =
-        defmodule :"ReceiptLedgerRetryStripe#{System.unique_integer([:positive])}" do
-          @behaviour Ysc.StripeBehaviour
-
-          def create_payment_intent(_params, _opts),
-            do: {:error, :not_implemented}
-
-          def cancel_payment_intent(_id, _opts), do: {:error, :not_implemented}
-          def create_customer(_params), do: {:error, :not_implemented}
-          def update_customer(_id, _params), do: {:error, :not_implemented}
-          def retrieve_payment_method(_id), do: {:error, :not_implemented}
-          def list_events(_params, _opts), do: {:error, :not_implemented}
-          def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
-          def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
-
-          def list_balance_transactions(_params, _opts),
-            do: {:error, :not_implemented}
-
-          def retrieve_payment_intent(id, _opts) do
-            {:ok,
-             %Stripe.PaymentIntent{
-               id: id,
-               status: "succeeded",
-               amount: 50_000,
-               customer: nil,
-               payment_method: nil,
-               latest_charge: nil
-             }}
-          end
-        end
-
-      Application.put_env(:ysc, :stripe_client, test_stripe_client)
       ensure_receipt_buyout_base_pricing!()
 
       user = user_fixture()
@@ -1160,7 +1128,59 @@ defmodule YscWeb.BookingReceiptLiveTest do
                  4
                )
 
+      booking = Repo.get!(Booking, booking.id)
       pi_id = "pi_receipt_ledger_retry_#{System.unique_integer([:positive])}"
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      module_name =
+        :"ReceiptLedgerRetryStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            @pi_amount unquote(amount_cents)
+            @booking_id unquote(booking.id)
+            @user_id unquote(booking.user_id)
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: @pi_amount,
+                 metadata: %{
+                   "booking_id" => @booking_id,
+                   "user_id" => @user_id
+                 },
+                 customer: nil,
+                 payment_method: nil,
+                 latest_charge: nil
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
 
       assert {:ok, _confirmed} = BookingLocker.confirm_booking(booking.id)
       assert receipt_ledger_payment_count(booking.id) == 0
@@ -1343,6 +1363,225 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert reloaded.refund_forfeited_at
 
       assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+    end
+
+    test "persists guest details after redirect-based paid modification with more guests",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(state: :active)
+        |> Repo.update!()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Receipt guest modify category"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name:
+            "Receipt guest modify room #{System.unique_integer([:positive])}",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(150)
+
+      assert {:ok, total, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 :room,
+                 room_id: room.id,
+                 guests_count: 2
+               )
+
+      assert {:ok, booking} =
+               BookingLocker.create_admin_booking(
+                 %{
+                   user_id: user.id,
+                   property: :tahoe,
+                   checkin_date: checkin,
+                   checkout_date: checkout,
+                   booking_mode: :room,
+                   guests_count: 2,
+                   total_price: total
+                 },
+                 rooms: [room],
+                 skip_email: true,
+                 skip_reminders: true
+               )
+
+      assert {:ok, _} =
+               Ysc.Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: total,
+                 entity_type: :booking,
+                 entity_id: booking.id,
+                 external_payment_id:
+                   "pi_receipt_guest_base_#{System.unique_integer([:positive])}",
+                 stripe_fee: Money.new(100, :USD),
+                 description: "Booking payment",
+                 property: booking.property,
+                 payment_method_id: nil
+               })
+
+      assert {:ok, _} =
+               Bookings.create_booking_guests(booking.id, [
+                 {0,
+                  %{
+                    "first_name" => user.first_name || "Test",
+                    "last_name" => user.last_name || "User",
+                    "is_child" => false,
+                    "is_booking_user" => true
+                  }},
+                 {1,
+                  %{
+                    "first_name" => "Guest",
+                    "last_name" => "Two",
+                    "is_child" => false,
+                    "is_booking_user" => false
+                  }}
+               ])
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 3,
+        children_count: 0
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, %{
+                 "checkin_date" => Date.to_string(checkin),
+                 "checkout_date" => Date.to_string(checkout),
+                 "guests_count" => "3",
+                 "children_count" => "0"
+               })
+
+      assert Money.positive?(preview.delta)
+
+      guest_params = %{
+        "0" => %{
+          "first_name" => user.first_name || "Test",
+          "last_name" => user.last_name || "User",
+          "is_child" => false,
+          "is_booking_user" => true,
+          "order_index" => 0
+        },
+        "1" => %{
+          "first_name" => "Guest",
+          "last_name" => "Two",
+          "is_child" => false,
+          "is_booking_user" => false,
+          "order_index" => 1
+        },
+        "2" => %{
+          "first_name" => "New",
+          "last_name" => "Guest",
+          "is_child" => false,
+          "is_booking_user" => false,
+          "order_index" => 2
+        }
+      }
+
+      assert {:ok, _} =
+               Bookings.place_modification_hold(booking, attrs,
+                 guest_params: guest_params
+               )
+
+      payment_intent_id =
+        "pi_receipt_guest_redirect_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stripe_metadata = %{
+        "booking_id" => to_string(booking.id),
+        "user_id" => to_string(user.id),
+        "modification" => "true"
+      }
+
+      module_name =
+        :"ReceiptGuestModificationRedirectStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: unquote(amount_cents),
+                 metadata: unquote(Macro.escape(stripe_metadata)),
+                 latest_charge: %Stripe.Charge{id: "ch_#{id}"}
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
+        )
+
+      assert html =~ "Reservation updated"
+
+      reloaded = Repo.get!(Booking, booking.id) |> Repo.preload(:booking_guests)
+      assert reloaded.guests_count == 3
+
+      guests =
+        reloaded.booking_guests
+        |> Enum.sort_by(& &1.order_index)
+
+      assert length(guests) == 3
+      assert Enum.at(guests, 2).first_name == "New"
+      assert Enum.at(guests, 2).last_name == "Guest"
     end
 
     test "records modification ledger after redirect when change was already applied",

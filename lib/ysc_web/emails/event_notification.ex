@@ -8,10 +8,15 @@ defmodule YscWeb.Emails.EventNotification do
     mjml_template: "templates/event_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1, member_greeting_name: 1]
+  import YscWeb.Emails.Helpers,
+    only: [
+      absolute_url: 1,
+      format_event_start_datetime: 2,
+      member_greeting_name: 1,
+      plain_text_from_html: 1
+    ]
 
   alias Ysc.Events.Event
-  alias HtmlSanitizeEx
   alias Ysc.Media.Image
   alias Ysc.Repo
 
@@ -107,7 +112,8 @@ defmodule YscWeb.Emails.EventNotification do
       end
 
     # Format event date and time
-    event_date_time = format_event_datetime(event)
+    event_date_time =
+      format_event_start_datetime(event.start_date, event.start_time)
 
     # Get event image URL
     event_image_url = get_event_image_url(event)
@@ -117,8 +123,7 @@ defmodule YscWeb.Emails.EventNotification do
     event_map = %{
       id: event.id,
       title: event.title,
-      description:
-        event.description && HtmlSanitizeEx.strip_tags(event.description),
+      description: plain_text_from_html(event.description),
       start_date: event.start_date,
       start_time: event.start_time,
       end_date: event.end_date,
@@ -144,30 +149,6 @@ defmodule YscWeb.Emails.EventNotification do
       event_image_url: event_image_url,
       notification_settings_url: notification_settings_url()
     }
-  end
-
-  defp format_event_datetime(event) do
-    case {event.start_date, event.start_time} do
-      {nil, _} ->
-        nil
-
-      {date, nil} ->
-        # Convert DateTime to Date if needed
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        Calendar.strftime(date_only, "%B %d, %Y")
-
-      {date, time} ->
-        # Convert DateTime to Date if needed
-        date_only =
-          if is_struct(date, DateTime), do: DateTime.to_date(date), else: date
-
-        datetime = DateTime.new!(date_only, time, "Etc/UTC")
-        # Convert to PST
-        pst_datetime = DateTime.shift_zone!(datetime, "America/Los_Angeles")
-        Calendar.strftime(pst_datetime, "%B %d, %Y at %I:%M %p %Z")
-    end
   end
 
   defp get_event_image_url(event) do

@@ -205,7 +205,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Set Your Password
             <:subtitle>
-              Create a password to access your account and manage your membership.
+              Create a password at least 12 characters long to access your account and manage your membership.
             </:subtitle>
           </.header>
 

@@ -13,11 +13,11 @@ defmodule YscWeb.UserEventsListLive do
           class="flex flex-col md:flex-row gap-4 p-4 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
           id={id}
         >
-          <div :if={ticket.event.image_id} class="flex-shrink-0 w-full md:w-32">
+          <div :if={ticket.event.cover_image} class="flex-shrink-0 w-full md:w-32">
             <.live_component
               id={"user-event-image-#{ticket.event.id}"}
               module={YscWeb.Components.Image}
-              image_id={ticket.event.image_id}
+              image={ticket.event.cover_image}
               aspect_class="aspect-[4/3]"
             />
           </div>

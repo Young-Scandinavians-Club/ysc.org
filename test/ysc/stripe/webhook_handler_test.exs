@@ -3,6 +3,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
   # Most tests can run async, but some complex ones need to be synchronous
   # due to transaction isolation with the new transactional webhook processing
 
+  alias Ysc.Stripe.SubscriptionFixtures
   alias Ysc.Stripe.WebhookHandler
   alias Ysc.Subscriptions
   alias Ysc.Ledgers
@@ -797,20 +798,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
     test "creates subscription from customer.subscription.created" do
       user = user_with_stripe_id()
 
-      subscription_data = %Stripe.Subscription{
-        id: "sub_created_#{System.unique_integer()}",
-        customer: user.stripe_id,
-        status: "active",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: "sub_created_#{System.unique_integer()}",
+          customer: user.stripe_id,
+          status: "active",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.created", subscription_data)
@@ -834,20 +836,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       stripe_sub_id = "sub_incomplete_#{System.unique_integer()}"
 
-      subscription_data = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: user.stripe_id,
-        status: "incomplete",
-        start_date: System.os_time(:second),
-        current_period_start: nil,
-        current_period_end: nil,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "incomplete",
+          start_date: System.os_time(:second),
+          current_period_start: nil,
+          current_period_end: nil,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.created", subscription_data)
@@ -861,11 +864,12 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       subscription = create_subscription(user)
 
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "canceled"
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "canceled"
+        )
 
       event =
         build_stripe_event("customer.subscription.deleted", subscription_data)
@@ -881,20 +885,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       subscription = create_subscription(user, %{stripe_status: "active"})
 
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "past_due",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "past_due",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.updated", subscription_data)
@@ -924,20 +929,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       original_period_end = subscription.current_period_end
 
       # Simulate Stripe webhook when schedule is attached - null period dates
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "active",
-        start_date: nil,
-        current_period_start: nil,
-        current_period_end: nil,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "active",
+          start_date: nil,
+          current_period_start: nil,
+          current_period_end: nil,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.updated", subscription_data)
@@ -960,21 +966,22 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       ts = System.os_time(:second)
 
-      fake_stripe_subscription = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: user.stripe_id,
-        status: "active",
-        start_date: ts,
-        current_period_start: ts,
-        current_period_end: ts + 30 * 24 * 60 * 60,
-        ended_at: nil,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      fake_stripe_subscription =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "active",
+          start_date: ts,
+          current_period_start: ts,
+          current_period_end: ts + 30 * 24 * 60 * 60,
+          ended_at: nil,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       callback = fn _id, _opts -> {:ok, fake_stripe_subscription} end
 
@@ -985,20 +992,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
           callback
         )
 
-        event_data = %Stripe.Subscription{
-          id: stripe_sub_id,
-          customer: user.stripe_id,
-          status: "active",
-          start_date: ts,
-          current_period_start: ts,
-          current_period_end: ts + 30 * 24 * 60 * 60,
-          items: %Stripe.List{
-            data: [],
-            has_more: false,
-            object: "list",
-            url: "/v1/subscription_items"
-          }
-        }
+        event_data =
+          SubscriptionFixtures.subscription(
+            id: stripe_sub_id,
+            customer: user.stripe_id,
+            status: "active",
+            start_date: ts,
+            current_period_start: ts,
+            current_period_end: ts + 30 * 24 * 60 * 60,
+            items: %Stripe.List{
+              data: [],
+              has_more: false,
+              object: "list",
+              url: "/v1/subscription_items"
+            }
+          )
 
         event = build_stripe_event("customer.subscription.updated", event_data)
         assert :ok = WebhookHandler.handle_event(event)
@@ -1026,21 +1034,22 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       ts = System.os_time(:second)
 
-      fake_stripe_subscription = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: user.stripe_id,
-        status: "trialing",
-        start_date: ts,
-        current_period_start: ts,
-        current_period_end: ts + 30 * 24 * 60 * 60,
-        ended_at: nil,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      fake_stripe_subscription =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "trialing",
+          start_date: ts,
+          current_period_start: ts,
+          current_period_end: ts + 30 * 24 * 60 * 60,
+          ended_at: nil,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       callback = fn _id, _opts -> {:ok, fake_stripe_subscription} end
 
@@ -1051,17 +1060,18 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
           callback
         )
 
-        event_data = %Stripe.Subscription{
-          id: stripe_sub_id,
-          customer: user.stripe_id,
-          status: "trialing",
-          items: %Stripe.List{
-            data: [],
-            has_more: false,
-            object: "list",
-            url: "/v1/subscription_items"
-          }
-        }
+        event_data =
+          SubscriptionFixtures.subscription(
+            id: stripe_sub_id,
+            customer: user.stripe_id,
+            status: "trialing",
+            items: %Stripe.List{
+              data: [],
+              has_more: false,
+              object: "list",
+              url: "/v1/subscription_items"
+            }
+          )
 
         event = build_stripe_event("customer.subscription.updated", event_data)
         assert :ok = WebhookHandler.handle_event(event)
@@ -1085,17 +1095,18 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
 
-      event_data = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: user.stripe_id,
-        status: "incomplete",
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      event_data =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "incomplete",
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event = build_stripe_event("customer.subscription.updated", event_data)
       assert :ok = WebhookHandler.handle_event(event)
@@ -1112,17 +1123,18 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       assert Subscriptions.get_subscription_by_stripe_id(stripe_sub_id) == nil
 
-      event_data = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: unknown_customer_id,
-        status: "active",
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      event_data =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: unknown_customer_id,
+          status: "active",
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event = build_stripe_event("customer.subscription.updated", event_data)
       assert :ok = WebhookHandler.handle_event(event)
@@ -1144,20 +1156,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
           current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
         })
 
-      event_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "incomplete",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      event_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "incomplete",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event = build_stripe_event("customer.subscription.updated", event_data)
       assert :ok = WebhookHandler.handle_event(event)
@@ -1177,20 +1190,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
           current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
         })
 
-      event_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "incomplete",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      event_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "incomplete",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event = build_stripe_event("customer.subscription.updated", event_data)
       assert :ok = WebhookHandler.handle_event(event)
@@ -1211,20 +1225,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
           current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
         })
 
-      event_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "incomplete",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      event_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "incomplete",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event = build_stripe_event("customer.subscription.updated", event_data)
       assert :ok = WebhookHandler.handle_event(event)
@@ -1610,20 +1625,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       subscription = create_subscription(user, %{stripe_status: "active"})
 
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "past_due",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "past_due",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.updated", subscription_data)
@@ -1849,7 +1865,6 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
         amount_paid: 4500,
         description: "Membership",
         number: "INV-S",
-        charge: nil,
         metadata: %{},
         billing_reason: "subscription_cycle",
         lines: empty_stripe_list()
@@ -1988,16 +2003,17 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       stripe_sub_id = "sub_wp_#{System.unique_integer()}"
 
-      subscription_data = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: user.stripe_id,
-        status: "active",
-        metadata: %{"wp_migration" => "true"},
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 86_400,
-        items: empty_stripe_list()
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "active",
+          metadata: %{"wp_migration" => "true"},
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 86_400,
+          items: empty_stripe_list()
+        )
 
       event =
         build_stripe_event("customer.subscription.created", subscription_data)
@@ -2011,15 +2027,16 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       stripe_sub_id = "sub_trial_#{System.unique_integer()}"
 
-      subscription_data = %Stripe.Subscription{
-        id: stripe_sub_id,
-        customer: user.stripe_id,
-        status: "trialing",
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 86_400,
-        items: empty_stripe_list()
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: stripe_sub_id,
+          customer: user.stripe_id,
+          status: "trialing",
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 86_400,
+          items: empty_stripe_list()
+        )
 
       event =
         build_stripe_event("customer.subscription.created", subscription_data)
@@ -2327,12 +2344,13 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
           stripe_id: "sub_incexp_#{System.unique_integer()}"
         })
 
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "incomplete_expired",
-        items: empty_stripe_list()
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "incomplete_expired",
+          items: empty_stripe_list()
+        )
 
       event =
         build_stripe_event("customer.subscription.updated", subscription_data)
@@ -2530,21 +2548,22 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       subscription = create_subscription(user, %{stripe_status: "active"})
       cancel_at = System.os_time(:second) + 86_400
 
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "active",
-        cancel_at: cancel_at,
-        start_date: System.os_time(:second),
-        current_period_start: System.os_time(:second),
-        current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "active",
+          cancel_at: cancel_at,
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 30 * 24 * 60 * 60,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.updated", subscription_data)
@@ -2703,20 +2722,21 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       original_start = subscription.current_period_start
       original_end = subscription.current_period_end
 
-      subscription_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "past_due",
-        start_date: nil,
-        current_period_start: nil,
-        current_period_end: nil,
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/subscription_items"
-        }
-      }
+      subscription_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "past_due",
+          start_date: nil,
+          current_period_start: nil,
+          current_period_end: nil,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
 
       event =
         build_stripe_event("customer.subscription.updated", subscription_data)
@@ -2913,17 +2933,18 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       user = user_with_stripe_id()
       subscription = create_subscription(user, %{stripe_status: "active"})
 
-      sub_data = %Stripe.Subscription{
-        id: subscription.stripe_id,
-        customer: user.stripe_id,
-        status: "canceled",
-        items: %Stripe.List{
-          data: [],
-          has_more: false,
-          object: "list",
-          url: "/v1/items"
-        }
-      }
+      sub_data =
+        SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          customer: user.stripe_id,
+          status: "canceled",
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/items"
+          }
+        )
 
       event = build_stripe_event("customer.subscription.deleted", sub_data)
       assert :ok = WebhookHandler.handle_event(event)
@@ -3198,8 +3219,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       # struct rather than a plain string — this is the bug scenario.
       expanded_charge = %Stripe.Charge{
         id: "ch_expanded_#{System.unique_integer()}",
-        payment_intent: %Stripe.PaymentIntent{id: pi_id},
-        invoice: nil
+        payment_intent: %Stripe.PaymentIntent{id: pi_id}
       }
 
       # link_charge_to_payout is tested via the public relink helper by

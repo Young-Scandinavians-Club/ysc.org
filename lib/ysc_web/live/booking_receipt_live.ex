@@ -1,6 +1,7 @@
 defmodule YscWeb.BookingReceiptLive do
   use YscWeb, :live_view
 
+  alias YscWeb.BookingGuestForm
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
@@ -1410,66 +1411,23 @@ defmodule YscWeb.BookingReceiptLive do
          }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
-          reloaded_booking =
-            Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
-
-          if reloaded_booking.status == :complete do
+          verification_result =
             if modification_payment_intent?(payment_intent) do
-              finalize_modification_redirect_payment(
-                reloaded_booking,
-                payment_intent_id,
-                payment_intent
-              )
+              :ok
             else
-              finalize_paid_ledger_payment(reloaded_booking, payment_intent)
+              Bookings.verify_booking_payment_intent(payment_intent, booking)
             end
-          else
-            case BookingLocker.confirm_booking(reloaded_booking.id) do
-              {:ok, confirmed_booking} ->
-                case process_ledger_payment(confirmed_booking, payment_intent) do
-                  {:ok, _payment} ->
-                    {:ok, confirmed_booking, payment_intent}
 
-                  {:error, reason} ->
-                    Ysc.Logging.error(
-                      "Booking confirmed but ledger payment recording failed",
-                      booking_id: confirmed_booking.id,
-                      error: inspect(reason)
-                    )
+          case verification_result do
+            :ok ->
+              process_verified_booking_payment_success(
+                booking,
+                payment_intent,
+                payment_intent_id
+              )
 
-                    {:error, :payment_processing_failed}
-                end
-
-              {:error, :invalid_status} ->
-                final_booking =
-                  Repo.get!(Booking, reloaded_booking.id)
-                  |> Repo.preload([:rooms, :user])
-
-                if final_booking.status == :complete do
-                  Ysc.Logging.info(
-                    "Booking confirmed by another process, ensuring ledger payment",
-                    booking_id: booking.id
-                  )
-
-                  finalize_paid_ledger_payment(final_booking, payment_intent)
-                else
-                  Ysc.Logging.error(
-                    "Failed to confirm booking: invalid status",
-                    booking_id: booking.id,
-                    status: final_booking.status
-                  )
-
-                  {:error, :booking_confirmation_failed}
-                end
-
-              {:error, reason} ->
-                Ysc.Logging.error(
-                  "Failed to confirm booking: #{inspect(reason)}",
-                  booking_id: reloaded_booking.id
-                )
-
-                {:error, :booking_confirmation_failed}
-            end
+            {:error, reason} ->
+              {:error, reason}
           end
         else
           {:error, :payment_not_succeeded}
@@ -1481,6 +1439,74 @@ defmodule YscWeb.BookingReceiptLive do
         )
 
         {:error, :payment_verification_failed}
+    end
+  end
+
+  defp process_verified_booking_payment_success(
+         booking,
+         payment_intent,
+         payment_intent_id
+       ) do
+    reloaded_booking =
+      Repo.get!(Booking, booking.id) |> Repo.preload([:rooms, :user])
+
+    if reloaded_booking.status == :complete do
+      if modification_payment_intent?(payment_intent) do
+        finalize_modification_redirect_payment(
+          reloaded_booking,
+          payment_intent_id,
+          payment_intent
+        )
+      else
+        finalize_paid_ledger_payment(reloaded_booking, payment_intent)
+      end
+    else
+      case BookingLocker.confirm_booking(reloaded_booking.id) do
+        {:ok, confirmed_booking} ->
+          case process_ledger_payment(confirmed_booking, payment_intent) do
+            {:ok, _payment} ->
+              {:ok, confirmed_booking, payment_intent}
+
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Booking confirmed but ledger payment recording failed",
+                booking_id: confirmed_booking.id,
+                error: inspect(reason)
+              )
+
+              {:error, :payment_processing_failed}
+          end
+
+        {:error, :invalid_status} ->
+          final_booking =
+            Repo.get!(Booking, reloaded_booking.id)
+            |> Repo.preload([:rooms, :user])
+
+          if final_booking.status == :complete do
+            Ysc.Logging.info(
+              "Booking confirmed by another process, ensuring ledger payment",
+              booking_id: booking.id
+            )
+
+            finalize_paid_ledger_payment(final_booking, payment_intent)
+          else
+            Ysc.Logging.error(
+              "Failed to confirm booking: invalid status",
+              booking_id: booking.id,
+              status: final_booking.status
+            )
+
+            {:error, :booking_confirmation_failed}
+          end
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to confirm booking: #{inspect(reason)}",
+            booking_id: reloaded_booking.id
+          )
+
+          {:error, :booking_confirmation_failed}
+      end
     end
   end
 
@@ -1499,6 +1525,9 @@ defmodule YscWeb.BookingReceiptLive do
          payment_intent_id,
          payment_intent
        ) do
+    hold_attrs = booking.modification_hold_attrs
+    original_booking = booking
+
     cond do
       Bookings.modification_ledger_recorded?(booking.id, payment_intent_id) ->
         {:ok, reload_booking_for_receipt(booking.id), payment_intent}
@@ -1517,7 +1546,14 @@ defmodule YscWeb.BookingReceiptLive do
                    payment_intent_id: payment_intent_id
                  ) do
               {:ok, updated_booking} ->
-                {:ok, updated_booking, payment_intent}
+                sync_guests_after_modification_redirect(
+                  updated_booking,
+                  hold_attrs,
+                  original_booking
+                )
+
+                {:ok, reload_booking_for_receipt(updated_booking.id),
+                 payment_intent}
 
               {:error, :no_changes} ->
                 finalize_modification_ledger_only(
@@ -1537,6 +1573,28 @@ defmodule YscWeb.BookingReceiptLive do
                 {:error, reason}
             end
         end
+    end
+  end
+
+  defp sync_guests_after_modification_redirect(
+         updated_booking,
+         hold_attrs,
+         original_booking
+       ) do
+    case BookingGuestForm.sync_guests_after_modification_apply(
+           updated_booking,
+           hold_attrs,
+           original_booking
+         ) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "Modification applied but guest details could not be saved",
+          booking_id: updated_booking.id,
+          error: inspect(reason)
+        )
     end
   end
 

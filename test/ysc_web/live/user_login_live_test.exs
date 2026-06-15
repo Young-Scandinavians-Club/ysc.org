@@ -6,11 +6,12 @@ defmodule YscWeb.UserLoginLiveTest do
 
   describe "Log in page" do
     test "renders log in page", %{conn: conn} do
-      {:ok, _lv, html} = live(conn, ~p"/users/log-in")
+      {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Sign in to your YSC account"
       assert html =~ "Apply for membership"
       assert html =~ "Forgot your password?"
+      assert has_element?(lv, "a[href='/users/reset-password']")
     end
 
     test "renders authentication method buttons", %{conn: conn} do
@@ -63,6 +64,7 @@ defmodule YscWeb.UserLoginLiveTest do
       {:ok, lv, html} = live(conn, ~p"/users/log-in")
 
       assert html =~ "Having trouble signing in?"
+      assert html =~ "Try another sign-in option below"
       assert html =~ "Reset your password"
       assert html =~ "Contact us for help"
       assert has_element?(lv, "#failed-login-banner")
@@ -334,6 +336,18 @@ defmodule YscWeb.UserLoginLiveTest do
       |> render_hook("passkey_auth_error", %{"x" => "y"})
 
       assert render(lv) =~ "error" or render(lv) =~ "authentication"
+    end
+  end
+
+  describe "removed legacy email confirmation routes" do
+    test "no longer serves /users/confirm", %{conn: conn} do
+      conn = get(conn, "/users/confirm")
+      assert html_response(conn, 404)
+    end
+
+    test "no longer serves /users/confirm/:token", %{conn: conn} do
+      conn = get(conn, "/users/confirm/legacy-token")
+      assert html_response(conn, 404)
     end
   end
 end

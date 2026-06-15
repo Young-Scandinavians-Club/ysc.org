@@ -92,9 +92,12 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="How do you qualify for membership? (select all that apply)*"
+                    label="How do you qualify for membership? Select every option that applies to you. You only need to meet one of these to apply.*"
                     options={SignupApplication.eligibility_options()}
                   />
+                  <p class="text-sm leading-6 text-zinc-600 -mt-1">
+                    When we say Scandinavia, we mean Denmark, Finland, Iceland, Norway, and Sweden.
+                  </p>
                 </.inputs_for>
               </div>
             </div>
@@ -337,7 +340,7 @@ defmodule YscWeb.UserRegistrationLive do
                 />
                 <.input
                   field={rf[:link_to_scandinavia]}
-                  label="If you were not born in or are not a citizen of a Scandinavian country, describe your family background or other connection to Scandinavia:"
+                  label="Optional — only if the options above don't fully describe your connection: Tell us about your family background or other ties to Scandinavia."
                   type="textarea"
                 />
                 <.input
@@ -610,14 +613,6 @@ defmodule YscWeb.UserRegistrationLive do
                   YscWeb.Endpoint.url() <> "/admin/users/#{user.id}/review"
               }
             )
-
-            # Email verification is now handled in the account setup flow with codes
-            # No need to send separate confirmation email with link
-            # {:ok, _} =
-            #   Accounts.deliver_user_confirmation_instructions(
-            #     user,
-            #     &url(~p"/users/confirm/#{&1}")
-            #   )
 
             # After successful registration, redirect to account setup flow
             {:noreply,
