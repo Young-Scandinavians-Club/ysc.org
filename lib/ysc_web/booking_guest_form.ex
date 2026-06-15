@@ -183,6 +183,44 @@ defmodule YscWeb.BookingGuestForm do
   end
 
   @doc """
+  Persists guest records after a modification is applied.
+
+  Uses guest params stored on the modification hold when present; otherwise trims
+  excess guests when counts decreased.
+  """
+  def sync_guests_after_modification_apply(
+        %Booking{} = updated_booking,
+        hold_attrs,
+        %Booking{} = original_booking,
+        opts \\ []
+      ) do
+    guest_params =
+      Keyword.get(opts, :guest_params) || hold_guest_params(hold_attrs)
+
+    cond do
+      is_map(guest_params) and map_size(guest_params) > 0 ->
+        preview =
+          preview_booking(
+            updated_booking,
+            updated_booking.guests_count,
+            updated_booking.children_count || 0
+          )
+
+        save_guests(preview, guest_params)
+
+      guest_counts_changed?(original_booking, updated_booking) ->
+        trim_guests_to_counts(
+          updated_booking.id,
+          updated_booking.guests_count,
+          updated_booking.children_count || 0
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  @doc """
   Removes guest records above the new total count after a decrease.
   """
   def trim_guests_to_counts(booking_id, guests_count, children_count) do
@@ -589,5 +627,15 @@ defmodule YscWeb.BookingGuestForm do
     Enum.count(guests_list, fn guest ->
       guest_field(guest, "is_child") in [true, "true"]
     end)
+  end
+
+  defp hold_guest_params(%{"guest_params" => params}) when is_map(params),
+    do: params
+
+  defp hold_guest_params(_), do: nil
+
+  defp guest_counts_changed?(%Booking{} = original, %Booking{} = updated) do
+    original.guests_count != updated.guests_count ||
+      (original.children_count || 0) != (updated.children_count || 0)
   end
 end
