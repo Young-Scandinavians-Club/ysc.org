@@ -225,7 +225,7 @@ defmodule Ysc.Accounts.SignupApplicationEmailValidationTest do
     end
   end
 
-  defp valid_application_attrs(overrides \\ %{}) do
+  defp valid_application_attrs(overrides) do
     Enum.into(overrides, %{
       membership_type: "single",
       membership_eligibility: ["born_in_scandinavia"],

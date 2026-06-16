@@ -136,17 +136,20 @@ stripe listen --forward-to localhost:4000/webhooks/stripe
 
 API keys (test mode): [Stripe Dashboard → API keys](https://dashboard.stripe.com/test/apikeys)
 
-### ShellCheck & shfmt
+### ShellCheck, shfmt & dprint
 
 Required for `make preflight`:
 
 ```bash
 # macOS
-brew install shellcheck shfmt
+brew install shellcheck shfmt dprint
 
 # Ubuntu/Debian
 sudo apt-get install -y shellcheck shfmt
+curl -fsSL https://dprint.dev/install.sh | sh
 ```
+
+`dprint` formats JSON, YAML, and TOML config files (see `dprint.json`).
 
 ## Environment variables
 

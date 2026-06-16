@@ -23,7 +23,7 @@ Open [http://localhost:4000](http://localhost:4000). Seeded admin: `admin@ysc.or
 - [Docker](https://www.docker.com/products/docker-desktop) (PostgreSQL, MinIO)
 - Elixir & Erlang via [asdf](https://asdf-vm.com/) (`asdf install` in repo root; versions in `.tool-versions`)
 - [Stripe CLI](https://stripe.com/docs/stripe-cli) (`stripe login`, then webhook forwarding above)
-- `shellcheck` and `shfmt` (for `make preflight`)
+- `shellcheck`, `shfmt`, and `dprint` (for `make preflight`)
 
 Install steps per OS: [New Developer Guide → Prerequisites](docs/NEW_DEVELOPER_GUIDE.md#detailed-prerequisites).
 

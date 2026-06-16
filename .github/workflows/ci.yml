@@ -96,7 +96,7 @@ jobs:
           verbose: true
 
   shell:
-    name: Shell Scripts
+    name: Shell Scripts & Config
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -105,6 +105,11 @@ jobs:
       - name: Install shfmt
         run: sudo apt-get update && sudo apt-get install -y shfmt
 
+      - name: Install dprint
+        run: |
+          curl -fsSL https://dprint.dev/install.sh | sh
+          echo "$HOME/.dprint/bin" >> "$GITHUB_PATH"
+
       - name: ShellCheck
         run: find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' -exec shellcheck {} +
 
@@ -112,6 +117,9 @@ jobs:
         run: |
           scripts=$(find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*')
           if [ -n "$scripts" ]; then shfmt -d -i 2 -ci $scripts; fi
+
+      - name: dprint (format check)
+        run: dprint check
 
   formatting:
     name: Code Formatting

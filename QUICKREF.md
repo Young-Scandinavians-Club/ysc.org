@@ -69,7 +69,7 @@ make setup-dev-db     # Create, migrate, and seed the database
 ### Code Quality
 
 ```bash
-make format           # Format all Elixir code
+make format           # Format Elixir, shell scripts, and JSON/YAML/TOML
 make lint             # Run linting checks (Credo + format check)
 make preflight        # Run ALL CI checks locally (recommended before committing)
 ```

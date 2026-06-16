@@ -41,7 +41,7 @@ echo "${GREEN}✓ Compilation successful${RESET}"
 echo ""
 
 # ── Phase 3: Parallel checks that do not touch _build ────────────────────────
-echo "${BOLD}[Phase 3] Running parallel checks (format, deps audit, shell scripts)...${RESET}"
+echo "${BOLD}[Phase 3] Running parallel checks (format, deps audit, shell scripts, config files)...${RESET}"
 
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
@@ -61,7 +61,7 @@ pid_format=$!
 pid_audit=$!
 
 (
-  make shell-lint shell-format-check >"$tmpdir/shell.log" 2>&1 &&
+  make shell-lint shell-format-check config-format-check >"$tmpdir/shell.log" 2>&1 &&
     echo "✓ shell" >"$tmpdir/shell.status" ||
     echo "✗ shell" >"$tmpdir/shell.status"
 ) &
@@ -86,7 +86,7 @@ if [[ "$audit_status" == "✗ deps.audit" ]]; then
 fi
 
 if [[ "$shell_status" == "✗ shell" ]]; then
-  echo "${RED}✗ Shell script checks failed${RESET}"
+  echo "${RED}✗ Shell script or config file checks failed${RESET}"
   cat "$tmpdir/shell.log"
   exit 1
 fi

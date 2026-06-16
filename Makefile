@@ -123,11 +123,19 @@ query-explain-main:  ## EXPLAIN + SQL for CI targets vs main since merge-base (f
 SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' -not -path '*/node_modules/*' 2>/dev/null)
 
 .PHONY: format
-format:  ## Format the code (Elixir and shell scripts)
+format:  ## Format the code (Elixir, shell scripts, and JSON/YAML/TOML)
 	@mix format
 	@if command -v shfmt >/dev/null 2>&1 && [ -n "$(SHELL_SCRIPTS)" ]; then \
 		shfmt -w -i 2 -ci $(SHELL_SCRIPTS); \
 	fi
+	@if command -v dprint >/dev/null 2>&1; then \
+		dprint fmt; \
+	fi
+
+.PHONY: config-format-check
+config-format-check:  ## Check JSON/YAML/TOML formatting with dprint
+	@command -v dprint >/dev/null 2>&1 || { echo "Install dprint: brew install dprint"; exit 1; }
+	@dprint check
 
 .PHONY: shell-lint
 shell-lint:  ## Lint shell scripts with ShellCheck
@@ -147,7 +155,7 @@ dialyzer:  ## Run Dialyzer type checker (builds PLT on first run, cached after)
 lint:  ## Run the lint suite
 	@mix credo --all
 	@mix format --check-formatted
-	@$(MAKE) shell-lint shell-format-check
+	@$(MAKE) shell-lint shell-format-check config-format-check
 
 .PHONY: preflight
 preflight:  ## Run all CI checks locally (compile, format, credo, sobelow, audit, tests)

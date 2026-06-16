@@ -4,7 +4,8 @@
 # CI (tests, format, credo, security) is not duplicated here: the same commit was
 # already validated when it landed on main (.github/workflows/fly-deploy.yml).
 # This workflow deploys sandbox first, then production — if sandbox deploy fails,
-# production does not run.
+# production does not run. Sandbox deploy uses the shared deploy-sandbox concurrency
+# group with cancel-in-progress: true so release deploys win over CI sandbox deploys.
 #
 # Requires secrets:
 # - FLY_SANDBOX_API_TOKEN or FLY_API_TOKEN (sandbox gate deploy before prod)

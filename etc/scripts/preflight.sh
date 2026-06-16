@@ -52,12 +52,12 @@ fi
 echo "${GREEN}✓ Code formatting is correct${RESET}"
 echo ""
 
-next_step "Checking shell scripts (ShellCheck + shfmt)..."
-if ! make shell-lint shell-format-check; then
-  echo "${RED}✗ Shell script checks failed. Run 'make format' for shfmt, fix ShellCheck issues manually.${RESET}"
+next_step "Checking shell scripts and config files (ShellCheck, shfmt, dprint)..."
+if ! make shell-lint shell-format-check config-format-check; then
+  echo "${RED}✗ Shell script or config file checks failed. Run 'make format' to fix formatting issues.${RESET}"
   exit 1
 fi
-echo "${GREEN}✓ Shell scripts OK${RESET}"
+echo "${GREEN}✓ Shell scripts and config files OK${RESET}"
 echo ""
 
 next_step "Running Credo (strict mode)..."

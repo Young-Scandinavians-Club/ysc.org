@@ -5,6 +5,8 @@
 # Production deploys sandbox (one deploy, no duplicate work). The gate job still runs so branch checks stay green.
 # Only deploy_sandbox uses the deploy-sandbox concurrency group — the gate job must not, or it cancels
 # in-progress Deploy Production sandbox deploys on release (main push + tag push from release.sh).
+# CI deploy_sandbox uses cancel-in-progress: false so a release deploy is never cancelled by CI;
+# Deploy Production keeps cancel-in-progress: true and wins the shared deploy-sandbox group.
 #
 # Secrets: use FLY_SANDBOX_API_TOKEN for the sandbox Fly org (recommended). If unset, FLY_API_TOKEN
 # is used so existing repos keep working — do not point FLY_API_TOKEN at production.
@@ -14,6 +16,12 @@ on:
   push:
     branches:
       - main
+
+# Cancel superseded runs when main moves on (e.g. merge immediately before release.sh).
+# Without this, a stale run can finish CI and reach deploy_sandbox after a newer push/tag.
+concurrency:
+  group: ci-main-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -185,14 +193,24 @@ jobs:
         with:
           fetch-depth: 0
       - id: sandbox_skip
-        name: Skip Fly deploy if v* tag on commit
+        name: Skip Fly deploy (stale run, or v* tag on commit)
         run: |
+          git fetch origin main
+          MAIN_HEAD="$(git rev-parse origin/main)"
+
+          if [ "$MAIN_HEAD" != "$GITHUB_SHA" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Stale run: origin/main is at ${MAIN_HEAD}, not ${GITHUB_SHA}."
+            exit 0
+          fi
+
           if git tag --points-at "$GITHUB_SHA" | grep -qE '^v[0-9]'; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "v* tag on this commit — sandbox Fly deploy runs only in Deploy Production."
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
 
   deploy_sandbox:
     name: Deploy app sandbox
@@ -201,7 +219,7 @@ jobs:
     if: needs.deploy.outputs.skip != 'true'
     concurrency:
       group: deploy-sandbox
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
@@ -213,6 +231,12 @@ jobs:
         run: bash etc/scripts/fly_verify_app_access.sh ysc-sandbox
       - name: Deploy to Fly.io sandbox
         run: |
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            echo "Stale run — main has moved on, skipping sandbox deploy."
+            exit 0
+          fi
+
           GIT_HASH=$(git rev-parse --short=7 HEAD)
           VERSION_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
           if [ -n "$VERSION_TAG" ]; then

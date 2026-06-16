@@ -8,84 +8,84 @@ primary_region = 'sjc'
 kill_signal = 'SIGTERM'
 
 [build]
-  # Relative to this file (etc/fly/), not repo root — see fly.io monorepo / -c path rules.
-  dockerfile = "../docker/Dockerfile"
+# Relative to this file (etc/fly/), not repo root — see fly.io monorepo / -c path rules.
+dockerfile = "../docker/Dockerfile"
 
 [deploy]
-  # RELEASE_COMMAND=1: minimal runtime (see config/runtime.exs) so migrate/seed need only DB + core config.
-  # DATABASE_URL must be set for each step (Fly expands ${RAW_DATABASE_URL} before the shell runs).
-  release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/migrate && DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/seed'"
+# RELEASE_COMMAND=1: minimal runtime (see config/runtime.exs) so migrate/seed need only DB + core config.
+# DATABASE_URL must be set for each step (Fly expands ${RAW_DATABASE_URL} before the shell runs).
+release_command = "/bin/sh -lc 'DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/migrate && DATABASE_URL=${RAW_DATABASE_URL} env RELEASE_COMMAND=1 /app/bin/seed'"
 
 [env]
-  DNS_CLUSTER_QUERY = 'ysc-prod.internal'
-  APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID = 'pass.org.ysc.membership'
-  APPLE_WALLET_ORG_NAME = 'Young Scandinavians Club'
-  APPLE_WALLET_TEAM_ID = 'FAN7NBS7AB'
-  APPLE_WALLET_TICKET_PASS_TYPE_ID = 'pass.org.ysc.tickets'
-  APP_ENV = 'production'
-  AVATARS_BUCKET_NAME = 'ysc-prod-avatars'
-  BUCKET_NAME = 'ysc-prod-assets'
-  ECTO_IPV6 = 'true'
-  EMAIL_ADMIN = 'admin@ysc.org'
-  EMAIL_BOARD = 'board@ysc.org'
-  EMAIL_CLEAR_LAKE = 'cl@ysc.org'
-  EMAIL_CONTACT = 'info@ysc.org'
-  EMAIL_FROM = 'info@ysc.org'
-  EMAIL_FROM_NAME = 'YSC'
-  EMAIL_MEMBERSHIP = 'memberships@ysc.org'
-  EMAIL_TAHOE = 'tahoe@ysc.org'
-  EMAIL_VOLUNTEER = 'volunteer@ysc.org'
-  ENVIRONMENT = 'production'
-  ERL_AFLAGS = '-proto_dist inet6_tcp'
-  EXPENSE_REPORTS_BUCKET_NAME = 'ysc-prod-expense-reports'
-  FLOWROUTE_FORCE_ENABLE = 'true'
-  LOG_LEVEL = 'warn'
-  PHX_HOST = 'beta.ysc.org'
-  PHX_SERVER = 'true'
-  PORT = '4000'
-  QUICKBOOKS_APP_ID = 'a08a8da4-d5aa-4186-a3e0-b6ce84d1028b'
-  QUICKBOOKS_BASE_URL = 'https://quickbooks.api.intuit.com/v3'
-  QUICKBOOKS_REALM_ID = '123145772177359'
-  QUICKBOOKS_STRIPE_ACCOUNT_ID = '1150040001'
-  QUICKBOOKS_BANK_ACCOUNT_ID = '383'
-  QUICKBOOKS_SYSTEM_CUSTOMER_ID = '6855'
-  QUICKBOOKS_EVENT_ITEM_ID = '652'
-  QUICKBOOKS_DONATION_ITEM_ID = '602'
-  QUICKBOOKS_TAHOE_BOOKING_ITEM_ID = '371'
-  QUICKBOOKS_CLEAR_LAKE_BOOKING_ITEM_ID = '369'
-  QUICKBOOKS_MEMBERSHIP_ITEM_ID = '340'
-  QUICKBOOKS_SINGLE_MEMBERSHIP_ITEM_ID = '372'
-  QUICKBOOKS_FAMILY_MEMBERSHIP_ITEM_ID = '370'
-  QUICKBOOKS_STRIPE_FEE_ITEM_ID = '734'
-  STRIPE_PROCESS_PAYOUT_WEBHOOKS = 'false'
-  S3_AVATARS_PUBLIC_BASE_URL = 'https://avatars.ysc.org'
-  S3_EXPENSE_REPORTS_PUBLIC_BASE_URL = 'https://expenses.ysc.org'
-  S3_MEDIA_PUBLIC_BASE_URL = 'https://assets.ysc.org'
-  S3_USE_CUSTOM_DOMAIN = 'true'
-  STRIPE_FAMILY_PRICE_ID = 'price_1TP6efIZd8GkARoBVD9zY8ux'
-  STRIPE_SINGLE_PRICE_ID = 'price_1TP6f0IZd8GkARoByyICLSbm'
-  SES_AWS_REGION = 'us-west-1'
+DNS_CLUSTER_QUERY = 'ysc-prod.internal'
+APPLE_WALLET_MEMBERSHIP_PASS_TYPE_ID = 'pass.org.ysc.membership'
+APPLE_WALLET_ORG_NAME = 'Young Scandinavians Club'
+APPLE_WALLET_TEAM_ID = 'FAN7NBS7AB'
+APPLE_WALLET_TICKET_PASS_TYPE_ID = 'pass.org.ysc.tickets'
+APP_ENV = 'production'
+AVATARS_BUCKET_NAME = 'ysc-prod-avatars'
+BUCKET_NAME = 'ysc-prod-assets'
+ECTO_IPV6 = 'true'
+EMAIL_ADMIN = 'admin@ysc.org'
+EMAIL_BOARD = 'board@ysc.org'
+EMAIL_CLEAR_LAKE = 'cl@ysc.org'
+EMAIL_CONTACT = 'info@ysc.org'
+EMAIL_FROM = 'info@ysc.org'
+EMAIL_FROM_NAME = 'YSC'
+EMAIL_MEMBERSHIP = 'memberships@ysc.org'
+EMAIL_TAHOE = 'tahoe@ysc.org'
+EMAIL_VOLUNTEER = 'volunteer@ysc.org'
+ENVIRONMENT = 'production'
+ERL_AFLAGS = '-proto_dist inet6_tcp'
+EXPENSE_REPORTS_BUCKET_NAME = 'ysc-prod-expense-reports'
+FLOWROUTE_FORCE_ENABLE = 'true'
+LOG_LEVEL = 'warn'
+PHX_HOST = 'beta.ysc.org'
+PHX_SERVER = 'true'
+PORT = '4000'
+QUICKBOOKS_APP_ID = 'a08a8da4-d5aa-4186-a3e0-b6ce84d1028b'
+QUICKBOOKS_BASE_URL = 'https://quickbooks.api.intuit.com/v3'
+QUICKBOOKS_REALM_ID = '123145772177359'
+QUICKBOOKS_STRIPE_ACCOUNT_ID = '1150040001'
+QUICKBOOKS_BANK_ACCOUNT_ID = '383'
+QUICKBOOKS_SYSTEM_CUSTOMER_ID = '6855'
+QUICKBOOKS_EVENT_ITEM_ID = '652'
+QUICKBOOKS_DONATION_ITEM_ID = '602'
+QUICKBOOKS_TAHOE_BOOKING_ITEM_ID = '371'
+QUICKBOOKS_CLEAR_LAKE_BOOKING_ITEM_ID = '369'
+QUICKBOOKS_MEMBERSHIP_ITEM_ID = '340'
+QUICKBOOKS_SINGLE_MEMBERSHIP_ITEM_ID = '372'
+QUICKBOOKS_FAMILY_MEMBERSHIP_ITEM_ID = '370'
+QUICKBOOKS_STRIPE_FEE_ITEM_ID = '734'
+STRIPE_PROCESS_PAYOUT_WEBHOOKS = 'false'
+S3_AVATARS_PUBLIC_BASE_URL = 'https://avatars.ysc.org'
+S3_EXPENSE_REPORTS_PUBLIC_BASE_URL = 'https://expenses.ysc.org'
+S3_MEDIA_PUBLIC_BASE_URL = 'https://assets.ysc.org'
+S3_USE_CUSTOM_DOMAIN = 'true'
+STRIPE_FAMILY_PRICE_ID = 'price_1TP6efIZd8GkARoBVD9zY8ux'
+STRIPE_SINGLE_PRICE_ID = 'price_1TP6f0IZd8GkARoByyICLSbm'
+SES_AWS_REGION = 'us-west-1'
 
 [http_service]
-  internal_port = 4000
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  # Rolling deploys need at least two started machines; CI enforces this before release.
-  min_machines_running = 2
-  max_machines_running = 3
-  processes = ['app']
+internal_port = 4000
+force_https = true
+auto_stop_machines = 'stop'
+auto_start_machines = true
+# Rolling deploys need at least two started machines; CI enforces this before release.
+min_machines_running = 2
+max_machines_running = 3
+processes = ['app']
 
-  [http_service.concurrency]
-    type = 'connections'
-    hard_limit = 800
-    soft_limit = 400
+[http_service.concurrency]
+type = 'connections'
+hard_limit = 800
+soft_limit = 400
 
 [[vm]]
-  size = 'shared-cpu-1x'
-  memory = '1gb'
-  cpus = 1
+size = 'shared-cpu-1x'
+memory = '1gb'
+cpus = 1
 
 [[metrics]]
-  port = 4000
-  path = '/metrics'
+port = 4000
+path = '/metrics'
