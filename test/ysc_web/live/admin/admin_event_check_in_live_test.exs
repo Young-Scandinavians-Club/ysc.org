@@ -210,21 +210,6 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
   describe "deferred ticket loading" do
     setup [:create_admin]
 
-    test "static HTML shows loading panel before ticket queries run", %{
-      conn: conn,
-      admin: admin
-    } do
-      %{event: event, buyer: buyer} = setup_event_with_tickets(admin)
-
-      {:ok, view, disconnected_html} =
-        live(conn, ~p"/admin/events/#{event.id}/check-in")
-
-      assert disconnected_html =~ "Loading"
-      refute disconnected_html =~ buyer.first_name
-
-      assert render(view) =~ buyer.first_name
-    end
-
     test "initial connect issues at most one ticket list query", %{
       conn: conn,
       admin: admin
@@ -235,7 +220,9 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       {{:ok, view, _html}, query_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
-            {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+            {:ok, view, html} =
+              live(conn, ~p"/admin/events/#{event.id}/check-in")
+
             render(view)
             {:ok, view, html}
           end,

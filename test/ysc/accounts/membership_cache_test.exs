@@ -452,10 +452,13 @@ defmodule Ysc.Accounts.MembershipCacheTest do
             stripe_status: "active",
             name: "Membership",
             current_period_end:
-              DateTime.utc_now() |> DateTime.add(30, :day) |> DateTime.truncate(:second)
+              DateTime.utc_now()
+              |> DateTime.add(30, :day)
+              |> DateTime.truncate(:second)
           })
 
         MembershipCache.invalidate_user(user.id)
+
         assert %Ysc.Subscriptions.Subscription{} =
                  MembershipCache.get_active_membership(user)
       end)

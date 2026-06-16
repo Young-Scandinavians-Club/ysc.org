@@ -143,14 +143,16 @@ defmodule Ysc.Accounts.MembershipCache do
             other
         end
 
-      {user_id, {membership, get_membership_plan_type_from_membership(membership)}}
+      {user_id,
+       {membership, get_membership_plan_type_from_membership(membership)}}
     end)
     |> Map.new()
   end
 
   @doc false
-  def batch_validate_subscription_ids(subscription_ids) when subscription_ids == [],
-    do: MapSet.new()
+  def batch_validate_subscription_ids(subscription_ids)
+      when subscription_ids == [],
+      do: MapSet.new()
 
   def batch_validate_subscription_ids(subscription_ids) do
     import Ecto.Query

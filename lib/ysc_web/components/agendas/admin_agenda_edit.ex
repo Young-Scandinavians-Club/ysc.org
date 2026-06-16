@@ -415,7 +415,11 @@ defmodule YscWeb.AgendaEditComponent do
           {:noreply, socket}
         else
           {:noreply,
-           stream_insert(socket, :agenda_items, to_change_form(agenda_item, %{}))}
+           stream_insert(
+             socket,
+             :agenda_items,
+             to_change_form(agenda_item, %{})
+           )}
         end
     end
   end

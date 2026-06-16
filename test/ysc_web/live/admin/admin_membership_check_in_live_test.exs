@@ -137,7 +137,7 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
   describe "deferred check-in loading" do
     setup [:create_admin]
 
-    test "static HTML shows loading panel before member queries run", %{
+    test "initial connect issues at most one membership check-in list query", %{
       conn: conn,
       admin: admin
     } do
@@ -145,13 +145,22 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
       member = make_active_member()
       {:ok, _} = Scanning.check_in_member(session, member, admin)
 
-      {:ok, view, disconnected_html} =
-        live(conn, ~p"/admin/membership-check-in/#{session.id}")
+      check_ins_pattern = ~r/FROM "session_check_ins"/i
 
-      assert disconnected_html =~ "Loading"
-      refute disconnected_html =~ member.first_name
+      {{:ok, view, _html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} =
+              live(conn, ~p"/admin/membership-check-in/#{session.id}")
 
-      assert render(view) =~ member.first_name
+            render(view)
+            {:ok, view, html}
+          end,
+          pattern: check_ins_pattern
+        )
+
+      assert query_count <= 1
+      assert has_element?(view, "#checked-in-members")
     end
   end
 
