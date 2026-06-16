@@ -327,13 +327,39 @@ defmodule YscWeb.TrixUploadsControllerTest do
     port
   end
 
+  defp start_trix_uploads_finch do
+    finch_name = :"trix_uploads_finch_#{System.unique_integer([:positive])}"
+
+    {:ok, _} =
+      Finch.start_link(
+        name: finch_name,
+        pools: %{
+          default: [size: 20, count: 1, conn_opts: [protocols: [:http1]]]
+        }
+      )
+
+    finch_name
+  end
+
   defp override_exaws_s3_port(port) do
     original = Application.get_env(:ex_aws, :s3)
+    prev_req_opts = Application.get_env(:ex_aws, :req_opts, [])
+    finch_name = start_trix_uploads_finch()
 
     Application.put_env(:ex_aws, :s3,
       scheme: "http://",
       host: "localhost",
       port: port
+    )
+
+    # Req rejects combining :finch with :connect_options, so use a dedicated
+    # Finch pool (HTTP/1, larger size) for concurrent mock S3 uploads in CI.
+    Application.put_env(
+      :ex_aws,
+      :req_opts,
+      prev_req_opts
+      |> Keyword.merge(finch: finch_name, pool_timeout: 60_000)
+      |> Keyword.delete(:connect_options)
     )
 
     on_exit(fn ->
@@ -342,6 +368,8 @@ defmodule YscWeb.TrixUploadsControllerTest do
       else
         Application.delete_env(:ex_aws, :s3)
       end
+
+      Application.put_env(:ex_aws, :req_opts, prev_req_opts)
     end)
   end
 
@@ -485,14 +513,11 @@ defmodule YscWeb.TrixUploadsControllerTest do
           fn _ ->
             Ysc.DataCase.allow_sandbox(self(), parent)
 
-            conn =
-              user
-              |> build_logged_in_admin_conn()
-              |> post(~p"/admin/trix-uploads", %{
-                "file" => plain_text_upload(path, "concurrent.png")
-              })
-
-            conn
+            user
+            |> build_logged_in_admin_conn()
+            |> post(~p"/admin/trix-uploads", %{
+              "file" => plain_text_upload(path, "concurrent.png")
+            })
           end,
           max_concurrency: 2,
           timeout: 120_000
