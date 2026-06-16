@@ -327,9 +327,24 @@ defmodule YscWeb.TrixUploadsControllerTest do
     port
   end
 
+  defp start_trix_uploads_finch do
+    finch_name = :"trix_uploads_finch_#{System.unique_integer([:positive])}"
+
+    {:ok, _} =
+      Finch.start_link(
+        name: finch_name,
+        pools: %{
+          default: [size: 20, count: 1, conn_opts: [protocols: [:http1]]]
+        }
+      )
+
+    finch_name
+  end
+
   defp override_exaws_s3_port(port) do
     original = Application.get_env(:ex_aws, :s3)
     prev_req_opts = Application.get_env(:ex_aws, :req_opts, [])
+    finch_name = start_trix_uploads_finch()
 
     Application.put_env(:ex_aws, :s3,
       scheme: "http://",
@@ -337,16 +352,14 @@ defmodule YscWeb.TrixUploadsControllerTest do
       port: port
     )
 
+    # Req rejects combining :finch with :connect_options, so use a dedicated
+    # Finch pool (HTTP/1, larger size) for concurrent mock S3 uploads in CI.
     Application.put_env(
       :ex_aws,
       :req_opts,
-      Keyword.merge(prev_req_opts,
-        connect_options: [protocols: [:http1]],
-        pool_timeout: 60_000,
-        finch_pools: %{
-          :default => [size: 20, count: 1]
-        }
-      )
+      prev_req_opts
+      |> Keyword.merge(finch: finch_name, pool_timeout: 60_000)
+      |> Keyword.delete(:connect_options)
     )
 
     on_exit(fn ->
@@ -494,22 +507,22 @@ defmodule YscWeb.TrixUploadsControllerTest do
       count_before = Media.count_images()
       parent = self()
 
-      upload = fn ->
-        Ysc.DataCase.allow_sandbox(self(), parent)
+      responses =
+        1..2
+        |> Task.async_stream(
+          fn _ ->
+            Ysc.DataCase.allow_sandbox(self(), parent)
 
-        user
-        |> build_logged_in_admin_conn()
-        |> post(~p"/admin/trix-uploads", %{
-          "file" => plain_text_upload(path, "concurrent.png")
-        })
-      end
-
-      # Stagger task start so two ExAws multipart uploads do not exhaust the
-      # shared Req connection pool in CI (pool_not_available flakes).
-      task1 = Task.async(upload)
-      Process.sleep(50)
-      task2 = Task.async(upload)
-      responses = [Task.await(task1, 120_000), Task.await(task2, 120_000)]
+            user
+            |> build_logged_in_admin_conn()
+            |> post(~p"/admin/trix-uploads", %{
+              "file" => plain_text_upload(path, "concurrent.png")
+            })
+          end,
+          max_concurrency: 2,
+          timeout: 120_000
+        )
+        |> Enum.map(fn {:ok, conn} -> conn end)
 
       for conn <- responses do
         assert %{"url" => url} = json_response(conn, 201)
