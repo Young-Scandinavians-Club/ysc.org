@@ -24,19 +24,28 @@ defmodule Ysc.Accounts.MembershipCache do
   def get_active_membership(user) when is_nil(user), do: nil
 
   def get_active_membership(user) do
+    get_active_membership(user, validate: true)
+  end
+
+  @doc """
+  Like `get_active_membership/1`, with optional `:validate` (default `true`).
+
+  When `validate: false`, returns cached membership without a per-subscription
+  database round-trip. Pair with `batch_validate_subscription_ids/1` for hot paths
+  that load many users at once.
+  """
+  def get_active_membership(user, opts) when is_list(opts) do
+    validate? = Keyword.get(opts, :validate, true)
     cache_key = build_cache_key(user.id, "active")
 
     case Cachex.get(@cache_name, cache_key) do
       {:ok, nil} ->
-        # Cache miss - fetch from database
         membership = get_active_membership_db(user)
-        # Cache with TTL
         cache_with_ttl(cache_key, membership)
         membership
 
       {:ok, membership} ->
-        # Re-check against DB — cached structs can be stale after subscription updates
-        if membership_valid?(membership) do
+        if !validate? or membership_valid?(membership) do
           membership
         else
           invalidate_user(user.id)
@@ -46,7 +55,6 @@ defmodule Ysc.Accounts.MembershipCache do
         end
 
       {:error, _reason} ->
-        # Cache error - fallback to database
         get_active_membership_db(user)
     end
   end
@@ -91,8 +99,68 @@ defmodule Ysc.Accounts.MembershipCache do
 
   def get_membership_data(user) do
     membership = get_active_membership(user)
-    plan_type = get_membership_plan_type(user)
+    plan_type = get_membership_plan_type_from_membership(membership)
     {membership, plan_type}
+  end
+
+  @doc """
+  Returns `{membership, plan_type}` tuples keyed by user id.
+
+  Validates cached subscriptions in a single query instead of one `Repo.get/2`
+  per user — intended for membership check-in search.
+  """
+  def batch_membership_data_for_users(users) when is_list(users) do
+    memberships =
+      Enum.map(users, fn user ->
+        {user.id, get_active_membership(user, validate: false)}
+      end)
+
+    subscription_ids =
+      memberships
+      |> Enum.flat_map(fn
+        {_, %Subscriptions.Subscription{id: id}} -> [id]
+        _ -> []
+      end)
+      |> Enum.uniq()
+
+    valid_subscription_ids = batch_validate_subscription_ids(subscription_ids)
+
+    memberships
+    |> Enum.map(fn {user_id, membership} ->
+      user = Enum.find(users, &(&1.id == user_id))
+
+      membership =
+        case membership do
+          %Subscriptions.Subscription{id: id} = sub ->
+            if MapSet.member?(valid_subscription_ids, id) do
+              sub
+            else
+              invalidate_user(user_id)
+              get_active_membership(user)
+            end
+
+          other ->
+            other
+        end
+
+      {user_id, {membership, get_membership_plan_type_from_membership(membership)}}
+    end)
+    |> Map.new()
+  end
+
+  @doc false
+  def batch_validate_subscription_ids(subscription_ids) when subscription_ids == [],
+    do: MapSet.new()
+
+  def batch_validate_subscription_ids(subscription_ids) do
+    import Ecto.Query
+
+    Subscriptions.Subscription
+    |> where([s], s.id in ^subscription_ids)
+    |> Ysc.Repo.all()
+    |> Enum.filter(&Subscriptions.valid?/1)
+    |> Enum.map(& &1.id)
+    |> MapSet.new()
   end
 
   @doc """

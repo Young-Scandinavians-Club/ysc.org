@@ -151,9 +151,9 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     } do
       event = event_fixture(%{organizer_id: admin.id})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
 
-      assert html =~ "No confirmed tickets for this event"
+      assert render(view) =~ "No confirmed tickets for this event"
     end
 
     test "has QR scanner button", %{conn: conn, admin: admin} do
@@ -178,9 +178,9 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     } do
       %{event: event} = setup_event_with_tickets(admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
 
-      assert html =~ "0 / 1"
+      assert render(view) =~ "0 / 1"
     end
 
     test "shows pending section header with count badge", %{
@@ -207,6 +207,46 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     end
   end
 
+  describe "deferred ticket loading" do
+    setup [:create_admin]
+
+    test "static HTML shows loading panel before ticket queries run", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event, buyer: buyer} = setup_event_with_tickets(admin)
+
+      {:ok, view, disconnected_html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      assert disconnected_html =~ "Loading"
+      refute disconnected_html =~ buyer.first_name
+
+      assert render(view) =~ buyer.first_name
+    end
+
+    test "initial connect issues at most one ticket list query", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event} = setup_event_with_tickets(admin)
+      tickets_pattern = ~r/FROM "tickets"/i
+
+      {{:ok, view, _html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+            render(view)
+            {:ok, view, html}
+          end,
+          pattern: tickets_pattern
+        )
+
+      assert query_count <= 1
+      assert has_element?(view, "#pending-groups")
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Ticket listing
   # ---------------------------------------------------------------------------
@@ -220,7 +260,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     } do
       %{event: event, buyer: buyer} = setup_event_with_tickets(admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       assert html =~ buyer.first_name
       assert html =~ buyer.last_name
@@ -230,7 +271,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       %{event: event, order: order} = setup_event_with_tickets(admin)
       ticket = List.first(order.tickets)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       assert html =~ ticket.reference_id
     end
@@ -241,7 +283,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     } do
       %{event: event, order: order} = setup_event_with_tickets(admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       assert html =~ order.reference_id
     end
@@ -249,7 +292,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     test "shows tier badge for each ticket", %{conn: conn, admin: admin} do
       %{event: event, tier: tier} = setup_event_with_tickets(admin)
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       assert html =~ tier.name
     end
@@ -264,7 +308,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       # Do NOT confirm this order — tickets stay :pending
       _order = ticket_order_fixture(%{user: buyer, event: event, tier: tier})
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       refute html =~ "UnconfirmedBuyer"
       assert html =~ "No confirmed tickets for this event"
@@ -288,7 +333,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
         ticket_order_fixture(%{user: buyer2, event: event, tier: tier})
       )
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       assert html =~ "0 / 2"
     end
@@ -314,7 +360,8 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
         ticket_order_fixture(%{user: buyer2, event: event, tier: tier})
       )
 
-      {:ok, _view, html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      html = render(view)
 
       assert html =~ "AlicexyzListing"
       assert html =~ "BobxyzListing"
@@ -710,8 +757,10 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
         ticket_order_fixture(%{user: bob, event: event, tier: tier})
       )
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(conn, ~p"/admin/events/#{event.id}/check-in?q=AliceUniqueXYZ")
+
+      html = render(view)
 
       assert html =~ "AliceUniqueXYZ"
       refute html =~ "BobUniqueXYZ"
@@ -743,11 +792,13 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
         ticket_order_fixture(%{user: bob, event: event, tier: tier})
       )
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(
           conn,
           ~p"/admin/events/#{event.id}/check-in?q=uniqueAlice@searchtest.example"
         )
+
+      html = render(view)
 
       assert html =~ "uniqueAlice@searchtest.example"
       refute html =~ "uniqueBob@searchtest.example"
@@ -773,11 +824,13 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
           ticket_order_fixture(%{user: buyer2, event: event, tier: tier})
         )
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(
           conn,
           ~p"/admin/events/#{event.id}/check-in?q=#{order1.reference_id}"
         )
+
+      html = render(view)
 
       assert html =~ "OrderSearchAlice"
       refute html =~ "OrderSearchBob"
@@ -804,11 +857,13 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       ticket = List.first(order1.tickets)
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(
           conn,
           ~p"/admin/events/#{event.id}/check-in?q=#{ticket.reference_id}"
         )
+
+      html = render(view)
 
       assert html =~ "TicketSearchAlice"
       refute html =~ "TicketSearchBob"
@@ -824,8 +879,10 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
         ticket_order_fixture(%{user: buyer, event: event, tier: tier})
       )
 
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(conn, ~p"/admin/events/#{event.id}/check-in?q=casesensalice")
+
+      html = render(view)
 
       assert html =~ "CaseSensAlice"
     end
@@ -910,8 +967,10 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       # With a search that matches only Alice, the counter should still show
       # the full event total (0 / 2), not filtered results
-      {:ok, _view, html} =
+      {:ok, view, _html} =
         live(conn, ~p"/admin/events/#{event.id}/check-in?q=SearchCountAlice")
+
+      html = render(view)
 
       assert html =~ "0 / 2"
     end

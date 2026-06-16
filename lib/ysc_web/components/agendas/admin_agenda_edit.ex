@@ -62,6 +62,7 @@ defmodule YscWeb.AgendaEditComponent do
               for={form}
               as={nil}
               phx-change="validate"
+              phx-debounce="300"
               phx-submit="save"
               phx-value-id={form.data.id}
               phx-target={@myself}
@@ -201,14 +202,12 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    agenda = Agendas.get_agenda!(agenda_item.agenda_id)
+    items = upsert_agenda_item(socket.assigns.agenda_items, agenda_item)
 
     {:ok,
      socket
-     |> assign(agenda_items: agenda.agenda_items)
-     |> assign(
-       chronological_warning: check_chronological_order(agenda.agenda_items)
-     )
+     |> assign(:agenda_items, items)
+     |> assign(:chronological_warning, check_chronological_order(items))
      |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}))}
   end
 
@@ -220,14 +219,12 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    agenda = Agendas.get_agenda!(agenda_item.agenda_id)
+    items = remove_agenda_item(socket.assigns.agenda_items, agenda_item)
 
     {:ok,
      socket
-     |> assign(agenda_items: agenda.agenda_items)
-     |> assign(
-       chronological_warning: check_chronological_order(agenda.agenda_items)
-     )
+     |> assign(:agenda_items, items)
+     |> assign(:chronological_warning, check_chronological_order(items))
      |> stream_delete(:agenda_items, to_change_form(agenda_item, %{}))}
   end
 
@@ -239,14 +236,12 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    agenda = Agendas.get_agenda!(agenda_item.agenda_id)
+    items = upsert_agenda_item(socket.assigns.agenda_items, agenda_item)
 
     {:ok,
      socket
-     |> assign(agenda_items: agenda.agenda_items)
-     |> assign(
-       chronological_warning: check_chronological_order(agenda.agenda_items)
-     )
+     |> assign(:agenda_items, items)
+     |> assign(:chronological_warning, check_chronological_order(items))
      |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}))}
   end
 
@@ -258,14 +253,12 @@ defmodule YscWeb.AgendaEditComponent do
         },
         socket
       ) do
-    agenda = Agendas.get_agenda!(agenda_item.agenda_id)
+    items = upsert_agenda_item(socket.assigns.agenda_items, agenda_item)
 
     {:ok,
      socket
-     |> assign(agenda_items: agenda.agenda_items)
-     |> assign(
-       chronological_warning: check_chronological_order(agenda.agenda_items)
-     )
+     |> assign(:agenda_items, items)
+     |> assign(:chronological_warning, check_chronological_order(items))
      |> stream_insert(:agenda_items, to_change_form(agenda_item, %{}),
        at: agenda_item.position
      )}
@@ -285,14 +278,18 @@ defmodule YscWeb.AgendaEditComponent do
   end
 
   def handle_event("validate", %{"id" => id, "agenda_item" => params}, socket) do
-    agenda_item = Agendas.get_agenda_item!(id)
+    case find_agenda_item(socket, id) do
+      nil ->
+        {:noreply, socket}
 
-    {:noreply,
-     stream_insert(
-       socket,
-       :agenda_items,
-       to_change_form(agenda_item, params, :validate)
-     )}
+      agenda_item ->
+        {:noreply,
+         stream_insert(
+           socket,
+           :agenda_items,
+           to_change_form(agenda_item, params, :validate)
+         )}
+    end
   end
 
   def handle_event("validate", %{"agenda_item" => params}, socket) do
@@ -408,14 +405,37 @@ defmodule YscWeb.AgendaEditComponent do
 
   def handle_event("restore_if_unsaved", %{"value" => val} = params, socket) do
     id = params["id"]
-    agenda_item = Agendas.get_agenda_item!(id)
 
-    if agenda_item.title == val do
-      {:noreply, socket}
-    else
-      {:noreply,
-       stream_insert(socket, :agenda_items, to_change_form(agenda_item, %{}))}
+    case find_agenda_item(socket, id) do
+      nil ->
+        {:noreply, socket}
+
+      agenda_item ->
+        if agenda_item.title == val do
+          {:noreply, socket}
+        else
+          {:noreply,
+           stream_insert(socket, :agenda_items, to_change_form(agenda_item, %{}))}
+        end
     end
+  end
+
+  defp find_agenda_item(socket, id) do
+    Enum.find(socket.assigns.agenda_items, &(to_string(&1.id) == to_string(id)))
+  end
+
+  defp upsert_agenda_item(items, agenda_item) do
+    if Enum.any?(items, &(&1.id == agenda_item.id)) do
+      Enum.map(items, fn item ->
+        if item.id == agenda_item.id, do: agenda_item, else: item
+      end)
+    else
+      items ++ [agenda_item]
+    end
+  end
+
+  defp remove_agenda_item(items, agenda_item) do
+    Enum.reject(items, &(&1.id == agenda_item.id))
   end
 
   defp to_change_form(agenda_item_or_changeset, params, action \\ nil) do
