@@ -588,6 +588,46 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                )
     end
 
+    test "place_modification_hold persists guest_params in modification_hold_attrs",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(110)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      guest_params = %{
+        "0" => %{
+          "first_name" => "Primary",
+          "last_name" => "Guest",
+          "is_child" => false,
+          "is_booking_user" => true,
+          "order_index" => 0
+        },
+        "1" => %{
+          "first_name" => "Extra",
+          "last_name" => "Guest",
+          "is_child" => false,
+          "is_booking_user" => false,
+          "order_index" => 1
+        }
+      }
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs,
+                 guest_params: guest_params
+               )
+
+      assert held_booking.modification_hold_attrs["guest_params"] ==
+               guest_params
+    end
+
     test "place_modification_hold reserves newly added calendar days", %{
       user: user
     } do

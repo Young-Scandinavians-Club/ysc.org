@@ -55,5 +55,25 @@ defmodule YscWeb.AdminMediaLibraryBrowserTest do
       assert html =~ "2024"
       assert html =~ "bg-zinc-800 text-white"
     end
+
+    test "omits infinite-scroll trigger when end of timeline is reached" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_media_library_browser
+          id="cover"
+          grid_id="media-picker-grid-cover"
+          target="picker-target"
+          search=""
+          selected_year={nil}
+          available_years={[]}
+          picker_images={[]}
+          end_of_timeline?={true}
+        />
+        """)
+
+      refute html =~ ~s(phx-viewport-bottom="load-more-media")
+    end
   end
 end
