@@ -747,6 +747,135 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
+  defp confirm_buyout_inventory_from_available!(booking) do
+    prop_inv =
+      fetch_property_inventory(
+        booking.property,
+        booking.checkin_date,
+        booking.checkout_date
+      )
+
+    if Enum.any?(prop_inv, fn pi ->
+         pi.buyout_held == true or pi.buyout_booked == true
+       end) do
+      Repo.rollback({:error, :buyout_unavailable})
+    end
+
+    expected_days = Date.diff(booking.checkout_date, booking.checkin_date)
+
+    {count, _} =
+      Repo.update_all(
+        from(pi in PropertyInventory,
+          where:
+            pi.property == ^booking.property and
+              pi.day >= ^booking.checkin_date and
+              pi.day < ^booking.checkout_date and
+              pi.buyout_held == false and
+              pi.buyout_booked == false
+        ),
+        set: [
+          buyout_booked: true,
+          updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+        ]
+      )
+
+    if count != expected_days do
+      Repo.rollback({:error, :inventory_update_failed})
+    end
+  end
+
+  defp confirm_room_inventory_from_available!(booking) do
+    room_ids = Enum.map(booking.rooms, & &1.id)
+
+    if room_ids == [] do
+      Repo.rollback({:error, :inventory_update_failed})
+    end
+
+    prop_inv =
+      fetch_property_inventory(
+        booking.property,
+        booking.checkin_date,
+        booking.checkout_date
+      )
+
+    room_inv =
+      fetch_room_inventory(
+        room_ids,
+        booking.checkin_date,
+        booking.checkout_date
+      )
+
+    validate_room_booking_availability(prop_inv, room_inv)
+
+    expected_rows =
+      length(room_ids) * Date.diff(booking.checkout_date, booking.checkin_date)
+
+    {count, _} =
+      Repo.update_all(
+        from(ri in RoomInventory,
+          where:
+            ri.room_id in ^room_ids and
+              ri.day >= ^booking.checkin_date and
+              ri.day < ^booking.checkout_date and
+              ri.held == false and
+              ri.booked == false
+        ),
+        set: [
+          booked: true,
+          updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+        ]
+      )
+
+    if count != expected_rows do
+      Repo.rollback({:error, :inventory_update_failed})
+    end
+  end
+
+  defp confirm_day_inventory_from_available!(booking) do
+    prop_inv =
+      fetch_property_inventory(
+        booking.property,
+        booking.checkin_date,
+        booking.checkout_date
+      )
+
+    invalid_day? =
+      Enum.any?(prop_inv, fn pi ->
+        pi.buyout_held == true or
+          pi.buyout_booked == true or
+          pi.capacity_booked + pi.capacity_held + booking.guests_count >
+            pi.capacity_total
+      end)
+
+    if invalid_day? do
+      Repo.rollback({:error, :insufficient_capacity})
+    end
+
+    updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+    {count, _} =
+      Repo.update_all(
+        from(pi in PropertyInventory,
+          where:
+            pi.property == ^booking.property and
+              pi.day >= ^booking.checkin_date and
+              pi.day < ^booking.checkout_date and
+              pi.buyout_held == false and
+              pi.buyout_booked == false and
+              pi.capacity_booked + pi.capacity_held + ^booking.guests_count <=
+                pi.capacity_total
+        ),
+        inc: [capacity_booked: booking.guests_count],
+        set: [updated_at: updated_at]
+      )
+
+    expected_days = Date.diff(booking.checkout_date, booking.checkin_date)
+
+    if count != expected_days do
+      Repo.rollback({:error, :inventory_update_failed})
+    end
+  end
+
   defp update_room_inventory_for_booking(room_inv) do
     # IMPORTANT: We must update ALL rows or the booking fails (no partial bookings)
     # For composite primary keys, we manually check lock_version in the WHERE clause
@@ -1236,49 +1365,31 @@ defmodule Ysc.Bookings.BookingLocker do
         Repo.rollback({:already_confirmed, booking})
       end
 
-      # Booking must be in :hold status to proceed with confirmation
-      if booking.status != :hold do
+      # Allow :canceled so a succeeded Stripe payment can still confirm when
+      # HoldExpiryWorker wins the race against payment_intent.succeeded / redirect.
+      unless booking.status in [:hold, :canceled] do
         Repo.rollback({:error, :invalid_status})
       end
 
+      from_released_hold = booking.status == :canceled
+
       case booking.booking_mode do
         :buyout ->
-          # Flip to buyout_booked = true
-          {count, _} =
-            Repo.update_all(
-              from(pi in PropertyInventory,
-                where:
-                  pi.property == ^booking.property and
-                    pi.day >= ^booking.checkin_date and
-                    pi.day < ^booking.checkout_date
-              ),
-              set: [
-                buyout_held: false,
-                buyout_booked: true,
-                updated_at: DateTime.truncate(DateTime.utc_now(), :second)
-              ]
-            )
-
-          if count == 0 do
-            Repo.rollback({:error, :inventory_update_failed})
-          end
-
-        :room ->
-          # Set booked = true, clear held for all rooms
-          room_ids = Enum.map(booking.rooms, & &1.id)
-
-          if room_ids != [] do
+          if from_released_hold do
+            confirm_buyout_inventory_from_available!(booking)
+          else
+            # Flip to buyout_booked = true
             {count, _} =
               Repo.update_all(
-                from(ri in RoomInventory,
+                from(pi in PropertyInventory,
                   where:
-                    ri.room_id in ^room_ids and
-                      ri.day >= ^booking.checkin_date and
-                      ri.day < ^booking.checkout_date
+                    pi.property == ^booking.property and
+                      pi.day >= ^booking.checkin_date and
+                      pi.day < ^booking.checkout_date
                 ),
                 set: [
-                  held: false,
-                  booked: true,
+                  buyout_held: false,
+                  buyout_booked: true,
                   updated_at: DateTime.truncate(DateTime.utc_now(), :second)
                 ]
               )
@@ -1288,27 +1399,60 @@ defmodule Ysc.Bookings.BookingLocker do
             end
           end
 
-        :day ->
-          # Decrement held, increment booked
-          updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+        :room ->
+          if from_released_hold do
+            confirm_room_inventory_from_available!(booking)
+          else
+            # Set booked = true, clear held for all rooms
+            room_ids = Enum.map(booking.rooms, & &1.id)
 
-          update_all_day_property_inventory!(
-            booking,
-            [
-              inc: [
-                capacity_booked: booking.guests_count,
-                capacity_held: -booking.guests_count
+            if room_ids != [] do
+              {count, _} =
+                Repo.update_all(
+                  from(ri in RoomInventory,
+                    where:
+                      ri.room_id in ^room_ids and
+                        ri.day >= ^booking.checkin_date and
+                        ri.day < ^booking.checkout_date
+                  ),
+                  set: [
+                    held: false,
+                    booked: true,
+                    updated_at: DateTime.truncate(DateTime.utc_now(), :second)
+                  ]
+                )
+
+              if count == 0 do
+                Repo.rollback({:error, :inventory_update_failed})
+              end
+            end
+          end
+
+        :day ->
+          if from_released_hold do
+            confirm_day_inventory_from_available!(booking)
+          else
+            # Decrement held, increment booked
+            updated_at = DateTime.truncate(DateTime.utc_now(), :second)
+
+            update_all_day_property_inventory!(
+              booking,
+              [
+                inc: [
+                  capacity_booked: booking.guests_count,
+                  capacity_held: -booking.guests_count
+                ],
+                set: [updated_at: updated_at]
               ],
-              set: [updated_at: updated_at]
-            ],
-            retry_updates: [
-              set: [
-                capacity_booked: booking.guests_count,
-                capacity_held: 0,
-                updated_at: updated_at
+              retry_updates: [
+                set: [
+                  capacity_booked: booking.guests_count,
+                  capacity_held: 0,
+                  updated_at: updated_at
+                ]
               ]
-            ]
-          )
+            )
+          end
       end
 
       # Update booking status

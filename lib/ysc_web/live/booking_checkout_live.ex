@@ -1442,7 +1442,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_event("confirm-complimentary-booking", _params, socket) do
-    booking = socket.assigns.booking
+    booking = reload_checkout_booking(socket.assigns.booking.id)
 
     cond do
       not socket.assigns.complimentary_checkout or
@@ -1556,61 +1556,48 @@ defmodule YscWeb.BookingCheckoutLive do
         %{"payment_intent_id" => payment_intent_id},
         socket
       ) do
-    # Check if booking has expired before processing payment
-    if booking_expired?(socket.assigns.booking) do
-      {:noreply,
-       socket
-       |> assign(
-         payment_error:
-           "This booking has expired and is no longer available for payment.",
-         show_payment_form: false,
-         stripe_payment_element_ready: false
-       )
-       |> YscWeb.Flash.put_toast(
-         :error,
-         "This booking has expired. Please create a new booking.",
-         title: "Checkout"
-       )}
-    else
-      case process_payment_success(socket.assigns.booking, payment_intent_id) do
-        {:ok, booking} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "Payment successful! Your booking is confirmed.",
-             title: "Booking confirmed",
-             icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
-           )
-           |> push_navigate(
-             to: ~p"/bookings/#{booking.id}/receipt?confetti=true"
-           )}
+    booking = reload_checkout_booking(socket.assigns.booking.id)
 
-        {:error, reason} ->
-          Ysc.Logging.error(
-            "[BookingCheckout] Payment succeeded but booking confirmation failed",
-            reason: inspect(reason),
-            booking_id: socket.assigns.booking.id
-          )
+    case process_payment_success(booking, payment_intent_id) do
+      {:ok, booking} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Payment successful! Your booking is confirmed.",
+           title: "Booking confirmed",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+         )
+         |> push_navigate(to: ~p"/bookings/#{booking.id}/receipt?confetti=true")}
 
-          {:noreply,
-           assign(socket,
-             payment_error:
-               "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
-           )}
-      end
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "[BookingCheckout] Payment succeeded but booking confirmation failed",
+          reason: inspect(reason),
+          booking_id: socket.assigns.booking.id
+        )
+
+        {:noreply,
+         assign(socket,
+           payment_error:
+             "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
+         )}
     end
   end
 
   @impl true
   def handle_info(:check_booking_expiration, socket) do
-    # Check if booking has expired
-    if booking_expired?(socket.assigns.booking) do
-      # Reload booking to get latest status
-      booking =
-        Repo.get!(Booking, socket.assigns.booking.id)
-        |> Repo.preload([:user, :rooms])
+    booking = reload_checkout_booking(socket.assigns.booking.id)
 
+    if booking_payable?(booking) do
+      Process.send_after(self(), :check_booking_expiration, 5_000)
+
+      {:noreply,
+       assign(socket,
+         booking: booking,
+         is_expired: false
+       )}
+    else
       {:noreply,
        socket
        |> assign(
@@ -1626,10 +1613,6 @@ defmodule YscWeb.BookingCheckoutLive do
          "This booking has expired. Please create a new booking.",
          title: "Checkout"
        )}
-    else
-      # Schedule next check in 5 seconds
-      Process.send_after(self(), :check_booking_expiration, 5_000)
-      {:noreply, socket}
     end
   end
 
@@ -2579,6 +2562,17 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp remaining_minutes(_), do: 0
+
+  defp reload_checkout_booking(booking_id) do
+    Repo.get!(Booking, booking_id)
+    |> Repo.preload([:user, :booking_guests, rooms: :room_category])
+  end
+
+  defp booking_payable?(%Booking{status: :hold} = booking) do
+    not booking_expired?(booking)
+  end
+
+  defp booking_payable?(_booking), do: false
 
   defp booking_expired?(booking) do
     case booking do
