@@ -387,17 +387,24 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def handle_params(params, _uri, socket) do
     search_query = normalize_search_query(Map.get(params, "q", ""))
 
+    socket = assign(socket, :search_query, search_query)
+
+    # Defer check-in list and search until the WebSocket connects so the
+    # static HTML response stays fast and the loading panel can render.
     socket =
-      socket
-      |> assign(:search_query, search_query)
-      |> reload_checked_in()
-      |> then(fn s ->
-        if searching?(search_query) do
-          run_search(s, search_query)
-        else
-          assign(s, :search_results, [])
-        end
-      end)
+      if connected?(socket) do
+        socket
+        |> reload_checked_in()
+        |> then(fn s ->
+          if searching?(search_query) do
+            run_search(s, search_query)
+          else
+            assign(s, :search_results, [])
+          end
+        end)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end

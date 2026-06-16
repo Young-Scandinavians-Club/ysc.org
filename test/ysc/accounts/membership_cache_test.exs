@@ -422,6 +422,61 @@ defmodule Ysc.Accounts.MembershipCacheTest do
     end
   end
 
+  describe "batch_membership_data_for_users/1" do
+    test "returns membership data keyed by user id" do
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      MembershipCache.invalidate_user(user.id)
+
+      data = MembershipCache.batch_membership_data_for_users([user])
+
+      assert {membership, plan_type} = Map.fetch!(data, user.id)
+      assert membership.type == :lifetime
+      assert plan_type == :lifetime
+    end
+
+    test "validates cached subscriptions in a single query" do
+      users = for _ <- 1..3, do: user_fixture()
+
+      Enum.each(users, fn user ->
+        {:ok, _subscription} =
+          Ysc.Subscriptions.create_subscription(%{
+            user_id: user.id,
+            stripe_id: "sub_batch_#{System.unique_integer([:positive])}",
+            stripe_status: "active",
+            name: "Membership",
+            current_period_end:
+              DateTime.utc_now()
+              |> DateTime.add(30, :day)
+              |> DateTime.truncate(:second)
+          })
+
+        MembershipCache.invalidate_user(user.id)
+
+        assert %Ysc.Subscriptions.Subscription{} =
+                 MembershipCache.get_active_membership(user)
+      end)
+
+      subscriptions_pattern = ~r/FROM "subscriptions"/i
+
+      {_data, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            MembershipCache.batch_membership_data_for_users(users)
+          end,
+          pattern: subscriptions_pattern
+        )
+
+      assert query_count <= 1
+    end
+  end
+
   describe "invalidate_user/1" do
     test "invalidates cache for user by ID" do
       user =
