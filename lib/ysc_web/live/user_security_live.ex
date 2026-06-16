@@ -792,7 +792,7 @@ defmodule YscWeb.UserSecurityLive do
       "passkey" -> "Passkey"
       "google" -> "Google"
       "facebook" -> "Facebook"
-      "oauth" -> "OAuth"
+      "oauth" -> "Google or Facebook"
       other when is_binary(other) and other != "" -> String.capitalize(other)
       _ -> "Sign-in"
     end

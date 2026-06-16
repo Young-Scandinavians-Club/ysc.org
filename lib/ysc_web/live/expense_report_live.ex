@@ -77,7 +77,7 @@ defmodule YscWeb.ExpenseReportLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "You must be an active user to access this page.",
+         "Expense reports are only available to approved members in good standing. If you think you should have access, contact info@ysc.org.",
          title: "Expense report"
        )
        |> redirect(to: ~p"/")}
@@ -3524,7 +3524,10 @@ defmodule YscWeb.ExpenseReportLive do
     do: "Invalid file type. Use PDF, JPG, JPEG, PNG, or WEBP"
 
   defp upload_error_to_string(:too_many_files), do: "Too many files selected"
-  defp upload_error_to_string(err), do: "Upload error: #{inspect(err)}"
+
+  defp upload_error_to_string(_err),
+    do:
+      "Something went wrong uploading that file. Please try again, or use a different file format."
 
   # Timeline component for expense report status
   defp timeline_section(assigns) do
