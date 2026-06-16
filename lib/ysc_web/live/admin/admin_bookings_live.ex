@@ -5850,15 +5850,7 @@ defmodule YscWeb.AdminBookingsLive do
          )}
 
       {:error, changeset} ->
-        error_message =
-          Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-            Enum.reduce(opts, msg, fn {key, value}, acc ->
-              String.replace(acc, "%{#{key}}", to_string(value))
-            end)
-          end)
-          |> Enum.map_join("; ", fn {field, errors} ->
-            "#{field}: #{Enum.join(errors, ", ")}"
-          end)
+        error_message = YscWeb.FormHelpers.format_changeset_errors(changeset)
 
         {:noreply,
          YscWeb.Flash.put_toast(
@@ -6348,14 +6340,7 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp translate_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-    |> Enum.map_join("; ", fn {field, errors} ->
-      "#{field}: #{Enum.join(errors, ", ")}"
-    end)
+    YscWeb.FormHelpers.format_changeset_errors(changeset)
   end
 
   defp maybe_convert_atom(params, key) do

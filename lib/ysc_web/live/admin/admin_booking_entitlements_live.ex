@@ -439,15 +439,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
   end
 
   defp format_changeset_errors(changeset) do
-    changeset
-    |> Ecto.Changeset.traverse_errors(fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-    |> Enum.map_join("; ", fn {field, messages} ->
-      "#{field}: #{Enum.join(messages, ", ")}"
-    end)
+    YscWeb.FormHelpers.format_changeset_errors(changeset)
   end
 
   defp property_text(nil), do: "Any"

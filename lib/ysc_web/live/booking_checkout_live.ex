@@ -846,15 +846,7 @@ defmodule YscWeb.BookingCheckoutLive do
 
               if changeset && not changeset.valid? do
                 changeset_errors =
-                  Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-                    if is_binary(msg) do
-                      Enum.reduce(opts, msg, fn {key, value}, acc ->
-                        String.replace(acc, "%{#{key}}", to_string(value))
-                      end)
-                    else
-                      to_string(msg)
-                    end
-                  end)
+                  YscWeb.FormHelpers.changeset_errors(changeset)
 
                 # Use the original index_str from the form to match template keys
                 Map.put(
@@ -892,16 +884,7 @@ defmodule YscWeb.BookingCheckoutLive do
             if changeset.valid? do
               acc
             else
-              changeset_errors =
-                Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-                  if is_binary(msg) do
-                    Enum.reduce(opts, msg, fn {key, value}, acc ->
-                      String.replace(acc, "%{#{key}}", to_string(value))
-                    end)
-                  else
-                    to_string(msg)
-                  end
-                end)
+              changeset_errors = YscWeb.FormHelpers.changeset_errors(changeset)
 
               Map.put(acc, Integer.to_string(index), changeset_errors)
             end
@@ -1371,16 +1354,7 @@ defmodule YscWeb.BookingCheckoutLive do
             end
 
           {:error, changeset} ->
-            errors =
-              Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-                if is_binary(msg) do
-                  Enum.reduce(opts, msg, fn {key, value}, acc ->
-                    String.replace(acc, "%{#{key}}", to_string(value))
-                  end)
-                else
-                  to_string(msg)
-                end
-              end)
+            errors = YscWeb.FormHelpers.changeset_errors(changeset)
 
             {:noreply,
              assign(socket,
@@ -1406,16 +1380,7 @@ defmodule YscWeb.BookingCheckoutLive do
             if changeset.valid? do
               acc
             else
-              changeset_errors =
-                Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-                  if is_binary(msg) do
-                    Enum.reduce(opts, msg, fn {key, value}, acc ->
-                      String.replace(acc, "%{#{key}}", to_string(value))
-                    end)
-                  else
-                    to_string(msg)
-                  end
-                end)
+              changeset_errors = YscWeb.FormHelpers.changeset_errors(changeset)
 
               Map.put(acc, Integer.to_string(index), changeset_errors)
             end

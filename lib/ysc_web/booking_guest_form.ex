@@ -567,11 +567,10 @@ defmodule YscWeb.BookingGuestForm do
       case Enum.at(invalid_by_index, idx) do
         %Ecto.Changeset{} = changeset ->
           changeset_errors =
-            Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-              Enum.reduce(opts, msg, fn {key, value}, error ->
-                String.replace(error, "%{#{key}}", to_string(value))
-              end)
-            end)
+            Ecto.Changeset.traverse_errors(
+              changeset,
+              &YscWeb.FormHelpers.translate_error/1
+            )
 
           Map.put(acc, index_str, changeset_errors)
 
