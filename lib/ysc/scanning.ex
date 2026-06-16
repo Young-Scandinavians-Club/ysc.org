@@ -1168,11 +1168,11 @@ defmodule Ysc.Scanning do
       users = Accounts.search_users(trimmed, limit: 20)
       user_ids = Enum.map(users, & &1.id)
       checked_in_ids = checked_in_user_ids(session_id, user_ids)
+      membership_data = MembershipCache.batch_membership_data_for_users(users)
 
       Enum.map(users, fn user ->
-        membership = MembershipCache.get_active_membership(user)
+        {membership, plan_type} = Map.get(membership_data, user.id, {nil, nil})
         active? = YscWeb.UserAuth.membership_active?(membership)
-        plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
 
         %{
           user: user,
