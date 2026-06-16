@@ -1402,15 +1402,7 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp format_changeset_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-    |> Enum.flat_map(fn {field, messages} ->
-      Enum.map(messages, &"#{field}: #{&1}")
-    end)
-    |> Enum.join(". ")
+    YscWeb.FormHelpers.format_changeset_errors(changeset, style: :flat)
   end
 
   defp modification_error_message(:blackout_conflict),

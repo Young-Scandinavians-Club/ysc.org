@@ -1605,15 +1605,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
         {:error, changeset} ->
           message =
-            changeset
-            |> Ecto.Changeset.traverse_errors(fn {msg, opts} ->
-              Enum.reduce(opts, msg, fn {key, value}, acc ->
-                String.replace(acc, "%{#{key}}", to_string(value))
-              end)
-            end)
-            |> Enum.map_join("; ", fn {field, errors} ->
-              "#{Phoenix.Naming.humanize(field)}: #{Enum.join(errors, ", ")}"
-            end)
+            YscWeb.FormHelpers.format_changeset_errors(changeset,
+              field_format: :humanize
+            )
 
           {:noreply,
            socket

@@ -3272,13 +3272,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   defp format_booking_error(_),
     do: "An error occurred while creating your booking. Please try again."
 
-  defp format_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        String.replace(acc, "%{#{key}}", to_string(value))
-      end)
-    end)
-  end
+  defp format_errors(changeset),
+    do: YscWeb.FormHelpers.changeset_errors(changeset)
 
   defp check_booking_eligibility(nil) do
     sign_in_path = ~p"/users/log-in?#{%{redirect_to: ~p"/bookings/clear-lake"}}"

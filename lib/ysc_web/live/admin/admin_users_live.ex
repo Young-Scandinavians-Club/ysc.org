@@ -1041,19 +1041,7 @@ defmodule YscWeb.AdminUsersLive do
          )}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        errors =
-          Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-            Regex.replace(~r"%{(\w+)}", msg, fn _, key ->
-              opts
-              |> Keyword.get(String.to_existing_atom(key), key)
-              |> to_string()
-            end)
-          end)
-
-        error_detail =
-          Enum.map_join(errors, "; ", fn {field, msgs} ->
-            "#{field}: #{Enum.join(msgs, ", ")}"
-          end)
+        error_detail = YscWeb.FormHelpers.format_changeset_errors(changeset)
 
         {:noreply,
          socket

@@ -5980,19 +5980,8 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
-  defp format_errors(changeset) do
-    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-      Enum.reduce(opts, msg, fn {key, value}, acc ->
-        placeholder = "%{#{key}}"
-
-        if String.contains?(acc, placeholder) do
-          String.replace(acc, placeholder, to_string(value))
-        else
-          acc
-        end
-      end)
-    end)
-  end
+  defp format_errors(changeset),
+    do: YscWeb.FormHelpers.changeset_errors(changeset)
 
   defp date_to_datetime_string(nil), do: nil
 

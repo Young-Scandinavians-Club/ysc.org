@@ -31,12 +31,7 @@ defmodule YscWeb.Api.FallbackController do
   end
 
   def call(conn, {:error, %Ecto.Changeset{} = changeset}) do
-    errors =
-      Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
-        end)
-      end)
+    errors = YscWeb.FormHelpers.changeset_errors(changeset)
 
     conn
     |> put_status(:unprocessable_entity)
