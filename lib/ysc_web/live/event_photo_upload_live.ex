@@ -365,7 +365,9 @@ defmodule YscWeb.EventPhotoUploadLive do
   defp error_to_string(:not_accepted),
     do: "File type not accepted — use a photo or video format we support"
 
-  defp error_to_string(err), do: "Upload error: #{inspect(err)}"
+  defp error_to_string(_err),
+    do:
+      "Something went wrong uploading that file. Please try again, or use a different photo or video format."
 
   attr :event, Event, required: true
   attr :greeting_name, :string, required: true

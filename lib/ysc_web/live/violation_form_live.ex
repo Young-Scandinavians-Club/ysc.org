@@ -65,7 +65,7 @@ defmodule YscWeb.ConductViolationReportLive do
               </.link>
             </div>
             <h1 class="text-3xl lg:text-4xl font-bold text-zinc-900 mb-4">
-              Report a Conduct Violation
+              Report a concern
             </h1>
             <p class="text-lg text-zinc-600 max-w-xl mx-auto mb-4">
               We're here to help. If you've experienced or witnessed a violation of our Code of Conduct, please share the details below. Your report will be handled with care and confidentiality.
@@ -336,10 +336,10 @@ defmodule YscWeb.ConductViolationReportLive do
 
     {:ok,
      socket
-     |> assign(:page_title, "Report Conduct Violation")
+     |> assign(:page_title, "Report a Concern")
      |> assign(
        :meta_description,
-       "Report a code of conduct violation to the Young Scandinavians Club. All reports are handled confidentially."
+       "Report a code of conduct concern to the Young Scandinavians Club. All reports are handled confidentially."
      )
      |> assign(:logged_in?, current_user != nil)
      |> assign(:current_user, current_user)
