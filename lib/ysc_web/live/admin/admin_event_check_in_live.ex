@@ -420,11 +420,18 @@ defmodule YscWeb.AdminEventCheckInLive do
   def handle_params(params, _uri, socket) do
     search = Map.get(params, "q", "")
 
-    {:noreply,
-     socket
-     |> assign(:search_query, search)
-     |> assign_scan_session_from_params(params)
-     |> reload_tickets(search)}
+    socket =
+      socket
+      |> assign(:search_query, search)
+      |> assign_scan_session_from_params(params)
+
+    # Defer ticket loading until the WebSocket connects so the static HTML
+    # response stays fast and the loading panel can render on first paint.
+    if connected?(socket) do
+      {:noreply, reload_tickets(socket, search)}
+    else
+      {:noreply, socket}
+    end
   end
 
   # ---------------------------------------------------------------------------

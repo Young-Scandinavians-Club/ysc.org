@@ -218,6 +218,28 @@ defmodule YscWeb.AgendaEditComponentTest do
       assert html =~ "phx-submit=\"save\""
     end
 
+    test "debounces validate events to limit database load", %{
+      agenda: agenda,
+      event: event
+    } do
+      {:ok, _item} =
+        Agendas.create_agenda_item(event.id, agenda, %{
+          title: "Test"
+        })
+
+      agenda = Agendas.get_agenda!(agenda.id)
+
+      html =
+        render_component(AgendaEditComponent, %{
+          id: "agenda-edit-#{agenda.id}",
+          agenda: agenda,
+          agenda_id: agenda.id,
+          event_id: event.id
+        })
+
+      assert html =~ "phx-debounce=\"300\""
+    end
+
     test "form auto-submits on blur", %{agenda: agenda, event: event} do
       {:ok, _item} =
         Agendas.create_agenda_item(event.id, agenda, %{
