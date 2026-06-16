@@ -1674,8 +1674,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
-  describe "confirm_booking/1 invalid status" do
-    test "returns invalid_status when booking was released (canceled hold)", %{
+  describe "confirm_booking/1 after hold release" do
+    test "confirms canceled hold when inventory is still available", %{
       user: user
     } do
       checkin = Date.utc_today() |> Date.add(120)
@@ -1694,7 +1694,38 @@ defmodule Ysc.Bookings.BookingLockerTest do
       canceled = Ysc.Repo.reload!(booking)
       assert canceled.status == :canceled
 
-      assert {:error, {:error, :invalid_status}} =
+      assert {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+      assert confirmed.status == :complete
+    end
+
+    test "rejects canceled hold when buyout inventory was taken after release", %{
+      user: user
+    } do
+      other_user = user_fixture(%{phone_number: "+14159098312"})
+      checkin = Date.utc_today() |> Date.add(121)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      assert {:ok, _} = BookingLocker.release_hold(booking.id)
+
+      assert {:ok, _other_booking} =
+               BookingLocker.create_buyout_booking(
+                 other_user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      assert {:error, {:error, :buyout_unavailable}} =
                BookingLocker.confirm_booking(booking.id)
     end
   end

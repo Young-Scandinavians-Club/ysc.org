@@ -373,6 +373,87 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "payment-success confirms booking after hold expiry worker released hold",
+         %{
+           conn: conn,
+           user: user
+         } do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      pi_id = "pi_hold_expiry_race_#{System.unique_integer([:positive])}"
+      booking = Repo.get!(Booking, booking.id)
+      amount_cents = Ysc.MoneyHelper.money_to_cents(booking.total_price)
+
+      expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: pi_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => booking.user_id
+           },
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert {:ok, _} = BookingLocker.release_hold(booking.id)
+      assert Repo.get!(Booking, booking.id).status == :canceled
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               render_click(view, "payment-success", %{
+                 "payment_intent_id" => pi_id
+               })
+
+      assert receipt_path =~ "/receipt"
+      assert Repo.get!(Booking, booking.id).status == :complete
+      assert booking_ledger_payment_count(booking.id) == 1
+      Mox.verify!(StripeMock)
+    end
+
+    test "handle_info :check_booking_expiration marks expired when hold was released in DB",
+         %{
+           conn: conn,
+           user: user
+         } do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert {:ok, _} = BookingLocker.release_hold(booking.id)
+
+      send(view.pid, :check_booking_expiration)
+      html = render(view)
+
+      assert html =~ "expired"
+      refute html =~ "Pay "
+    end
+
     test "handle_info :check_booking_expiration reschedules when hold still valid",
          %{
            conn: conn,
