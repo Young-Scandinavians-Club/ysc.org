@@ -378,6 +378,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            conn: conn,
            user: user
          } do
+      Ysc.TestHelpers.setup_quickbooks_mocks()
+
       checkin = Date.utc_today() |> Date.add(7)
       checkout = Date.add(checkin, 3)
 
