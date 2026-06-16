@@ -1559,31 +1559,29 @@ defmodule YscWeb.BookingCheckoutLive do
     booking = reload_checkout_booking(socket.assigns.booking.id)
 
     case process_payment_success(booking, payment_intent_id) do
-        {:ok, booking} ->
-          {:noreply,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "Payment successful! Your booking is confirmed.",
-             title: "Booking confirmed",
-             icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
-           )
-           |> push_navigate(
-             to: ~p"/bookings/#{booking.id}/receipt?confetti=true"
-           )}
+      {:ok, booking} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Payment successful! Your booking is confirmed.",
+           title: "Booking confirmed",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+         )
+         |> push_navigate(to: ~p"/bookings/#{booking.id}/receipt?confetti=true")}
 
-        {:error, reason} ->
-          Ysc.Logging.error(
-            "[BookingCheckout] Payment succeeded but booking confirmation failed",
-            reason: inspect(reason),
-            booking_id: socket.assigns.booking.id
-          )
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "[BookingCheckout] Payment succeeded but booking confirmation failed",
+          reason: inspect(reason),
+          booking_id: socket.assigns.booking.id
+        )
 
-          {:noreply,
-           assign(socket,
-             payment_error:
-               "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
-           )}
+        {:noreply,
+         assign(socket,
+           payment_error:
+             "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
+         )}
     end
   end
 

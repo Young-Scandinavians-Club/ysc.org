@@ -1698,9 +1698,10 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert confirmed.status == :complete
     end
 
-    test "rejects canceled hold when buyout inventory was taken after release", %{
-      user: user
-    } do
+    test "rejects canceled hold when buyout inventory was taken after release",
+         %{
+           user: user
+         } do
       other_user = user_fixture(%{phone_number: "+14159098312"})
       checkin = Date.utc_today() |> Date.add(121)
       checkout = Date.add(checkin, 2)
@@ -1727,6 +1728,165 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
       assert {:error, {:error, :buyout_unavailable}} =
                BookingLocker.confirm_booking(booking.id)
+    end
+
+    test "confirms canceled room hold when inventory is still available", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Released hold room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      checkin = Date.utc_today() |> Date.add(122)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, _} = BookingLocker.release_hold(hold.id)
+      assert Ysc.Repo.reload!(hold).status == :canceled
+
+      assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
+      assert confirmed.status == :complete
+      assert confirmed.booking_mode == :room
+    end
+
+    test "rejects canceled room hold when room was booked after release", %{
+      user: user
+    } do
+      other_user = user_fixture(%{phone_number: "+14159098313"})
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Contested room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      checkin = Date.utc_today() |> Date.add(123)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, _} = BookingLocker.release_hold(hold.id)
+
+      assert {:ok, other_hold} =
+               BookingLocker.create_room_booking(
+                 other_user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, _other_confirmed} =
+               BookingLocker.confirm_booking(other_hold.id)
+
+      assert {:error, {:error, :room_unavailable}} =
+               BookingLocker.confirm_booking(hold.id)
+    end
+
+    test "confirms canceled per-guest hold when inventory is still available",
+         %{
+           user: user
+         } do
+      ensure_clear_lake_day_pricing_rule()
+
+      checkin = Date.utc_today() |> Date.add(124)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, _} = BookingLocker.release_hold(hold.id)
+      assert Ysc.Repo.reload!(hold).status == :canceled
+
+      assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
+      assert confirmed.status == :complete
+      assert confirmed.booking_mode == :day
+    end
+
+    test "rejects canceled per-guest hold when capacity was taken after release",
+         %{
+           user: user
+         } do
+      other_user = user_fixture(%{phone_number: "+14159098314"})
+      ensure_clear_lake_day_pricing_rule()
+
+      checkin = Date.utc_today() |> Date.add(125)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, _} = BookingLocker.release_hold(hold.id)
+
+      assert {:ok, buyout_hold} =
+               BookingLocker.create_buyout_booking(
+                 other_user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 6
+               )
+
+      assert {:ok, _buyout_confirmed} =
+               BookingLocker.confirm_booking(buyout_hold.id)
+
+      assert {:error, {:error, :insufficient_capacity}} =
+               BookingLocker.confirm_booking(hold.id)
     end
   end
 
