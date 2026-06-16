@@ -8,6 +8,47 @@ defmodule YscWeb.TahoeBookingLiveTest do
   alias Ysc.Bookings
 
   describe "deferred room availability" do
+    test "dead render skips room inventory queries when dates are in the URL",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      tahoe_rooms =
+        Bookings.list_rooms(:tahoe)
+        |> Enum.filter(& &1.is_active)
+
+      if tahoe_rooms == [] do
+        assert true
+      else
+        room = List.first(tahoe_rooms)
+        {checkin, checkout} = tahoe_booking_dates(30)
+
+        params = %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout),
+          "booking_mode" => "room"
+        }
+
+        inventory_pattern = ~r/FROM "room_inventory"/i
+
+        {html, query_count} =
+          Ysc.QueryCounter.with_query_counter(
+            fn ->
+              conn
+              |> get(~p"/bookings/tahoe?#{URI.encode_query(params)}")
+              |> html_response(200)
+            end,
+            pattern: inventory_pattern
+          )
+
+        assert query_count == 0
+        assert html =~ "Tahoe"
+        refute html =~ ~s(id="room-#{room.id}")
+      end
+    end
+
     test "populates room cards after connect when booking dates are in the URL",
          %{
            conn: conn
