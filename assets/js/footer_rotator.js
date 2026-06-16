@@ -13,7 +13,7 @@ const FooterRotator = {
       "Made with ❤️ by the YSC WebTech Team.",
       "Powered by fika and strong coffee. ☕🥐",
       "Your Nordic home in the Bay. 🇩🇰 🇫🇮 🇮🇸 🇳🇴 🇸🇪",
-      "Hand-coded with hygge 🕯️ in the SF Bay.",
+      "Promptly engineered with hygge. 🕯️🤖",
       "Built for the community, by the community 🤝",
       "Skål! From the YSC WebTech crew 🍻",
       "Bringing the North to the West Coast 🏔️🌊",
