@@ -369,6 +369,9 @@ defmodule YscWeb.EventPhotoUploadLive do
     do:
       "Something went wrong uploading that file. Please try again, or use a different photo or video format."
 
+  @doc false
+  def test_upload_error_to_string(err), do: error_to_string(err)
+
   attr :event, Event, required: true
   attr :greeting_name, :string, required: true
   attr :event_datetime_label, :string, default: nil

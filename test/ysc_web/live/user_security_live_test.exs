@@ -535,6 +535,30 @@ defmodule YscWeb.UserSecurityLiveTest do
       assert html =~ "192.168.xxx.xxx"
     end
 
+    test "displays OAuth sign-in method as Google or Facebook", %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      alias Ysc.Accounts.AuthEvent
+
+      AuthEvent.login_success_changeset(user, %{
+        ip_address: "192.168.1.100",
+        user_agent: "Mozilla/5.0",
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "macOS",
+        metadata: %{"auth_method" => "oauth"}
+      })
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "Google or Facebook"
+    end
+
     test "displays failed sign-in when present", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)

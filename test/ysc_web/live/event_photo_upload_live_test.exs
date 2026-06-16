@@ -75,4 +75,14 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
     assert {:error, {:live_redirect, %{to: "/"}}} =
              live(conn, ~p"/events/photos/#{Ecto.UUID.generate()}")
   end
+
+  test "shows friendly message for unexpected upload validation errors" do
+    message =
+      YscWeb.EventPhotoUploadLive.test_upload_error_to_string(
+        {:writer_failure, :timeout}
+      )
+
+    assert message =~ "Something went wrong uploading that file"
+    assert message =~ "Please try again"
+  end
 end
