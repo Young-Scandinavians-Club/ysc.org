@@ -16,10 +16,7 @@ defmodule Ysc.WpMigration.FamilyMembersBackupIntegrationTest do
   @tag :backup_integration
   @tag timeout: 180_000
   test "backup users with spouse/child usermeta all produce importable family records" do
-    if not File.exists?(@backup) do
-      IO.puts("Skipping: backup.sql not found at #{@backup}")
-      assert true
-    else
+    with_backup_file(fn ->
       users = BackupMetaParser.collect_family_users(@backup)
 
       assert length(users) >= 900,
@@ -46,16 +43,13 @@ defmodule Ysc.WpMigration.FamilyMembersBackupIntegrationTest do
 
       assert failures == [],
              "failed to build family records for #{length(failures)} users: #{inspect(Enum.take(failures, 5))}"
-    end
+    end)
   end
 
   @tag :backup_integration
   @tag timeout: 180_000
   test "extract application_from_usermeta matches fixture builder for backup users" do
-    if not File.exists?(@backup) do
-      IO.puts("Skipping: backup.sql not found at #{@backup}")
-      assert true
-    else
+    with_backup_file(fn ->
       users =
         @backup
         |> BackupMetaParser.collect_family_users()
@@ -82,6 +76,15 @@ defmodule Ysc.WpMigration.FamilyMembersBackupIntegrationTest do
 
         assert fixture_row["spouse_last_name"] == extracted["spouse_last_name"]
       end
+    end)
+  end
+
+  defp with_backup_file(fun) when is_function(fun, 0) do
+    if File.exists?(@backup) do
+      fun.()
+    else
+      IO.puts("Skipping: backup.sql not found at #{@backup}")
+      assert true
     end
   end
 
