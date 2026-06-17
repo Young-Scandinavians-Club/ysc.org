@@ -159,7 +159,14 @@ defmodule YscWeb.AdminMoneyLive do
     # Ensure live_action is set
     socket = assign(socket, :live_action, socket.assigns.live_action || :index)
 
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+    socket =
+      if connected?(socket) do
+        apply_action(socket, socket.assigns.live_action, params)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   # Normalizes entity type strings to atoms safely

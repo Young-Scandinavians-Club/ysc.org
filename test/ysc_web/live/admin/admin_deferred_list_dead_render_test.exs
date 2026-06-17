@@ -8,6 +8,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
   import Ysc.EventsFixtures
   import Ysc.ScanningFixtures
 
+  alias Ysc.Ledgers
+
   setup %{conn: conn} do
     user = user_fixture(%{role: "admin"})
     %{conn: log_in_user(conn, user), admin: user}
@@ -196,6 +198,50 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     assert query_count == 0
     assert html =~ "Loading newsletter"
     refute html =~ "Static Render Edition"
+  end
+
+  test "dead render skips payment modal queries on payment detail route", %{
+    conn: conn
+  } do
+    Ledgers.ensure_basic_accounts()
+    payment = Ysc.LedgersFixtures.payment_fixture()
+
+    payments_pattern = ~r/FROM "payments"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/money/payments/#{payment.id}")
+          |> html_response(200)
+        end,
+        pattern: payments_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Money Management"
+    refute html =~ ~s(id="payment-modal")
+  end
+
+  test "dead render skips refund modal queries on refund route", %{conn: conn} do
+    Ledgers.ensure_basic_accounts()
+    payment = Ysc.LedgersFixtures.payment_fixture()
+
+    refunds_pattern = ~r/FROM "refunds"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/money/payments/#{payment.id}/refund")
+          |> html_response(200)
+        end,
+        pattern: refunds_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Money Management"
+    refute html =~ ~s(id="refund-modal")
   end
 
   describe "connected list loading" do

@@ -3853,32 +3853,36 @@ defmodule YscWeb.EventDetailsLive do
         query_params[:resume_order]
 
     socket =
-      cond do
-        # If we have checkout step and order_id, restore that state
-        checkout_step && order_id && socket.assigns.current_user ->
-          restore_checkout_state_from_url(
-            socket,
-            order_id,
-            checkout_step,
-            socket.assigns.event.id
-          )
+      if connected?(socket) do
+        cond do
+          # If we have checkout step and order_id, restore that state
+          checkout_step && order_id && socket.assigns.current_user ->
+            restore_checkout_state_from_url(
+              socket,
+              order_id,
+              checkout_step,
+              socket.assigns.event.id
+            )
 
-        # Legacy: resume_order parameter (for backwards compatibility)
-        order_id && socket.assigns.current_user ->
-          restore_checkout_state(socket, order_id, socket.assigns.event.id)
+          # Legacy: resume_order parameter (for backwards compatibility)
+          order_id && socket.assigns.current_user ->
+            restore_checkout_state(socket, order_id, socket.assigns.event.id)
 
-        # If we're on the tickets route, show ticket modal
-        socket.assigns.live_action == :tickets ->
-          socket
-          |> assign(:show_ticket_modal, true)
+          # If we're on the tickets route, show ticket modal
+          socket.assigns.live_action == :tickets ->
+            socket
+            |> assign(:show_ticket_modal, true)
 
-        # Otherwise, clear any checkout state
-        true ->
-          socket
-          |> assign(:show_ticket_modal, false)
-          |> assign(:show_payment_modal, false)
-          |> assign(:stripe_payment_element_ready, false)
-          |> assign(:show_free_ticket_confirmation, false)
+          # Otherwise, clear any checkout state
+          true ->
+            socket
+            |> assign(:show_ticket_modal, false)
+            |> assign(:show_payment_modal, false)
+            |> assign(:stripe_payment_element_ready, false)
+            |> assign(:show_free_ticket_confirmation, false)
+        end
+      else
+        socket
       end
 
     {:noreply, socket}

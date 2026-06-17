@@ -37,6 +37,43 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
   end
 
   describe "restore checkout state from URL" do
+    test "dead render skips ticket order restore queries when order_id is in URL",
+         %{
+           conn: conn,
+           user: user
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      {:ok, order} =
+        %TicketOrder{}
+        |> TicketOrder.create_changeset(%{
+          user_id: user.id,
+          event_id: event.id,
+          total_amount: tier.price,
+          status: :pending,
+          expires_at: DateTime.add(DateTime.utc_now(), 30, :minute),
+          reference_id: "ORD-#{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      orders_pattern = ~r/FROM "ticket_orders"/i
+
+      {html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/events/#{event.id}?order_id=#{order.id}")
+            |> html_response(200)
+          end,
+          pattern: orders_pattern
+        )
+
+      assert query_count == 0
+      assert html =~ event.title
+    end
+
     test "restores pending order with valid URL parameters", %{
       conn: conn,
       user: user
