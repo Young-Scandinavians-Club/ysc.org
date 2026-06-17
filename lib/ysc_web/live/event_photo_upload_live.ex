@@ -59,7 +59,7 @@ defmodule YscWeb.EventPhotoUploadLive do
              socket
              |> put_flash(
                :error,
-               "You must be signed in with the email used for your event ticket to upload photos or videos."
+               "To upload photos, sign in with the same email address you used when you bought your ticket for this event. If you used a different email, sign out and sign in with the ticket email, or contact info@ysc.org for help."
              )
              |> push_navigate(to: ~p"/")}
 
