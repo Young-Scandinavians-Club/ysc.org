@@ -1068,12 +1068,6 @@ defmodule YscWeb.AdminMediaLive do
            |> assign(:loading_more?, false)}
 
         [_ | _] ->
-          first_new_image_date = List.first(new_images).inserted_at
-
-          needs_header =
-            last_image_date.year != first_new_image_date.year ||
-              last_image_date.month != first_new_image_date.month
-
           {new_years_set, _} = years_from_images(new_images)
           updated_years = MapSet.union(socket.assigns.years_set, new_years_set)
           years_list = updated_years |> MapSet.to_list() |> Enum.sort(:desc)
@@ -1087,34 +1081,7 @@ defmodule YscWeb.AdminMediaLive do
             |> assign_cursor_from_images(new_images)
             |> assign(:years_set, updated_years)
             |> assign(:years_list, years_list)
-
-          socket =
-            if needs_header do
-              new_sections = Timeline.inject_sections(new_images)
-
-              socket
-              |> assign(:sections, socket.assigns.sections ++ new_sections)
-              |> stream(:images, new_sections, at: -1, dom_id: &get_dom_id/1)
-            else
-              old_len = length(socket.assigns.sections)
-
-              updated_sections =
-                Timeline.append_images_to_last_section(
-                  socket.assigns.sections,
-                  new_images
-                )
-
-              stream_items =
-                if length(updated_sections) > old_len do
-                  Enum.drop(updated_sections, old_len - 1)
-                else
-                  [List.last(updated_sections)]
-                end
-
-              socket
-              |> assign(:sections, updated_sections)
-              |> stream(:images, stream_items, dom_id: &get_dom_id/1)
-            end
+            |> append_sections_from_load_more(new_images)
 
           {:noreply, assign(socket, :loading_more?, false)}
       end
@@ -1425,6 +1392,27 @@ defmodule YscWeb.AdminMediaLive do
     socket
     |> assign(:sections, sections)
     |> stream(:images, sections, reset: true, dom_id: &get_dom_id/1)
+  end
+
+  defp append_sections_from_load_more(socket, new_images) do
+    old_len = length(socket.assigns.sections)
+
+    updated_sections =
+      Timeline.append_images_to_last_section(
+        socket.assigns.sections,
+        new_images
+      )
+
+    stream_items =
+      if length(updated_sections) > old_len do
+        Enum.drop(updated_sections, old_len - 1)
+      else
+        [List.last(updated_sections)]
+      end
+
+    socket
+    |> assign(:sections, updated_sections)
+    |> stream(:images, stream_items, dom_id: &get_dom_id/1)
   end
 
   defp update_image_in_sections(sections, %Media.Image{id: image_id} = image) do

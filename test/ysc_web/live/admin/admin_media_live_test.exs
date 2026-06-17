@@ -316,6 +316,50 @@ defmodule YscWeb.AdminMediaLiveTest do
       assert has_element?(view, "#image-#{last_image.id}")
     end
 
+    test "load-more splits a batch across month sections when it spans month boundaries",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{role: "admin"})
+      token = "MonthSplit#{System.unique_integer([:positive])}"
+      feb_base = ~U[2099-02-28 12:00:00Z]
+
+      for i <- 1..35 do
+        {:ok, _} =
+          %Ysc.Media.Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/#{token}-feb-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at: DateTime.add(feb_base, -i, :hour),
+            updated_at: DateTime.add(feb_base, -i, :hour)
+          }
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, jan_image} =
+        %Ysc.Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/#{token}-jan.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2099-01-15 12:00:00Z],
+          updated_at: ~U[2099-01-15 12:00:00Z]
+        }
+        |> Ysc.Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      refute has_element?(view, "#image-#{jan_image.id}")
+
+      html =
+        view
+        |> element("#media-scroll-container")
+        |> render_hook("load-more")
+
+      assert html =~ "image-#{jan_image.id}"
+      assert has_element?(view, "#section-2099-1", "January 2099")
+      assert has_element?(view, "#section-2099-2", "February 2099")
+    end
+
     test "jump-to-year keeps all-years mode so load-more reaches older years",
          %{
            conn: conn
