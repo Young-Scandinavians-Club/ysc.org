@@ -20,7 +20,7 @@ defmodule YscWeb.Components.PageMastheadTest do
       assert html =~ "border-y border-zinc-200"
       assert html =~ "py-8 md:py-12"
       assert html =~ "Events"
-      assert html =~ "What's Next"
+      assert html =~ "What&#39;s Next"
       assert html =~ "text-4xl md:text-7xl"
       assert html =~ "<h1"
       refute html =~ "<h2"
