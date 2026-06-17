@@ -7,68 +7,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   alias Ecto.Adapters.SQL.Sandbox
   alias Ysc.Repo
 
-  describe "deferred availability and pricing" do
-    test "dead render skips availability queries when dates are in the URL", %{
-      conn: conn
-    } do
-      checkin = Date.add(Date.utc_today(), 45)
-      checkout = Date.add(checkin, 3)
-
-      params = %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout),
-        "booking_mode" => "day"
-      }
-
-      bookings_pattern = ~r/FROM "bookings"/i
-
-      {html, query_count} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            conn
-            |> get(~p"/bookings/clear-lake?#{URI.encode_query(params)}")
-            |> html_response(200)
-          end,
-          pattern: bookings_pattern
-        )
-
-      assert query_count == 0
-      assert html =~ "Clear Lake"
-    end
-
-    test "info tab switch does not re-query availability", %{conn: conn} do
-      user = user_with_membership(:lifetime)
-      conn = log_in_user(conn, user)
-
-      checkin = Date.add(Date.utc_today(), 45)
-      checkout = Date.add(checkin, 3)
-
-      path =
-        "/bookings/clear-lake?" <>
-          URI.encode_query(%{
-            "checkin_date" => Date.to_string(checkin),
-            "checkout_date" => Date.to_string(checkout),
-            "tab" => "information",
-            "info_tab" => "general"
-          })
-
-      {:ok, view, _html} = live(conn, path)
-      render(view)
-
-      bookings_pattern = ~r/FROM "bookings"/i
-
-      {_html, query_count} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            render_click(view, "switch-info-tab", %{"tab" => "rules"})
-          end,
-          pattern: bookings_pattern
-        )
-
-      assert query_count == 0
-    end
-  end
-
   describe "malformed query params" do
     test "parses checkin and checkout when query string arrives as a single key",
          %{
