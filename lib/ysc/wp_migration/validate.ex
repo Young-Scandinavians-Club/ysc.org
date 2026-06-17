@@ -119,7 +119,7 @@ defmodule Ysc.WpMigration.Validate do
           WHERE post_type = 'post'
             AND (
               post_status = 'publish'
-              OR (post_status = 'future' AND CAST(post_date AS TIMESTAMP) <= CURRENT_TIMESTAMP)
+              OR (post_status = 'future' AND post_date <= '#{migration_now()}')
             )
           """
         ),
@@ -363,4 +363,8 @@ defmodule Ysc.WpMigration.Validate do
   defp parse_int(v) when is_integer(v), do: v
   defp parse_int(v) when is_binary(v), do: String.to_integer(v)
   defp parse_int(_), do: 0
+
+  defp migration_now do
+    DateTime.utc_now() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+  end
 end

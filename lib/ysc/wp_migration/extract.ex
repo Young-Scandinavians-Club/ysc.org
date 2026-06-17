@@ -197,6 +197,8 @@ defmodule Ysc.WpMigration.Extract do
         "country" => meta["country"] || meta["billing_country"],
         "membership_type" => decode_membership_type(meta["membership_type"]),
         "account_status" => meta["account_status"],
+        # UM profile timestamp (unix seconds); best available proxy for admin review date
+        "last_update" => normalize_unix_timestamp(meta["last_update"]),
         "birth_date" => normalize_date(meta["birth_date"]),
         "citizenship" => meta["citizenship"],
         # WP key has a typo ("noedic"), so check both spellings
@@ -347,8 +349,11 @@ defmodule Ysc.WpMigration.Extract do
       "spoken_languages" => presence(form["register_message_03"]),
       "hear_about_the_club" => presence(form["register_message_04"]),
       "agreed_to_bylaws" => agreed_to_bylaws,
-      "spouse_first_name" => presence(form["spouse_first_name"]),
-      "spouse_last_name" => presence(form["spouse_last_name"]),
+      "spouse_first_name" =>
+        presence(form["spouse_first_name"]) ||
+          presence(meta["spouse_first_name"]),
+      "spouse_last_name" =>
+        presence(form["spouse_last_name"]) || presence(meta["spouse_last_name"]),
       "children" => children,
       "submitted_date" => normalize_datetime(user_registered),
       "has_submitted_application" => map_size(form) > 0
@@ -428,6 +433,24 @@ defmodule Ysc.WpMigration.Extract do
       Regex.match?(~r/^\d{4}$/, value) -> value
       true -> normalize_date(value)
     end
+  end
+
+  defp normalize_unix_timestamp(nil), do: nil
+  defp normalize_unix_timestamp(""), do: nil
+
+  defp normalize_unix_timestamp(value) when is_binary(value) do
+    case Integer.parse(String.trim(value)) do
+      {unix, ""} when unix > 0 ->
+        unix
+        |> DateTime.from_unix!(:second)
+        |> DateTime.truncate(:second)
+        |> Calendar.strftime("%Y-%m-%dT%H:%M:%S")
+
+      _ ->
+        nil
+    end
+  rescue
+    ArgumentError -> nil
   end
 
   defp normalize_datetime(nil), do: nil
@@ -685,5 +708,11 @@ defmodule Ysc.WpMigration.Extract do
         path: path
       )
     end
+  end
+
+  @doc false
+  def application_from_usermeta(user_id, email, user_registered, meta)
+      when is_map(meta) do
+    build_application(user_id, email, user_registered, meta)
   end
 end

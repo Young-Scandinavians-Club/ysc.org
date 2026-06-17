@@ -11,6 +11,42 @@ defmodule Ysc.Media.Timeline do
     defstruct [:id, :date, :formatted_date, type: :header]
   end
 
+  defmodule Section do
+    @moduledoc """
+    A year-month group with a sticky header and its images.
+
+    Used as a LiveView stream item so headers can sit outside masonry columns.
+    """
+    defstruct [:id, :header, :images, type: :section]
+  end
+
+  @doc """
+  Groups images into year-month sections for gallery rendering.
+
+  Each section has a sticky-friendly header outside the masonry grid.
+  """
+  def inject_sections(images) when is_list(images) do
+    images
+    |> Enum.chunk_by(fn image ->
+      {image.inserted_at.year, image.inserted_at.month}
+    end)
+    |> Enum.map(&section_from_image_group/1)
+  end
+
+  @doc """
+  Appends images to the last section when load-more stays in the same month.
+  """
+  def append_images_to_last_section(sections, images)
+      when is_list(sections) and is_list(images) do
+    case List.last(sections) do
+      %Section{} = last ->
+        List.replace_at(sections, -1, %{last | images: last.images ++ images})
+
+      _ ->
+        sections ++ inject_sections(images)
+    end
+  end
+
   @doc """
   Injects date headers into a list of images, grouping by year-month.
 
@@ -36,6 +72,20 @@ defmodule Ysc.Media.Timeline do
 
       [header | group]
     end)
+  end
+
+  defp section_from_image_group([%_{inserted_at: inserted_at} | _] = group) do
+    header = %Header{
+      id: "header-#{inserted_at.year}-#{inserted_at.month}",
+      date: inserted_at,
+      formatted_date: format_date(inserted_at)
+    }
+
+    %Section{
+      id: "section-#{inserted_at.year}-#{inserted_at.month}",
+      header: header,
+      images: group
+    }
   end
 
   defp format_date(datetime) do

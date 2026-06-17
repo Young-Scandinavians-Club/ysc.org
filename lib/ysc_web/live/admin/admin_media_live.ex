@@ -379,7 +379,7 @@ defmodule YscWeb.AdminMediaLive do
         phx-hook="MediaDropZone"
         phx-drop-target={@uploads.media_drop_uploads.ref}
       >
-        <div class="flex justify-between items-center py-6">
+        <div class="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div class="flex items-center gap-2">
               <.admin_page_title>Media Library</.admin_page_title>
@@ -396,7 +396,7 @@ defmodule YscWeb.AdminMediaLive do
             </p>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-start sm:shrink-0">
             <div
               :if={@media_count > 0}
               id="media-layout-preference"
@@ -622,8 +622,10 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:search_query, "")
       |> assign(:per_page, 30)
       |> assign(:end_of_timeline?, false)
+      |> assign(:loading_more?, false)
       |> assign(:stream_initialized?, false)
       |> assign(:last_image_date, nil)
+      |> assign(:last_image_id, nil)
       |> assign(:images_empty?, true)
       |> assign(:years_set, MapSet.new())
       |> assign(:years_list, [])
@@ -634,6 +636,7 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:layout_mode, :masonry)
       |> assign(:show_drop_zone, false)
       |> assign(:pending_upload_submit?, false)
+      |> assign(:sections, [])
       |> assign(form: nil)
       |> stream(:images, [], dom_id: &get_dom_id/1)
       |> allow_upload(:media_uploads,
@@ -777,17 +780,17 @@ defmodule YscWeb.AdminMediaLive do
         Ysc.Logging.debug("Loaded #{length(images)} images for year #{year}")
 
         {years_set, years_list} = years_from_images(images)
-        stream_items = Timeline.inject_date_headers(images)
+        stream_items = Timeline.inject_sections(images)
 
         socket
         |> assign(:selected_year, year)
         |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
         |> assign(:stream_initialized?, true)
-        |> assign(:last_image_date, images |> List.last() |> last_date())
+        |> assign_cursor_from_images(images)
         |> assign(:images_empty?, images == [])
         |> assign(:years_set, years_set)
         |> assign(:years_list, years_list)
-        |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+        |> reset_image_sections(stream_items)
       else
         socket
       end
@@ -804,17 +807,17 @@ defmodule YscWeb.AdminMediaLive do
           )
 
         {years_set, years_list} = years_from_images(images)
-        stream_items = Timeline.inject_date_headers(images)
+        stream_items = Timeline.inject_sections(images)
 
         socket
         |> assign(:selected_year, nil)
         |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
         |> assign(:stream_initialized?, true)
-        |> assign(:last_image_date, images |> List.last() |> last_date())
+        |> assign_cursor_from_images(images)
         |> assign(:images_empty?, images == [])
         |> assign(:years_set, years_set)
         |> assign(:years_list, years_list)
-        |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+        |> reset_image_sections(stream_items)
       else
         socket
       end
@@ -932,7 +935,7 @@ defmodule YscWeb.AdminMediaLive do
     available_years = Enum.map(timeline, & &1.year)
     images = Media.list_images_cursor(limit: socket.assigns.per_page)
     {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_date_headers(images)
+    stream_items = Timeline.inject_sections(images)
 
     {:noreply,
      socket
@@ -940,11 +943,11 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:available_years, available_years)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:stream_initialized?, true)
-     |> assign(:last_image_date, images |> List.last() |> last_date())
+     |> assign_cursor_from_images(images)
      |> assign(:images_empty?, images == [])
      |> assign(:years_set, years_set)
      |> assign(:years_list, years_list)
-     |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+     |> reset_image_sections(stream_items)
      |> push_patch(to: build_media_url_with_state(socket))}
   end
 
@@ -962,7 +965,7 @@ defmodule YscWeb.AdminMediaLive do
 
   def handle_event("filter_by_year", %{"year" => ""}, socket) do
     images = Media.list_images_cursor(limit: socket.assigns.per_page)
-    stream_items = Timeline.inject_date_headers(images)
+    stream_items = Timeline.inject_sections(images)
 
     new_years =
       Enum.map(images, fn image -> image.inserted_at.year end) |> MapSet.new()
@@ -974,9 +977,10 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_year, nil)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:images_empty?, images == [])
+     |> assign_cursor_from_images(images)
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
-     |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)}
+     |> reset_image_sections(stream_items)}
   end
 
   def handle_event("filter_by_year", %{"year" => year_str}, socket) do
@@ -992,7 +996,7 @@ defmodule YscWeb.AdminMediaLive do
           limit: ^socket.assigns.per_page
       )
 
-    stream_items = Timeline.inject_date_headers(images)
+    stream_items = Timeline.inject_sections(images)
 
     new_years =
       Enum.map(images, fn image -> image.inserted_at.year end) |> MapSet.new()
@@ -1004,9 +1008,10 @@ defmodule YscWeb.AdminMediaLive do
      |> assign(:selected_year, year)
      |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
      |> assign(:images_empty?, images == [])
+     |> assign_cursor_from_images(images)
      |> assign(:years_set, new_years)
      |> assign(:years_list, years_list)
-     |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)}
+     |> reset_image_sections(stream_items)}
   end
 
   @impl true
@@ -1014,9 +1019,17 @@ defmodule YscWeb.AdminMediaLive do
     require Ysc.Logging
 
     last_image_date = socket.assigns.last_image_date
+    last_image_id = socket.assigns.last_image_id
     search_query = socket.assigns.search_query
 
-    if not socket.assigns.end_of_timeline? and not is_nil(last_image_date) do
+    if socket.assigns.end_of_timeline? or is_nil(last_image_date) or
+         socket.assigns[:loading_more?] do
+      {:noreply, socket}
+    else
+      before_cursor = {last_image_date, last_image_id}
+
+      socket = assign(socket, :loading_more?, true)
+
       new_images =
         if socket.assigns.selected_year do
           year = socket.assigns.selected_year
@@ -1033,12 +1046,13 @@ defmodule YscWeb.AdminMediaLive do
               end_date,
               search_query,
               socket.assigns.per_page,
-              last_image_date
+              before_cursor
             )
           )
         else
           Media.list_images_cursor(
             before_date: last_image_date,
+            before_id: last_image_id,
             limit: socket.assigns.per_page,
             search: search_query
           )
@@ -1048,7 +1062,10 @@ defmodule YscWeb.AdminMediaLive do
 
       case new_images do
         [] ->
-          {:noreply, assign(socket, :end_of_timeline?, true)}
+          {:noreply,
+           socket
+           |> assign(:end_of_timeline?, true)
+           |> assign(:loading_more?, false)}
 
         [_ | _] ->
           first_new_image_date = List.first(new_images).inserted_at
@@ -1057,35 +1074,55 @@ defmodule YscWeb.AdminMediaLive do
             last_image_date.year != first_new_image_date.year ||
               last_image_date.month != first_new_image_date.month
 
-          stream_items =
-            if needs_header,
-              do: Timeline.inject_date_headers(new_images),
-              else: new_images
-
           {new_years_set, _} = years_from_images(new_images)
           updated_years = MapSet.union(socket.assigns.years_set, new_years_set)
           years_list = updated_years |> MapSet.to_list() |> Enum.sort(:desc)
 
-          {:noreply,
-           socket
-           |> assign(
-             :end_of_timeline?,
-             length(new_images) < socket.assigns.per_page
-           )
-           |> assign(:last_image_date, new_images |> List.last() |> last_date())
-           |> assign(:years_set, updated_years)
-           |> assign(:years_list, years_list)
-           |> stream(:images, stream_items, at: -1, dom_id: &get_dom_id/1)}
+          socket =
+            socket
+            |> assign(
+              :end_of_timeline?,
+              length(new_images) < socket.assigns.per_page
+            )
+            |> assign_cursor_from_images(new_images)
+            |> assign(:years_set, updated_years)
+            |> assign(:years_list, years_list)
+
+          socket =
+            if needs_header do
+              new_sections = Timeline.inject_sections(new_images)
+
+              socket
+              |> assign(:sections, socket.assigns.sections ++ new_sections)
+              |> stream(:images, new_sections, at: -1, dom_id: &get_dom_id/1)
+            else
+              updated_sections =
+                Timeline.append_images_to_last_section(
+                  socket.assigns.sections,
+                  new_images
+                )
+
+              updated_section = List.last(updated_sections)
+
+              socket
+              |> assign(:sections, updated_sections)
+              |> stream(:images, [updated_section], dom_id: &get_dom_id/1)
+            end
+
+          {:noreply, assign(socket, :loading_more?, false)}
       end
-    else
-      {:noreply, socket}
     end
   end
 
   def handle_event("show-all-years", _params, socket) do
-    images = Media.list_images_cursor(limit: socket.assigns.per_page)
+    images =
+      Media.list_images_cursor(
+        limit: socket.assigns.per_page,
+        search: socket.assigns.search_query
+      )
+
     {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_date_headers(images)
+    stream_items = Timeline.inject_sections(images)
 
     socket =
       socket
@@ -1095,9 +1132,9 @@ defmodule YscWeb.AdminMediaLive do
       |> assign(:years_list, years_list)
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
-      |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> assign_cursor_from_images(images)
       |> assign(:images_empty?, images == [])
-      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+      |> reset_image_sections(stream_items)
       |> push_patch(to: ~p"/admin/media")
 
     {:noreply, socket}
@@ -1106,34 +1143,29 @@ defmodule YscWeb.AdminMediaLive do
   def handle_event("jump-to-year", %{"year" => year}, socket) do
     year_int = if is_binary(year), do: String.to_integer(year), else: year
 
-    # Load images starting from this year using cursor-based pagination
+    # Jump within the full timeline — do not set a year filter so load-more
+    # can continue into older years seamlessly.
     images =
       Media.list_images_cursor(
         start_at_year: year_int,
-        limit: socket.assigns.per_page
+        limit: socket.assigns.per_page,
+        search: socket.assigns.search_query
       )
 
     {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_date_headers(images)
+    stream_items = Timeline.inject_sections(images)
 
     socket =
       socket
-      |> assign(:selected_year, year_int)
-      |> assign(:url_year_param, to_string(year_int))
+      |> assign(:selected_year, nil)
+      |> assign(:url_year_param, nil)
       |> assign(:years_set, years_set)
       |> assign(:years_list, years_list)
       |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
       |> assign(:stream_initialized?, true)
-      |> assign(:last_image_date, images |> List.last() |> last_date())
+      |> assign_cursor_from_images(images)
       |> assign(:images_empty?, images == [])
-      |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
-
-    # Build URL with year parameter
-    url = build_media_url_with_state(socket)
-
-    socket =
-      socket
-      |> push_patch(to: url)
+      |> reset_image_sections(stream_items)
       |> push_event("scroll-to-year", %{year: year_int})
 
     {:noreply, socket}
@@ -1178,7 +1210,13 @@ defmodule YscWeb.AdminMediaLive do
         _ -> :square
       end
 
-    {:noreply, assign(socket, :layout_mode, layout_mode)}
+    {:noreply,
+     socket
+     |> assign(:layout_mode, layout_mode)
+     |> stream(:images, socket.assigns.sections,
+       reset: true,
+       dom_id: &get_dom_id/1
+     )}
   end
 
   def handle_event("show-drop-zone", _params, socket) do
@@ -1204,7 +1242,16 @@ defmodule YscWeb.AdminMediaLive do
             socket
           end
 
-        {:noreply, stream_insert(socket, :images, image)}
+        case update_image_in_sections(socket.assigns.sections, image) do
+          {updated_sections, changed_sections} ->
+            {:noreply,
+             socket
+             |> assign(:sections, updated_sections)
+             |> stream(:images, changed_sections, dom_id: &get_dom_id/1)}
+
+          nil ->
+            {:noreply, socket}
+        end
     end
   end
 
@@ -1254,7 +1301,7 @@ defmodule YscWeb.AdminMediaLive do
     available_years = Enum.map(timeline, & &1.year)
     images = Media.list_images_cursor(limit: socket.assigns.per_page)
     {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_date_headers(images)
+    stream_items = Timeline.inject_sections(images)
 
     socket
     |> update(:uploaded_files, &(&1 ++ uploaded_files))
@@ -1263,13 +1310,13 @@ defmodule YscWeb.AdminMediaLive do
     |> assign(:available_years, available_years)
     |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
     |> assign(:stream_initialized?, true)
-    |> assign(:last_image_date, images |> List.last() |> last_date())
+    |> assign_cursor_from_images(images)
     |> assign(:images_empty?, images == [])
     |> assign(:years_set, years_set)
     |> assign(:years_list, years_list)
     |> assign(:show_drop_zone, false)
     |> assign(:pending_upload_submit?, false)
-    |> stream(:images, stream_items, reset: true, dom_id: &get_dom_id/1)
+    |> reset_image_sections(stream_items)
     |> push_patch(to: ~p"/admin/media")
   end
 
@@ -1364,9 +1411,36 @@ defmodule YscWeb.AdminMediaLive do
   defp get_image_path(%Media.Image{thumbnail_path: thumbnail_path}),
     do: thumbnail_path
 
-  # Get DOM ID for stream items (headers or images)
-  defp get_dom_id(%Timeline.Header{} = header), do: header.id
-  defp get_dom_id(%Media.Image{} = image), do: "image-#{image.id}"
+  # Get DOM ID for stream items (year-month sections)
+  defp get_dom_id(%Timeline.Section{id: id}), do: id
+
+  defp reset_image_sections(socket, sections) do
+    socket
+    |> assign(:sections, sections)
+    |> stream(:images, sections, reset: true, dom_id: &get_dom_id/1)
+  end
+
+  defp update_image_in_sections(sections, %Media.Image{id: image_id} = image) do
+    case Enum.find_index(sections, fn section ->
+           Enum.any?(section.images, &(&1.id == image_id))
+         end) do
+      nil ->
+        nil
+
+      index ->
+        section = Enum.at(sections, index)
+
+        updated_images =
+          Enum.map(section.images, fn
+            %{id: ^image_id} -> image
+            other -> other
+          end)
+
+        updated_section = %{section | images: updated_images}
+        updated_sections = List.replace_at(sections, index, updated_section)
+        {updated_sections, [updated_section]}
+    end
+  end
 
   defp build_media_url_with_state(assigns_or_socket) do
     # Handle both socket and assigns map
@@ -1478,7 +1552,7 @@ defmodule YscWeb.AdminMediaLive do
          end_date,
          search_query,
          limit,
-         before_date \\ nil
+         before_cursor \\ nil
        ) do
     query =
       from i in Media.Image,
@@ -1487,10 +1561,18 @@ defmodule YscWeb.AdminMediaLive do
         limit: ^limit
 
     query =
-      if before_date do
-        from i in query, where: i.inserted_at < ^before_date
-      else
-        query
+      case before_cursor do
+        {before_date, before_id} when not is_nil(before_id) ->
+          from i in query,
+            where:
+              i.inserted_at < ^before_date or
+                (i.inserted_at == ^before_date and i.id < ^before_id)
+
+        before_date when not is_nil(before_date) ->
+          from i in query, where: i.inserted_at < ^before_date
+
+        nil ->
+          query
       end
 
     apply_image_search(query, search_query)
@@ -1536,8 +1618,20 @@ defmodule YscWeb.AdminMediaLive do
     |> String.replace(")", "\\)")
   end
 
-  defp last_date(nil), do: nil
-  defp last_date(%{inserted_at: inserted_at}), do: inserted_at
+  defp assign_cursor_from_images(socket, []),
+    do: socket |> assign(:last_image_date, nil) |> assign(:last_image_id, nil)
+
+  defp assign_cursor_from_images(socket, images) do
+    case List.last(images) do
+      nil ->
+        assign_cursor_from_images(socket, [])
+
+      %{inserted_at: inserted_at, id: id} ->
+        socket
+        |> assign(:last_image_date, inserted_at)
+        |> assign(:last_image_id, id)
+    end
+  end
 
   defp positive_image_dimension(value) when is_integer(value) and value > 0,
     do: value
@@ -1566,118 +1660,143 @@ defmodule YscWeb.AdminMediaLive do
       </div>
     <% else %>
       <div
-        id="images-grid"
-        phx-update="stream"
-        phx-viewport-bottom={!@end_of_timeline? && "load-more"}
-        class={[
-          if(@layout_mode == :square,
-            do:
-              "media-square-grid grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9",
-            else: "media-masonry-grid"
-          )
-        ]}
+        id="media-scroll-container"
+        phx-hook="MediaGalleryInfiniteScroll"
+        data-load-more-enabled={to_string(!@end_of_timeline? && !@loading_more?)}
       >
-        <%= for {id, item} <- @streams.images do %>
-          <%!-- RENDER HEADER --%>
-          <%= if match?(%Timeline.Header{}, item) do %>
+        <div
+          id="images-grid"
+          phx-update="stream"
+          class="pb-10"
+        >
+          <%= for {id, %Timeline.Section{} = section} <- @streams.images do %>
             <div
               id={id}
-              data-year-section={item.date.year}
-              class={[
-                "sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200",
-                if(@layout_mode == :square,
-                  do: "col-span-full",
-                  else: "media-masonry-header"
-                )
-              ]}
+              class="media-year-section"
+              data-year-section={section.header.date.year}
             >
-              {item.formatted_date}
+              <div class="sticky top-0 z-10 bg-white/95 backdrop-blur py-4 px-4 mt-4 font-bold text-xl border-b border-zinc-200">
+                {section.header.formatted_date}
+              </div>
+              <div class={
+                if(@layout_mode == :square,
+                  do:
+                    "media-square-grid grid gap-3 md:gap-4 grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-7 4xl:grid-cols-9",
+                  else: "media-masonry-grid"
+                )
+              }>
+                <%= for item <- section.images do %>
+                  <button
+                    phx-click={
+                      JS.patch(build_image_edit_url_with_state(assigns, item.id))
+                    }
+                    id={"image-#{item.id}"}
+                    class={[
+                      "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
+                      if(@layout_mode == :square,
+                        do: "aspect-square",
+                        else: "media-masonry-card bg-zinc-100"
+                      )
+                    ]}
+                  >
+                    <%!-- Processing Overlay --%>
+                    <%= if item.processing_state != :completed do %>
+                      <div class="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
+                        <div class="text-center">
+                          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2">
+                          </div>
+                          <p class="text-xs font-medium text-white">
+                            Processing...
+                          </p>
+                        </div>
+                      </div>
+                    <% end %>
+
+                    <%!-- Missing Alt Text Warning --%>
+                    <%= if is_nil(item.alt_text) || item.alt_text == "" do %>
+                      <div
+                        class="absolute top-2 right-2 z-[3] flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500 text-white shadow-lg"
+                        title="Missing alt text"
+                        aria-label="Missing alt text"
+                      >
+                        <.icon
+                          name="hero-exclamation-triangle"
+                          class="h-4 w-4 flex-none"
+                        />
+                      </div>
+                    <% end %>
+
+                    <canvas
+                      id={"blur-hash-img-#{item.id}"}
+                      src={Media.Image.blur_hash_for_display(item)}
+                      class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
+                      phx-hook="BlurHashCanvas"
+                    ></canvas>
+
+                    <img
+                      class={[
+                        "z-[1] rounded-lg opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100",
+                        if(@layout_mode == :square,
+                          do: "absolute inset-0 h-full w-full object-cover",
+                          else: "relative block h-auto w-full object-contain"
+                        )
+                      ]}
+                      id={"img-#{item.id}"}
+                      src={get_image_path(item)}
+                      width={positive_image_dimension(item.width)}
+                      height={positive_image_dimension(item.height)}
+                      loading="lazy"
+                      phx-hook="BlurHashImage"
+                      alt={item.alt_text || item.title || "Image"}
+                    />
+
+                    <div
+                      :if={item.title != nil or item.alt_text != nil}
+                      class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
+                    >
+                      <p
+                        :if={item.title != nil}
+                        class="text-xs font-medium text-white truncate"
+                        title={item.title}
+                      >
+                        {item.title}
+                      </p>
+                      <p
+                        :if={item.title == nil and item.alt_text != nil}
+                        class="text-xs font-medium text-white/90 truncate"
+                        title={item.alt_text}
+                      >
+                        {item.alt_text}
+                      </p>
+                    </div>
+                  </button>
+                <% end %>
+              </div>
             </div>
           <% end %>
-
-          <%!-- RENDER IMAGE --%>
-          <%= if match?(%Media.Image{}, item) do %>
-            <button
-              phx-click={
-                JS.patch(build_image_edit_url_with_state(assigns, item.id))
-              }
-              id={id}
-              class={[
-                "group relative w-full rounded-lg border border-zinc-200 cursor-pointer hover:border-blue-500 hover:ring-2 hover:ring-blue-500 hover:ring-offset-2 hover:shadow-lg focus:outline-none focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:shadow-lg transition-all duration-200 overflow-hidden",
-                if(@layout_mode == :square,
-                  do: "aspect-square",
-                  else: "media-masonry-card bg-zinc-100"
-                )
-              ]}
-            >
-              <%!-- Processing Overlay --%>
-              <%= if item.processing_state != :completed do %>
-                <div class="absolute inset-0 z-10 bg-black/50 flex items-center justify-center">
-                  <div class="text-center">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2">
-                    </div>
-                    <p class="text-xs font-medium text-white">Processing...</p>
-                  </div>
-                </div>
-              <% end %>
-
-              <%!-- Missing Alt Text Warning --%>
-              <%= if is_nil(item.alt_text) || item.alt_text == "" do %>
-                <div
-                  class="absolute top-2 right-2 z-[3] flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500 text-white shadow-lg"
-                  title="Missing alt text"
-                  aria-label="Missing alt text"
-                >
-                  <.icon name="hero-exclamation-triangle" class="h-4 w-4 flex-none" />
-                </div>
-              <% end %>
-
-              <canvas
-                id={"blur-hash-img-#{item.id}"}
-                src={Media.Image.blur_hash_for_display(item)}
-                class="absolute inset-0 z-0 h-full w-full rounded-lg object-cover"
-                phx-hook="BlurHashCanvas"
-              ></canvas>
-
-              <img
-                class={[
-                  "z-[1] rounded-lg opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100",
-                  if(@layout_mode == :square,
-                    do: "absolute inset-0 h-full w-full object-cover",
-                    else: "relative block h-auto w-full object-contain"
-                  )
-                ]}
-                id={"img-#{item.id}"}
-                src={get_image_path(item)}
-                width={positive_image_dimension(item.width)}
-                height={positive_image_dimension(item.height)}
-                loading="lazy"
-                phx-hook="BlurHashImage"
-                alt={item.alt_text || item.title || "Image"}
-              />
-
-              <div
-                :if={item.title != nil or item.alt_text != nil}
-                class="absolute z-[2] hidden group-hover:block inset-x-0 bottom-0 px-2 py-2 bg-gradient-to-t from-zinc-900/90 via-zinc-900/80 to-transparent"
-              >
-                <p
-                  :if={item.title != nil}
-                  class="text-xs font-medium text-white truncate"
-                  title={item.title}
-                >
-                  {item.title}
-                </p>
-                <p
-                  :if={item.title == nil and item.alt_text != nil}
-                  class="text-xs font-medium text-white/90 truncate"
-                  title={item.alt_text}
-                >
-                  {item.alt_text}
-                </p>
-              </div>
-            </button>
+        </div>
+        <div
+          :if={!@end_of_timeline?}
+          id="media-load-more-footer"
+          class="flex flex-col items-center justify-center gap-2 border-t border-zinc-100 py-10 text-zinc-500"
+          aria-live="polite"
+        >
+          <%= if @loading_more? do %>
+            <.icon name="hero-arrow-path" class="h-6 w-6 animate-spin" />
+            <p class="text-sm font-medium">Loading more images…</p>
+          <% else %>
+            <.icon name="hero-chevron-down" class="h-5 w-5 animate-bounce" />
+            <p class="text-sm font-medium">Scroll down for more images</p>
           <% end %>
-        <% end %>
+        </div>
+        <div
+          :if={@stream_initialized? && !@images_empty? && @end_of_timeline?}
+          id="media-end-of-library"
+          class="flex flex-col items-center justify-center gap-1 border-t border-zinc-100 py-10 text-zinc-400"
+        >
+          <.icon name="hero-check-circle" class="h-5 w-5" />
+          <p class="text-sm font-medium">End of the media library</p>
+        </div>
       </div>
     <% end %>
     """

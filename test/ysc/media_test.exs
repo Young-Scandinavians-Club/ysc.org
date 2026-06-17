@@ -332,12 +332,95 @@ defmodule Ysc.MediaTest do
       page1 = Media.list_images_cursor(limit: 2)
       assert length(page1) == 2
 
-      cursor = List.last(page1).inserted_at
-      page2 = Media.list_images_cursor(limit: 2, before_date: cursor)
+      cursor_image = List.last(page1)
+
+      page2 =
+        Media.list_images_cursor(
+          limit: 2,
+          before_date: cursor_image.inserted_at,
+          before_id: cursor_image.id
+        )
 
       assert Enum.all?(page2, fn img ->
-               DateTime.compare(img.inserted_at, cursor) == :lt
+               DateTime.compare(img.inserted_at, cursor_image.inserted_at) ==
+                 :lt or
+                 (DateTime.compare(img.inserted_at, cursor_image.inserted_at) ==
+                    :eq and
+                    img.id < cursor_image.id)
              end)
+    end
+
+    test "paginates through images that share the same inserted_at", %{
+      user: user
+    } do
+      shared_time = ~U[2024-06-01 12:00:00Z]
+
+      images =
+        for i <- 1..5 do
+          {:ok, image} =
+            %Image{
+              user_id: user.id,
+              raw_image_path: "https://example.com/shared-ts-#{i}.jpg",
+              processing_state: :unprocessed,
+              inserted_at: shared_time,
+              updated_at: shared_time
+            }
+            |> Repo.insert()
+
+          image
+        end
+
+      page1 = Media.list_images_cursor(limit: 2)
+      assert length(page1) == 2
+
+      cursor_image = List.last(page1)
+      page2_ids = images |> Enum.map(& &1.id) |> MapSet.new()
+
+      page2 =
+        Media.list_images_cursor(
+          limit: 10,
+          before_date: cursor_image.inserted_at,
+          before_id: cursor_image.id
+        )
+
+      assert length(page2) == 3
+      refute cursor_image.id in Enum.map(page2, & &1.id)
+      assert Enum.all?(page2, &MapSet.member?(page2_ids, &1.id))
+    end
+
+    test "paginates across years when browsing the full timeline", %{user: user} do
+      {:ok, recent} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/recent.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2026-03-01 12:00:00Z],
+          updated_at: ~U[2026-03-01 12:00:00Z]
+        }
+        |> Repo.insert()
+
+      {:ok, older} =
+        %Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/older.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2020-03-01 12:00:00Z],
+          updated_at: ~U[2020-03-01 12:00:00Z]
+        }
+        |> Repo.insert()
+
+      page1 = Media.list_images_cursor(limit: 1, search: "recent")
+      assert Enum.map(page1, & &1.id) == [recent.id]
+
+      page2 =
+        Media.list_images_cursor(
+          limit: 10,
+          before_date: recent.inserted_at,
+          before_id: recent.id,
+          search: "older"
+        )
+
+      assert Enum.map(page2, & &1.id) == [older.id]
     end
   end
 

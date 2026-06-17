@@ -346,8 +346,31 @@ defmodule YscWeb.MediaPickerComponent do
 
   defp maybe_add_cursor(opts, %{last_image_date: nil}), do: opts
 
+  defp maybe_add_cursor(opts, %{
+         last_image_date: date,
+         last_image_id: id,
+         selected_year: nil
+       })
+       when not is_nil(id) do
+    opts
+    |> Keyword.put(:before_date, date)
+    |> Keyword.put(:before_id, id)
+  end
+
   defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: nil}),
     do: Keyword.put(opts, :before_date, date)
+
+  defp maybe_add_cursor(opts, %{
+         last_image_date: date,
+         last_image_id: id,
+         selected_year: year
+       })
+       when not is_nil(year) and not is_nil(id) do
+    opts
+    |> Keyword.put(:before_date, date)
+    |> Keyword.put(:before_id, id)
+    |> Keyword.put(:start_at_year, year)
+  end
 
   defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: year})
        when not is_nil(year) do

@@ -1,0 +1,93 @@
+[
+  {
+    "wp_user_id": "41",
+    "description": "Spouse + two children with year-only birthdays (WP user 41)",
+    "meta": {
+      "membership_type": "family",
+      "spouse_first_name": "Andrew",
+      "spouse_last_name": "Napper",
+      "first_child_name": "Kate",
+      "first_child_birthday": "1999",
+      "second_child_name": "Olivia",
+      "second_child_birthday": "2009"
+    },
+    "expected": {
+      "spouse": { "first_name": "Andrew", "last_name": "Napper" },
+      "children": [
+        { "first_name": "Kate", "last_name": "-", "birth_date": "1999-01-01" },
+        { "first_name": "Olivia", "last_name": "-", "birth_date": "2009-01-01" }
+      ]
+    }
+  },
+  {
+    "wp_user_id": "56",
+    "description": "Children with multi-word full names (WP user 56)",
+    "meta": {
+      "membership_type": "family",
+      "spouse_first_name": "Laura",
+      "spouse_last_name": "Fromm",
+      "first_child_name": "Emma Louise Bach",
+      "first_child_birthday": "2005",
+      "second_child_name": "Erik Victor Bach",
+      "second_child_birthday": "2005"
+    },
+    "expected": {
+      "spouse": { "first_name": "Laura", "last_name": "Fromm" },
+      "children": [
+        { "first_name": "Emma Louise", "last_name": "Bach", "birth_date": "2005-01-01" },
+        { "first_name": "Erik Victor", "last_name": "Bach", "birth_date": "2005-01-01" }
+      ]
+    }
+  },
+  {
+    "wp_user_id": "76",
+    "description": "Children stored as 'First Last' in name field (WP user 76)",
+    "meta": {
+      "membership_type": "family",
+      "spouse_first_name": "George",
+      "spouse_last_name": "Frost",
+      "first_child_name": "Marit Frost",
+      "first_child_birthday": "1999",
+      "second_child_name": "Lily Frost",
+      "second_child_birthday": "2004"
+    },
+    "expected": {
+      "spouse": { "first_name": "George", "last_name": "Frost" },
+      "children": [
+        { "first_name": "Marit", "last_name": "Frost", "birth_date": "1999-01-01" },
+        { "first_name": "Lily", "last_name": "Frost", "birth_date": "2004-01-01" }
+      ]
+    }
+  },
+  {
+    "wp_user_id": "23",
+    "description": "Spouse only, no children (WP user 23)",
+    "meta": {
+      "membership_type": "family",
+      "spouse_first_name": "Angela",
+      "spouse_last_name": "Kjolby"
+    },
+    "expected": {
+      "spouse": { "first_name": "Angela", "last_name": "Kjolby" },
+      "children": []
+    }
+  },
+  {
+    "wp_user_id": "31",
+    "description": "Children only, no spouse (WP user 31 — Lars Erik Broman family)",
+    "meta": {
+      "membership_type": "family",
+      "first_child_name": "Lars Erik Broman",
+      "first_child_birthday": "2000",
+      "second_child_name": "Hannah Broman",
+      "second_child_birthday": "2002"
+    },
+    "expected": {
+      "spouse": null,
+      "children": [
+        { "first_name": "Lars Erik", "last_name": "Broman", "birth_date": "2000-01-01" },
+        { "first_name": "Hannah", "last_name": "Broman", "birth_date": "2002-01-01" }
+      ]
+    }
+  }
+]
