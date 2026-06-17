@@ -2508,6 +2508,152 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Bordered page masthead used on public index pages (events, news, newsletters, booking landing).
+
+  Use `size={:large}` for hero-style titles (`text-6xl md:text-8xl`). The default size matches
+  section headers on booking landing pages (`text-4xl md:text-7xl`).
+
+  ## Examples
+
+      <.page_masthead eyebrow="Events" title="What's Next" />
+
+      <.page_masthead size={:large} title="Club News" />
+
+      <.page_masthead
+        size={:large}
+        title="Newsletters"
+        subtitle="Browse our past newsletters."
+      />
+
+      <.page_masthead eyebrow="Since 1993" title="Experience Tahoe" heading_tag={:h2} />
+  """
+  attr :id, :string, default: nil
+  attr :eyebrow, :string, default: nil
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+
+  attr :size, :atom,
+    default: :default,
+    values: [:default, :large],
+    doc:
+      "`:default` uses responsive padding and medium title; `:large` uses fixed py-12 and hero title"
+
+  attr :heading_tag, :atom,
+    default: :h1,
+    values: [:h1, :h2],
+    doc: "Semantic heading level for the title"
+
+  attr :title_class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged with the default title styles"
+
+  attr :class, :any, default: nil
+
+  slot :inner_block,
+    doc:
+      "Optional content rendered below the title and subtitle inside the bordered masthead"
+
+  def page_masthead(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "text-center border-y border-zinc-200",
+        page_masthead_padding_class(@size),
+        @class
+      ]}
+    >
+      <p
+        :if={@eyebrow}
+        class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
+      >
+        {@eyebrow}
+      </p>
+      <%= if @heading_tag == :h2 do %>
+        <h2 class={[page_masthead_title_class(@size), @title_class]}>
+          {@title}
+        </h2>
+      <% else %>
+        <h1 class={[page_masthead_title_class(@size), @title_class]}>
+          {@title}
+        </h1>
+      <% end %>
+      <p :if={@subtitle} class="mt-4 text-zinc-500 text-lg">
+        {@subtitle}
+      </p>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  defp page_masthead_padding_class(:default), do: "py-8 md:py-12"
+  defp page_masthead_padding_class(:large), do: "py-12"
+
+  defp page_masthead_title_class(:default),
+    do: "text-4xl md:text-7xl font-black text-zinc-900"
+
+  defp page_masthead_title_class(:large),
+    do: "text-6xl md:text-8xl font-black text-zinc-900 tracking-tighter"
+
+  @doc """
+  Rounded feature card with an uppercase eyebrow title and a body slot.
+
+  Used on booking landing pages, event sidebars, and similar marketing sections.
+
+  ## Examples
+
+      <.feature_card title="Private Dock Access">
+        <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
+          Swim, boat, and unwind at our private dock.
+        </p>
+      </.feature_card>
+
+      <.feature_card title="Ready to Book?" title_tone={:accent}>
+        <p class="text-base text-zinc-700 leading-relaxed mb-6">Sign in to view availability.</p>
+        <.link navigate={~p"/users/log-in"}>Sign In to Book</.link>
+      </.feature_card>
+  """
+  attr :title, :string, required: true
+
+  attr :title_tone, :atom,
+    default: :muted,
+    values: [:muted, :accent],
+    doc:
+      "`:muted` uses zinc eyebrow styling; `:accent` uses blue eyebrow styling"
+
+  attr :class, :any, default: nil
+
+  slot :inner_block, required: true
+
+  def feature_card(assigns) do
+    ~H"""
+    <div class={[
+      "p-6 md:p-8 rounded-xl border",
+      feature_card_container_class(@title_tone),
+      @class
+    ]}>
+      <h4 class={feature_card_title_class(@title_tone)}>
+        {@title}
+      </h4>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  defp feature_card_container_class(:muted), do: "bg-zinc-50 border-zinc-100"
+
+  defp feature_card_container_class(:accent),
+    do: "bg-blue-50/40 border-blue-200"
+
+  defp feature_card_title_class(:muted),
+    do:
+      "text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6"
+
+  defp feature_card_title_class(:accent),
+    do:
+      "text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
+
+  @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another

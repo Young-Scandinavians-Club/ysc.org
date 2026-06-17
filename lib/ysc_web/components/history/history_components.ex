@@ -17,20 +17,19 @@ defmodule YscWeb.Components.History.HistoryComponents do
   def history_masthead(assigns) do
     ~H"""
     <div id="history-hero" class="max-w-screen-xl mx-auto px-4 mb-12 md:mb-16">
-      <div class="text-center py-8 md:py-12 border-y border-zinc-200">
-        <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-          History
-        </p>
-        <h1 class="text-4xl md:text-7xl font-black text-zinc-900 tracking-tighter">
-          {@years}+ Years
-        </h1>
+      <.page_masthead
+        id="history-masthead"
+        eyebrow="History"
+        title={"#{@years}+ Years"}
+        title_class="tracking-tighter"
+      >
         <p class="history-serif text-zinc-500 italic text-sm mt-4 tracking-wide">
           Established 1950
         </p>
         <p class="text-zinc-400 uppercase tracking-[0.25em] text-xs mt-2">
           San Francisco, California
         </p>
-      </div>
+      </.page_masthead>
 
       <div class="max-w-2xl mx-auto mt-10 md:mt-12 text-center">
         <h2 class="text-2xl md:text-3xl font-medium text-zinc-900 mb-6 history-serif">
