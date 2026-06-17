@@ -17,7 +17,9 @@ defmodule YscWeb.EventsLive do
       <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
         <.page_masthead
           eyebrow="Events"
-          title={if @total_upcoming_count == 0, do: "The Calendar", else: "What's Next"}
+          title={
+            if @total_upcoming_count == 0, do: "The Calendar", else: "What's Next"
+          }
         />
       </div>
 

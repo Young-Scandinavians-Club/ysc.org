@@ -2530,7 +2530,11 @@ defmodule YscWeb.ClearLakeBookingLive do
           </div>
           <%!-- CTA Card --%>
           <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
-            <.feature_card title="Ready to Book?" title_tone={:accent} class="p-8 md:p-12 text-center flex flex-col items-center">
+            <.feature_card
+              title="Ready to Book?"
+              title_tone={:accent}
+              class="p-8 md:p-12 text-center flex flex-col items-center"
+            >
               <p class="text-base text-zinc-700 leading-relaxed mb-6">
                 Sign in to view the cabin calendar, check availability, and reserve your dates.
               </p>

@@ -2535,7 +2535,8 @@ defmodule YscWeb.CoreComponents do
   attr :size, :atom,
     default: :default,
     values: [:default, :large],
-    doc: "`:default` uses responsive padding and medium title; `:large` uses fixed py-12 and hero title"
+    doc:
+      "`:default` uses responsive padding and medium title; `:large` uses fixed py-12 and hero title"
 
   attr :heading_tag, :atom,
     default: :h1,
@@ -2549,7 +2550,8 @@ defmodule YscWeb.CoreComponents do
   attr :class, :any, default: nil
 
   slot :inner_block,
-    doc: "Optional content rendered below the title and subtitle inside the bordered masthead"
+    doc:
+      "Optional content rendered below the title and subtitle inside the bordered masthead"
 
   def page_masthead(assigns) do
     ~H"""
@@ -2616,7 +2618,8 @@ defmodule YscWeb.CoreComponents do
   attr :title_tone, :atom,
     default: :muted,
     values: [:muted, :accent],
-    doc: "`:muted` uses zinc eyebrow styling; `:accent` uses blue eyebrow styling"
+    doc:
+      "`:muted` uses zinc eyebrow styling; `:accent` uses blue eyebrow styling"
 
   attr :class, :any, default: nil
 
@@ -2638,13 +2641,17 @@ defmodule YscWeb.CoreComponents do
   end
 
   defp feature_card_container_class(:muted), do: "bg-zinc-50 border-zinc-100"
-  defp feature_card_container_class(:accent), do: "bg-blue-50/40 border-blue-200"
+
+  defp feature_card_container_class(:accent),
+    do: "bg-blue-50/40 border-blue-200"
 
   defp feature_card_title_class(:muted),
-    do: "text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6"
+    do:
+      "text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6"
 
   defp feature_card_title_class(:accent),
-    do: "text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
+    do:
+      "text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
 
   @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
