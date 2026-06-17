@@ -1137,30 +1137,28 @@ defmodule Ysc.WpMigration.Load do
           {:ok, _} ->
             upsert_address(user_id, row)
 
-            case WpFamilyMembers.sync_for_user(user_id, row) do
-              {:ok, stats} ->
-                if stats.inserted + stats.updated > 0 do
-                  Ysc.Logging.info(
-                    "[WP Load] Synced family members for user #{user_id}",
-                    inserted: stats.inserted,
-                    updated: stats.updated,
-                    skipped: stats.skipped
-                  )
-                end
-            end
-
-            {:cont, {:ok, :done}}
-
           {:error, cs} ->
             Ysc.Logging.warning(
               "[WP Load] Failed to insert application for user #{user_id}: #{inspect(cs.errors)}"
             )
-
-            {:cont, {:ok, :done}}
         end
-      else
-        {:cont, {:ok, :done}}
       end
+
+      if user_id do
+        case WpFamilyMembers.sync_for_user(user_id, row) do
+          {:ok, stats} ->
+            if stats.inserted + stats.updated > 0 do
+              Ysc.Logging.info(
+                "[WP Load] Synced family members for user #{user_id}",
+                inserted: stats.inserted,
+                updated: stats.updated,
+                skipped: stats.skipped
+              )
+            end
+        end
+      end
+
+      {:cont, {:ok, :done}}
     end)
   end
 
@@ -1257,11 +1255,12 @@ defmodule Ysc.WpMigration.Load do
               %{body: %{location: location}} when is_binary(location) ->
                 raw_image_path = URI.encode(location)
                 title = meta["title"]
+                alt_text = meta["alt_text"] || title
 
                 attrs = %{
                   raw_image_path: raw_image_path,
                   title: title,
-                  alt_text: title,
+                  alt_text: alt_text,
                   upload_data: %{
                     "wp_attachment_id" => att_id,
                     "created" => meta["created"],

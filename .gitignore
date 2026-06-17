@@ -8,7 +8,6 @@ priv/static/exports/*.csv
 .cursor/
 wp_migration_export/
 backup/
-wp_backup/
 tmp/
 
 priv/static/assets/*.{gz,br,zst}

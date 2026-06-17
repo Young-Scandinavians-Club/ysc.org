@@ -149,6 +149,36 @@ defmodule Ysc.ZeroCoverageModulesSmokeTest do
     end
   end
 
+  describe "Ysc.Media.Timeline.append_images_to_last_section/2" do
+    test "keeps same-month images in the last section and opens new sections for older months" do
+      existing = [
+        %Timeline.Section{
+          id: "section-2024-2",
+          header: %Timeline.Header{
+            id: "header-2024-2",
+            date: ~U[2024-02-15 00:00:00Z],
+            formatted_date: "February 2024"
+          },
+          images: [%{id: "existing", inserted_at: ~U[2024-02-15 00:00:00Z]}]
+        }
+      ]
+
+      incoming = [
+        %{id: "feb", inserted_at: ~U[2024-02-10 00:00:00Z]},
+        %{id: "jan", inserted_at: ~U[2024-01-20 00:00:00Z]}
+      ]
+
+      assert [feb_section, jan_section] =
+               Timeline.append_images_to_last_section(existing, incoming)
+
+      assert feb_section.id == "section-2024-2"
+      assert Enum.map(feb_section.images, & &1.id) == ["existing", "feb"]
+
+      assert jan_section.id == "section-2024-1"
+      assert Enum.map(jan_section.images, & &1.id) == ["jan"]
+    end
+  end
+
   describe "Ysc.Payments.PaymentDisplay" do
     test "returns booking-specific icon and styling based on property" do
       booking = %{property: :tahoe, reference_id: "BK-1"}

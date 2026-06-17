@@ -1096,17 +1096,24 @@ defmodule YscWeb.AdminMediaLive do
               |> assign(:sections, socket.assigns.sections ++ new_sections)
               |> stream(:images, new_sections, at: -1, dom_id: &get_dom_id/1)
             else
+              old_len = length(socket.assigns.sections)
+
               updated_sections =
                 Timeline.append_images_to_last_section(
                   socket.assigns.sections,
                   new_images
                 )
 
-              updated_section = List.last(updated_sections)
+              stream_items =
+                if length(updated_sections) > old_len do
+                  Enum.drop(updated_sections, old_len - 1)
+                else
+                  [List.last(updated_sections)]
+                end
 
               socket
               |> assign(:sections, updated_sections)
-              |> stream(:images, [updated_section], dom_id: &get_dom_id/1)
+              |> stream(:images, stream_items, dom_id: &get_dom_id/1)
             end
 
           {:noreply, assign(socket, :loading_more?, false)}

@@ -13,6 +13,7 @@ defmodule Ysc.WpMigration.FamilyMembers do
 
   alias Ysc.Repo
   alias Ysc.Accounts.FamilyMember
+  alias Ysc.Ci.QueryExplain.Fixtures
 
   @type application_row :: map()
   @type member_attrs :: %{
@@ -52,17 +53,33 @@ defmodule Ysc.WpMigration.FamilyMembers do
       |> where(user_id: ^user_id)
       |> Repo.all()
 
-    stats =
-      Enum.reduce(desired, %{inserted: 0, updated: 0, skipped: 0}, fn attrs,
-                                                                      acc ->
-        case upsert_member(user_id, existing, attrs) do
-          {:inserted, _} -> %{acc | inserted: acc.inserted + 1}
-          {:updated, _} -> %{acc | updated: acc.updated + 1}
-          :skipped -> %{acc | skipped: acc.skipped + 1}
+    {stats, _existing} =
+      Enum.reduce(
+        desired,
+        {%{inserted: 0, updated: 0, skipped: 0}, existing},
+        fn attrs, {acc, existing_acc} ->
+          case upsert_member(user_id, existing_acc, attrs) do
+            {:inserted, member} ->
+              {%{acc | inserted: acc.inserted + 1}, [member | existing_acc]}
+
+            {:updated, _} ->
+              {%{acc | updated: acc.updated + 1}, existing_acc}
+
+            :skipped ->
+              {%{acc | skipped: acc.skipped + 1}, existing_acc}
+          end
         end
-      end)
+      )
 
     {:ok, stats}
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    user = Fixtures.user()
+
+    FamilyMember
+    |> where(user_id: ^user.id)
   end
 
   @doc """
@@ -118,10 +135,7 @@ defmodule Ysc.WpMigration.FamilyMembers do
         end
 
       Regex.match?(~r/^\d{1,2}\/\d{1,2}\/\d{4}$/, value) ->
-        case Timex.parse(value, "{M}/{D}/{YYYY}") do
-          {:ok, dt} -> NaiveDateTime.to_date(dt)
-          _ -> nil
-        end
+        parse_us_slash_date(value)
 
       Regex.match?(~r/^\d{4}[-\/]\d{2}[-\/]\d{2}/, value) ->
         value
@@ -140,6 +154,23 @@ defmodule Ysc.WpMigration.FamilyMembers do
   end
 
   def parse_birth_date(_), do: nil
+
+  defp parse_us_slash_date(value) when is_binary(value) do
+    case String.split(value, "/") do
+      [month_str, day_str, year_str] ->
+        with {month, ""} <- Integer.parse(month_str),
+             {day, ""} <- Integer.parse(day_str),
+             {year, ""} <- Integer.parse(year_str),
+             {:ok, date} <- Date.new(year, month, day) do
+          date
+        else
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
 
   defp spouse_records(row) do
     first = presence(row["spouse_first_name"])

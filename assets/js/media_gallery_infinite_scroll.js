@@ -11,22 +11,47 @@ const PREFETCH_PX = 280;
 let MediaGalleryInfiniteScroll = {
     mounted() {
         this.cooldownUntil = 0;
+        this.rafId = null;
+        this.timeoutId = null;
         this.onScroll = () => this.check();
         window.addEventListener("scroll", this.onScroll, { passive: true });
         this.resizeObserver = new ResizeObserver(() => this.check());
         this.resizeObserver.observe(document.documentElement);
-        requestAnimationFrame(() => this.check());
+        this.rafId = requestAnimationFrame(() => {
+            this.rafId = null;
+            this.check();
+        });
     },
 
     updated() {
-        requestAnimationFrame(() => this.check());
-        setTimeout(() => this.check(), COOLDOWN_MS + 50);
+        this.clearScheduledChecks();
+        this.rafId = requestAnimationFrame(() => {
+            this.rafId = null;
+            this.check();
+        });
+        this.timeoutId = setTimeout(() => {
+            this.timeoutId = null;
+            this.check();
+        }, COOLDOWN_MS + 50);
     },
 
     destroyed() {
+        this.clearScheduledChecks();
         window.removeEventListener("scroll", this.onScroll);
         if (this.resizeObserver) {
             this.resizeObserver.disconnect();
+        }
+    },
+
+    clearScheduledChecks() {
+        if (this.rafId != null) {
+            cancelAnimationFrame(this.rafId);
+            this.rafId = null;
+        }
+
+        if (this.timeoutId != null) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = null;
         }
     },
 

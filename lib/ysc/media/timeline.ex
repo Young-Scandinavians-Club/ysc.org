@@ -3,22 +3,8 @@ defmodule Ysc.Media.Timeline do
   Timeline utilities for injecting date headers into image streams.
   """
 
-  # A simple struct for our headers
-  defmodule Header do
-    @moduledoc """
-    Represents a date header in the timeline.
-    """
-    defstruct [:id, :date, :formatted_date, type: :header]
-  end
-
-  defmodule Section do
-    @moduledoc """
-    A year-month group with a sticky header and its images.
-
-    Used as a LiveView stream item so headers can sit outside masonry columns.
-    """
-    defstruct [:id, :header, :images, type: :section]
-  end
+  alias Ysc.Media.Timeline.Header
+  alias Ysc.Media.Timeline.Section
 
   @doc """
   Groups images into year-month sections for gallery rendering.
@@ -35,12 +21,35 @@ defmodule Ysc.Media.Timeline do
 
   @doc """
   Appends images to the last section when load-more stays in the same month.
+
+  Images from other months are grouped into new sections appended after the last
+  section.
   """
   def append_images_to_last_section(sections, images)
       when is_list(sections) and is_list(images) do
     case List.last(sections) do
-      %Section{} = last ->
-        List.replace_at(sections, -1, %{last | images: last.images ++ images})
+      %Section{header: %Header{date: last_date}} = last ->
+        {same_month, other_months} =
+          Enum.split_with(images, fn image ->
+            image.inserted_at.year == last_date.year &&
+              image.inserted_at.month == last_date.month
+          end)
+
+        sections =
+          if same_month == [] do
+            sections
+          else
+            List.replace_at(sections, -1, %{
+              last
+              | images: last.images ++ same_month
+            })
+          end
+
+        if other_months == [] do
+          sections
+        else
+          sections ++ inject_sections(other_months)
+        end
 
       _ ->
         sections ++ inject_sections(images)
@@ -74,7 +83,7 @@ defmodule Ysc.Media.Timeline do
     end)
   end
 
-  defp section_from_image_group([%_{inserted_at: inserted_at} | _] = group) do
+  defp section_from_image_group([%{inserted_at: inserted_at} | _] = group) do
     header = %Header{
       id: "header-#{inserted_at.year}-#{inserted_at.month}",
       date: inserted_at,

@@ -215,12 +215,45 @@ defmodule YscWeb.Workers.ImageProcessor do
       custom_media_public_object_storage_url?(uri)
   end
 
-  defp path_style_object_storage_url?(%URI{path: path}, bucket)
-       when is_binary(path) do
-    String.starts_with?(path, "/#{bucket}/")
+  defp path_style_object_storage_url?(%URI{} = uri, bucket)
+       when is_binary(bucket) do
+    path = uri.path || ""
+
+    path_style_object_storage_origin?(uri) and
+      String.starts_with?(path, "/#{bucket}/")
   end
 
-  defp path_style_object_storage_url?(_, _), do: false
+  defp path_style_object_storage_origin?(%URI{} = uri) do
+    Enum.any?(
+      object_storage_origin_uris(),
+      &same_object_storage_origin?(uri, &1)
+    )
+  end
+
+  defp object_storage_origin_uris do
+    [
+      S3Config.base_url(),
+      S3Config.media_public_url(),
+      S3Config.avatars_public_url(),
+      S3Config.expense_reports_public_url()
+    ]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.map(fn url -> url |> String.trim_trailing("/") |> URI.parse() end)
+    |> Enum.filter(&match?(%URI{host: host} when is_binary(host), &1))
+  end
+
+  defp same_object_storage_origin?(%URI{} = left, %URI{} = right) do
+    left.scheme == right.scheme and left.host == right.host and
+      object_storage_effective_port(left) ==
+        object_storage_effective_port(right)
+  end
+
+  defp object_storage_effective_port(%URI{port: port}) when is_integer(port),
+    do: port
+
+  defp object_storage_effective_port(%URI{scheme: "https"}), do: 443
+  defp object_storage_effective_port(%URI{scheme: "http"}), do: 80
+  defp object_storage_effective_port(_), do: nil
 
   defp virtual_host_object_storage_url?(%URI{host: host}, bucket)
        when is_binary(host) do

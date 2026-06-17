@@ -38,10 +38,16 @@ defmodule YscWeb.AdminMediaLiveTest do
           |> Ysc.Repo.insert()
       end
 
-      {:ok, view, html} = live(conn, ~p"/admin/media")
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
 
       assert has_element?(view, "#media-load-more-footer")
-      assert html =~ "Scroll down for more images"
+
+      assert has_element?(
+               view,
+               "#media-load-more-footer",
+               "Scroll down for more images"
+             )
+
       refute has_element?(view, "#media-end-of-library")
     end
 
