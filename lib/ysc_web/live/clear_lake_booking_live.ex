@@ -220,21 +220,20 @@ defmodule YscWeb.ClearLakeBookingLive do
     user_for_check = socket.assigns[:user] || socket.assigns.current_user
 
     {can_book, booking_error_title, booking_disabled_reason} =
-      if socket.assigns[:can_book] != nil do
-        # Already computed in mount - reuse it
+      if connected?(socket) && is_nil(socket.assigns[:can_book]) do
+        check_booking_eligibility(user_for_check)
+      else
         {
           socket.assigns.can_book,
           socket.assigns.booking_error_title,
           socket.assigns.booking_disabled_reason
         }
-      else
-        # First time (shouldn't happen normally since mount runs first)
-        check_booking_eligibility(user_for_check)
       end
 
-    # Load active bookings for the user (only if not already loaded in mount)
+    # Load active bookings for the user (only when connected)
     active_bookings =
-      if user_for_check && !socket.assigns[:active_bookings] do
+      if connected?(socket) && user_for_check &&
+           is_nil(socket.assigns[:active_bookings]) do
         get_active_bookings(user_for_check.id, socket.assigns.today)
       else
         socket.assigns[:active_bookings] || []
@@ -345,8 +344,11 @@ defmodule YscWeb.ClearLakeBookingLive do
           buyout_booking_allowed
         )
 
-      # Validate all conditions (availability, booking mode, guests, etc.)
-      # This ensures URL parameters are validated even if user manipulates them
+      # Validate availability and price only after connect, and only when booking
+      # inputs changed (skip tab-only navigation work on the dead render path).
+      needs_booking_recalculation =
+        dates_changed || guests_changed || booking_mode_changed
+
       socket =
         socket
         |> assign(
@@ -379,38 +381,37 @@ defmodule YscWeb.ClearLakeBookingLive do
           buyout_booking_allowed: buyout_booking_allowed,
           active_bookings: active_bookings
         )
-        |> validate_all_conditions(
-          checkin_date,
-          checkout_date,
-          resolved_booking_mode,
-          guests_count,
-          current_season
-        )
-        |> then(fn s ->
-          # Update date form with validated/corrected dates
-          validated_date_form =
-            to_form(
-              %{
-                "checkin_date" =>
-                  date_to_datetime_string(s.assigns.checkin_date),
-                "checkout_date" =>
-                  date_to_datetime_string(s.assigns.checkout_date)
-              },
-              as: "booking_dates"
-            )
 
-          s
-          |> assign(:date_form, validated_date_form)
-          |> then(fn updated_s ->
-            # Only run price calculation if dates, guests, or booking mode changed, not just tab
-            if dates_changed || guests_changed || booking_mode_changed do
-              updated_s
-              |> calculate_price_if_ready()
-            else
-              updated_s
-            end
+      socket =
+        if connected?(socket) && needs_booking_recalculation do
+          socket
+          |> validate_all_conditions(
+            checkin_date,
+            checkout_date,
+            resolved_booking_mode,
+            guests_count,
+            current_season
+          )
+          |> then(fn s ->
+            # Update date form with validated/corrected dates
+            validated_date_form =
+              to_form(
+                %{
+                  "checkin_date" =>
+                    date_to_datetime_string(s.assigns.checkin_date),
+                  "checkout_date" =>
+                    date_to_datetime_string(s.assigns.checkout_date)
+                },
+                as: "booking_dates"
+              )
+
+            s
+            |> assign(:date_form, validated_date_form)
+            |> calculate_price_if_ready()
           end)
-        end)
+        else
+          socket
+        end
 
       {:noreply, socket}
     else

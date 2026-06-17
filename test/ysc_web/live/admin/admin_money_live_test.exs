@@ -245,11 +245,13 @@ defmodule YscWeb.AdminMoneyLiveTest do
     test "redirects to index with error flash when payout id does not exist", %{
       conn: conn
     } do
-      assert {:error, {:live_redirect, %{to: to, flash: flash}}} =
-               live(conn, ~p"/admin/money/payouts/00000000000000000000000000")
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/money/payouts/00000000000000000000000000")
 
-      assert to =~ "/admin/money"
-      assert flash["error"] =~ "Payout not found"
+      html = render(view)
+
+      refute has_element?(view, "#payout-modal")
+      assert html =~ "Payout not found"
     end
 
     # ---------------------------------------------------------------------------

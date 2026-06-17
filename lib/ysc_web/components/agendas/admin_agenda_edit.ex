@@ -270,6 +270,7 @@ defmodule YscWeb.AgendaEditComponent do
     {:ok,
      socket
      |> assign(agenda_id: agenda.id)
+     |> assign(:event_id, agenda.event_id)
      |> assign(agenda_items: agenda.agenda_items)
      |> assign(
        chronological_warning: check_chronological_order(agenda.agenda_items)
@@ -304,23 +305,27 @@ defmodule YscWeb.AgendaEditComponent do
   end
 
   def handle_event("save", %{"id" => id, "agenda_item" => params}, socket) do
-    agenda_item = Agendas.get_agenda_item!(id)
-
-    case Agendas.update_agenda_item(
-           agenda_item.agenda.event_id,
-           agenda_item,
-           params
-         ) do
-      {:ok, _updated_agenda_item} ->
+    case find_agenda_item(socket, id) do
+      nil ->
         {:noreply, socket}
 
-      {:error, changeset} ->
-        {:noreply,
-         stream_insert(
-           socket,
-           :agenda_items,
-           to_change_form(changeset, %{}, :insert)
-         )}
+      agenda_item ->
+        case Agendas.update_agenda_item(
+               socket.assigns.event_id,
+               agenda_item,
+               params
+             ) do
+          {:ok, _updated_agenda_item} ->
+            {:noreply, socket}
+
+          {:error, changeset} ->
+            {:noreply,
+             stream_insert(
+               socket,
+               :agenda_items,
+               to_change_form(changeset, %{}, :insert)
+             )}
+        end
     end
   end
 
@@ -355,12 +360,16 @@ defmodule YscWeb.AgendaEditComponent do
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
-    agenda_item = Agendas.get_agenda_item!(id)
+    case find_agenda_item(socket, id) do
+      nil ->
+        {:noreply, socket}
 
-    {:ok, _} =
-      Agendas.delete_agenda_item(agenda_item.agenda.event_id, agenda_item)
+      agenda_item ->
+        {:ok, _} =
+          Agendas.delete_agenda_item(socket.assigns.event_id, agenda_item)
 
-    {:noreply, socket}
+        {:noreply, socket}
+    end
   end
 
   def handle_event("new", %{"at" => at}, socket) do
@@ -391,15 +400,19 @@ defmodule YscWeb.AgendaEditComponent do
 
       {:noreply, socket}
     else
-      agenda_item = Agendas.get_agenda_item!(id)
+      case find_agenda_item(socket, id) do
+        nil ->
+          {:noreply, socket}
 
-      Agendas.update_agenda_item_position(
-        agenda_item.agenda.event_id,
-        agenda_item,
-        new_idx
-      )
+        agenda_item ->
+          Agendas.update_agenda_item_position(
+            socket.assigns.event_id,
+            agenda_item,
+            new_idx
+          )
 
-      {:noreply, socket}
+          {:noreply, socket}
+      end
     end
   end
 
