@@ -1678,7 +1678,7 @@ defmodule YscWeb.AdminMoneyLive do
       </.admin_collapsible_section>
       <!-- Refund Modal -->
       <.modal
-        :if={@live_action == :refund_payment}
+        :if={@live_action == :refund_payment && @selected_payment}
         id="refund-modal"
         show
         on_cancel={JS.push("close_refund_modal")}
