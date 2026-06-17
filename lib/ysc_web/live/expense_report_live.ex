@@ -1592,19 +1592,17 @@ defmodule YscWeb.ExpenseReportLive do
         <div class="print-hide mt-8">
           <!-- Primary Actions -->
           <div class="flex flex-col sm:flex-row justify-center gap-3">
-            <.link
-              navigate={~p"/expensereport"}
-              class="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
-            >
+            <.button navigate={~p"/expensereport"}>
               <.icon name="hero-plus" class="w-5 h-5" /> Submit Another Report
-            </.link>
-            <button
+            </.button>
+            <.button
               type="button"
               phx-click="download-pdf"
-              class="inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-sm hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-500 focus:ring-offset-2 transition-colors"
+              variant="outline"
+              color="zinc"
             >
               <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Download PDF
-            </button>
+            </.button>
           </div>
           <!-- Secondary Actions -->
           <div class="flex flex-wrap items-center justify-center mt-6 text-sm">
@@ -1648,12 +1646,9 @@ defmodule YscWeb.ExpenseReportLive do
                 View and manage all your submitted expense reports.
               </p>
             </div>
-            <.link
-              navigate={~p"/expensereport"}
-              class="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 min-h-[44px] flex items-center gap-2"
-            >
+            <.button navigate={~p"/expensereport"}>
               <.icon name="hero-plus" class="w-5 h-5" /> Submit New Report
-            </.link>
+            </.button>
           </div>
         </div>
         <!-- Expense Reports List -->
@@ -1667,12 +1662,9 @@ defmodule YscWeb.ExpenseReportLive do
               <p class="text-sm text-zinc-600 mb-6">
                 You haven't submitted any expense reports. Submit your first expense report to get started.
               </p>
-              <.link
-                navigate={~p"/expensereport"}
-                class="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 min-h-[44px] flex items-center gap-2 inline-flex"
-              >
+              <.button navigate={~p"/expensereport"}>
                 <.icon name="hero-plus" class="w-5 h-5" /> Submit Your First Report
-              </.link>
+              </.button>
             </div>
           </div>
         <% else %>
@@ -1769,15 +1761,16 @@ defmodule YscWeb.ExpenseReportLive do
                     </div>
                     <!-- Right side: Actions -->
                     <div class="flex-shrink-0 flex flex-col gap-2">
-                      <.link
+                      <.button
                         navigate={~p"/expensereport/#{report.id}/success"}
-                        class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 min-h-[44px] flex items-center justify-center gap-2"
+                        variant="outline"
+                        color="blue"
                       >
                         <.icon
                           name="hero-document-magnifying-glass"
                           class="w-5 h-5"
                         /> View Details
-                      </.link>
+                      </.button>
                     </div>
                   </div>
                 </div>
@@ -1824,12 +1817,14 @@ defmodule YscWeb.ExpenseReportLive do
                 </a>).
                 </p>
               </div>
-              <.link
+              <.button
                 navigate={~p"/expensereports"}
-                class="px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 min-h-[44px] flex items-center gap-2 flex-shrink-0"
+                variant="outline"
+                color="zinc"
+                class="flex-shrink-0"
               >
                 <.icon name="hero-document-text" class="w-5 h-5" /> View My Reports
-              </.link>
+              </.button>
             </div>
           </div>
           <!-- 2-Column Layout: Form on left, Sticky Summary on right -->
@@ -1912,14 +1907,15 @@ defmodule YscWeb.ExpenseReportLive do
                         <h4 class="text-md font-medium text-zinc-800">
                           Expense Item {expense_f.index + 1}
                         </h4>
-                        <button
+                        <.button
                           type="button"
                           phx-click="remove_expense_item"
                           phx-value-index={expense_f.index}
-                          class="px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 min-h-[44px] flex items-center gap-2"
+                          variant="outline"
+                          color="red"
                         >
                           <.icon name="hero-x-mark" class="w-5 h-5" />Remove
-                        </button>
+                        </.button>
                       </div>
                       <!-- Date, Vendor, Amount in one row for better visibility -->
                       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2135,14 +2131,15 @@ defmodule YscWeb.ExpenseReportLive do
                                     Click image to preview
                                   </span>
                                 <% end %>
-                                <button
+                                <.button
                                   type="button"
                                   phx-click="remove-receipt"
                                   phx-value-index={expense_f.index}
-                                  class="text-sm text-red-600 hover:text-red-800 font-medium min-h-[44px] px-3 py-2 border border-red-300 rounded-md hover:bg-red-50"
+                                  variant="outline"
+                                  color="red"
                                 >
                                   Remove
-                                </button>
+                                </.button>
                               </div>
                             </div>
                           </div>
@@ -2237,7 +2234,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       {entry.progress}%
                                     </progress>
                                     <div class="flex gap-2">
-                                      <button
+                                      <.button
                                         type="button"
                                         phx-click="consume-receipt"
                                         phx-value-ref={entry.ref}
@@ -2250,7 +2247,6 @@ defmodule YscWeb.ExpenseReportLive do
                                         data-ref={entry.ref}
                                         data-done={entry.done?}
                                         data-progress={entry.progress}
-                                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-zinc-400 disabled:cursor-not-allowed min-h-[44px]"
                                       >
                                         <%= cond do %>
                                           <% entry.done? && entry.progress == 100 -> %>
@@ -2260,16 +2256,17 @@ defmodule YscWeb.ExpenseReportLive do
                                           <% true -> %>
                                             Uploading... ({entry.progress}%)
                                         <% end %>
-                                      </button>
-                                      <button
+                                      </.button>
+                                      <.button
                                         type="button"
                                         phx-click="cancel-upload"
                                         phx-value-ref={entry.ref}
                                         phx-disable-with="Cancelling..."
-                                        class="px-4 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 border border-red-300 min-h-[44px]"
+                                        variant="outline"
+                                        color="red"
                                       >
                                         Cancel
-                                      </button>
+                                      </.button>
                                     </div>
                                   </div>
                                 </div>
@@ -2282,13 +2279,9 @@ defmodule YscWeb.ExpenseReportLive do
                   </.inputs_for>
 
                   <div class="mt-4">
-                    <button
-                      type="button"
-                      phx-click="add_expense_item"
-                      class="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 min-h-[44px] flex items-center gap-2"
-                    >
+                    <.button type="button" phx-click="add_expense_item">
                       <.icon name="hero-plus" class="w-5 h-5" />Add Expense Item
-                    </button>
+                    </.button>
                   </div>
                 </div>
                 <!-- Step 3: Income Items (Optional) -->
@@ -2323,13 +2316,14 @@ defmodule YscWeb.ExpenseReportLive do
                             You collected $20 cash from a member for a guest ticket, or received a refund that should offset your expenses.
                           </p>
                         </div>
-                        <button
+                        <.button
                           type="button"
                           phx-click="add_income_item"
-                          class="px-6 py-3 text-sm font-medium text-blue-600 bg-white border border-blue-300 rounded-md hover:bg-blue-50 min-h-[44px] flex items-center gap-2"
+                          variant="outline"
+                          color="blue"
                         >
                           <.icon name="hero-plus" class="w-5 h-5" />Add Income Item
-                        </button>
+                        </.button>
                       </div>
                     </div>
                   <% end %>
@@ -2340,14 +2334,15 @@ defmodule YscWeb.ExpenseReportLive do
                         <h4 class="text-md font-medium text-zinc-800">
                           Income Item {income_f.index + 1}
                         </h4>
-                        <button
+                        <.button
                           type="button"
                           phx-click="remove_income_item"
                           phx-value-index={income_f.index}
-                          class="text-red-600 hover:text-red-800"
+                          variant="outline"
+                          color="red"
                         >
                           <.icon name="hero-x-mark" class="w-5 h-5 -mt-0.5 me-1" />Remove
-                        </button>
+                        </.button>
                       </div>
 
                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2492,14 +2487,15 @@ defmodule YscWeb.ExpenseReportLive do
                                     Click image to preview
                                   </span>
                                 <% end %>
-                                <button
+                                <.button
                                   type="button"
                                   phx-click="remove-proof"
                                   phx-value-index={income_f.index}
-                                  class="text-sm text-red-600 hover:text-red-800 font-medium min-h-[44px] px-3 py-2 border border-red-300 rounded-md hover:bg-red-50"
+                                  variant="outline"
+                                  color="red"
                                 >
                                   Remove
-                                </button>
+                                </.button>
                               </div>
                             </div>
                           </div>
@@ -2591,7 +2587,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       {entry.progress}%
                                     </progress>
                                     <div class="flex gap-2">
-                                      <button
+                                      <.button
                                         type="button"
                                         phx-click="consume-proof"
                                         phx-value-ref={entry.ref}
@@ -2604,7 +2600,6 @@ defmodule YscWeb.ExpenseReportLive do
                                         data-ref={entry.ref}
                                         data-done={entry.done?}
                                         data-progress={entry.progress}
-                                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-zinc-400 disabled:cursor-not-allowed min-h-[44px]"
                                       >
                                         <%= cond do %>
                                           <% entry.done? && entry.progress == 100 -> %>
@@ -2614,16 +2609,17 @@ defmodule YscWeb.ExpenseReportLive do
                                           <% true -> %>
                                             Uploading... ({entry.progress}%)
                                         <% end %>
-                                      </button>
-                                      <button
+                                      </.button>
+                                      <.button
                                         type="button"
                                         phx-click="cancel-proof-upload"
                                         phx-value-ref={entry.ref}
                                         phx-disable-with="Cancelling..."
-                                        class="px-4 py-2 text-sm font-medium text-red-600 rounded-md hover:bg-red-50 border border-red-300 min-h-[44px]"
+                                        variant="outline"
+                                        color="red"
                                       >
                                         Cancel
-                                      </button>
+                                      </.button>
                                     </div>
                                   </div>
                                 </div>
@@ -2643,13 +2639,9 @@ defmodule YscWeb.ExpenseReportLive do
                     }
                     class="mt-4"
                   >
-                    <button
-                      type="button"
-                      phx-click="add_income_item"
-                      class="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 min-h-[44px] flex items-center gap-2"
-                    >
+                    <.button type="button" phx-click="add_income_item">
                       <.icon name="hero-plus" class="w-5 h-5" />Add Income Item
-                    </button>
+                    </.button>
                   </div>
                 </div>
                 <!-- Step 4: Reimbursement Method -->
@@ -2754,13 +2746,12 @@ defmodule YscWeb.ExpenseReportLive do
                       </p>
                       <div class="flex items-center gap-2">
                         <span class="text-sm text-zinc-600">Or</span>
-                        <button
-                          type="button"
+                        <.link
                           phx-click="open-bank-account-modal"
                           class="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium"
                         >
                           add a new bank account
-                        </button>
+                        </.link>
                       </div>
                     </div>
                     <div :if={length(@bank_accounts) == 0} class="space-y-3">
@@ -2772,13 +2763,9 @@ defmodule YscWeb.ExpenseReportLive do
                           Please add a bank account to continue.
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        phx-click="open-bank-account-modal"
-                        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-                      >
+                      <.button type="button" phx-click="open-bank-account-modal">
                         Add Bank Account
-                      </button>
+                      </.button>
                     </div>
                     <p
                       :for={error <- @form[:reimbursement_method].errors}
@@ -2827,6 +2814,7 @@ defmodule YscWeb.ExpenseReportLive do
                       type="submit"
                       name="_action"
                       value="submit"
+                      color="green"
                       phx-disable-with="Submitting..."
                       disabled={
                         !can_submit?(
@@ -2836,18 +2824,12 @@ defmodule YscWeb.ExpenseReportLive do
                           @current_user
                         )
                       }
-                      class={
-                      "w-full min-w-[180px] min-h-[44px] px-6 py-3 text-sm font-medium rounded-md transition-all duration-200 " <>
-                        if(can_submit?(@form, @bank_accounts, @billing_address, @current_user),
-                          do: "text-white bg-green-600 hover:bg-green-700 shadow-md hover:shadow-lg transform hover:scale-[1.02]",
-                          else: "text-zinc-400 bg-zinc-300 cursor-not-allowed"
-                        )
-                    }
+                      class="w-full"
                     >
                       <%= if can_submit?(@form, @bank_accounts, @billing_address, @current_user) do %>
                         <.icon
                           name="hero-paper-airplane"
-                          class="w-4 h-4 inline mr-2"
+                          class="w-5 h-5 inline"
                         /> Submit {Money.to_string!(@totals.net_total)} Report
                       <% else %>
                         Complete checklist to submit
@@ -2876,6 +2858,7 @@ defmodule YscWeb.ExpenseReportLive do
                       form="expense-report-form"
                       name="_action"
                       value="submit"
+                      color="green"
                       phx-disable-with="Submitting..."
                       disabled={
                         !can_submit?(
@@ -2885,13 +2868,7 @@ defmodule YscWeb.ExpenseReportLive do
                           @current_user
                         )
                       }
-                      class={
-                      "w-full min-h-[44px] px-6 py-3 text-sm font-medium rounded-md transition-all duration-200 " <>
-                        if(can_submit?(@form, @bank_accounts, @billing_address, @current_user),
-                          do: "text-white bg-green-600 hover:bg-green-700 shadow-md",
-                          else: "text-zinc-400 bg-zinc-300 cursor-not-allowed"
-                        )
-                    }
+                      class="w-full"
                     >
                       <%= if can_submit?(@form, @bank_accounts, @billing_address, @current_user) do %>
                         <.icon
@@ -3013,19 +2990,7 @@ defmodule YscWeb.ExpenseReportLive do
                       class="text-zinc-400 hover:text-zinc-500"
                     >
                       <span class="sr-only">Close</span>
-                      <svg
-                        class="w-6 h-6"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
+                      <.icon name="hero-x-mark" class="w-6 h-6" />
                     </button>
                   </div>
                   <!-- Illustration showing where to find routing and account numbers -->
@@ -3214,13 +3179,14 @@ defmodule YscWeb.ExpenseReportLive do
                     />
 
                     <div class="mt-4 flex justify-end gap-3">
-                      <button
+                      <.button
                         type="button"
                         phx-click="close-bank-account-modal"
-                        class="px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50"
+                        variant="outline"
+                        color="zinc"
                       >
                         Cancel
-                      </button>
+                      </.button>
                       <.button>Add Bank Account</.button>
                     </div>
                   </.simple_form>
