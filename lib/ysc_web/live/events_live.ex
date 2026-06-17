@@ -15,16 +15,10 @@ defmodule YscWeb.EventsLive do
     <div class="py-6 md:py-12">
       <%!-- The "Masthead" Header --%>
       <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
-        <div class="text-center py-8 md:py-12 border-y border-zinc-200">
-          <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-            Events
-          </p>
-          <h1 class="text-4xl md:text-7xl font-black text-zinc-900">
-            {if @total_upcoming_count == 0,
-              do: "The Calendar",
-              else: "What's Next"}
-          </h1>
-        </div>
+        <.page_masthead
+          eyebrow="Events"
+          title={if @total_upcoming_count == 0, do: "The Calendar", else: "What's Next"}
+        />
       </div>
 
       <%!-- Hero and Event List (handled by component) --%>
@@ -44,19 +38,13 @@ defmodule YscWeb.EventsLive do
 
           <%!-- Sidebar --%>
           <aside class="lg:col-span-3 space-y-4 md:space-y-8">
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                Upcoming Events
-              </h4>
+            <.feature_card title="Upcoming Events">
               <p class="text-base text-zinc-600 leading-relaxed">
                 Explore our curated calendar of events. From social gatherings to cultural celebrations, there's always something happening at YSC.
               </p>
-            </div>
+            </.feature_card>
             <%!-- Get Involved - Always shown to encourage event hosting --%>
-            <div class="p-6 md:p-8 bg-blue-50/40 rounded-xl border border-blue-200">
-              <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-                Get Involved
-              </h4>
+            <.feature_card title="Get Involved" title_tone={:accent}>
               <p class="text-base text-zinc-700 leading-relaxed mb-4">
                 Have an idea for an event? We'd love to help you host it! Reach out through our contact page.
               </p>
@@ -68,7 +56,7 @@ defmodule YscWeb.EventsLive do
               >
                 Contact Us <.icon name="hero-arrow-right" class="w-4 h-4 ml-1" />
               </.link>
-            </div>
+            </.feature_card>
             <div class="p-6 md:p-8 bg-white rounded-xl border border-zinc-100">
               <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-3 md:mb-4">
                 Stay Connected

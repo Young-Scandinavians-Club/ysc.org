@@ -29,11 +29,7 @@ defmodule YscWeb.NewsLive do
     <div class="py-6 md:py-12">
       <%!-- The "Masthead" Header --%>
       <div class="max-w-screen-xl mx-auto px-4 mb-16">
-        <div class="text-center py-12 border-y border-zinc-200">
-          <h1 class="text-6xl md:text-8xl font-black text-zinc-900 tracking-tighter">
-            Club News
-          </h1>
-        </div>
+        <.page_masthead size={:large} title="Club News" />
       </div>
 
       <%!-- Loading skeleton for featured post --%>

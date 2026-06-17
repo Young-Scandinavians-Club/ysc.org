@@ -27,14 +27,11 @@ defmodule YscWeb.NewsletterArchiveLive do
     ~H"""
     <div class="py-6 md:py-12">
       <div class="max-w-screen-xl mx-auto px-4 mb-12">
-        <div class="text-center py-12 border-y border-zinc-200">
-          <h1 class="text-6xl md:text-8xl font-black text-zinc-900 tracking-tighter">
-            Newsletters
-          </h1>
-          <p class="mt-4 text-zinc-500 text-lg">
-            Browse our past newsletters. Subscribe to receive future newsletters in your inbox.
-          </p>
-        </div>
+        <.page_masthead
+          size={:large}
+          title="Newsletters"
+          subtitle="Browse our past newsletters. Subscribe to receive future newsletters in your inbox."
+        />
       </div>
 
       <%!-- Subscription widget --%>

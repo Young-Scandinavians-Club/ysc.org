@@ -4454,53 +4454,38 @@ defmodule YscWeb.TahoeBookingLive do
       <section :if={!@user} class="bg-white py-6 md:py-12">
         <%!-- Section Header --%>
         <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
-          <div class="text-center py-8 md:py-12 border-y border-zinc-200">
-            <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-              Since 1993
-            </p>
-            <h2 class="text-4xl md:text-7xl font-black text-zinc-900">
-              Experience Tahoe
-            </h2>
-          </div>
+          <.page_masthead
+            eyebrow="Since 1993"
+            title="Experience Tahoe"
+            heading_tag={:h2}
+          />
         </div>
         <%!-- Feature Grid --%>
         <div class="max-w-screen-xl mx-auto px-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
             <%!-- Traditional Sauna --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                Traditional Sauna
-              </h4>
+            <.feature_card title="Traditional Sauna">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 Experience the authentic Scandinavian sauna and our wood-fired fireplace. This traditional feature brings the Nordic wellness culture to the mountains, perfect for unwinding after a day on the slopes.
               </p>
-            </div>
+            </.feature_card>
             <%!-- Ski Proximity --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                Ski Proximity
-              </h4>
+            <.feature_card title="Ski Proximity">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 <strong class="text-zinc-900">20 minutes</strong>
                 to Palisades Tahoe (site of the 1960 Winter Olympics) and Alpine Meadows. About
                 <strong class="text-zinc-900">30 minutes</strong>
                 to Northstar. World-class skiing is right at your doorstep.
               </p>
-            </div>
+            </.feature_card>
             <%!-- West Shore Magic --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                West Shore Magic
-              </h4>
+            <.feature_card title="West Shore Magic">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 Escape the tourist traps. Our cabin offers quiet, forested living on Tahoe's pristine west shore. Experience the authentic mountain lifestyle away from the crowds.
               </p>
-            </div>
+            </.feature_card>
             <%!-- The Dugnad Spirit --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                The Dugnad Spirit
-              </h4>
+            <.feature_card title="The Dugnad Spirit">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 <% season_id =
                   if @checkin_date do
@@ -4514,14 +4499,11 @@ defmodule YscWeb.TahoeBookingLive do
                 <% default_adult_price =
                   get_default_adult_price(@property, season_id) %> Low rates (<strong class="text-blue-600">{MoneyHelper.format_money!(default_adult_price)}/adult</strong>) are possible because members steward the cabin together. This is <strong class="text-zinc-900">your cabin — not a hotel</strong>.
               </p>
-            </div>
+            </.feature_card>
           </div>
           <%!-- CTA Card --%>
           <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
-            <div class="p-8 md:p-12 bg-blue-50/40 rounded-xl border border-blue-200 text-center flex flex-col items-center">
-              <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-                Ready to Book?
-              </h4>
+            <.feature_card title="Ready to Book?" title_tone={:accent} class="p-8 md:p-12 text-center flex flex-col items-center">
               <p class="text-base text-zinc-700 leading-relaxed mb-6">
                 Sign in to view the cabin calendar, check availability, and reserve your dates.
               </p>
@@ -4531,7 +4513,7 @@ defmodule YscWeb.TahoeBookingLive do
               >
                 Sign In to Book
               </.link>
-            </div>
+            </.feature_card>
           </div>
         </div>
       </section>

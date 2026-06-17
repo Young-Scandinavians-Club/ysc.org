@@ -2489,66 +2489,48 @@ defmodule YscWeb.ClearLakeBookingLive do
       <section :if={!@user} class="bg-white py-6 md:py-12">
         <%!-- Section Header --%>
         <div class="max-w-screen-xl mx-auto px-4 mb-8 md:mb-16">
-          <div class="text-center py-8 md:py-12 border-y border-zinc-200">
-            <p class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-              Since 1963
-            </p>
-            <h2 class="text-4xl md:text-7xl font-black text-zinc-900">
-              Experience Clear Lake
-            </h2>
-          </div>
+          <.page_masthead
+            eyebrow="Since 1963"
+            title="Experience Clear Lake"
+            heading_tag={:h2}
+          />
         </div>
         <%!-- Feature Grid --%>
         <div class="max-w-screen-xl mx-auto px-4">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
             <%!-- Private Dock --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                Private Dock Access
-              </h4>
+            <.feature_card title="Private Dock Access">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 Swim, boat, and unwind at our private dock. Perfect for mooring your boat, enjoying morning coffee over the water, or taking a refreshing dip in California's largest natural lake.
               </p>
-            </div>
+            </.feature_card>
             <%!-- Year-Round Access --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                Year-Round Access
-              </h4>
+            <.feature_card title="Year-Round Access">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 <strong class="text-zinc-900">Summer (May–Sept):</strong>
                 Legendary dock parties and sleeping under the stars on our lawn.<br />
                 <strong class="text-zinc-900">Winter (Oct–April):</strong>
                 Cozy indoor beds set up in the cabin for warm, comfortable lakeside retreats.
               </p>
-            </div>
+            </.feature_card>
             <%!-- Community Treasure --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                A Community Treasure
-              </h4>
+            <.feature_card title="A Community Treasure">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 Owned and operated by our members since 1963. <strong class="text-zinc-900">Your cabin, your getaway</strong>. Low rates and authentic experiences made possible through our cooperative spirit.
               </p>
-            </div>
+            </.feature_card>
             <%!-- California's Oldest Lake --%>
-            <div class="p-6 md:p-8 bg-zinc-50 rounded-xl border border-zinc-100">
-              <h4 class="text-sm font-black text-zinc-500 uppercase tracking-[0.2em] mb-4 md:mb-6">
-                California's Oldest Lake
-              </h4>
+            <.feature_card title="California's Oldest Lake">
               <p class="text-sm md:text-base text-zinc-600 leading-relaxed">
                 Clear Lake is
                 <strong class="text-zinc-900">2.5 million years old</strong>
                 — the oldest natural lake in North America. Experience a unique ecosystem perfect for bird watching, fishing, and connecting with nature year-round.
               </p>
-            </div>
+            </.feature_card>
           </div>
           <%!-- CTA Card --%>
           <div class="mt-12 md:mt-16 max-w-2xl mx-auto">
-            <div class="p-8 md:p-12 bg-blue-50/40 rounded-xl border border-blue-200 text-center flex flex-col items-center">
-              <h4 class="text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4">
-                Ready to Book?
-              </h4>
+            <.feature_card title="Ready to Book?" title_tone={:accent} class="p-8 md:p-12 text-center flex flex-col items-center">
               <p class="text-base text-zinc-700 leading-relaxed mb-6">
                 Sign in to view the cabin calendar, check availability, and reserve your dates.
               </p>
@@ -2560,7 +2542,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               >
                 Sign In to Book
               </.link>
-            </div>
+            </.feature_card>
           </div>
         </div>
       </section>
