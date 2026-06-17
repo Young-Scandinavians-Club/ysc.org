@@ -40,6 +40,115 @@ defmodule Ysc.Release do
   end
 
   @doc """
+  Loads a WordPress migration export directory into the production database.
+
+  The export must already exist on the machine (e.g. unpacked under `/data/wp_migration_export`).
+  Run extract locally (`mix ysc.wp_extract`); production releases do not include Mix.
+
+  Usage in production (one-off Fly machine or SSH session):
+
+      bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", dry_run: true)'
+      bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export")'
+      bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false)'
+
+  Options (keyword list as second argument):
+  - `:dry_run` — log only, no DB or S3 writes (default: false)
+  - `:upload_media` — upload media/ to Tigris and create Image records (default: true)
+  - `:create_stripe_subscriptions` — create Stripe subs in the connected account (default: false; sandbox only)
+  - `:only_emails` — load a single email or list of emails for targeted runs
+  """
+  def wp_load(export_dir, opts \\ []) when is_binary(export_dir) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+    upload_media = Keyword.get(opts, :upload_media, true)
+
+    create_stripe_subscriptions =
+      Keyword.get(opts, :create_stripe_subscriptions, false)
+
+    only_emails = Keyword.get(opts, :only_emails)
+
+    require Ysc.Logging
+
+    Ysc.Logging.info("WP migration load starting",
+      export_dir: export_dir,
+      dry_run: dry_run,
+      upload_media: upload_media,
+      create_stripe_subscriptions: create_stripe_subscriptions,
+      only_emails: only_emails
+    )
+
+    load_opts = [
+      export_dir: export_dir,
+      dry_run: dry_run,
+      upload_media: upload_media,
+      create_stripe_subscriptions: create_stripe_subscriptions
+    ]
+
+    load_opts =
+      if only_emails,
+        do: Keyword.put(load_opts, :only_emails, only_emails),
+        else: load_opts
+
+    case Ysc.WpMigration.Load.run(load_opts) do
+      {:ok, result} ->
+        Ysc.Logging.info("WP migration load finished",
+          users: map_size(result[:user_map] || %{}),
+          images: map_size(result[:image_map] || %{}),
+          dry_run: dry_run
+        )
+
+        {:ok, result}
+
+      {:error, message} ->
+        Ysc.Logging.error("WP migration load failed", error: message)
+        {:error, message}
+    end
+  end
+
+  @doc """
+  Clears `wp_migration_active`, re-enabling Stripe webhook side effects (emails, QuickBooks, etc.).
+
+  Run after migration load and validation are complete.
+
+  Usage in production:
+
+      bin/ysc eval "Ysc.Release.wp_migration_unlock()"
+  """
+  def wp_migration_unlock do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    current = Ysc.Settings.get_setting_safe("wp_migration_active")
+
+    if current == "true" do
+      case Ysc.Settings.update_setting("wp_migration_active", "false") do
+        {:ok, _} ->
+          Ysc.Logging.info(
+            "[WP Migration] Comms suppression DISABLED via Release.wp_migration_unlock"
+          )
+
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error("Failed to clear wp_migration_active",
+            error: reason
+          )
+
+          {:error, reason}
+      end
+    else
+      Ysc.Logging.info(
+        "[WP Migration] wp_migration_active is already #{inspect(current)} — nothing to do"
+      )
+
+      :ok
+    end
+  end
+
+  @doc """
   Re-queues all failed email messages.
 
   Usage in production:

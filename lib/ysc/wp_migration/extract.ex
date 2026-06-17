@@ -616,6 +616,8 @@ defmodule Ysc.WpMigration.Extract do
       "checkout_date" => presence(row["mphb_check_out_date"]),
       "total_price" => presence(row["mphb_total_price"]),
       "wp_customer_user_id" => presence(row["mphb_customer_id"]),
+      "wp_customer_post_id" => presence(row["mphb_customer_post_id"]),
+      "guest_email" => presence(row["mphb_email"]),
       "guest_first_name" => presence(row["mphb_first_name"]),
       "guest_last_name" => presence(row["mphb_last_name"]),
       "guests_count" => guests_count,
