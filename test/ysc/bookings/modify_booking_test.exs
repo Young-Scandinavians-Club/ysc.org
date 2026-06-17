@@ -711,6 +711,131 @@ defmodule Ysc.Bookings.ModifyBookingTest do
                )
     end
 
+    test "apply_modification rejects modification payment with wrong delta amount",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(121)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} = Bookings.prepare_modification(booking, attrs)
+      assert Money.positive?(preview.delta)
+
+      payment_intent_id =
+        "pi_mod_underpaid_#{System.unique_integer([:positive])}"
+
+      underpaid_cents = Ysc.MoneyHelper.money_to_cents(preview.delta) - 100
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: underpaid_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error, :payment_amount_mismatch} =
+                 Bookings.apply_modification(booking, attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "apply_modification rejects checkout payment intents missing modification metadata",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(122)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} = Bookings.prepare_modification(booking, attrs)
+      assert Money.positive?(preview.delta)
+
+      payment_intent_id =
+        "pi_mod_missing_flag_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id)
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error, :payment_metadata_mismatch} =
+                 Bookings.apply_modification(booking, attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
     test "apply_modification refreshes an expired hold after payment succeeds",
          %{
            user: user

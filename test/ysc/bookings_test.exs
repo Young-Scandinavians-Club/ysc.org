@@ -3521,5 +3521,75 @@ defmodule Ysc.BookingsTest do
       assert {:error, :payment_metadata_mismatch} =
                Bookings.verify_booking_payment_intent(payment_intent, booking)
     end
+
+    test "rejects payment intents that have not succeeded" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_pending",
+        status: "requires_payment_method",
+        amount: Ysc.MoneyHelper.money_to_cents(booking.total_price),
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_not_succeeded} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking)
+    end
+
+    test "rejects payment intents bound to another user" do
+      owner = user_fixture()
+      other_user = user_fixture()
+      booking = booking_fixture(user_id: owner.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_wrong_user",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking.total_price),
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => other_user.id
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking)
+    end
+
+    test "rejects payment intents already recorded for another booking" do
+      user = user_fixture()
+      booking_a = booking_fixture(user_id: user.id, status: :hold)
+      booking_b = booking_fixture(user_id: user.id, status: :hold)
+      payment_intent_id = "pi_reused_#{System.unique_integer([:positive])}"
+
+      assert {:ok, {_payment, _, _}} =
+               Ledgers.process_payment(%{
+                 user_id: user.id,
+                 amount: booking_a.total_price,
+                 entity_type: :booking,
+                 entity_id: booking_a.id,
+                 external_payment_id: payment_intent_id,
+                 stripe_fee: Money.new(100, :USD),
+                 description: "Booking payment",
+                 property: booking_a.property,
+                 payment_method_id: nil
+               })
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: payment_intent_id,
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(booking_b.total_price),
+        metadata: %{
+          "booking_id" => booking_b.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_already_used} =
+               Bookings.verify_booking_payment_intent(payment_intent, booking_b)
+    end
   end
 end
