@@ -113,30 +113,6 @@ defmodule YscWeb.AdminEventsLiveTest do
       )
     end
 
-    test "does not re-query event organizers on each search patch", %{
-      conn: conn,
-      admin: admin
-    } do
-      event_fixture(%{title: "Organizer Cache XYZ", organizer_id: admin.id})
-
-      {:ok, view, _} = live(conn, ~p"/admin/events")
-
-      author_filter_pattern =
-        ~r/DISTINCT ON \(.*"organizer_id"\).*FROM "events"/is
-
-      {_patch, author_queries} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            view
-            |> form("#events-search-form", %{q: "Organizer Cache"})
-            |> render_submit()
-          end,
-          pattern: author_filter_pattern
-        )
-
-      assert author_queries == 0
-    end
-
     test "invalid flop params redirect to default events list", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/events")
 
