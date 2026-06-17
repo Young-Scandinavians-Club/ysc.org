@@ -96,7 +96,8 @@ jobs:
           verbose: true
 
   shell:
-    name: Shell Scripts & Config
+    # Name must match the "Shell Scripts" required check in the Protect Main ruleset.
+    name: Shell Scripts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
