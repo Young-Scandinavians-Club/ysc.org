@@ -187,5 +187,58 @@ defmodule YscWeb.BookingGuestFormTest do
       assert length(guests) == 3
       assert Enum.at(guests, 2).first_name == "Cara"
     end
+
+    test "trims excess guests when modification decreases counts without hold guest params" do
+      user = user_fixture()
+
+      {:ok, inserted} =
+        %Booking{
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :room,
+          status: :complete,
+          checkin_date: ~D[2026-08-01],
+          checkout_date: ~D[2026-08-05],
+          guests_count: 3,
+          children_count: 0,
+          reference_id: "TEST-#{System.unique_integer([:positive])}",
+          total_price: Money.new(100, :USD)
+        }
+        |> Booking.changeset(%{}, skip_validation: true)
+        |> Repo.insert()
+
+      for {first_name, order_index} <- [{"Ada", 0}, {"Bob", 1}, {"Cara", 2}] do
+        %BookingGuest{}
+        |> BookingGuest.changeset(%{
+          booking_id: inserted.id,
+          first_name: first_name,
+          last_name: "Guest",
+          is_child: false,
+          is_booking_user: order_index == 0,
+          order_index: order_index
+        })
+        |> Repo.insert!()
+      end
+
+      original_booking = Repo.preload(inserted, :booking_guests)
+      updated_booking = %{original_booking | guests_count: 2}
+
+      assert :ok =
+               BookingGuestForm.sync_guests_after_modification_apply(
+                 updated_booking,
+                 %{},
+                 original_booking
+               )
+
+      guests =
+        Repo.all(
+          from g in BookingGuest,
+            where: g.booking_id == ^inserted.id,
+            order_by: g.order_index
+        )
+
+      assert length(guests) == 2
+      assert Enum.map(guests, & &1.first_name) == ["Ada", "Bob"]
+    end
   end
 end
