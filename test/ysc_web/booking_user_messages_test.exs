@@ -44,6 +44,6 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.checkout_guest_info_step_continue_complimentary() =~
              "before your hold expires"
 
-    assert BookingUserMessages.checkout_payment_step_pay() =~ "secure payment"
+    assert BookingUserMessages.checkout_payment_step_pay() =~ "payment details"
   end
 end

@@ -607,7 +607,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Add Family Members
         <:subtitle>
-          Your Family membership covers your spouse or partner and children under 18. List everyone below — we'll save their details when you continue, and email an invite to anyone you add an email address for.
+          Family memberships must include at least one other person (spouse, partner, or child under 18). Add everyone who should be on your membership now. We'll save their details when you continue, and email an invite to anyone you add an email for.
         </:subtitle>
       </.header>
 
@@ -1337,7 +1337,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, :no_members} ->
         YscWeb.Flash.send_toast(
           :error,
-          "Please add at least one family member before continuing.",
+          "Please add at least one family member (spouse, partner, or child) before continuing, or contact info@ysc.org if you need help.",
           title: "Family Members Required"
         )
 

@@ -48,11 +48,11 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_payment_step_pay do
-    "Complete your secure payment above"
+    "Enter your payment details in the payment section to complete your booking"
   end
 
   def checkout_payment_step_confirm_complimentary do
-    "Confirm your booking above"
+    "Review the booking details and confirm your reservation"
   end
 
   defp trim(string), do: String.trim(string)

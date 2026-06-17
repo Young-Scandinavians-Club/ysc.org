@@ -79,7 +79,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "Complete Your Booking"
       assert html =~ "Booking Summary"
       assert html =~ "What Happens Next?"
-      assert html =~ "Complete your secure payment above"
+      assert html =~ "Enter your payment details in the payment section to complete your booking"
     end
 
     test "renders Clear Lake property title", %{conn: conn, user: user} do
