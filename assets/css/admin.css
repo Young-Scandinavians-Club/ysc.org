@@ -844,6 +844,22 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
     grid-column: 1 / -1;
 }
 
+.media-year-section+.media-year-section {
+    margin-top: 0.5rem;
+}
+
+.media-year-section>.media-masonry-grid,
+.media-year-section>.media-square-grid {
+    margin-top: 1rem;
+}
+
+@media (min-width: 768px) {
+    .media-year-section>.media-masonry-grid,
+    .media-year-section>.media-square-grid {
+        margin-top: 1.25rem;
+    }
+}
+
 .media-masonry-grid {
     column-count: 2;
     column-gap: 0.75rem;

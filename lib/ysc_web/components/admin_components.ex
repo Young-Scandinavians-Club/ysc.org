@@ -1839,7 +1839,7 @@ defmodule YscWeb.AdminComponents do
 
     <main
       id="admin-main"
-      class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen min-w-0 overflow-x-hidden"
+      class="px-4 lg:px-10 lg:ml-72 mt-0 lg:-mt-14 min-h-screen min-w-0 overflow-x-clip"
     >
       {render_slot(@inner_block)}
     </main>

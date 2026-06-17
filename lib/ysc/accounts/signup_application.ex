@@ -214,9 +214,12 @@ defmodule Ysc.Accounts.SignupApplication do
       :spoken_languages,
       :hear_about_the_club,
       :agreed_to_bylaws,
+      :agreed_to_bylaws_at,
       :started,
       :completed,
-      :agreed_to_bylaws_at
+      :reviewed_at,
+      :review_outcome,
+      :reviewed_by_user_id
     ])
     |> validate_birth_date()
   end

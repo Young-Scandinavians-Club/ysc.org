@@ -163,10 +163,11 @@ defmodule Ysc.WpMigration.WpRepo do
         WHERE post_type = 'post'
           AND (
             post_status = 'publish'
-            OR (post_status = 'future' AND CAST(post_date AS TIMESTAMP) <= CURRENT_TIMESTAMP)
+            OR (post_status = 'future' AND post_date <= $1)
           )
         ORDER BY post_date DESC
-        """
+        """,
+        [migration_now()]
       )
 
     rows
@@ -703,6 +704,12 @@ defmodule Ysc.WpMigration.WpRepo do
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # WordPress post_date values are VARCHAR in DuckDB; compare as strings to avoid
+  # DuckDB timestamp functions that require the core_functions extension.
+  defp migration_now do
+    DateTime.utc_now() |> Calendar.strftime("%Y-%m-%d %H:%M:%S")
+  end
 
   defp query_maps(conn, sql, params \\ []) do
     result =

@@ -5,6 +5,10 @@
 
 etc/docker/volume/*
 priv/static/exports/*.csv
+.cursor/
+wp_migration_export/
+backup/
+tmp/
 
 priv/static/assets/*.{gz,br,zst}
 

@@ -14,8 +14,57 @@ defmodule YscWeb.AdminMediaLiveTest do
     setup [:create_admin]
 
     test "renders media library", %{conn: conn} do
-      {:ok, _view, html} = live(conn, ~p"/admin/media")
+      _image = create_test_image()
+      {:ok, view, html} = live(conn, ~p"/admin/media")
       assert html =~ "Media Library"
+      assert has_element?(view, "#media-scroll-container")
+      assert has_element?(view, "#images-grid[phx-update=stream]")
+    end
+
+    test "enables viewport infinite scroll when more results exist", %{
+      conn: conn
+    } do
+      user = user_fixture(%{role: "admin"})
+
+      for i <- 1..35 do
+        {:ok, _} =
+          %Ysc.Media.Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/viewport-scroll-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at: ~U[2099-06-15 12:00:00Z],
+            updated_at: ~U[2099-06-15 12:00:00Z]
+          }
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      assert has_element?(view, "#media-load-more-footer")
+
+      assert has_element?(
+               view,
+               "#media-load-more-footer",
+               "Scroll down for more images"
+             )
+
+      refute has_element?(view, "#media-end-of-library")
+    end
+
+    test "shows end of library indicator when all images are loaded", %{
+      conn: conn
+    } do
+      _image = create_test_image()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      refute has_element?(view, "#media-load-more-footer")
+
+      assert has_element?(
+               view,
+               "#media-end-of-library",
+               "End of the media library"
+             )
     end
 
     test "navigates to upload page", %{conn: conn} do
@@ -94,7 +143,7 @@ defmodule YscWeb.AdminMediaLiveTest do
                "button[data-media-layout='masonry'][phx-value-layout='masonry'][aria-pressed='true']"
              )
 
-      assert has_element?(view, "#images-grid.media-masonry-grid")
+      assert has_element?(view, "#images-grid .media-masonry-grid")
 
       view
       |> element("button[phx-click='set-layout'][phx-value-layout='square']")
@@ -110,11 +159,11 @@ defmodule YscWeb.AdminMediaLiveTest do
                "button[phx-value-layout='masonry'][aria-pressed='false']"
              )
 
-      assert has_element?(view, "#images-grid.grid")
+      assert has_element?(view, "#images-grid .media-square-grid")
 
       assert has_element?(
                view,
-               "#images-grid.media-square-grid #image-#{image.id}"
+               "#images-grid .media-square-grid #image-#{image.id}"
              )
     end
 
@@ -184,6 +233,175 @@ defmodule YscWeb.AdminMediaLiveTest do
       send(view.pid, {Ysc.Media, {:image_updated, image.id}})
 
       refute has_element?(view, "#image-#{image.id}", "Processing...")
+    end
+
+    test "load-more spans multiple years when all years is selected", %{
+      conn: conn
+    } do
+      user = user_fixture(%{role: "admin"})
+      shared_time = ~U[2099-06-15 12:00:00Z]
+      token = "AllYearsScroll#{System.unique_integer([:positive])}"
+
+      for i <- 1..35 do
+        {:ok, _} =
+          %Ysc.Media.Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/#{token}-recent-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at: shared_time,
+            updated_at: shared_time
+          }
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, older} =
+        %Ysc.Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/#{token}-older.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2098-01-01 12:00:00Z],
+          updated_at: ~U[2098-01-01 12:00:00Z]
+        }
+        |> Ysc.Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      refute has_element?(view, "#image-#{older.id}")
+
+      html =
+        view
+        |> element("#media-scroll-container")
+        |> render_hook("load-more")
+
+      assert html =~ "image-#{older.id}"
+    end
+
+    test "load-more paginates images with identical inserted_at timestamps", %{
+      conn: conn
+    } do
+      user = user_fixture(%{role: "admin"})
+      shared_time = ~U[2099-06-15 12:00:00Z]
+      token = "SharedTsScroll#{System.unique_integer([:positive])}"
+
+      {:ok, last_image} =
+        %Ysc.Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/#{token}-recent-last.jpg",
+          processing_state: :unprocessed,
+          inserted_at: shared_time,
+          updated_at: shared_time
+        }
+        |> Ysc.Repo.insert()
+
+      for i <- 1..34 do
+        {:ok, _} =
+          %Ysc.Media.Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/#{token}-recent-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at: shared_time,
+            updated_at: shared_time
+          }
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      refute has_element?(view, "#image-#{last_image.id}")
+
+      view
+      |> element("#media-scroll-container")
+      |> render_hook("load-more")
+
+      assert has_element?(view, "#image-#{last_image.id}")
+    end
+
+    test "load-more splits a batch across month sections when it spans month boundaries",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{role: "admin"})
+      token = "MonthSplit#{System.unique_integer([:positive])}"
+      feb_base = ~U[2099-02-28 12:00:00Z]
+
+      for i <- 1..35 do
+        {:ok, _} =
+          %Ysc.Media.Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/#{token}-feb-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at: DateTime.add(feb_base, -i, :hour),
+            updated_at: DateTime.add(feb_base, -i, :hour)
+          }
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, jan_image} =
+        %Ysc.Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/#{token}-jan.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[2099-01-15 12:00:00Z],
+          updated_at: ~U[2099-01-15 12:00:00Z]
+        }
+        |> Ysc.Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      refute has_element?(view, "#image-#{jan_image.id}")
+
+      html =
+        view
+        |> element("#media-scroll-container")
+        |> render_hook("load-more")
+
+      assert html =~ "image-#{jan_image.id}"
+      assert has_element?(view, "#section-2099-1", "January 2099")
+      assert has_element?(view, "#section-2099-2", "February 2099")
+    end
+
+    test "jump-to-year keeps all-years mode so load-more reaches older years",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{role: "admin"})
+      shared_time = ~U[1997-06-15 12:00:00Z]
+      token = "JumpYearScroll#{System.unique_integer([:positive])}"
+
+      for i <- 1..31 do
+        {:ok, _} =
+          %Ysc.Media.Image{
+            user_id: user.id,
+            raw_image_path: "https://example.com/#{token}-1997-#{i}.jpg",
+            processing_state: :unprocessed,
+            inserted_at: shared_time,
+            updated_at: shared_time
+          }
+          |> Ysc.Repo.insert()
+      end
+
+      {:ok, older} =
+        %Ysc.Media.Image{
+          user_id: user.id,
+          raw_image_path: "https://example.com/#{token}-older.jpg",
+          processing_state: :unprocessed,
+          inserted_at: ~U[1996-12-31 12:00:00Z],
+          updated_at: ~U[1996-12-31 12:00:00Z]
+        }
+        |> Ysc.Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/media")
+
+      render_click(view, "jump-to-year", %{"year" => "1997"})
+
+      refute has_element?(view, "#image-#{older.id}")
+
+      html =
+        view
+        |> element("#media-scroll-container")
+        |> render_hook("load-more")
+
+      assert html =~ "image-#{older.id}"
     end
   end
 end

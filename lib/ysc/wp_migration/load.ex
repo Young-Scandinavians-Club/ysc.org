@@ -19,6 +19,7 @@ defmodule Ysc.WpMigration.Load do
   alias Ysc.Customers
   alias YscWeb.Workers.ImageProcessor
   alias Ysc.WpMigration.HtmlTransformer
+  alias Ysc.WpMigration.FamilyMembers, as: WpFamilyMembers
 
   @doc """
   Runs the load. Reads export_dir (users.json, applications.json, posts.json, media/, stripe_customer_lookup.json)
@@ -159,7 +160,7 @@ defmodule Ysc.WpMigration.Load do
       )
 
       Ysc.Logging.info("[WP Load] Phase: Applications")
-      {:ok, _} = load_applications(applications_data, user_map)
+      {:ok, _} = load_applications(applications_data, user_map, users_data)
       Ysc.Logging.info("[WP Load] Phase: Applications complete")
 
       {:ok, image_map, filename_map} =
@@ -253,6 +254,8 @@ defmodule Ysc.WpMigration.Load do
                 row["first_name"] || row["display_name"] || "Unknown",
               "last_name" => row["last_name"] || "User",
               "phone_number" => normalize_phone(row["phone_number"]),
+              "state" => resolve_user_state(row),
+              "role" => map_role(row["role"]),
               "most_connected_country" =>
                 normalize_country(
                   row["most_connected_country"] ||
@@ -264,6 +267,7 @@ defmodule Ysc.WpMigration.Load do
 
           case existing
                |> User.update_user_changeset(update_attrs)
+               |> apply_migration_user_verification(row)
                |> backdate_timestamp(row["user_registered"])
                |> Repo.update() do
             {:ok, _} ->
@@ -276,9 +280,6 @@ defmodule Ysc.WpMigration.Load do
           end
 
         nil ->
-          state = map_account_status(row["account_status"])
-          role = map_role(row["role"])
-
           attrs =
             %{
               "email" => email,
@@ -286,8 +287,6 @@ defmodule Ysc.WpMigration.Load do
                 row["first_name"] || row["display_name"] || "Unknown",
               "last_name" => row["last_name"] || "User",
               "phone_number" => normalize_phone(row["phone_number"]),
-              "state" => state,
-              "role" => role,
               "most_connected_country" =>
                 normalize_country(
                   row["most_connected_country"] ||
@@ -304,6 +303,7 @@ defmodule Ysc.WpMigration.Load do
               validate_email: false,
               hash_password: false
             )
+            |> apply_migration_user_identity(row)
             |> backdate_timestamp(row["user_registered"])
 
           case Repo.insert(changeset) do
@@ -999,13 +999,77 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp map_account_status("approved"), do: "active"
-  defp map_account_status(_), do: "pending_approval"
+  defp apply_migration_user_identity(changeset, row) do
+    changeset
+    |> Ecto.Changeset.put_change(:state, resolve_user_state(row))
+    |> Ecto.Changeset.put_change(:role, map_role(row["role"]))
+    |> apply_migration_user_verification(row)
+  end
+
+  # registration_changeset/3 and update_user_changeset/3 do not cast these fields.
+  # Pre-verified WP members should skip account-setup email verification and reach
+  # post-migration onboarding (when active) instead of /account-setup.
+  defp apply_migration_user_verification(changeset, row) do
+    if resolve_user_state(row) == "active" do
+      verified_at =
+        parse_datetime(row["user_registered"]) ||
+          DateTime.utc_now() |> DateTime.truncate(:second)
+
+      changeset
+      |> Ecto.Changeset.put_change(:email_verified_at, verified_at)
+      |> Ecto.Changeset.put_change(:confirmed_at, verified_at)
+    else
+      changeset
+    end
+  end
+
+  defp resolve_user_state(row) do
+    case row["account_status"] do
+      "approved" -> "active"
+      "rejected" -> "rejected"
+      _ -> if wp_member_active?(row), do: "active", else: "pending_approval"
+    end
+  end
+
+  defp wp_member_active?(row) do
+    row["has_active_wp_subscription"] == true or
+      row["wcm_status"] == "wcm-active" or
+      row["sub_status"] in ["wc-active", "wc-on-hold"]
+  end
 
   defp map_role("admin"), do: "admin"
   defp map_role(_), do: "member"
 
-  defp load_applications(applications_data, user_map) do
+  defp migration_review_attrs("approved", reviewed_at),
+    do: %{
+      review_outcome: :approved,
+      reviewed_at: reviewed_at || DateTime.utc_now()
+    }
+
+  defp migration_review_attrs("rejected", reviewed_at),
+    do: %{
+      review_outcome: :rejected,
+      reviewed_at: reviewed_at || DateTime.utc_now()
+    }
+
+  defp migration_review_attrs(_, _), do: %{}
+
+  defp migration_reviewed_at(nil, submitted_dt), do: submitted_dt
+
+  defp migration_reviewed_at(user_row, submitted_dt) do
+    last_update_dt = parse_datetime(user_row["last_update"])
+
+    cond do
+      is_nil(last_update_dt) -> submitted_dt
+      is_nil(submitted_dt) -> last_update_dt
+      DateTime.compare(last_update_dt, submitted_dt) != :lt -> last_update_dt
+      true -> submitted_dt
+    end
+  end
+
+  defp load_applications(applications_data, user_map, users_data) do
+    users_by_wp_id = Map.new(users_data, fn row -> {row["wp_user_id"], row} end)
+
     Enum.reduce_while(applications_data, {:ok, :done}, fn row, {:ok, _} ->
       email = row["email"]
 
@@ -1015,34 +1079,44 @@ defmodule Ysc.WpMigration.Load do
       if user_id && row["has_submitted_application"] do
         birth_date = parse_date(row["birth_date"])
         submitted_dt = parse_datetime(row["submitted_date"])
+        user_row = Map.get(users_by_wp_id, row["wp_user_id"])
 
-        attrs = %{
-          user_id: user_id,
-          membership_type: (row["membership_type"] || "single") |> to_string(),
-          birth_date: birth_date,
-          address: row["address"] || row["Address"],
-          city: row["city"] || row["City"],
-          region: row["region"] || row["State"],
-          postal_code: row["postal_code"] || row["Zip code"],
-          country: normalize_country(row["country"] || row["Country"]),
-          citizenship: normalize_country(row["citizenship"]),
-          most_connected_nordic_country:
-            normalize_country(
-              row["most_connected_nordic_country"] ||
-                row["nordic_country_connected"]
-            ),
-          place_of_birth: normalize_country(row["place_of_birth"]),
-          occupation: row["occupation"],
-          link_to_scandinavia: row["link_to_scandinavia"],
-          lived_in_scandinavia: row["lived_in_scandinavia"],
-          spoken_languages: row["spoken_languages"],
-          hear_about_the_club: row["hear_about_the_club"],
-          agreed_to_bylaws: row["agreed_to_bylaws"] || false,
-          agreed_to_bylaws_at: (row["agreed_to_bylaws"] && submitted_dt) || nil,
-          membership_eligibility: row["membership_eligibility"] || [],
-          started: submitted_dt,
-          completed: submitted_dt
-        }
+        attrs =
+          %{
+            user_id: user_id,
+            membership_type:
+              (row["membership_type"] || "single") |> to_string(),
+            birth_date: birth_date,
+            address: row["address"] || row["Address"],
+            city: row["city"] || row["City"],
+            region: row["region"] || row["State"],
+            postal_code: row["postal_code"] || row["Zip code"],
+            country: normalize_country(row["country"] || row["Country"]),
+            citizenship: normalize_country(row["citizenship"]),
+            most_connected_nordic_country:
+              normalize_country(
+                row["most_connected_nordic_country"] ||
+                  row["nordic_country_connected"]
+              ),
+            place_of_birth: normalize_country(row["place_of_birth"]),
+            occupation: row["occupation"],
+            link_to_scandinavia: row["link_to_scandinavia"],
+            lived_in_scandinavia: row["lived_in_scandinavia"],
+            spoken_languages: row["spoken_languages"],
+            hear_about_the_club: row["hear_about_the_club"],
+            agreed_to_bylaws: row["agreed_to_bylaws"] || false,
+            agreed_to_bylaws_at:
+              (row["agreed_to_bylaws"] && submitted_dt) || nil,
+            membership_eligibility: row["membership_eligibility"] || [],
+            started: submitted_dt,
+            completed: submitted_dt
+          }
+          |> Map.merge(
+            migration_review_attrs(
+              user_row && user_row["account_status"],
+              migration_reviewed_at(user_row, submitted_dt)
+            )
+          )
 
         existing = Repo.get_by(SignupApplication, user_id: user_id)
 
@@ -1061,22 +1135,30 @@ defmodule Ysc.WpMigration.Load do
 
         case result do
           {:ok, _} ->
-            # Use the application's address data to fill in the user's billing
-            # address — this is often the most complete source since the form
-            # required it at submission time.
             upsert_address(user_id, row)
-            {:cont, {:ok, :done}}
 
           {:error, cs} ->
             Ysc.Logging.warning(
               "[WP Load] Failed to insert application for user #{user_id}: #{inspect(cs.errors)}"
             )
-
-            {:cont, {:ok, :done}}
         end
-      else
-        {:cont, {:ok, :done}}
       end
+
+      if user_id do
+        case WpFamilyMembers.sync_for_user(user_id, row) do
+          {:ok, stats} ->
+            if stats.inserted + stats.updated > 0 do
+              Ysc.Logging.info(
+                "[WP Load] Synced family members for user #{user_id}",
+                inserted: stats.inserted,
+                updated: stats.updated,
+                skipped: stats.skipped
+              )
+            end
+        end
+      end
+
+      {:cont, {:ok, :done}}
     end)
   end
 
@@ -1172,20 +1254,22 @@ defmodule Ysc.WpMigration.Load do
             case Media.upload_file_to_s3(file_path, key) do
               %{body: %{location: location}} when is_binary(location) ->
                 raw_image_path = URI.encode(location)
+                title = meta["title"]
+                alt_text = meta["alt_text"] || title
 
                 attrs = %{
                   raw_image_path: raw_image_path,
-                  user_id: uploader.id,
-                  title: meta["title"],
-                  alt_text: meta["alt_text"],
+                  title: title,
+                  alt_text: alt_text,
                   upload_data: %{
                     "wp_attachment_id" => att_id,
-                    "created" => meta["created"]
+                    "created" => meta["created"],
+                    "key" => key
                   }
                 }
 
                 changeset =
-                  %Image{}
+                  %Image{user_id: uploader.id}
                   |> Image.add_image_changeset(attrs)
                   |> backdate_timestamp(meta["created"])
 
@@ -1203,11 +1287,19 @@ defmodule Ysc.WpMigration.Load do
 
                     {:cont, {:ok, Map.put(img_acc, att_id, img), fname_acc}}
 
-                  {:error, _} ->
+                  {:error, changeset} ->
+                    Ysc.Logging.warning(
+                      "[WP Load] Failed to insert image for attachment #{att_id}: #{inspect(changeset.errors)}"
+                    )
+
                     {:cont, {:ok, img_acc, fname_acc}}
                 end
 
-              _ ->
+              other ->
+                Ysc.Logging.warning(
+                  "[WP Load] Failed to upload attachment #{att_id} to S3: #{inspect(other)}"
+                )
+
                 {:cont, {:ok, img_acc, fname_acc}}
             end
           end
@@ -1296,6 +1388,7 @@ defmodule Ysc.WpMigration.Load do
           if existing do
             existing
             |> Post.update_post_changeset(attrs, validate_url_name: false)
+            |> Ecto.Changeset.put_change(:user_id, author_id)
             |> backdate_timestamp(row["post_date"])
             |> Repo.update()
           else

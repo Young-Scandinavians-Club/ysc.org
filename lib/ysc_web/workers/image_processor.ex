@@ -179,12 +179,103 @@ defmodule YscWeb.Workers.ImageProcessor do
   end
 
   defp download_raw_to_temp(%Media.Image{} = image, dest_path) do
-    case upload_key_from_image(image) do
+    case s3_download_key(image) do
       key when is_binary(key) ->
         download_s3_object_to_temp(image, key, dest_path)
 
       nil ->
         download_raw_url_to_temp(image, dest_path)
+    end
+  end
+
+  # Prefer an explicit upload key; otherwise derive one only from URLs that point
+  # at our object storage (MinIO path-style, Tigris virtual-host, custom CDN).
+  defp s3_download_key(%Media.Image{} = image) do
+    case upload_key_from_image(image) do
+      key when is_binary(key) ->
+        key
+
+      _ ->
+        case image.raw_image_path do
+          url when is_binary(url) ->
+            if object_storage_url?(url), do: key_from_object_url(url), else: nil
+
+          _ ->
+            nil
+        end
+    end
+  end
+
+  defp object_storage_url?(url) when is_binary(url) do
+    uri = URI.parse(url)
+    bucket = S3Config.bucket_name()
+
+    path_style_object_storage_url?(uri, bucket) or
+      virtual_host_object_storage_url?(uri, bucket) or
+      custom_media_public_object_storage_url?(uri)
+  end
+
+  defp path_style_object_storage_url?(%URI{} = uri, bucket)
+       when is_binary(bucket) do
+    path = uri.path || ""
+
+    path_style_object_storage_origin?(uri) and
+      String.starts_with?(path, "/#{bucket}/")
+  end
+
+  defp path_style_object_storage_origin?(%URI{} = uri) do
+    Enum.any?(
+      object_storage_origin_uris(),
+      &same_object_storage_origin?(uri, &1)
+    )
+  end
+
+  defp object_storage_origin_uris do
+    [
+      S3Config.base_url(),
+      S3Config.media_public_url(),
+      S3Config.avatars_public_url(),
+      S3Config.expense_reports_public_url()
+    ]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.map(fn url -> url |> String.trim_trailing("/") |> URI.parse() end)
+    |> Enum.filter(&match?(%URI{host: host} when is_binary(host), &1))
+  end
+
+  defp same_object_storage_origin?(%URI{} = left, %URI{} = right) do
+    left.scheme == right.scheme and left.host == right.host and
+      object_storage_effective_port(left) ==
+        object_storage_effective_port(right)
+  end
+
+  defp object_storage_effective_port(%URI{port: port}) when is_integer(port),
+    do: port
+
+  defp object_storage_effective_port(%URI{scheme: "https"}), do: 443
+  defp object_storage_effective_port(%URI{scheme: "http"}), do: 80
+  defp object_storage_effective_port(_), do: nil
+
+  defp virtual_host_object_storage_url?(%URI{host: host}, bucket)
+       when is_binary(host) do
+    host == "#{bucket}.fly.storage.tigris.dev"
+  end
+
+  defp virtual_host_object_storage_url?(_, _), do: false
+
+  defp custom_media_public_object_storage_url?(%URI{} = uri) do
+    case S3Config.media_public_url() do
+      base when is_binary(base) and base != "" ->
+        case URI.parse(String.trim_trailing(base, "/")) do
+          %URI{scheme: scheme, host: host, port: port}
+          when scheme in ["http", "https"] and is_binary(host) ->
+            uri.scheme == scheme and uri.host == host and uri.port == port
+
+          _ ->
+            false
+        end
+
+      _ ->
+        false
     end
   end
 
@@ -379,8 +470,27 @@ defmodule YscWeb.Workers.ImageProcessor do
 
   defp key_from_object_url(url) when is_binary(url) do
     path = URI.parse(url).path || ""
-    key = path |> String.trim_leading("/") |> URI.decode()
+
+    key =
+      path
+      |> String.trim_leading("/")
+      |> URI.decode()
+      |> strip_bucket_prefix_from_key()
+
     if key != "", do: key, else: nil
+  end
+
+  # Path-style MinIO URLs look like http://localhost:9000/media/<key>; the bucket
+  # name is part of the path and must not be included in the S3 object key.
+  defp strip_bucket_prefix_from_key(key) when is_binary(key) do
+    bucket = S3Config.bucket_name()
+    prefix = "#{bucket}/"
+
+    if String.starts_with?(key, prefix) do
+      String.replace_prefix(key, prefix, "")
+    else
+      key
+    end
   end
 
   # Find file with any image extension

@@ -102,7 +102,8 @@ defmodule Ysc.Media do
   Uses inserted_at and id as cursor for efficient pagination.
 
   Options:
-  - :before_date - Only return images before this date
+  - :before_date - Cursor timestamp; pair with :before_id for stable pagination
+  - :before_id - Cursor id when multiple images share :before_date
   - :start_at_year - Restrict results to this calendar year (works with :before_date for pagination)
   - :limit - Number of images to return (default: 30)
   - :search - Case-insensitive fuzzy search on title, alt_text, and filename
@@ -110,6 +111,7 @@ defmodule Ysc.Media do
   def list_images_cursor(opts \\ []) do
     limit = Keyword.get(opts, :limit, 30)
     before_date = Keyword.get(opts, :before_date)
+    before_id = Keyword.get(opts, :before_id)
     start_at_year = Keyword.get(opts, :start_at_year)
     search = Keyword.get(opts, :search)
 
@@ -121,7 +123,7 @@ defmodule Ysc.Media do
     query =
       query
       |> apply_images_cursor_year_filter(start_at_year)
-      |> apply_images_cursor_before_date(before_date)
+      |> apply_images_cursor(before_date, before_id)
 
     query =
       if search && search != "" do
@@ -145,10 +147,17 @@ defmodule Ysc.Media do
     Repo.all(query)
   end
 
-  defp apply_images_cursor_before_date(query, nil), do: query
+  defp apply_images_cursor(query, nil, _before_id), do: query
 
-  defp apply_images_cursor_before_date(query, before_date) do
+  defp apply_images_cursor(query, before_date, nil) do
     from i in query, where: i.inserted_at < ^before_date
+  end
+
+  defp apply_images_cursor(query, before_date, before_id) do
+    from i in query,
+      where:
+        i.inserted_at < ^before_date or
+          (i.inserted_at == ^before_date and i.id < ^before_id)
   end
 
   defp apply_images_cursor_year_filter(query, nil), do: query
