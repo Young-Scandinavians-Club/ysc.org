@@ -111,7 +111,8 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
   defp expect_retrieve_payment_intent(ticket_order, payment_intent_id) do
     payment_intent = payment_intent_for_order(ticket_order, payment_intent_id)
 
-    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
       {:ok, payment_intent}
     end)
 
