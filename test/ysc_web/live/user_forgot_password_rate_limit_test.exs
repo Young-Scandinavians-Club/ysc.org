@@ -27,6 +27,14 @@ defmodule YscWeb.UserForgotPasswordRateLimitTest do
       email =
         "rate_limit_forgot_#{System.unique_integer([:positive])}@example.com"
 
+      # Isolate IP counters from parallel auth rate-limit tests in the full suite.
+      conn =
+        Map.put(
+          conn,
+          :remote_ip,
+          {127, 0, 0, rem(System.unique_integer([:positive]), 254) + 1}
+        )
+
       # First submit: allowed, redirects to /
       {:ok, lv1, _html} = live(conn, ~p"/users/reset-password")
 

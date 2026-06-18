@@ -1,3 +1,20 @@
+defmodule Ysc.Test.ImageProcessor.MockS3Plug do
+  @moduledoc false
+  import Plug.Conn
+
+  @tiny_png_path Path.expand("../../support/fixtures/tiny.png", __DIR__)
+
+  def init(opts), do: opts
+
+  def call(conn, _opts) do
+    content = File.read!(@tiny_png_path)
+
+    conn
+    |> put_resp_content_type("image/png")
+    |> send_resp(200, content)
+  end
+end
+
 defmodule YscWeb.Workers.ImageProcessorTest do
   @moduledoc """
   Tests for ImageProcessor worker module.
@@ -63,6 +80,127 @@ defmodule YscWeb.Workers.ImageProcessorTest do
        not_found:
          Ysc.HttpTestServer.ensure_started(Serve404Plug, :image_processor_404)
      }}
+  end
+
+  defp start_s3_mock_server do
+    Ysc.HttpTestServer.ensure_started(
+      Ysc.Test.ImageProcessor.MockS3Plug,
+      :image_processor_s3
+    )
+  end
+
+  defp override_exaws_s3_port(port) do
+    original = Application.get_env(:ex_aws, :s3)
+
+    Application.put_env(:ex_aws, :s3,
+      scheme: "http://",
+      host: "127.0.0.1",
+      port: port
+    )
+
+    on_exit(fn ->
+      if original do
+        Application.put_env(:ex_aws, :s3, original)
+      else
+        Application.delete_env(:ex_aws, :s3)
+      end
+    end)
+  end
+
+  defp override_s3_base_url(url) do
+    original = Application.get_env(:ysc, :s3_base_url)
+
+    Application.put_env(:ysc, :s3_base_url, url)
+
+    on_exit(fn ->
+      if original do
+        Application.put_env(:ysc, :s3_base_url, original)
+      else
+        Application.delete_env(:ysc, :s3_base_url)
+      end
+    end)
+  end
+
+  defp make_job(image_id) do
+    %Oban.Job{
+      id: 1,
+      args: %{"id" => image_id},
+      worker: "YscWeb.Workers.ImageProcessor",
+      queue: "media",
+      state: "available",
+      attempt: 1
+    }
+  end
+
+  describe "perform/1 with object storage URLs" do
+    test "downloads raw bytes from path-style object storage URL when upload_data key is absent" do
+      port = start_s3_mock_server()
+      override_exaws_s3_port(port)
+      override_s3_base_url("http://127.0.0.1:#{port}")
+
+      bucket = Ysc.S3Config.bucket_name()
+      object_key = "wp-import/tiny.png"
+      raw_url = "http://127.0.0.1:#{port}/#{bucket}/#{object_key}"
+
+      image =
+        create_test_image(%{
+          raw_image_path: raw_url,
+          upload_data: nil,
+          optimized_image_path: nil,
+          thumbnail_path: nil,
+          processing_state: "unprocessed"
+        })
+
+      assert {:ok, result} = ImageProcessor.perform(make_job(image.id))
+      assert result.processing_state == :completed
+
+      reloaded = Media.fetch_image(image.id)
+      assert reloaded.processing_state == :completed
+      assert is_binary(reloaded.optimized_image_path)
+    end
+
+    test "downloads raw bytes from Tigris virtual-host URL when upload_data key is absent" do
+      port = start_s3_mock_server()
+      override_exaws_s3_port(port)
+
+      bucket = Ysc.S3Config.bucket_name()
+      object_key = "wp-import/tiny.png"
+      raw_url = "https://#{bucket}.fly.storage.tigris.dev/#{object_key}"
+
+      image =
+        create_test_image(%{
+          raw_image_path: raw_url,
+          upload_data: nil,
+          optimized_image_path: nil,
+          thumbnail_path: nil,
+          processing_state: "unprocessed"
+        })
+
+      assert {:ok, result} = ImageProcessor.perform(make_job(image.id))
+      assert result.processing_state == :completed
+    end
+
+    test "prefers explicit upload_data key over raw_image_path URL derivation" do
+      port = start_s3_mock_server()
+      override_exaws_s3_port(port)
+      override_s3_base_url("http://127.0.0.1:#{port}")
+
+      bucket = Ysc.S3Config.bucket_name()
+      object_key = "wp-import/tiny.png"
+      raw_url = "http://127.0.0.1:#{port}/#{bucket}/wrong-key.png"
+
+      image =
+        create_test_image(%{
+          raw_image_path: raw_url,
+          upload_data: %{"key" => object_key},
+          optimized_image_path: nil,
+          thumbnail_path: nil,
+          processing_state: "unprocessed"
+        })
+
+      assert {:ok, result} = ImageProcessor.perform(make_job(image.id))
+      assert result.processing_state == :completed
+    end
   end
 
   describe "perform/1" do
