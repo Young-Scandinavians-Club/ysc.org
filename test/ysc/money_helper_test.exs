@@ -105,6 +105,15 @@ defmodule Ysc.MoneyHelperTest do
       assert MoneyHelper.money_to_cents(Money.new!(:USD, "0.004")) == 0
     end
 
+    test "rounds entitlement-style fractional dollar amounts before converting" do
+      money = %Money{
+        amount: Decimal.new("76.66666666666666666666666666667"),
+        currency: :USD
+      }
+
+      assert MoneyHelper.money_to_cents(money) == 7667
+    end
+
     test "returns zero for non-Money values" do
       assert MoneyHelper.money_to_cents(nil) == 0
     end

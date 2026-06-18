@@ -1792,7 +1792,7 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp create_payment_intent(booking, total_amount, user) do
-    amount_cents = money_to_cents(total_amount)
+    amount_cents = MoneyHelper.money_to_cents(total_amount)
 
     # Note: Stripe PaymentIntents don't support expires_at parameter.
     # The expires_at parameter is only available for Checkout Sessions, not PaymentIntents.
@@ -2225,23 +2225,6 @@ defmodule YscWeb.BookingCheckoutLive do
       map
     end
   end
-
-  # Helper functions for money conversion
-  defp money_to_cents(%Money{amount: amount, currency: :USD}) do
-    # Use Decimal for precise conversion to avoid floating-point errors
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(%Money{amount: amount, currency: _currency}) do
-    # For other currencies, use same conversion
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(_), do: 0
 
   defp cents_to_money(cents, currency)
 
