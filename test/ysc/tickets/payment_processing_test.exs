@@ -15,6 +15,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
   alias Ysc.Repo
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
+  alias Ysc.Events.Ticket
 
   setup :verify_on_exit!
 
@@ -83,6 +84,40 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
     |> Repo.aggregate(:count)
   end
 
+  defp fully_finalize_ticket_order!(ticket_order, payment_intent_id) do
+    {:ok, {payment, _transaction, _entries}} =
+      Ysc.Ledgers.process_payment(%{
+        user_id: ticket_order.user_id,
+        amount: ticket_order.total_amount,
+        entity_type: :event,
+        entity_id: ticket_order.event_id,
+        external_payment_id: payment_intent_id,
+        stripe_fee: Money.new(0, :USD),
+        description: "Event tickets - Order #{ticket_order.reference_id}",
+        property: nil,
+        payment_method_id: nil
+      })
+
+    ticket_order
+    |> Ecto.Changeset.change(status: :completed, payment_id: payment.id)
+    |> Repo.update!()
+
+    from(t in Ticket, where: t.ticket_order_id == ^ticket_order.id)
+    |> Repo.update_all(set: [status: :confirmed])
+
+    Tickets.get_ticket_order(ticket_order.id)
+  end
+
+  defp expect_retrieve_payment_intent(ticket_order, payment_intent_id) do
+    payment_intent = payment_intent_for_order(ticket_order, payment_intent_id)
+
+    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+      {:ok, payment_intent}
+    end)
+
+    payment_intent
+  end
+
   describe "process_ticket_order_payment/2 idempotency" do
     test "returns completed order without calling Stripe when already completed" do
       Oban.Testing.with_testing_mode(:manual, fn ->
@@ -93,6 +128,9 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
         assert ticket_order.status == :completed
 
         payment_intent_id = "pi_already_done_#{ticket_order.id}"
+
+        ticket_order =
+          fully_finalize_ticket_order!(ticket_order, payment_intent_id)
 
         deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
 
@@ -126,7 +164,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
 
         payment_intent_id = "pi_recover_tickets_#{ticket_order.id}"
 
-        deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+        expect_retrieve_payment_intent(ticket_order, payment_intent_id)
 
         assert {:ok, returned} =
                  Tickets.process_ticket_order_payment(
@@ -187,7 +225,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
 
         payment_intent_id = "pi_partial_refund_#{ticket_order.id}"
 
-        deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+        expect_retrieve_payment_intent(ticket_order, payment_intent_id)
 
         assert {:ok, returned} =
                  Tickets.process_ticket_order_payment(
@@ -226,7 +264,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
 
         payment_intent_id = "pi_recover_expired_#{ticket_order.id}"
 
-        deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+        expect_retrieve_payment_intent(ticket_order, payment_intent_id)
 
         assert {:ok, returned} =
                  Tickets.process_ticket_order_payment(
