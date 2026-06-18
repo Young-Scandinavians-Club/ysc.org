@@ -23,15 +23,14 @@ defmodule YscWeb.ExpenseReportLiveTest do
     conn: conn,
     user: user
   } do
-    {:ok, report} =
-      Ysc.ExpenseReports.create_expense_report(
-        %{
-          "status" => "submitted",
-          "purpose" => "Static render success page",
-          "reimbursement_method" => "bank_transfer"
-        },
-        user
-      )
+    report =
+      %Ysc.ExpenseReports.ExpenseReport{
+        user_id: user.id,
+        purpose: "Static render success page",
+        status: "submitted",
+        reimbursement_method: "check"
+      }
+      |> Ysc.Repo.insert!()
 
     expense_reports_pattern = ~r/FROM "expense_reports"/i
 

@@ -27,7 +27,7 @@ defmodule YscWeb.AdminBookingsLive do
     >
       <!-- New/Edit Blackout Modal -->
       <.modal
-        :if={@live_action in [:new_blackout, :edit_blackout]}
+        :if={@live_action in [:new_blackout, :edit_blackout] && @blackout_form}
         id="blackout-modal"
         on_cancel={
           query_params =
@@ -125,7 +125,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Pricing Rule Modal -->
       <.modal
-        :if={@live_action in [:new_pricing_rule, :edit_pricing_rule]}
+        :if={@live_action in [:new_pricing_rule, :edit_pricing_rule] && @form}
         id="pricing-rule-modal"
         on_cancel={
           query_params =
@@ -294,7 +294,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- Edit Season Modal -->
       <.modal
-        :if={@live_action == :edit_season}
+        :if={@live_action == :edit_season && @season_form}
         id="season-modal"
         on_cancel={
           JS.patch(
@@ -1220,7 +1220,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Refund Policy Modal -->
       <.modal
-        :if={@live_action in [:new_refund_policy, :edit_refund_policy]}
+        :if={@live_action in [:new_refund_policy, :edit_refund_policy] && @refund_policy_form}
         id="refund-policy-modal"
         on_cancel={
           query_params =
@@ -1321,7 +1321,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- Refund Policy Rules Modal -->
       <.modal
-        :if={@live_action == :manage_refund_policy_rules}
+        :if={@live_action == :manage_refund_policy_rules && @refund_policy}
         id="refund-policy-rules-modal"
         on_cancel={
           query_params =
@@ -1482,7 +1482,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Booking Modal -->
       <.modal
-        :if={@live_action in [:new_booking, :edit_booking]}
+        :if={@live_action in [:new_booking, :edit_booking] && @booking_form}
         id="booking-form-modal"
         on_cancel={
           query_params =
@@ -1664,7 +1664,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Room Modal -->
       <.modal
-        :if={@live_action in [:new_room, :edit_room]}
+        :if={@live_action in [:new_room, :edit_room] && @room_form}
         id="room-modal"
         on_cancel={
           query_params =

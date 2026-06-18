@@ -21,10 +21,20 @@ defmodule YscWeb.BookingCheckoutLive do
         socket = assign_checkout_loading_shell(socket, booking_id, timezone)
 
         if connected?(socket) do
-          send(self(), {:load_checkout, booking_id, user, timezone})
-        end
+          case load_checkout(socket, booking_id, user, timezone) do
+            {:ok, socket} ->
+              schedule_expiration_check(socket)
+              {:ok, socket}
 
-        {:ok, socket}
+            {:error, {:redirect, path, message}} ->
+              {:ok,
+               socket
+               |> YscWeb.Flash.put_toast(:error, message, title: "Checkout")
+               |> redirect(to: path)}
+          end
+        else
+          {:ok, socket}
+        end
 
       {:error, {:redirect, path, message}} ->
         {:ok,
@@ -79,6 +89,14 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp validate_user_signed_in(_user), do: :ok
+
+  defp load_checkout(socket, booking_id, user, timezone) do
+    with {:ok, booking} <- load_booking(booking_id, user),
+         :ok <- validate_booking_status(booking),
+         :ok <- validate_booking_not_expired(booking) do
+      initialize_checkout(socket, booking, user, timezone)
+    end
+  end
 
   defp load_booking(booking_id, user) do
     # SECURITY: Filter by user_id in the database query to prevent unauthorized access
@@ -1580,28 +1598,6 @@ defmodule YscWeb.BookingCheckoutLive do
            payment_error:
              "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
          )}
-    end
-  end
-
-  @impl true
-  def handle_info({:load_checkout, booking_id, user, timezone}, socket) do
-    result =
-      with {:ok, booking} <- load_booking(booking_id, user),
-           :ok <- validate_booking_status(booking),
-           :ok <- validate_booking_not_expired(booking) do
-        initialize_checkout(socket, booking, user, timezone)
-      end
-
-    case result do
-      {:ok, socket} ->
-        schedule_expiration_check(socket)
-        {:noreply, socket}
-
-      {:error, {:redirect, path, message}} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:error, message, title: "Checkout")
-         |> redirect(to: path)}
     end
   end
 
