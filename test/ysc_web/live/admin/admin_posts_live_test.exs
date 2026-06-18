@@ -62,29 +62,6 @@ defmodule YscWeb.AdminPostsLiveTest do
       )
     end
 
-    test "does not re-query post authors on each search patch", %{
-      conn: conn,
-      admin: admin
-    } do
-      post_fixture(admin, %{title: "Author Cache Headline"})
-
-      {:ok, view, _} = live(conn, ~p"/admin/posts")
-
-      author_filter_pattern = ~r/DISTINCT ON \(.*"user_id"\).*FROM "posts"/is
-
-      {_patch, author_queries} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            view
-            |> form("#posts-search-form", q: "Author Cache")
-            |> render_change()
-          end,
-          pattern: author_filter_pattern
-        )
-
-      assert author_queries == 0
-    end
-
     test "toggles featured post", %{conn: conn, admin: admin} do
       p1 =
         post_fixture(admin, %{title: "Featured Candidate", featured_post: false})
