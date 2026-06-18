@@ -2092,7 +2092,7 @@ defmodule YscWeb.UserSettingsLive do
                   <div>
                     <h2 class="text-lg font-bold text-zinc-900">Your stay perks</h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
-                      Applied automatically when you book a qualifying cabin stay.
+                      Applied automatically when you book a cabin stay that matches each perk below. Discounts and free nights appear in your price before you pay.
                     </p>
                   </div>
                   <div class="hidden sm:flex items-center text-zinc-400">

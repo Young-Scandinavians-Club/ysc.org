@@ -491,9 +491,12 @@ defmodule YscWeb.BookingChangeLive do
         >
           <%= if @booking.rooms != [] do %>
             <div>
-              <h2 class="text-sm font-semibold text-zinc-700 mb-2">
-                Rooms (fixed)
+              <h2 class="text-sm font-semibold text-zinc-700 mb-1">
+                Your rooms
               </h2>
+              <p class="text-sm text-zinc-500 mb-2">
+                Room assignments cannot be changed here. To change rooms, cancel this reservation and book again.
+              </p>
               <ul class="text-sm text-zinc-600 list-disc list-inside">
                 <%= for room <- @booking.rooms do %>
                   <li>{room.name}</li>
