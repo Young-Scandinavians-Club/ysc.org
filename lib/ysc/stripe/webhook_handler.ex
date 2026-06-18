@@ -2583,8 +2583,6 @@ defmodule Ysc.Stripe.WebhookHandler do
   def extract_stripe_fee_from_payment_intent(payment_intent) do
     require Ysc.Logging
 
-    payment_intent_id = get_payment_intent_id(payment_intent)
-
     # Try to get the charge from the payment intent
     case get_charge_from_payment_intent(payment_intent) do
       {:ok, %{id: charge_id}} when is_binary(charge_id) ->
@@ -2603,47 +2601,12 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
 
       {:error, _reason} ->
-        # When callers already passed a payment intent struct (e.g. after a
-        # retrieve in checkout/ticket flows), estimate from its amount instead
-        # of issuing another expanded retrieve just for fee lookup.
-        cond do
-          payment_intent_amount_available?(payment_intent) ->
-            estimate_fee_from_payment_intent(payment_intent)
-
-          payment_intent_id ->
-            case retrieve_payment_intent_with_charges(payment_intent_id) do
-              {:ok, payment_intent_with_charges} ->
-                case get_charge_from_payment_intent(payment_intent_with_charges) do
-                  {:ok, %{id: charge_id}} when is_binary(charge_id) ->
-                    fetch_actual_stripe_fee_from_charge(charge_id)
-
-                  {:ok, charge} when is_map(charge) ->
-                    charge_id = Map.get(charge, :id) || Map.get(charge, "id")
-
-                    if charge_id do
-                      fetch_actual_stripe_fee_from_charge(charge_id)
-                    else
-                      estimate_fee_from_payment_intent(payment_intent)
-                    end
-
-                  {:error, _} ->
-                    estimate_fee_from_payment_intent(payment_intent)
-                end
-
-              {:error, _} ->
-                estimate_fee_from_payment_intent(payment_intent)
-            end
-
-          true ->
-            estimate_fee_from_payment_intent(payment_intent)
-        end
+        # When callers already passed a payment intent (e.g. after checkout/ticket
+        # retrieve), estimate from its amount instead of issuing another expanded
+        # retrieve just for fee lookup.
+        estimate_fee_from_payment_intent(payment_intent)
     end
   end
-
-  # Helper to get payment intent ID from struct or map
-  defp get_payment_intent_id(%{id: id}) when is_binary(id), do: id
-  defp get_payment_intent_id(%{"id" => id}) when is_binary(id), do: id
-  defp get_payment_intent_id(_), do: nil
 
   # Helper to get charge from payment intent (latest_charge or legacy charges maps)
   defp get_charge_from_payment_intent(payment_intent) do
@@ -2657,17 +2620,6 @@ defmodule Ysc.Stripe.WebhookHandler do
       charge ->
         {:ok, charge}
     end
-  end
-
-  # Helper to retrieve payment intent with latest charge expanded (for fee lookup)
-  @dialyzer {:nowarn_function, retrieve_payment_intent_with_charges: 1}
-  defp retrieve_payment_intent_with_charges(nil),
-    do: {:error, :no_payment_intent_id}
-
-  defp retrieve_payment_intent_with_charges(payment_intent_id) do
-    stripe_client().retrieve_payment_intent(payment_intent_id, %{
-      expand: ["latest_charge.balance_transaction"]
-    })
   end
 
   # Helper to estimate fee from payment intent amount
@@ -2689,10 +2641,6 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   # Helper to get amount from payment intent
-  defp payment_intent_amount_available?(payment_intent) do
-    not is_nil(get_payment_intent_amount(payment_intent))
-  end
-
   defp get_payment_intent_amount(%{amount: amount}) when is_integer(amount),
     do: amount
 

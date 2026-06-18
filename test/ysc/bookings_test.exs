@@ -1414,6 +1414,7 @@ defmodule Ysc.BookingsTest do
       suffix = System.unique_integer([:positive])
       last_name = "BatchSearch#{suffix}"
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
       # Active booking requires checkin <= today < checkout; avoid Saturday-without-Sunday.
       checkin = Date.add(today, -1)
       raw_checkout = Date.add(today, 2)
