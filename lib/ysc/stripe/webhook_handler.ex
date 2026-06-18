@@ -2603,29 +2603,38 @@ defmodule Ysc.Stripe.WebhookHandler do
         end
 
       {:error, _reason} ->
-        # Fallback: try to retrieve payment intent with latest_charge expanded
-        case retrieve_payment_intent_with_charges(payment_intent_id) do
-          {:ok, payment_intent_with_charges} ->
-            case get_charge_from_payment_intent(payment_intent_with_charges) do
-              {:ok, %{id: charge_id}} when is_binary(charge_id) ->
-                fetch_actual_stripe_fee_from_charge(charge_id)
+        # When callers already passed a payment intent struct (e.g. after a
+        # retrieve in checkout/ticket flows), estimate from its amount instead
+        # of issuing another expanded retrieve just for fee lookup.
+        cond do
+          payment_intent_amount_available?(payment_intent) ->
+            estimate_fee_from_payment_intent(payment_intent)
 
-              {:ok, charge} when is_map(charge) ->
-                charge_id = Map.get(charge, :id) || Map.get(charge, "id")
+          payment_intent_id ->
+            case retrieve_payment_intent_with_charges(payment_intent_id) do
+              {:ok, payment_intent_with_charges} ->
+                case get_charge_from_payment_intent(payment_intent_with_charges) do
+                  {:ok, %{id: charge_id}} when is_binary(charge_id) ->
+                    fetch_actual_stripe_fee_from_charge(charge_id)
 
-                if charge_id do
-                  fetch_actual_stripe_fee_from_charge(charge_id)
-                else
-                  estimate_fee_from_payment_intent(payment_intent)
+                  {:ok, charge} when is_map(charge) ->
+                    charge_id = Map.get(charge, :id) || Map.get(charge, "id")
+
+                    if charge_id do
+                      fetch_actual_stripe_fee_from_charge(charge_id)
+                    else
+                      estimate_fee_from_payment_intent(payment_intent)
+                    end
+
+                  {:error, _} ->
+                    estimate_fee_from_payment_intent(payment_intent)
                 end
 
               {:error, _} ->
-                # Final fallback: estimate from payment intent amount
                 estimate_fee_from_payment_intent(payment_intent)
             end
 
-          {:error, _} ->
-            # Fallback to estimated fee
+          true ->
             estimate_fee_from_payment_intent(payment_intent)
         end
     end
@@ -2680,6 +2689,10 @@ defmodule Ysc.Stripe.WebhookHandler do
   end
 
   # Helper to get amount from payment intent
+  defp payment_intent_amount_available?(payment_intent) do
+    not is_nil(get_payment_intent_amount(payment_intent))
+  end
+
   defp get_payment_intent_amount(%{amount: amount}) when is_integer(amount),
     do: amount
 
