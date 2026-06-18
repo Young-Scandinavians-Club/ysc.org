@@ -2298,6 +2298,81 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "2 adults"
       assert html =~ "2 nights"
     end
+
+    test "renders entitlement discount line when pricing_items include discounts",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :room,
+          children_count: 1,
+          total_price: Money.new(:USD, "76.67"),
+          subtotal_price: Money.new(:USD, "230"),
+          discount_total: Money.new(:USD, "153.33")
+        })
+
+      room_item = %{
+        "type" => "room",
+        "room_id" => "r1",
+        "room_name" => "Pine",
+        "nights" => 2,
+        "guests_count" => 2,
+        "children_count" => 1,
+        "base" => %{"amount" => "180", "currency" => "USD"},
+        "adult_price_per_night" => %{"amount" => "45", "currency" => "USD"},
+        "children" => %{"amount" => "50", "currency" => "USD"},
+        "billable_people" => 2
+      }
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "room",
+            "nights" => 2,
+            "guests_count" => 2,
+            "children_count" => 1,
+            "rooms" => [room_item],
+            "subtotal" => %{"amount" => "230", "currency" => "USD"},
+            "discount_total" => %{"amount" => "153.33", "currency" => "USD"},
+            "discounts" => [
+              %{
+                "entitlement_id" => Ecto.ULID.generate(),
+                "summary" => "50% off stay",
+                "amount" => %{"amount" => "153.33", "currency" => "USD"}
+              }
+            ]
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(:USD, "76.67"))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+      html = render(view)
+
+      assert has_element?(
+               view,
+               "#payment-summary-entitlement-discount",
+               "50% off stay"
+             )
+
+      assert has_element?(
+               view,
+               "#payment-summary-entitlement-discount",
+               "−$153.33"
+             )
+
+      assert html =~ "$76.67"
+    end
   end
 
   describe "async loading" do

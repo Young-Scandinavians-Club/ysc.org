@@ -88,7 +88,7 @@ defmodule YscWeb.BookingReceiptLive do
           timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
 
           # Parse saved pricing items (saved at booking time) - no query needed
-          price_breakdown = parse_pricing_items(booking.pricing_items)
+          price_breakdown = parse_pricing_items(booking.pricing_items, booking)
 
           # Check if booking can be cancelled - no query needed
           can_cancel = BookingActions.can_cancel_booking?(booking)
@@ -932,6 +932,32 @@ defmodule YscWeb.BookingReceiptLive do
                         <% end %>
                       <% end %>
                   <% end %>
+                <% end %>
+                <%= if @price_breakdown[:entitlement_discount] &&
+                      Money.positive?(@price_breakdown[:entitlement_discount]) do %>
+                  <div
+                    id="payment-summary-entitlement-discount"
+                    class="flex justify-between"
+                  >
+                    <span class={
+                      if(@booking.status == :canceled,
+                        do: "text-zinc-600",
+                        else: "text-emerald-400"
+                      )
+                    }>
+                      {@price_breakdown[:entitlement_summary] || "Member discount"}
+                    </span>
+                    <span class={
+                      if(@booking.status == :canceled,
+                        do: "text-zinc-700",
+                        else: "text-emerald-400"
+                      )
+                    }>
+                      −{MoneyHelper.format_money!(
+                        @price_breakdown[:entitlement_discount]
+                      )}
+                    </span>
+                  </div>
                 <% end %>
                 <%= if @multiple_payments? && @booking.total_price do %>
                   <div class="flex justify-between">
@@ -1947,13 +1973,23 @@ defmodule YscWeb.BookingReceiptLive do
     Money.mult!(price_per_night, nights)
   end
 
-  defp buyout_line_amount(_price_breakdown, booking) do
-    booking.subtotal_price || booking.total_price
+  defp buyout_line_amount(price_breakdown, booking) do
+    price_breakdown[:entitlement_subtotal] ||
+      booking.subtotal_price ||
+      booking.total_price
   end
 
-  defp parse_pricing_items(nil), do: nil
+  defp parse_pricing_items(nil, _booking), do: nil
 
-  defp parse_pricing_items(pricing_items) when is_map(pricing_items) do
+  defp parse_pricing_items(pricing_items, booking) when is_map(pricing_items) do
+    pricing_items
+    |> parse_pricing_items_by_type()
+    |> merge_entitlement_from_pricing_items(pricing_items, booking)
+  end
+
+  defp parse_pricing_items(_, _booking), do: nil
+
+  defp parse_pricing_items_by_type(pricing_items) do
     case Map.get(pricing_items, "type") do
       "buyout" ->
         %{
@@ -2041,7 +2077,63 @@ defmodule YscWeb.BookingReceiptLive do
     end
   end
 
-  defp parse_pricing_items(_), do: nil
+  defp merge_entitlement_from_pricing_items(nil, _pricing_items, _booking),
+    do: nil
+
+  defp merge_entitlement_from_pricing_items(breakdown, pricing_items, booking) do
+    discount = entitlement_discount_from_pricing(pricing_items, booking)
+    summary = entitlement_summary_from_pricing(pricing_items)
+    subtotal = entitlement_subtotal_from_pricing(pricing_items, booking)
+
+    if discount && Money.positive?(discount) do
+      Map.merge(breakdown, %{
+        entitlement_discount: discount,
+        entitlement_summary: summary || "Member discount",
+        entitlement_subtotal: subtotal
+      })
+    else
+      breakdown
+    end
+  end
+
+  defp entitlement_discount_from_pricing(pricing_items, booking) do
+    cond do
+      money_field = Map.get(pricing_items, "entitlement_discount") ->
+        parse_money_from_map(money_field)
+
+      money_field = Map.get(pricing_items, "discount_total") ->
+        parse_money_from_map(money_field)
+
+      booking.discount_total && Money.positive?(booking.discount_total) ->
+        booking.discount_total
+
+      true ->
+        nil
+    end
+  end
+
+  defp entitlement_subtotal_from_pricing(pricing_items, booking) do
+    cond do
+      money_field = Map.get(pricing_items, "entitlement_subtotal") ->
+        parse_money_from_map(money_field)
+
+      money_field = Map.get(pricing_items, "subtotal") ->
+        parse_money_from_map(money_field)
+
+      booking.subtotal_price ->
+        booking.subtotal_price
+
+      true ->
+        nil
+    end
+  end
+
+  defp entitlement_summary_from_pricing(pricing_items) do
+    case Map.get(pricing_items, "discounts") do
+      [%{"summary" => summary} | _] when is_binary(summary) -> summary
+      _ -> nil
+    end
+  end
 
   # Helper to convert money map (with string amount) back to Money struct
   defp parse_money_from_map(nil), do: nil
