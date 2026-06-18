@@ -128,22 +128,30 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp apply_action(socket, :success, %{"id" => id} = params) do
-    user = socket.assigns.current_user
-
-    expense_report = ExpenseReports.get_expense_report!(id, user)
-    totals = ExpenseReports.calculate_totals(expense_report)
-
     show_confetti = Map.get(params, "confetti") == "true"
 
-    socket
-    |> assign(:page_title, "Expense Report Submitted")
-    |> assign(
-      :meta_description,
-      "Your expense report has been submitted to Young Scandinavians Club."
-    )
-    |> assign(:expense_report, expense_report)
-    |> assign(:totals, totals)
-    |> assign(:show_confetti, show_confetti)
+    socket =
+      socket
+      |> assign(:page_title, "Expense Report Submitted")
+      |> assign(
+        :meta_description,
+        "Your expense report has been submitted to Young Scandinavians Club."
+      )
+      |> assign(:show_confetti, show_confetti)
+
+    if connected?(socket) do
+      user = socket.assigns.current_user
+      expense_report = ExpenseReports.get_expense_report!(id, user)
+      totals = ExpenseReports.calculate_totals(expense_report)
+
+      socket
+      |> assign(:expense_report, expense_report)
+      |> assign(:totals, totals)
+    else
+      socket
+      |> assign(:expense_report, nil)
+      |> assign(:totals, nil)
+    end
   end
 
   defp handle_modal_params(socket, params) do
@@ -1329,9 +1337,10 @@ defmodule YscWeb.ExpenseReportLive do
           </p>
         </div>
         <!-- Reimbursement Timeline -->
-        <.timeline_section expense_report={@expense_report} />
-        <!-- Expense Report Summary Card -->
-        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+        <%= if @expense_report do %>
+          <.timeline_section expense_report={@expense_report} />
+          <!-- Expense Report Summary Card -->
+          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
           <div class="px-6 py-4 border-b border-zinc-200">
             <h2 class="text-lg font-semibold text-zinc-900">
               Expense Report Summary
@@ -1628,6 +1637,9 @@ defmodule YscWeb.ExpenseReportLive do
             </.link>
           </div>
         </div>
+        <% else %>
+          <p class="text-center text-zinc-600">Loading expense report details…</p>
+        <% end %>
       </div>
     </div>
     """

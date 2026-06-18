@@ -18,4 +18,36 @@ defmodule YscWeb.ExpenseReportLiveTest do
 
     assert html =~ "Expense Report"
   end
+
+  test "dead render skips success page queries and shows loading state", %{
+    conn: conn,
+    user: user
+  } do
+    {:ok, report} =
+      Ysc.ExpenseReports.create_expense_report(
+        %{
+          "status" => "submitted",
+          "purpose" => "Static render success page",
+          "reimbursement_method" => "bank_transfer"
+        },
+        user
+      )
+
+    expense_reports_pattern = ~r/FROM "expense_reports"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get(~p"/expensereport/#{report.id}/success")
+          |> html_response(200)
+        end,
+        pattern: expense_reports_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Expense Report Submitted!"
+    assert html =~ "Loading expense report details"
+    refute html =~ "Static render success page"
+  end
 end

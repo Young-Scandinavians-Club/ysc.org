@@ -5,6 +5,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
   import Ysc.ScanningFixtures
 
@@ -242,6 +243,29 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     assert query_count == 0
     assert html =~ "Money Management"
     refute html =~ ~s(id="refund-modal")
+  end
+
+  test "dead render skips booking modal queries on booking detail route", %{
+    conn: conn
+  } do
+    user = user_fixture()
+    booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+    bookings_pattern = ~r/FROM "bookings"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/bookings/#{booking.id}")
+          |> html_response(200)
+        end,
+        pattern: bookings_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ "Bookings"
+    refute html =~ ~s(id="booking-modal")
   end
 
   describe "connected list loading" do

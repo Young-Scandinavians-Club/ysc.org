@@ -539,7 +539,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- View Booking Modal -->
       <.modal
-        :if={@live_action == :view_booking}
+        :if={@live_action == :view_booking && @booking}
         id="booking-modal"
         on_cancel={JS.push("close-booking-modal")}
         show
@@ -3446,6 +3446,13 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:filtered_seasons, [])
       |> assign(:filtered_pricing_rules, [])
       |> assign(:filtered_refund_policies, [])
+      |> assign(:booking, nil)
+      |> assign(:booking_form, nil)
+      |> assign(:booking_type, nil)
+      |> assign(:blackout, nil)
+      |> assign(:blackout_form, nil)
+      |> assign(:pricing_rule, nil)
+      |> assign(:form, nil)
       # Empty stream so reservations section renders on dead connect before data loads
       |> stream(:reservations, [], reset: true)
 
@@ -3783,7 +3790,14 @@ defmodule YscWeb.AdminBookingsLive do
         socket
       end
 
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+    socket =
+      if connected?(socket) do
+        apply_action(socket, socket.assigns.live_action, params)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   # Parse query parameters, handling malformed/double-encoded URLs
