@@ -568,7 +568,7 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp build_overlapping_booking_error_message(membership_type) do
     if membership_type in [:family, :lifetime] do
-      "Your family can only have up to 2 bookings in the same time period. Please complete your existing booking first or book within the same time period as your existing booking."
+      "Your family can only have 2 cabin bookings at the same time. You already have 2 reservations during these dates — cancel or complete one before booking again."
     else
       "You can only have one active booking at a time. Please complete your existing booking first."
     end
