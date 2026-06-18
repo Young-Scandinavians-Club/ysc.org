@@ -4,10 +4,11 @@ defmodule Ysc.ResendRateLimiterTest do
   alias Ysc.ResendRateLimiter
 
   setup do
-    # Unique per test so parallel runs do not delete each other's cache keys.
+    # Unique per test for cache isolation between sequential tests in this module
+    # and to avoid collisions with concurrently running tests in other modules.
     id = System.unique_integer([:positive])
-    email_key = "resend_email:#{id}"
-    sms_key = "resend_sms:#{id}"
+    email_key = ResendRateLimiter.cache_key(id, :email)
+    sms_key = ResendRateLimiter.cache_key(id, :sms)
 
     Cachex.del(:ysc_cache, email_key)
     Cachex.del(:ysc_cache, sms_key)

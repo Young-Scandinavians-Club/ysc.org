@@ -23,7 +23,28 @@ defmodule Ysc.WpMigration.MembershipPlanTest do
     end
   end
 
+  describe "from_membership_type/1" do
+    test "normalizes application and usermeta membership type values" do
+      assert MembershipPlan.from_membership_type("family") == "family"
+      assert MembershipPlan.from_membership_type("wc-family") == "family"
+      assert MembershipPlan.from_membership_type("single") == "single"
+      assert MembershipPlan.from_membership_type("unknown") == nil
+      assert MembershipPlan.from_membership_type(nil) == nil
+      assert MembershipPlan.from_membership_type("") == nil
+    end
+  end
+
   describe "resolve/1" do
+    test "prefers membership_product_name over all other plan signals" do
+      assert MembershipPlan.resolve(%{
+               membership_product_name: "One Year Single Membership",
+               wcm_product_name: "One Year Family Membership",
+               sub_product_name: "One Year Family Membership",
+               application_membership_type: "family",
+               user_membership_type: "family"
+             }) == "single"
+    end
+
     test "prefers WooCommerce membership product over application and usermeta" do
       assert MembershipPlan.resolve(%{
                wcm_product_name: "One Year Family Membership",

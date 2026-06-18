@@ -42,8 +42,7 @@ defmodule Ysc.WpMigration.IgnoredAccounts do
 
     if ignored != [] do
       Ysc.Logging.info(
-        "[WP Migration] Skipping #{length(ignored)} ignored WordPress account(s)",
-        emails: Enum.map(ignored, & &1["email"])
+        "[WP Migration] Skipping #{length(ignored)} ignored WordPress account(s)"
       )
     end
 

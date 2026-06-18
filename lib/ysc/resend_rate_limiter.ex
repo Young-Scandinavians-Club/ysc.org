@@ -217,7 +217,8 @@ defmodule Ysc.ResendRateLimiter do
   end
 
   # Private helper to generate cache keys
-  defp cache_key(identifier, type) do
+  @doc false
+  def cache_key(identifier, type) do
     "resend_#{type}:#{identifier}"
   end
 end

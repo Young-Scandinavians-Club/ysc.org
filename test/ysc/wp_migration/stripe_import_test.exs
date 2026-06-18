@@ -45,7 +45,13 @@ defmodule Ysc.WpMigration.StripeImportTest do
 
       assert StripeImport.failure_count(report) == 1
 
-      tmp = System.tmp_dir!()
+      tmp =
+        System.tmp_dir!()
+        |> Path.join("stripe-import-#{System.unique_integer()}")
+        |> tap(&File.mkdir_p!/1)
+
+      on_exit(fn -> File.rm_rf!(tmp) end)
+
       path = StripeImport.write_report(report, tmp)
       assert File.exists?(path)
 

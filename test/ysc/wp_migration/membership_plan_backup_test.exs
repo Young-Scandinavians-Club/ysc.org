@@ -12,6 +12,7 @@ defmodule Ysc.WpMigration.MembershipPlanBackupTest do
   test "active membership product names map to family or single plans" do
     with_duckdb_backup(fn ->
       assert {:ok, repo} = WpRepo.open(@backup_db)
+      on_exit(fn -> WpRepo.close(repo) end)
 
       assert {:ok, membership} = WpRepo.get_membership_for_user(repo, "123706")
 

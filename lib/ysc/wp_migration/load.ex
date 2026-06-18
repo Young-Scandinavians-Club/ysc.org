@@ -147,8 +147,8 @@ defmodule Ysc.WpMigration.Load do
       Ysc.Logging.info(
         "[WP Load] Starting migration load from #{export_dir} " <>
           "(#{length(users_data)} users, #{length(applications_data)} applications, " <>
-          "#{length(posts_data)} posts, #{length(stripe_data || [])} stripe lookups, " <>
-          "#{length(bookings_data || [])} bookings, stripe_subscriptions=#{create_stripe_subscriptions})"
+          "#{length(posts_data)} posts, #{length(stripe_data)} stripe lookups, " <>
+          "#{length(bookings_data)} bookings, stripe_subscriptions=#{create_stripe_subscriptions})"
       )
 
       Ysc.Settings.get_or_create_setting(
@@ -197,7 +197,7 @@ defmodule Ysc.WpMigration.Load do
       Ysc.Logging.info("[WP Load] Phase: Posts complete")
 
       stripe_report =
-        if stripe_data && stripe_data != [] do
+        if stripe_data != [] do
           Ysc.Logging.info(
             "[WP Load] Phase: Stripe customers (#{length(stripe_data)} lookups)"
           )
@@ -233,7 +233,7 @@ defmodule Ysc.WpMigration.Load do
         )
       end
 
-      if bookings_data && bookings_data != [] do
+      if bookings_data != [] do
         Ysc.Logging.info(
           "[WP Load] Phase: Bookings (#{length(bookings_data)} bookings)"
         )
@@ -300,82 +300,85 @@ defmodule Ysc.WpMigration.Load do
 
     Enum.reduce_while(users_data, {:ok, user_map}, fn row, {:ok, acc} ->
       email = row["email"]
-      if is_nil(email) or email == "", do: {:cont, {:ok, acc}}
 
-      application_row = Map.get(applications_by_wp_id, row["wp_user_id"], %{})
-      names = UserNames.resolve(row, application_row)
+      if is_nil(email) or email == "" do
+        {:cont, {:ok, acc}}
+      else
+        application_row = Map.get(applications_by_wp_id, row["wp_user_id"], %{})
+        names = UserNames.resolve(row, application_row)
 
-      case Ysc.Accounts.get_user_by_email(email) do
-        existing when not is_nil(existing) ->
-          # Idempotent: update profile from export when re-running
-          update_attrs =
-            %{
-              "first_name" => names.first_name,
-              "last_name" => names.last_name,
-              "phone_number" => normalize_phone(row["phone_number"]),
-              "state" => resolve_user_state(row),
-              "role" => map_role(row["role"]),
-              "most_connected_country" =>
-                normalize_country(
-                  row["most_connected_country"] ||
-                    row["nordic_country_connected"] ||
-                    row["Country"]
-                )
-            }
-            |> maybe_put_date_of_birth(row)
+        case Ysc.Accounts.get_user_by_email(email) do
+          existing when not is_nil(existing) ->
+            # Idempotent: update profile from export when re-running
+            update_attrs =
+              %{
+                "first_name" => names.first_name,
+                "last_name" => names.last_name,
+                "phone_number" => normalize_phone(row["phone_number"]),
+                "state" => resolve_user_state(row),
+                "role" => map_role(row["role"]),
+                "most_connected_country" =>
+                  normalize_country(
+                    row["most_connected_country"] ||
+                      row["nordic_country_connected"] ||
+                      row["Country"]
+                  )
+              }
+              |> maybe_put_date_of_birth(row)
 
-          case existing
-               |> User.update_user_changeset(update_attrs)
-               |> apply_migration_user_verification(row)
-               |> backdate_timestamp(row["user_registered"])
-               |> Repo.update() do
-            {:ok, _} ->
-              upsert_address(existing.id, row)
-              {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
+            case existing
+                 |> User.update_user_changeset(update_attrs)
+                 |> apply_migration_user_verification(row)
+                 |> backdate_timestamp(row["user_registered"])
+                 |> Repo.update() do
+              {:ok, _} ->
+                upsert_address(existing.id, row)
+                {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
 
-            {:error, _} ->
-              upsert_address(existing.id, row)
-              {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
-          end
+              {:error, _} ->
+                upsert_address(existing.id, row)
+                {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
+            end
 
-        nil ->
-          attrs =
-            %{
-              "email" => email,
-              "first_name" => names.first_name,
-              "last_name" => names.last_name,
-              "phone_number" => normalize_phone(row["phone_number"]),
-              "most_connected_country" =>
-                normalize_country(
-                  row["most_connected_country"] ||
-                    row["nordic_country_connected"] ||
-                    row["Country"]
-                )
-            }
-            |> maybe_put_date_of_birth(row)
+          nil ->
+            attrs =
+              %{
+                "email" => email,
+                "first_name" => names.first_name,
+                "last_name" => names.last_name,
+                "phone_number" => normalize_phone(row["phone_number"]),
+                "most_connected_country" =>
+                  normalize_country(
+                    row["most_connected_country"] ||
+                      row["nordic_country_connected"] ||
+                      row["Country"]
+                  )
+              }
+              |> maybe_put_date_of_birth(row)
 
-          changeset =
-            %User{}
-            |> User.registration_changeset(attrs,
-              require_password: false,
-              validate_email: false,
-              hash_password: false
-            )
-            |> apply_migration_user_identity(row)
-            |> backdate_timestamp(row["user_registered"])
-
-          case Repo.insert(changeset) do
-            {:ok, user} ->
-              upsert_address(user.id, row)
-              {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
-
-            {:error, changeset} ->
-              Ysc.Logging.warning(
-                "[WP Load] Failed to insert user #{email}: #{inspect(changeset.errors)}"
+            changeset =
+              %User{}
+              |> User.registration_changeset(attrs,
+                require_password: false,
+                validate_email: false,
+                hash_password: false
               )
+              |> apply_migration_user_identity(row)
+              |> backdate_timestamp(row["user_registered"])
 
-              {:cont, {:ok, acc}}
-          end
+            case Repo.insert(changeset) do
+              {:ok, user} ->
+                upsert_address(user.id, row)
+                {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
+
+              {:error, changeset} ->
+                Ysc.Logging.warning(
+                  "[WP Load] Failed to insert user #{email}: #{inspect(changeset.errors)}"
+                )
+
+                {:cont, {:ok, acc}}
+            end
+        end
       end
     end)
   end
@@ -2191,6 +2194,35 @@ defmodule Ysc.WpMigration.Load do
 
               Ysc.Logging.warning(
                 "[WP Load] Failed to create Stripe subscription for user #{user_id} (customer=#{user.stripe_id}): #{err.message}"
+              )
+
+              load_subscription_locally(
+                row,
+                user_id,
+                renewal_dt,
+                start_dt,
+                false,
+                membership_plan
+              )
+
+              report
+
+            {:error, other} ->
+              report =
+                StripeImport.record_failure(
+                  report,
+                  %{
+                    category: "stripe_subscription_create",
+                    user_id: user_id,
+                    email: row["email"],
+                    wp_user_id: row["wp_user_id"],
+                    stripe_customer_id: user.stripe_id,
+                    reason: inspect(other)
+                  }
+                )
+
+              Ysc.Logging.warning(
+                "[WP Load] Failed to create Stripe subscription for user #{user_id} (customer=#{user.stripe_id}): #{inspect(other)}"
               )
 
               load_subscription_locally(

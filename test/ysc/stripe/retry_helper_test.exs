@@ -25,6 +25,13 @@ defmodule Ysc.Stripe.RetryHelperTest do
                message: "server error",
                extra: %{http_status: 503}
              })
+
+      assert RetryHelper.transient_stripe_error?(%Stripe.Error{
+               source: :stripe,
+               code: :api_error,
+               message: "server error",
+               extra: %{"http_status" => 503}
+             })
     end
 
     test "does not treat resource_missing as transient" do

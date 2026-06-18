@@ -379,11 +379,21 @@ defmodule Ysc.WpMigration.StripeImport do
   defp maybe_put_starting_after(params, id),
     do: Map.put(params, :starting_after, id)
 
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    user_has_real_subscription_query(Fixtures.ulid())
+  end
+
   defp user_has_real_subscription?(user_id) do
-    Repo.exists?(
-      from s in Subscription,
-        where: s.user_id == ^user_id,
-        where: not like(s.stripe_id, "migrated_%")
+    Repo.exists?(user_has_real_subscription_query(user_id))
+  end
+
+  defp user_has_real_subscription_query(user_id) do
+    from(s in Subscription,
+      where: s.user_id == ^user_id,
+      where: not like(s.stripe_id, "migrated_%")
     )
   end
 

@@ -30,8 +30,13 @@ defmodule Mix.Tasks.ShellLint do
       Path.join([File.cwd!(), "etc/scripts/list_lintable_shell_scripts.sh"])
 
     case System.cmd(script, [], cd: File.cwd!(), stderr_to_stdout: true) do
-      {output, 0} -> String.split(output, "\n", trim: true)
-      _ -> []
+      {output, 0} ->
+        String.split(output, "\n", trim: true)
+
+      {output, status} ->
+        Mix.raise(
+          "Failed to list shell scripts (exit #{status}): #{String.trim(output)}"
+        )
     end
   end
 
