@@ -2147,6 +2147,36 @@ defmodule Ysc.WpMigration.Load do
   end
 
   defp load_one_booking(row, user_id, booking_user_first, booking_user_last) do
+    ref_id = "MIG-WP-#{row["wp_booking_id"]}"
+
+    case Bookings.get_booking_by_reference_id(ref_id) do
+      %Booking{} = existing ->
+        fix_migrated_booking(
+          existing,
+          user_id,
+          row,
+          booking_user_first,
+          booking_user_last
+        )
+
+      nil ->
+        insert_migrated_booking_if_valid(
+          row,
+          user_id,
+          booking_user_first,
+          booking_user_last,
+          ref_id
+        )
+    end
+  end
+
+  defp insert_migrated_booking_if_valid(
+         row,
+         user_id,
+         booking_user_first,
+         booking_user_last,
+         ref_id
+       ) do
     raw_room_names = Enum.map(row["rooms"] || [], & &1["room_name"])
 
     buyout? =
@@ -2207,31 +2237,19 @@ defmodule Ysc.WpMigration.Load do
               :ok
 
             checkout_date ->
-              ref_id = "MIG-WP-#{row["wp_booking_id"]}"
-
-              case Bookings.get_booking_by_reference_id(ref_id) do
-                %Booking{} = existing ->
-                  fix_migrated_booking(
-                    existing,
-                    user_id,
-                    row,
-                    booking_user_first,
-                    booking_user_last
-                  )
-
-                nil ->
-                  insert_migrated_booking(
-                    row,
-                    user_id,
-                    booking_user_first,
-                    booking_user_last,
-                    ref_id,
-                    checkin_date,
-                    checkout_date,
-                    room_structs,
-                    booking_mode
-                  )
-              end
+              insert_migrated_booking(
+                row,
+                user_id,
+                booking_user_first,
+                booking_user_last,
+                %{
+                  ref_id: ref_id,
+                  checkin_date: checkin_date,
+                  checkout_date: checkout_date,
+                  room_structs: room_structs,
+                  booking_mode: booking_mode
+                }
+              )
           end
       end
     end
@@ -2242,41 +2260,45 @@ defmodule Ysc.WpMigration.Load do
          user_id,
          booking_user_first,
          booking_user_last,
-         ref_id,
-         checkin_date,
-         checkout_date,
-         room_structs,
-         booking_mode
+         parsed
        ) do
     total_price = parse_booking_money(row["total_price"])
 
     attrs = %{
-      reference_id: ref_id,
-      checkin_date: checkin_date,
-      checkout_date: checkout_date,
+      reference_id: parsed.ref_id,
+      checkin_date: parsed.checkin_date,
+      checkout_date: parsed.checkout_date,
       guests_count: row["guests_count"] || 0,
       children_count: row["children_count"] || 0,
       property: :tahoe,
-      booking_mode: booking_mode,
+      booking_mode: parsed.booking_mode,
       status: :complete,
       total_price: total_price,
       user_id: user_id
     }
 
     case Booking.changeset(%Booking{}, attrs,
-           rooms: room_structs,
+           rooms: parsed.room_structs,
            skip_validation: true
          )
          |> Repo.insert() do
       {:ok, booking} ->
-        insert_migrated_booking_guest(
-          booking,
-          row,
-          booking_user_first,
-          booking_user_last
-        )
+        case insert_migrated_booking_guest(
+               booking,
+               row,
+               booking_user_first,
+               booking_user_last
+             ) do
+          {:ok, _guest} ->
+            :ok
 
-        :ok
+          {:error, changeset} ->
+            Ysc.Logging.warning(
+              "[WP Load] Failed to insert guest for booking #{row["wp_booking_id"]}: #{inspect(changeset.errors)}"
+            )
+
+            {:error, changeset}
+        end
 
       {:error, changeset} ->
         Ysc.Logging.warning(
@@ -2325,8 +2347,6 @@ defmodule Ysc.WpMigration.Load do
       booking_user_first,
       booking_user_last
     )
-
-    :ok
   end
 
   defp insert_migrated_booking_guest(
@@ -2341,8 +2361,6 @@ defmodule Ysc.WpMigration.Load do
     %BookingGuest{}
     |> BookingGuest.changeset(Map.put(guest_attrs, :booking_id, booking.id))
     |> Repo.insert()
-
-    :ok
   end
 
   defp sync_migrated_booking_guest(
@@ -2368,10 +2386,8 @@ defmodule Ysc.WpMigration.Load do
         |> BookingGuest.changeset(guest_attrs)
         |> Repo.update()
 
-        :ok
-
       guests ->
-        Enum.each(guests, fn guest ->
+        Enum.reduce_while(guests, {:ok, :synced}, fn guest, {:ok, _} ->
           is_user =
             BookingImport.guest_is_booking_user?(
               guest.first_name,
@@ -2380,12 +2396,24 @@ defmodule Ysc.WpMigration.Load do
               booking_user_last
             )
 
-          guest
-          |> BookingGuest.changeset(%{is_booking_user: is_user})
-          |> Repo.update()
+          case guest
+               |> BookingGuest.changeset(%{is_booking_user: is_user})
+               |> Repo.update() do
+            {:ok, updated} -> {:cont, {:ok, updated}}
+            {:error, changeset} -> {:halt, {:error, changeset}}
+          end
         end)
-
+    end
+    |> case do
+      {:ok, _} ->
         :ok
+
+      {:error, changeset} ->
+        Ysc.Logging.warning(
+          "[WP Load] Failed to sync booking guest for #{booking.reference_id}: #{inspect(changeset.errors)}"
+        )
+
+        {:error, changeset}
     end
   end
 

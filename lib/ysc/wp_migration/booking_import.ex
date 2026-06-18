@@ -23,12 +23,14 @@ defmodule Ysc.WpMigration.BookingImport do
         customer_post_id,
         email
       ) do
+    normalized_email = normalize_email(email)
+
     cond do
       customer_post_id && Map.has_key?(customer_user_map, customer_post_id) ->
         Map.get(customer_user_map, customer_post_id)
 
-      email = normalize_email(email) ->
-        Map.get(email_user_map, email)
+      normalized_email ->
+        Map.get(email_user_map, normalized_email)
 
       true ->
         nil
