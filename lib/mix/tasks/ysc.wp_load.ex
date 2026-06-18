@@ -77,6 +77,22 @@ defmodule Mix.Tasks.Ysc.WpLoad do
             IO.puts(
               "  image_map: #{map_size(result[:image_map] || %{})} images"
             )
+
+            case result[:stripe_import_report] do
+              %{failures: failures} when is_list(failures) ->
+                count = length(failures)
+
+                if count > 0 do
+                  IO.puts("  stripe_import_failures: #{count}")
+
+                  IO.puts(
+                    "  stripe_import_failures_path: #{result[:stripe_import_failures_path]}"
+                  )
+                end
+
+              _ ->
+                :ok
+            end
           end
         end
 

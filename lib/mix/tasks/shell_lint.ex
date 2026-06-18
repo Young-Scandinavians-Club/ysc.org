@@ -26,14 +26,18 @@ defmodule Mix.Tasks.ShellLint do
   end
 
   defp find_shell_scripts do
-    root = File.cwd!()
+    script =
+      Path.join([File.cwd!(), "etc/scripts/list_lintable_shell_scripts.sh"])
 
-    Path.wildcard(Path.join(root, "**/*.sh"))
-    |> Enum.reject(fn path ->
-      String.contains?(path, "/_build/") or
-        String.contains?(path, "/deps/") or
-        String.contains?(path, "/node_modules/")
-    end)
+    case System.cmd(script, [], cd: File.cwd!(), stderr_to_stdout: true) do
+      {output, 0} ->
+        String.split(output, "\n", trim: true)
+
+      {output, status} ->
+        Mix.raise(
+          "Failed to list shell scripts (exit #{status}): #{String.trim(output)}"
+        )
+    end
   end
 
   defp run_shellcheck(scripts) do

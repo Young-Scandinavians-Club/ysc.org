@@ -1,37 +1,48 @@
 defmodule Ysc.ResendRateLimiterTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Ysc.ResendRateLimiter
 
   setup do
-    # Best-effort cleanup; cache may not be started in some envs.
-    Cachex.del(:ysc_cache, "resend_email:1")
-    Cachex.del(:ysc_cache, "resend_sms:1")
-    :ok
+    # Unique per test for cache isolation between sequential tests in this module
+    # and to avoid collisions with concurrently running tests in other modules.
+    id = System.unique_integer([:positive])
+    email_key = ResendRateLimiter.cache_key(id, :email)
+    sms_key = ResendRateLimiter.cache_key(id, :sms)
+
+    Cachex.del(:ysc_cache, email_key)
+    Cachex.del(:ysc_cache, sms_key)
+
+    on_exit(fn ->
+      Cachex.del(:ysc_cache, email_key)
+      Cachex.del(:ysc_cache, sms_key)
+    end)
+
+    {:ok, id: id}
   end
 
   describe "resend_allowed?/3 and record_resend/3" do
-    test "allows when no cache entry exists" do
-      assert {:ok, :allowed} = ResendRateLimiter.resend_allowed?(1, :email, 60)
-      assert ResendRateLimiter.remaining_seconds(1, :email, 60) == 0
+    test "allows when no cache entry exists", %{id: id} do
+      assert {:ok, :allowed} = ResendRateLimiter.resend_allowed?(id, :email, 60)
+      assert ResendRateLimiter.remaining_seconds(id, :email, 60) == 0
     end
 
-    test "rate limits after record_resend/3" do
-      assert :ok = ResendRateLimiter.record_resend(1, :email, 60)
+    test "rate limits after record_resend/3", %{id: id} do
+      assert :ok = ResendRateLimiter.record_resend(id, :email, 60)
 
       assert {:error, :rate_limited, remaining} =
-               ResendRateLimiter.resend_allowed?(1, :email, 60)
+               ResendRateLimiter.resend_allowed?(id, :email, 60)
 
       assert is_integer(remaining)
       assert remaining > 0
     end
 
-    test "check_and_record_resend/3 records when allowed" do
+    test "check_and_record_resend/3 records when allowed", %{id: id} do
       assert {:ok, :allowed} =
-               ResendRateLimiter.check_and_record_resend(1, :sms, 60)
+               ResendRateLimiter.check_and_record_resend(id, :sms, 60)
 
       assert {:error, :rate_limited, _} =
-               ResendRateLimiter.check_and_record_resend(1, :sms, 60)
+               ResendRateLimiter.check_and_record_resend(id, :sms, 60)
     end
   end
 

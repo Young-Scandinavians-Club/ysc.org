@@ -95,7 +95,7 @@ defmodule YscWeb.UserRegistrationLive do
                     label="How do you qualify for membership? Select every option that applies to you. You only need to meet one of these to apply.*"
                     options={SignupApplication.eligibility_options()}
                   />
-                  <p class="text-sm leading-6 text-zinc-600 -mt-1">
+                  <p class="text-sm leading-6 text-zinc-600 mt-4">
                     When we say Scandinavia, we mean Denmark, Finland, Iceland, Norway, and Sweden.
                   </p>
                 </.inputs_for>

@@ -5,7 +5,14 @@ defmodule Ysc.WpMigration.Extract do
   """
 
   require Ysc.Logging
-  alias Ysc.WpMigration.{WpRepo, PhpDeserialize, HtmlTransformer}
+
+  alias Ysc.WpMigration.{
+    WpRepo,
+    PhpDeserialize,
+    HtmlTransformer,
+    MembershipPlan,
+    IgnoredAccounts
+  }
 
   @doc """
   Runs the extract: opens the DuckDB file, writes users.json, applications.json,
@@ -61,8 +68,13 @@ defmodule Ysc.WpMigration.Extract do
             File.mkdir_p!(Path.join(export_dir, "media"))
           end
 
-          users =
-            repo |> build_users() |> filter_by_emails(only_emails, "email")
+          all_users =
+            repo
+            |> build_users()
+            |> filter_by_emails(only_emails, "email")
+
+          ignored_wp_user_ids = IgnoredAccounts.ignored_wp_user_ids(all_users)
+          users = IgnoredAccounts.reject_users(all_users)
 
           if only_emails,
             do:
@@ -80,6 +92,11 @@ defmodule Ysc.WpMigration.Extract do
             repo
             |> build_applications()
             |> filter_by_wp_user_ids(only_wp_user_ids, "wp_user_id")
+            |> IgnoredAccounts.reject_by_wp_user_id(
+              ignored_wp_user_ids,
+              "wp_user_id"
+            )
+            |> IgnoredAccounts.reject_user_rows()
 
           if dry_run,
             do:
@@ -97,6 +114,10 @@ defmodule Ysc.WpMigration.Extract do
             repo
             |> build_stripe_customer_lookup()
             |> filter_by_wp_user_ids(only_wp_user_ids, "wp_user_id")
+            |> IgnoredAccounts.reject_by_wp_user_id(
+              ignored_wp_user_ids,
+              "wp_user_id"
+            )
 
           write_json(
             export_dir,
@@ -109,6 +130,10 @@ defmodule Ysc.WpMigration.Extract do
             repo
             |> build_bookings()
             |> filter_by_wp_user_ids(only_wp_user_ids, "wp_customer_user_id")
+            |> IgnoredAccounts.reject_by_wp_user_id(
+              ignored_wp_user_ids,
+              "wp_customer_user_id"
+            )
 
           if dry_run,
             do: Ysc.Logging.info("Would write #{length(bookings)} bookings")
@@ -196,6 +221,17 @@ defmodule Ysc.WpMigration.Extract do
         "zip" => meta["zip"] || meta["billing_postcode"],
         "country" => meta["country"] || meta["billing_country"],
         "membership_type" => decode_membership_type(meta["membership_type"]),
+        "wcm_product_id" => presence(membership["wcm_product_id"]),
+        "wcm_product_name" => presence(membership["wcm_product_name"]),
+        "sub_product_id" => presence(membership["sub_product_id"]),
+        "sub_product_name" => presence(membership["sub_product_name"]),
+        "membership_plan" =>
+          MembershipPlan.resolve(%{
+            wcm_product_name: membership["wcm_product_name"],
+            sub_product_name: membership["sub_product_name"],
+            user_membership_type:
+              decode_membership_type(meta["membership_type"])
+          }),
         "account_status" => meta["account_status"],
         # UM profile timestamp (unix seconds); best available proxy for admin review date
         "last_update" => normalize_unix_timestamp(meta["last_update"]),
