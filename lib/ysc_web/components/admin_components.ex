@@ -1027,10 +1027,10 @@ defmodule YscWeb.AdminComponents do
     doc: "Optional CTA below the description (e.g. upload button on media page)"
 
   def admin_icon_empty_state(assigns) do
-    assigns =
-      assign_new(assigns, :icon_class, fn ->
-        icon_empty_state_icon_class(assigns.variant)
-      end)
+    icon_class =
+      assigns.icon_class || icon_empty_state_icon_class(assigns.variant)
+
+    assigns = assign(assigns, :icon_class, icon_class)
 
     ~H"""
     <div id={@id} class={icon_empty_state_container_class(@variant, @class)}>
