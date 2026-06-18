@@ -1658,7 +1658,7 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp process_ledger_payment(booking, payment_intent) do
-    amount = cents_to_money(payment_intent.amount, :USD)
+    amount = MoneyHelper.cents_to_money(payment_intent.amount, :USD)
     # Use consolidated fee extraction from Stripe.WebhookHandler
     stripe_fee =
       Ysc.Stripe.WebhookHandler.extract_stripe_fee_from_payment_intent(
@@ -1780,12 +1780,6 @@ defmodule YscWeb.BookingReceiptLive do
             nil
         end
     end
-  end
-
-  defp cents_to_money(cents, currency) when is_integer(cents) do
-    cents_decimal = Decimal.new(cents)
-    dollars = Decimal.div(cents_decimal, Decimal.new(100))
-    Money.new(currency, dollars)
   end
 
   # Load receipt data asynchronously after WebSocket connection

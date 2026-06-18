@@ -12,6 +12,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
   import Ysc.TicketsFixtures
 
   alias Ysc.Ledgers.Payment
+  alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
@@ -44,10 +45,7 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
   end
 
   defp payment_intent_for_order(ticket_order, payment_intent_id) do
-    amount_cents =
-      ticket_order.total_amount.amount
-      |> Decimal.mult(100)
-      |> Decimal.to_integer()
+    amount_cents = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
     build_payment_intent(%{
       id: payment_intent_id,

@@ -2035,7 +2035,7 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp process_ledger_payment(booking, payment_intent) do
-    amount = cents_to_money(payment_intent.amount, :USD)
+    amount = MoneyHelper.cents_to_money(payment_intent.amount, :USD)
     # Use consolidated fee extraction from Stripe.WebhookHandler
     stripe_fee =
       Ysc.Stripe.WebhookHandler.extract_stripe_fee_from_payment_intent(
@@ -2225,16 +2225,6 @@ defmodule YscWeb.BookingCheckoutLive do
       map
     end
   end
-
-  defp cents_to_money(cents, currency)
-
-  defp cents_to_money(cents, currency) when is_integer(cents) do
-    cents_decimal = Decimal.new(cents)
-    dollars = Decimal.div(cents_decimal, Decimal.new(100))
-    Money.new(currency, dollars)
-  end
-
-  defp cents_to_money(_, _), do: Money.new(0, :USD)
 
   # Extract and sync payment method from Stripe
   defp extract_and_sync_payment_method(payment_intent, user_id) do

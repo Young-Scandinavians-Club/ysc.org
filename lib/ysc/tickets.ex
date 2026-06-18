@@ -12,6 +12,7 @@ defmodule Ysc.Tickets do
 
   import Ecto.Query, warn: false
   alias Ysc.Repo
+  alias Ysc.MoneyHelper
 
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Tickets.BookingLocker
@@ -1405,7 +1406,7 @@ defmodule Ysc.Tickets do
   end
 
   defp validate_payment_intent(payment_intent, ticket_order) do
-    expected_amount = money_to_cents(ticket_order.total_amount)
+    expected_amount = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
     cond do
       payment_intent.amount != expected_amount ->
@@ -1632,26 +1633,6 @@ defmodule Ysc.Tickets do
       _ ->
         nil
     end
-  end
-
-  # Helper function to safely convert Money to cents
-  defp money_to_cents(%Money{amount: amount, currency: :USD}) do
-    # Use Decimal for precise conversion to avoid floating-point errors
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(%Money{amount: amount, currency: _currency}) do
-    # For other currencies, use same conversion
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(_) do
-    # Fallback for invalid money values
-    0
   end
 
   defp confirm_tickets(ticket_order) do

@@ -9,6 +9,7 @@ defmodule YscWeb.EventDetailsLive do
 
   alias Ysc.Events
   alias Ysc.Events.Event
+  alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.DonationDisplay
 
@@ -4246,21 +4247,6 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Convert Money struct to cents (integer)
-  defp money_to_cents(%Money{amount: amount, currency: :USD}) do
-    # Use Decimal for precise conversion to avoid floating-point errors
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(%Money{amount: amount, currency: _currency}) do
-    # For other currencies, use same conversion
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
   # Build selected_tickets map from a ticket order
   # For regular tickets: tier_id => quantity
   # For donation tickets: tier_id => amount_cents (total donation amount in cents)
@@ -4304,7 +4290,7 @@ defmodule YscWeb.EventDetailsLive do
                 {:ok, tier_donation_total} =
                   Money.mult(amount_per_ticket, quantity)
 
-                amount_cents = money_to_cents(tier_donation_total)
+                amount_cents = MoneyHelper.money_to_cents(tier_donation_total)
                 Map.put(acc, tier_id, amount_cents)
 
               _ ->
@@ -5670,7 +5656,7 @@ defmodule YscWeb.EventDetailsLive do
       end
 
     # Parse the donation amount from the input string (e.g., "10.99" -> 1099 cents)
-    donation_amount_cents = parse_donation_amount(value)
+    donation_amount_cents = MoneyHelper.parse_dollar_string_to_cents(value)
 
     updated_tickets =
       if donation_amount_cents > 0 and tier_id do
@@ -7219,35 +7205,6 @@ defmodule YscWeb.EventDetailsLive do
         ""
     end
   end
-
-  defp parse_donation_amount(value) when is_binary(value) do
-    # Handle empty strings explicitly
-    trimmed = String.trim(value)
-
-    if trimmed == "" || trimmed == "0" || trimmed == "0.00" do
-      0
-    else
-      # Remove any non-numeric characters except decimal point
-      cleaned = trimmed |> String.replace(~r/[^\d.]/, "")
-
-      if cleaned == "" do
-        0
-      else
-        case Decimal.parse(cleaned) do
-          {decimal, _} ->
-            # Convert to cents (multiply by 100)
-            decimal
-            |> Decimal.mult(Decimal.new(100))
-            |> Decimal.to_integer()
-
-          :error ->
-            0
-        end
-      end
-    end
-  end
-
-  defp parse_donation_amount(_), do: 0
 
   # Helper function to get tickets that require registration
   defp get_tickets_requiring_registration(tickets) do

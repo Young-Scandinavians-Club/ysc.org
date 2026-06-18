@@ -916,7 +916,7 @@ defmodule Ysc.Bookings do
             {:error, :payment_metadata_mismatch}
 
           true ->
-            {:ok, stripe_cents_to_money(payment_intent.amount, :USD)}
+            {:ok, Ysc.MoneyHelper.cents_to_money(payment_intent.amount, :USD)}
         end
 
       {:ok, _} ->
@@ -937,12 +937,6 @@ defmodule Ysc.Bookings do
       {:error, _} ->
         false
     end
-  end
-
-  defp stripe_cents_to_money(cents, currency) when is_integer(cents) do
-    cents_decimal = Decimal.new(cents)
-    dollars = Decimal.div(cents_decimal, Decimal.new(100))
-    Money.new(currency, dollars)
   end
 
   defp sum_booking_stripe_payment_entries(booking_id) do
