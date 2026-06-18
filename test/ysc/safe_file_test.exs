@@ -71,5 +71,24 @@ defmodule Ysc.SafeFileTest do
       assert {:error, :invalid_path} =
                SafeFile.write_under_root(root, "../escape.json", "nope")
     end
+
+    test "returns error when the root is not writable" do
+      root =
+        Path.join(
+          System.tmp_dir!(),
+          "safe-file-readonly-#{System.unique_integer()}"
+        )
+
+      File.mkdir_p!(root)
+      File.chmod!(root, 0o555)
+
+      on_exit(fn ->
+        File.chmod!(root, 0o755)
+        File.rm_rf(root)
+      end)
+
+      assert {:error, :eacces} =
+               SafeFile.write_under_root(root, "report.json", ~s({"ok":true}))
+    end
   end
 end

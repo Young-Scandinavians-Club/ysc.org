@@ -225,12 +225,7 @@ defmodule Ysc.SafeFile do
     end
   end
 
-  defp ensure_parent_dir(path) do
-    case Path.dirname(path) do
-      "." -> :ok
-      dir -> do_mkdir_p(dir)
-    end
-  end
+  defp ensure_parent_dir(path), do: do_mkdir_p(Path.dirname(path))
 
   # Paths are validated with Path.safe_relative/2 before File operations run.
   # sobelow_skip ["Traversal.FileModule"]
