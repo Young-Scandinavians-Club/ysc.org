@@ -146,6 +146,7 @@ defmodule Ysc.MoneyHelperTest do
 
     test "returns zero for invalid input" do
       assert MoneyHelper.parse_dollar_string_to_cents("invalid") == 0
+      assert MoneyHelper.parse_dollar_string_to_cents("12.34.56") == 0
     end
   end
 end

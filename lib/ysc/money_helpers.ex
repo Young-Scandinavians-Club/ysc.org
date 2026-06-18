@@ -136,9 +136,14 @@ defmodule Ysc.MoneyHelper do
         if cleaned == "" do
           0
         else
-          case parse_money(cleaned) do
-            %Money{} = money -> money_to_cents(money)
-            _ -> 0
+          case Decimal.parse(cleaned) do
+            {decimal, ""} ->
+              decimal
+              |> Money.new(:USD)
+              |> money_to_cents()
+
+            _ ->
+              0
           end
         end
     end
