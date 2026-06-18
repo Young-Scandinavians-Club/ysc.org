@@ -749,15 +749,25 @@ defmodule Ysc.Tickets do
       when is_binary(payment_intent_id) do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
-    if ticket_order_completed?(ticket_order) do
-      finalize_already_completed_ticket_order(ticket_order)
-    else
-      with {:ok, payment_intent} <-
-             Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-               stripe_client().retrieve_payment_intent(payment_intent_id, %{})
-             end) do
-        process_ticket_order_payment(ticket_order, payment_intent)
-      end
+    cond do
+      ticket_order_fully_finalized?(ticket_order) ->
+        {:ok, completed_ticket_order_for_return(ticket_order)}
+
+      ticket_order_completed?(ticket_order) ->
+        with {:ok, payment_intent} <-
+               Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                 stripe_client().retrieve_payment_intent(payment_intent_id, %{})
+               end) do
+          finalize_already_completed_ticket_order(ticket_order, payment_intent)
+        end
+
+      true ->
+        with {:ok, payment_intent} <-
+               Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                 stripe_client().retrieve_payment_intent(payment_intent_id, %{})
+               end) do
+          process_ticket_order_payment(ticket_order, payment_intent)
+        end
     end
   end
 
@@ -773,10 +783,15 @@ defmodule Ysc.Tickets do
       |> ensure_ticket_order_for_payment()
 
     result =
-      if ticket_order_completed?(ticket_order) do
-        finalize_already_completed_ticket_order(ticket_order)
-      else
-        do_process_ticket_order_payment(ticket_order, payment_intent)
+      cond do
+        ticket_order_fully_finalized?(ticket_order) ->
+          {:ok, completed_ticket_order_for_return(ticket_order)}
+
+        ticket_order_completed?(ticket_order) ->
+          finalize_already_completed_ticket_order(ticket_order, payment_intent)
+
+        true ->
+          do_process_ticket_order_payment(ticket_order, payment_intent)
       end
 
     emit_payment_processed_telemetry(
@@ -790,14 +805,17 @@ defmodule Ysc.Tickets do
   end
 
   defp do_process_ticket_order_payment(ticket_order, payment_intent) do
+    # Complete the order before recording ledger payment so a concurrent cancel
+    # cannot leave a Stripe charge recorded without tickets (see booking checkout).
     with :ok <- validate_payment_intent(payment_intent, ticket_order),
          :ok <- validate_fulfillable_order_status(ticket_order),
          :ok <- validate_expired_order_fulfillment_capacity(ticket_order),
+         {:ok, completed_order, completion_status} <-
+           complete_ticket_order_if_pending(ticket_order, nil),
+         :ok <- confirm_tickets(completed_order),
          {:ok, {payment, _transaction, _entries}} <-
            process_ledger_payment(ticket_order, payment_intent),
-         {:ok, completed_order, completion_status} <-
-           complete_ticket_order_if_pending(ticket_order, payment.id),
-         :ok <- confirm_tickets(completed_order) do
+         :ok <- attach_ledger_payment_to_order(completed_order.id, payment.id) do
       reloaded_order =
         if completion_status == :newly_completed do
           get_ticket_order(completed_order.id)
@@ -873,6 +891,30 @@ defmodule Ysc.Tickets do
     |> Repo.exists?()
   end
 
+  defp ticket_order_fully_finalized?(%TicketOrder{} = ticket_order) do
+    ticket_order.status == :completed and not is_nil(ticket_order.payment_id) and
+      tickets_all_confirmed?(ticket_order)
+  end
+
+  defp tickets_all_confirmed?(%TicketOrder{tickets: tickets})
+       when is_list(tickets) and tickets != [] do
+    Enum.all?(tickets, &(&1.status == :confirmed))
+  end
+
+  defp tickets_all_confirmed?(%TicketOrder{id: id}) do
+    total =
+      from(t in Ysc.Events.Ticket, where: t.ticket_order_id == ^id)
+      |> Repo.aggregate(:count)
+
+    unconfirmed =
+      from(t in Ysc.Events.Ticket,
+        where: t.ticket_order_id == ^id and t.status != :confirmed
+      )
+      |> Repo.aggregate(:count)
+
+    total > 0 and unconfirmed == 0
+  end
+
   defp completed_ticket_order_for_return(
          %TicketOrder{status: :completed} = ticket_order
        ) do
@@ -884,10 +926,25 @@ defmodule Ysc.Tickets do
   end
 
   # Idempotent recovery when the order row is already :completed but ticket
-  # confirmation did not finish (e.g. crash between complete and confirm).
-  defp finalize_already_completed_ticket_order(ticket_order) do
-    confirm_tickets(ticket_order)
-    {:ok, completed_ticket_order_for_return(ticket_order)}
+  # confirmation and/or ledger recording did not finish.
+  defp finalize_already_completed_ticket_order(ticket_order, payment_intent) do
+    with :ok <- confirm_tickets(ticket_order),
+         {:ok, {payment, _transaction, _entries}} <-
+           process_ledger_payment(ticket_order, payment_intent),
+         :ok <- attach_ledger_payment_to_order(ticket_order.id, payment.id) do
+      {:ok, completed_ticket_order_for_return(ticket_order)}
+    end
+  end
+
+  defp attach_ledger_payment_to_order(ticket_order_id, payment_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    from(to in TicketOrder,
+      where: to.id == ^ticket_order_id and is_nil(to.payment_id)
+    )
+    |> Repo.update_all(set: [payment_id: payment_id, updated_at: now])
+
+    :ok
   end
 
   defp ticket_order_ready_for_payment?(%TicketOrder{} = ticket_order) do

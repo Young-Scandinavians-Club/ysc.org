@@ -260,6 +260,76 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     )
   end
 
+  test "concurrent checkout cancel does not orphan ledger payment", %{
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      end)
+
+    payment_intent_id = "pi_cancel_race_#{order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      fn pi_id ->
+        payment_task =
+          Task.async(fn ->
+            Tickets.process_ticket_order_payment(order, pi_id)
+          end)
+
+        assert {:ok, _cancelled} =
+                 Tickets.cancel_ticket_order(order, "User closed checkout")
+
+        payment_result = Task.await(payment_task, 5_000)
+
+        assert {:error, :cannot_complete_order} = payment_result
+        refute Ledgers.get_payment_by_external_id(pi_id)
+
+        reloaded = Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id)
+        assert reloaded.status == :cancelled
+      end
+    )
+  end
+
+  test "retrying an already-completed order is idempotent", %{
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      end)
+
+    payment_intent_id = "pi_completed_retry_#{order.id}"
+    amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      amount_cents,
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(order, pi_id)
+
+        assert completed.status == :completed
+        assert completed.payment_id
+        assert Ledgers.get_payment_by_external_id(pi_id)
+
+        assert {:ok, retried} =
+                 Tickets.process_ticket_order_payment(completed, pi_id)
+
+        assert retried.id == completed.id
+        assert retried.payment_id == completed.payment_id
+        assert Ledgers.get_payment_by_external_id(pi_id)
+      end
+    )
+  end
+
   test "does not expire completed orders when timeout worker races payment", %{
     user: user,
     event: event,
