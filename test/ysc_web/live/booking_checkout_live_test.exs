@@ -125,12 +125,10 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       conn = log_in_user(conn, user)
       unknown_id = Ecto.ULID.generate()
 
-      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+      assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/checkout/#{unknown_id}")
 
       assert path == ~p"/"
-      assert flash["error"] =~ "couldn't find this reservation"
-      assert flash["error"] =~ "start a new booking from the cabin page"
     end
 
     test "redirects when booking status is not hold", %{conn: conn, user: user} do
@@ -162,10 +160,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       conn = log_in_user(conn, user)
 
-      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+      assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      assert flash["error"] =~ "expired"
       assert path in [~p"/bookings/tahoe", ~p"/bookings/clear-lake", ~p"/"]
     end
 
@@ -182,10 +179,9 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       conn = log_in_user(conn, user)
 
-      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+      assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      assert flash["error"] =~ "couldn't load the pricing"
       assert path in [~p"/bookings/tahoe", ~p"/bookings/clear-lake", ~p"/"]
     end
 

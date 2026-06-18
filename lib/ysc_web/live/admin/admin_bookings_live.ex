@@ -27,7 +27,7 @@ defmodule YscWeb.AdminBookingsLive do
     >
       <!-- New/Edit Blackout Modal -->
       <.modal
-        :if={@live_action in [:new_blackout, :edit_blackout]}
+        :if={@live_action in [:new_blackout, :edit_blackout] && @blackout_form}
         id="blackout-modal"
         on_cancel={
           query_params =
@@ -125,7 +125,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Pricing Rule Modal -->
       <.modal
-        :if={@live_action in [:new_pricing_rule, :edit_pricing_rule]}
+        :if={@live_action in [:new_pricing_rule, :edit_pricing_rule] && @form}
         id="pricing-rule-modal"
         on_cancel={
           query_params =
@@ -294,7 +294,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- Edit Season Modal -->
       <.modal
-        :if={@live_action == :edit_season}
+        :if={@live_action == :edit_season && @season_form}
         id="season-modal"
         on_cancel={
           JS.patch(
@@ -539,7 +539,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- View Booking Modal -->
       <.modal
-        :if={@live_action == :view_booking}
+        :if={@live_action == :view_booking && @booking}
         id="booking-modal"
         on_cancel={JS.push("close-booking-modal")}
         show
@@ -1220,7 +1220,10 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Refund Policy Modal -->
       <.modal
-        :if={@live_action in [:new_refund_policy, :edit_refund_policy]}
+        :if={
+          @live_action in [:new_refund_policy, :edit_refund_policy] &&
+            @refund_policy_form
+        }
         id="refund-policy-modal"
         on_cancel={
           query_params =
@@ -1321,7 +1324,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- Refund Policy Rules Modal -->
       <.modal
-        :if={@live_action == :manage_refund_policy_rules}
+        :if={@live_action == :manage_refund_policy_rules && @refund_policy}
         id="refund-policy-rules-modal"
         on_cancel={
           query_params =
@@ -1482,7 +1485,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Booking Modal -->
       <.modal
-        :if={@live_action in [:new_booking, :edit_booking]}
+        :if={@live_action in [:new_booking, :edit_booking] && @booking_form}
         id="booking-form-modal"
         on_cancel={
           query_params =
@@ -1664,7 +1667,7 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Room Modal -->
       <.modal
-        :if={@live_action in [:new_room, :edit_room]}
+        :if={@live_action in [:new_room, :edit_room] && @room_form}
         id="room-modal"
         on_cancel={
           query_params =
@@ -3446,6 +3449,13 @@ defmodule YscWeb.AdminBookingsLive do
       |> assign(:filtered_seasons, [])
       |> assign(:filtered_pricing_rules, [])
       |> assign(:filtered_refund_policies, [])
+      |> assign(:booking, nil)
+      |> assign(:booking_form, nil)
+      |> assign(:booking_type, nil)
+      |> assign(:blackout, nil)
+      |> assign(:blackout_form, nil)
+      |> assign(:pricing_rule, nil)
+      |> assign(:form, nil)
       # Empty stream so reservations section renders on dead connect before data loads
       |> stream(:reservations, [], reset: true)
 
@@ -3783,7 +3793,14 @@ defmodule YscWeb.AdminBookingsLive do
         socket
       end
 
-    {:noreply, apply_action(socket, socket.assigns.live_action, params)}
+    socket =
+      if connected?(socket) do
+        apply_action(socket, socket.assigns.live_action, params)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   # Parse query parameters, handling malformed/double-encoded URLs

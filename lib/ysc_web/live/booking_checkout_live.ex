@@ -13,21 +13,28 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def mount(%{"booking_id" => booking_id}, _session, socket) do
-    schedule_expiration_check(socket)
     user = socket.assigns.current_user
     timezone = get_timezone_from_connect_params(socket)
 
-    result =
-      with :ok <- validate_user_signed_in(user),
-           {:ok, booking} <- load_booking(booking_id, user),
-           :ok <- validate_booking_status(booking),
-           :ok <- validate_booking_not_expired(booking) do
-        initialize_checkout(socket, booking, user, timezone)
-      end
+    case validate_user_signed_in(user) do
+      :ok ->
+        socket = assign_checkout_loading_shell(socket, booking_id, timezone)
 
-    case result do
-      {:ok, _socket} = reply ->
-        reply
+        if connected?(socket) do
+          case load_checkout(socket, booking_id, user, timezone) do
+            {:ok, socket} ->
+              schedule_expiration_check(socket)
+              {:ok, socket}
+
+            {:error, {:redirect, path, message}} ->
+              {:ok,
+               socket
+               |> YscWeb.Flash.put_toast(:error, message, title: "Checkout")
+               |> redirect(to: path)}
+          end
+        else
+          {:ok, socket}
+        end
 
       {:error, {:redirect, path, message}} ->
         {:ok,
@@ -35,6 +42,34 @@ defmodule YscWeb.BookingCheckoutLive do
          |> YscWeb.Flash.put_toast(:error, message, title: "Checkout")
          |> redirect(to: path)}
     end
+  end
+
+  defp assign_checkout_loading_shell(socket, booking_id, timezone) do
+    assign(socket,
+      booking_id: booking_id,
+      checkout_data_loaded?: false,
+      booking: nil,
+      total_price: nil,
+      price_breakdown: nil,
+      payment_intent: nil,
+      payment_error: nil,
+      show_payment_form: false,
+      complimentary_checkout: false,
+      is_expired: false,
+      timezone: timezone,
+      checkout_step: :payment,
+      guest_info_form: nil,
+      guest_info_errors: %{},
+      family_members: [],
+      other_family_members: [],
+      guests_for_me: %{},
+      selected_family_members_for_guests: %{},
+      show_price_details: false,
+      stripe_payment_element_ready: false,
+      page_title: "Booking Checkout",
+      meta_description:
+        "Complete your cabin booking with Young Scandinavians Club."
+    )
   end
 
   defp schedule_expiration_check(socket) do
@@ -54,6 +89,14 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   defp validate_user_signed_in(_user), do: :ok
+
+  defp load_checkout(socket, booking_id, user, timezone) do
+    with {:ok, booking} <- load_booking(booking_id, user),
+         :ok <- validate_booking_status(booking),
+         :ok <- validate_booking_not_expired(booking) do
+      initialize_checkout(socket, booking, user, timezone)
+    end
+  end
 
   defp load_booking(booking_id, user) do
     # SECURITY: Filter by user_id in the database query to prevent unauthorized access
@@ -169,6 +212,7 @@ defmodule YscWeb.BookingCheckoutLive do
         selected_family_members_for_guests: %{},
         show_price_details: false,
         stripe_payment_element_ready: false,
+        checkout_data_loaded?: true,
         page_title: "Booking Checkout",
         meta_description:
           "Complete your cabin booking with Young Scandinavians Club."
@@ -277,7 +321,14 @@ defmodule YscWeb.BookingCheckoutLive do
         <h1>Complete Your Booking</h1>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+      <p :if={!@checkout_data_loaded?} class="text-zinc-600">
+        Loading checkout details…
+      </p>
+
+      <div
+        :if={@checkout_data_loaded?}
+        class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+      >
         <!-- Left Column: Booking Summary and Payment -->
         <div class="lg:col-span-2 space-y-6">
           <!-- Visual Booking Summary -->
@@ -1552,6 +1603,14 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_info(:check_booking_expiration, socket) do
+    if socket.assigns[:checkout_data_loaded?] && socket.assigns.booking do
+      handle_booking_expiration_check(socket)
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp handle_booking_expiration_check(socket) do
     booking = reload_checkout_booking(socket.assigns.booking.id)
 
     if booking_payable?(booking) do
