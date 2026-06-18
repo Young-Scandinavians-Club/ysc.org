@@ -390,8 +390,8 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       assert {:error, {:redirect, %{flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      assert flash["error"] =~ "discount" or
-               flash["error"] =~ "no longer applies"
+      err = redirect_flash_error(flash)
+      assert err =~ "discount" or err =~ "no longer applies"
     end
   end
 
@@ -1127,7 +1127,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       assert {:error, {:redirect, %{flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      err = Map.get(flash, "error") || Map.get(flash, :error) || ""
+      err = redirect_flash_error(flash)
       assert err =~ "discount" or err =~ "no longer applies"
     end
 
@@ -1204,12 +1204,22 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
       assert {:error, {:redirect, %{flash: flash}}} =
                live(conn, ~p"/bookings/checkout/#{booking.id}")
 
-      err = Map.get(flash, "error") || Map.get(flash, :error) || ""
+      err = redirect_flash_error(flash)
       assert err =~ "discount" or err =~ "no longer applies"
     end
   end
 
   ## ——— helpers ———
+
+  defp redirect_flash_error(flash) when is_map(flash) do
+    Map.get(flash, "error") || Map.get(flash, :error) || ""
+  end
+
+  defp redirect_flash_error(flash) when is_binary(flash) do
+    YscWeb.Endpoint
+    |> Phoenix.LiveView.Utils.verify_flash(flash)
+    |> redirect_flash_error()
+  end
 
   defp ensure_buyout_base_pricing! do
     for prop <- [:tahoe, :clear_lake] do
