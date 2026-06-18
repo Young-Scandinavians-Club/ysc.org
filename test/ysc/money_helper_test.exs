@@ -105,8 +105,48 @@ defmodule Ysc.MoneyHelperTest do
       assert MoneyHelper.money_to_cents(Money.new!(:USD, "0.004")) == 0
     end
 
+    test "rounds entitlement-style fractional dollar amounts before converting" do
+      money = %Money{
+        amount: Decimal.new("76.66666666666666666666666666667"),
+        currency: :USD
+      }
+
+      assert MoneyHelper.money_to_cents(money) == 7667
+    end
+
     test "returns zero for non-Money values" do
       assert MoneyHelper.money_to_cents(nil) == 0
+    end
+  end
+
+  describe "cents_to_money/2" do
+    test "converts integer cents to Money" do
+      assert MoneyHelper.cents_to_money(1099, :USD) == Money.new(:USD, "10.99")
+      assert MoneyHelper.cents_to_money(7667, :USD) == Money.new(:USD, "76.67")
+    end
+
+    test "returns zero money for invalid cents" do
+      assert MoneyHelper.cents_to_money(nil, :USD) == Money.new(0, :USD)
+    end
+  end
+
+  describe "parse_dollar_string_to_cents/1" do
+    test "parses dollar strings to rounded cents" do
+      assert MoneyHelper.parse_dollar_string_to_cents("10.99") == 1099
+      assert MoneyHelper.parse_dollar_string_to_cents("$25.50") == 2550
+      assert MoneyHelper.parse_dollar_string_to_cents("76.666") == 7667
+    end
+
+    test "returns zero for blank or zero input" do
+      assert MoneyHelper.parse_dollar_string_to_cents("") == 0
+      assert MoneyHelper.parse_dollar_string_to_cents("0") == 0
+      assert MoneyHelper.parse_dollar_string_to_cents("0.00") == 0
+      assert MoneyHelper.parse_dollar_string_to_cents(nil) == 0
+    end
+
+    test "returns zero for invalid input" do
+      assert MoneyHelper.parse_dollar_string_to_cents("invalid") == 0
+      assert MoneyHelper.parse_dollar_string_to_cents("12.34.56") == 0
     end
   end
 end

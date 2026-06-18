@@ -6,6 +6,7 @@ defmodule Ysc.Tickets.StripeServiceTest do
 
   import Ecto.Query
   import Mox
+  alias Ysc.MoneyHelper
   alias Ysc.Tickets.StripeService
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
@@ -162,10 +163,7 @@ defmodule Ysc.Tickets.StripeServiceTest do
 
   describe "process_successful_payment/1" do
     defp payment_intent_for_order(ticket_order, overrides \\ []) do
-      amount_cents =
-        ticket_order.total_amount.amount
-        |> Decimal.mult(100)
-        |> Decimal.to_integer()
+      amount_cents = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
       defaults = %{
         id: "pi_success_#{ticket_order.id}",

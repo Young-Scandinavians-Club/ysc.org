@@ -84,6 +84,17 @@ defmodule Ysc.MoneyHelper do
   def cents_to_dollars(_), do: Decimal.new("0.0")
 
   @doc """
+  Converts integer cents to a `Money` struct.
+
+  Use when building `Money` values from Stripe amounts and similar cent-based APIs.
+  """
+  def cents_to_money(cents, currency) when is_integer(cents) do
+    Money.new(currency, cents_to_dollars(cents))
+  end
+
+  def cents_to_money(_, _currency), do: Money.new(0, :USD)
+
+  @doc """
   Converts Money to cents (integer) for Stripe and similar APIs.
 
   Rounds to the currency's minor units (`Money.round/1`) before converting so
@@ -104,4 +115,39 @@ defmodule Ysc.MoneyHelper do
   end
 
   def money_to_cents(_), do: 0
+
+  @doc """
+  Parses a dollar amount string (e.g. `"10.99"`, `"$25.00"`) to cents for Stripe APIs.
+
+  Returns `0` for blank, zero, or invalid input. Rounds to the nearest cent.
+  """
+  def parse_dollar_string_to_cents(nil), do: 0
+
+  def parse_dollar_string_to_cents(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    cond do
+      trimmed in ["", "0", "0.00"] ->
+        0
+
+      true ->
+        cleaned = trimmed |> String.replace(~r/[^\d.]/, "")
+
+        if cleaned == "" do
+          0
+        else
+          case Decimal.parse(cleaned) do
+            {decimal, ""} ->
+              decimal
+              |> Money.new(:USD)
+              |> money_to_cents()
+
+            _ ->
+              0
+          end
+        end
+    end
+  end
+
+  def parse_dollar_string_to_cents(_), do: 0
 end

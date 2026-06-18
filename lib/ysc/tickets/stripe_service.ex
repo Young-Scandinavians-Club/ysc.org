@@ -10,6 +10,7 @@ defmodule Ysc.Tickets.StripeService do
   """
 
   alias Ysc.Tickets
+  alias Ysc.MoneyHelper
 
   defp stripe_client do
     Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
@@ -31,7 +32,7 @@ defmodule Ysc.Tickets.StripeService do
     customer_id = Keyword.get(opts, :customer_id)
     payment_method_id = Keyword.get(opts, :payment_method_id)
 
-    amount_cents = money_to_cents(ticket_order.total_amount)
+    amount_cents = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
     # Note: Stripe PaymentIntents don't support expires_at parameter.
     # The expires_at parameter is only available for Checkout Sessions, not PaymentIntents.
@@ -251,7 +252,7 @@ defmodule Ysc.Tickets.StripeService do
   end
 
   defp validate_payment_intent(payment_intent, ticket_order) do
-    expected_amount = money_to_cents(ticket_order.total_amount)
+    expected_amount = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
     cond do
       payment_intent.amount != expected_amount ->
@@ -318,25 +319,5 @@ defmodule Ysc.Tickets.StripeService do
       {:error, reason} ->
         {:error, reason}
     end
-  end
-
-  # Helper function to safely convert Money to cents
-  defp money_to_cents(%Money{amount: amount, currency: :USD}) do
-    # Use Decimal for precise conversion to avoid floating-point errors
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(%Money{amount: amount, currency: _currency}) do
-    # For other currencies, use same conversion
-    amount
-    |> Decimal.mult(100)
-    |> Decimal.to_integer()
-  end
-
-  defp money_to_cents(_) do
-    # Fallback for invalid money values
-    0
   end
 end

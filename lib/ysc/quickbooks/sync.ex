@@ -10,6 +10,7 @@ defmodule Ysc.Quickbooks.Sync do
   alias Ysc.Repo
   alias Ysc.Ledgers.{Payment, Refund, Payout, LedgerEntry}
   alias Ysc.Quickbooks
+  alias Ysc.MoneyHelper
   alias Ysc.Accounts.User
   alias Ysc.Bookings
   alias Ysc.Subscriptions
@@ -2693,8 +2694,7 @@ defmodule Ysc.Quickbooks.Sync do
         "[QB Sync] calculate_payout_stripe_fees: Total fees calculated",
         payout_id: payout.id,
         total_fees: inspect(total_fees),
-        fees_cents:
-          total_fees.amount |> Decimal.mult(100) |> Decimal.to_integer()
+        fees_cents: MoneyHelper.money_to_cents(total_fees)
       )
 
       total_fees
