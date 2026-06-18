@@ -1220,7 +1220,10 @@ defmodule YscWeb.AdminBookingsLive do
       </.modal>
       <!-- New/Edit Refund Policy Modal -->
       <.modal
-        :if={@live_action in [:new_refund_policy, :edit_refund_policy] && @refund_policy_form}
+        :if={
+          @live_action in [:new_refund_policy, :edit_refund_policy] &&
+            @refund_policy_form
+        }
         id="refund-policy-modal"
         on_cancel={
           query_params =

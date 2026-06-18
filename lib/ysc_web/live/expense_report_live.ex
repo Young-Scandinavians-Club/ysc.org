@@ -1341,302 +1341,308 @@ defmodule YscWeb.ExpenseReportLive do
           <.timeline_section expense_report={@expense_report} />
           <!-- Expense Report Summary Card -->
           <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
-          <div class="px-6 py-4 border-b border-zinc-200">
-            <h2 class="text-lg font-semibold text-zinc-900">
-              Expense Report Summary
-            </h2>
-          </div>
-          <div class="px-6 py-4 space-y-4">
-            <div>
-              <dt class="text-sm font-medium text-zinc-500">Purpose</dt>
-              <dd class="mt-1 text-sm text-zinc-900">
-                {@expense_report.purpose}
-              </dd>
+            <div class="px-6 py-4 border-b border-zinc-200">
+              <h2 class="text-lg font-semibold text-zinc-900">
+                Expense Report Summary
+              </h2>
             </div>
-            <%= if @expense_report.event do %>
+            <div class="px-6 py-4 space-y-4">
               <div>
-                <dt class="text-sm font-medium text-zinc-500">Related Event</dt>
+                <dt class="text-sm font-medium text-zinc-500">Purpose</dt>
                 <dd class="mt-1 text-sm text-zinc-900">
-                  {@expense_report.event.title} - {Calendar.strftime(
-                    @expense_report.event.start_date,
-                    "%B %d, %Y"
+                  {@expense_report.purpose}
+                </dd>
+              </div>
+              <%= if @expense_report.event do %>
+                <div>
+                  <dt class="text-sm font-medium text-zinc-500">Related Event</dt>
+                  <dd class="mt-1 text-sm text-zinc-900">
+                    {@expense_report.event.title} - {Calendar.strftime(
+                      @expense_report.event.start_date,
+                      "%B %d, %Y"
+                    )}
+                  </dd>
+                </div>
+              <% end %>
+              <div>
+                <dt class="text-sm font-medium text-zinc-500">Report ID</dt>
+                <dd class="mt-1 flex items-center gap-2">
+                  <span class="text-xs sm:text-sm text-zinc-900 font-mono break-all">
+                    {@expense_report.id}
+                  </span>
+                  <button
+                    type="button"
+                    phx-click="copy-report-id"
+                    phx-value-id={@expense_report.id}
+                    class="px-1.5 py-0.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors flex-shrink-0"
+                    title="Copy Report ID"
+                  >
+                    <.icon name="hero-clipboard" class="w-4 h-4 -mt-1.5" />
+                  </button>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-sm font-medium text-zinc-500">Submitted</dt>
+                <dd class="mt-1 text-sm text-zinc-900">
+                  {Calendar.strftime(
+                    @expense_report.inserted_at,
+                    "%B %d, %Y at %I:%M %p"
                   )}
                 </dd>
               </div>
-            <% end %>
-            <div>
-              <dt class="text-sm font-medium text-zinc-500">Report ID</dt>
-              <dd class="mt-1 flex items-center gap-2">
-                <span class="text-xs sm:text-sm text-zinc-900 font-mono break-all">
-                  {@expense_report.id}
-                </span>
-                <button
-                  type="button"
-                  phx-click="copy-report-id"
-                  phx-value-id={@expense_report.id}
-                  class="px-1.5 py-0.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded transition-colors flex-shrink-0"
-                  title="Copy Report ID"
-                >
-                  <.icon name="hero-clipboard" class="w-4 h-4 -mt-1.5" />
-                </button>
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm font-medium text-zinc-500">Submitted</dt>
-              <dd class="mt-1 text-sm text-zinc-900">
-                {Calendar.strftime(
-                  @expense_report.inserted_at,
-                  "%B %d, %Y at %I:%M %p"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt class="text-sm font-medium text-zinc-500">
-                Reimbursement Method
-              </dt>
-              <dd class="mt-1 text-sm text-zinc-900">
-                {case @expense_report.reimbursement_method do
-                  "bank_transfer" -> "Bank Transfer"
-                  "check" -> "Check"
-                  _ -> "Not specified"
-                end}
-              </dd>
+              <div>
+                <dt class="text-sm font-medium text-zinc-500">
+                  Reimbursement Method
+                </dt>
+                <dd class="mt-1 text-sm text-zinc-900">
+                  {case @expense_report.reimbursement_method do
+                    "bank_transfer" -> "Bank Transfer"
+                    "check" -> "Check"
+                    _ -> "Not specified"
+                  end}
+                </dd>
+              </div>
             </div>
           </div>
-        </div>
-        <!-- Expense Items Card -->
-        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
-          <div class="px-6 py-4 border-b border-zinc-200">
-            <h2 class="text-lg font-semibold text-zinc-900">Expense Items</h2>
-          </div>
-          <div class="px-6 py-4">
-            <div class="space-y-4">
-              <%= if Enum.empty?(@expense_report.expense_items) do %>
-                <p class="text-sm text-zinc-500">No expense items</p>
-              <% else %>
-                <%= for {item, index} <- Enum.with_index(@expense_report.expense_items) do %>
-                  <div class="flex justify-between items-start p-4 bg-zinc-50 rounded-lg">
-                    <div class="flex-1">
-                      <p class="font-medium text-zinc-900">
-                        {item.description}
-                      </p>
-                      <p class="text-sm text-zinc-500 mt-1">
-                        <%= if item.vendor do %>
-                          Vendor: {item.vendor} •
-                        <% end %>
-                        <%= if item.date do %>
-                          Date: {Calendar.strftime(item.date, "%B %d, %Y")}
-                        <% end %>
-                      </p>
-                      <%= if item.receipt_s3_path do %>
-                        <%= if pdf?(item.receipt_s3_path) do %>
-                          <a
-                            href={ExpenseReports.receipt_url(item.receipt_s3_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1"
-                          >
-                            <.icon name="hero-document-check" class="w-4 h-4" />
-                            View PDF receipt
-                          </a>
-                        <% else %>
-                          <div
-                            phx-hook="ReceiptLightbox"
-                            id={"success-receipt-#{@expense_report.id}-#{index}"}
-                            class="inline-block"
-                          >
+          <!-- Expense Items Card -->
+          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+            <div class="px-6 py-4 border-b border-zinc-200">
+              <h2 class="text-lg font-semibold text-zinc-900">Expense Items</h2>
+            </div>
+            <div class="px-6 py-4">
+              <div class="space-y-4">
+                <%= if Enum.empty?(@expense_report.expense_items) do %>
+                  <p class="text-sm text-zinc-500">No expense items</p>
+                <% else %>
+                  <%= for {item, index} <- Enum.with_index(@expense_report.expense_items) do %>
+                    <div class="flex justify-between items-start p-4 bg-zinc-50 rounded-lg">
+                      <div class="flex-1">
+                        <p class="font-medium text-zinc-900">
+                          {item.description}
+                        </p>
+                        <p class="text-sm text-zinc-500 mt-1">
+                          <%= if item.vendor do %>
+                            Vendor: {item.vendor} •
+                          <% end %>
+                          <%= if item.date do %>
+                            Date: {Calendar.strftime(item.date, "%B %d, %Y")}
+                          <% end %>
+                        </p>
+                        <%= if item.receipt_s3_path do %>
+                          <%= if pdf?(item.receipt_s3_path) do %>
                             <a
                               href={
                                 ExpenseReports.receipt_url(item.receipt_s3_path)
                               }
-                              data-lightbox="receipt"
-                              class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1 cursor-zoom-in"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1"
                             >
                               <.icon name="hero-document-check" class="w-4 h-4" />
-                              View receipt
+                              View PDF receipt
                             </a>
-                          </div>
+                          <% else %>
+                            <div
+                              phx-hook="ReceiptLightbox"
+                              id={"success-receipt-#{@expense_report.id}-#{index}"}
+                              class="inline-block"
+                            >
+                              <a
+                                href={
+                                  ExpenseReports.receipt_url(item.receipt_s3_path)
+                                }
+                                data-lightbox="receipt"
+                                class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1 cursor-zoom-in"
+                              >
+                                <.icon name="hero-document-check" class="w-4 h-4" />
+                                View receipt
+                              </a>
+                            </div>
+                          <% end %>
                         <% end %>
-                      <% end %>
+                      </div>
+                      <div class="text-right ml-4">
+                        <p class="font-semibold text-zinc-900">
+                          {case Ysc.MoneyHelper.format_money(item.amount) do
+                            {:ok, amount} -> amount
+                            amount when is_binary(amount) -> amount
+                            _ -> "N/A"
+                          end}
+                        </p>
+                      </div>
                     </div>
-                    <div class="text-right ml-4">
-                      <p class="font-semibold text-zinc-900">
-                        {case Ysc.MoneyHelper.format_money(item.amount) do
-                          {:ok, amount} -> amount
-                          amount when is_binary(amount) -> amount
-                          _ -> "N/A"
-                        end}
-                      </p>
-                    </div>
-                  </div>
+                  <% end %>
                 <% end %>
-              <% end %>
+              </div>
             </div>
           </div>
-        </div>
-        <!-- Income Items Card -->
-        <%= if not Enum.empty?(@expense_report.income_items) do %>
-          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
-            <div class="px-6 py-4 border-b border-zinc-200">
-              <h2 class="text-lg font-semibold text-zinc-900">Income Items</h2>
-            </div>
-            <div class="px-6 py-4">
-              <div class="space-y-4">
-                <%= for {item, index} <- Enum.with_index(@expense_report.income_items) do %>
-                  <div class="flex justify-between items-start p-4 bg-zinc-50 rounded-lg">
-                    <div class="flex-1">
-                      <p class="font-medium text-zinc-900">
-                        {item.description}
-                      </p>
-                      <p class="text-sm text-zinc-500 mt-1">
-                        <%= if item.date do %>
-                          Date: {Calendar.strftime(item.date, "%B %d, %Y")}
-                        <% end %>
-                      </p>
-                      <%= if item.proof_s3_path do %>
-                        <%= if pdf?(item.proof_s3_path) do %>
-                          <a
-                            href={ExpenseReports.receipt_url(item.proof_s3_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1"
-                          >
-                            <.icon name="hero-document-check" class="w-4 h-4" />
-                            View PDF proof
-                          </a>
-                        <% else %>
-                          <div
-                            phx-hook="ReceiptLightbox"
-                            id={"success-proof-#{@expense_report.id}-#{index}"}
-                            class="inline-block"
-                          >
+          <!-- Income Items Card -->
+          <%= if not Enum.empty?(@expense_report.income_items) do %>
+            <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6">
+              <div class="px-6 py-4 border-b border-zinc-200">
+                <h2 class="text-lg font-semibold text-zinc-900">Income Items</h2>
+              </div>
+              <div class="px-6 py-4">
+                <div class="space-y-4">
+                  <%= for {item, index} <- Enum.with_index(@expense_report.income_items) do %>
+                    <div class="flex justify-between items-start p-4 bg-zinc-50 rounded-lg">
+                      <div class="flex-1">
+                        <p class="font-medium text-zinc-900">
+                          {item.description}
+                        </p>
+                        <p class="text-sm text-zinc-500 mt-1">
+                          <%= if item.date do %>
+                            Date: {Calendar.strftime(item.date, "%B %d, %Y")}
+                          <% end %>
+                        </p>
+                        <%= if item.proof_s3_path do %>
+                          <%= if pdf?(item.proof_s3_path) do %>
                             <a
                               href={ExpenseReports.receipt_url(item.proof_s3_path)}
-                              data-lightbox="receipt"
-                              class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1 cursor-zoom-in"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1"
                             >
                               <.icon name="hero-document-check" class="w-4 h-4" />
-                              View proof
+                              View PDF proof
                             </a>
-                          </div>
+                          <% else %>
+                            <div
+                              phx-hook="ReceiptLightbox"
+                              id={"success-proof-#{@expense_report.id}-#{index}"}
+                              class="inline-block"
+                            >
+                              <a
+                                href={
+                                  ExpenseReports.receipt_url(item.proof_s3_path)
+                                }
+                                data-lightbox="receipt"
+                                class="text-xs text-green-600 mt-1 hover:text-green-700 hover:underline inline-flex items-center gap-1 cursor-zoom-in"
+                              >
+                                <.icon name="hero-document-check" class="w-4 h-4" />
+                                View proof
+                              </a>
+                            </div>
+                          <% end %>
                         <% end %>
-                      <% end %>
+                      </div>
+                      <div class="text-right ml-4">
+                        <p class="font-semibold text-zinc-900">
+                          {case Ysc.MoneyHelper.format_money(item.amount) do
+                            {:ok, amount} -> amount
+                            amount when is_binary(amount) -> amount
+                            _ -> "N/A"
+                          end}
+                        </p>
+                      </div>
                     </div>
-                    <div class="text-right ml-4">
-                      <p class="font-semibold text-zinc-900">
-                        {case Ysc.MoneyHelper.format_money(item.amount) do
-                          {:ok, amount} -> amount
-                          amount when is_binary(amount) -> amount
-                          _ -> "N/A"
-                        end}
-                      </p>
-                    </div>
-                  </div>
-                <% end %>
+                  <% end %>
+                </div>
               </div>
             </div>
-          </div>
-        <% end %>
-        <!-- Totals Card -->
-        <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6 print-no-break">
-          <div class="px-6 py-4 border-b border-zinc-200">
-            <h2 class="text-lg font-semibold text-zinc-900">Totals</h2>
-          </div>
-          <div class="px-6 py-4">
-            <div class="space-y-3">
-              <div class="flex justify-between">
-                <span class="text-zinc-600">Total Expenses</span>
-                <span class="font-medium">
-                  {case Ysc.MoneyHelper.format_money(@totals.expense_total) do
-                    {:ok, amount} -> amount
-                    amount when is_binary(amount) -> amount
-                    _ -> "N/A"
-                  end}
-                </span>
-              </div>
-              <%= if not Money.zero?(@totals.income_total) do %>
+          <% end %>
+          <!-- Totals Card -->
+          <div class="bg-white rounded-lg shadow-sm border border-zinc-200 mb-6 print-no-break">
+            <div class="px-6 py-4 border-b border-zinc-200">
+              <h2 class="text-lg font-semibold text-zinc-900">Totals</h2>
+            </div>
+            <div class="px-6 py-4">
+              <div class="space-y-3">
                 <div class="flex justify-between">
-                  <span class="text-zinc-600">Total Income</span>
+                  <span class="text-zinc-600">Total Expenses</span>
                   <span class="font-medium">
-                    {case Ysc.MoneyHelper.format_money(@totals.income_total) do
+                    {case Ysc.MoneyHelper.format_money(@totals.expense_total) do
                       {:ok, amount} -> amount
                       amount when is_binary(amount) -> amount
                       _ -> "N/A"
                     end}
                   </span>
                 </div>
-              <% end %>
-              <div class="flex justify-between pt-3 border-t border-zinc-200">
-                <span class="text-lg font-semibold text-zinc-900">Net Total</span>
-                <span class="text-lg font-semibold text-zinc-900">
-                  {case Ysc.MoneyHelper.format_money(@totals.net_total) do
-                    {:ok, amount} -> amount
-                    amount when is_binary(amount) -> amount
-                    _ -> "N/A"
-                  end}
-                </span>
+                <%= if not Money.zero?(@totals.income_total) do %>
+                  <div class="flex justify-between">
+                    <span class="text-zinc-600">Total Income</span>
+                    <span class="font-medium">
+                      {case Ysc.MoneyHelper.format_money(@totals.income_total) do
+                        {:ok, amount} -> amount
+                        amount when is_binary(amount) -> amount
+                        _ -> "N/A"
+                      end}
+                    </span>
+                  </div>
+                <% end %>
+                <div class="flex justify-between pt-3 border-t border-zinc-200">
+                  <span class="text-lg font-semibold text-zinc-900">Net Total</span>
+                  <span class="text-lg font-semibold text-zinc-900">
+                    {case Ysc.MoneyHelper.format_money(@totals.net_total) do
+                      {:ok, amount} -> amount
+                      amount when is_binary(amount) -> amount
+                      _ -> "N/A"
+                    end}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <!-- Confirmation Email Notice -->
-        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div class="flex">
-            <div class="flex-shrink-0">
-              <.icon name="hero-envelope" class="w-5 h-5 text-blue-600" />
-            </div>
-            <div class="ml-3">
-              <h3 class="text-sm font-medium text-blue-800">Confirmation Email</h3>
-              <div class="mt-2 text-sm text-blue-700">
-                <p>
-                  You will receive a confirmation email at
-                  <strong>{@current_user.email}</strong>
-                  with the details of your submitted expense report.
-                </p>
+          <!-- Confirmation Email Notice -->
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <.icon name="hero-envelope" class="w-5 h-5 text-blue-600" />
+              </div>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-blue-800">
+                  Confirmation Email
+                </h3>
+                <div class="mt-2 text-sm text-blue-700">
+                  <p>
+                    You will receive a confirmation email at
+                    <strong>{@current_user.email}</strong>
+                    with the details of your submitted expense report.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <!-- Actions -->
-        <div class="print-hide mt-8">
-          <!-- Primary Actions -->
-          <div class="flex flex-col sm:flex-row justify-center gap-3">
-            <.button navigate={~p"/expensereport"}>
-              <.icon name="hero-plus" class="w-5 h-5" /> Submit Another Report
-            </.button>
-            <.button
-              type="button"
-              phx-click="download-pdf"
-              variant="outline"
-              color="zinc"
-            >
-              <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Download PDF
-            </.button>
+          <!-- Actions -->
+          <div class="print-hide mt-8">
+            <!-- Primary Actions -->
+            <div class="flex flex-col sm:flex-row justify-center gap-3">
+              <.button navigate={~p"/expensereport"}>
+                <.icon name="hero-plus" class="w-5 h-5" /> Submit Another Report
+              </.button>
+              <.button
+                type="button"
+                phx-click="download-pdf"
+                variant="outline"
+                color="zinc"
+              >
+                <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Download PDF
+              </.button>
+            </div>
+            <!-- Secondary Actions -->
+            <div class="flex flex-wrap items-center justify-center mt-6 text-sm">
+              <.link
+                navigate={~p"/expensereports"}
+                class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
+              >
+                View My Reports
+              </.link>
+              <span class="text-zinc-300">·</span>
+              <.link
+                navigate={~p"/"}
+                class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
+              >
+                Return to Dashboard
+              </.link>
+              <span class="text-zinc-300">·</span>
+              <.link
+                href={"mailto:treasurer@ysc.org?subject=Question about Expense Report #{@expense_report.id}&body=Hi Treasurer,%0D%0A%0D%0AI have a question regarding my expense report (ID: #{@expense_report.id}).%0D%0A%0D%0A[Please describe your question or issue here]%0D%0A%0D%0AThank you!"}
+                class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
+              >
+                Contact Treasurer
+              </.link>
+            </div>
           </div>
-          <!-- Secondary Actions -->
-          <div class="flex flex-wrap items-center justify-center mt-6 text-sm">
-            <.link
-              navigate={~p"/expensereports"}
-              class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
-            >
-              View My Reports
-            </.link>
-            <span class="text-zinc-300">·</span>
-            <.link
-              navigate={~p"/"}
-              class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
-            >
-              Return to Dashboard
-            </.link>
-            <span class="text-zinc-300">·</span>
-            <.link
-              href={"mailto:treasurer@ysc.org?subject=Question about Expense Report #{@expense_report.id}&body=Hi Treasurer,%0D%0A%0D%0AI have a question regarding my expense report (ID: #{@expense_report.id}).%0D%0A%0D%0A[Please describe your question or issue here]%0D%0A%0D%0AThank you!"}
-              class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
-            >
-              Contact Treasurer
-            </.link>
-          </div>
-        </div>
         <% else %>
           <p class="text-center text-zinc-600">Loading expense report details…</p>
         <% end %>

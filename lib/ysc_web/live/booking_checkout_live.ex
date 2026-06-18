@@ -1603,10 +1603,10 @@ defmodule YscWeb.BookingCheckoutLive do
 
   @impl true
   def handle_info(:check_booking_expiration, socket) do
-    unless socket.assigns[:checkout_data_loaded?] && socket.assigns.booking do
-      {:noreply, socket}
-    else
+    if socket.assigns[:checkout_data_loaded?] && socket.assigns.booking do
       handle_booking_expiration_check(socket)
+    else
+      {:noreply, socket}
     end
   end
 
