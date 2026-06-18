@@ -537,6 +537,10 @@ defmodule Ysc.WpMigration.WpRepo do
     - `"sub_next_payment_date"` — next renewal datetime (nil if expired/cancelled)
     - `"sub_amount"`           — subscription amount (USD string)
     - `"sub_period"`           — billing period (e.g. "year")
+    - `"wcm_product_id"`       — WooCommerce Membership product ID
+    - `"wcm_product_name"`     — WooCommerce Membership product title
+    - `"sub_product_id"`       — product ID linked via membership + subscription
+    - `"sub_product_name"`     — product title linked via membership + subscription
   """
   def get_membership_for_user(%__MODULE__{conn: conn}, user_id) do
     uid_str = to_string(user_id)
@@ -546,12 +550,18 @@ defmodule Ysc.WpMigration.WpRepo do
     SELECT
       p.post_status AS wcm_status,
       pm_start.meta_value AS wcm_start_date,
-      pm_end.meta_value AS wcm_end_date
+      pm_end.meta_value AS wcm_end_date,
+      pm_product.meta_value AS wcm_product_id,
+      prod.post_title AS wcm_product_name
     FROM #{@table_prefix}_posts p
     LEFT JOIN #{@table_prefix}_postmeta pm_start
       ON pm_start.post_id = p.ID AND pm_start.meta_key = '_start_date'
     LEFT JOIN #{@table_prefix}_postmeta pm_end
       ON pm_end.post_id = p.ID AND pm_end.meta_key = '_end_date'
+    LEFT JOIN #{@table_prefix}_postmeta pm_product
+      ON pm_product.post_id = p.ID AND pm_product.meta_key = '_product_id'
+    LEFT JOIN #{@table_prefix}_posts prod
+      ON prod.ID = pm_product.meta_value
     WHERE p.post_type = 'wc_user_membership'
       AND p.post_author = $1
     ORDER BY
@@ -629,7 +639,48 @@ defmodule Ysc.WpMigration.WpRepo do
         _ -> %{}
       end
 
-    {:ok, wcm |> Map.merge(sub) |> Map.merge(sub_original)}
+    sub_product_sql = """
+    SELECT
+      pm_product.meta_value AS sub_product_id,
+      prod.post_title AS sub_product_name
+    FROM #{@table_prefix}_posts sub
+    JOIN #{@table_prefix}_postmeta pm_user
+      ON pm_user.post_id = sub.ID
+     AND pm_user.meta_key = '_customer_user'
+     AND pm_user.meta_value = $1
+    JOIN #{@table_prefix}_posts wcm
+      ON wcm.post_type = 'wc_user_membership'
+     AND wcm.post_author = $1
+    JOIN #{@table_prefix}_postmeta pm_sub
+      ON pm_sub.post_id = wcm.ID
+     AND pm_sub.meta_key = '_subscription_id'
+     AND pm_sub.meta_value = CAST(sub.ID AS VARCHAR)
+    JOIN #{@table_prefix}_postmeta pm_product
+      ON pm_product.post_id = wcm.ID
+     AND pm_product.meta_key = '_product_id'
+    JOIN #{@table_prefix}_posts prod
+      ON prod.ID = pm_product.meta_value
+    WHERE sub.post_type = 'shop_subscription'
+    ORDER BY
+      CASE sub.post_status
+        WHEN 'wc-active' THEN 0
+        WHEN 'wc-on-hold' THEN 1
+        WHEN 'wc-cancelled' THEN 2
+        WHEN 'wc-expired' THEN 3
+        ELSE 4
+      END,
+      CAST(sub.ID AS BIGINT) DESC
+    LIMIT 1
+    """
+
+    sub_product =
+      case query_maps(conn, sub_product_sql, [uid_str]) do
+        {:ok, [row | _]} -> row
+        _ -> %{}
+      end
+
+    {:ok,
+     wcm |> Map.merge(sub) |> Map.merge(sub_original) |> Map.merge(sub_product)}
   end
 
   @doc """

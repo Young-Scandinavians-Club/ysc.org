@@ -112,11 +112,13 @@ jobs:
           echo "$HOME/.dprint/bin" >> "$GITHUB_PATH"
 
       - name: ShellCheck
-        run: find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' -exec shellcheck {} +
+        run: |
+          scripts=$(./etc/scripts/list_lintable_shell_scripts.sh)
+          if [ -n "$scripts" ]; then shellcheck $scripts; fi
 
       - name: shfmt (format check)
         run: |
-          scripts=$(find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*')
+          scripts=$(./etc/scripts/list_lintable_shell_scripts.sh)
           if [ -n "$scripts" ]; then shfmt -d -i 2 -ci $scripts; fi
 
       - name: dprint (format check)

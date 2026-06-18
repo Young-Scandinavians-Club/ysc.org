@@ -83,6 +83,27 @@ defmodule Ysc.SafeFile do
     end
   end
 
+  @doc """
+  Writes bytes to a basename file under `root`.
+
+  Returns `{:ok, absolute_path}` or `{:error, :invalid_path}` when `filename` is
+  not a safe basename or resolves outside `root`.
+  """
+  @spec write_under_root(String.t(), String.t(), binary()) ::
+          {:ok, String.t()} | {:error, :invalid_path | term()}
+  def write_under_root(root, filename, bytes)
+      when is_binary(root) and is_binary(filename) and is_binary(bytes) do
+    with :ok <- validate_basename(filename),
+         {:ok, path} <- join_under_root(Path.expand(root), [filename]),
+         :ok <- ensure_parent_dir(path),
+         :ok <- do_write(path, bytes) do
+      {:ok, path}
+    else
+      :error -> {:error, :invalid_path}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @doc "Copies a regular file to an absolute destination path (parent dirs created)."
   @spec copy_upload_to(String.t(), String.t()) :: :ok | {:error, term()}
   def copy_upload_to(src, dest) when is_binary(src) and is_binary(dest) do
@@ -201,6 +222,13 @@ defmodule Ysc.SafeFile do
       ext == "" -> :ok
       String.match?(ext, ~r/^\.[a-z0-9]+$/) -> :ok
       true -> :error
+    end
+  end
+
+  defp ensure_parent_dir(path) do
+    case Path.dirname(path) do
+      "." -> :ok
+      dir -> do_mkdir_p(dir)
     end
   end
 

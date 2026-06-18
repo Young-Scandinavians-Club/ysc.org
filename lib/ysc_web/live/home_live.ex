@@ -304,73 +304,70 @@ defmodule YscWeb.HomeLive do
         video={@hero_video}
         poster={@hero_poster}
         captions={@hero_captions}
-        height="90vh"
-        overlay_opacity="bg-black/40"
+        height="85vh"
+        overlay_opacity="bg-gradient-to-b from-black/30 via-black/40 to-black/60"
       >
-        <%!-- Constrained content block on mobile for balanced measure and centering --%>
-        <div class="mx-auto w-full max-w-2xl md:max-w-none flex flex-col items-center">
-          <div class="max-w-full">
-            <span class={[
-              "block font-serif italic text-xl sm:text-2xl md:text-2xl lg:text-4xl mb-3 sm:mb-4 text-white/80 font-light tracking-tight",
-              "[@media(max-height:600px)]:hidden"
-            ]}>
-              Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years of
-            </span>
-            <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-9xl font-black text-white drop-shadow-2xl max-w-full leading-tight">
-              <span class="block whitespace-nowrap">Young</span>
-              <span class="block whitespace-nowrap">Scandinavians</span>
-              <span class="block whitespace-nowrap">Club</span>
-            </h1>
+        <div class="mt-12 w-full max-w-4xl flex flex-col items-center">
+          <span class={[
+            "block font-serif italic text-lg sm:text-xl md:text-2xl mb-4 text-white/90 font-light tracking-wide",
+            "[@media(max-height:600px)]:hidden"
+          ]}>
+            Celebrating {div(Date.utc_today().year - 1950, 5) * 5} Years
+          </span>
+
+          <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white tracking-tight leading-[1.1] drop-shadow-lg">
+            Young Scandinavians Club
+          </h1>
+        </div>
+
+        <p class="mt-6 text-lg sm:text-xl md:text-2xl max-w-2xl mx-auto text-white/90 font-light leading-relaxed drop-shadow-md">
+          Your Nordic home in the Bay Area. Connecting generations through nature, tradition, and lifelong friendships.
+        </p>
+
+        <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-md sm:max-w-none">
+          <.link
+            navigate={~p"/users/register"}
+            class="group flex items-center justify-center px-8 py-4 text-base font-semibold text-zinc-900 bg-white rounded hover:bg-zinc-100 transition-all duration-200 w-full sm:w-auto shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+          >
+            Apply for Membership
+            <.icon
+              name="hero-arrow-right"
+              class="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform duration-300"
+            />
+          </.link>
+          <.link
+            navigate={~p"/events"}
+            class="flex items-center justify-center px-8 py-4 text-base font-medium text-white border border-white/60 rounded hover:bg-white/10 hover:border-white transition-all duration-200 backdrop-blur-sm w-full sm:w-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+          >
+            Explore Our Events
+          </.link>
+        </div>
+
+        <div class="hidden md:flex mt-16 flex-wrap items-center justify-center gap-10 text-white/80 border-t border-white/20 pt-8 w-full max-w-3xl">
+          <div class="text-center">
+            <div class="text-xl font-semibold text-white tracking-wide">
+              Since 1951
+            </div>
+            <div class="text-sm font-light uppercase tracking-widest mt-1 opacity-80">
+              Established
+            </div>
           </div>
-
-          <p class="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl lg:text-2xl max-w-2xl mx-auto text-white/85 font-normal leading-relaxed drop-shadow-md px-0">
-            A vibrant community for Scandinavians and Scandinavian-Americans in and around the San Francisco Bay Area
-          </p>
-
-          <div class="mt-8 sm:mt-10 w-full max-w-sm sm:max-w-none flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center items-stretch sm:items-center">
-            <.link
-              navigate={~p"/users/register"}
-              class="group flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-zinc-900 bg-white rounded-md hover:bg-blue-50 transition-colors duration-150 min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-            >
-              Apply for Membership
-              <.icon
-                name="hero-arrow-right"
-                class="me-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
-              />
-            </.link>
-            <.link
-              navigate={~p"/events"}
-              class="flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-sm sm:text-base font-bold text-white border-2 border-white/80 rounded-md hover:bg-white hover:text-zinc-900 transition-all duration-150 backdrop-blur-sm min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
-            >
-              Explore Our Events
-            </.link>
+          <div class="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+          <div class="text-center">
+            <div class="text-xl font-semibold text-white tracking-wide">
+              Clear Lake & Tahoe
+            </div>
+            <div class="text-sm font-light uppercase tracking-widest mt-1 opacity-80">
+              Private Cabins
+            </div>
           </div>
-
-          <%!-- Stats as a single grouped unit on mobile for visual balance --%>
-          <div class="hidden md:block mt-10 sm:mt-12 md:mt-16 w-full max-w-none mx-auto px-0 py-0">
-            <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 md:gap-8 text-white/70">
-              <div class="text-center min-w-0 flex-none basis-auto">
-                <div class="text-2xl sm:text-3xl font-bold text-white">500+</div>
-                <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
-                  Members
-                </div>
-              </div>
-              <div class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 block"></div>
-              <div class="text-center min-w-0 flex-none basis-auto">
-                <div class="text-2xl sm:text-3xl font-bold text-white">2</div>
-                <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
-                  Properties
-                </div>
-              </div>
-              <div class="w-px h-10 sm:h-12 bg-white/30 flex-shrink-0 block"></div>
-              <div class="text-center min-w-0 flex-none basis-auto">
-                <div class="text-2xl sm:text-3xl font-bold text-white">
-                  {div(Date.utc_today().year - 1950, 5) * 5}+
-                </div>
-                <div class="text-xs sm:text-sm uppercase tracking-wide mt-0.5">
-                  Years
-                </div>
-              </div>
+          <div class="w-1.5 h-1.5 rounded-full bg-white/40"></div>
+          <div class="text-center">
+            <div class="text-xl font-semibold text-white tracking-wide">
+              Bay Area
+            </div>
+            <div class="text-sm font-light uppercase tracking-widest mt-1 opacity-80">
+              Community
             </div>
           </div>
         </div>
@@ -385,14 +382,14 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 lg:gap-20 items-center">
           <div class="lg:col-span-5 min-w-0">
-            <span class="text-blue-600 font-black text-sm uppercase tracking-[0.3em]">
+            <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
               Velkommen back
             </span>
-            <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-black text-zinc-900 tracking-tighter leading-[0.95] break-words">
+            <h2 class="mt-4 sm:mt-6 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight leading-[1.05] break-words">
               A home for Nordic spirits in the Bay.
             </h2>
             <p class="mt-6 sm:mt-8 text-base sm:text-lg text-zinc-600 leading-relaxed pr-0 sm:pr-4">
-              The Young Scandinavians Club (YSC) is a vibrant community for Scandinavians and Scandinavian-Americans of all ages in the San Francisco Bay Area. We host a wide range of events across Northern California, offering members access to our scenic cabins in Clear Lake and Lake Tahoe.
+              The Young Scandinavians Club (YSC) is a welcoming community for Scandinavians and Scandinavian-Americans of all ages in the San Francisco Bay Area. We host a wide range of events across Northern California, offering members access to our scenic cabins in Clear Lake and Lake Tahoe.
             </p>
             <div class="mt-6 flex items-center gap-3 flex-wrap">
               <.flag country="fi-dk" class="h-8 w-12 rounded shadow-sm" />
@@ -405,7 +402,7 @@ defmodule YscWeb.HomeLive do
               Those with <strong class="text-zinc-900">Danish</strong>, <strong class="text-zinc-900">Finnish</strong>, <strong class="text-zinc-900">Icelandic</strong>, <strong class="text-zinc-900">Norwegian</strong>, or
               <strong class="text-zinc-900">Swedish</strong>
               heritage may qualify for membership, with rates starting at just
-              <strong class="text-blue-600">
+              <strong class="text-blue-700">
                 {Ysc.MoneyHelper.format_money!(
                   Money.new(
                     :USD,
@@ -418,7 +415,7 @@ defmodule YscWeb.HomeLive do
             <div class="mt-6 sm:mt-8">
               <.link
                 navigate={~p"/users/register"}
-                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 text-base font-bold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+                class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 text-base font-bold text-white bg-blue-700 rounded hover:bg-blue-800 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-700 focus-visible:ring-offset-2"
               >
                 Apply for Membership
                 <.icon name="hero-arrow-right" class="ml-2 w-5 h-5" />
@@ -455,7 +452,7 @@ defmodule YscWeb.HomeLive do
     <section :if={@current_user == nil} class="py-12 sm:py-16 lg:py-24 bg-zinc-50">
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
-          <span class="text-blue-600 font-semibold text-sm uppercase tracking-wider">
+          <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
             Nordic Living
           </span>
           <h2 class="mt-3 text-2xl sm:text-3xl lg:text-4xl font-bold text-zinc-900 break-words leading-snug">
@@ -525,15 +522,15 @@ defmodule YscWeb.HomeLive do
           </div>
 
           <%!-- Community stats card --%>
-          <div class="md:col-span-1 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl p-5 sm:p-6 flex flex-col justify-center items-center text-center shadow-lg min-h-[180px] sm:min-h-0">
-            <div class="text-3xl sm:text-4xl font-black text-white mb-1.5 sm:mb-2">
+          <div class="md:col-span-1 bg-blue-900 rounded-2xl p-5 sm:p-6 flex flex-col justify-center items-center text-center shadow-lg min-h-[180px] sm:min-h-0">
+            <div class="text-3xl sm:text-4xl font-extrabold text-white mb-1.5 sm:mb-2">
               500+
             </div>
-            <div class="text-sm text-blue-100 uppercase tracking-widest font-bold">
+            <div class="text-sm text-blue-100 uppercase tracking-widest font-semibold">
               Active Members
             </div>
-            <div class="mt-4 pt-4 border-t border-blue-400/30 w-full">
-              <div class="text-2xl font-black text-white mb-1">
+            <div class="mt-4 pt-4 border-t border-blue-700/30 w-full">
+              <div class="text-2xl font-extrabold text-white mb-1">
                 {div(Date.utc_today().year - 1950, 5) * 5}+
               </div>
               <div class="text-xs text-blue-100 uppercase tracking-widest">
@@ -553,10 +550,10 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20">
           <div class="max-w-2xl min-w-0">
-            <span class="text-blue-600 font-black text-sm uppercase tracking-[0.3em]">
+            <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
               Exclusive Retreats
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-7xl font-black text-zinc-900 tracking-tighter break-words leading-tight">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight break-words leading-tight">
               The Cabin Legacy.
             </h2>
           </div>
@@ -569,10 +566,10 @@ defmodule YscWeb.HomeLive do
           <%!-- Lake Tahoe --%>
           <div class="grid lg:grid-cols-12 gap-8 sm:gap-12 items-center">
             <div class="lg:col-span-5 order-2 lg:order-1">
-              <div class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-black uppercase tracking-widest mb-4 sm:mb-6">
+              <div class="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6">
                 <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Lake Tahoe, CA
               </div>
-              <h3 class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight mb-3 sm:mb-4">
+              <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
                 The Alpine Retreat
               </h3>
               <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
@@ -600,7 +597,7 @@ defmodule YscWeb.HomeLive do
               </ul>
               <.link
                 navigate={~p"/bookings/tahoe"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-blue-600 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded font-bold hover:bg-blue-700 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
               >
                 Learn More About Tahoe
               </.link>
@@ -632,10 +629,10 @@ defmodule YscWeb.HomeLive do
               </div>
             </div>
             <div class="lg:col-span-5">
-              <div class="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest mb-4 sm:mb-6">
+              <div class="inline-flex items-center px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold uppercase tracking-widest mb-4 sm:mb-6">
                 <.icon name="hero-map-pin" class="w-3 h-3 mr-1" /> Clear Lake, CA
               </div>
-              <h3 class="text-3xl sm:text-4xl font-black text-zinc-900 tracking-tight mb-3 sm:mb-4">
+              <h3 class="text-3xl sm:text-4xl font-extrabold text-zinc-900 tracking-tight mb-3 sm:mb-4">
                 The Waterfront Sanctuary
               </h3>
               <p class="text-zinc-600 text-base sm:text-lg leading-relaxed mb-4 sm:mb-6 font-normal">
@@ -661,7 +658,7 @@ defmodule YscWeb.HomeLive do
               </ul>
               <.link
                 navigate={~p"/bookings/clear-lake"}
-                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded-md font-bold hover:bg-emerald-600 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
+                class="inline-flex items-center min-h-[44px] px-8 py-3 bg-zinc-900 text-white rounded font-bold hover:bg-emerald-700 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900 focus-visible:ring-offset-2"
               >
                 Learn More About Clear Lake
               </.link>
@@ -677,14 +674,14 @@ defmodule YscWeb.HomeLive do
         @current_user == nil && @async_data_loaded &&
           (length(@upcoming_events) > 0 || length(@latest_news) > 0)
       }
-      class="bg-gradient-to-r from-blue-600 to-blue-800 text-white py-4 border-b border-blue-500/20 overflow-hidden"
+      class="bg-blue-900 text-white py-4 border-b border-blue-800/30 overflow-hidden"
     >
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
           <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2">
               <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span class="text-sm font-black uppercase tracking-widest">
+              <span class="text-sm font-bold uppercase tracking-widest">
                 Happening Soon
               </span>
             </div>
@@ -738,16 +735,13 @@ defmodule YscWeb.HomeLive do
       }
       class="py-16 sm:py-20 lg:py-32 bg-zinc-900 relative overflow-hidden"
     >
-      <div class="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-[120px] pointer-events-none">
-      </div>
-
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6 relative z-10">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-10 sm:mb-16">
           <div class="min-w-0">
-            <span class="text-blue-300 font-black text-sm uppercase tracking-[0.3em]">
+            <span class="text-blue-300 font-semibold text-sm uppercase tracking-widest">
               Upcoming Events
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-black text-white tracking-tighter leading-none break-words">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-white tracking-tight leading-none break-words">
               The Pulse of the Club.
             </h2>
           </div>
@@ -786,7 +780,7 @@ defmodule YscWeb.HomeLive do
           class="flex flex-wrap justify-center gap-6 sm:gap-8 lg:gap-10"
         >
           <%= for event <- @upcoming_events do %>
-            <div class="group flex flex-col bg-white/5 backdrop-blur-sm rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-500/50 transition-all duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
+            <div class="group flex flex-col bg-white/5 backdrop-blur-sm rounded-2xl sm:rounded-[2.5rem] border border-white/10 hover:border-blue-700/40 transition-all duration-500 overflow-hidden shadow-2xl w-full md:max-w-md lg:max-w-[calc(33.333%-2rem)]">
               <.link
                 navigate={~p"/events/#{event.id}"}
                 class="block relative aspect-[16/11] overflow-hidden"
@@ -813,18 +807,18 @@ defmodule YscWeb.HomeLive do
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap">
                   <%= if days_since_inserted(event.inserted_at) <= 7 do %>
-                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-black uppercase tracking-widest rounded shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-700 text-white text-xs font-bold uppercase tracking-widest rounded shadow-lg">
                       Just Added
                     </span>
                   <% end %>
                   <%= if event_sold_out?(event) do %>
-                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-black uppercase tracking-widest rounded shadow-lg">
+                    <span class="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-bold uppercase tracking-widest rounded shadow-lg">
                       Sold Out
                     </span>
                   <% end %>
                 </div>
                 <div class="absolute bottom-4 right-4 z-[2]">
-                  <span class="bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-xl text-white text-xs font-black ring-1 ring-white/10 tracking-widest">
+                  <span class="bg-zinc-900/80 backdrop-blur-md px-4 py-2 rounded-xl text-white text-xs font-semibold ring-1 ring-white/10 tracking-widest">
                     {event.pricing_info.display_text}
                   </span>
                 </div>
@@ -834,7 +828,7 @@ defmodule YscWeb.HomeLive do
 
               <div class="p-6 sm:p-8 flex flex-col flex-1">
                 <div class="flex items-center gap-3 mb-3 sm:mb-4">
-                  <span class="text-blue-300 font-black text-sm tracking-widest uppercase">
+                  <span class="text-blue-300 font-semibold text-sm tracking-widest uppercase">
                     {format_event_date(event.start_date)}
                   </span>
                   <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span>
@@ -845,7 +839,7 @@ defmodule YscWeb.HomeLive do
                   <% end %>
                 </div>
                 <.link navigate={~p"/events/#{event.id}"} class="block">
-                  <h3 class="text-xl sm:text-2xl font-black text-white tracking-tight group-hover:text-blue-300 transition-colors leading-tight">
+                  <h3 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight group-hover:text-blue-300 transition-colors leading-tight">
                     {event.title}
                   </h3>
                 </.link>
@@ -858,7 +852,7 @@ defmodule YscWeb.HomeLive do
                 <div class="mt-auto pt-6 sm:pt-8 flex justify-between items-center border-t border-white/5">
                   <%= if event.location_name do %>
                     <span class="text-sm font-bold text-zinc-400 flex items-center gap-2">
-                      <.icon name="hero-map-pin" class="w-4 h-4 text-blue-400" />
+                      <.icon name="hero-map-pin" class="w-4 h-4 text-blue-300" />
                       {event.location_name}
                     </span>
                   <% else %>
@@ -887,10 +881,10 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 sm:gap-6 mb-12 sm:mb-20 border-b border-zinc-200 pb-8 sm:pb-10">
           <div class="max-w-2xl min-w-0">
-            <span class="text-blue-600 font-black text-sm uppercase tracking-[0.3em]">
+            <span class="text-blue-700 font-semibold text-sm uppercase tracking-widest">
               Club News
             </span>
-            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-black text-zinc-900 tracking-tighter break-words">
+            <h2 class="mt-4 text-3xl sm:text-4xl lg:text-6xl font-extrabold text-zinc-900 tracking-tight break-words">
               Stay Informed.
             </h2>
           </div>
@@ -953,10 +947,10 @@ defmodule YscWeb.HomeLive do
                   }
                 />
               </div>
-              <time class="text-xs font-black text-blue-600 uppercase tracking-widest">
+              <time class="text-xs font-semibold text-blue-700 uppercase tracking-widest">
                 {format_post_date(post.published_on)} · {reading_time_for_news(post)} min read
               </time>
-              <h3 class="text-2xl font-black text-zinc-900 tracking-tight mt-3 group-hover:text-blue-600 transition-colors leading-none">
+              <h3 class="text-2xl font-extrabold text-zinc-900 tracking-tight mt-3 group-hover:text-blue-700 transition-colors leading-snug">
                 {post.title}
               </h3>
               <%= if post.preview_text || post.rendered_body do %>
@@ -973,7 +967,7 @@ defmodule YscWeb.HomeLive do
     <%!-- Membership Options Section --%>
     <section
       :if={@current_user == nil}
-      class="py-12 sm:py-16 lg:py-24 bg-gradient-to-br from-blue-600 to-blue-800 overflow-hidden"
+      class="py-12 sm:py-16 lg:py-24 bg-blue-900 overflow-hidden"
     >
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
         <div class="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
@@ -1005,15 +999,15 @@ defmodule YscWeb.HomeLive do
             </p>
             <ul class="mt-6 space-y-3">
               <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-600 mr-3" />
+                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
                 Access to both cabins
               </li>
               <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-600 mr-3" />
+                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
                 Member events
               </li>
               <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-600 mr-3" />
+                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
                 Community access
               </li>
             </ul>
@@ -1038,15 +1032,15 @@ defmodule YscWeb.HomeLive do
             </p>
             <ul class="mt-6 space-y-3">
               <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-600 mr-3" />
+                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
                 Everything in Single
               </li>
               <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-600 mr-3" />
+                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
                 Spouse included
               </li>
               <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-600 mr-3" />
+                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
                 Children under 18 included
               </li>
             </ul>
@@ -1056,7 +1050,7 @@ defmodule YscWeb.HomeLive do
         <div class="text-center mt-12">
           <.link
             navigate={~p"/users/register"}
-            class="inline-flex items-center px-8 py-4 text-lg font-bold text-blue-600 bg-white rounded-md hover:bg-blue-50 transition-colors duration-150"
+            class="inline-flex items-center px-8 py-4 text-lg font-bold text-blue-700 bg-white rounded hover:bg-zinc-100 transition-colors duration-200"
           >
             Check Eligibility & Apply
             <.icon name="hero-arrow-right" class="ml-2 w-5 h-5" />
@@ -1116,7 +1110,7 @@ defmodule YscWeb.HomeLive do
                     name="email"
                     autocomplete="email"
                     value={@newsletter_email}
-                    class="w-full px-4 py-3 border border-zinc-300 rounded text-zinc-900 focus:ring-2 focus:ring-blue-600 focus:border-blue-600"
+                    class="w-full px-4 py-3 border border-zinc-300 rounded text-zinc-900 focus:ring-2 focus:ring-blue-700 focus:border-blue-700"
                     placeholder="Email address"
                     required
                     disabled={@newsletter_submitted}
@@ -1514,12 +1508,9 @@ defmodule YscWeb.HomeLive do
                   <p class="text-zinc-500 text-sm mb-6">
                     Discover what's happening in our community
                   </p>
-                  <.link
-                    navigate={~p"/events"}
-                    class="inline-flex items-center justify-center rounded py-2 px-3 transition duration-150 ease-in-out text-sm font-semibold leading-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 bg-zinc-900 hover:bg-zinc-800 text-white active:text-white/80 active:scale-[0.98] active:transition-none"
-                  >
+                  <.button navigate={~p"/events"} color="zinc">
                     Browse Events
-                  </.link>
+                  </.button>
                 </div>
 
                 <div
@@ -1582,15 +1573,16 @@ defmodule YscWeb.HomeLive do
                         <div class="flex flex-col gap-1.5">
                           <%= if order_ids != [] do %>
                             <div class="flex items-center gap-3">
-                              <.link
+                              <.button
                                 navigate={
                                   ~p"/events/#{event.id}/tickets/qr?return_to=/"
                                 }
-                                class="inline-flex items-center gap-1.5 rounded py-1.5 px-3 text-sm font-semibold leading-6 text-zinc-100 bg-zinc-900 hover:bg-zinc-800 active:scale-[0.98] active:transition-none transition duration-150 ease-in-out whitespace-nowrap"
+                                color="zinc"
+                                class="!py-1.5 whitespace-nowrap"
                               >
                                 <.icon name="hero-qr-code" class="w-4 h-4" />
                                 Show event tickets
-                              </.link>
+                              </.button>
                               <%= if length(order_ids) == 1 do %>
                                 <.link
                                   navigate={

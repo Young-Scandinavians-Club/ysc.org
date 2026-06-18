@@ -19,7 +19,41 @@ module.exports = {
                 serif: ['"Source Serif 4"', "Georgia", '"Times New Roman"', "serif"],
             },
             colors: {
-                brand: "#1b1b52",
+                brand: "#144993",
+                primary: "#144993",
+                blue: {
+                    50: "#eef8ff",
+                    100: "#d8efff",
+                    200: "#b9e3ff",
+                    300: "#89d3ff",
+                    400: "#52bbff",
+                    500: "#2a9dff",
+                    600: "#1381fd",
+                    700: "#0c69e9",
+                    800: "#1154bc",
+                    900: "#144993",
+                    950: "#112d5a"
+                },
+                // Nordic Flag Colors
+                denmark: {
+                    red: '#C8102E',
+                },
+                finland: {
+                    blue: '#002F6C',
+                },
+                iceland: {
+                    blue: '#02529C',
+                    red: '#DC1E35',
+                },
+                norway: {
+                    red: '#BA0C2F',
+                    blue: '#00205B',
+                },
+                sweden: {
+                    blue: '#005293',
+                    yellow: '#FECB00',
+                }
+
             },
             screens: {
                 '3xl': '1600px',

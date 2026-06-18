@@ -1,9 +1,6 @@
 {
   "includes": ["**/*.{json,yml,yaml,toml}"],
   "excludes": [
-    "**/node_modules",
-    "**/_build",
-    "**/deps",
     "**/*-lock.json"
   ],
   "plugins": [

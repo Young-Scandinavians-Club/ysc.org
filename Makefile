@@ -119,8 +119,8 @@ query-explain-main:  ## EXPLAIN + SQL for CI targets vs main since merge-base (f
 	@git fetch origin main --quiet 2>/dev/null || true
 	@MIX_ENV=test bash "$(CURDIR)/etc/scripts/ci/query_explain_local.sh" main
 
-# Shell scripts to lint/format (exclude vendor and build dirs)
-SHELL_SCRIPTS := $(shell find . -type f -name '*.sh' -not -path './_build/*' -not -path './deps/*' -not -path '*/node_modules/*' 2>/dev/null)
+# Shell scripts to lint/format (respects all .gitignore files)
+SHELL_SCRIPTS := $(shell ./etc/scripts/list_lintable_shell_scripts.sh 2>/dev/null)
 
 .PHONY: format
 format:  ## Format the code (Elixir, shell scripts, and JSON/YAML/TOML)
