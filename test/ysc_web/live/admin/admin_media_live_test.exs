@@ -115,8 +115,7 @@ defmodule YscWeb.AdminMediaLiveTest do
     end
 
     test "saving an edited image preserves the active search filter", %{
-      conn: conn,
-      admin: admin
+      conn: conn
     } do
       _other =
         create_test_image(%{
@@ -134,11 +133,9 @@ defmodule YscWeb.AdminMediaLiveTest do
       assert html =~ matching.title
       refute html =~ "AdminMediaSaveOther998877"
 
-      {:ok, view, _html} =
-        live(
-          conn,
-          ~p"/admin/media/upload/#{matching.id}?search=#{matching.title}"
-        )
+      view
+      |> element("#image-#{matching.id}")
+      |> render_click()
 
       html_after_save =
         view

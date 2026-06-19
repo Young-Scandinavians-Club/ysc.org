@@ -239,11 +239,11 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     } do
       %{event: event, order: order} = setup_event_with_tickets(admin)
       ticket = List.first(order.tickets)
-      tickets_pattern = ~r/FROM "tickets"/i
+      list_pattern = ~r/FROM "tickets" AS t0 LEFT OUTER JOIN/i
 
       {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
 
-      {_html, query_count} =
+      {_html, list_query_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
             view
@@ -254,10 +254,10 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
             render(view)
           end,
-          pattern: tickets_pattern
+          pattern: list_pattern
         )
 
-      assert query_count == 0
+      assert list_query_count == 0
       assert render(view) =~ "1 / 1"
     end
   end

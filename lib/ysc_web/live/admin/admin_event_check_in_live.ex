@@ -775,7 +775,7 @@ defmodule YscWeb.AdminEventCheckInLive do
       ticket_matches_search?(ticket, search)
   end
 
-  defp ticket_matches_search?(ticket, search) when search in [nil, ""], do: true
+  defp ticket_matches_search?(_ticket, search) when search in [nil, ""], do: true
 
   defp ticket_matches_search?(ticket, search) when is_binary(search) do
     search_term = String.downcase(search)
