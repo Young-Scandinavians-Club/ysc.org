@@ -93,7 +93,16 @@ defmodule Ysc.Bookings.EntitlementsTest do
                )
 
       assert entitlement.id == booking_a.applied_booking_entitlement_id
-      assert entitlement.id == booking_b.applied_booking_entitlement_id
+      refute booking_b.applied_booking_entitlement_id
+
+      assert {:ok, _} = BookingLocker.release_hold(booking_b.id)
+
+      booking_b =
+        booking_b
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
+        |> Repo.update!()
 
       owner = self()
 
@@ -158,6 +167,127 @@ defmodule Ysc.Bookings.EntitlementsTest do
       ent = Entitlements.get_entitlement!(entitlement.id)
       assert ent.status == :consumed
       assert ent.consumed_booking_id in [booking_a.id, booking_b.id]
+    end
+  end
+
+  describe "active hold entitlement reservation" do
+    test "only the first active hold can lock an entitlement", %{
+      user: user,
+      admin: admin
+    } do
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Ent reserve category #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      assert {:ok, _} =
+               Bookings.create_pricing_rule(%{
+                 amount: Money.new(:USD, 100),
+                 booking_mode: :room,
+                 price_unit: :per_person_per_night,
+                 property: :tahoe,
+                 season_id: nil,
+                 room_id: nil,
+                 room_category_id: category.id
+               })
+
+      {:ok, room_a} =
+        Bookings.create_room(%{
+          name: "Ent reserve room A",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {:ok, room_b} =
+        Bookings.create_room(%{
+          name: "Ent reserve room B",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, booking_a} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room_a.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, booking_b} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room_b.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert booking_a.applied_booking_entitlement_id == entitlement.id
+      refute booking_b.applied_booking_entitlement_id
+
+      assert [reserved_id] =
+               Entitlements.entitlement_ids_reserved_on_active_holds()
+
+      assert reserved_id == entitlement.id
+
+      refute Entitlements.entitlement_reserved_on_active_hold?(
+               entitlement.id,
+               booking_a.id
+             )
+
+      assert Entitlements.entitlement_reserved_on_active_hold?(
+               entitlement.id,
+               booking_b.id
+             )
+
+      assert {:error, changeset} =
+               booking_b
+               |> Ecto.Changeset.change(%{
+                 applied_booking_entitlement_id: entitlement.id
+               })
+               |> Ecto.Changeset.unique_constraint(
+                 :applied_booking_entitlement_id,
+                 name: :bookings_one_hold_per_entitlement_idx
+               )
+               |> Repo.update()
+
+      assert "has already been taken" in errors_on(changeset).applied_booking_entitlement_id
+
+      refute Entitlements.entitlement_reserved_on_active_hold?(nil)
+
+      booking_b_with_entitlement = %{
+        booking_b
+        | applied_booking_entitlement_id: entitlement.id
+      }
+
+      assert {:error, :entitlement_no_longer_valid} =
+               Entitlements.price_with_locked_entitlement(
+                 booking_b_with_entitlement,
+                 Money.new(:USD, 200),
+                 :room,
+                 guests_count: 2,
+                 children_count: 0,
+                 room_ids: [room_b.id]
+               )
     end
   end
 

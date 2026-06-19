@@ -689,15 +689,6 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       {checkin, checkout} = tahoe_booking_dates(40)
 
-      assert {:ok, booking_a} =
-               BookingLocker.create_buyout_booking(
-                 user.id,
-                 :tahoe,
-                 checkin,
-                 checkout,
-                 4
-               )
-
       booking_b =
         booking_fixture(%{
           user_id: user.id,
@@ -712,6 +703,19 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         })
         |> change(%{applied_booking_entitlement_id: entitlement.id})
         |> Repo.update!()
+
+      booking_a =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          property: :tahoe,
+          booking_mode: :buyout,
+          checkin_date: Date.add(checkin, 14),
+          checkout_date: Date.add(checkout, 14),
+          guests_count: 4,
+          children_count: 0,
+          total_price: Money.new(500, :USD)
+        })
 
       %{
         conn: log_in_user(conn, user),
@@ -758,6 +762,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert booking_ledger_payment_count(booking_b.id) == 0
 
       Mox.verify!(StripeMock)
+    end
+  end
+
+  describe "payment-success rejects foreign payment intent" do
+    setup %{conn: conn} do
+      user = user_fixture()
+      %{conn: log_in_user(conn, user), user: user}
     end
 
     test "payment-success rejects a succeeded payment intent from another booking",

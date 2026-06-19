@@ -7,7 +7,7 @@ defmodule Ysc.Bookings.Entitlements do
   import Ecto.Changeset, only: [put_change: 3]
 
   alias Ysc.Repo
-  alias Ysc.Bookings.{BookingEntitlement, EntitlementDiscount}
+  alias Ysc.Bookings.{Booking, BookingEntitlement, EntitlementDiscount}
   alias YscWeb.Emails.BookingEntitlementGranted
   alias YscWeb.Emails.Notifier
 
@@ -17,6 +17,48 @@ defmodule Ysc.Bookings.Entitlements do
 
   def get_entitlement(nil), do: nil
   def get_entitlement(id), do: Repo.get(BookingEntitlement, id)
+
+  @doc """
+  Entitlement ids already attached to another member's active `:hold` booking.
+
+  Optional `exclude_booking_id` ignores the current booking (checkout re-price).
+  """
+  def entitlement_ids_reserved_on_active_holds(exclude_booking_id \\ nil) do
+    query =
+      from(b in Booking,
+        where: b.status == :hold,
+        where: not is_nil(b.applied_booking_entitlement_id),
+        select: b.applied_booking_entitlement_id,
+        distinct: true
+      )
+
+    query =
+      if exclude_booking_id do
+        where(query, [b], b.id != ^exclude_booking_id)
+      else
+        query
+      end
+
+    Repo.all(query)
+  end
+
+  def entitlement_reserved_on_active_hold?(
+        entitlement_id,
+        exclude_booking_id \\ nil
+      )
+
+  def entitlement_reserved_on_active_hold?(entitlement_id, exclude_booking_id)
+      when is_binary(entitlement_id) do
+    entitlement_id in entitlement_ids_reserved_on_active_holds(
+      exclude_booking_id
+    )
+  end
+
+  def entitlement_reserved_on_active_hold?(
+        _entitlement_id,
+        _exclude_booking_id
+      ),
+      do: false
 
   @doc """
   Active entitlements for a user: `status` is `:active` and not past `expires_at`
@@ -172,7 +214,14 @@ defmodule Ysc.Bookings.Entitlements do
     room_ids = Keyword.get(opts, :room_ids, [])
     headcount = guests + children
 
-    entitlements = list_active_for_user(user_id)
+    reserved_entitlement_ids =
+      entitlement_ids_reserved_on_active_holds()
+      |> MapSet.new()
+
+    entitlements =
+      user_id
+      |> list_active_for_user()
+      |> Enum.reject(&MapSet.member?(reserved_entitlement_ids, &1.id))
 
     {ent, discount, final_total} =
       EntitlementDiscount.pick_best(
@@ -268,6 +317,9 @@ defmodule Ysc.Bookings.Entitlements do
         cond do
           ent.status != :active ||
               EntitlementDiscount.expired_for_checkout?(ent) ->
+            {:error, :entitlement_no_longer_valid}
+
+          entitlement_reserved_on_active_hold?(ent.id, booking.id) ->
             {:error, :entitlement_no_longer_valid}
 
           not EntitlementDiscount.eligible?(
