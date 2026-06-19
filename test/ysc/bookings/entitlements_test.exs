@@ -271,6 +271,23 @@ defmodule Ysc.Bookings.EntitlementsTest do
                |> Repo.update()
 
       assert "has already been taken" in errors_on(changeset).applied_booking_entitlement_id
+
+      refute Entitlements.entitlement_reserved_on_active_hold?(nil)
+
+      booking_b_with_entitlement = %{
+        booking_b
+        | applied_booking_entitlement_id: entitlement.id
+      }
+
+      assert {:error, :entitlement_no_longer_valid} =
+               Entitlements.price_with_locked_entitlement(
+                 booking_b_with_entitlement,
+                 Money.new(:USD, 200),
+                 :room,
+                 guests_count: 2,
+                 children_count: 0,
+                 room_ids: [room_b.id]
+               )
     end
   end
 
