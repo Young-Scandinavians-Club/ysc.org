@@ -318,6 +318,19 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "Check in all"
       refute html =~ "phx-click"
     end
+
+    test "renders mobile interactive button without icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_all_button order_id={5} variant={:mobile} />
+        """)
+
+      assert html =~ "Check in all"
+      assert html =~ ~s(phx-value-order-id="5")
+      refute html =~ "hero-check-circle"
+    end
   end
 
   describe "admin_icon_empty_state/1 success variant" do
@@ -336,6 +349,24 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "All attendees checked in!"
       assert html =~ "bg-white rounded border border-zinc-200"
       assert html =~ "text-emerald-400"
+    end
+
+    test "uses variant icon_class when icon_class is omitted" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_icon_empty_state
+          variant={:success}
+          icon="hero-check-circle"
+          title="Done"
+          description="Everyone is here"
+        />
+        """)
+
+      assert html =~ "w-10 h-10 mx-auto mb-2 text-emerald-400"
+      assert html =~ "Everyone is here"
+      assert html =~ "text-sm mt-1 text-zinc-400"
     end
   end
 

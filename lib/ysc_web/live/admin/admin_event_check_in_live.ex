@@ -94,9 +94,7 @@ defmodule YscWeb.AdminEventCheckInLive do
               </.admin_section_heading>
             </div>
 
-            <div
-              :if={@total_count - @checked_in_count == 0}
-            >
+            <div :if={@total_count - @checked_in_count == 0}>
               <.admin_icon_empty_state
                 variant={:success}
                 icon="hero-check-circle"
