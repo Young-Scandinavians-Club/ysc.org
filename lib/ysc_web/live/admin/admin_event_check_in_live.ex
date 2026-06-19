@@ -518,7 +518,8 @@ defmodule YscWeb.AdminEventCheckInLive do
 
   @impl true
   def handle_info(
-        {Scanning, %MessagePassingEvents.TicketCheckedIn{ticket: ticket, event_id: eid}},
+        {Scanning,
+         %MessagePassingEvents.TicketCheckedIn{ticket: ticket, event_id: eid}},
         socket
       ) do
     socket =
@@ -532,7 +533,11 @@ defmodule YscWeb.AdminEventCheckInLive do
   end
 
   def handle_info(
-        {Scanning, %MessagePassingEvents.TicketCheckInUndone{ticket: ticket, event_id: eid}},
+        {Scanning,
+         %MessagePassingEvents.TicketCheckInUndone{
+           ticket: ticket,
+           event_id: eid
+         }},
         socket
       ) do
     socket =
@@ -750,7 +755,10 @@ defmodule YscWeb.AdminEventCheckInLive do
 
     socket
     |> bump_checked_in_count(1, search)
-    |> assign(:ticket_by_id, Map.put(socket.assigns.ticket_by_id, ticket.id, ticket))
+    |> assign(
+      :ticket_by_id,
+      Map.put(socket.assigns.ticket_by_id, ticket.id, ticket)
+    )
   end
 
   defp do_apply_ticket_unchecked(socket, ticket) do
@@ -767,7 +775,10 @@ defmodule YscWeb.AdminEventCheckInLive do
 
     socket
     |> bump_checked_in_count(-1, search)
-    |> assign(:ticket_by_id, Map.put(socket.assigns.ticket_by_id, ticket.id, ticket))
+    |> assign(
+      :ticket_by_id,
+      Map.put(socket.assigns.ticket_by_id, ticket.id, ticket)
+    )
   end
 
   defp ticket_in_current_view?(socket, ticket, search) do
@@ -775,7 +786,8 @@ defmodule YscWeb.AdminEventCheckInLive do
       ticket_matches_search?(ticket, search)
   end
 
-  defp ticket_matches_search?(_ticket, search) when search in [nil, ""], do: true
+  defp ticket_matches_search?(_ticket, search) when search in [nil, ""],
+    do: true
 
   defp ticket_matches_search?(ticket, search) when is_binary(search) do
     search_term = String.downcase(search)
@@ -820,7 +832,11 @@ defmodule YscWeb.AdminEventCheckInLive do
           |> stream_insert(:pending_groups, updated_group)
           |> assign(
             :pending_groups_by_id,
-            Map.put(socket.assigns.pending_groups_by_id, group_id, updated_group)
+            Map.put(
+              socket.assigns.pending_groups_by_id,
+              group_id,
+              updated_group
+            )
           )
         end
     end
@@ -846,7 +862,10 @@ defmodule YscWeb.AdminEventCheckInLive do
 
         socket
         |> stream_insert(:pending_groups, group)
-        |> assign(:pending_groups_by_id, Map.put(socket.assigns.pending_groups_by_id, group_id, group))
+        |> assign(
+          :pending_groups_by_id,
+          Map.put(socket.assigns.pending_groups_by_id, group_id, group)
+        )
 
       group ->
         updated_group = %{group | tickets: [ticket | group.tickets]}
