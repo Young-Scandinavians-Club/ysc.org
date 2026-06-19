@@ -931,23 +931,9 @@ defmodule YscWeb.AdminMediaLive do
 
     Media.update_image(active_image, image_params, current_user)
 
-    timeline = Media.get_timeline_indices()
-    available_years = Enum.map(timeline, & &1.year)
-    images = Media.list_images_cursor(limit: socket.assigns.per_page)
-    {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_sections(images)
-
     {:noreply,
      socket
-     |> assign(:timeline, timeline)
-     |> assign(:available_years, available_years)
-     |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-     |> assign(:stream_initialized?, true)
-     |> assign_cursor_from_images(images)
-     |> assign(:images_empty?, images == [])
-     |> assign(:years_set, years_set)
-     |> assign(:years_list, years_list)
-     |> reset_image_sections(stream_items)
+     |> reload_gallery_preserving_filters()
      |> push_patch(to: build_media_url_with_state(socket))}
   end
 
@@ -1270,28 +1256,23 @@ defmodule YscWeb.AdminMediaLive do
         {:ok, new_image}
       end)
 
-    timeline = Media.get_timeline_indices()
-    media_count = Media.total_image_count_from_timeline(timeline)
-    available_years = Enum.map(timeline, & &1.year)
-    images = Media.list_images_cursor(limit: socket.assigns.per_page)
-    {years_set, years_list} = years_from_images(images)
-    stream_items = Timeline.inject_sections(images)
-
     socket
     |> update(:uploaded_files, &(&1 ++ uploaded_files))
-    |> assign(:media_count, media_count)
-    |> assign(:timeline, timeline)
-    |> assign(:available_years, available_years)
-    |> assign(:end_of_timeline?, length(images) < socket.assigns.per_page)
-    |> assign(:stream_initialized?, true)
-    |> assign_cursor_from_images(images)
-    |> assign(:images_empty?, images == [])
-    |> assign(:years_set, years_set)
-    |> assign(:years_list, years_list)
     |> assign(:show_drop_zone, false)
     |> assign(:pending_upload_submit?, false)
-    |> reset_image_sections(stream_items)
-    |> push_patch(to: ~p"/admin/media")
+    |> reload_gallery_preserving_filters()
+    |> push_patch(to: build_media_url_with_state(socket))
+  end
+
+  defp reload_gallery_preserving_filters(socket) do
+    socket
+    |> assign(:stream_initialized?, false)
+    |> ensure_timeline_loaded()
+    |> load_media_gallery_for_params(
+      socket.assigns.url_year_param,
+      socket.assigns.search_query,
+      socket.assigns.search_query
+    )
   end
 
   defp presign_upload(entry, socket) do
