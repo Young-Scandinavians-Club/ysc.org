@@ -2373,6 +2373,108 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert html =~ "$76.67"
     end
+
+    test "falls back to booking.discount_total when pricing_items omit discount fields",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :buyout,
+          total_price: Money.new(:USD, "850")
+        })
+
+      {:ok, booking} =
+        booking
+        |> Ecto.Changeset.change(%{
+          subtotal_price: Money.new(:USD, "1275"),
+          discount_total: Money.new(:USD, "425"),
+          pricing_items: %{
+            "type" => "buyout",
+            "nights" => 3,
+            "price_per_night" => %{"amount" => "425", "currency" => "USD"}
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(:USD, "850"))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+
+      assert has_element?(
+               view,
+               "#payment-summary-entitlement-discount",
+               "Member discount"
+             )
+
+      assert has_element?(
+               view,
+               "#payment-summary-entitlement-discount",
+               "−$425.00"
+             )
+    end
+
+    test "renders buyout entitlement discount from top-level pricing_items fields",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          status: :complete,
+          booking_mode: :buyout,
+          total_price: Money.new(:USD, "850"),
+          subtotal_price: Money.new(:USD, "850")
+        })
+
+      {:ok, _} =
+        booking
+        |> Ecto.Changeset.change(%{
+          pricing_items: %{
+            "type" => "buyout",
+            "nights" => 3,
+            "price_per_night" => %{"amount" => "425", "currency" => "USD"},
+            "entitlement_discount" => %{"amount" => "425", "currency" => "USD"},
+            "entitlement_subtotal" => %{"amount" => "1275", "currency" => "USD"}
+          }
+        })
+        |> Repo.update()
+
+      booking = Repo.reload!(booking)
+      create_payment_for_booking(booking, Money.new(:USD, "850"))
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
+      render_async(view, @async_timeout_ms)
+      html = render(view)
+
+      assert has_element?(
+               view,
+               "#payment-summary-buyout-line",
+               "($425.00 × 3 nights)"
+             )
+
+      assert has_element?(view, "#payment-summary-buyout-line", "$1,275.00")
+
+      assert has_element?(
+               view,
+               "#payment-summary-entitlement-discount",
+               "Member discount"
+             )
+
+      assert has_element?(
+               view,
+               "#payment-summary-entitlement-discount",
+               "−$425.00"
+             )
+
+      assert html =~ "$850.00"
+    end
   end
 
   describe "async loading" do
