@@ -668,13 +668,19 @@ defmodule Ysc.Ledgers.Reconciliation do
         exclude_refunds: true
       )
 
-    credits = sum_stripe_entity_entries(stripe_account.id, entity_type, "credit")
+    credits =
+      sum_stripe_entity_entries(stripe_account.id, entity_type, "credit")
 
     {:ok, payments_total} = Money.sub(debits, credits)
     payments_total
   end
 
-  defp sum_stripe_entity_entries(account_id, entity_type, debit_credit, opts \\ []) do
+  defp sum_stripe_entity_entries(
+         account_id,
+         entity_type,
+         debit_credit,
+         opts \\ []
+       ) do
     query =
       from(e in LedgerEntry,
         where: e.account_id == ^account_id,

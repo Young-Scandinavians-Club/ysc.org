@@ -206,9 +206,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
       role={@admin_role}
     >
       <div class="py-6 space-y-6">
-        <.admin_page_title
-          subtitle="Active entitlements not yet used (not consumed, not expired)."
-        >
+        <.admin_page_title subtitle="Active entitlements not yet used (not consumed, not expired).">
           Outstanding member benefits
         </.admin_page_title>
 
