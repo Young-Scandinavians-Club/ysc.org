@@ -589,7 +589,25 @@ defmodule Ysc.Events do
     event
     |> Event.changeset(attrs)
     |> Repo.update()
-    |> case do
+    |> finalize_event_update()
+  end
+
+  @doc """
+  Updates editorial event fields from the admin editor (auto-save / validate).
+
+  Ignores mass-assigned publish controls (`state`, `published_at`, `publish_at`,
+  `organizer_id`). Use `publish_event/1`, `unpublish_event/1`, and similar for
+  lifecycle transitions.
+  """
+  def update_event_editor(%Event{} = event, attrs) do
+    event
+    |> Event.editor_changeset(attrs)
+    |> Repo.update()
+    |> finalize_event_update()
+  end
+
+  defp finalize_event_update(result) do
+    case result do
       {:ok, event} ->
         invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})

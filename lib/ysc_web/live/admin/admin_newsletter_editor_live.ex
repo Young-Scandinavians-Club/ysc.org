@@ -1125,18 +1125,19 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
     params =
       params
+      |> Map.take(["title", "subject", "intro_text", "cover_image_id"])
       |> Map.put("post_ids", socket.assigns.selected_post_ids)
       |> Map.put("event_ids", socket.assigns.selected_event_ids)
 
     result =
       case socket.assigns.edition do
         nil ->
-          Newsletter.create_edition(params,
+          Newsletter.create_edition_draft(params,
             created_by_id: socket.assigns.current_user.id
           )
 
         edition ->
-          Newsletter.update_edition(edition, params)
+          Newsletter.update_edition_draft(edition, params)
       end
 
     case result do
@@ -1444,12 +1445,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     result =
       case socket.assigns.edition do
         nil ->
-          Newsletter.create_edition(params,
+          Newsletter.create_edition_draft(params,
             created_by_id: socket.assigns.current_user.id
           )
 
         edition ->
-          Newsletter.update_edition(edition, params)
+          Newsletter.update_edition_draft(edition, params)
       end
 
     case result do

@@ -137,43 +137,61 @@ defmodule Ysc.Events.Event do
     timestamps()
   end
 
+  @publish_control_fields [:state, :published_at, :publish_at, :organizer_id]
+
+  @editor_fields [
+    :reference_id,
+    :title,
+    :description,
+    :max_attendees,
+    :unlimited_capacity,
+    :age_restriction,
+    :raw_details,
+    :rendered_details,
+    :image_id,
+    :location_name,
+    :address,
+    :latitude,
+    :longitude,
+    :place_id,
+    :partiful_link,
+    :tickets_tbd,
+    :start_date,
+    :start_time,
+    :end_date,
+    :end_time,
+    :lock_version
+  ]
+
   @doc """
   Changeset for the event with validations.
   """
   def changeset(event, attrs) do
     event
-    |> cast(attrs, [
-      :reference_id,
-      :state,
-      :published_at,
-      :publish_at,
-      :organizer_id,
-      :title,
-      :description,
-      :max_attendees,
-      :unlimited_capacity,
-      :age_restriction,
-      :raw_details,
-      :rendered_details,
-      :image_id,
-      :location_name,
-      :address,
-      :latitude,
-      :longitude,
-      :place_id,
-      :partiful_link,
-      :tickets_tbd,
-      :start_date,
-      :start_time,
-      :end_date,
-      :end_time,
-      :lock_version
-    ])
+    |> cast(attrs, @editor_fields ++ @publish_control_fields)
     |> validate_required([
       :state,
       :organizer_id,
       :title
     ])
+    |> shared_validations()
+  end
+
+  @doc """
+  Changeset for admin editor auto-save and validate events.
+
+  Publishing state, schedule, and organizer must use dedicated context functions
+  (`publish_event/1`, `delete_event/1`, etc.), not LiveView form params.
+  """
+  def editor_changeset(event, attrs) do
+    event
+    |> cast(attrs, @editor_fields)
+    |> validate_required([:title])
+    |> shared_validations()
+  end
+
+  defp shared_validations(changeset) do
+    changeset
     |> validate_length(:title, max: 100)
     |> validate_length(:description, max: 200)
     |> strip_description_html()

@@ -504,6 +504,21 @@ defmodule Ysc.Newsletter do
     |> Repo.insert()
   end
 
+  @doc """
+  Creates a newsletter edition from editor draft fields only.
+
+  Strips forged lifecycle params (`status`, `sent_at`, etc.) from LiveView saves.
+  """
+  def create_edition_draft(attrs \\ %{}, opts \\ []) do
+    creator_id = Keyword.get(opts, :created_by_id)
+
+    %Edition{}
+    |> Edition.draft_changeset(attrs)
+    |> Ecto.Changeset.put_change(:status, :draft)
+    |> maybe_put_creator(creator_id)
+    |> Repo.insert()
+  end
+
   defp maybe_put_creator(changeset, nil), do: changeset
 
   defp maybe_put_creator(changeset, creator_id),
@@ -515,6 +530,15 @@ defmodule Ysc.Newsletter do
   def update_edition(%Edition{} = edition, attrs) do
     edition
     |> Edition.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Updates editorial newsletter fields from the admin editor draft save path.
+  """
+  def update_edition_draft(%Edition{} = edition, attrs) do
+    edition
+    |> Edition.draft_changeset(attrs)
     |> Repo.update()
   end
 
