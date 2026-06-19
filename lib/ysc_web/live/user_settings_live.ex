@@ -1681,8 +1681,7 @@ defmodule YscWeb.UserSettingsLive do
                                 "#{@membership_change_info.current_plan.id}"
                               )} to {String.capitalize(
                                 "#{@membership_change_info.new_plan.id}"
-                              )} membership. The charge will be up to
-                              <strong>
+                              )} membership. The charge will be up to <strong>
                                 {Ysc.MoneyHelper.format_money!(
                                   Money.new(
                                     :USD,
