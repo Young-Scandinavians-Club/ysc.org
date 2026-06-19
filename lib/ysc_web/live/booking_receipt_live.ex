@@ -1235,7 +1235,7 @@ defmodule YscWeb.BookingReceiptLive do
 
           <div class="space-y-4">
             <p class="text-zinc-600">
-              Are you sure you want to cancel this booking? This action cannot be undone.
+              Cancel this reservation? This can't be undone.
             </p>
             <!-- Refund Information -->
             <%= if @refund_info && Map.get(@refund_info, :modified) do %>

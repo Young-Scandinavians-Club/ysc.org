@@ -1409,7 +1409,8 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp modification_error_message(:blackout_conflict),
-    do: "The selected dates overlap with a blackout period."
+    do:
+      "Those dates aren't available for booking. They may be reserved for maintenance or a club event. Please choose different dates, or email info@ysc.org if you have questions."
 
   defp modification_error_message(:property_unavailable),
     do: "The selected dates or guest count are not available."
@@ -1418,7 +1419,8 @@ defmodule YscWeb.BookingChangeLive do
     do: "One or more of your rooms are not available for the selected dates."
 
   defp modification_error_message(:property_buyout_active),
-    do: "The property has an active buyout for the selected dates."
+    do:
+      "The whole cabin is already reserved for those dates. Please choose different dates."
 
   defp modification_error_message(:rooms_already_booked),
     do: "Rooms are already booked for the selected dates."

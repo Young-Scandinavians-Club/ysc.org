@@ -223,7 +223,6 @@ defmodule YscWeb.UserBookingDetailLive do
                 :if={@can_cancel}
                 phx-click="show-cancel-modal"
                 color="red"
-                data-confirm="Are you sure you want to cancel this booking?"
               >
                 <.icon name="hero-x-circle" class="w-5 h-5 me-1 -mt-0.5" />
                 Cancel Booking
@@ -501,7 +500,7 @@ defmodule YscWeb.UserBookingDetailLive do
 
             <div class="space-y-4">
               <p class="text-zinc-600">
-                Are you sure you want to cancel this booking? This action cannot be undone.
+                Cancel this reservation? This can't be undone.
               </p>
 
               <%= if Map.get(@refund_info, :modified) do %>

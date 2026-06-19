@@ -1544,7 +1544,7 @@ defmodule YscWeb.UserSettingsLive do
                           @current_membership
                         )
                     }
-                    data-confirm="Turn off automatic renewal? You keep full membership benefits until the end of your current billing period, and you can turn auto-renewal back on anytime before then."
+                    data-confirm="Turn off automatic renewal? You keep full membership benefits until your current membership year ends, and you can turn auto-renewal back on anytime before then."
                     class="w-full sm:w-auto justify-center"
                   >
                     Turn off auto-renewal
@@ -1676,20 +1676,19 @@ defmodule YscWeb.UserSettingsLive do
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
                             <p>
-                              You will be charged a prorated amount now to upgrade from {String.capitalize(
+                              To upgrade today, you'll pay the difference for the rest of your
+                              membership year when you switch from {String.capitalize(
                                 "#{@membership_change_info.current_plan.id}"
                               )} to {String.capitalize(
                                 "#{@membership_change_info.new_plan.id}"
-                              )} membership. The maximum charge will be
-                              <strong>
+                              )} membership. The charge will be up to <strong>
                                 {Ysc.MoneyHelper.format_money!(
                                   Money.new(
                                     :USD,
                                     @membership_change_info.price_difference
                                   )
                                 )}
-                              </strong>
-                              based on time remaining in your billing period.
+                              </strong>.
                             </p>
                           <% else %>
                             <p>
@@ -1775,7 +1774,7 @@ defmodule YscWeb.UserSettingsLive do
                   >
                     <p class="text-sm text-zinc-500">
                       <%= if @membership_change_info && @membership_change_info.direction == :upgrade do %>
-                        You will be charged a prorated amount today.
+                        You'll pay the difference for the rest of your membership year today.
                       <% else %>
                         The change will take effect at your next renewal date.
                       <% end %>
@@ -4398,7 +4397,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :info,
-             "Auto-renewal is off. You'll keep access until the end of your current billing period.",
+             "Auto-renewal is off. You'll keep access until your current membership year ends.",
              title: "Membership"
            )
            |> push_patch(to: ~p"/users/membership")}
@@ -5055,7 +5054,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp get_success_message(:upgrade) do
-    "Your membership plan has been upgraded. You have been charged the prorated difference."
+    "Your membership plan has been upgraded. You've been charged the difference for the rest of your membership year."
   end
 
   defp get_success_message(:downgrade) do
