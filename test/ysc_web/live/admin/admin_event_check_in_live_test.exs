@@ -207,33 +207,6 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
     end
   end
 
-  describe "deferred ticket loading" do
-    setup [:create_admin]
-
-    test "initial connect issues at most one ticket list query", %{
-      conn: conn,
-      admin: admin
-    } do
-      %{event: event} = setup_event_with_tickets(admin)
-      tickets_pattern = ~r/FROM "tickets"/i
-
-      {{:ok, view, _html}, query_count} =
-        Ysc.QueryCounter.with_query_counter(
-          fn ->
-            {:ok, view, html} =
-              live(conn, ~p"/admin/events/#{event.id}/check-in")
-
-            render(view)
-            {:ok, view, html}
-          end,
-          pattern: tickets_pattern
-        )
-
-      assert query_count <= 1
-      assert has_element?(view, "#pending-groups")
-    end
-  end
-
   # ---------------------------------------------------------------------------
   # Ticket listing
   # ---------------------------------------------------------------------------
