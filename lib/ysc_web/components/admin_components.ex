@@ -583,6 +583,134 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_event_check_in_order_group_header
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Order group header row for event check-in ticket tables.
+
+  Shows the order reference, ticket count, and optional bulk check-in action.
+  Use `variant={:desktop}` inside the 12-column table layout; `variant={:mobile}`
+  for the stacked card list. Set `interactive={false}` for static ghost previews.
+  """
+  attr :order_ref, :string, required: true
+  attr :ticket_count, :integer, required: true
+  attr :order_id, :any, default: nil
+  attr :id, :string, default: nil
+
+  attr :variant, :atom,
+    default: :desktop,
+    values: [:desktop, :mobile]
+
+  attr :interactive, :boolean,
+    default: true,
+    doc: "When false, renders a static bulk action (ghost preview)"
+
+  def admin_event_check_in_order_group_header(assigns) do
+    ~H"""
+    <div class={order_group_header_container_class(@variant)}>
+      <div class={order_group_header_info_class(@variant)}>
+        <.icon
+          name="hero-shopping-bag"
+          class={[
+            "w-3.5 h-3.5 text-zinc-400",
+            @variant == :desktop && "shrink-0"
+          ]}
+        />
+        <span class="text-xs font-semibold text-zinc-600">{@order_ref}</span>
+        <span :if={@variant == :desktop} class="text-xs text-zinc-400">
+          ({ticket_count_label(@ticket_count)})
+        </span>
+      </div>
+      <div :if={@variant == :desktop} class="col-span-2 flex items-center">
+        <.admin_check_in_all_button
+          :if={@ticket_count > 1}
+          id={@id}
+          order_id={@order_id}
+          variant={:desktop}
+          interactive={@interactive}
+        />
+      </div>
+      <.admin_check_in_all_button
+        :if={@variant == :mobile and @ticket_count > 1}
+        id={@id}
+        order_id={@order_id}
+        variant={:mobile}
+        interactive={@interactive}
+      />
+    </div>
+    """
+  end
+
+  defp order_group_header_container_class(:desktop),
+    do: "grid grid-cols-12 gap-4 px-4 py-2 bg-zinc-50 border-b border-zinc-100"
+
+  defp order_group_header_container_class(:mobile),
+    do:
+      "flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-100"
+
+  defp order_group_header_info_class(:desktop),
+    do: "col-span-10 flex items-center gap-2"
+
+  defp order_group_header_info_class(:mobile),
+    do: "flex items-center gap-2"
+
+  defp ticket_count_label(count),
+    do: "#{count} ticket" <> if(count != 1, do: "s", else: "")
+
+  # ---------------------------------------------------------------------------
+  # admin_check_in_all_button
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Bulk check-in control for multi-ticket orders in event check-in flows.
+
+  Renders a `phx-click="check-in-order"` button by default, or a static label when
+  `interactive` is false (ghost preview).
+  """
+  attr :id, :string, default: nil
+  attr :order_id, :any, default: nil
+
+  attr :variant, :atom,
+    default: :desktop,
+    values: [:desktop, :mobile]
+
+  attr :interactive, :boolean, default: true
+
+  def admin_check_in_all_button(assigns) do
+    ~H"""
+    <%= if @interactive do %>
+      <button
+        :if={@variant == :desktop}
+        id={@id}
+        phx-click="check-in-order"
+        phx-value-order-id={@order_id}
+        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors whitespace-nowrap"
+      >
+        <.icon name="hero-check-circle" class="w-3.5 h-3.5 shrink-0" /> Check in all
+      </button>
+      <button
+        :if={@variant == :mobile}
+        id={@id}
+        phx-click="check-in-order"
+        phx-value-order-id={@order_id}
+        class="text-xs font-medium text-emerald-700 hover:text-emerald-900"
+      >
+        Check in all
+      </button>
+    <% else %>
+      <span
+        :if={@variant == :desktop}
+        id={@id}
+        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1 whitespace-nowrap"
+      >
+        <.icon name="hero-check-circle" class="w-3.5 h-3.5 shrink-0" /> Check in all
+      </span>
+    <% end %>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_responsive_icon_button
   # ---------------------------------------------------------------------------
 
@@ -849,6 +977,7 @@ defmodule YscWeb.AdminComponents do
   - `:default` — `py-16`, large icon, prominent title (scanner, event check-in)
   - `:compact` — `py-10`, medium icon (search no-results, stream empty lists)
   - `:dashed` — dashed border panel for dashboard widgets (default `py-12`)
+  - `:success` — bordered success panel with emerald icon (all attendees checked in)
 
   ## Examples
 
@@ -882,8 +1011,9 @@ defmodule YscWeb.AdminComponents do
 
   attr :variant, :atom,
     default: :default,
-    values: [:default, :compact, :dashed],
-    doc: "Layout density; :dashed adds a bordered panel (dashboard widgets)"
+    values: [:default, :compact, :dashed, :success],
+    doc:
+      "Layout density; :dashed adds a bordered panel; :success uses emerald icon styling"
 
   attr :icon_class, :any,
     default: nil,
@@ -897,10 +1027,10 @@ defmodule YscWeb.AdminComponents do
     doc: "Optional CTA below the description (e.g. upload button on media page)"
 
   def admin_icon_empty_state(assigns) do
-    assigns =
-      assign_new(assigns, :icon_class, fn ->
-        icon_empty_state_icon_class(assigns.variant)
-      end)
+    icon_class =
+      assigns.icon_class || icon_empty_state_icon_class(assigns.variant)
+
+    assigns = assign(assigns, :icon_class, icon_class)
 
     ~H"""
     <div id={@id} class={icon_empty_state_container_class(@variant, @class)}>
@@ -930,6 +1060,12 @@ defmodule YscWeb.AdminComponents do
       extra
     ]
 
+  defp icon_empty_state_container_class(:success, extra),
+    do: [
+      "bg-white rounded border border-zinc-200 py-12 text-center text-zinc-500",
+      extra
+    ]
+
   defp icon_empty_state_icon_class(:default),
     do: "w-12 h-12 mx-auto mb-3 text-zinc-300"
 
@@ -939,9 +1075,13 @@ defmodule YscWeb.AdminComponents do
   defp icon_empty_state_icon_class(:dashed),
     do: "w-8 h-8 text-zinc-200 mx-auto mb-2"
 
+  defp icon_empty_state_icon_class(:success),
+    do: "w-10 h-10 mx-auto mb-2 text-emerald-400"
+
   defp icon_empty_state_title_class(:default), do: "text-lg font-medium"
   defp icon_empty_state_title_class(:compact), do: "font-medium"
   defp icon_empty_state_title_class(:dashed), do: "text-sm text-zinc-400"
+  defp icon_empty_state_title_class(:success), do: "font-medium"
 
   defp icon_empty_state_description_class(:default), do: "text-sm mt-1"
 
@@ -949,6 +1089,9 @@ defmodule YscWeb.AdminComponents do
     do: "text-sm mt-1 text-zinc-400"
 
   defp icon_empty_state_description_class(:dashed),
+    do: "text-sm mt-1 text-zinc-400"
+
+  defp icon_empty_state_description_class(:success),
     do: "text-sm mt-1 text-zinc-400"
 
   # ---------------------------------------------------------------------------

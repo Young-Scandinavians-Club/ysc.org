@@ -217,6 +217,159 @@ defmodule YscWeb.AdminCheckInComponentsTest do
     end
   end
 
+  describe "admin_event_check_in_order_group_header/1" do
+    test "renders desktop order group with bulk check-in button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_order_group_header
+          order_ref="ORD-12345"
+          ticket_count={3}
+          order_id={42}
+        />
+        """)
+
+      assert html =~ "ORD-12345"
+      assert html =~ "3 tickets"
+      assert html =~ "hero-shopping-bag"
+      assert html =~ ~s(phx-click="check-in-order")
+      assert html =~ ~s(phx-value-order-id="42")
+      assert html =~ "Check in all"
+      assert html =~ "grid grid-cols-12"
+    end
+
+    test "hides bulk action for single-ticket orders" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_order_group_header
+          order_ref="ORD-99999"
+          ticket_count={1}
+          order_id={7}
+        />
+        """)
+
+      assert html =~ "1 ticket"
+      refute html =~ "Check in all"
+    end
+
+    test "renders mobile variant with text-only bulk action" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_order_group_header
+          variant={:mobile}
+          order_ref="ORD-55555"
+          ticket_count={2}
+          order_id={9}
+        />
+        """)
+
+      assert html =~ "ORD-55555"
+      assert html =~ "Check in all"
+      refute html =~ "hero-check-circle"
+      refute html =~ "grid grid-cols-12"
+    end
+
+    test "renders static bulk action for ghost preview" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_order_group_header
+          order_ref="ORD-77777"
+          ticket_count={2}
+          id="ghost-check-in-order-all"
+          interactive={false}
+        />
+        """)
+
+      assert html =~ ~s(id="ghost-check-in-order-all")
+      assert html =~ "Check in all"
+      refute html =~ ~s(phx-click="check-in-order")
+    end
+  end
+
+  describe "admin_check_in_all_button/1" do
+    test "renders desktop interactive button with icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_all_button order_id={11} variant={:desktop} />
+        """)
+
+      assert html =~ "Check in all"
+      assert html =~ "hero-check-circle"
+      assert html =~ ~s(phx-value-order-id="11")
+    end
+
+    test "renders static desktop label without phx-click" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_all_button variant={:desktop} interactive={false} />
+        """)
+
+      assert html =~ "Check in all"
+      refute html =~ "phx-click"
+    end
+
+    test "renders mobile interactive button without icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_check_in_all_button order_id={5} variant={:mobile} />
+        """)
+
+      assert html =~ "Check in all"
+      assert html =~ ~s(phx-value-order-id="5")
+      refute html =~ "hero-check-circle"
+    end
+  end
+
+  describe "admin_icon_empty_state/1 success variant" do
+    test "renders bordered success panel with emerald icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_icon_empty_state
+          variant={:success}
+          icon="hero-check-circle"
+          title="All attendees checked in!"
+        />
+        """)
+
+      assert html =~ "All attendees checked in!"
+      assert html =~ "bg-white rounded border border-zinc-200"
+      assert html =~ "text-emerald-400"
+    end
+
+    test "uses variant icon_class when icon_class is omitted" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_icon_empty_state
+          variant={:success}
+          icon="hero-check-circle"
+          title="Done"
+          description="Everyone is here"
+        />
+        """)
+
+      assert html =~ "w-10 h-10 mx-auto mb-2 text-emerald-400"
+      assert html =~ "Everyone is here"
+      assert html =~ "text-sm mt-1 text-zinc-400"
+    end
+  end
+
   describe "admin_responsive_icon_button/1" do
     test "renders labeled desktop button and icon-only mobile control" do
       assigns = %{}

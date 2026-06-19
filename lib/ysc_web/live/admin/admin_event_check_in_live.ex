@@ -94,15 +94,12 @@ defmodule YscWeb.AdminEventCheckInLive do
               </.admin_section_heading>
             </div>
 
-            <div
-              :if={@total_count - @checked_in_count == 0}
-              class="bg-white rounded border border-zinc-200 py-12 text-center text-zinc-500"
-            >
-              <.icon
-                name="hero-check-circle"
-                class="w-10 h-10 mx-auto mb-2 text-emerald-400"
+            <div :if={@total_count - @checked_in_count == 0}>
+              <.admin_icon_empty_state
+                variant={:success}
+                icon="hero-check-circle"
+                title="All attendees checked in!"
               />
-              <p class="font-medium">All attendees checked in!</p>
             </div>
 
             <%!-- Desktop: table with order grouping --%>
@@ -114,36 +111,11 @@ defmodule YscWeb.AdminEventCheckInLive do
 
               <div id="pending-groups" phx-update="stream">
                 <div :for={{dom_id, group} <- @streams.pending_groups} id={dom_id}>
-                  <%!-- Order group header --%>
-                  <div class="grid grid-cols-12 gap-4 px-4 py-2 bg-zinc-50 border-b border-zinc-100">
-                    <div class="col-span-10 flex items-center gap-2">
-                      <.icon
-                        name="hero-shopping-bag"
-                        class="w-3.5 h-3.5 text-zinc-400 shrink-0"
-                      />
-                      <span class="text-xs font-semibold text-zinc-600">
-                        {group.order_ref}
-                      </span>
-                      <span class="text-xs text-zinc-400">
-                        ({length(group.tickets)} ticket{if length(group.tickets) !=
-                                                             1,
-                                                           do: "s"})
-                      </span>
-                    </div>
-                    <div class="col-span-2 flex items-center">
-                      <button
-                        :if={length(group.tickets) > 1}
-                        phx-click="check-in-order"
-                        phx-value-order-id={group.order_id}
-                        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded px-2 py-1 transition-colors whitespace-nowrap"
-                      >
-                        <.icon
-                          name="hero-check-circle"
-                          class="w-3.5 h-3.5 shrink-0"
-                        /> Check in all
-                      </button>
-                    </div>
-                  </div>
+                  <.admin_event_check_in_order_group_header
+                    order_ref={group.order_ref}
+                    ticket_count={length(group.tickets)}
+                    order_id={group.order_id}
+                  />
                   <%!-- Ticket rows --%>
                   <div
                     :for={ticket <- group.tickets}
@@ -209,25 +181,12 @@ defmodule YscWeb.AdminEventCheckInLive do
                   id={"mobile-#{dom_id}"}
                   class="bg-white rounded border border-zinc-200 overflow-hidden"
                 >
-                  <div class="flex items-center justify-between px-4 py-2.5 bg-zinc-50 border-b border-zinc-100">
-                    <div class="flex items-center gap-2">
-                      <.icon
-                        name="hero-shopping-bag"
-                        class="w-3.5 h-3.5 text-zinc-400"
-                      />
-                      <span class="text-xs font-semibold text-zinc-600">
-                        {group.order_ref}
-                      </span>
-                    </div>
-                    <button
-                      :if={length(group.tickets) > 1}
-                      phx-click="check-in-order"
-                      phx-value-order-id={group.order_id}
-                      class="text-xs font-medium text-emerald-700 hover:text-emerald-900"
-                    >
-                      Check in all
-                    </button>
-                  </div>
+                  <.admin_event_check_in_order_group_header
+                    variant={:mobile}
+                    order_ref={group.order_ref}
+                    ticket_count={length(group.tickets)}
+                    order_id={group.order_id}
+                  />
                   <div
                     :for={ticket <- group.tickets}
                     data-checkin-row
