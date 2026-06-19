@@ -371,6 +371,8 @@ defmodule YscWeb.AdminEventCheckInLive do
      |> assign(:total_count, 0)
      |> assign(:filtered_total, 0)
      |> assign(:scan_session, nil)
+     |> assign(:ticket_by_id, %{})
+     |> assign(:pending_groups_by_id, %{})
      |> stream(:pending_groups, [])
      |> stream(:checked_in_tickets, [])}
   end
@@ -469,7 +471,7 @@ defmodule YscWeb.AdminEventCheckInLive do
   end
 
   def handle_event("toggle-check-in", %{"ticket-id" => ticket_id}, socket) do
-    ticket = fetch_ticket(ticket_id)
+    ticket = fetch_ticket(ticket_id, socket)
 
     cond do
       is_nil(ticket) ->
@@ -516,12 +518,13 @@ defmodule YscWeb.AdminEventCheckInLive do
 
   @impl true
   def handle_info(
-        {Scanning, %MessagePassingEvents.TicketCheckedIn{event_id: eid}},
+        {Scanning,
+         %MessagePassingEvents.TicketCheckedIn{ticket: ticket, event_id: eid}},
         socket
       ) do
     socket =
       if eid == socket.assigns.event.id do
-        reload_tickets(socket, socket.assigns.search_query)
+        apply_ticket_checked_in(socket, ticket)
       else
         socket
       end
@@ -530,12 +533,16 @@ defmodule YscWeb.AdminEventCheckInLive do
   end
 
   def handle_info(
-        {Scanning, %MessagePassingEvents.TicketCheckInUndone{event_id: eid}},
+        {Scanning,
+         %MessagePassingEvents.TicketCheckInUndone{
+           ticket: ticket,
+           event_id: eid
+         }},
         socket
       ) do
     socket =
       if eid == socket.assigns.event.id do
-        reload_tickets(socket, socket.assigns.search_query)
+        apply_ticket_unchecked(socket, ticket)
       else
         socket
       end
@@ -567,6 +574,8 @@ defmodule YscWeb.AdminEventCheckInLive do
     |> assign(:checked_in_count, checked_in_count)
     |> assign(:total_count, total_count)
     |> assign(:filtered_total, length(tickets))
+    |> assign(:ticket_by_id, Map.new(tickets, &{&1.id, &1}))
+    |> assign(:pending_groups_by_id, Map.new(pending_groups, &{&1.id, &1}))
     |> stream(:pending_groups, pending_groups, reset: true)
     |> stream(:checked_in_tickets, checked_in, reset: true)
   end
@@ -603,8 +612,14 @@ defmodule YscWeb.AdminEventCheckInLive do
        )}
     else
       case Scanning.check_in_single(session, ticket.id) do
-        {:ok, _result} ->
-          {:noreply, reload_tickets(socket, socket.assigns.search_query)}
+        {:ok, {db_ticket, _record}} ->
+          updated_ticket = %{
+            ticket
+            | checked_in: true,
+              checked_in_at: db_ticket.checked_in_at
+          }
+
+          {:noreply, apply_ticket_checked_in(socket, updated_ticket)}
 
         {:error, _type, message} ->
           {:noreply, put_flash(socket, :error, message)}
@@ -614,8 +629,14 @@ defmodule YscWeb.AdminEventCheckInLive do
 
   defp do_undo_check_in(socket, ticket) do
     case Scanning.undo_check_in(ticket.id, socket.assigns.event.id) do
-      {:ok, _updated} ->
-        {:noreply, reload_tickets(socket, socket.assigns.search_query)}
+      {:ok, updated} ->
+        updated_ticket = %{
+          ticket
+          | checked_in: false,
+            checked_in_at: updated.checked_in_at
+        }
+
+        {:noreply, apply_ticket_unchecked(socket, updated_ticket)}
 
       {:error, _type, message} when is_binary(message) ->
         {:noreply, put_flash(socket, :error, message)}
@@ -675,7 +696,17 @@ defmodule YscWeb.AdminEventCheckInLive do
 
   defp assign_scan_session_from_params(socket, _params), do: socket
 
-  defp fetch_ticket(ticket_id) do
+  defp fetch_ticket(ticket_id, socket) do
+    case Map.get(socket.assigns.ticket_by_id, ticket_id) do
+      %{} = ticket ->
+        ticket
+
+      nil ->
+        fetch_ticket_from_db(ticket_id)
+    end
+  end
+
+  defp fetch_ticket_from_db(ticket_id) do
     case Ysc.Repo.get(Ysc.Events.Ticket, ticket_id) do
       nil ->
         nil
@@ -688,6 +719,181 @@ defmodule YscWeb.AdminEventCheckInLive do
           :ticket_order
         ])
     end
+  end
+
+  defp apply_ticket_checked_in(socket, ticket) do
+    case Map.get(socket.assigns.ticket_by_id, ticket.id) do
+      %{checked_in: true} ->
+        socket
+
+      _ ->
+        do_apply_ticket_checked_in(socket, ticket)
+    end
+  end
+
+  defp apply_ticket_unchecked(socket, ticket) do
+    case Map.get(socket.assigns.ticket_by_id, ticket.id) do
+      %{checked_in: false} ->
+        socket
+
+      _ ->
+        do_apply_ticket_unchecked(socket, ticket)
+    end
+  end
+
+  defp do_apply_ticket_checked_in(socket, ticket) do
+    search = socket.assigns.search_query
+
+    socket =
+      if ticket_in_current_view?(socket, ticket, search) do
+        socket
+        |> remove_ticket_from_pending(ticket)
+        |> stream_insert(:checked_in_tickets, ticket)
+      else
+        socket
+      end
+
+    socket
+    |> bump_checked_in_count(1, search)
+    |> assign(
+      :ticket_by_id,
+      Map.put(socket.assigns.ticket_by_id, ticket.id, ticket)
+    )
+  end
+
+  defp do_apply_ticket_unchecked(socket, ticket) do
+    search = socket.assigns.search_query
+
+    socket =
+      if ticket_in_current_view?(socket, ticket, search) do
+        socket
+        |> stream_delete(:checked_in_tickets, ticket)
+        |> add_ticket_to_pending(ticket)
+      else
+        socket
+      end
+
+    socket
+    |> bump_checked_in_count(-1, search)
+    |> assign(
+      :ticket_by_id,
+      Map.put(socket.assigns.ticket_by_id, ticket.id, ticket)
+    )
+  end
+
+  defp ticket_in_current_view?(socket, ticket, search) do
+    Map.has_key?(socket.assigns.ticket_by_id, ticket.id) or
+      ticket_matches_search?(ticket, search)
+  end
+
+  defp ticket_matches_search?(_ticket, search) when search in [nil, ""],
+    do: true
+
+  defp ticket_matches_search?(ticket, search) when is_binary(search) do
+    search_term = String.downcase(search)
+
+    fields =
+      [
+        attendee_name(ticket),
+        attendee_email(ticket),
+        ticket.reference_id,
+        ticket.ticket_order && ticket.ticket_order.reference_id
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.any?(fields, fn field ->
+      field
+      |> String.downcase()
+      |> String.contains?(search_term)
+    end)
+  end
+
+  defp remove_ticket_from_pending(socket, ticket) do
+    group_id = pending_group_id(ticket.ticket_order_id)
+
+    case Map.get(socket.assigns.pending_groups_by_id, group_id) do
+      nil ->
+        socket
+
+      group ->
+        remaining = Enum.reject(group.tickets, &(&1.id == ticket.id))
+
+        if remaining == [] do
+          socket
+          |> stream_delete(:pending_groups, group)
+          |> assign(
+            :pending_groups_by_id,
+            Map.delete(socket.assigns.pending_groups_by_id, group_id)
+          )
+        else
+          updated_group = %{group | tickets: remaining}
+
+          socket
+          |> stream_insert(:pending_groups, updated_group)
+          |> assign(
+            :pending_groups_by_id,
+            Map.put(
+              socket.assigns.pending_groups_by_id,
+              group_id,
+              updated_group
+            )
+          )
+        end
+    end
+  end
+
+  defp add_ticket_to_pending(socket, ticket) do
+    group_id = pending_group_id(ticket.ticket_order_id)
+
+    case Map.get(socket.assigns.pending_groups_by_id, group_id) do
+      nil ->
+        order_ref =
+          case ticket.ticket_order do
+            %{reference_id: ref} when not is_nil(ref) -> ref
+            _ -> "Unknown order"
+          end
+
+        group = %{
+          id: group_id,
+          order_id: ticket.ticket_order_id,
+          order_ref: order_ref,
+          tickets: [ticket]
+        }
+
+        socket
+        |> stream_insert(:pending_groups, group)
+        |> assign(
+          :pending_groups_by_id,
+          Map.put(socket.assigns.pending_groups_by_id, group_id, group)
+        )
+
+      group ->
+        updated_group = %{group | tickets: [ticket | group.tickets]}
+
+        socket
+        |> stream_insert(:pending_groups, updated_group)
+        |> assign(
+          :pending_groups_by_id,
+          Map.put(socket.assigns.pending_groups_by_id, group_id, updated_group)
+        )
+    end
+  end
+
+  defp pending_group_id(order_id),
+    do: "group-#{order_id || :erlang.unique_integer([:positive])}"
+
+  defp bump_checked_in_count(socket, delta, search)
+       when search in [nil, ""] do
+    assign(socket, :checked_in_count, socket.assigns.checked_in_count + delta)
+  end
+
+  defp bump_checked_in_count(socket, _delta, _search) do
+    {checked_in_count, total_count} =
+      Scanning.event_checkin_counts(socket.assigns.event.id)
+
+    socket
+    |> assign(:checked_in_count, checked_in_count)
+    |> assign(:total_count, total_count)
   end
 
   defp attendee_name(%{

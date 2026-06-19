@@ -232,6 +232,34 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       assert query_count <= 1
       assert has_element?(view, "#pending-groups")
     end
+
+    test "single check-in avoids reloading the full ticket list", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event, order: order} = setup_event_with_tickets(admin)
+      ticket = List.first(order.tickets)
+      list_pattern = ~r/FROM "tickets" AS t0 LEFT OUTER JOIN/i
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      {_html, list_query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> element(
+              "#pending-groups button[phx-value-ticket-id='#{ticket.id}']"
+            )
+            |> render_click()
+
+            render(view)
+          end,
+          pattern: list_pattern
+        )
+
+      assert list_query_count == 0
+      assert render(view) =~ "1 / 1"
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -476,6 +504,43 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       |> render_click()
 
       assert has_element?(view, "#checked-in-tickets")
+    end
+
+    test "checking in one ticket from a multi-ticket order leaves the other pending",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 10})
+      buyer = make_member()
+
+      order =
+        confirm_order(
+          ticket_order_fixture(%{
+            user: buyer,
+            event: event,
+            tier: tier,
+            ticket_selections: %{tier.id => 2}
+          })
+        )
+
+      [ticket1, ticket2] = order.tickets
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+      view
+      |> element("#pending-groups button[phx-value-ticket-id='#{ticket1.id}']")
+      |> render_click()
+
+      assert render(view) =~ "1 / 2"
+      assert has_element?(view, "#pending-groups")
+      assert has_element?(view, "#checked-in-tickets")
+
+      assert has_element?(
+               view,
+               "#pending-groups button[phx-value-ticket-id='#{ticket2.id}']"
+             )
     end
 
     test "checking in updates the attendance counter", %{
@@ -1289,6 +1354,320 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       )
 
       assert render(view) =~ "0 / 1"
+    end
+
+    test "ignores duplicate TicketCheckedIn when ticket is already checked in",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      %{event: event, order: order} = setup_event_with_tickets(admin)
+      ticket = List.first(order.tickets)
+
+      ticket
+      |> Ecto.Changeset.change(
+        checked_in: true,
+        checked_in_at: DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      assert render(view) =~ "1 / 1"
+
+      reloaded =
+        Repo.get!(Ysc.Events.Ticket, ticket.id)
+        |> Repo.preload([
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        event.id,
+        %Ysc.MessagePassingEvents.TicketCheckedIn{
+          ticket: reloaded,
+          event_id: event.id
+        }
+      )
+
+      assert render(view) =~ "1 / 1"
+    end
+
+    test "ignores duplicate TicketCheckInUndone when ticket is already pending",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      %{event: event, order: order} = setup_event_with_tickets(admin)
+      ticket = List.first(order.tickets)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      assert render(view) =~ "0 / 1"
+
+      reloaded =
+        Repo.get!(Ysc.Events.Ticket, ticket.id)
+        |> Repo.preload([
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        event.id,
+        %Ysc.MessagePassingEvents.TicketCheckInUndone{
+          ticket: reloaded,
+          event_id: event.id
+        }
+      )
+
+      assert render(view) =~ "0 / 1"
+      refute has_element?(view, "#checked-in-tickets")
+    end
+
+    test "PubSub check-in for ticket outside active search filter only refreshes counts",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      alice = make_member(%{first_name: "HiddenPubSubAlice", last_name: "Test"})
+      bob = make_member(%{first_name: "VisiblePubSubBob", last_name: "Test"})
+
+      alice_order =
+        confirm_order(
+          ticket_order_fixture(%{user: alice, event: event, tier: tier})
+        )
+
+      confirm_order(
+        ticket_order_fixture(%{user: bob, event: event, tier: tier})
+      )
+
+      alice_ticket = List.first(alice_order.tickets)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=VisiblePubSubBob")
+
+      html = render(view)
+      assert html =~ "VisiblePubSubBob"
+      refute html =~ "HiddenPubSubAlice"
+      assert html =~ "0 / 2"
+
+      updated_ticket =
+        alice_ticket
+        |> Ecto.Changeset.change(
+          checked_in: true,
+          checked_in_at: DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      reloaded =
+        Repo.preload(updated_ticket, [
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        event.id,
+        %Ysc.MessagePassingEvents.TicketCheckedIn{
+          ticket: reloaded,
+          event_id: event.id
+        }
+      )
+
+      html_after = render(view)
+      assert html_after =~ "1 / 2"
+      refute html_after =~ "HiddenPubSubAlice"
+    end
+
+    test "PubSub check-in removes only one ticket from a multi-ticket pending group",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 10})
+      buyer = make_member()
+
+      order =
+        confirm_order(
+          ticket_order_fixture(%{
+            user: buyer,
+            event: event,
+            tier: tier,
+            ticket_selections: %{tier.id => 2}
+          })
+        )
+
+      [ticket1, ticket2] = order.tickets
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      assert render(view) =~ "0 / 2"
+
+      updated_ticket =
+        ticket1
+        |> Ecto.Changeset.change(
+          checked_in: true,
+          checked_in_at: DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      reloaded =
+        Repo.preload(updated_ticket, [
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        event.id,
+        %Ysc.MessagePassingEvents.TicketCheckedIn{
+          ticket: reloaded,
+          event_id: event.id
+        }
+      )
+
+      html = render(view)
+      assert html =~ "1 / 2"
+      assert has_element?(view, "#pending-groups")
+      assert has_element?(view, "#checked-in-tickets")
+
+      assert has_element?(
+               view,
+               "#pending-groups button[phx-value-ticket-id='#{ticket2.id}']"
+             )
+    end
+
+    test "PubSub undo adds ticket back to an existing multi-ticket pending group",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 10})
+      buyer = make_member()
+
+      order =
+        confirm_order(
+          ticket_order_fixture(%{
+            user: buyer,
+            event: event,
+            tier: tier,
+            ticket_selections: %{tier.id => 2}
+          })
+        )
+
+      [ticket1, ticket2] = order.tickets
+
+      ticket1
+      |> Ecto.Changeset.change(
+        checked_in: true,
+        checked_in_at: DateTime.truncate(DateTime.utc_now(), :second)
+      )
+      |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/check-in")
+      assert render(view) =~ "1 / 2"
+
+      assert has_element?(
+               view,
+               "#pending-groups button[phx-value-ticket-id='#{ticket2.id}']"
+             )
+
+      undone =
+        ticket1
+        |> Ecto.Changeset.change(checked_in: false, checked_in_at: nil)
+        |> Repo.update!()
+        |> Repo.preload([
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        event.id,
+        %Ysc.MessagePassingEvents.TicketCheckInUndone{
+          ticket: undone,
+          event_id: event.id
+        }
+      )
+
+      html = render(view)
+      assert html =~ "0 / 2"
+
+      assert has_element?(
+               view,
+               "#pending-groups button[phx-value-ticket-id='#{ticket1.id}']"
+             )
+
+      assert has_element?(
+               view,
+               "#pending-groups button[phx-value-ticket-id='#{ticket2.id}']"
+             )
+
+      refute has_element?(view, "#checked-in-tickets")
+    end
+
+    test "PubSub check-in with search filter refreshes counts from the database",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      alice = make_member(%{first_name: "PubSubSearchAlice", last_name: "Test"})
+      bob = make_member(%{first_name: "PubSubSearchBob", last_name: "Test"})
+
+      alice_order =
+        confirm_order(
+          ticket_order_fixture(%{user: alice, event: event, tier: tier})
+        )
+
+      confirm_order(
+        ticket_order_fixture(%{user: bob, event: event, tier: tier})
+      )
+
+      alice_ticket = List.first(alice_order.tickets)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=PubSubSearchAlice")
+
+      assert render(view) =~ "0 / 2"
+
+      updated_ticket =
+        alice_ticket
+        |> Ecto.Changeset.change(
+          checked_in: true,
+          checked_in_at: DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Repo.update!()
+
+      reloaded =
+        Repo.preload(updated_ticket, [
+          :registration,
+          :user,
+          :ticket_tier,
+          :ticket_order
+        ])
+
+      Scanning.broadcast_checkin(
+        event.id,
+        %Ysc.MessagePassingEvents.TicketCheckedIn{
+          ticket: reloaded,
+          event_id: event.id
+        }
+      )
+
+      assert render(view) =~ "1 / 2"
+      assert has_element?(view, "#checked-in-tickets")
     end
   end
 

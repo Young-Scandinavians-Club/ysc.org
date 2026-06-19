@@ -114,6 +114,40 @@ defmodule YscWeb.AdminMediaLiveTest do
       assert html_after_clear =~ "AdminMediaOtherImage998877"
     end
 
+    test "saving an edited image preserves the active search filter", %{
+      conn: conn
+    } do
+      _other =
+        create_test_image(%{
+          title: "AdminMediaSaveOther998877"
+        })
+
+      matching =
+        create_test_image(%{
+          title: "AdminMediaSaveSearch554433"
+        })
+
+      {:ok, view, html} =
+        live(conn, ~p"/admin/media?search=#{matching.title}")
+
+      assert html =~ matching.title
+      refute html =~ "AdminMediaSaveOther998877"
+
+      view
+      |> element("#image-#{matching.id}")
+      |> render_click()
+
+      html_after_save =
+        view
+        |> form("#edit_image_form", %{
+          "image" => %{"title" => "AdminMediaSaveSearch554433 Updated"}
+        })
+        |> render_submit()
+
+      assert html_after_save =~ "AdminMediaSaveSearch554433 Updated"
+      refute html_after_save =~ "AdminMediaSaveOther998877"
+    end
+
     test "toggles the media gallery between square and masonry layouts", %{
       conn: conn
     } do
