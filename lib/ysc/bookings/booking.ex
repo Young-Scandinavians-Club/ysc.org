@@ -165,6 +165,9 @@ defmodule Ysc.Bookings.Booking do
     |> validate_date_range()
     |> validate_booking_rules(opts)
     |> unique_constraint(:reference_id)
+    |> unique_constraint(:applied_booking_entitlement_id,
+      name: :bookings_one_hold_per_entitlement_idx
+    )
     |> foreign_key_constraint(:user_id)
   end
 
