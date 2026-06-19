@@ -57,7 +57,8 @@ defmodule Ysc.Bookings.Entitlements do
   def entitlement_reserved_on_active_hold?(
         _entitlement_id,
         _exclude_booking_id
-      ), do: false
+      ),
+      do: false
 
   @doc """
   Active entitlements for a user: `status` is `:active` and not past `expires_at`
