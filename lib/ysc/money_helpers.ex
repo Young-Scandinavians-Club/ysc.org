@@ -109,6 +109,7 @@ defmodule Ysc.MoneyHelper do
       %Money{amount: 1099, currency: :USD}
   """
   def usd_from_db_sum(nil), do: Money.new(0, :USD)
+  def usd_from_db_sum(%Decimal{} = amount), do: Money.new(amount, :USD)
   def usd_from_db_sum(amount) when is_integer(amount), do: Money.new(amount, :USD)
   def usd_from_db_sum(_), do: Money.new(0, :USD)
 

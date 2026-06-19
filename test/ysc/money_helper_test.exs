@@ -139,6 +139,11 @@ defmodule Ysc.MoneyHelperTest do
       assert MoneyHelper.usd_from_db_sum(1099) == Money.new(1099, :USD)
     end
 
+    test "wraps decimal dollar amounts from SQL sums" do
+      assert MoneyHelper.usd_from_db_sum(Decimal.new("1099")) ==
+               Money.new(Decimal.new("1099"), :USD)
+    end
+
     test "returns zero USD for unexpected aggregate types" do
       assert MoneyHelper.usd_from_db_sum("invalid") == Money.new(0, :USD)
     end

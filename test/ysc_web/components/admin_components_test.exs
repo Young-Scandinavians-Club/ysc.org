@@ -318,6 +318,8 @@ defmodule YscWeb.AdminComponentsTest do
 
   describe "admin_table_message/1" do
     test "renders centered table status text with optional id" do
+      assigns = %{}
+
       html =
         rendered_to_string(~H"""
         <.admin_table_message id="entitlements-loading">
