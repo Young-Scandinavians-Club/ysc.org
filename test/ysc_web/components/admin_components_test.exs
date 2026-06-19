@@ -315,4 +315,19 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "mb-2"
     end
   end
+
+  describe "admin_table_message/1" do
+    test "renders centered table status text with optional id" do
+      html =
+        rendered_to_string(~H"""
+        <.admin_table_message id="entitlements-loading">
+          Loading entitlements…
+        </.admin_table_message>
+        """)
+
+      assert html =~ ~s(id="entitlements-loading")
+      assert html =~ "Loading entitlements…"
+      assert html =~ "px-4 py-8 text-center text-zinc-500 text-sm"
+    end
+  end
 end

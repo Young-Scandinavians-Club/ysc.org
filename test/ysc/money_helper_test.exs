@@ -130,6 +130,20 @@ defmodule Ysc.MoneyHelperTest do
     end
   end
 
+  describe "usd_from_db_sum/1" do
+    test "returns zero USD for nil aggregate results" do
+      assert MoneyHelper.usd_from_db_sum(nil) == Money.new(0, :USD)
+    end
+
+    test "wraps integer dollar amounts from SQL sums" do
+      assert MoneyHelper.usd_from_db_sum(1099) == Money.new(1099, :USD)
+    end
+
+    test "returns zero USD for unexpected aggregate types" do
+      assert MoneyHelper.usd_from_db_sum("invalid") == Money.new(0, :USD)
+    end
+  end
+
   describe "parse_dollar_string_to_cents/1" do
     test "parses dollar strings to rounded cents" do
       assert MoneyHelper.parse_dollar_string_to_cents("10.99") == 1099

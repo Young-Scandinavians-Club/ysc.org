@@ -95,6 +95,24 @@ defmodule Ysc.MoneyHelper do
   def cents_to_money(_, _currency), do: Money.new(0, :USD)
 
   @doc """
+  Converts a SQL `sum()` result on money composite columns to a `Money` struct.
+
+  Ecto aggregate queries return `nil` when no rows match; this helper maps that to
+  zero USD. Non-nil integer amounts are passed to `Money.new/2`.
+
+  ## Examples
+
+      iex> Ysc.MoneyHelper.usd_from_db_sum(nil)
+      %Money{amount: 0, currency: :USD}
+
+      iex> Ysc.MoneyHelper.usd_from_db_sum(1099)
+      %Money{amount: 1099, currency: :USD}
+  """
+  def usd_from_db_sum(nil), do: Money.new(0, :USD)
+  def usd_from_db_sum(amount) when is_integer(amount), do: Money.new(amount, :USD)
+  def usd_from_db_sum(_), do: Money.new(0, :USD)
+
+  @doc """
   Converts Money to cents (integer) for Stripe and similar APIs.
 
   Rounds to the currency's minor units (`Money.round/1`) before converting so

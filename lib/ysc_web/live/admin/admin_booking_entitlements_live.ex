@@ -206,14 +206,11 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
       role={@admin_role}
     >
       <div class="py-6 space-y-6">
-        <div>
-          <h1 class="text-2xl font-semibold text-zinc-800">
-            Outstanding member benefits
-          </h1>
-          <p class="text-sm text-zinc-500 mt-1">
-            Active entitlements not yet used (not consumed, not expired).
-          </p>
-        </div>
+        <.admin_page_title
+          subtitle="Active entitlements not yet used (not consumed, not expired)."
+        >
+          Outstanding member benefits
+        </.admin_page_title>
 
         <div class="rounded-lg border border-zinc-200 p-4 bg-white max-w-4xl">
           <h2 class="text-sm font-semibold text-zinc-800 mb-3">
@@ -311,42 +308,27 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
 
         <div class="flex flex-wrap gap-2 items-center">
           <span class="text-sm text-zinc-600">Property:</span>
-          <.link
+          <.admin_toggle_pill
+            variant={:dark}
+            active={is_nil(@filter_property)}
             patch={~p"/admin/bookings/entitlements"}
-            class={[
-              "px-3 py-1.5 rounded text-sm font-medium",
-              if(is_nil(@filter_property),
-                do: "bg-zinc-800 text-white",
-                else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-              )
-            ]}
           >
             All
-          </.link>
-          <.link
+          </.admin_toggle_pill>
+          <.admin_toggle_pill
+            variant={:dark}
+            active={@filter_property == :tahoe}
             patch={~p"/admin/bookings/entitlements?property=tahoe"}
-            class={[
-              "px-3 py-1.5 rounded text-sm font-medium",
-              if(@filter_property == :tahoe,
-                do: "bg-zinc-800 text-white",
-                else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-              )
-            ]}
           >
             Tahoe
-          </.link>
-          <.link
+          </.admin_toggle_pill>
+          <.admin_toggle_pill
+            variant={:dark}
+            active={@filter_property == :clear_lake}
             patch={~p"/admin/bookings/entitlements?property=clear_lake"}
-            class={[
-              "px-3 py-1.5 rounded text-sm font-medium",
-              if(@filter_property == :clear_lake,
-                do: "bg-zinc-800 text-white",
-                else: "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-              )
-            ]}
           >
             Clear Lake
-          </.link>
+          </.admin_toggle_pill>
         </div>
 
         <div class="overflow-x-auto rounded-lg border border-zinc-200">
@@ -413,21 +395,21 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               </tr>
             </tbody>
           </table>
-          <p
+          <.admin_table_message
             :if={@loading_outstanding_entitlements?}
-            class="px-4 py-8 text-center text-zinc-500 text-sm"
+            id="entitlements-loading"
           >
             Loading entitlements…
-          </p>
-          <p
+          </.admin_table_message>
+          <.admin_table_message
             :if={
               !@loading_outstanding_entitlements? and
                 @outstanding_entitlements == []
             }
-            class="px-4 py-8 text-center text-zinc-500 text-sm"
+            id="entitlements-empty"
           >
             No outstanding entitlements for this filter.
-          </p>
+          </.admin_table_message>
         </div>
       </div>
     </.side_menu>

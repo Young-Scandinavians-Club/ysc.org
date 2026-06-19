@@ -57,5 +57,20 @@ defmodule YscWeb.AdminPageTitleTest do
 
       assert html =~ "mb-4"
     end
+
+    test "renders optional subtitle below the title" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_page_title subtitle="Manage active entitlements.">
+          Benefits
+        </.admin_page_title>
+        """)
+
+      assert html =~ "Benefits"
+      assert html =~ "Manage active entitlements."
+      assert html =~ ~s(<p class="text-sm text-zinc-500 mt-1">)
+    end
   end
 end

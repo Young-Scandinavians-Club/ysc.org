@@ -735,24 +735,20 @@ defmodule Ysc.ExpenseReports do
 
   defp calculate_totals_from_db(%ExpenseReport{id: expense_report_id}) do
     expense_total =
-      case Repo.one(
-             from ei in ExpenseReportItem,
-               where: ei.expense_report_id == ^expense_report_id,
-               select: sum(fragment("(?.amount).amount", ei))
-           ) do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
+      from(ei in ExpenseReportItem,
+        where: ei.expense_report_id == ^expense_report_id,
+        select: sum(fragment("(?.amount).amount", ei))
+      )
+      |> Repo.one()
+      |> Ysc.MoneyHelper.usd_from_db_sum()
 
     income_total =
-      case Repo.one(
-             from ii in ExpenseReportIncomeItem,
-               where: ii.expense_report_id == ^expense_report_id,
-               select: sum(fragment("(?.amount).amount", ii))
-           ) do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
+      from(ii in ExpenseReportIncomeItem,
+        where: ii.expense_report_id == ^expense_report_id,
+        select: sum(fragment("(?.amount).amount", ii))
+      )
+      |> Repo.one()
+      |> Ysc.MoneyHelper.usd_from_db_sum()
 
     net_total = money_sub_or_zero(expense_total, income_total)
 
