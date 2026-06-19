@@ -192,7 +192,8 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       conn: conn,
       admin: admin
     } do
-      edition = edition_fixture(admin, %{"title" => "Draft", "subject" => "Subj"})
+      edition =
+        edition_fixture(admin, %{"title" => "Draft", "subject" => "Subj"})
 
       view = live_editing_edition(conn, edition)
 

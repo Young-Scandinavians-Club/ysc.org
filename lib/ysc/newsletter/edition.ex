@@ -53,7 +53,10 @@ defmodule Ysc.Newsletter.Edition do
   """
   def changeset(edition, attrs) do
     edition
-    |> cast(attrs, @draft_fields ++ [:status, :scheduled_at, :sent_at, :sent_count])
+    |> cast(
+      attrs,
+      @draft_fields ++ [:status, :scheduled_at, :sent_at, :sent_count]
+    )
     |> validate_required([:title, :subject])
     |> shared_validations()
   end
