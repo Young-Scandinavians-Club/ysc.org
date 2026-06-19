@@ -1382,16 +1382,16 @@ defmodule YscWeb.AdminEventsNewLive do
     current_event = Events.get_event!(socket.assigns[:event].id)
 
     event_changeset =
-      Event.changeset(current_event, event_params)
+      Event.editor_changeset(current_event, event_params)
       |> Map.put(:action, :validate)
 
     {updated_event, updated_changeset} =
       if event_changeset.valid? do
-        case Events.update_event(current_event, event_params) do
+        case Events.update_event_editor(current_event, event_params) do
           {:ok, updated_event} ->
             # Update succeeded, rebuild changeset with updated event
             updated_changeset =
-              Event.changeset(updated_event, event_params)
+              Event.editor_changeset(updated_event, event_params)
               |> Map.put(:action, :validate)
 
             {updated_event, updated_changeset}
@@ -1460,14 +1460,14 @@ defmodule YscWeb.AdminEventsNewLive do
     current_event = Events.get_event!(socket.assigns[:event].id)
     rendered = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
     update_attrs = %{"raw_details" => raw_body, "rendered_details" => rendered}
-    changeset = Event.changeset(current_event, update_attrs)
+    changeset = Event.editor_changeset(current_event, update_attrs)
 
     {updated_event, updated_changeset} =
       if changeset.valid? do
-        case Events.update_event(current_event, update_attrs) do
+        case Events.update_event_editor(current_event, update_attrs) do
           {:ok, updated_event} ->
             updated_changeset =
-              Event.changeset(updated_event, update_attrs)
+              Event.editor_changeset(updated_event, update_attrs)
 
             {updated_event, updated_changeset}
 
@@ -1665,7 +1665,7 @@ defmodule YscWeb.AdminEventsNewLive do
         # Extract the processed max_attendees value from the changeset
         new_max_attendees = Ecto.Changeset.get_field(changeset, :max_attendees)
 
-        case Events.update_event(current_event, %{
+        case Events.update_event_editor(current_event, %{
                "max_attendees" => new_max_attendees
              }) do
           {:ok, event} -> event
@@ -1701,7 +1701,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     {updated_event, updated_changeset} =
       if changeset.valid? do
-        case Events.update_event(current_event, capacity_params) do
+        case Events.update_event_editor(current_event, capacity_params) do
           {:ok, event} ->
             updated_changeset =
               Event.changeset(event, capacity_params)
@@ -1736,7 +1736,7 @@ defmodule YscWeb.AdminEventsNewLive do
         other -> other
       end
 
-    case Events.update_event(current_event, capacity_params) do
+    case Events.update_event_editor(current_event, capacity_params) do
       {:ok, event} ->
         {:noreply,
          socket
@@ -1955,7 +1955,7 @@ defmodule YscWeb.AdminEventsNewLive do
     changeset = Event.changeset(socket.assigns[:event], data)
 
     if changeset.valid? do
-      Events.update_event(socket.assigns[:event], data)
+      Events.update_event_editor(socket.assigns[:event], data)
     end
 
     {:noreply,
@@ -1970,7 +1970,7 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     current_event = Events.get_event!(socket.assigns[:event].id)
 
-    case Events.update_event(current_event, %{image_id: nil}) do
+    case Events.update_event_editor(current_event, %{image_id: nil}) do
       {:ok, event} ->
         changeset = Event.changeset(event, %{"image_id" => nil})
         {:noreply, assign_form(socket, changeset) |> assign(:event, event)}
@@ -1978,7 +1978,7 @@ defmodule YscWeb.AdminEventsNewLive do
       {:error, _} ->
         reloaded_event = Events.get_event!(socket.assigns[:event].id)
 
-        case Events.update_event(reloaded_event, %{image_id: nil}) do
+        case Events.update_event_editor(reloaded_event, %{image_id: nil}) do
           {:ok, event} ->
             changeset = Event.changeset(event, %{"image_id" => nil})
             {:noreply, assign_form(socket, changeset) |> assign(:event, event)}
@@ -2001,7 +2001,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     updated_event =
       if changeset.valid? do
-        case Events.update_event(current_event, %{image_id: image_id}) do
+        case Events.update_event_editor(current_event, %{image_id: image_id}) do
           {:ok, event} -> event
           {:error, _} -> current_event
         end
@@ -2258,7 +2258,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
       updated_event =
         if changeset.valid? do
-          case Events.update_event(current_event, attrs) do
+          case Events.update_event_editor(current_event, attrs) do
             {:ok, event} -> event
             {:error, _} -> current_event
           end

@@ -187,6 +187,30 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.title == "Original Title"
     end
+
+    test "save-draft ignores forged sent status in edition params", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin, %{"title" => "Draft", "subject" => "Subj"})
+
+      view = live_editing_edition(conn, edition)
+
+      view
+      |> form("#newsletter-editor-form", %{
+        "edition" => %{
+          "title" => "Draft",
+          "subject" => "Subj",
+          "status" => "sent",
+          "sent_count" => "9999"
+        }
+      })
+      |> render_submit()
+
+      reloaded = Newsletter.get_edition!(edition.id)
+      assert reloaded.status == :draft
+      assert reloaded.sent_count == 0
+    end
   end
 
   # ---------------------------------------------------------------------------

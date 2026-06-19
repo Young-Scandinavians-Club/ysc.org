@@ -1170,6 +1170,98 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Event editor: publish controls must not be mass-assignable from LiveView
+  # ---------------------------------------------------------------------------
+
+  describe "event editor mass assignment hardening" do
+    alias Ysc.Events
+    alias Ysc.Events.Event
+
+    import Ysc.EventsFixtures
+
+    test "editor_changeset ignores forged state, published_at, and organizer_id" do
+      organizer = user_fixture()
+      other = user_fixture()
+      event = event_fixture(%{state: :draft, organizer_id: organizer.id})
+
+      changeset =
+        Event.editor_changeset(event, %{
+          "title" => "Updated title",
+          "state" => "published",
+          "published_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "organizer_id" => other.id
+        })
+
+      assert Ecto.Changeset.get_change(changeset, :title) == "Updated title"
+      refute Map.has_key?(changeset.changes, :state)
+      refute Map.has_key?(changeset.changes, :published_at)
+      refute Map.has_key?(changeset.changes, :organizer_id)
+    end
+
+    test "update_event_editor cannot resurrect a deleted event via forged publish params" do
+      event = event_fixture(%{state: :published})
+      {:ok, deleted} = Events.delete_event(event)
+
+      assert deleted.state == :deleted
+
+      assert {:ok, updated} =
+               Events.update_event_editor(deleted, %{
+                 "title" => "Sneaky republish",
+                 "state" => "published",
+                 "published_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+               })
+
+      assert updated.state == :deleted
+      assert updated.title == "Sneaky republish"
+      refute Events.get_public_event(updated.id)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Newsletter editor: lifecycle fields must not be mass-assignable on draft save
+  # ---------------------------------------------------------------------------
+
+  describe "newsletter edition draft mass assignment hardening" do
+    alias Ysc.Newsletter
+    alias Ysc.Newsletter.Edition
+
+    test "draft_changeset ignores forged status and delivery metadata" do
+      edition = %Edition{status: :draft, sent_count: 0}
+
+      changeset =
+        Edition.draft_changeset(edition, %{
+          "title" => "Q2 Update",
+          "subject" => "Hello members",
+          "status" => "sent",
+          "sent_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "sent_count" => 9_999
+        })
+
+      assert Ecto.Changeset.get_change(changeset, :title) == "Q2 Update"
+      refute Map.has_key?(changeset.changes, :status)
+      refute Map.has_key?(changeset.changes, :sent_at)
+      refute Map.has_key?(changeset.changes, :sent_count)
+    end
+
+    test "update_edition_draft keeps draft status when client sends sent" do
+      {:ok, edition} =
+        Newsletter.create_edition(%{"title" => "Draft", "subject" => "Subj"})
+
+      assert {:ok, updated} =
+               Newsletter.update_edition_draft(edition, %{
+                 "title" => "Still draft",
+                 "subject" => "Still subj",
+                 "status" => "sent",
+                 "sent_count" => 500
+               })
+
+      assert updated.status == :draft
+      assert updated.sent_count == 0
+      assert updated.title == "Still draft"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 20 (CRITICAL): Booking checkout accepts foreign PaymentIntents
   # ---------------------------------------------------------------------------
 

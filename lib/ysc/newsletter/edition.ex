@@ -39,24 +39,40 @@ defmodule Ysc.Newsletter.Edition do
     timestamps()
   end
 
+  @draft_fields [
+    :title,
+    :subject,
+    :intro_text,
+    :cover_image_id,
+    :post_ids,
+    :event_ids
+  ]
+
   @doc """
   Changeset for creating or updating an edition.
   """
   def changeset(edition, attrs) do
     edition
-    |> cast(attrs, [
-      :title,
-      :subject,
-      :intro_text,
-      :cover_image_id,
-      :post_ids,
-      :event_ids,
-      :status,
-      :scheduled_at,
-      :sent_at,
-      :sent_count
-    ])
+    |> cast(attrs, @draft_fields ++ [:status, :scheduled_at, :sent_at, :sent_count])
     |> validate_required([:title, :subject])
+    |> shared_validations()
+  end
+
+  @doc """
+  Changeset for member-facing draft saves from the newsletter editor.
+
+  Lifecycle fields (`status`, `scheduled_at`, `sent_at`, `sent_count`) must be
+  updated only via `Newsletter.send_edition/1`, `schedule_edition/2`, etc.
+  """
+  def draft_changeset(edition, attrs) do
+    edition
+    |> cast(attrs, @draft_fields)
+    |> validate_required([:title, :subject])
+    |> shared_validations()
+  end
+
+  defp shared_validations(changeset) do
+    changeset
     |> validate_length(:title, max: 255)
     |> validate_length(:subject, max: 255)
     |> validate_length(:intro_text, max: 50_000)
