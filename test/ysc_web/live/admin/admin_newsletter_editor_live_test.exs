@@ -196,8 +196,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
 
       view = live_editing_edition(conn, edition)
 
-      view
-      |> form("#newsletter-editor-form", %{
+      render_submit(view, "save-draft", %{
         "edition" => %{
           "title" => "Draft",
           "subject" => "Subj",
@@ -205,7 +204,6 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
           "sent_count" => "9999"
         }
       })
-      |> render_submit()
 
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.status == :draft
