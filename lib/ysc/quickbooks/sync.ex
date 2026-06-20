@@ -2684,11 +2684,8 @@ defmodule Ysc.Quickbooks.Sync do
         |> Repo.one()
 
       total_fees =
-        case fees do
-          nil -> Money.new(0, :USD)
-          amount when is_integer(amount) -> Money.new(amount, :USD)
-          _ -> Money.new(0, :USD)
-        end
+        fees
+        |> Ysc.MoneyHelper.usd_from_db_sum()
 
       Ysc.Logging.debug(
         "[QB Sync] calculate_payout_stripe_fees: Total fees calculated",

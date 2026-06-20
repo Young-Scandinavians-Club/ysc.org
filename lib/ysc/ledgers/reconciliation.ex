@@ -33,6 +33,7 @@ defmodule Ysc.Ledgers.Reconciliation do
   alias Ysc.Repo
   alias Ysc.Ledgers
   alias Ysc.Ledgers.{Payment, Payout, Refund, LedgerEntry, LedgerTransaction}
+  alias Ysc.MoneyHelper
 
   @doc """
   Runs a full reconciliation check across all financial entities.
@@ -474,10 +475,9 @@ defmodule Ysc.Ledgers.Reconciliation do
         select: sum(fragment("(?.amount).amount", e))
       )
 
-    case Repo.one(query) do
-      nil -> Money.new(0, :USD)
-      amount -> Money.new(amount, :USD)
-    end
+    query
+    |> Repo.one()
+    |> MoneyHelper.usd_from_db_sum()
   end
 
   defp calculate_refund_total_from_ledger do
@@ -493,10 +493,9 @@ defmodule Ysc.Ledgers.Reconciliation do
         select: sum(fragment("(?.amount).amount", e))
       )
 
-    case Repo.one(query) do
-      nil -> Money.new(0, :USD)
-      amount -> Money.new(0, :USD) |> Money.add!(Money.new(amount, :USD))
-    end
+    query
+    |> Repo.one()
+    |> MoneyHelper.usd_from_db_sum()
   end
 
   defp find_orphaned_payment_entries do
@@ -556,78 +555,8 @@ defmodule Ysc.Ledgers.Reconciliation do
   end
 
   defp reconcile_membership_payments do
-    # Get net membership revenue from ledger entries (credits - debits)
-    # Credits are original revenue, debits are refund reversals
-    credits =
-      from(e in LedgerEntry,
-        join: a in assoc(e, :account),
-        where: a.name == "membership_revenue",
-        where: e.debit_credit == "credit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    debits =
-      from(e in LedgerEntry,
-        join: a in assoc(e, :account),
-        where: a.name == "membership_revenue",
-        where: e.debit_credit == "debit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    {:ok, ledger_total} = Money.sub(credits, debits)
-
-    # Get net stripe receivable for membership payments (debits - credits)
-    stripe_account = Ledgers.get_account_by_name("stripe_account")
-
-    unless stripe_account do
-      raise "stripe_account not found"
-    end
-
-    # Sum debit entries (original payments)
-    membership_debits =
-      from(e in LedgerEntry,
-        where: e.account_id == ^stripe_account.id,
-        where: e.related_entity_type == :membership,
-        where: e.debit_credit == "debit",
-        where: is_nil(e.refund_id),
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Sum credit entries (refunds).
-    # Note: stripe_account credits with related_entity_type :membership are exclusively
-    # created by create_refund_entries, so the refund_id filter is not required here.
-    # Omitting it ensures backward-compatibility with entries created before Feb 2026
-    # when the refund_id column did not exist on ledger_entries.
-    membership_credits =
-      from(e in LedgerEntry,
-        where: e.account_id == ^stripe_account.id,
-        where: e.related_entity_type == :membership,
-        where: e.debit_credit == "credit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Net payments = debits - credits
-    {:ok, payments_total} = Money.sub(membership_debits, membership_credits)
+    ledger_total = get_revenue_total("membership_revenue")
+    payments_total = stripe_net_for_entity_type(:membership)
 
     %{
       status:
@@ -639,56 +568,13 @@ defmodule Ysc.Ledgers.Reconciliation do
   end
 
   defp reconcile_booking_payments do
-    # Similar logic for bookings
     ledger_totals = %{
       tahoe: get_revenue_total("tahoe_booking_revenue"),
       clear_lake: get_revenue_total("clear_lake_booking_revenue")
     }
 
     {:ok, total} = Money.add(ledger_totals.tahoe, ledger_totals.clear_lake)
-
-    # Get net stripe receivable for booking payments (debits - credits)
-    stripe_account = Ledgers.get_account_by_name("stripe_account")
-
-    unless stripe_account do
-      raise "stripe_account not found"
-    end
-
-    # Sum debit entries (original payments)
-    booking_debits =
-      from(e in LedgerEntry,
-        where: e.account_id == ^stripe_account.id,
-        where: e.related_entity_type == :booking,
-        where: e.debit_credit == "debit",
-        where: is_nil(e.refund_id),
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Sum credit entries (refunds).
-    # Note: stripe_account credits with related_entity_type :booking are exclusively
-    # created by create_refund_entries, so the refund_id filter is not required here.
-    # Omitting it ensures backward-compatibility with entries created before Feb 2026
-    # when the refund_id column did not exist on ledger_entries.
-    booking_credits =
-      from(e in LedgerEntry,
-        where: e.account_id == ^stripe_account.id,
-        where: e.related_entity_type == :booking,
-        where: e.debit_credit == "credit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Net payments = debits - credits
-    {:ok, payments_total} = Money.sub(booking_debits, booking_credits)
+    payments_total = stripe_net_for_entity_type(:booking)
 
     %{
       status: if(Money.equal?(total, payments_total), do: :ok, else: :error),
@@ -701,50 +587,7 @@ defmodule Ysc.Ledgers.Reconciliation do
 
   defp reconcile_event_payments do
     ledger_total = get_revenue_total("event_revenue")
-
-    # Get net stripe receivable for event payments (debits - credits for events)
-    # This represents the net amount received from customers for events after refunds
-    stripe_account = Ledgers.get_account_by_name("stripe_account")
-
-    unless stripe_account do
-      raise "stripe_account not found"
-    end
-
-    # Sum debit entries (original payments)
-    event_debits =
-      from(e in LedgerEntry,
-        where: e.account_id == ^stripe_account.id,
-        where: e.related_entity_type == :event,
-        where: e.debit_credit == "debit",
-        where: is_nil(e.refund_id),
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Sum credit entries (refunds).
-    # Note: stripe_account credits with related_entity_type :event are exclusively
-    # created by create_refund_entries, so the refund_id filter is not required here.
-    # Omitting it ensures backward-compatibility with entries created before Feb 2026
-    # when the refund_id column did not exist on ledger_entries.
-    event_credits =
-      from(e in LedgerEntry,
-        where: e.account_id == ^stripe_account.id,
-        where: e.related_entity_type == :event,
-        where: e.debit_credit == "credit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Net payments = debits - credits
-    {:ok, payments_total} = Money.sub(event_debits, event_credits)
+    payments_total = stripe_net_for_entity_type(:event)
 
     %{
       status:
@@ -756,18 +599,11 @@ defmodule Ysc.Ledgers.Reconciliation do
   end
 
   defp reconcile_donation_payments do
-    # Get net donation revenue from ledger entries (credits - debits)
     ledger_total = get_revenue_total("donation_revenue")
 
     # For donations, we can't use stripe_account entries because donations are often
     # bundled with events, and the stripe_account entry is marked as :event.
     # Instead, we verify that the donation_revenue account properly tracks net revenue.
-    # Since donations don't have separate payment records, we just verify the revenue
-    # account is internally consistent (has proper double-entry bookkeeping).
-
-    # The payment_total for donations should match the ledger_total since donations
-    # are always part of properly recorded transactions. We'll verify by checking
-    # that donation revenue entries have corresponding payment_ids.
     payments_total =
       from(e in LedgerEntry,
         join: a in assoc(e, :account),
@@ -778,17 +614,8 @@ defmodule Ysc.Ledgers.Reconciliation do
         where: is_nil(e.refund_id),
         select: sum(fragment("(?.amount).amount", e))
       )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
+      |> sum_ledger_entry_amount()
 
-    # Subtract refunds from donations.
-    # Note: donation_revenue debit entries are exclusively created by
-    # create_refund_entries (payment entries only create credits), so the
-    # refund_id filter is not required. Omitting it ensures backward-compatibility
-    # with entries created before Feb 2026 when the refund_id column did not exist.
     refunds_total =
       from(e in LedgerEntry,
         join: a in assoc(e, :account),
@@ -796,11 +623,7 @@ defmodule Ysc.Ledgers.Reconciliation do
         where: e.debit_credit == "debit",
         select: sum(fragment("(?.amount).amount", e))
       )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
+      |> sum_ledger_entry_amount()
 
     {:ok, net_payments} = Money.sub(payments_total, refunds_total)
 
@@ -814,37 +637,73 @@ defmodule Ysc.Ledgers.Reconciliation do
   end
 
   defp get_revenue_total(account_name) do
-    # Get net revenue by summing credits and subtracting debits
-    # Credits increase revenue, debits decrease revenue (refunds)
-    credits =
-      from(e in LedgerEntry,
-        join: a in assoc(e, :account),
-        where: a.name == ^account_name,
-        where: e.debit_credit == "credit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    debits =
-      from(e in LedgerEntry,
-        join: a in assoc(e, :account),
-        where: a.name == ^account_name,
-        where: e.debit_credit == "debit",
-        select: sum(fragment("(?.amount).amount", e))
-      )
-      |> Repo.one()
-      |> case do
-        nil -> Money.new(0, :USD)
-        amount -> Money.new(amount, :USD)
-      end
-
-    # Net revenue = Credits - Debits
+    credits = sum_revenue_entries(account_name, "credit")
+    debits = sum_revenue_entries(account_name, "debit")
     {:ok, net_revenue} = Money.sub(credits, debits)
     net_revenue
+  end
+
+  defp sum_ledger_entry_amount(query) do
+    query |> Repo.one() |> MoneyHelper.usd_from_db_sum()
+  end
+
+  defp sum_revenue_entries(account_name, debit_credit) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: a.name == ^account_name,
+      where: e.debit_credit == ^debit_credit,
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> sum_ledger_entry_amount()
+  end
+
+  defp stripe_net_for_entity_type(entity_type) do
+    stripe_account = stripe_account!()
+
+    debits =
+      sum_stripe_entity_entries(
+        stripe_account.id,
+        entity_type,
+        "debit",
+        exclude_refunds: true
+      )
+
+    credits =
+      sum_stripe_entity_entries(stripe_account.id, entity_type, "credit")
+
+    {:ok, payments_total} = Money.sub(debits, credits)
+    payments_total
+  end
+
+  defp sum_stripe_entity_entries(
+         account_id,
+         entity_type,
+         debit_credit,
+         opts \\ []
+       ) do
+    query =
+      from(e in LedgerEntry,
+        where: e.account_id == ^account_id,
+        where: e.related_entity_type == ^entity_type,
+        where: e.debit_credit == ^debit_credit,
+        select: sum(fragment("(?.amount).amount", e))
+      )
+
+    query =
+      if Keyword.get(opts, :exclude_refunds, false) do
+        from(e in query, where: is_nil(e.refund_id))
+      else
+        query
+      end
+
+    sum_ledger_entry_amount(query)
+  end
+
+  defp stripe_account! do
+    case Ledgers.get_account_by_name("stripe_account") do
+      nil -> raise "stripe_account not found"
+      account -> account
+    end
   end
 
   defp determine_overall_status(checks) do
