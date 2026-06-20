@@ -738,7 +738,8 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     do: "The property is not available starting on this date"
 
   defp availability_error_message(:blackout_conflict),
-    do: "The selected dates overlap with a blackout period"
+    do:
+      "These dates aren't available for booking. They may be reserved for maintenance or a club event. Please choose different dates, or contact info@ysc.org if you have questions."
 
   defp availability_error_message(:property_unavailable),
     do: "The selected dates or guest count are not available"

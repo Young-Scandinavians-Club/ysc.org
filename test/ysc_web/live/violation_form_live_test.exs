@@ -6,6 +6,18 @@ defmodule YscWeb.ViolationFormLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  describe "page copy" do
+    test "uses plain language on the concern report form", %{conn: conn} do
+      {:ok, _view, html} = live(conn, ~p"/report-conduct-violation")
+
+      assert html =~ "Report a concern"
+      assert html =~ "What happened?"
+      refute html =~ "Violation Summary"
+      assert html =~ "kept private"
+      refute html =~ "confidentiality protocols"
+    end
+  end
+
   describe "handle_event validate and save" do
     test "validate updates the form", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/report-conduct-violation")

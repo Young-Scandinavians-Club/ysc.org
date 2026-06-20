@@ -6428,7 +6428,7 @@ defmodule YscWeb.TahoeBookingLive do
             Map.put(
               errors,
               :availability,
-              "Selected dates are not available due to blackout dates."
+              YscWeb.BookingUserMessages.unavailable_blackout_dates()
             )
           else
             # 3. Check for ANY existing active bookings on the selected dates (rooms or buyouts)
