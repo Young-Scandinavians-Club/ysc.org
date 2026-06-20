@@ -353,7 +353,7 @@ defmodule YscWeb.UserTicketsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Failed to cancel order: #{reason}",
+               cancel_order_error_message(reason),
                title: "Order"
              )}
         end
@@ -478,4 +478,11 @@ defmodule YscWeb.UserTicketsLive do
   end
 
   defp format_visited_date(_), do: "Visited"
+
+  defp cancel_order_error_message(:not_found),
+    do: "We couldn't find this order. It may have already been cancelled."
+
+  defp cancel_order_error_message(_reason),
+    do:
+      "We couldn't cancel this order. Please try again, or contact info@ysc.org for help."
 end

@@ -4434,7 +4434,10 @@ defmodule YscWeb.UserSettingsLive do
 
       {:error, :no_scheduled_downgrade} ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "No scheduled downgrade found.",
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "There is no plan change scheduled on your account. Your current membership level is already in effect.",
            title: "Membership"
          )
          |> push_patch(to: ~p"/users/membership")}
