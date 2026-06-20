@@ -53,32 +53,6 @@ defmodule YscWeb.BookingReceiptLive do
            |> redirect(to: ~p"/")}
 
         booking ->
-          # Handle Stripe redirect parameters (may update booking status)
-          # Track if booking was actually updated to avoid unnecessary reload
-          {socket, booking_updated, reservation_updated_from_redirect} =
-            handle_stripe_redirect(params, booking, socket)
-
-          show_reservation_updated =
-            Map.get(params, "updated") == "true" or
-              reservation_updated_from_redirect
-
-          # PERFORMANCE: Only reload booking if redirect handling actually changed it
-          booking =
-            if booking_updated do
-              from(b in Booking,
-                where: b.id == ^booking_id and b.user_id == ^user.id,
-                preload: [
-                  {:user, :current_avatar},
-                  :booking_guests,
-                  rooms: :room_category
-                ]
-              )
-              |> Repo.one!()
-            else
-              booking
-            end
-
-          # Get timezone from connect params
           connect_params =
             case get_connect_params(socket) do
               nil -> %{}
@@ -87,14 +61,6 @@ defmodule YscWeb.BookingReceiptLive do
 
           timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
 
-          # Parse saved pricing items (saved at booking time) - no query needed
-          price_breakdown = parse_pricing_items(booking.pricing_items, booking)
-
-          # Check if booking can be cancelled - no query needed
-          can_cancel = BookingActions.can_cancel_booking?(booking)
-          can_change = BookingActions.can_change_booking?(booking)
-
-          # Check if confetti should be shown (only when coming from payment)
           show_confetti =
             Map.get(params, "confetti") == "true" ||
               Map.get(params, "redirect_status") == "succeeded"
@@ -103,44 +69,23 @@ defmodule YscWeb.BookingReceiptLive do
             "Confetti check: params=#{inspect(params)}, show_confetti=#{show_confetti}"
           )
 
-          # PERFORMANCE: Essential data for initial render
-          # - booking, price_breakdown, can_cancel are needed immediately
-          # - payment, refund_info, door_code, refund_data can be loaded after connection
-
+          # PERFORMANCE: Static HTML only needs the booking row and display assigns.
+          # Stripe redirect finalization (API call + possible confirm/reload) runs
+          # after the WebSocket connects, matching BookingCheckoutLive.
           socket =
-            socket
-            |> assign(:booking, booking)
-            |> assign(:timezone, timezone)
-            |> assign(:price_breakdown, price_breakdown)
-            |> assign(:user_first_name, user.first_name || "Member")
-            |> assign(:booking_in_past, booking_checkout_in_past?(booking))
-            |> assign(:can_cancel, can_cancel)
-            |> assign(:can_change, can_change)
-            |> assign(:show_cancel_modal, false)
-            |> assign(:cancel_reason, "")
-            |> assign(:show_confetti, show_confetti)
-            |> assign(:show_reservation_updated, show_reservation_updated)
-            |> assign(:page_title, "Booking Confirmation")
-            |> assign(
-              :meta_description,
-              "Your cabin booking confirmation from Young Scandinavians Club."
+            assign_initial_receipt_state(
+              socket,
+              booking,
+              user,
+              timezone,
+              show_confetti,
+              Map.get(params, "updated") == "true"
             )
-            # Placeholders for async-loaded data
-            |> assign(:payment, nil)
-            |> assign(:booking_payments, [])
-            |> assign(:booking_payment_entries, [])
-            |> assign(:total_paid_amount, nil)
-            |> assign(:multiple_payments?, false)
-            |> assign(:refund_info, nil)
-            |> assign(:door_code, nil)
-            |> assign(:show_door_code, false)
-            |> assign(:refund_data, nil)
-            |> assign(:payment_method_description, nil)
-            |> assign(:payment_method_logo, nil)
-            |> assign(:async_data_loaded, false)
 
           if connected?(socket) do
-            # Load secondary data asynchronously after WebSocket connection
+            {socket, booking} =
+              finalize_stripe_redirect(socket, params, booking, booking_id)
+
             {:ok, load_receipt_data_async(socket, booking)}
           else
             {:ok, socket}
@@ -1355,6 +1300,92 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   ## Private Functions
+
+  defp assign_initial_receipt_state(
+         socket,
+         booking,
+         user,
+         timezone,
+         show_confetti,
+         show_reservation_updated
+       ) do
+    price_breakdown = parse_pricing_items(booking.pricing_items, booking)
+
+    socket
+    |> assign(:booking, booking)
+    |> assign(:timezone, timezone)
+    |> assign(:price_breakdown, price_breakdown)
+    |> assign(:user_first_name, user.first_name || "Member")
+    |> assign(:booking_in_past, booking_checkout_in_past?(booking))
+    |> assign(:can_cancel, BookingActions.can_cancel_booking?(booking))
+    |> assign(:can_change, BookingActions.can_change_booking?(booking))
+    |> assign(:show_cancel_modal, false)
+    |> assign(:cancel_reason, "")
+    |> assign(:show_confetti, show_confetti)
+    |> assign(:show_reservation_updated, show_reservation_updated)
+    |> assign(:page_title, "Booking Confirmation")
+    |> assign(
+      :meta_description,
+      "Your cabin booking confirmation from Young Scandinavians Club."
+    )
+    |> assign(:payment, nil)
+    |> assign(:booking_payments, [])
+    |> assign(:booking_payment_entries, [])
+    |> assign(:total_paid_amount, nil)
+    |> assign(:multiple_payments?, false)
+    |> assign(:refund_info, nil)
+    |> assign(:door_code, nil)
+    |> assign(:show_door_code, false)
+    |> assign(:refund_data, nil)
+    |> assign(:payment_method_description, nil)
+    |> assign(:payment_method_logo, nil)
+    |> assign(:async_data_loaded, false)
+  end
+
+  defp finalize_stripe_redirect(socket, params, booking, booking_id) do
+    {socket, booking_updated, reservation_updated_from_redirect} =
+      handle_stripe_redirect(params, booking, socket)
+
+    socket =
+      if reservation_updated_from_redirect do
+        assign(socket, :show_reservation_updated, true)
+      else
+        socket
+      end
+
+    booking =
+      if booking_updated do
+        from(b in Booking,
+          where:
+            b.id == ^booking_id and b.user_id == ^socket.assigns.current_user.id,
+          preload: [
+            {:user, :current_avatar},
+            :booking_guests,
+            rooms: :room_category
+          ]
+        )
+        |> Repo.one!()
+      else
+        booking
+      end
+
+    socket =
+      if booking_updated do
+        socket
+        |> assign(:booking, booking)
+        |> assign(
+          :price_breakdown,
+          parse_pricing_items(booking.pricing_items, booking)
+        )
+        |> assign(:booking_in_past, booking_checkout_in_past?(booking))
+        |> assign(:can_cancel, BookingActions.can_cancel_booking?(booking))
+        |> assign(:can_change, BookingActions.can_change_booking?(booking))
+      else
+        socket
+      end
+
+    {socket, booking}
+  end
 
   @dialyzer {:nowarn_function, handle_stripe_redirect: 3}
   defp handle_stripe_redirect(params, booking, socket) do
