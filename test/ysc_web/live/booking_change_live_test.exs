@@ -293,9 +293,10 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "Total room capacity is 4"
   end
 
-  test "shows plain-language blackout message when dates overlap a blackout period", %{
-    conn: conn
-  } do
+  test "shows plain-language blackout message when dates overlap a blackout period",
+       %{
+         conn: conn
+       } do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
