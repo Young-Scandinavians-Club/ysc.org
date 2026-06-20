@@ -9,6 +9,7 @@ defmodule Ysc.Events.Event do
 
   import Ecto.Changeset
 
+  alias Ysc.Events.EventDateTime
   alias Ysc.ReferenceGenerator
 
   @reference_prefix "EVT"
@@ -210,8 +211,8 @@ defmodule Ysc.Events.Event do
     end_date = get_field(changeset, :end_date)
     end_time = get_field(changeset, :end_time)
 
-    start_datetime = combine_date_time(start_date, start_time)
-    end_datetime = combine_date_time(end_date, end_time)
+    start_datetime = EventDateTime.combine(start_date, start_time)
+    end_datetime = EventDateTime.combine(end_date, end_time)
 
     if start_datetime && end_datetime &&
          DateTime.compare(start_datetime, end_datetime) == :gt do
@@ -226,7 +227,7 @@ defmodule Ysc.Events.Event do
     start_date = get_field(changeset, :start_date)
     start_time = get_field(changeset, :start_time)
 
-    start_datetime = combine_date_time(start_date, start_time)
+    start_datetime = EventDateTime.combine(start_date, start_time)
 
     if publish_at && start_datetime &&
          DateTime.compare(publish_at, start_datetime) == :gt do
@@ -238,22 +239,6 @@ defmodule Ysc.Events.Event do
     else
       changeset
     end
-  end
-
-  defp combine_date_time(nil, _), do: nil
-  defp combine_date_time(_, nil), do: nil
-
-  defp combine_date_time(%DateTime{} = date, %Time{} = time) do
-    naive_date = DateTime.to_naive(date)
-    date_part = NaiveDateTime.to_date(naive_date)
-    naive_datetime = NaiveDateTime.new!(date_part, time)
-    DateTime.from_naive!(naive_datetime, "Etc/UTC")
-  end
-
-  defp combine_date_time(date, time)
-       when not is_nil(date) and not is_nil(time) do
-    NaiveDateTime.new!(date, time)
-    |> DateTime.from_naive!("Etc/UTC")
   end
 
   defp validate_partiful_link(changeset) do
