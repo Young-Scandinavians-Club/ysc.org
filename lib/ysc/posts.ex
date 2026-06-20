@@ -298,6 +298,22 @@ defmodule Ysc.Posts do
     end
   end
 
+  @doc """
+  Updates editorial post fields from the admin editor auto-save path.
+
+  Ignores mass-assigned lifecycle controls (`state`, `published_on`, `deleted_on`,
+  `featured_post`, etc.).
+  """
+  def update_post_editor(post, params, %User{} = current_user, opts \\ []) do
+    with :ok <- Policy.authorize(:post_update, current_user, post) do
+      result =
+        post |> Post.editor_changeset(params, opts) |> Repo.update()
+
+      maybe_invalidate_public_post_cache(result, post)
+      result
+    end
+  end
+
   defp maybe_set_board_position_at_publish(post, params) do
     new_state = Map.get(params, "state") || Map.get(params, :state)
 
