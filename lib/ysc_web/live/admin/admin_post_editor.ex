@@ -385,7 +385,7 @@ defmodule YscWeb.AdminPostEditorLive do
     default_title = Slug.default_title()
 
     changeset =
-      Post.update_post_changeset(%Post{state: :draft}, %{
+      Post.editor_changeset(%Post{state: :draft}, %{
         "title" => default_title,
         "url_name" => Slug.from_title(default_title)
       })
@@ -428,7 +428,7 @@ defmodule YscWeb.AdminPostEditorLive do
         %{}
       end
 
-    update_post_changeset = Post.update_post_changeset(post, form_attrs)
+    update_post_changeset = Post.editor_changeset(post, form_attrs)
 
     YscWeb.Endpoint.subscribe("post_saved:#{id}")
 
@@ -480,7 +480,7 @@ defmodule YscWeb.AdminPostEditorLive do
       maybe_sync_url_name(socket, updated_values)
 
     changeset =
-      Post.update_post_changeset(%Post{}, updated_values)
+      Post.editor_changeset(%Post{}, updated_values)
       |> Map.put(:action, :validate)
 
     form_socket =
@@ -531,7 +531,7 @@ defmodule YscWeb.AdminPostEditorLive do
             html_scrubbed_values
             |> maybe_unique_url_name(previous_url_name, updated_values)
 
-          case Posts.update_post(
+          case Posts.update_post_editor(
                  %Post{id: post_id},
                  persist_values,
                  current_user,
@@ -711,7 +711,7 @@ defmodule YscWeb.AdminPostEditorLive do
     post_id = socket.assigns.post_id
     current_user = socket.assigns.current_user
 
-    case Posts.update_post(
+    case Posts.update_post_editor(
            %Post{id: post_id},
            %{"image_id" => nil},
            current_user
@@ -740,7 +740,7 @@ defmodule YscWeb.AdminPostEditorLive do
     post_id = socket.assigns.post_id
     current_user = socket.assigns.current_user
 
-    case Posts.update_post(
+    case Posts.update_post_editor(
            %Post{id: post_id},
            %{"image_id" => image_id},
            current_user

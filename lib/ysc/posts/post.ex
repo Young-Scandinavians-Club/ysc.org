@@ -75,6 +75,30 @@ defmodule Ysc.Posts.Post do
     timestamps()
   end
 
+  @editor_fields [
+    :title,
+    :url_name,
+    :rendered_body,
+    :raw_body,
+    :image_id,
+    :preview_text
+  ]
+
+  @doc """
+  Changeset for admin editor auto-save and validate.
+
+  Publishing state and featured-post flags must use dedicated actions
+  (`publish-post`, `restore-post`, `delete-post`), not LiveView form params.
+  """
+  def editor_changeset(post, attrs, opts \\ []) do
+    post
+    |> cast(attrs, @editor_fields)
+    |> validate_length(:title, max: 150)
+    |> validate_length(:url_name, min: 1, max: 150)
+    |> foreign_key_constraint(:image_id)
+    |> maybe_validate_unique_url_name(opts)
+  end
+
   def new_post_changeset(post, attrs, opts \\ []) do
     post
     |> cast(attrs, [
