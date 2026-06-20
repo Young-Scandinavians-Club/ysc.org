@@ -38,12 +38,16 @@
       ]}
     >
       <div class="nav-bar-inner flex flex-row items-center justify-between max-w-screen-xl mx-auto py-4 lg:py-0 px-4">
-        <!-- Logo - hidden on mobile -->
+        <!-- Logo - hidden on mobile; "Home" label hints the link destination -->
         <.link
           navigate={~p"/"}
-          class="hidden lg:flex items-center flex-shrink-0"
+          id="nav-logo-home-link"
+          aria-label="Home"
+          title="Home"
+          class="nav-logo-home hidden lg:flex items-center gap-2 flex-shrink-0 rounded px-2 py-2 font-bold transition ease-in-out duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
         >
-          <.ysc_logo no_circle={true} class="h-12 w-12" width={48} height={48} />
+          <.ysc_logo no_circle={true} class="h-12 w-12 flex-shrink-0" width={48} height={48} />
+          <span class="nav-logo-home-label text-sm font-bold">Home</span>
         </.link>
 
         <div class="flex flex-1 items-center justify-end lg:justify-between py-0 lg:py-4">
@@ -158,6 +162,15 @@
 
             <:mobile_content>
               <ul class="flex flex-col font-medium">
+                <li>
+                  <.link
+                    navigate={~p"/"}
+                    phx-click={hide_mobile_menu("navbar-dropdown")}
+                    class="nav-link block px-3 py-2 font-bold transition ease-in-out rounded duration-150 text-zinc-900 hover:bg-zinc-100 hover:text-black"
+                  >
+                    Home
+                  </.link>
+                </li>
                 <li>
                   <.link
                     navigate={~p"/news"}
