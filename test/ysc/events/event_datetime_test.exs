@@ -34,7 +34,10 @@ defmodule Ysc.Events.EventDateTimeTest do
     end
 
     test "returns nil when start date or time is missing" do
-      assert EventDateTime.start_datetime(%Event{start_date: nil, start_time: ~T[18:00:00]}) ==
+      assert EventDateTime.start_datetime(%Event{
+               start_date: nil,
+               start_time: ~T[18:00:00]
+             }) ==
                nil
 
       assert EventDateTime.start_datetime(%Event{
@@ -61,7 +64,9 @@ defmodule Ysc.Events.EventDateTimeTest do
       }
 
       assert EventDateTime.in_future?(past_event) == false
-      assert EventDateTime.in_future?(%Event{start_date: nil, start_time: nil}) == false
+
+      assert EventDateTime.in_future?(%Event{start_date: nil, start_time: nil}) ==
+               false
     end
   end
 
