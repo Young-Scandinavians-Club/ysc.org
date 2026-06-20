@@ -243,7 +243,7 @@ defmodule Ysc.MixProject do
       {:phoenix, "~> 1.8"},
       {:plug_cowboy, "~> 2.8"},
       {:postgrex, "~> 0.22"},
-      {:prom_ex, "~> 1.11"},
+      {:prom_ex, "~> 1.12"},
       {:remote_ip, "~> 1.2"},
       {:req, "~> 0.6"},
       {:retry_on, "~> 0.1"},
