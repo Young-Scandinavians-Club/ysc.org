@@ -8,6 +8,9 @@ defmodule YscWeb.ViolationFormLiveTest do
 
   describe "page copy" do
     test "uses plain language on the concern report form", %{conn: conn} do
+      user = user_fixture(%{phone_number: "+14155559999"})
+      conn = log_in_user(conn, user)
+
       {:ok, _view, html} = live(conn, ~p"/report-conduct-violation")
 
       assert html =~ "Report a concern"
