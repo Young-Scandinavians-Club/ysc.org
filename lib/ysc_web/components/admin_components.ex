@@ -73,6 +73,10 @@ defmodule YscWeb.AdminComponents do
     default: nil,
     doc: "Additional classes merged with the default title styles"
 
+  attr :subtitle, :string,
+    default: nil,
+    doc: "Optional muted description rendered below the title"
+
   slot :inner_block, required: true
 
   def admin_page_title(assigns) do
@@ -87,6 +91,9 @@ defmodule YscWeb.AdminComponents do
           {render_slot(@inner_block)}
         </h2>
     <% end %>
+    <p :if={@subtitle} class="text-sm text-zinc-500 mt-1">
+      {@subtitle}
+    </p>
     """
   end
 
@@ -836,6 +843,42 @@ defmodule YscWeb.AdminComponents do
     >
       {render_slot(@inner_block)}
     </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_table_message
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Centered status text below admin data tables (loading placeholders, empty filters).
+
+  ## Examples
+
+      <.admin_table_message :if={@loading?} id="entitlements-loading">
+        Loading entitlements…
+      </.admin_table_message>
+
+      <.admin_table_message :if={@empty?}>
+        No outstanding entitlements for this filter.
+      </.admin_table_message>
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the message paragraph"
+
+  slot :inner_block, required: true
+
+  def admin_table_message(assigns) do
+    ~H"""
+    <p
+      id={@id}
+      class={["px-4 py-8 text-center text-zinc-500 text-sm", @class]}
+    >
+      {render_slot(@inner_block)}
+    </p>
     """
   end
 
