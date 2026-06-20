@@ -69,9 +69,6 @@ defmodule YscWeb.BookingReceiptLive do
             "Confetti check: params=#{inspect(params)}, show_confetti=#{show_confetti}"
           )
 
-          # PERFORMANCE: Static HTML only needs the booking row and display assigns.
-          # Stripe redirect finalization (API call + possible confirm/reload) runs
-          # after the WebSocket connects, matching BookingCheckoutLive.
           socket =
             assign_initial_receipt_state(
               socket,
@@ -82,10 +79,17 @@ defmodule YscWeb.BookingReceiptLive do
               Map.get(params, "updated") == "true"
             )
 
-          if connected?(socket) do
-            {socket, booking} =
+          # Finalize redirect-based payments (Amazon Pay, CashApp, etc.) whenever
+          # Stripe return params are present — including the dead render — so a
+          # succeeded charge is not left unconfirmed if the WebSocket never connects.
+          {socket, booking} =
+            if stripe_redirect_return?(params) do
               finalize_stripe_redirect(socket, params, booking, booking_id)
+            else
+              {socket, booking}
+            end
 
+          if connected?(socket) do
             {:ok, load_receipt_data_async(socket, booking)}
           else
             {:ok, socket}
@@ -1300,6 +1304,11 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   ## Private Functions
+
+  defp stripe_redirect_return?(params) do
+    Map.get(params, "redirect_status") == "succeeded" and
+      is_binary(Map.get(params, "payment_intent"))
+  end
 
   defp assign_initial_receipt_state(
          socket,
