@@ -1199,9 +1199,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert receipt_ledger_payment_count(booking.id) == 1
     end
 
-    test "dead render confirms booking when Stripe redirect params are present", %{
-      conn: conn
-    } do
+    test "dead render confirms booking when Stripe redirect params are present",
+         %{
+           conn: conn
+         } do
       Ysc.Ledgers.ensure_basic_accounts()
       original_stripe_client = Application.get_env(:ysc, :stripe_client)
 

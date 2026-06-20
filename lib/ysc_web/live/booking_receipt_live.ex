@@ -1306,8 +1306,11 @@ defmodule YscWeb.BookingReceiptLive do
   ## Private Functions
 
   defp stripe_redirect_return?(params) do
-    Map.get(params, "redirect_status") == "succeeded" and
-      is_binary(Map.get(params, "payment_intent"))
+    case Map.get(params, "redirect_status") do
+      "succeeded" -> is_binary(Map.get(params, "payment_intent"))
+      "failed" -> true
+      _ -> false
+    end
   end
 
   defp assign_initial_receipt_state(
