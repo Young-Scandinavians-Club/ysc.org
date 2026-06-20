@@ -27,6 +27,7 @@ import topbar from "../vendor/topbar";
 import "../vendor/add-to-calendar-button@2.js";
 import LivePhone from "./live_phone";
 import StickyNavbar, { syncNavHeight } from "./sticky_navbar";
+import { releaseStaleBodyScrollLock } from "./body_scroll_lock";
 import Uploaders from "./uploaders";
 import BlurHashCanvas from "./blur_hash_canvas";
 import BlurHashImage from "./blur_hash_image";
@@ -209,7 +210,10 @@ if ('scrollRestoration' in history) {
 // Show progress bar on live navigation and form submits
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });
 window.addEventListener("phx:page-loading-start", (_info) => topbar.show(300));
-window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
+window.addEventListener("phx:page-loading-stop", (_info) => {
+    topbar.hide();
+    releaseStaleBodyScrollLock();
+});
 
 // Handle custom events from LiveView
 window.addEventListener("phx:scroll-to-top", () => {
