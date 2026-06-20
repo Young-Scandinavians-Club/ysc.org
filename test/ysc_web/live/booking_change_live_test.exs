@@ -293,6 +293,50 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "Total room capacity is 4"
   end
 
+  test "shows plain-language blackout message when dates overlap a blackout period", %{
+    conn: conn
+  } do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    extended_checkout = Date.add(booking.checkout_date, 1)
+
+    assert {:ok, _} =
+             Bookings.create_blackout(%{
+               property: :tahoe,
+               reason: "Maintenance",
+               start_date: booking.checkout_date,
+               end_date: extended_checkout
+             })
+
+    {view, _html} = live_change(conn, booking)
+
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    html =
+      view
+      |> form("#booking-change-form", %{
+        "modification" => %{
+          "checkin_date" => checkin_str,
+          "checkout_date" => extended_checkout_str
+        }
+      })
+      |> render_change()
+
+    assert html =~ "modification-preview-error"
+    assert html =~ "available for booking"
+    refute html =~ "blackout"
+  end
+
   test "dismisses payment form when dates no longer require additional payment",
        %{
          conn: conn
