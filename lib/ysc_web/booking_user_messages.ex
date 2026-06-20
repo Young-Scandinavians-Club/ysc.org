@@ -35,16 +35,22 @@ defmodule YscWeb.BookingUserMessages do
     "The cabin isn't open for bookings on #{date_str}. This date may be reserved for maintenance or a club event. Please choose different dates, or contact info@ysc.org if you have questions."
   end
 
+  def unavailable_blackout_dates do
+    trim("""
+    These dates aren't available for booking. They may be reserved for maintenance or a club event. Please choose different dates, or contact info@ysc.org if you have questions.
+    """)
+  end
+
   def checkout_guest_info_step_enter_guests do
     "Enter the name of every guest who will stay in your room(s)"
   end
 
   def checkout_guest_info_step_continue_payment do
-    "Continue to payment and finish before your hold expires"
+    "Continue to payment — finish before your reservation timer runs out"
   end
 
   def checkout_guest_info_step_continue_complimentary do
-    "Continue to confirm your booking before your hold expires"
+    "Continue to confirm your booking — finish before your reservation timer runs out"
   end
 
   def checkout_payment_step_pay do

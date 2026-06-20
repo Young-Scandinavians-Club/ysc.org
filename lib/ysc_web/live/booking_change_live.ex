@@ -1409,8 +1409,7 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp modification_error_message(:blackout_conflict),
-    do:
-      "Those dates aren't available for booking. They may be reserved for maintenance or a club event. Please choose different dates, or email info@ysc.org if you have questions."
+    do: YscWeb.BookingUserMessages.unavailable_blackout_dates()
 
   defp modification_error_message(:property_unavailable),
     do: "The selected dates or guest count are not available."
@@ -1432,10 +1431,12 @@ defmodule YscWeb.BookingChangeLive do
     do: "Payment was not completed. Please try again."
 
   defp modification_error_message(:payment_amount_mismatch),
-    do: "Payment amount does not match the required balance."
+    do:
+      "We couldn't confirm your payment for these date changes. You have not been charged for the change yet. Please try again, or contact info@ysc.org if the problem continues."
 
   defp modification_error_message(:payment_metadata_mismatch),
-    do: "Payment could not be verified for this modification. Please try again."
+    do:
+      "We couldn't verify your payment. Your reservation has not been changed yet. Please try again."
 
   defp modification_error_message(:inventory_update_failed),
     do:
@@ -1446,7 +1447,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp modification_error_message(:modification_hold_expired),
     do:
-      "Your checkout timed out before payment finished. Please make your changes again and complete payment."
+      "Time ran out before payment finished. Your original reservation is unchanged. Please start your date change again."
 
   defp modification_error_message(:modification_hold_mismatch),
     do:

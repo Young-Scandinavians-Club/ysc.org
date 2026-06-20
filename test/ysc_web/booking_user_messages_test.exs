@@ -34,15 +34,22 @@ defmodule YscWeb.BookingUserMessagesTest do
              "isn't open for bookings on 2026-06-01"
   end
 
+  test "unavailable blackout dates message" do
+    assert BookingUserMessages.unavailable_blackout_dates() =~
+             "aren't available for booking"
+
+    refute BookingUserMessages.unavailable_blackout_dates() =~ "blackout"
+  end
+
   test "checkout step copy" do
     assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
              "every guest"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_payment() =~
-             "finish before your hold expires"
+             "reservation timer runs out"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_complimentary() =~
-             "before your hold expires"
+             "reservation timer runs out"
 
     assert BookingUserMessages.checkout_payment_step_pay() =~ "payment details"
   end

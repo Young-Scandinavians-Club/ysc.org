@@ -155,7 +155,7 @@ defmodule YscWeb.ConductViolationReportLive do
                     </div>
                   </div>
                   <p class="text-xs text-zinc-500 italic border-t border-zinc-200 pt-3">
-                    This information allows us to contact you for further details. Your identity is protected under our confidentiality protocols.
+                    We may contact you if we need more information. Your report is kept private and only shared with the YSC board and people involved in reviewing it—not with the person you are reporting about (unless you choose otherwise below).
                   </p>
                   <%!-- Hidden fields to ensure user data is submitted --%>
                   <input
@@ -245,8 +245,8 @@ defmodule YscWeb.ConductViolationReportLive do
                   <.input
                     type="textarea"
                     field={@form[:summary]}
-                    label="Violation Summary*"
-                    placeholder="Describe the incident in detail, including when and where it occurred, who was involved, and any relevant context..."
+                    label="What happened?*"
+                    placeholder="Tell us what happened, including when and where, who was involved, and any other details you think we should know..."
                     rows={8}
                   />
                 </div>
