@@ -630,6 +630,103 @@ defmodule Ysc.Bookings.EntitlementsTest do
     end
   end
 
+  describe "apply_best_entitlement/7" do
+    test "skips entitlements reserved on another active hold and picks the next best",
+         %{user: user, admin: admin} do
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Apply best category #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      assert {:ok, _} =
+               Bookings.create_pricing_rule(%{
+                 amount: Money.new(:USD, 100),
+                 booking_mode: :room,
+                 price_unit: :per_person_per_night,
+                 property: :tahoe,
+                 season_id: nil,
+                 room_id: nil,
+                 room_category_id: category.id
+               })
+
+      {:ok, room_a} =
+        Bookings.create_room(%{
+          name: "Apply best room A",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      {:ok, room_b} =
+        Bookings.create_room(%{
+          name: "Apply best room B",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      assert {:ok, larger_entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 50)
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, smaller_entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+      subtotal = Money.new(:USD, 200)
+
+      assert {:ok, booking_a} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room_a.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert booking_a.applied_booking_entitlement_id == larger_entitlement.id
+
+      {final_total, items, ^subtotal, discount, ent_id} =
+        Entitlements.apply_best_entitlement(
+          user.id,
+          :tahoe,
+          :room,
+          checkin,
+          checkout,
+          subtotal,
+          %{"type" => "room", "nights" => 2},
+          guests_count: 2,
+          children_count: 0,
+          room_ids: [room_b.id]
+        )
+
+      assert ent_id == smaller_entitlement.id
+      assert ent_id != larger_entitlement.id
+      assert Money.cmp(discount, Money.new(:USD, 25)) == 0
+      assert Money.cmp(final_total, Money.new(:USD, 175)) == 0
+      assert [%{"entitlement_id" => ent_id_str}] = Map.get(items, "discounts")
+      assert ent_id_str == smaller_entitlement.id
+    end
+  end
+
   defp duplicate_pricing_rule?(%Ecto.Changeset{} = cs) do
     Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
       meta[:constraint] == :unique

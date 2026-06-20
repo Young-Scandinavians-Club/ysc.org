@@ -260,6 +260,40 @@ defmodule Ysc.NewsletterTest do
     end
   end
 
+  describe "create_edition_draft/2" do
+    test "creates a draft edition and ignores forged lifecycle fields" do
+      user = user_fixture()
+
+      assert {:ok, %Edition{} = edition} =
+               Newsletter.create_edition_draft(
+                 %{
+                   "title" => "Q2 Update",
+                   "subject" => "Hello members",
+                   "status" => "sent",
+                   "sent_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+                   "sent_count" => 9_999,
+                   "scheduled_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+                 },
+                 created_by_id: user.id
+               )
+
+      assert edition.status == :draft
+      assert edition.title == "Q2 Update"
+      assert edition.subject == "Hello members"
+      assert edition.sent_count == 0
+      assert edition.sent_at == nil
+      assert edition.scheduled_at == nil
+      assert edition.creator_id == user.id
+    end
+
+    test "returns changeset error when required draft fields are missing" do
+      assert {:error, changeset} =
+               Newsletter.create_edition_draft(%{"title" => "Title only"})
+
+      assert %{subject: [_ | _]} = errors_on(changeset)
+    end
+  end
+
   describe "editions" do
     test "list_editions includes created editions" do
       user = user_fixture()
