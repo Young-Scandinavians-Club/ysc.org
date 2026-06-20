@@ -1262,6 +1262,65 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Post editor: lifecycle fields must not be mass-assignable from LiveView
+  # ---------------------------------------------------------------------------
+
+  describe "post editor mass assignment hardening" do
+    alias Ysc.Posts
+    alias Ysc.Posts.Post
+
+    test "editor_changeset ignores forged state, published_on, and featured_post" do
+      post = %Post{state: :draft, featured_post: false}
+
+      changeset =
+        Post.editor_changeset(post, %{
+          "title" => "Updated title",
+          "state" => "published",
+          "published_on" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "featured_post" => true,
+          "deleted_on" => DateTime.utc_now() |> DateTime.to_iso8601()
+        })
+
+      assert Ecto.Changeset.get_change(changeset, :title) == "Updated title"
+      refute Map.has_key?(changeset.changes, :state)
+      refute Map.has_key?(changeset.changes, :published_on)
+      refute Map.has_key?(changeset.changes, :featured_post)
+      refute Map.has_key?(changeset.changes, :deleted_on)
+    end
+
+    test "update_post_editor cannot publish a draft via forged params" do
+      author = user_fixture(%{role: :volunteer})
+
+      assert {:ok, post} =
+               Posts.create_post(
+                 %{
+                   "title" => "Draft post",
+                   "url_name" => "draft-post-#{System.unique_integer()}",
+                   "state" => "draft"
+                 },
+                 author
+               )
+
+      assert post.state == :draft
+
+      assert {:ok, updated} =
+               Posts.update_post_editor(
+                 post,
+                 %{
+                   "title" => "Sneaky publish",
+                   "state" => "published",
+                   "published_on" => DateTime.utc_now() |> DateTime.to_iso8601()
+                 },
+                 author
+               )
+
+      assert updated.state == :draft
+      assert updated.title == "Sneaky publish"
+      assert Posts.get_public_post(updated.id) == nil
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 20 (CRITICAL): Booking checkout accepts foreign PaymentIntents
   # ---------------------------------------------------------------------------
 

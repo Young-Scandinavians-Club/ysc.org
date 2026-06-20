@@ -498,10 +498,11 @@ defmodule YscWeb.AdminEventCheckInLive do
     else
       case Scanning.check_in_order(session, order_id) do
         {:ok, :group_checked_in, count} ->
+          # PERFORMANCE: PubSub delivers TicketCheckedIn per ticket; incremental
+          # stream updates handle the UI. Avoid a full list_event_checkin_tickets reload.
           {:noreply,
-           socket
-           |> reload_tickets(socket.assigns.search_query)
-           |> put_flash(
+           put_flash(
+             socket,
              :info,
              "Checked in #{count} ticket#{if count != 1, do: "s"}."
            )}
