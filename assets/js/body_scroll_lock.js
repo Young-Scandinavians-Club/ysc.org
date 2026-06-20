@@ -25,6 +25,8 @@ function hasVisibleModal() {
  * Clears stale `body.overflow-hidden` left behind when LiveView navigates away
  * while the mobile menu or a destroyed modal had scroll lock enabled. `<body>`
  * sits outside the LiveView tree, so those classes are not reset on navigation.
+ *
+ * Safe to call repeatedly; skips releasing the lock while a modal is open.
  */
 export function releaseStaleBodyScrollLock() {
     resetMobileMenu();
@@ -32,4 +34,14 @@ export function releaseStaleBodyScrollLock() {
     if (!hasVisibleModal()) {
         document.body.classList.remove("overflow-hidden");
     }
+}
+
+/** True for full LiveView navigations (push_navigate), not patch/form updates. */
+export function shouldReleaseScrollLockOnNavigation(detail = {}) {
+    if (detail.patch === false) {
+        return true;
+    }
+
+    const kind = detail.kind;
+    return kind === "redirect" || kind === "initial";
 }
