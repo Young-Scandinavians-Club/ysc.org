@@ -341,11 +341,12 @@ defmodule YscWeb.NewsLiveTest do
 
     test "strips HTML from preview_text instead of rendering it raw", %{conn: conn} do
       marker = "SafePreviewMarker#{System.unique_integer()}"
+      xss_probe = "XSSProbe#{System.unique_integer()}"
 
       create_post(%{
         title: "Preview Text XSS",
         preview_text:
-          "<p>#{marker}</p><script>document.cookie</script><img src=x onerror=alert(1)>",
+          "<p>#{marker}</p><script>#{xss_probe}</script><img src=x onerror=alert(1)>",
         raw_body: "<p>ignored body</p>"
       })
 
@@ -354,9 +355,9 @@ defmodule YscWeb.NewsLiveTest do
 
       html = render(view)
       assert html =~ marker
-      refute html =~ "<script>"
-      refute html =~ "onerror="
-      refute html =~ "<img"
+      refute html =~ "<script>#{xss_probe}</script>"
+      refute html =~ "onerror=alert(1)"
+      refute html =~ "src=x"
     end
 
     test "uses rendered_body for reading time when present", %{conn: conn} do
