@@ -416,4 +416,51 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ "text-blue-700 hover:text-blue-900"
     end
   end
+
+  describe "admin_responsive_clipboard_button/1" do
+    test "renders labeled desktop button and icon-only mobile clipboard control" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_responsive_clipboard_button
+          id="copy-url-btn"
+          copy="https://example.com/admin/session"
+          icon="hero-clipboard"
+          label="Share"
+          aria_label="Copy session link for other admins to join"
+          title="Copy session link for other admins to join"
+          variant="outline"
+          color="zinc"
+          mobile_tone={:zinc}
+        />
+        """)
+
+      assert html =~ ~s(id="copy-url-btn")
+      assert html =~ "Share"
+      assert html =~ "hero-clipboard"
+      assert html =~ ~s(aria-label="Copy session link for other admins to join")
+      assert html =~ ~s(phx-hook="ClipboardCopy")
+      assert html =~ ~s(data-copy="https://example.com/admin/session")
+      assert html =~ "hidden sm:inline-flex"
+      assert html =~ "sm:hidden"
+      assert html =~ "text-zinc-500 hover:text-zinc-700"
+    end
+
+    test "supports copy_target for element-based clipboard sources" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_responsive_clipboard_button
+          id="copy-target-btn"
+          copy_target="source-field"
+          label="Copy"
+          aria_label="Copy value"
+        />
+        """)
+
+      assert html =~ ~s(data-copy-target="source-field")
+    end
+  end
 end

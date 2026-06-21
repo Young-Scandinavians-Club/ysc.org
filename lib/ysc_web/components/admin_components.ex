@@ -782,6 +782,154 @@ defmodule YscWeb.AdminComponents do
     do: "text-zinc-500 hover:text-zinc-700"
 
   # ---------------------------------------------------------------------------
+  # admin_responsive_clipboard_button
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Clipboard control with a labeled `<.button>` on `sm+` and an icon-only button on mobile.
+
+  Uses the `ClipboardCopy` LiveView hook. Provide `copy` for inline text or
+  `copy_target` for an element id whose value/text should be copied.
+  """
+  attr :id, :string, required: true
+  attr :icon, :string, default: "hero-clipboard"
+  attr :label, :string, required: true
+  attr :aria_label, :string, required: true
+  attr :copy, :string, default: nil, doc: "Text copied via data-copy"
+  attr :copy_target, :string, default: nil, doc: "Element id copied via data-copy-target"
+
+  attr :variant, :string,
+    default: "outline",
+    values: ["solid", "outline"],
+    doc: "Desktop button variant"
+
+  attr :color, :string,
+    default: "zinc",
+    values: ["blue", "zinc"],
+    doc: "Desktop button color"
+
+  attr :mobile_tone, :atom,
+    default: :zinc,
+    values: [:primary, :zinc],
+    doc: "Icon-only mobile button text/hover colors"
+
+  attr :rest, :global, include: ~w(title)
+
+  def admin_responsive_clipboard_button(assigns) do
+    ~H"""
+    <.button
+      id={@id}
+      type="button"
+      phx-hook="ClipboardCopy"
+      variant={@variant}
+      color={@color}
+      class="hidden sm:inline-flex"
+      data-copy={@copy}
+      data-copy-target={@copy_target}
+      {@rest}
+    >
+      <.icon name={@icon} class="w-5 h-5 me-1 mt-0.5" />
+      {@label}
+    </.button>
+    <button
+      type="button"
+      phx-hook="ClipboardCopy"
+      class={["sm:hidden p-2", responsive_icon_button_mobile_classes(@mobile_tone)]}
+      aria-label={@aria_label}
+      data-copy={@copy}
+      data-copy-target={@copy_target}
+      {@rest}
+    >
+      <.icon name={@icon} class="w-6 h-6" />
+    </button>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_clipboard_button
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Copy-to-clipboard button using the `ClipboardCopy` hook.
+
+  ## Variants
+
+  - `:icon` — compact icon-only control (e.g. booking reference IDs)
+  - `:labeled_feedback` — labeled button with inline "Copied" feedback (e.g. media library)
+  """
+  attr :id, :string, required: true
+  attr :variant, :atom, required: true, values: [:icon, :labeled_feedback]
+  attr :copy, :string, default: nil, doc: "Text copied via data-copy"
+  attr :copy_target, :string, default: nil, doc: "Element id copied via data-copy-target"
+  attr :icon, :string, default: "hero-clipboard"
+  attr :label, :string, default: nil
+  attr :title, :string, default: nil
+  attr :aria_label, :string, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the button"
+
+  def admin_clipboard_button(assigns) do
+    feedback_id = "#{assigns.id}-feedback"
+
+    assigns =
+      assigns
+      |> assign(:feedback_id, feedback_id)
+      |> assign(:aria_label, assigns.aria_label || assigns.title || assigns.label)
+      |> assign(:icon_class, clipboard_button_icon_class(assigns.variant))
+
+    ~H"""
+    <%= case @variant do %>
+      <% :icon -> %>
+        <button
+          type="button"
+          id={@id}
+          phx-hook="ClipboardCopy"
+          data-copy={@copy}
+          data-copy-target={@copy_target}
+          class={[
+            "inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors flex-shrink-0",
+            @class
+          ]}
+          title={@title}
+          aria-label={@aria_label}
+        >
+          <.icon name={@icon} class={@icon_class} />
+        </button>
+      <% :labeled_feedback -> %>
+        <button
+          type="button"
+          id={@id}
+          phx-hook="ClipboardCopy"
+          data-copy={@copy}
+          data-copy-target={@copy_target}
+          data-copy-feedback={@feedback_id}
+          class={[
+            "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors",
+            @class
+          ]}
+          title={@title}
+        >
+          <.icon name={@icon} class={@icon_class} />
+          {@label}
+          <span
+            id={@feedback_id}
+            class="hidden items-center gap-1 text-green-700"
+            aria-live="polite"
+          >
+            <.icon name="hero-check" class="h-3.5 w-3.5" />
+            <span data-copy-feedback-label>Copied</span>
+          </span>
+        </button>
+    <% end %>
+    """
+  end
+
+  defp clipboard_button_icon_class(:icon), do: "w-4 h-4"
+  defp clipboard_button_icon_class(:labeled_feedback), do: "w-3.5 h-3.5"
+
+  # ---------------------------------------------------------------------------
   # admin_check_in_qr_scanner
   # ---------------------------------------------------------------------------
 

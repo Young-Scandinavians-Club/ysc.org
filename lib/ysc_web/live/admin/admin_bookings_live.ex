@@ -754,17 +754,13 @@ defmodule YscWeb.AdminBookingsLive do
                           {payment.reference_id}
                         </span>
                         <span class="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            phx-hook="ClipboardCopy"
+                          <.admin_clipboard_button
                             id={"copy-payment-ref-#{payment.id}"}
-                            data-copy={payment.reference_id}
-                            class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                            variant={:icon}
+                            copy={payment.reference_id}
                             title="Copy reference ID"
-                            aria-label="Copy reference ID"
-                          >
-                            <.icon name="hero-clipboard" class="w-4 h-4" />
-                          </button>
+                            aria_label="Copy reference ID"
+                          />
                           <.badge type={payment_status_type}>
                             {String.capitalize(to_string(payment.status))}
                           </.badge>
@@ -789,17 +785,13 @@ defmodule YscWeb.AdminBookingsLive do
                         >
                           {payment.external_payment_id}
                         </a>
-                        <button
-                          type="button"
-                          phx-hook="ClipboardCopy"
+                        <.admin_clipboard_button
                           id={"copy-stripe-payment-#{payment.id}"}
-                          data-copy={payment.external_payment_id}
-                          class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors flex-shrink-0"
+                          variant={:icon}
+                          copy={payment.external_payment_id}
                           title="Copy Stripe ID"
-                          aria-label="Copy Stripe ID"
-                        >
-                          <.icon name="hero-clipboard" class="w-4 h-4" />
-                        </button>
+                          aria_label="Copy Stripe ID"
+                        />
                       </div>
                       <p
                         :if={payment.quickbooks_sales_receipt_id}
@@ -836,17 +828,13 @@ defmodule YscWeb.AdminBookingsLive do
                           {refund.reference_id}
                         </span>
                         <span class="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            phx-hook="ClipboardCopy"
+                          <.admin_clipboard_button
                             id={"copy-refund-ref-#{refund.id}"}
-                            data-copy={refund.reference_id}
-                            class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                            variant={:icon}
+                            copy={refund.reference_id}
                             title="Copy reference ID"
-                            aria-label="Copy reference ID"
-                          >
-                            <.icon name="hero-clipboard" class="w-4 h-4" />
-                          </button>
+                            aria_label="Copy reference ID"
+                          />
                           <.badge type={refund_status_type}>
                             {String.capitalize(to_string(refund.status))}
                           </.badge>
@@ -877,17 +865,13 @@ defmodule YscWeb.AdminBookingsLive do
                         >
                           {refund.external_refund_id}
                         </a>
-                        <button
-                          type="button"
-                          phx-hook="ClipboardCopy"
+                        <.admin_clipboard_button
                           id={"copy-stripe-refund-#{refund.id}"}
-                          data-copy={refund.external_refund_id}
-                          class="inline-flex items-center justify-center p-1.5 text-zinc-500 hover:text-zinc-700 border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors flex-shrink-0"
+                          variant={:icon}
+                          copy={refund.external_refund_id}
                           title="Copy Stripe refund ID"
-                          aria-label="Copy Stripe refund ID"
-                        >
-                          <.icon name="hero-clipboard" class="w-4 h-4" />
-                        </button>
+                          aria_label="Copy Stripe refund ID"
+                        />
                       </div>
                       <p
                         :if={refund.quickbooks_sales_receipt_id}
