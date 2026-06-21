@@ -69,7 +69,7 @@
     <%= if @is_buyout do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <div class="buyout-text">
-        <strong>Full Property Buyout:</strong> You have the entire property to yourself!
+        <strong>Entire cabin:</strong> You have the whole cabin to yourself for these dates.
       </div>
     </mj-text>
     <% else %>

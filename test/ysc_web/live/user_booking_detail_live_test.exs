@@ -539,7 +539,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       }
     end
 
-    test "shows pending admin review message when refund policy applies", %{
+    test "shows refund under review message when refund policy applies", %{
       conn: conn,
       booking: booking
     } do
@@ -552,7 +552,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> form("#cancel-booking-form", %{"reason" => "Change of plans"})
         |> render_submit()
 
-      assert html =~ "pending admin review"
+      assert html =~ "We're reviewing your refund"
+      assert html =~ "no action needed on your side"
     end
   end
 

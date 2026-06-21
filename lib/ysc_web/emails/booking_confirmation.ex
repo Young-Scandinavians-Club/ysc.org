@@ -101,7 +101,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     # Use both boolean and string check for robustness across JSON serialization
     is_buyout =
       booking.booking_mode == :buyout ||
-        booking_mode_description == "Property Buyout"
+        booking_mode_description == "Entire cabin"
 
     %{
       first_name: member_greeting_name(booking.user),
@@ -134,7 +134,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
 
   defp get_booking_mode_description(:room), do: "Room Booking"
   defp get_booking_mode_description(:day), do: "Day Booking"
-  defp get_booking_mode_description(:buyout), do: "Property Buyout"
+  defp get_booking_mode_description(:buyout), do: "Entire cabin"
 
   defp get_booking_mode_description(mode) when is_atom(mode),
     do: String.capitalize(to_string(mode))

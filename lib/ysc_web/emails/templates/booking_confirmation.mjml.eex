@@ -47,9 +47,9 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Duration:</strong> <%= @booking.nights %> <%= if @booking.nights == 1, do: "night", else: "nights" %>
     </mj-text>
-    <%= if Map.get(@booking, :is_buyout, false) || @booking.booking_mode == "Property Buyout" || Map.get(@booking, :booking_mode_raw, "") == "buyout" do %>
+    <%= if Map.get(@booking, :is_buyout, false) || @booking.booking_mode == "Entire cabin" || @booking.booking_mode == "Property Buyout" || Map.get(@booking, :booking_mode_raw, "") == "buyout" do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="color: #059669; font-weight: bold;">
-      <strong>Full Property Buyout:</strong> You have the entire property to yourself!
+      <strong>Entire cabin:</strong> You have the whole cabin to yourself for these dates.
     </mj-text>
     <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">

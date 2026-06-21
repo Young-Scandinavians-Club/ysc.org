@@ -528,7 +528,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               <span class="text-xl flex-shrink-0">🧺</span>
               <div>
                 <p class="text-xs font-black text-teal-400 uppercase">
-                  Mandatory
+                  Linens
                 </p>
                 <p class="text-xs font-bold leading-tight">
                   Bring your own bed linens
@@ -539,7 +539,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               <span class="text-xl flex-shrink-0">🚫</span>
               <div>
                 <p class="text-xs font-black text-zinc-400 uppercase">
-                  Enforced
+                  House rules
                 </p>
                 <p class="text-xs font-bold leading-tight">No pets or smoking</p>
               </div>

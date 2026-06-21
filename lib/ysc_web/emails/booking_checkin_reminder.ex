@@ -174,7 +174,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
 
   defp get_booking_mode_description(:room), do: "Room Booking"
   defp get_booking_mode_description(:day), do: "Day Booking"
-  defp get_booking_mode_description(:buyout), do: "Property Buyout"
+  defp get_booking_mode_description(:buyout), do: "Entire cabin"
 
   defp get_booking_mode_description(mode) when is_atom(mode),
     do: String.capitalize(to_string(mode))
