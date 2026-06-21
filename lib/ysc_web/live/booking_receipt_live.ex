@@ -152,7 +152,7 @@ defmodule YscWeb.BookingReceiptLive do
           refund_message =
             if Money.positive?(refund_amount) do
               if is_pending_refund do
-                "Booking cancelled. Your refund of #{MoneyHelper.format_money!(refund_amount)} is pending admin review and will be processed once approved."
+                "Booking cancelled. We are reviewing your refund of #{MoneyHelper.format_money!(refund_amount)}. You will get an email when it is approved. No action is needed on your side."
               else
                 "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
               end
@@ -235,7 +235,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <strong>
                     {MoneyHelper.format_money!(@refund_data.total_refunded)}
                   </strong>
-                  is pending admin review.
+                  is being reviewed. You will get an email when it is approved.
                 <% else %>
                   A refund of
                   <strong>

@@ -44,7 +44,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <%= if @refund.is_pending do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="16px" css-class="yellow-alert-box" background-color="#FEF3C7" border-left="4px solid #F59E0B" border-radius="6px">
-      <strong>Refund Pending Review:</strong> Your refund of <span style="color: #059669; font-weight: bold;"><%= @refund.amount %></span> is pending admin review and will be processed once approved.
+      <strong>Refund under review:</strong> We are reviewing your refund of <span style="color: #059669; font-weight: bold;"><%= @refund.amount %></span>. You will receive a separate email once it is approved and processed. No action is needed on your side.
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">You will receive a separate email notification once your refund has been approved and processed.</mj-text>
     <% else %>
