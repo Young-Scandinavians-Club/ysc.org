@@ -249,6 +249,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       assert reserved_id == entitlement.id
 
+      assert Entitlements.entitlement_reserved_on_active_hold?(entitlement.id)
+
       refute Entitlements.entitlement_reserved_on_active_hold?(
                entitlement.id,
                booking_a.id
