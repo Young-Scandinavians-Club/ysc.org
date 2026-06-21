@@ -860,6 +860,20 @@ defmodule Ysc.ScanningTest do
       assert tier_preload_count == 1
     end
 
+    test "returns zero when every ticket in the order is already checked in", %{
+      session: session,
+      order: order
+    } do
+      Enum.each(order.tickets, fn ticket ->
+        ticket
+        |> Ysc.Events.Ticket.check_in_changeset()
+        |> Ysc.Repo.update!()
+      end)
+
+      assert {:ok, :group_checked_in, 0} =
+               Scanning.check_in_order(session, order.id)
+    end
+
     test "returns error for unknown order id", %{session: session} do
       nonexistent_id = Ecto.ULID.generate()
 
