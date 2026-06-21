@@ -86,7 +86,7 @@ defmodule YscWeb.Emails.BookingCancellationEmailsTest do
 
       html = BookingCancellationConfirmation.render(data)
       assert html =~ "Refund under review"
-      assert html =~ "No action needed on your side"
+      assert html =~ "No action is needed on your side"
     end
 
     test "get_subject/0 and booking_url/1" do

@@ -552,8 +552,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> form("#cancel-booking-form", %{"reason" => "Change of plans"})
         |> render_submit()
 
-      assert html =~ "We're reviewing your refund"
-      assert html =~ "no action needed on your side"
+      assert html =~ "We are reviewing your refund"
+      assert html =~ "No action is needed on your side"
     end
   end
 

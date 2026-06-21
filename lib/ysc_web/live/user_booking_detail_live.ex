@@ -147,7 +147,7 @@ defmodule YscWeb.UserBookingDetailLive do
             refund_message =
               if Money.positive?(refund_amount) do
                 if is_pending_refund do
-                  "Booking cancelled. We're reviewing your refund of #{MoneyHelper.format_money!(refund_amount)}. You'll get an email when it's approved — no action needed on your side."
+                  "Booking cancelled. We are reviewing your refund of #{MoneyHelper.format_money!(refund_amount)}. You will get an email when it is approved. No action is needed on your side."
                 else
                   "Booking cancelled. A refund of #{MoneyHelper.format_money!(refund_amount)} will be processed."
                 end
