@@ -883,18 +883,8 @@ defmodule YscWeb.AdminEventCheckInLive do
   defp pending_group_id(order_id),
     do: "group-#{order_id || :erlang.unique_integer([:positive])}"
 
-  defp bump_checked_in_count(socket, delta, search)
-       when search in [nil, ""] do
+  defp bump_checked_in_count(socket, delta, _search) do
     assign(socket, :checked_in_count, socket.assigns.checked_in_count + delta)
-  end
-
-  defp bump_checked_in_count(socket, _delta, _search) do
-    {checked_in_count, total_count} =
-      Scanning.event_checkin_counts(socket.assigns.event.id)
-
-    socket
-    |> assign(:checked_in_count, checked_in_count)
-    |> assign(:total_count, total_count)
   end
 
   defp attendee_name(%{
