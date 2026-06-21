@@ -984,6 +984,56 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert html =~ "Booking Confirmation"
     end
 
+    test "dead render does not confirm booking when redirect succeeded without payment_intent",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      ensure_receipt_buyout_base_pricing!()
+
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      assert booking.status == :hold
+      assert receipt_ledger_payment_count(booking.id) == 0
+
+      conn
+      |> get(~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded")
+      |> html_response(200)
+
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.status == :hold
+      assert receipt_ledger_payment_count(booking.id) == 0
+    end
+
+    test "dead render shows payment failed flash when redirect_status is failed",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      booking = booking_fixture(%{user_id: user.id, status: :hold})
+
+      html =
+        conn
+        |> get(~p"/bookings/#{booking.id}/receipt?redirect_status=failed")
+        |> html_response(200)
+
+      assert html =~ "Payment failed"
+      assert Repo.get!(Booking, booking.id).status == :hold
+    end
+
     test "unknown redirect_status loads page", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
