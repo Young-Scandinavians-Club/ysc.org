@@ -1016,9 +1016,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert receipt_ledger_payment_count(booking.id) == 0
     end
 
-    test "dead render shows payment failed flash when redirect_status is failed", %{
-      conn: conn
-    } do
+    test "dead render shows payment failed flash when redirect_status is failed",
+         %{
+           conn: conn
+         } do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
