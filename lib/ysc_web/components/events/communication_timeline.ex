@@ -8,6 +8,7 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
 
   alias Ysc.EventPhotos
   alias Ysc.Events.Event
+  alias Ysc.Events.EventDateTime
   alias Ysc.Events.EventUpdate
 
   attr :entries, :list, required: true
@@ -210,7 +211,7 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
   end
 
   defp publication_notification_schedulable?(%Event{} = event) do
-    event.published_at != nil and event_in_future?(event)
+    event.published_at != nil and EventDateTime.in_future?(event)
   end
 
   defp photo_reminder_entry(%Event{} = event, photo_collection) do
@@ -273,26 +274,6 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
       nil -> false
       scheduled_at -> DateTime.compare(scheduled_at, DateTime.utc_now()) == :gt
     end
-  end
-
-  defp event_in_future?(%Event{} = event) do
-    case combine_date_time(event.start_date, event.start_time) do
-      nil -> false
-      datetime -> DateTime.compare(datetime, DateTime.utc_now()) == :gt
-    end
-  end
-
-  defp combine_date_time(nil, _), do: nil
-  defp combine_date_time(_, nil), do: nil
-
-  defp combine_date_time(%DateTime{} = date, %Time{} = time) do
-    date_part = date |> DateTime.to_naive() |> NaiveDateTime.to_date()
-    NaiveDateTime.new!(date_part, time) |> DateTime.from_naive!("Etc/UTC")
-  end
-
-  defp combine_date_time(date, time)
-       when not is_nil(date) and not is_nil(time) do
-    NaiveDateTime.new!(date, time) |> DateTime.from_naive!("Etc/UTC")
   end
 
   defp sent_by_name(%{first_name: first, last_name: last})

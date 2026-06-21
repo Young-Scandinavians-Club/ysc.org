@@ -13,7 +13,7 @@ defmodule Ysc.Tickets.BookingValidator do
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Events
-  alias Ysc.Events.{Event, TicketTier, Ticket, TicketReservation}
+  alias Ysc.Events.{Event, EventDateTime, TicketTier, Ticket, TicketReservation}
   alias Ysc.Accounts
 
   @doc """
@@ -148,7 +148,7 @@ defmodule Ysc.Tickets.BookingValidator do
         {:error, :event_not_available}
 
       %Event{} = event ->
-        if event_in_past?(event) do
+        if EventDateTime.in_past?(event) do
           {:error, :event_in_past}
         else
           :ok
@@ -557,31 +557,6 @@ defmodule Ysc.Tickets.BookingValidator do
   defp tier_on_sale?(%TicketTier{start_date: start_date}) do
     now = DateTime.utc_now()
     DateTime.compare(now, start_date) != :lt
-  end
-
-  defp event_in_past?(%Event{start_date: nil}), do: false
-
-  defp event_in_past?(%Event{start_date: start_date, start_time: nil}) do
-    DateTime.compare(DateTime.utc_now(), start_date) == :gt
-  end
-
-  defp event_in_past?(%Event{start_date: start_date, start_time: start_time}) do
-    event_datetime = combine_date_time(start_date, start_time)
-    DateTime.compare(DateTime.utc_now(), event_datetime) == :gt
-  end
-
-  defp combine_date_time(date, time) do
-    case {date, time} do
-      {%DateTime{} = dt, %Time{} = t} ->
-        naive_date = DateTime.to_naive(dt)
-        date_part = NaiveDateTime.to_date(naive_date)
-        naive_datetime = NaiveDateTime.new!(date_part, t)
-        DateTime.from_naive!(naive_datetime, "Etc/UTC")
-
-      {date, time} when not is_nil(date) and not is_nil(time) ->
-        NaiveDateTime.new!(date, time)
-        |> DateTime.from_naive!("Etc/UTC")
-    end
   end
 
   defp get_ticket_tier(tier_id) do
