@@ -7,13 +7,25 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
   alias Ysc.Bookings.{AvailabilityCache, BlackoutListCache}
   alias YscWeb.Components.AvailabilityCalendar
 
-  # Dedicated dates for buyout/blackout styling tests — offset from the
-  # near-future helper (1–4 days) to reduce parallel-test collisions in CI.
-  defp buyout_calendar_test_date,
-    do: Date.add(near_future_in_current_month(), 5)
+  # Dedicated dates for buyout/blackout styling tests — kept within the current
+  # month so render_shifted_calendar (today = date - 1) stays in the visible month.
+  defp buyout_calendar_test_date, do: styling_test_date_in_month(2)
+  defp blackout_calendar_test_date, do: styling_test_date_in_month(3)
 
-  defp blackout_calendar_test_date,
-    do: Date.add(near_future_in_current_month(), 6)
+  defp styling_test_date_in_month(slot) when slot in 1..5 do
+    today = Date.utc_today()
+    end_of_month = Date.end_of_month(today)
+    # render_shifted_calendar uses today = date - 1, so leave one day before month end.
+    latest = Date.add(end_of_month, -1)
+    earliest = Date.add(today, 2)
+    candidate = Date.add(earliest, slot - 1)
+
+    if Date.compare(candidate, latest) == :gt do
+      Date.add(latest, -(5 - slot))
+    else
+      candidate
+    end
+  end
 
   # Returns a date that falls in the current calendar month. When today is the
   # last day of the month (days_left == 0) it returns today so the anchor stays
