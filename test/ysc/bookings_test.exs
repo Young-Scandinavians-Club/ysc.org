@@ -3485,7 +3485,9 @@ defmodule Ysc.BookingsTest do
     end
 
     test "updates total_price when optional breakdown fields are omitted" do
-      booking = booking_fixture(status: :hold, total_price: Money.new(720, :USD))
+      booking =
+        booking_fixture(status: :hold, total_price: Money.new(720, :USD))
+
       recalculated_total = Money.new(360, :USD)
 
       assert {:ok, updated} =
