@@ -5,7 +5,6 @@ defmodule YscWeb.Components.News.NewsCard do
   use Phoenix.Component
 
   import YscWeb.CoreComponents
-  import Phoenix.HTML
 
   use Phoenix.VerifiedRoutes,
     endpoint: YscWeb.Endpoint,
@@ -83,7 +82,7 @@ defmodule YscWeb.Components.News.NewsCard do
         </.link>
 
         <article class="text-zinc-500 text-sm leading-relaxed line-clamp-3 mb-8">
-          {raw(@preview_text)}
+          {@preview_text}
         </article>
 
         <div class="mt-auto pt-6 border-t border-zinc-50 flex items-center justify-between">
@@ -195,7 +194,8 @@ defmodule YscWeb.Components.News.NewsCard do
   end
 
   defp preview_text(post) do
-    post.preview_text || ""
+    (post.preview_text || "")
+    |> Scrubber.scrub(YscWeb.Scrubber.StripEverythingExceptText)
   end
 
   @board_position_to_title_lookup %{

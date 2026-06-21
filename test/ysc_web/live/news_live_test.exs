@@ -339,6 +339,29 @@ defmodule YscWeb.NewsLiveTest do
       assert html =~ "UniqueRawSnippet"
     end
 
+    test "strips HTML from preview_text instead of rendering it raw", %{
+      conn: conn
+    } do
+      marker = "SafePreviewMarker#{System.unique_integer()}"
+      xss_probe = "XSSProbe#{System.unique_integer()}"
+
+      create_post(%{
+        title: "Preview Text XSS",
+        preview_text:
+          "<p>#{marker}</p><script>#{xss_probe}</script><img src=x onerror=alert(1)>",
+        raw_body: "<p>ignored body</p>"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_news_async(view)
+
+      html = render(view)
+      assert html =~ marker
+      refute html =~ "<script>#{xss_probe}</script>"
+      refute html =~ "onerror=alert(1)"
+      refute html =~ "src=x"
+    end
+
     test "uses rendered_body for reading time when present", %{conn: conn} do
       long_html = "<p>" <> String.duplicate("word ", 500) <> "</p>"
 

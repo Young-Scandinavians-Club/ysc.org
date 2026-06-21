@@ -126,7 +126,7 @@ defmodule YscWeb.NewsLive do
                   </h2>
 
                   <article class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-2xl">
-                    {raw(preview_text(@featured))}
+                    {preview_text(@featured)}
                   </article>
 
                   <div class="flex items-center gap-3 pt-4 border-t border-zinc-100 sm:border-white/20">
@@ -247,7 +247,7 @@ defmodule YscWeb.NewsLive do
               </.link>
 
               <article class="text-zinc-500 text-base leading-relaxed line-clamp-3 mb-8">
-                {raw(preview_text(post))}
+                {preview_text(post)}
               </article>
 
               <div class="mt-auto pt-6 border-t border-zinc-50 flex items-center justify-between">
@@ -423,7 +423,10 @@ defmodule YscWeb.NewsLive do
     Scrubber.scrub(post.raw_body, YscWeb.Scrubber.StripEverythingExceptText)
   end
 
-  defp preview_text(post), do: post.preview_text
+  defp preview_text(post) do
+    (post.preview_text || "")
+    |> Scrubber.scrub(YscWeb.Scrubber.StripEverythingExceptText)
+  end
 
   defp featured_image_url(nil), do: "/images/ysc_logo.webp"
 
