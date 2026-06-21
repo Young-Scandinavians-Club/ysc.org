@@ -124,6 +124,70 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
              )
   end
 
+  test "validate_modification_dates rejects extending a room stay into another buyout hold",
+       %{
+         user: user
+       } do
+    other_user =
+      user_fixture()
+      |> Ecto.Changeset.change(state: :active)
+      |> Repo.update!()
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(500, :USD),
+        booking_mode: :buyout,
+        price_unit: :buyout_fixed,
+        property: :tahoe,
+        season_id: nil
+      })
+
+    room = create_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    overlapping_checkin = checkout
+    overlapping_checkout = Date.add(checkout, 3)
+
+    assert {:ok, _} =
+             BookingLocker.create_buyout_booking(
+               other_user.id,
+               :tahoe,
+               overlapping_checkin,
+               overlapping_checkout,
+               4
+             )
+
+    parsed = %{
+      checkin_date: checkin,
+      checkout_date: overlapping_checkout,
+      guests_count: 2,
+      children_count: 0
+    }
+
+    assert {:error, :property_buyout_active} =
+             Bookings.validate_modification_availability(booking, parsed)
+
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    cached_snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    assert {:error, :property_buyout_active} =
+             Bookings.validate_modification_availability(
+               booking,
+               parsed,
+               availability_snapshot: cached_snapshot
+             )
+  end
+
   test "validate_modification_dates matches Bookings.validate_modification_availability",
        %{
          user: user
