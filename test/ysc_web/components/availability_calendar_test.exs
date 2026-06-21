@@ -15,6 +15,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
   defp styling_test_date_in_month(slot) when slot in 1..5 do
     today = Date.utc_today()
     end_of_month = Date.end_of_month(today)
+
     # render_shifted_calendar uses today = date - 1, so leave one day before month end.
     latest = Date.add(end_of_month, -1)
     earliest = Date.add(today, 2)
