@@ -339,7 +339,9 @@ defmodule YscWeb.NewsLiveTest do
       assert html =~ "UniqueRawSnippet"
     end
 
-    test "strips HTML from preview_text instead of rendering it raw", %{conn: conn} do
+    test "strips HTML from preview_text instead of rendering it raw", %{
+      conn: conn
+    } do
       marker = "SafePreviewMarker#{System.unique_integer()}"
       xss_probe = "XSSProbe#{System.unique_integer()}"
 
