@@ -426,6 +426,71 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "payment-success syncs recalculated checkout price before verifying Stripe amount",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Ysc.TestHelpers.setup_quickbooks_mocks()
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      correct_total = booking.total_price
+      stale_total = Money.mult!(correct_total, 2)
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(total_price: stale_total)
+        |> Repo.update!()
+
+      pi_id = "pi_stale_price_sync_#{System.unique_integer([:positive])}"
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      synced_booking = Repo.get!(Booking, booking.id)
+      assert Money.equal?(synced_booking.total_price, correct_total)
+      refute Money.equal?(synced_booking.total_price, stale_total)
+
+      amount_cents =
+        Ysc.MoneyHelper.money_to_cents(synced_booking.total_price)
+
+      expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: pi_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => booking.user_id
+           },
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               render_click(view, "payment-success", %{
+                 "payment_intent_id" => pi_id
+               })
+
+      assert receipt_path =~ "/receipt"
+      assert Repo.get!(Booking, booking.id).status == :complete
+      assert booking_ledger_payment_count(booking.id) == 1
+      Mox.verify!(StripeMock)
+    end
+
     test "handle_info :check_booking_expiration marks expired when hold was released in DB",
          %{
            conn: conn,
