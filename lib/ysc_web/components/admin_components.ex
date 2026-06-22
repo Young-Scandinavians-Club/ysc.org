@@ -796,7 +796,10 @@ defmodule YscWeb.AdminComponents do
   attr :label, :string, required: true
   attr :aria_label, :string, required: true
   attr :copy, :string, default: nil, doc: "Text copied via data-copy"
-  attr :copy_target, :string, default: nil, doc: "Element id copied via data-copy-target"
+
+  attr :copy_target, :string,
+    default: nil,
+    doc: "Element id copied via data-copy-target"
 
   attr :variant, :string,
     default: "outline",
@@ -860,7 +863,11 @@ defmodule YscWeb.AdminComponents do
   attr :id, :string, required: true
   attr :variant, :atom, required: true, values: [:icon, :labeled_feedback]
   attr :copy, :string, default: nil, doc: "Text copied via data-copy"
-  attr :copy_target, :string, default: nil, doc: "Element id copied via data-copy-target"
+
+  attr :copy_target, :string,
+    default: nil,
+    doc: "Element id copied via data-copy-target"
+
   attr :icon, :string, default: "hero-clipboard"
   attr :label, :string, default: nil
   attr :title, :string, default: nil
@@ -876,7 +883,10 @@ defmodule YscWeb.AdminComponents do
     assigns =
       assigns
       |> assign(:feedback_id, feedback_id)
-      |> assign(:aria_label, assigns.aria_label || assigns.title || assigns.label)
+      |> assign(
+        :aria_label,
+        assigns.aria_label || assigns.title || assigns.label
+      )
       |> assign(:icon_class, clipboard_button_icon_class(assigns.variant))
 
     ~H"""
