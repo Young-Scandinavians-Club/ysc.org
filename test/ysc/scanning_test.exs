@@ -910,10 +910,11 @@ defmodule Ysc.ScanningTest do
                Scanning.check_in_order(session, other_order.id)
     end
 
-    test "returns error when scan session no longer exists during batch check-in", %{
-      session: session,
-      order: order
-    } do
+    test "returns error when scan session no longer exists during batch check-in",
+         %{
+           session: session,
+           order: order
+         } do
       Repo.delete!(session)
 
       assert {:error, :check_in_failed, message} =

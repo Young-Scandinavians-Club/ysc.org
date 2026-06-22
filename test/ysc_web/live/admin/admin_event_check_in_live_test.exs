@@ -1653,7 +1653,10 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
       session = event_scan_session_fixture(event, admin)
 
       {:ok, view, _html} =
-        live(conn, ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}")
+        live(
+          conn,
+          ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}"
+        )
 
       Repo.delete!(session)
 
@@ -1663,23 +1666,31 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
         })
 
       assert html =~ "Failed to check in tickets"
-      refute Enum.all?(order.tickets, &Repo.get!(Ysc.Events.Ticket, &1.id).checked_in)
+
+      refute Enum.all?(
+               order.tickets,
+               &Repo.get!(Ysc.Events.Ticket, &1.id).checked_in
+             )
     end
   end
 
   describe "single check-in error handling" do
     setup [:create_admin]
 
-    test "shows error flash when check-in transaction fails instead of crashing", %{
-      conn: conn,
-      admin: admin
-    } do
+    test "shows error flash when check-in transaction fails instead of crashing",
+         %{
+           conn: conn,
+           admin: admin
+         } do
       %{event: event, order: order} = setup_event_with_tickets(admin)
       ticket = List.first(order.tickets)
       session = event_scan_session_fixture(event, admin)
 
       {:ok, view, _html} =
-        live(conn, ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}")
+        live(
+          conn,
+          ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}"
+        )
 
       Repo.delete!(session)
 
