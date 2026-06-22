@@ -19,14 +19,14 @@ defmodule YscWeb.AdminFlopHelpersTest do
       assert AdminFlopHelpers.non_flop_params(params) == %{"tab" => "upcoming"}
     end
 
-    test "drops Flop keys from atom-keyed params" do
+    test "preserves atom-keyed Flop params (URL params use string keys)" do
       params = %{
         tab: :drafts,
         page: 3,
         filters: %{state: :draft}
       }
 
-      assert AdminFlopHelpers.non_flop_params(params) == %{tab: :drafts}
+      assert AdminFlopHelpers.non_flop_params(params) == params
     end
 
     test "returns empty map for non-map input" do
