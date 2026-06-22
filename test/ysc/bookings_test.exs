@@ -2954,6 +2954,45 @@ defmodule Ysc.BookingsTest do
     rule
   end
 
+  defp ensure_buyout_base_pricing! do
+    for prop <- [:tahoe, :clear_lake] do
+      case Bookings.create_pricing_rule(%{
+             amount: Money.new(430, :USD),
+             booking_mode: :buyout,
+             price_unit: :buyout_fixed,
+             property: prop,
+             season_id: nil,
+             room_id: nil,
+             room_category_id: nil
+           }) do
+        {:ok, _} ->
+          :ok
+
+        {:error, %Ecto.Changeset{} = cs} ->
+          if duplicate_buyout_base_pricing_rule?(cs) do
+            :ok
+          else
+            flunk(
+              "unexpected Bookings.create_pricing_rule failure in ensure_buyout_base_pricing!: #{inspect(cs.errors)}"
+            )
+          end
+
+        {:error, other} ->
+          flunk(
+            "unexpected Bookings.create_pricing_rule result in ensure_buyout_base_pricing!: #{inspect(other)}"
+          )
+      end
+    end
+
+    :ok
+  end
+
+  defp duplicate_buyout_base_pricing_rule?(%Ecto.Changeset{} = cs) do
+    Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
+      meta[:constraint] == :unique
+    end)
+  end
+
   defp create_blackout_fixture(attrs \\ %{}) do
     default_attrs = %{
       property: :tahoe,
@@ -3503,8 +3542,23 @@ defmodule Ysc.BookingsTest do
 
   describe "sync_hold_pricing_from_calculation/1" do
     test "recalculates and persists hold pricing from booking details" do
-      booking = booking_fixture(status: :hold)
+      ensure_buyout_base_pricing!()
+
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               Ysc.Bookings.BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 2
+               )
+
       {:ok, priced} = Bookings.calculate_modification_pricing(booking)
+      assert Money.positive?(priced.total)
 
       stale_total = Money.mult!(priced.total, 2)
 
