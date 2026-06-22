@@ -832,6 +832,25 @@ defmodule Ysc.ScanningTest do
       assert count == 2
     end
 
+    test "records a successful scan for each ticket checked in as a group", %{
+      session: session,
+      order: order
+    } do
+      assert Scanning.count_scan_records(session.id) == 0
+
+      assert {:ok, :group_checked_in, 2} =
+               Scanning.check_in_order(session, order.id)
+
+      assert Scanning.count_scan_records(session.id) == 2
+
+      records = Scanning.list_scan_records(session.id)
+
+      assert Enum.all?(records, &(&1.result == :success))
+
+      assert Enum.sort(Enum.map(records, & &1.ticket_id)) ==
+               Enum.sort(Enum.map(order.tickets, & &1.id))
+    end
+
     test "skips already checked-in tickets", %{session: session, order: order} do
       [first | _] = order.tickets
 

@@ -5,9 +5,8 @@ defmodule YscWeb.NewsLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias HtmlSanitizeEx.Scrubber
-
   alias Ysc.{Posts, PublicContentCache}
+  alias YscWeb.PlainText
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
 
@@ -125,7 +124,7 @@ defmodule YscWeb.NewsLive do
                     {@featured.title}
                   </h2>
 
-                  <article class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-2xl">
+                  <article class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 whitespace-pre-line mb-6 max-w-2xl">
                     {preview_text(@featured)}
                   </article>
 
@@ -246,7 +245,7 @@ defmodule YscWeb.NewsLive do
                 {post.title}
               </.link>
 
-              <article class="text-zinc-500 text-base leading-relaxed line-clamp-3 mb-8">
+              <article class="text-zinc-500 text-base leading-relaxed line-clamp-3 whitespace-pre-line mb-8">
                 {preview_text(post)}
               </article>
 
@@ -418,15 +417,7 @@ defmodule YscWeb.NewsLive do
     end
   end
 
-  # Do some magic to try and figure out what the preview text should be
-  defp preview_text(%Post{preview_text: nil} = post) do
-    Scrubber.scrub(post.raw_body, YscWeb.Scrubber.StripEverythingExceptText)
-  end
-
-  defp preview_text(post) do
-    (post.preview_text || "")
-    |> Scrubber.scrub(YscWeb.Scrubber.StripEverythingExceptText)
-  end
+  defp preview_text(post), do: PlainText.from_post(post)
 
   defp featured_image_url(nil), do: "/images/ysc_logo.webp"
 
@@ -458,18 +449,15 @@ defmodule YscWeb.NewsLive do
         calculate_minutes(word_count)
 
       post.raw_body && post.raw_body != "" ->
-        # Strip HTML tags and count words
-        text =
-          Scrubber.scrub(
-            post.raw_body,
-            YscWeb.Scrubber.StripEverythingExceptText
-          )
+        word_count =
+          post.raw_body |> PlainText.from_html() |> count_words_in_text()
 
-        word_count = count_words_in_text(text)
         calculate_minutes(word_count)
 
       post.preview_text && post.preview_text != "" ->
-        word_count = count_words_in_html(post.preview_text)
+        word_count =
+          post.preview_text |> PlainText.from_html() |> count_words_in_text()
+
         calculate_minutes(word_count)
 
       true ->

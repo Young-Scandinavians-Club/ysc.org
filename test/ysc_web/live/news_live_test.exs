@@ -362,6 +362,27 @@ defmodule YscWeb.NewsLiveTest do
       refute html =~ "src=x"
     end
 
+    test "strips formatting tags from preview_text as plain text", %{conn: conn} do
+      marker = "Happy python code#{System.unique_integer()}"
+
+      create_post(%{
+        title: "Formatted Preview",
+        preview_text:
+          "Line one<br>Line two<strong>Hkk</strong><div></div>#{marker}<div><br /></div>"
+      })
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_news_async(view)
+
+      html = render(view)
+      assert html =~ "whitespace-pre-line"
+      assert html =~ "Line one"
+      assert html =~ "Line twoHkk"
+      assert html =~ marker
+      refute html =~ "&lt;strong&gt;"
+      refute html =~ "<strong>"
+    end
+
     test "uses rendered_body for reading time when present", %{conn: conn} do
       long_html = "<p>" <> String.duplicate("word ", 500) <> "</p>"
 
