@@ -3501,6 +3501,33 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "sync_hold_pricing_from_calculation/1" do
+    test "recalculates and persists hold pricing from booking details" do
+      booking = booking_fixture(status: :hold)
+      {:ok, priced} = Bookings.calculate_modification_pricing(booking)
+
+      stale_total = Money.mult!(priced.total, 2)
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(total_price: stale_total)
+        |> Repo.update!()
+
+      assert {:ok, updated} =
+               Bookings.sync_hold_pricing_from_calculation(booking)
+
+      assert Money.equal?(updated.total_price, priced.total)
+      refute Money.equal?(updated.total_price, stale_total)
+    end
+
+    test "rejects non-hold bookings" do
+      booking = booking_fixture(status: :complete)
+
+      assert {:error, :invalid_status} =
+               Bookings.sync_hold_pricing_from_calculation(booking)
+    end
+  end
+
   describe "verify_booking_payment_intent/2" do
     test "accepts a payment intent that matches booking metadata and amount" do
       user = user_fixture()
