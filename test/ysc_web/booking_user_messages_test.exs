@@ -74,7 +74,8 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.insufficient_capacity_summary() =~
              "Not enough space"
 
-    assert BookingUserMessages.property_unavailable_summary() =~ "Cabin unavailable"
+    assert BookingUserMessages.property_unavailable_summary() =~
+             "Cabin unavailable"
 
     assert BookingUserMessages.membership_required_link_text() ==
              "Membership page"
