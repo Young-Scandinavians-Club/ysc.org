@@ -104,5 +104,48 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
       assert list_query_count == 0
       assert render(view) =~ "1 / 1"
     end
+
+    test "check-in with active search avoids aggregate recount query", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      alice = make_member(%{first_name: "QueryCountAlice", last_name: "Test"})
+      bob = make_member(%{first_name: "QueryCountBob", last_name: "Test"})
+
+      alice_order =
+        ticket_order_fixture(%{user: alice, event: event, tier: tier})
+        |> confirm_order()
+
+      ticket_order_fixture(%{user: bob, event: event, tier: tier})
+      |> confirm_order()
+
+      alice_ticket = List.first(alice_order.tickets)
+      aggregate_pattern = ~r/count\(.*"id"\).*FILTER/i
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?q=QueryCountAlice")
+
+      assert render(view) =~ "0 / 2"
+
+      {_html, aggregate_query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            view
+            |> element(
+              "#pending-groups button[phx-value-ticket-id='#{alice_ticket.id}']"
+            )
+            |> render_click()
+
+            render(view)
+          end,
+          pattern: aggregate_pattern
+        )
+
+      assert aggregate_query_count == 0
+      assert render(view) =~ "1 / 2"
+    end
   end
 end

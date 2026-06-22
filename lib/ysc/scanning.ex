@@ -520,16 +520,63 @@ defmodule Ysc.Scanning do
             t.status == :confirmed && !t.checked_in
           end)
 
-        results =
-          Enum.map(unchecked, fn ticket ->
-            case validate_manual_check_in(session, ticket) do
-              {:ok, result} -> {:ok, result}
-              {:error, _type, _message} = error -> error
+        case unchecked do
+          [] ->
+            {:ok, :group_checked_in, 0}
+
+          tickets ->
+            check_in_order_tickets(session, tickets)
+        end
+    end
+  end
+
+  defp check_in_order_tickets(session, tickets) do
+    result =
+      Repo.transaction(fn ->
+        updated_tickets =
+          Enum.map(tickets, fn ticket ->
+            case Repo.update(Ticket.check_in_changeset(ticket)) do
+              {:ok, updated} -> updated
+              {:error, changeset} -> Repo.rollback(changeset)
             end
           end)
 
-        successes = Enum.filter(results, &match?({:ok, _}, &1))
-        {:ok, :group_checked_in, Enum.count(successes)}
+        Enum.each(updated_tickets, fn ticket ->
+          case record_scan(session, %{
+                 user_id: ticket.user_id,
+                 ticket_id: ticket.id,
+                 ticket_order_id: ticket.ticket_order_id,
+                 checkin_type: :individual,
+                 result: :success
+               }) do
+            {:ok, _record} -> :ok
+            {:error, reason} -> Repo.rollback(reason)
+          end
+        end)
+
+        updated_tickets
+      end)
+
+    case result do
+      {:ok, updated_tickets} ->
+        event_id = session.event_id
+
+        updated_tickets
+        |> Repo.preload([:registration, :user, :ticket_tier, :ticket_order])
+        |> Enum.each(fn loaded_ticket ->
+          broadcast_checkin(
+            event_id,
+            %MessagePassingEvents.TicketCheckedIn{
+              ticket: loaded_ticket,
+              event_id: event_id
+            }
+          )
+        end)
+
+        {:ok, :group_checked_in, length(updated_tickets)}
+
+      {:error, _reason} ->
+        {:ok, :group_checked_in, 0}
     end
   end
 

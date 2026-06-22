@@ -49,9 +49,22 @@ defmodule Ysc.Bookings.Entitlements do
 
   def entitlement_reserved_on_active_hold?(entitlement_id, exclude_booking_id)
       when is_binary(entitlement_id) do
-    entitlement_id in entitlement_ids_reserved_on_active_holds(
-      exclude_booking_id
-    )
+    query =
+      from(b in Booking,
+        where: b.status == :hold,
+        where: b.applied_booking_entitlement_id == ^entitlement_id,
+        select: 1,
+        limit: 1
+      )
+
+    query =
+      if exclude_booking_id do
+        where(query, [b], b.id != ^exclude_booking_id)
+      else
+        query
+      end
+
+    Repo.exists?(query)
   end
 
   def entitlement_reserved_on_active_hold?(
