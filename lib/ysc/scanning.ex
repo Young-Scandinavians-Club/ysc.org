@@ -76,22 +76,45 @@ defmodule Ysc.Scanning do
   """
   def authorize_membership_checkin_access!(session_id, user_id) do
     case Repo.get(ScanSession, session_id) do
-      %{type: :event_membership, created_by_id: ^user_id} ->
-        :ok
-
-      %{type: :event_membership, closed_at: nil} ->
-        :ok
-
-      %{type: :event_membership} ->
-        {:error, :unauthorized}
+      %ScanSession{} = session ->
+        authorize_membership_checkin_session(session, user_id)
 
       nil ->
         {:error, :not_found}
-
-      %ScanSession{} ->
-        {:error, :unauthorized}
     end
   end
+
+  @doc """
+  Loads an `event_membership` check-in session with associations when access is allowed.
+
+  Combines authorization and preload in a single database round-trip.
+  """
+  def fetch_membership_checkin_session(session_id, user_id) do
+    case Repo.get(ScanSession, session_id) |> Repo.preload([:event, :created_by]) do
+      %ScanSession{} = session ->
+        case authorize_membership_checkin_session(session, user_id) do
+          :ok -> {:ok, session}
+          error -> error
+        end
+
+      nil ->
+        {:error, :not_found}
+    end
+  end
+
+  defp authorize_membership_checkin_session(
+         %{type: :event_membership, created_by_id: creator_id} = session,
+         user_id
+       ) do
+    cond do
+      creator_id == user_id -> :ok
+      is_nil(session.closed_at) -> :ok
+      true -> {:error, :unauthorized}
+    end
+  end
+
+  defp authorize_membership_checkin_session(_session, _user_id),
+       do: {:error, :unauthorized}
 
   def list_sessions(opts \\ []) do
     type_filter = Keyword.get(opts, :type)

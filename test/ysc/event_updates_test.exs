@@ -298,6 +298,77 @@ defmodule Ysc.EventUpdatesTest do
     end
   end
 
+  describe "event_update_recipient_email?/2" do
+    test "matches list_event_update_recipients/1 membership", %{
+      event: event,
+      user: user
+    } do
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          requires_registration: true
+        })
+
+      ticket =
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      %TicketDetail{
+        id: Ecto.ULID.generate(),
+        ticket_id: ticket.id,
+        first_name: "Guest",
+        last_name: "User",
+        email: "guest@example.com"
+      }
+      |> Repo.insert!()
+
+      recipients = Events.list_event_update_recipients(event.id)
+
+      for recipient <- recipients do
+        assert Events.event_update_recipient_email?(event.id, recipient.email)
+      end
+
+      refute Events.event_update_recipient_email?(event.id, "stranger@example.com")
+    end
+
+    test "returns false for donation-only ticket holders", %{event: event} do
+      donor = user_fixture()
+
+      donation_tier =
+        ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: donor.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      refute Events.event_update_recipient_email?(event.id, donor.email)
+    end
+
+    test "returns false for blank email" do
+      event = event_fixture()
+      refute Events.event_update_recipient_email?(event.id, "")
+      refute Events.event_update_recipient_email?(event.id, nil)
+    end
+  end
+
   describe "mark_event_notification_sent/2" do
     test "sets notification_sent_at and notification_recipient_count", %{
       event: event

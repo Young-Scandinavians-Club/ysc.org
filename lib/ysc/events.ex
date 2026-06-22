@@ -2971,6 +2971,43 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Returns true when `email` belongs to a confirmed, non-donation event attendee.
+
+  Checks purchaser (`User.email`) and registrant (`TicketDetail.email`) addresses
+  with a single indexed `EXISTS` query instead of loading every recipient.
+  """
+  def event_update_recipient_email?(event_id, email)
+      when is_binary(event_id) and is_binary(email) and email != "" do
+    normalized = String.downcase(email)
+
+    purchaser_match =
+      from t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        join: u in User,
+        on: t.user_id == u.id,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        where: fragment("lower(?)", u.email) == ^normalized
+
+    detail_match =
+      from t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        join: td in TicketDetail,
+        on: td.ticket_id == t.id,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        where: fragment("lower(?)", td.email) == ^normalized
+
+    Repo.exists?(purchaser_match) or Repo.exists?(detail_match)
+  end
+
+  def event_update_recipient_email?(_event_id, _email), do: false
+
+  @doc """
   Returns the number of ticket tiers configured for an event.
   """
   def count_ticket_tiers_for_event(event_id) do
