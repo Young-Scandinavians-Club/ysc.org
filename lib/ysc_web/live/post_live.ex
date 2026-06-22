@@ -5,6 +5,7 @@ defmodule YscWeb.PostLive do
   require Ysc.Logging
 
   alias HtmlSanitizeEx.Scrubber
+  alias YscWeb.PlainText
 
   alias Ysc.Posts
   alias Ysc.Posts.Post
@@ -261,11 +262,7 @@ defmodule YscWeb.PostLive do
           |> assign(:post, post)
           |> assign(:content_preview?, post.state != :published)
           |> assign(:page_title, post.title)
-          |> assign(
-            :meta_description,
-            post.preview_text ||
-              "Read this article on the Young Scandinavians Club news feed."
-          )
+          |> assign(:meta_description, meta_description_for_post(post))
           |> assign(:animate_insert, false)
           # Use cached comment_count from post for initial render
           |> assign(:n_comments, post.comment_count)
@@ -421,4 +418,11 @@ defmodule YscWeb.PostLive do
   end
 
   defp format_board_position(_), do: ""
+
+  defp meta_description_for_post(post) do
+    case PlainText.from_post(post) do
+      "" -> "Read this article on the Young Scandinavians Club news feed."
+      text -> text
+    end
+  end
 end

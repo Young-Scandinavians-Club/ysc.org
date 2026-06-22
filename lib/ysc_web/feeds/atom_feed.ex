@@ -2,6 +2,7 @@ defmodule YscWeb.Feeds.AtomFeed do
   @moduledoc false
 
   alias Atomex.{Feed, Entry}
+  alias YscWeb.PlainText
 
   @site_author "Young Scandinavians Club"
 
@@ -62,7 +63,7 @@ defmodule YscWeb.Feeds.AtomFeed do
         entry =
           Entry.new(entry_url, updated_at, post.title || "Post")
           |> Entry.link(entry_url, rel: "alternate", type: "text/html")
-          |> maybe_entry_summary(post.preview_text)
+          |> maybe_entry_summary(PlainText.from_post(post))
           |> maybe_entry_html_content(post.rendered_body)
           |> Entry.published(published_at)
           |> maybe_post_author(post)
