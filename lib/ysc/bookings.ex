@@ -854,6 +854,21 @@ defmodule Ysc.Bookings do
   def sync_hold_checkout_pricing(%Booking{}, _attrs),
     do: {:error, :invalid_status}
 
+  @doc false
+  def sync_hold_pricing_from_calculation(%Booking{} = booking) do
+    case calculate_modification_pricing(booking) do
+      {:ok, priced} ->
+        sync_hold_checkout_pricing(booking, %{
+          total_price: priced.total,
+          subtotal_price: priced.subtotal,
+          discount_total: priced.discount
+        })
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
   defp put_optional_checkout_money(changeset, field, %Money{} = value) do
     Ecto.Changeset.put_change(changeset, field, value)
   end
