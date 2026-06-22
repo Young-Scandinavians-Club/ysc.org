@@ -90,7 +90,8 @@ defmodule Ysc.Scanning do
   Combines authorization and preload in a single database round-trip.
   """
   def fetch_membership_checkin_session(session_id, user_id) do
-    case Repo.get(ScanSession, session_id) |> Repo.preload([:event, :created_by]) do
+    case Repo.get(ScanSession, session_id)
+         |> Repo.preload([:event, :created_by]) do
       %ScanSession{} = session ->
         case authorize_membership_checkin_session(session, user_id) do
           :ok -> {:ok, session}
@@ -114,7 +115,7 @@ defmodule Ysc.Scanning do
   end
 
   defp authorize_membership_checkin_session(_session, _user_id),
-       do: {:error, :unauthorized}
+    do: {:error, :unauthorized}
 
   def list_sessions(opts \\ []) do
     type_filter = Keyword.get(opts, :type)

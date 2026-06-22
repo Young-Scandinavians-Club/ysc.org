@@ -38,7 +38,6 @@ defmodule YscWeb.EventPhotoUploadLive do
          |> push_navigate(to: ~p"/")}
 
       %{event: event} = collection ->
-
         cond do
           event.state not in [:published, "published"] ->
             {:ok,

@@ -338,7 +338,10 @@ defmodule Ysc.EventUpdatesTest do
         assert Events.event_update_recipient_email?(event.id, recipient.email)
       end
 
-      refute Events.event_update_recipient_email?(event.id, "stranger@example.com")
+      refute Events.event_update_recipient_email?(
+               event.id,
+               "stranger@example.com"
+             )
     end
 
     test "returns false for donation-only ticket holders", %{event: event} do
