@@ -188,6 +188,21 @@ defmodule YscWeb.BookingCheckoutLive do
          price_breakdown,
          timezone
        ) do
+    booking =
+      case sync_checkout_hold_pricing(booking, total_price, price_breakdown) do
+        {:ok, updated_booking} ->
+          updated_booking
+
+        {:error, reason} ->
+          Ysc.Logging.warning(
+            "[BookingCheckout] Failed to sync recalculated hold pricing",
+            booking_id: booking.id,
+            reason: inspect(reason)
+          )
+
+          booking
+      end
+
     is_expired = booking_expired?(booking)
     {checkout_step, guest_info_form} = determine_checkout_step(booking, user)
     {family_members, other_family_members} = load_family_members(user)
@@ -1641,6 +1656,14 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   ## Private Functions
+
+  defp sync_checkout_hold_pricing(booking, total_price, price_breakdown) do
+    Bookings.sync_hold_checkout_pricing(booking, %{
+      total_price: total_price,
+      subtotal_price: price_breakdown[:entitlement_subtotal],
+      discount_total: price_breakdown[:entitlement_discount]
+    })
+  end
 
   @dialyzer {:nowarn_function, calculate_booking_price: 1}
   defp calculate_booking_price(booking) do

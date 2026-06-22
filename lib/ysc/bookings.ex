@@ -837,6 +837,30 @@ defmodule Ysc.Bookings do
   end
 
   @doc false
+  def sync_hold_checkout_pricing(%Booking{status: :hold} = booking, attrs)
+      when is_map(attrs) do
+    total_price = Map.fetch!(attrs, :total_price)
+
+    changeset =
+      booking
+      |> Ecto.Changeset.change()
+      |> Ecto.Changeset.put_change(:total_price, total_price)
+      |> put_optional_checkout_money(:subtotal_price, attrs[:subtotal_price])
+      |> put_optional_checkout_money(:discount_total, attrs[:discount_total])
+
+    Repo.update(changeset)
+  end
+
+  def sync_hold_checkout_pricing(%Booking{}, _attrs),
+    do: {:error, :invalid_status}
+
+  defp put_optional_checkout_money(changeset, field, %Money{} = value) do
+    Ecto.Changeset.put_change(changeset, field, value)
+  end
+
+  defp put_optional_checkout_money(changeset, _field, _), do: changeset
+
+  @doc false
   def verify_booking_payment_intent(payment_intent, %Booking{} = booking) do
     metadata = payment_intent.metadata || %{}
 
