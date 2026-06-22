@@ -1885,6 +1885,58 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       # Either shows HTML, redirects, or errors
       assert is_binary(result) or match?({:error, _}, result)
     end
+
+    test "shows insufficient capacity copy when day guests exceed cabin capacity",
+         %{
+           conn: conn
+         } do
+      alias Ysc.Bookings
+      alias Ysc.Bookings.BookingLocker
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 30),
+          booking_mode: :day,
+          price_unit: :per_guest_per_day,
+          property: :clear_lake,
+          season_id: nil
+        })
+
+      host = user_with_membership(:lifetime)
+      other_user = user_with_membership(:lifetime)
+
+      checkin = Date.utc_today() |> Date.add(135)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, _} =
+               BookingLocker.create_per_guest_booking(
+                 host.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 12
+               )
+
+      conn = log_in_user(conn, other_user)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "1",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
+
+      render_click(view, "create-booking", %{})
+      state = :sys.get_state(view.pid)
+
+      assert state.socket.assigns.form_errors.general =~
+               "open spots at the cabin"
+    end
   end
 
   describe "payment redirect scenarios" do
