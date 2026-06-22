@@ -152,9 +152,10 @@ defmodule YscWeb.Emails.Helpers do
   def plain_text_from_html(""), do: nil
 
   def plain_text_from_html(html) when is_binary(html) do
-    html
-    |> HtmlSanitizeEx.strip_tags()
-    |> decode_html_entities()
+    case YscWeb.PlainText.from_html(html) do
+      "" -> nil
+      text -> String.trim(text)
+    end
   end
 
   @doc """
@@ -194,18 +195,5 @@ defmodule YscWeb.Emails.Helpers do
     |> NaiveDateTime.new!(~T[12:00:00])
     |> DateTime.from_naive!(@email_timezone)
     |> Calendar.strftime("%Z")
-  end
-
-  defp decode_html_entities(text) do
-    case Floki.parse_fragment(text) do
-      {:ok, document} ->
-        document |> Floki.text() |> String.trim()
-
-      {:error, _} ->
-        case Floki.parse_fragment("<span>#{text}</span>") do
-          {:ok, document} -> document |> Floki.text() |> String.trim()
-          {:error, _} -> String.trim(text)
-        end
-    end
   end
 end

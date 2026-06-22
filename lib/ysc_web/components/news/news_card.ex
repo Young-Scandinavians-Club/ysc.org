@@ -12,7 +12,7 @@ defmodule YscWeb.Components.News.NewsCard do
     statics: YscWeb.static_paths()
 
   alias Ysc.Media.Image
-  alias HtmlSanitizeEx.Scrubber
+  alias YscWeb.PlainText
 
   attr :post, :any, required: true
   attr :class, :string, default: nil
@@ -81,7 +81,7 @@ defmodule YscWeb.Components.News.NewsCard do
           {@post.title}
         </.link>
 
-        <article class="text-zinc-500 text-sm leading-relaxed line-clamp-3 mb-8">
+        <article class="text-zinc-500 text-sm leading-relaxed line-clamp-3 whitespace-pre-line mb-8">
           {@preview_text}
         </article>
 
@@ -144,17 +144,15 @@ defmodule YscWeb.Components.News.NewsCard do
         calculate_minutes(word_count)
 
       post.raw_body && post.raw_body != "" ->
-        text =
-          Scrubber.scrub(
-            post.raw_body,
-            YscWeb.Scrubber.StripEverythingExceptText
-          )
+        word_count =
+          post.raw_body |> PlainText.from_html() |> count_words_in_text()
 
-        word_count = count_words_in_text(text)
         calculate_minutes(word_count)
 
       post.preview_text && post.preview_text != "" ->
-        word_count = count_words_in_html(post.preview_text)
+        word_count =
+          post.preview_text |> PlainText.from_html() |> count_words_in_text()
+
         calculate_minutes(word_count)
 
       true ->
@@ -185,18 +183,7 @@ defmodule YscWeb.Components.News.NewsCard do
     Integer.to_string(minutes)
   end
 
-  defp preview_text(%{preview_text: nil} = post) do
-    if post.raw_body do
-      Scrubber.scrub(post.raw_body, YscWeb.Scrubber.StripEverythingExceptText)
-    else
-      ""
-    end
-  end
-
-  defp preview_text(post) do
-    (post.preview_text || "")
-    |> Scrubber.scrub(YscWeb.Scrubber.StripEverythingExceptText)
-  end
+  defp preview_text(post), do: PlainText.from_post(post)
 
   @board_position_to_title_lookup %{
     president: "President",

@@ -175,6 +175,9 @@
       object-fit: cover;
       width: 100%;
       }
+      .post-preview {
+      white-space: pre-line;
+      }
       .event-cover img {
       height: 220px;
       object-fit: cover;

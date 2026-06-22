@@ -11,7 +11,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
   alias Ysc.GoogleWallet
-  alias HtmlSanitizeEx.Scrubber
+  alias YscWeb.PlainText
   import Ecto.Query
 
   @impl true
@@ -954,7 +954,7 @@ defmodule YscWeb.HomeLive do
                 {post.title}
               </h3>
               <%= if post.preview_text || post.rendered_body do %>
-                <p class="text-zinc-500 mt-4 text-sm leading-relaxed line-clamp-2 italic">
+                <p class="text-zinc-500 mt-4 text-sm leading-relaxed line-clamp-2 whitespace-pre-line italic">
                   {preview_text_for_news(post)}
                 </p>
               <% end %>
@@ -1942,7 +1942,7 @@ defmodule YscWeb.HomeLive do
                         <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
                           {post.title}
                         </h3>
-                        <p class="text-xs text-zinc-500 line-clamp-1">
+                        <p class="text-xs text-zinc-500 line-clamp-1 whitespace-pre-line">
                           {preview_text_plain(post)}
                         </p>
                       </div>
@@ -2707,17 +2707,7 @@ defmodule YscWeb.HomeLive do
   end
 
   # Helper functions for news posts
-  defp preview_text_plain(%Post{preview_text: nil} = post) do
-    Scrubber.scrub(post.raw_body, YscWeb.Scrubber.StripEverythingExceptText)
-    |> String.replace(~r/<[^>]*>/, "")
-    |> String.trim()
-  end
-
-  defp preview_text_plain(post) do
-    post.preview_text
-    |> String.replace(~r/<[^>]*>/, "")
-    |> String.trim()
-  end
+  defp preview_text_plain(post), do: PlainText.from_post(post)
 
   defp format_event_time(event_start_date, %Time{} = time) do
     # Convert event date and time to PST for display
@@ -2850,23 +2840,21 @@ defmodule YscWeb.HomeLive do
     ceil(word_count / 200) |> max(1)
   end
 
-  defp preview_text_for_news(%Post{preview_text: nil} = post) do
-    if post.raw_body do
-      post.raw_body
-      |> Scrubber.scrub(YscWeb.Scrubber.StripEverythingExceptText)
-      |> String.slice(0, 150)
-      |> Kernel.<>("...")
-    else
-      ""
-    end
+  defp preview_text_for_news(post) do
+    post
+    |> PlainText.from_post()
+    |> truncate_preview(150)
   end
 
-  defp preview_text_for_news(%Post{preview_text: preview_text}),
-    do:
-      preview_text
-      |> Scrubber.scrub(YscWeb.Scrubber.StripEverythingExceptText)
-      |> String.slice(0, 150)
-      |> Kernel.<>("...")
+  defp truncate_preview("", _), do: ""
+
+  defp truncate_preview(text, max_length) do
+    if String.length(text) > max_length do
+      String.slice(text, 0, max_length) <> "..."
+    else
+      text
+    end
+  end
 
   defp thumbnail_image_url(nil), do: "/images/ysc_logo.webp"
 

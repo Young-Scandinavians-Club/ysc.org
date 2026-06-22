@@ -272,10 +272,12 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
   defp clean_preview_text(text) do
     text
-    |> HtmlSanitizeEx.strip_tags()
-    |> String.replace(~r/\s+/, " ")
+    |> YscWeb.PlainText.from_html()
     |> String.trim()
-    |> String.slice(0, 200)
+    |> then(fn
+      "" -> ""
+      plain -> String.slice(plain, 0, 200)
+    end)
   end
 
   defp post_image_url(image), do: Image.display_path(image)
