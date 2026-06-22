@@ -4990,37 +4990,43 @@ defmodule YscWeb.TahoeBookingLive do
              |> push_navigate(to: ~p"/bookings/checkout/#{booking.id}")}
 
           {:error, :insufficient_capacity} ->
+            insufficient_capacity_error =
+              YscWeb.BookingUserMessages.insufficient_capacity_error()
+
             {:noreply,
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "Sorry, there is not enough capacity for your requested dates.",
+               insufficient_capacity_error,
                title: "Booking"
              )
              |> assign(
                form_errors: %{
-                 general:
-                   "Sorry, there is not enough capacity for your requested dates."
+                 general: insufficient_capacity_error
                },
                calculated_price: nil,
-               price_error: "Insufficient capacity"
+               price_error:
+                 YscWeb.BookingUserMessages.insufficient_capacity_summary()
              )}
 
           {:error, :property_unavailable} ->
+            property_unavailable_error =
+              YscWeb.BookingUserMessages.property_unavailable_error()
+
             {:noreply,
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "Sorry, the property is not available for your requested dates.",
+               property_unavailable_error,
                title: "Booking"
              )
              |> assign(
                form_errors: %{
-                 general:
-                   "Sorry, the property is not available for your requested dates."
+                 general: property_unavailable_error
                },
                calculated_price: nil,
-               price_error: "Property unavailable"
+               price_error:
+                 YscWeb.BookingUserMessages.property_unavailable_summary()
              )}
 
           {:error, :rooms_already_booked} ->
@@ -6651,13 +6657,12 @@ defmodule YscWeb.TahoeBookingLive do
   defp membership_required_error do
     membership_path = ~p"/users/membership"
 
-    membership_link =
-      ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">go to Membership</a>)
-
     {
       false,
       "Membership Required",
-      "You need an active YSC membership to book a cabin. Please #{membership_link} to pay dues or renew."
+      YscWeb.BookingUserMessages.membership_required_message_html(
+        membership_path
+      )
     }
   end
 

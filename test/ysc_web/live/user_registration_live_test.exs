@@ -21,6 +21,13 @@ defmodule YscWeb.UserRegistrationLiveTest do
   end
 
   describe "Registration flow" do
+    test "shows clarified eligibility step copy", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/users/register")
+
+      assert html =~ "Check every statement that is true for you"
+      refute html =~ "Select every option that applies"
+    end
+
     test "completes full registration process successfully", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
@@ -1020,8 +1027,11 @@ defmodule YscWeb.UserRegistrationLiveTest do
       render_change(form, %{"user" => params})
       render_submit(form, %{"user" => params})
 
-      {path, _flash} = assert_redirect(lv)
+      {path, flash} = assert_redirect(lv)
       assert path =~ "/account/setup"
+
+      assert flash["info"] =~ "Application received!"
+      assert flash["info"] =~ "6-digit code"
     end
 
     test "blocks submission and shows error when Turnstile verification fails",

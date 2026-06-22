@@ -972,7 +972,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
                "Enter the name of every guest who will stay in your room(s)"
 
       assert html =~
-               "Continue to payment — finish before your reservation timer runs out"
+               "Continue to payment — your hold on these dates expires soon, so please finish checkout"
     end
 
     test "validate-guest-info with invalid guest data collects errors", %{

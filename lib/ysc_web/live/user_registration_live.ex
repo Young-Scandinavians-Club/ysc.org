@@ -92,7 +92,7 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="How do you qualify for membership? Select every option that applies to you. You only need to meet one of these to apply.*"
+                    label="How do you qualify for membership? Check every statement that is true for you. You only need one to apply.*"
                     options={SignupApplication.eligibility_options()}
                   />
                   <p class="text-sm leading-6 text-zinc-600 mt-4">
@@ -619,7 +619,7 @@ defmodule YscWeb.UserRegistrationLive do
              socket
              |> YscWeb.Flash.put_toast(
                :info,
-               "Check your email for a verification code. Use it to finish account setup (verify email, add a payment method, and create a password). We'll email you separately when the board has reviewed your application.",
+               "Application received! Check your email for a 6-digit code to finish setting up your account.",
                title: "Application submitted"
              )
              |> redirect(
