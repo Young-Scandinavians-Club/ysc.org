@@ -622,8 +622,16 @@ defmodule YscWeb.AdminEventCheckInLive do
 
           {:noreply, apply_ticket_checked_in(socket, updated_ticket)}
 
-        {:error, _type, message} ->
+        {:error, _type, message} when is_binary(message) ->
           {:noreply, put_flash(socket, :error, message)}
+
+        {:error, _} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "Failed to check in ticket. Please try again."
+           )}
       end
     end
   end

@@ -1631,6 +1631,66 @@ defmodule YscWeb.AdminEventCheckInLiveTest do
 
       assert html =~ "Order not found"
     end
+
+    test "shows error flash when batch check-in transaction fails", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id})
+      tier = ticket_tier_fixture(%{event_id: event.id, quantity: 10})
+      buyer = make_member()
+
+      order =
+        confirm_order(
+          ticket_order_fixture(%{
+            user: buyer,
+            event: event,
+            tier: tier,
+            ticket_selections: %{tier.id => 2}
+          })
+        )
+
+      session = event_scan_session_fixture(event, admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}")
+
+      Repo.delete!(session)
+
+      html =
+        render_click(view, "check-in-order", %{
+          "order-id" => order.id
+        })
+
+      assert html =~ "Failed to check in tickets"
+      refute Enum.all?(order.tickets, &Repo.get!(Ysc.Events.Ticket, &1.id).checked_in)
+    end
+  end
+
+  describe "single check-in error handling" do
+    setup [:create_admin]
+
+    test "shows error flash when check-in transaction fails instead of crashing", %{
+      conn: conn,
+      admin: admin
+    } do
+      %{event: event, order: order} = setup_event_with_tickets(admin)
+      ticket = List.first(order.tickets)
+      session = event_scan_session_fixture(event, admin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/events/#{event.id}/check-in?scan_session_id=#{session.id}")
+
+      Repo.delete!(session)
+
+      html =
+        view
+        |> element("#pending-groups button[phx-value-ticket-id='#{ticket.id}']")
+        |> render_click()
+
+      assert html =~ "Failed to check in ticket"
+      refute Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
+    end
   end
 
   describe "PubSub TicketCheckInUndone different event" do

@@ -576,7 +576,8 @@ defmodule Ysc.Scanning do
         {:ok, :group_checked_in, length(updated_tickets)}
 
       {:error, _reason} ->
-        {:ok, :group_checked_in, 0}
+        {:error, :check_in_failed,
+         "Failed to check in tickets. Please try again."}
     end
   end
 

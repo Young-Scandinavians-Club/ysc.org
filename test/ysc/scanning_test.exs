@@ -909,6 +909,22 @@ defmodule Ysc.ScanningTest do
       assert {:error, :invalid, "This order is for a different event."} =
                Scanning.check_in_order(session, other_order.id)
     end
+
+    test "returns error when scan session no longer exists during batch check-in", %{
+      session: session,
+      order: order
+    } do
+      Repo.delete!(session)
+
+      assert {:error, :check_in_failed, message} =
+               Scanning.check_in_order(session, order.id)
+
+      assert message =~ "Failed to check in"
+
+      refute Enum.any?(order.tickets, fn ticket ->
+               Repo.get!(Ysc.Events.Ticket, ticket.id).checked_in
+             end)
+    end
   end
 
   describe "check_in_single/2 cross-event guard" do
