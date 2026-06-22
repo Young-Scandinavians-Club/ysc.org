@@ -335,15 +335,9 @@ defmodule YscWeb.AdminMembershipCheckInLive do
   def mount(%{"session_id" => session_id}, _session, socket) do
     user_id = socket.assigns.current_user.id
 
-    case Scanning.authorize_membership_checkin_access!(session_id, user_id) do
-      :ok ->
-        session = Scanning.get_session!(session_id)
-
-        if session.type != :event_membership do
-          {:error, {:redirect, %{to: ~p"/admin/scanner/sessions"}}}
-        else
-          mount_desk(session, socket)
-        end
+    case Scanning.fetch_membership_checkin_session(session_id, user_id) do
+      {:ok, session} ->
+        mount_desk(session, socket)
 
       {:error, :unauthorized} ->
         {:ok,

@@ -187,6 +187,42 @@ defmodule Ysc.ScanningTest do
     end
   end
 
+  describe "fetch_membership_checkin_session/2" do
+    test "returns preloaded session when access is allowed" do
+      owner = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+
+      assert {:ok, loaded} =
+               Scanning.fetch_membership_checkin_session(session.id, owner.id)
+
+      assert loaded.id == session.id
+      assert loaded.event.id == event.id
+      assert loaded.created_by.id == owner.id
+    end
+
+    test "denies another admin access to a closed event_membership session" do
+      owner = user_fixture(%{role: "admin"})
+      other = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: owner.id})
+      session = event_membership_session_fixture(event, owner)
+      {:ok, _} = Scanning.close_session(session.id)
+
+      assert {:error, :unauthorized} =
+               Scanning.fetch_membership_checkin_session(session.id, other.id)
+    end
+
+    test "returns not_found for a missing session" do
+      admin = user_fixture(%{role: "admin"})
+
+      assert {:error, :not_found} =
+               Scanning.fetch_membership_checkin_session(
+                 Ecto.ULID.generate(),
+                 admin.id
+               )
+    end
+  end
+
   describe "close_session/1" do
     test "sets closed_at on the session" do
       session = scan_session_fixture()

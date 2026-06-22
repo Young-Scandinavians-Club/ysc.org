@@ -37,10 +37,7 @@ defmodule YscWeb.EventPhotoUploadLive do
          |> put_flash(:error, "This upload link is not valid.")
          |> push_navigate(to: ~p"/")}
 
-      collection ->
-        collection = Ysc.Repo.preload(collection, :event)
-        event = collection.event
-
+      %{event: event} = collection ->
         cond do
           event.state not in [:published, "published"] ->
             {:ok,

@@ -19,9 +19,12 @@ defmodule Ysc.EventPhotos do
     Repo.one(from c in Collection, where: c.event_id == ^event_id)
   end
 
-  @doc "Returns the collection for an upload token, or nil."
+  @doc "Returns the collection for an upload token with event preloaded, or nil."
   def get_by_upload_token(upload_token) when is_binary(upload_token) do
-    Repo.one(from c in Collection, where: c.upload_token == ^upload_token)
+    Collection
+    |> where([c], c.upload_token == ^upload_token)
+    |> preload(:event)
+    |> Repo.one()
   end
 
   @doc "Returns the collection with event preloaded."
@@ -176,11 +179,7 @@ defmodule Ysc.EventPhotos do
         true
 
       is_binary(user.email) ->
-        email = String.downcase(user.email)
-
-        event.id
-        |> Events.list_event_update_recipients()
-        |> Enum.any?(fn r -> String.downcase(r.email) == email end)
+        Events.event_update_recipient_email?(event.id, user.email)
 
       true ->
         false
