@@ -58,18 +58,30 @@ defmodule YscWeb.BookingUserMessagesTest do
   end
 
   test "cabin availability error copy" do
-    assert BookingUserMessages.insufficient_capacity_error() =~ "open spots at the cabin"
+    assert BookingUserMessages.insufficient_capacity_error() =~
+             "open spots at the cabin"
+
     refute BookingUserMessages.insufficient_capacity_error() =~ "capacity"
 
-    assert BookingUserMessages.insufficient_capacity_error(include_guest_count: true) =~
+    assert BookingUserMessages.insufficient_capacity_error(
+             include_guest_count: true
+           ) =~
              "group size"
 
     assert BookingUserMessages.property_unavailable_error() =~ "isn't available"
     refute BookingUserMessages.property_unavailable_error() =~ "property"
 
-    assert BookingUserMessages.membership_required_link_text() == "Membership page"
+    assert BookingUserMessages.insufficient_capacity_summary() =~
+             "Not enough space"
 
-    assert BookingUserMessages.membership_required_message_html("/users/membership") =~
+    assert BookingUserMessages.property_unavailable_summary() =~ "Cabin unavailable"
+
+    assert BookingUserMessages.membership_required_link_text() ==
+             "Membership page"
+
+    assert BookingUserMessages.membership_required_message_html(
+             "/users/membership"
+           ) =~
              "Membership page"
   end
 end

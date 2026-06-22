@@ -2923,11 +2923,15 @@ defmodule YscWeb.ClearLakeBookingLive do
               socket.assigns
             )
           else
-            YscWeb.BookingUserMessages.insufficient_capacity_error(include_guest_count: true)
+            YscWeb.BookingUserMessages.insufficient_capacity_error(
+              include_guest_count: true
+            )
           end
 
         insufficient_capacity_error =
-          YscWeb.BookingUserMessages.insufficient_capacity_error(include_guest_count: true)
+          YscWeb.BookingUserMessages.insufficient_capacity_error(
+            include_guest_count: true
+          )
 
         {:noreply,
          socket
@@ -2942,11 +2946,13 @@ defmodule YscWeb.ClearLakeBookingLive do
            },
            calculated_price: socket.assigns.calculated_price,
            availability_error:
-             availability_error || YscWeb.BookingUserMessages.insufficient_capacity_summary()
+             availability_error ||
+               YscWeb.BookingUserMessages.insufficient_capacity_summary()
          )}
 
       {:error, :property_unavailable} ->
-        property_unavailable_error = YscWeb.BookingUserMessages.property_unavailable_error()
+        property_unavailable_error =
+          YscWeb.BookingUserMessages.property_unavailable_error()
 
         {:noreply,
          socket
@@ -2960,7 +2966,8 @@ defmodule YscWeb.ClearLakeBookingLive do
              general: property_unavailable_error
            },
            calculated_price: socket.assigns.calculated_price,
-           availability_error: YscWeb.BookingUserMessages.property_unavailable_summary()
+           availability_error:
+             YscWeb.BookingUserMessages.property_unavailable_summary()
          )}
 
       {:error, reason} when is_atom(reason) ->
@@ -3238,7 +3245,10 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   defp format_booking_error(:insufficient_capacity),
-    do: YscWeb.BookingUserMessages.insufficient_capacity_error(include_guest_count: true)
+    do:
+      YscWeb.BookingUserMessages.insufficient_capacity_error(
+        include_guest_count: true
+      )
 
   defp format_booking_error(:property_unavailable),
     do: YscWeb.BookingUserMessages.property_unavailable_error()
@@ -3295,7 +3305,9 @@ defmodule YscWeb.ClearLakeBookingLive do
         {
           false,
           "Membership Required",
-          YscWeb.BookingUserMessages.membership_required_message_html(membership_path)
+          YscWeb.BookingUserMessages.membership_required_message_html(
+            membership_path
+          )
         }
       end
     end

@@ -5005,11 +5005,13 @@ defmodule YscWeb.TahoeBookingLive do
                  general: insufficient_capacity_error
                },
                calculated_price: nil,
-               price_error: YscWeb.BookingUserMessages.insufficient_capacity_summary()
+               price_error:
+                 YscWeb.BookingUserMessages.insufficient_capacity_summary()
              )}
 
           {:error, :property_unavailable} ->
-            property_unavailable_error = YscWeb.BookingUserMessages.property_unavailable_error()
+            property_unavailable_error =
+              YscWeb.BookingUserMessages.property_unavailable_error()
 
             {:noreply,
              socket
@@ -5023,7 +5025,8 @@ defmodule YscWeb.TahoeBookingLive do
                  general: property_unavailable_error
                },
                calculated_price: nil,
-               price_error: YscWeb.BookingUserMessages.property_unavailable_summary()
+               price_error:
+                 YscWeb.BookingUserMessages.property_unavailable_summary()
              )}
 
           {:error, :rooms_already_booked} ->
@@ -6657,7 +6660,9 @@ defmodule YscWeb.TahoeBookingLive do
     {
       false,
       "Membership Required",
-      YscWeb.BookingUserMessages.membership_required_message_html(membership_path)
+      YscWeb.BookingUserMessages.membership_required_message_html(
+        membership_path
+      )
     }
   end
 
