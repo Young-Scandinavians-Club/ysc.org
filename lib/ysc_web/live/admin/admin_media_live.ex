@@ -120,64 +120,30 @@ defmodule YscWeb.AdminMediaLive do
 
               <%!-- Quick Copy Actions --%>
               <div class="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
+                <.admin_clipboard_button
                   id="copy-path-btn"
-                  phx-hook="ClipboardCopy"
-                  data-copy-target={"image-path-text-#{@selected_image_version}"}
-                  data-copy-feedback="copy-path-btn-feedback"
-                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  variant={:labeled_feedback}
+                  copy_target={"image-path-text-#{@selected_image_version}"}
+                  icon="hero-link"
+                  label="Copy URL"
                   title="Copy URL to clipboard"
-                >
-                  <.icon name="hero-link" class="w-3.5 h-3.5" /> Copy URL
-                  <span
-                    id="copy-path-btn-feedback"
-                    class="hidden items-center gap-1 text-green-700"
-                    aria-live="polite"
-                  >
-                    <.icon name="hero-check" class="h-3.5 w-3.5" />
-                    <span data-copy-feedback-label>Copied</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
+                />
+                <.admin_clipboard_button
                   id="copy-markdown-btn"
-                  phx-hook="ClipboardCopy"
-                  data-copy-target={"image-markdown-#{@selected_image_version}"}
-                  data-copy-feedback="copy-markdown-btn-feedback"
-                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  variant={:labeled_feedback}
+                  copy_target={"image-markdown-#{@selected_image_version}"}
+                  icon="hero-document-text"
+                  label="Copy Markdown"
                   title="Copy as Markdown"
-                >
-                  <.icon name="hero-document-text" class="w-3.5 h-3.5" />
-                  Copy Markdown
-                  <span
-                    id="copy-markdown-btn-feedback"
-                    class="hidden items-center gap-1 text-green-700"
-                    aria-live="polite"
-                  >
-                    <.icon name="hero-check" class="h-3.5 w-3.5" />
-                    <span data-copy-feedback-label>Copied</span>
-                  </span>
-                </button>
-                <button
-                  type="button"
+                />
+                <.admin_clipboard_button
                   id="copy-html-btn"
-                  phx-hook="ClipboardCopy"
-                  data-copy-target={"image-html-#{@selected_image_version}"}
-                  data-copy-feedback="copy-html-btn-feedback"
-                  class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50 rounded transition-colors"
+                  variant={:labeled_feedback}
+                  copy_target={"image-html-#{@selected_image_version}"}
+                  icon="hero-code-bracket"
+                  label="Copy HTML"
                   title="Copy as HTML"
-                >
-                  <.icon name="hero-code-bracket" class="w-3.5 h-3.5" /> Copy HTML
-                  <span
-                    id="copy-html-btn-feedback"
-                    class="hidden items-center gap-1 text-green-700"
-                    aria-live="polite"
-                  >
-                    <.icon name="hero-check" class="h-3.5 w-3.5" />
-                    <span data-copy-feedback-label>Copied</span>
-                  </span>
-                </button>
+                />
                 <input
                   type="hidden"
                   id={"image-path-text-#{@selected_image_version}"}

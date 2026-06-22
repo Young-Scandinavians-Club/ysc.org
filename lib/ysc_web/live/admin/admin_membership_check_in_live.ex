@@ -54,17 +54,17 @@ defmodule YscWeb.AdminMembershipCheckInLive do
             </.button>
           <% else %>
             <.admin_check_in_qr_scanner id="launch-scanner-btn" />
-            <.button
+            <.admin_responsive_clipboard_button
               id="copy-url-btn"
-              phx-hook="ClipboardCopy"
-              data-copy={url(~p"/admin/membership-check-in/#{@session.id}")}
+              copy={url(~p"/admin/membership-check-in/#{@session.id}")}
+              icon="hero-clipboard"
+              label="Share"
+              aria_label="Copy session link for other admins to join"
+              title="Copy session link for other admins to join"
               variant="outline"
               color="zinc"
-              class="hidden sm:inline-flex"
-              title="Copy session link for other admins to join"
-            >
-              <.icon name="hero-clipboard" class="w-5 h-5 me-1 mt-0.5" /> Share
-            </.button>
+              mobile_tone={:zinc}
+            />
             <.admin_responsive_icon_button
               id="complete-session-btn"
               icon="hero-check-circle"

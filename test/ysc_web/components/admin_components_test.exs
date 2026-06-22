@@ -332,4 +332,52 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "px-4 py-8 text-center text-zinc-500 text-sm"
     end
   end
+
+  describe "admin_clipboard_button/1" do
+    test "icon variant renders compact clipboard control" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_clipboard_button
+          id="copy-payment-ref-123"
+          variant={:icon}
+          copy="PAY-123"
+          title="Copy reference ID"
+          aria_label="Copy reference ID"
+        />
+        """)
+
+      assert html =~ ~s(id="copy-payment-ref-123")
+      assert html =~ ~s(phx-hook="ClipboardCopy")
+      assert html =~ ~s(data-copy="PAY-123")
+      assert html =~ ~s(aria-label="Copy reference ID")
+      assert html =~ "hero-clipboard"
+      assert html =~ "w-4 h-4"
+    end
+
+    test "labeled_feedback variant renders label and feedback element" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_clipboard_button
+          id="copy-path-btn"
+          variant={:labeled_feedback}
+          copy_target="image-path-text-original"
+          icon="hero-link"
+          label="Copy URL"
+          title="Copy URL to clipboard"
+        />
+        """)
+
+      assert html =~ ~s(id="copy-path-btn")
+      assert html =~ "Copy URL"
+      assert html =~ "hero-link"
+      assert html =~ ~s(data-copy-target="image-path-text-original")
+      assert html =~ ~s(data-copy-feedback="copy-path-btn-feedback")
+      assert html =~ ~s(id="copy-path-btn-feedback")
+      assert html =~ "data-copy-feedback-label"
+    end
+  end
 end
