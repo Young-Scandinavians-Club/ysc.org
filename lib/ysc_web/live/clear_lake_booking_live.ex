@@ -2923,43 +2923,44 @@ defmodule YscWeb.ClearLakeBookingLive do
               socket.assigns
             )
           else
-            "Sorry, there is not enough capacity for your requested dates and number of guests."
+            YscWeb.BookingUserMessages.insufficient_capacity_error(include_guest_count: true)
           end
+
+        insufficient_capacity_error =
+          YscWeb.BookingUserMessages.insufficient_capacity_error(include_guest_count: true)
 
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           availability_error ||
-             "Sorry, there is not enough capacity for your requested dates and number of guests.",
+           availability_error || insufficient_capacity_error,
            title: "Booking"
          )
          |> assign(
            form_errors: %{
-             general:
-               availability_error ||
-                 "Sorry, there is not enough capacity for your requested dates and number of guests."
+             general: availability_error || insufficient_capacity_error
            },
            calculated_price: socket.assigns.calculated_price,
            availability_error:
-             availability_error || "Not enough capacity available"
+             availability_error || YscWeb.BookingUserMessages.insufficient_capacity_summary()
          )}
 
       {:error, :property_unavailable} ->
+        property_unavailable_error = YscWeb.BookingUserMessages.property_unavailable_error()
+
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Sorry, the property is not available for your requested dates.",
+           property_unavailable_error,
            title: "Booking"
          )
          |> assign(
            form_errors: %{
-             general:
-               "Sorry, the property is not available for your requested dates."
+             general: property_unavailable_error
            },
            calculated_price: socket.assigns.calculated_price,
-           availability_error: "Property unavailable"
+           availability_error: YscWeb.BookingUserMessages.property_unavailable_summary()
          )}
 
       {:error, reason} when is_atom(reason) ->
@@ -3237,11 +3238,10 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   defp format_booking_error(:insufficient_capacity),
-    do:
-      "Sorry, there is not enough capacity for your requested dates and number of guests."
+    do: YscWeb.BookingUserMessages.insufficient_capacity_error(include_guest_count: true)
 
   defp format_booking_error(:property_unavailable),
-    do: "Sorry, the property is not available for your requested dates."
+    do: YscWeb.BookingUserMessages.property_unavailable_error()
 
   defp format_booking_error(:stale_inventory),
     do:
@@ -3292,13 +3292,10 @@ defmodule YscWeb.ClearLakeBookingLive do
       else
         membership_path = ~p"/users/membership"
 
-        membership_link =
-          ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">go to Membership</a>)
-
         {
           false,
           "Membership Required",
-          "You need an active YSC membership to book a cabin. #{membership_link} to pay dues or renew."
+          YscWeb.BookingUserMessages.membership_required_message_html(membership_path)
         }
       end
     end

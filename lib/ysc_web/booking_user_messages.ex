@@ -46,11 +46,42 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_continue_payment do
-    "Continue to payment — finish before your reservation timer runs out"
+    "Continue to payment — your hold on these dates expires soon, so please finish checkout"
   end
 
   def checkout_guest_info_step_continue_complimentary do
-    "Continue to confirm your booking — finish before your reservation timer runs out"
+    "Continue to confirm your booking — your hold on these dates expires soon, so please finish checkout"
+  end
+
+  def insufficient_capacity_error(opts \\ []) do
+    if Keyword.get(opts, :include_guest_count, false) do
+      "There aren't enough open spots at the cabin for your dates and group size. Try fewer guests, different dates, or reserve the whole cabin."
+    else
+      "There aren't enough open spots at the cabin for your dates. Try different dates, fewer guests, or reserve the whole cabin."
+    end
+  end
+
+  def insufficient_capacity_summary do
+    "Not enough space available"
+  end
+
+  def property_unavailable_error do
+    "The cabin isn't available for those dates. Try different dates or reserve the whole cabin."
+  end
+
+  def property_unavailable_summary do
+    "Cabin unavailable"
+  end
+
+  def membership_required_link_text do
+    "Membership page"
+  end
+
+  def membership_required_message_html(membership_path) do
+    link =
+      ~s(<a href="#{membership_path}" class="font-semibold text-amber-900 hover:text-amber-950 underline">#{membership_required_link_text()}</a>)
+
+    "You need an active YSC membership to book the cabin. Go to your #{link} to pay or renew."
   end
 
   def checkout_payment_step_pay do
