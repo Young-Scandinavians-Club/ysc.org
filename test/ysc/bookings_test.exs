@@ -3503,8 +3503,19 @@ defmodule Ysc.BookingsTest do
 
   describe "sync_hold_pricing_from_calculation/1" do
     test "recalculates and persists hold pricing from booking details" do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(500, :USD),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :tahoe,
+          season_id: nil
+        })
+
       booking = booking_fixture(status: :hold)
       {:ok, priced} = Bookings.calculate_modification_pricing(booking)
+
+      refute Money.zero?(priced.total)
 
       stale_total = Money.mult!(priced.total, 2)
 
