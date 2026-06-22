@@ -126,13 +126,7 @@ defmodule YscWeb.AdminEventsLive do
             </.admin_filter_dropdown>
           </div>
 
-          <div :if={is_nil(@meta)} class="py-16 text-center">
-            <.icon
-              name="hero-arrow-path"
-              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
-            />
-            <p class="text-zinc-500 font-medium">Loading events…</p>
-          </div>
+          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading events…" />
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
@@ -557,10 +551,4 @@ defmodule YscWeb.AdminEventsLive do
   defp parse_tab("past"), do: :past
   defp parse_tab("all"), do: :all
   defp parse_tab(_), do: :upcoming
-
-  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
-  defp non_flop_params(params) when is_map(params),
-    do: Map.drop(params, @flop_keys)
-
-  defp non_flop_params(_), do: %{}
 end

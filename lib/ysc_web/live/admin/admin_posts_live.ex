@@ -104,13 +104,7 @@ defmodule YscWeb.AdminPostsLive do
             </.admin_filter_dropdown>
           </div>
 
-          <div :if={is_nil(@meta)} class="py-16 text-center">
-            <.icon
-              name="hero-arrow-path"
-              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
-            />
-            <p class="text-zinc-500 font-medium">Loading posts…</p>
-          </div>
+          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading posts…" />
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
@@ -575,10 +569,4 @@ defmodule YscWeb.AdminPostsLive do
   defp maybe_stream_update_post(socket, %Post{} = post) do
     stream_insert(socket, :posts, post)
   end
-
-  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
-  defp non_flop_params(params) when is_map(params),
-    do: Map.drop(params, @flop_keys)
-
-  defp non_flop_params(_), do: %{}
 end

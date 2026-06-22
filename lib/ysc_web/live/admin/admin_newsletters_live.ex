@@ -347,13 +347,7 @@ defmodule YscWeb.AdminNewslettersLive do
           </div>
 
           <%!-- Editions content --%>
-          <div :if={is_nil(@meta)} class="py-16 text-center">
-            <.icon
-              name="hero-arrow-path"
-              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
-            />
-            <p class="text-zinc-500 font-medium">Loading editions…</p>
-          </div>
+          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading editions…" />
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>
@@ -1116,10 +1110,4 @@ defmodule YscWeb.AdminNewslettersLive do
   defp subscribers_list_path(params) do
     ~p"/admin/newsletters?#{Map.put(params || %{}, "tab", "subscribers")}"
   end
-
-  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
-  defp non_flop_params(params) when is_map(params),
-    do: Map.drop(params, @flop_keys)
-
-  defp non_flop_params(_), do: %{}
 end
