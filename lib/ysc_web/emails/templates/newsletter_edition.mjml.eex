@@ -43,7 +43,7 @@
     </mj-column>
     <mj-column width="60%" vertical-align="middle" padding="0">
       <mj-text align="left" font-weight="bold" font-size="17px" padding-bottom="8px"><%= post[:title] %></mj-text>
-      <mj-text align="left" font-size="14px" color="#64748b" padding-top="0" line-height="1.5"><%= post[:preview_text] %></mj-text>
+      <mj-text align="left" font-size="14px" color="#64748b" padding-top="0" line-height="1.5" css-class="post-preview"><%= post[:preview_text] %></mj-text>
       <mj-text align="left" padding-top="4px">
         <a href="<%= post[:url] %>" style="color: #1447e6; text-decoration: none; font-size: 14px; font-weight: bold;">Read more →</a>
       </mj-text>

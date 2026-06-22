@@ -2,6 +2,7 @@ defmodule YscWeb.NewsListLive do
   use YscWeb, :live_component
 
   alias Ysc.Posts
+  alias YscWeb.PlainText
 
   @impl true
   def render(assigns) do
@@ -42,9 +43,8 @@ defmodule YscWeb.NewsListLive do
               </h3>
             </.link>
 
-            <p class="text-zinc-600 text-sm line-clamp-2">
-              {post.preview_text ||
-                String.slice(post.rendered_body || "", 0, 150) <> "..."}
+            <p class="text-zinc-600 text-sm line-clamp-2 whitespace-pre-line">
+              {PlainText.from_post(post)}
             </p>
           </div>
         </div>
