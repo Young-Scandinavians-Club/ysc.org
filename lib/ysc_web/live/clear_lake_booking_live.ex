@@ -855,7 +855,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                             <!-- Guests Counter -->
                             <div>
                               <div
-                                id="guests-label"
+                                id="guests-count-label"
                                 class="block text-sm font-semibold text-zinc-700 mb-2"
                               >
                                 Number of Guests
@@ -863,7 +863,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                               <div
                                 class="flex items-center space-x-3"
                                 role="group"
-                                aria-labelledby="guests-label"
+                                aria-labelledby="guests-count-label"
                               >
                                 <button
                                   type="button"
