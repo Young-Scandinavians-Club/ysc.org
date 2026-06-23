@@ -558,6 +558,29 @@ defmodule YscWeb.UserBookingDetailLiveTest do
   end
 
   describe "cancel modal and events" do
+    test "cancel button uses in-app modal instead of browser data-confirm", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, view, html} = live_booking_detail(conn, booking.id)
+
+      refute html =~ ~s/data-confirm=/
+      refute has_element?(view, "button[phx-click='show-cancel-modal'][data-confirm]")
+    end
+
+    test "cancel modal shows updated confirmation copy", %{conn: conn} do
+      %{conn: conn, user: user} = log_in_member(conn)
+      booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      {:ok, view, _html} = live_booking_detail(conn, booking.id)
+
+      view |> element("button[phx-click='show-cancel-modal']") |> render_click()
+
+      html = render(view)
+      assert html =~ "Cancel this reservation?"
+      assert html =~ "can't be undone"
+    end
+
     test "show and hide cancel modal", %{conn: conn} do
       %{conn: conn, user: user} = log_in_member(conn)
       booking = booking_fixture(%{user_id: user.id, status: :complete})

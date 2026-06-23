@@ -293,6 +293,57 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ "Total room capacity is 4"
   end
 
+  test "shows plain-language buyout message when extending into a buyout reservation",
+       %{
+         conn: conn
+       } do
+    user = user_fixture() |> active_user(conn)
+    other_user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+
+    room = create_test_room!()
+    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    overlapping_checkin = checkout
+    overlapping_checkout = Date.add(checkout, 3)
+
+    assert {:ok, _} =
+             BookingLocker.create_buyout_booking(
+               other_user.id,
+               :tahoe,
+               overlapping_checkin,
+               overlapping_checkout,
+               4
+             )
+
+    {view, _html} = live_change(conn, booking)
+
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(overlapping_checkout)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, overlapping_checkout)}
+    )
+
+    render(view)
+
+    html =
+      view
+      |> form("#booking-change-form", %{
+        "modification" => %{
+          "checkin_date" => checkin_str,
+          "checkout_date" => extended_checkout_str
+        }
+      })
+      |> render_change()
+
+    assert html =~ "modification-preview-error"
+    assert html =~ "whole cabin is already reserved"
+  end
+
   test "shows plain-language blackout message when dates overlap a blackout period",
        %{
          conn: conn
@@ -513,5 +564,10 @@ defmodule YscWeb.BookingChangeLiveTest do
       start_date: DateTime.new!(checkin, ~T[00:00:00], "Etc/UTC"),
       end_date: DateTime.new!(checkout, ~T[00:00:00], "Etc/UTC")
     }
+  end
+
+  defp first_monday_on_or_after(%Date{} = date) do
+    days_until_monday = rem(8 - Date.day_of_week(date, :monday), 7)
+    Date.add(date, days_until_monday)
   end
 end
