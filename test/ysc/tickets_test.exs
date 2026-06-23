@@ -530,14 +530,14 @@ defmodule Ysc.TicketsTest do
       {:ok, order} =
         Tickets.create_ticket_order(user.id, event.id, ticket_selections)
 
-      # Manually set inserted_at to be older than timeout using SQL
-      old_time =
-        DateTime.add(DateTime.utc_now(), -(16 * 60), :second)
+      expired_at =
+        DateTime.utc_now()
+        |> DateTime.add(-60, :second)
         |> DateTime.truncate(:second)
 
       Ysc.Repo.update_all(
         from(to in TicketOrder, where: to.id == ^order.id),
-        set: [inserted_at: old_time]
+        set: [expires_at: expired_at]
       )
 
       # Run expiration

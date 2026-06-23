@@ -31,6 +31,10 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      {:ok, build_payment_intent(%{id: id})}
+    end)
+
     user = user_with_membership(:lifetime)
     conn = log_in_user(conn, user)
 

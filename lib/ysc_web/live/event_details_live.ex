@@ -7433,6 +7433,8 @@ defmodule YscWeb.EventDetailsLive do
              customer_id: socket.assigns.current_user.stripe_id
            ) do
         {:ok, payment_intent} ->
+          ticket_order = %{ticket_order | payment_intent_id: payment_intent.id}
+
           # Show payment form with Stripe Elements
           # Update URL to reflect checkout state
           {:noreply,
