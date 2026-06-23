@@ -536,6 +536,49 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         assert Tickets.get_ticket_order(order.id).status == :pending
       end)
     end
+
+    test "confirm-free-tickets without an active order is rejected", %{
+      conn: conn,
+      user: user
+    } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      view = wait_for_async(view)
+
+      render_click(view, "confirm-free-tickets")
+
+      html = render(view)
+      assert html =~ "This order is no longer available."
+    end
+
+    test "confirm-free-tickets rejects completed orders restored from URL", %{
+      conn: conn,
+      user: user
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+        order =
+          ticket_order_fixture(%{user: user, event: event, status: :completed})
+          |> stabilize_pending_ticket_order!()
+          |> Ecto.Changeset.change(status: :completed)
+          |> Repo.update!()
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+        render_click(view, "confirm-free-tickets")
+
+        html = render(view)
+        assert html =~ "This order is no longer available."
+        assert Tickets.get_ticket_order(order.id).status == :completed
+      end)
+    end
   end
 
   describe "payment modal interactions" do
