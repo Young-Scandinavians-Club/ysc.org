@@ -41,6 +41,7 @@ defmodule YscWeb.SecurityAuditTest do
   alias YscWeb.AuthController
 
   import Ysc.AccountsFixtures
+  import EventDetailsLiveHelpers
 
   setup :verify_on_exit!
 
@@ -1333,6 +1334,29 @@ defmodule YscWeb.SecurityAuditTest do
   # ---------------------------------------------------------------------------
 
   describe "Finding 21: paid ticket free-checkout bypass" do
+    setup context do
+      if Map.has_key?(context, :conn) do
+        original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+        on_exit(fn ->
+          Application.put_env(:ysc, :stripe_client, original_stripe_client)
+        end)
+
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+        setup_stripe_mocks()
+
+        stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+          {:ok, build_payment_intent(%{amount: params.amount})}
+        end)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          {:ok, build_payment_intent(%{id: id})}
+        end)
+      end
+
+      :ok
+    end
+
     test "process_free_ticket_order rejects pending orders with a non-zero total" do
       user = user_with_membership(:lifetime)
       event = event_with_tickets(tier_count: 1, state: :upcoming)
@@ -1344,6 +1368,39 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:error, :payment_required} =
                Tickets.process_free_ticket_order(order)
+    end
+
+    test "process_free_ticket_order rejects non-pending orders" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+      order =
+        ticket_order_fixture(%{user: user, event: event, status: :completed})
+
+      assert {:error, :payment_required} =
+               Tickets.process_free_ticket_order(order)
+    end
+
+    test "checkout=free URL on paid order restores payment checkout instead of free flow",
+         %{conn: conn} do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+        event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+        order =
+          ticket_order_fixture(%{user: user, event: event, status: :pending})
+          |> stabilize_pending_ticket_order!()
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
+
+        assert has_element?(view, "#payment-modal")
+        refute has_element?(view, "#free-ticket-confirmation-modal")
+      end)
     end
 
     test "checkout=free URL cannot confirm a pending paid ticket order", %{
@@ -1365,6 +1422,8 @@ defmodule YscWeb.SecurityAuditTest do
           )
 
         render_click(view, "confirm-free-tickets")
+
+        assert render(view) =~ "This order requires payment."
 
         order = Tickets.get_ticket_order(order.id)
         assert order.status == :pending
