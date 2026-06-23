@@ -16,7 +16,7 @@ defmodule YscWeb.Components.ImageUploadComponent do
     <div>
       <form id="upload-form" phx-submit="save-upload" phx-change="validate-upload">
         <label
-          class="flex p-6 flex-col items-center justify-center w-full min-h-72 border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100"
+          class={upload_dropzone_label_class()}
           phx-drop-target={@uploads.media_uploads.ref}
         >
           <.live_file_input upload={@uploads.media_uploads} class="hidden" />
@@ -65,17 +65,8 @@ defmodule YscWeb.Components.ImageUploadComponent do
             </p>
           <% end %>
 
-          <div
-            :if={length(@uploads.media_uploads.entries) == 0}
-            class="flex flex-col items-center justify-center pt-5 pb-6"
-          >
-            <.icon name="hero-cloud-arrow-up" class="w-8 h-10 mb-4 text-zinc-500" />
-            <p class="mb-2 text-sm text-zinc-500">
-              <span class="font-semibold">Click to upload</span> or drag and drop
-            </p>
-            <p class="text-xs text-zinc-500">
-              SVG, PNG, JPG, JPEG or GIF
-            </p>
+          <div :if={length(@uploads.media_uploads.entries) == 0}>
+            <.upload_dropzone_empty_state />
           </div>
         </label>
 

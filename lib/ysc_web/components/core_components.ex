@@ -1534,6 +1534,85 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
+  Placeholder shown inside a file-upload drop zone when no files are selected.
+
+  Pair with a dashed `<label>` (see `upload_dropzone_label_class/1`) and show only
+  when the upload has zero entries.
+
+  ## Examples
+
+      <div :if={length(@uploads.avatar.entries) == 0}>
+        <.upload_dropzone_empty_state />
+      </div>
+
+      <.upload_dropzone_empty_state
+        size={:compact}
+        formats="PNG, JPG, JPEG, GIF or WebP"
+      />
+  """
+  attr :formats, :string,
+    default: "SVG, PNG, JPG, JPEG or GIF",
+    doc: "Human-readable list of accepted file types"
+
+  attr :size, :atom,
+    default: :default,
+    values: [:default, :compact],
+    doc: ":compact uses tighter padding for embedded pickers"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the outer container"
+
+  attr :id, :string, default: nil
+
+  def upload_dropzone_empty_state(assigns) do
+    ~H"""
+    <div id={@id} class={upload_dropzone_empty_state_class(@size, @class)}>
+      <.icon
+        name="hero-cloud-arrow-up"
+        class={upload_dropzone_empty_state_icon_class(@size)}
+      />
+      <p class={upload_dropzone_empty_state_primary_text_class(@size)}>
+        <span class="font-semibold">Click to upload</span> or drag and drop
+      </p>
+      <p class="text-xs text-zinc-500">{@formats}</p>
+    </div>
+    """
+  end
+
+  @doc """
+  Default Tailwind classes for dashed upload drop-zone labels.
+
+  Pass `min_height` to override the default `min-h-72` (e.g. `"min-h-52"`).
+  """
+  def upload_dropzone_label_class(opts \\ []) do
+    min_height = Keyword.get(opts, :min_height, "min-h-72")
+
+    [
+      "flex p-6 flex-col items-center justify-center w-full border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100",
+      min_height
+    ]
+  end
+
+  defp upload_dropzone_empty_state_class(:default, extra),
+    do: ["flex flex-col items-center justify-center pt-5 pb-6", extra]
+
+  defp upload_dropzone_empty_state_class(:compact, extra),
+    do: ["flex flex-col items-center justify-center pt-3 pb-4", extra]
+
+  defp upload_dropzone_empty_state_icon_class(:default),
+    do: "w-8 h-10 mb-4 text-zinc-500"
+
+  defp upload_dropzone_empty_state_icon_class(:compact),
+    do: "w-8 h-10 mb-3 text-zinc-500"
+
+  defp upload_dropzone_empty_state_primary_text_class(:default),
+    do: "mb-2 text-sm text-zinc-500"
+
+  defp upload_dropzone_empty_state_primary_text_class(:compact),
+    do: "mb-1 text-sm text-zinc-500"
+
+  @doc """
   Renders a back navigation link.
 
   ## Examples

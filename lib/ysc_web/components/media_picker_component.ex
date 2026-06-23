@@ -97,7 +97,7 @@ defmodule YscWeb.MediaPickerComponent do
           >
             <label
               phx-drop-target={@uploads.media_picker_file.ref}
-              class="flex p-6 flex-col items-center justify-center w-full min-h-52 border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100"
+              class={upload_dropzone_label_class(min_height: "min-h-52")}
             >
               <.live_file_input upload={@uploads.media_picker_file} class="hidden" />
 
@@ -143,19 +143,11 @@ defmodule YscWeb.MediaPickerComponent do
                 </p>
               <% end %>
 
-              <div
-                :if={length(@uploads.media_picker_file.entries) == 0}
-                class="flex flex-col items-center justify-center pt-3 pb-4"
-              >
-                <.icon
-                  name="hero-cloud-arrow-up"
-                  class="w-8 h-10 mb-3 text-zinc-500"
+              <div :if={length(@uploads.media_picker_file.entries) == 0}>
+                <.upload_dropzone_empty_state
+                  size={:compact}
+                  formats="PNG, JPG, JPEG, GIF or WebP"
                 />
-                <p class="mb-1 text-sm text-zinc-500">
-                  <span class="font-semibold">Click to upload</span>
-                  or drag and drop
-                </p>
-                <p class="text-xs text-zinc-500">PNG, JPG, JPEG, GIF or WebP</p>
               </div>
             </label>
 
