@@ -1229,7 +1229,9 @@ defmodule Ysc.AccountsTest do
 
       assert %{
                password: ["should be at least 12 character(s)"],
-               password_confirmation: ["does not match password"]
+               password_confirmation: [
+                 "Passwords don't match. Please enter the same password in both fields."
+               ]
              } = errors_on(changeset)
     end
 
@@ -1403,7 +1405,9 @@ defmodule Ysc.AccountsTest do
 
       assert %{
                password: ["should be at least 12 character(s)"],
-               password_confirmation: ["does not match password"]
+               password_confirmation: [
+                 "Passwords don't match. Please enter the same password in both fields."
+               ]
              } = errors_on(changeset)
     end
 

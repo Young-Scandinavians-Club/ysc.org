@@ -52,7 +52,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
         )
 
       assert result =~ "should be at least 12 character"
-      assert result =~ "does not match password"
+      assert result =~ "Please enter the same password in both fields"
     end
   end
 
@@ -97,7 +97,7 @@ defmodule YscWeb.UserResetPasswordLiveTest do
 
       assert result =~ "Reset Password"
       assert result =~ "should be at least 12 character(s)"
-      assert result =~ "does not match password"
+      assert result =~ "Please enter the same password in both fields"
     end
   end
 end
