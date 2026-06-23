@@ -555,13 +555,7 @@ defmodule YscWeb.AdminUsersLive do
             </.admin_filter_dropdown>
           </div>
 
-          <div :if={is_nil(@meta)} class="py-16 text-center">
-            <.icon
-              name="hero-arrow-path"
-              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
-            />
-            <p class="text-zinc-500 font-medium">Loading users…</p>
-          </div>
+          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading users…" />
 
           <div :if={@meta}>
             <!-- Mobile Card View -->
@@ -1358,12 +1352,6 @@ defmodule YscWeb.AdminUsersLive do
   end
 
   defp list_params_for_back(_), do: %{}
-
-  @flop_keys ~w(order_by order_directions page page_size limit offset filters)
-  defp non_flop_params(params) when is_map(params),
-    do: Map.drop(params, @flop_keys)
-
-  defp non_flop_params(_), do: %{}
 
   defp format_utc_date(%DateTime{} = dt) do
     dt

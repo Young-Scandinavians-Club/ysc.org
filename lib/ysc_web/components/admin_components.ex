@@ -568,6 +568,33 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_flop_loading_state
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Centered spinner shown while Flop list `@meta` is still loading (async assign).
+
+  Pair with `<div :if={@meta}>` for the loaded table content.
+  """
+  attr :message, :string, required: true
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the outer container"
+
+  def admin_flop_loading_state(assigns) do
+    ~H"""
+    <div class={["py-16 text-center", @class]}>
+      <.icon
+        name="hero-arrow-path"
+        class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+      />
+      <p class="text-zinc-500 font-medium">{@message}</p>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_event_check_in_table_header
   # ---------------------------------------------------------------------------
 
