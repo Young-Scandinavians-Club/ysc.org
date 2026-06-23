@@ -641,7 +641,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
 
-      {message, _} = Keyword.fetch!(changeset.errors, :user_id)
+      {message, _} = Keyword.fetch!(changeset.errors, :checkin_date)
       assert message =~ "2 cabin bookings at the same time"
     end
 
