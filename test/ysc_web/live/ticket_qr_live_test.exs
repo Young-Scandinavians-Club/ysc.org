@@ -268,7 +268,6 @@ defmodule YscWeb.TicketQrLiveTest do
       assert has_element?(view, "#back-link[href='/users/tickets']")
       refute has_element?(view, "#back-link[href*='evil.example.com']")
     end
-
   end
 
   describe "filters out donation tickets" do

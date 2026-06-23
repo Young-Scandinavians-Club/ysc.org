@@ -1336,7 +1336,9 @@ defmodule YscWeb.SecurityAuditTest do
     test "process_free_ticket_order rejects pending orders with a non-zero total" do
       user = user_with_membership(:lifetime)
       event = event_with_tickets(tier_count: 1, state: :upcoming)
-      order = ticket_order_fixture(%{user: user, event: event, status: :pending})
+
+      order =
+        ticket_order_fixture(%{user: user, event: event, status: :pending})
 
       refute Money.zero?(order.total_amount)
 
@@ -1344,11 +1346,15 @@ defmodule YscWeb.SecurityAuditTest do
                Tickets.process_free_ticket_order(order)
     end
 
-    test "checkout=free URL cannot confirm a pending paid ticket order", %{conn: conn} do
+    test "checkout=free URL cannot confirm a pending paid ticket order", %{
+      conn: conn
+    } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
       event = event_with_tickets(tier_count: 1, state: :upcoming)
-      order = ticket_order_fixture(%{user: user, event: event, status: :pending})
+
+      order =
+        ticket_order_fixture(%{user: user, event: event, status: :pending})
 
       {:ok, view, _html} =
         live(

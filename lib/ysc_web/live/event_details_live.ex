@@ -5125,78 +5125,6 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp confirm_free_tickets_if_allowed(socket, ticket_order) do
-    cond do
-      is_nil(ticket_order) or ticket_order.status != :pending ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
-           title: "Tickets"
-         )
-         |> assign(:show_free_ticket_confirmation, false)}
-
-      not Money.zero?(ticket_order.total_amount) ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(:error, "This order requires payment.",
-           title: "Tickets"
-         )
-         |> assign(:show_free_ticket_confirmation, false)}
-
-      true ->
-        confirm_free_tickets(socket, ticket_order)
-    end
-  end
-
-  defp confirm_free_tickets(socket, ticket_order) do
-    socket = assign(socket, :ticket_order, ticket_order)
-
-    # Save registration details if any tickets require registration
-    tickets_requiring_registration =
-      socket.assigns.tickets_requiring_registration || []
-
-    if Enum.any?(tickets_requiring_registration) do
-      tickets_for_me = socket.assigns.tickets_for_me || %{}
-      ticket_details_form = socket.assigns.ticket_details_form || %{}
-      current_user = socket.assigns.current_user
-
-      ticket_details_list =
-        build_ticket_details_list(
-          tickets_requiring_registration,
-          tickets_for_me,
-          ticket_details_form,
-          current_user
-        )
-
-      all_valid =
-        validate_ticket_details(
-          tickets_requiring_registration,
-          ticket_details_list,
-          tickets_for_me,
-          current_user
-        )
-
-      if all_valid do
-        save_ticket_details_and_process(ticket_details_list, socket, fn ->
-          process_free_tickets(socket)
-        end)
-      else
-        handle_registration_validation_failure(
-          tickets_requiring_registration,
-          ticket_details_list,
-          tickets_for_me,
-          ticket_details_form,
-          current_user,
-          socket,
-          "Please fill in all required registration fields before confirming."
-        )
-      end
-    else
-      # No registration required, proceed with free ticket processing
-      process_free_tickets(socket)
-    end
-  end
-
   @impl true
   def handle_event("close-order-completion", _params, socket) do
     {:noreply,
@@ -6533,6 +6461,78 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   # Helper function to process free tickets
+  defp confirm_free_tickets_if_allowed(socket, ticket_order) do
+    cond do
+      is_nil(ticket_order) or ticket_order.status != :pending ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      not Money.zero?(ticket_order.total_amount) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order requires payment.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      true ->
+        confirm_free_tickets(socket, ticket_order)
+    end
+  end
+
+  defp confirm_free_tickets(socket, ticket_order) do
+    socket = assign(socket, :ticket_order, ticket_order)
+
+    # Save registration details if any tickets require registration
+    tickets_requiring_registration =
+      socket.assigns.tickets_requiring_registration || []
+
+    if Enum.any?(tickets_requiring_registration) do
+      tickets_for_me = socket.assigns.tickets_for_me || %{}
+      ticket_details_form = socket.assigns.ticket_details_form || %{}
+      current_user = socket.assigns.current_user
+
+      ticket_details_list =
+        build_ticket_details_list(
+          tickets_requiring_registration,
+          tickets_for_me,
+          ticket_details_form,
+          current_user
+        )
+
+      all_valid =
+        validate_ticket_details(
+          tickets_requiring_registration,
+          ticket_details_list,
+          tickets_for_me,
+          current_user
+        )
+
+      if all_valid do
+        save_ticket_details_and_process(ticket_details_list, socket, fn ->
+          process_free_tickets(socket)
+        end)
+      else
+        handle_registration_validation_failure(
+          tickets_requiring_registration,
+          ticket_details_list,
+          tickets_for_me,
+          ticket_details_form,
+          current_user,
+          socket,
+          "Please fill in all required registration fields before confirming."
+        )
+      end
+    else
+      # No registration required, proceed with free ticket processing
+      process_free_tickets(socket)
+    end
+  end
+
   defp process_free_tickets(socket) do
     # Process the free ticket order directly without payment
     case Ysc.Tickets.process_free_ticket_order(socket.assigns.ticket_order) do
