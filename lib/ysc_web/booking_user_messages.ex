@@ -92,5 +92,13 @@ defmodule YscWeb.BookingUserMessages do
     "Review the booking details and confirm your reservation"
   end
 
+  def checkout_confirmation_email_step do
+    "You'll get a confirmation email right away with your booking details"
+  end
+
+  def checkout_cabin_access_step do
+    "You'll receive cabin access details (door code or key instructions) by email before check-in"
+  end
+
   defp trim(string), do: String.trim(string)
 end

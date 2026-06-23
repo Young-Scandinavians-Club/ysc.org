@@ -576,7 +576,9 @@ defmodule Ysc.Accounts.User do
   def password_changeset(user, attrs, opts \\ []) do
     user
     |> cast(attrs, [:password])
-    |> validate_confirmation(:password, message: "does not match password")
+    |> validate_confirmation(:password,
+      message: "Passwords don't match. Please enter the same password in both fields."
+    )
     |> validate_password(opts)
   end
 

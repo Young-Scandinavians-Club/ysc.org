@@ -1388,7 +1388,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     base =
       if skip_payment,
         do: base,
-        else: base ++ [{"Membership", @step_payment}]
+        else: base ++ [{"Renewal Payment", @step_payment}]
 
     if needs_family_members_step,
       do: base ++ [{"Family", @step_family}],
