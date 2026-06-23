@@ -334,7 +334,8 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     send(
       view.pid,
-      {:updated_event, updated_event(booking.checkin_date, Date.add(checkout, 1))}
+      {:updated_event,
+       updated_event(booking.checkin_date, Date.add(checkout, 1))}
     )
 
     render(view)
