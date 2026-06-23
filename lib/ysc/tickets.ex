@@ -979,18 +979,24 @@ defmodule Ysc.Tickets do
   @doc """
   Processes a free ticket order (no payment required).
   """
-  def process_free_ticket_order(ticket_order) do
-    with {:ok, completed_order} <- complete_ticket_order(ticket_order, nil),
-         :ok <- confirm_tickets(completed_order) do
-      # Reload the completed order with all necessary associations for email
-      reloaded_order = get_ticket_order(completed_order.id)
-      # Send confirmation email
-      send_ticket_confirmation_email(reloaded_order)
-      # Broadcast ticket availability update
-      broadcast_ticket_availability_update(ticket_order.event_id)
-      {:ok, reloaded_order}
+  def process_free_ticket_order(%TicketOrder{status: :pending} = ticket_order) do
+    if Money.zero?(ticket_order.total_amount) do
+      with {:ok, completed_order} <- complete_ticket_order(ticket_order, nil),
+           :ok <- confirm_tickets(completed_order) do
+        # Reload the completed order with all necessary associations for email
+        reloaded_order = get_ticket_order(completed_order.id)
+        # Send confirmation email
+        send_ticket_confirmation_email(reloaded_order)
+        # Broadcast ticket availability update
+        broadcast_ticket_availability_update(ticket_order.event_id)
+        {:ok, reloaded_order}
+      end
+    else
+      {:error, :payment_required}
     end
   end
+
+  def process_free_ticket_order(_ticket_order), do: {:error, :payment_required}
 
   ## Timeout Management
 

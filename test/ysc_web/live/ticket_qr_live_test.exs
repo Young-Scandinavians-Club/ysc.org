@@ -251,6 +251,24 @@ defmodule YscWeb.TicketQrLiveTest do
       assert has_element?(view, "#back-link[href='/users/tickets']")
       refute has_element?(view, "#back-link[href='https://evil.example.com']")
     end
+
+    test "rejects encoded protocol-relative return_to URLs", %{
+      conn: conn,
+      member: member,
+      order: order
+    } do
+      conn = log_in_user(conn, member)
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/tickets/#{order.id}/qr" <> "?return_to=/%2f%2fevil.example.com"
+        )
+
+      assert has_element?(view, "#back-link[href='/users/tickets']")
+      refute has_element?(view, "#back-link[href*='evil.example.com']")
+    end
+
   end
 
   describe "filters out donation tickets" do

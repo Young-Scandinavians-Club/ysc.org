@@ -18,6 +18,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 18 (HIGH)     Signup application mass assignment allowed forged review_outcome
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
   Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
+  Finding 21 (HIGH)     Paid ticket checkout bypassed via checkout=free URL / confirm-free-tickets
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -28,9 +29,12 @@ defmodule YscWeb.SecurityAuditTest do
   import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.TestDataFactory
+  import Ysc.TicketsFixtures
   import Mox
 
   alias Ysc.Accounts
+  alias Ysc.Tickets
   alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
@@ -1323,6 +1327,41 @@ defmodule YscWeb.SecurityAuditTest do
   # ---------------------------------------------------------------------------
   # Finding 20 (CRITICAL): Booking checkout accepts foreign PaymentIntents
   # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # Finding 21 (HIGH): Paid ticket orders cannot be completed without payment
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 21: paid ticket free-checkout bypass" do
+    test "process_free_ticket_order rejects pending orders with a non-zero total" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      order = ticket_order_fixture(%{user: user, event: event, status: :pending})
+
+      refute Money.zero?(order.total_amount)
+
+      assert {:error, :payment_required} =
+               Tickets.process_free_ticket_order(order)
+    end
+
+    test "checkout=free URL cannot confirm a pending paid ticket order", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      order = ticket_order_fixture(%{user: user, event: event, status: :pending})
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+        )
+
+      render_click(view, "confirm-free-tickets")
+
+      order = Tickets.get_ticket_order(order.id)
+      assert order.status == :pending
+    end
+  end
 
   describe "Finding 20: booking payment intent validation" do
     import Ysc.BookingsFixtures

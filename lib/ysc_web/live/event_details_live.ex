@@ -3973,7 +3973,11 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             # Restore the ticket order and payment intent based on checkout step
-            restore_payment_state_from_url(socket, ticket_order, checkout_step)
+            restore_payment_state_from_url(
+              socket,
+              ticket_order,
+              effective_checkout_step(checkout_step, ticket_order)
+            )
           end
         else
           Ysc.Logging.debug(
@@ -4074,7 +4078,11 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             # Determine checkout step and restore
-            restore_payment_state_from_url(socket, ticket_order, checkout_step)
+            restore_payment_state_from_url(
+              socket,
+              ticket_order,
+              effective_checkout_step(checkout_step, ticket_order)
+            )
           end
         else
           Ysc.Logging.debug(
@@ -4103,7 +4111,12 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Restore payment state from URL (payment intent or free ticket confirmation)
+  defp effective_checkout_step("free", ticket_order) do
+    if Money.zero?(ticket_order.total_amount), do: "free", else: "payment"
+  end
+
+  defp effective_checkout_step(checkout_step, _ticket_order), do: checkout_step
+
   defp restore_payment_state_from_url(socket, ticket_order, checkout_step) do
     require Ysc.Logging
 
@@ -5090,6 +5103,54 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("confirm-free-tickets", _params, socket) do
+    ticket_order = socket.assigns.ticket_order
+
+    cond do
+      is_nil(ticket_order) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      true ->
+        ticket_order =
+          Ysc.Tickets.get_user_ticket_order(
+            socket.assigns.current_user.id,
+            ticket_order.id
+          )
+
+        confirm_free_tickets_if_allowed(socket, ticket_order)
+    end
+  end
+
+  defp confirm_free_tickets_if_allowed(socket, ticket_order) do
+    cond do
+      is_nil(ticket_order) or ticket_order.status != :pending ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      not Money.zero?(ticket_order.total_amount) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order requires payment.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      true ->
+        confirm_free_tickets(socket, ticket_order)
+    end
+  end
+
+  defp confirm_free_tickets(socket, ticket_order) do
+    socket = assign(socket, :ticket_order, ticket_order)
+
     # Save registration details if any tickets require registration
     tickets_requiring_registration =
       socket.assigns.tickets_requiring_registration || []
