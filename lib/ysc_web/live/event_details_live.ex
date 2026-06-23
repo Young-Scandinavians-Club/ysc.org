@@ -3689,11 +3689,15 @@ defmodule YscWeb.EventDetailsLive do
     do: {nil, nil, nil, %{}, MapSet.new()}
 
   defp load_attendees(true, current_user, event_id) do
-    sold_ticket_count = Events.count_tickets_sold_excluding_donations(event_id)
+    %{
+      sold_count: sold_ticket_count,
+      ticket_counts: ticket_counts,
+      ticket_buyers: ticket_buyers
+    } =
+      Events.attendee_ticket_data_for_event(event_id)
+
     hosts = Events.list_event_hosts_by_event_id(event_id)
     host_ids = MapSet.new(hosts, & &1.id)
-
-    ticket_buyers = Events.list_unique_attendees_for_event(event_id)
 
     # Ticket buyers who are not hosts (hosts are already shown at the front)
     non_host_buyers =
@@ -3725,8 +3729,6 @@ defmodule YscWeb.EventDetailsLive do
     if merged == [] && sold_ticket_count == 0 do
       {nil, nil, nil, %{}, MapSet.new()}
     else
-      ticket_counts = Events.get_ticket_counts_per_user(event_id)
-
       {sold_ticket_count, displayed_attendees_count, merged, ticket_counts,
        host_ids}
     end
