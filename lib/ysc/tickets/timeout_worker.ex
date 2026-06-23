@@ -80,8 +80,7 @@ defmodule Ysc.Tickets.TimeoutWorker do
 
           ticket_order ->
             # Double-check status after acquiring lock
-            if ticket_order.status == :pending &&
-                 ticket_order_expired?(ticket_order) do
+            if ticket_order.status == :pending do
               # Preload tickets before expiring
               ticket_order_with_tickets =
                 Ysc.Repo.preload(ticket_order, :tickets)
@@ -109,10 +108,9 @@ defmodule Ysc.Tickets.TimeoutWorker do
               end
             else
               Ysc.Logging.info(
-                "Ticket order already processed or not yet due, skipping expiration",
+                "Ticket order already processed, skipping expiration",
                 ticket_order_id: ticket_order.id,
-                status: ticket_order.status,
-                expires_at: ticket_order.expires_at
+                status: ticket_order.status
               )
 
               :already_processed
@@ -269,12 +267,6 @@ defmodule Ysc.Tickets.TimeoutWorker do
     # Job timeout after 30 seconds
     30_000
   end
-
-  defp ticket_order_expired?(%{expires_at: expires_at}) when not is_nil(expires_at) do
-    DateTime.compare(DateTime.utc_now(), expires_at) == :gt
-  end
-
-  defp ticket_order_expired?(_), do: false
 
   @doc false
   def ci_query_explain_query do
