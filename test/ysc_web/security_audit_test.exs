@@ -1349,23 +1349,26 @@ defmodule YscWeb.SecurityAuditTest do
     test "checkout=free URL cannot confirm a pending paid ticket order", %{
       conn: conn
     } do
-      user = user_with_membership(:lifetime)
-      conn = log_in_user(conn, user)
-      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        user = user_with_membership(:lifetime)
+        conn = log_in_user(conn, user)
+        event = event_with_tickets(tier_count: 1, state: :upcoming)
 
-      order =
-        ticket_order_fixture(%{user: user, event: event, status: :pending})
+        order =
+          ticket_order_fixture(%{user: user, event: event, status: :pending})
+          |> stabilize_pending_ticket_order!()
 
-      {:ok, view, _html} =
-        live(
-          conn,
-          ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
-        )
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
 
-      render_click(view, "confirm-free-tickets")
+        render_click(view, "confirm-free-tickets")
 
-      order = Tickets.get_ticket_order(order.id)
-      assert order.status == :pending
+        order = Tickets.get_ticket_order(order.id)
+        assert order.status == :pending
+      end)
     end
   end
 
@@ -1407,5 +1410,24 @@ defmodule YscWeb.SecurityAuditTest do
       _key, _base_val, override_val ->
         override_val
     end)
+  end
+
+  defp stabilize_pending_ticket_order!(order) do
+    from(j in Oban.Job,
+      where: j.worker == "Ysc.Tickets.TimeoutWorker",
+      where: fragment("?->>'ticket_order_id' = ?", j.args, ^order.id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Repo.delete_all()
+
+    order
+    |> Ecto.Changeset.change(
+      status: :pending,
+      expires_at:
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+    )
+    |> Repo.update!()
   end
 end
