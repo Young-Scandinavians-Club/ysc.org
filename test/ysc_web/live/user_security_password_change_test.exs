@@ -117,7 +117,7 @@ defmodule YscWeb.UserSecurityPasswordChangeTest do
         )
         |> render_change()
 
-      assert result =~ "Passwords don't match"
+      assert result =~ "Please enter the same password in both fields"
     end
 
     test "shows re-auth modal when valid password submitted", %{conn: conn} do

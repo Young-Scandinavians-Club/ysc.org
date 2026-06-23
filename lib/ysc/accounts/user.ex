@@ -577,7 +577,8 @@ defmodule Ysc.Accounts.User do
     user
     |> cast(attrs, [:password])
     |> validate_confirmation(:password,
-      message: "Passwords don't match. Please enter the same password in both fields."
+      message:
+        "Passwords don't match. Please enter the same password in both fields."
     )
     |> validate_password(opts)
   end
