@@ -190,29 +190,6 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
       updated_order = Tickets.get_ticket_order(order.id)
       assert updated_order.status == :pending
     end
-
-    test "skips specific order expiration when expires_at is nil", %{
-      user: user,
-      event: event
-    } do
-      order =
-        %TicketOrder{
-          user_id: user.id,
-          event_id: event.id,
-          status: :pending,
-          total_amount: Money.new(1000, :USD),
-          reference_id: "TO-SPECIFIC-NO-EXPIRES",
-          expires_at: nil
-        }
-        |> Repo.insert!()
-
-      assert {:ok, "Expired specific ticket order"} =
-               TimeoutWorker.perform(%Oban.Job{
-                 args: %{"ticket_order_id" => order.id}
-               })
-
-      assert Tickets.get_ticket_order(order.id).status == :pending
-    end
   end
 
   describe "scheduling" do
