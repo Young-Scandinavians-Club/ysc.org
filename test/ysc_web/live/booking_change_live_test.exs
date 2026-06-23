@@ -301,13 +301,22 @@ defmodule YscWeb.BookingChangeLiveTest do
     other_user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
 
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(100, :USD),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe,
+        season_id: nil
+      })
+
     room = create_test_room!()
     checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)
     booking = complete_room_booking!(user, room, checkin, checkout)
 
     overlapping_checkin = checkout
-    overlapping_checkout = Date.add(checkout, 3)
+    overlapping_checkout = Date.add(checkout, 4)
 
     assert {:ok, _} =
              BookingLocker.create_buyout_booking(
@@ -321,11 +330,11 @@ defmodule YscWeb.BookingChangeLiveTest do
     {view, _html} = live_change(conn, booking)
 
     checkin_str = date_to_datetime_string(booking.checkin_date)
-    extended_checkout_str = date_to_datetime_string(overlapping_checkout)
+    extended_checkout_str = date_to_datetime_string(Date.add(checkout, 1))
 
     send(
       view.pid,
-      {:updated_event, updated_event(booking.checkin_date, overlapping_checkout)}
+      {:updated_event, updated_event(booking.checkin_date, Date.add(checkout, 1))}
     )
 
     render(view)

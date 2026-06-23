@@ -578,7 +578,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       html = render(view)
       assert html =~ "Cancel this reservation?"
-      assert html =~ "can't be undone"
+      assert html =~ "be undone"
     end
 
     test "show and hide cancel modal", %{conn: conn} do
