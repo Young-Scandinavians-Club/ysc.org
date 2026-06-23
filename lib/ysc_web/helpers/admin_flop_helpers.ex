@@ -10,6 +10,8 @@ defmodule YscWeb.AdminFlopHelpers do
   re-appended by `<.admin_flop_pagination>`.
   """
   @spec non_flop_params(map() | any()) :: map()
-  def non_flop_params(params) when is_map(params), do: Map.drop(params, @flop_keys)
+  def non_flop_params(params) when is_map(params),
+    do: Map.drop(params, @flop_keys)
+
   def non_flop_params(_), do: %{}
 end

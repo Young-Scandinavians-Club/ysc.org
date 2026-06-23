@@ -347,7 +347,10 @@ defmodule YscWeb.AdminNewslettersLive do
           </div>
 
           <%!-- Editions content --%>
-          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading editions…" />
+          <.admin_flop_loading_state
+            :if={is_nil(@meta)}
+            message="Loading editions…"
+          />
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>

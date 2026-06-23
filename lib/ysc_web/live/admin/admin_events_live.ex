@@ -126,7 +126,10 @@ defmodule YscWeb.AdminEventsLive do
             </.admin_filter_dropdown>
           </div>
 
-          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading events…" />
+          <.admin_flop_loading_state
+            :if={is_nil(@meta)}
+            message="Loading events…"
+          />
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>
