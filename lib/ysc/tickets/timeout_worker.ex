@@ -270,7 +270,8 @@ defmodule Ysc.Tickets.TimeoutWorker do
     30_000
   end
 
-  defp ticket_order_expired?(%{expires_at: expires_at}) when not is_nil(expires_at) do
+  defp ticket_order_expired?(%{expires_at: expires_at})
+       when not is_nil(expires_at) do
     DateTime.compare(DateTime.utc_now(), expires_at) == :gt
   end
 
