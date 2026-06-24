@@ -1023,7 +1023,10 @@ defmodule YscWeb.EventDetailsLive do
                         <%= if !@event.tickets_tbd do %>
                           <div class="w-full text-center py-2">
                             <p class="font-bold text-green-700 text-sm">
-                              No YSC ticket purchase needed
+                              No tickets to buy on this website
+                            </p>
+                            <p class="text-xs text-green-600 mt-1">
+                              Check the event details above for how to attend.
                             </p>
                           </div>
                         <% end %>
@@ -1199,7 +1202,7 @@ defmodule YscWeb.EventDetailsLive do
                         <% else %>
                           <%= if !@event.tickets_tbd do %>
                             <span class="text-xs font-black text-green-700 uppercase tracking-widest">
-                              No YSC ticket purchase needed
+                              No tickets to buy on this website
                             </span>
                           <% else %>
                             <%= if @current_user == nil do %>
@@ -1341,7 +1344,7 @@ defmodule YscWeb.EventDetailsLive do
                             You have {reserved_quantity} {if reserved_quantity ==
                                                                1,
                                                              do: "ticket",
-                                                             else: "tickets"} saved at the member price. You still need to complete payment to buy them.
+                                                             else: "tickets"} reserved at the member price. Complete payment before the timer runs out to confirm your tickets.
                             <%= if has_discount do %>
                               <.badge
                                 type="green"

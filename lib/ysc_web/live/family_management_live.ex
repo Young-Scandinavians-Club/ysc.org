@@ -1059,7 +1059,7 @@ defmodule YscWeb.FamilyManagementLive do
     message =
       case reason do
         :user_not_active ->
-          "Your account must be active to send invites."
+          "Your account must be approved by the board before you can send family invitations. We'll email you when your application is approved."
 
         :invalid_membership_type ->
           "You must have a family or lifetime membership to send invites."

@@ -1033,10 +1033,10 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert html =~ "What Happens Next?"
 
       assert html =~
-               "Enter the name of every guest who will stay in your room(s)"
+               "Enter the names of everyone else staying with you (you're already counted as a guest)"
 
       assert html =~
-               "Continue to payment — your hold on these dates expires soon, so please finish checkout"
+               "Continue to payment — we've temporarily reserved these dates for you, but they will be released if you don't finish checkout soon"
     end
 
     test "validate-guest-info with invalid guest data collects errors", %{
