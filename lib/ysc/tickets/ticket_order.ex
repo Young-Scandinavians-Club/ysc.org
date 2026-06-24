@@ -79,6 +79,7 @@ defmodule Ysc.Tickets.TicketOrder do
       :expires_at
     ])
     |> validate_money(:total_amount)
+    |> put_change(:status, :pending)
     |> put_reference_id()
     |> unique_constraint(:reference_id)
     |> foreign_key_constraint(:user_id)

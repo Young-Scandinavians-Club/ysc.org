@@ -11,10 +11,13 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
   import Ysc.EventsFixtures
+  import Ysc.TicketsFixtures
   import EventDetailsLiveHelpers
   import Mox
+  import Ecto.Query
 
   alias Ysc.Repo
+  alias Ysc.Tickets
 
   setup :verify_on_exit!
 
@@ -30,6 +33,14 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end)
 
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+    stub(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+      {:ok, build_payment_intent(%{amount: params.amount})}
+    end)
+
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      {:ok, build_payment_intent(%{id: id})}
+    end)
 
     user = user_with_membership(:lifetime)
     conn = log_in_user(conn, user)
@@ -477,6 +488,99 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end
   end
 
+  describe "paid ticket free-checkout bypass (Finding 21)" do
+    test "checkout=free URL on paid order restores payment checkout", %{
+      conn: conn,
+      user: user
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+        order =
+          ticket_order_fixture(%{user: user, event: event, status: :pending})
+          |> stabilize_pending_ticket_order!()
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+
+        assert has_element?(view, "#payment-modal")
+        refute has_element?(view, "#free-ticket-confirmation-modal")
+      end)
+    end
+
+    test "confirm-free-tickets cannot complete a pending paid order", %{
+      conn: conn,
+      user: user
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+        order =
+          ticket_order_fixture(%{user: user, event: event, status: :pending})
+          |> stabilize_pending_ticket_order!()
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+        render_click(view, "confirm-free-tickets")
+
+        assert Tickets.get_ticket_order(order.id).status == :pending
+      end)
+    end
+
+    test "confirm-free-tickets without an active order is rejected", %{
+      conn: conn,
+      user: user
+    } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      view = wait_for_async(view)
+
+      render_click(view, "confirm-free-tickets")
+
+      html = render(view)
+      assert html =~ "This order is no longer available."
+    end
+
+    test "confirm-free-tickets rejects completed orders restored from URL", %{
+      conn: conn,
+      user: user
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+
+        order =
+          ticket_order_fixture(%{user: user, event: event, status: :completed})
+          |> stabilize_pending_ticket_order!()
+          |> Ecto.Changeset.change(status: :completed)
+          |> Repo.update!()
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=free&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+        render_click(view, "confirm-free-tickets")
+
+        html = render(view)
+        assert html =~ "This order is no longer available."
+        assert Tickets.get_ticket_order(order.id).status == :completed
+      end)
+    end
+  end
+
   describe "payment modal interactions" do
     test "close-payment-modal event works", %{conn: conn, user: user} do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
@@ -522,5 +626,24 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       [el | _] -> Floki.attribute(el, "disabled") != []
       [] -> false
     end
+  end
+
+  defp stabilize_pending_ticket_order!(order) do
+    from(j in Oban.Job,
+      where: j.worker == "Ysc.Tickets.TimeoutWorker",
+      where: fragment("?->>'ticket_order_id' = ?", j.args, ^order.id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Repo.delete_all()
+
+    order
+    |> Ecto.Changeset.change(
+      status: :pending,
+      expires_at:
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+    )
+    |> Repo.update!()
   end
 end

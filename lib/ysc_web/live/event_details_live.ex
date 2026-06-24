@@ -3975,7 +3975,11 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             # Restore the ticket order and payment intent based on checkout step
-            restore_payment_state_from_url(socket, ticket_order, checkout_step)
+            restore_payment_state_from_url(
+              socket,
+              ticket_order,
+              effective_checkout_step(checkout_step, ticket_order)
+            )
           end
         else
           Ysc.Logging.debug(
@@ -4076,7 +4080,11 @@ defmodule YscWeb.EventDetailsLive do
             )
 
             # Determine checkout step and restore
-            restore_payment_state_from_url(socket, ticket_order, checkout_step)
+            restore_payment_state_from_url(
+              socket,
+              ticket_order,
+              effective_checkout_step(checkout_step, ticket_order)
+            )
           end
         else
           Ysc.Logging.debug(
@@ -4105,7 +4113,12 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  # Restore payment state from URL (payment intent or free ticket confirmation)
+  defp effective_checkout_step("free", ticket_order) do
+    if Money.zero?(ticket_order.total_amount), do: "free", else: "payment"
+  end
+
+  defp effective_checkout_step(checkout_step, _ticket_order), do: checkout_step
+
   defp restore_payment_state_from_url(socket, ticket_order, checkout_step) do
     require Ysc.Logging
 
@@ -5092,49 +5105,25 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("confirm-free-tickets", _params, socket) do
-    # Save registration details if any tickets require registration
-    tickets_requiring_registration =
-      socket.assigns.tickets_requiring_registration || []
+    ticket_order = socket.assigns.ticket_order
 
-    if Enum.any?(tickets_requiring_registration) do
-      tickets_for_me = socket.assigns.tickets_for_me || %{}
-      ticket_details_form = socket.assigns.ticket_details_form || %{}
-      current_user = socket.assigns.current_user
+    cond do
+      is_nil(ticket_order) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
 
-      ticket_details_list =
-        build_ticket_details_list(
-          tickets_requiring_registration,
-          tickets_for_me,
-          ticket_details_form,
-          current_user
-        )
+      true ->
+        ticket_order =
+          Ysc.Tickets.get_user_ticket_order(
+            socket.assigns.current_user.id,
+            ticket_order.id
+          )
 
-      all_valid =
-        validate_ticket_details(
-          tickets_requiring_registration,
-          ticket_details_list,
-          tickets_for_me,
-          current_user
-        )
-
-      if all_valid do
-        save_ticket_details_and_process(ticket_details_list, socket, fn ->
-          process_free_tickets(socket)
-        end)
-      else
-        handle_registration_validation_failure(
-          tickets_requiring_registration,
-          ticket_details_list,
-          tickets_for_me,
-          ticket_details_form,
-          current_user,
-          socket,
-          "Please fill in all required registration fields before confirming."
-        )
-      end
-    else
-      # No registration required, proceed with free ticket processing
-      process_free_tickets(socket)
+        confirm_free_tickets_if_allowed(socket, ticket_order)
     end
   end
 
@@ -6474,41 +6463,159 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   # Helper function to process free tickets
-  defp process_free_tickets(socket) do
-    # Process the free ticket order directly without payment
-    case Ysc.Tickets.process_free_ticket_order(socket.assigns.ticket_order) do
-      {:ok, updated_order} ->
-        # Update user tickets for this event
-        updated_user_tickets =
-          Ysc.Tickets.list_user_tickets_for_event(
-            socket.assigns.current_user.id,
-            socket.assigns.event.id
-          )
+  defp confirm_free_tickets_if_allowed(socket, ticket_order) do
+    now = DateTime.utc_now()
 
+    cond do
+      is_nil(ticket_order) or ticket_order.status != :pending ->
         {:noreply,
          socket
-         |> assign(:show_free_ticket_confirmation, false)
-         |> assign(:show_order_completion, true)
-         |> assign(:ticket_order, updated_order)
-         |> assign(:user_tickets, updated_user_tickets)
-         |> assign(:selected_tickets, %{})
-         |> assign(:tickets_requiring_registration, [])
-         |> assign(:ticket_details_form, %{})
-         |> redirect(
-           to: ~p"/orders/#{updated_order.id}/confirmation?confetti=true"
-         )}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Failed to confirm free tickets: #{reason}",
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
+
+      ticket_order.event_id != socket.assigns.event.id ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      DateTime.compare(now, ticket_order.expires_at) == :gt ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This reservation has expired.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      not Money.zero?(ticket_order.total_amount) ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order requires payment.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      true ->
+        confirm_free_tickets(socket, ticket_order)
     end
   end
+
+  defp confirm_free_tickets(socket, ticket_order) do
+    socket = assign(socket, :ticket_order, ticket_order)
+
+    # Save registration details if any tickets require registration
+    tickets_requiring_registration =
+      socket.assigns.tickets_requiring_registration || []
+
+    if Enum.any?(tickets_requiring_registration) do
+      tickets_for_me = socket.assigns.tickets_for_me || %{}
+      ticket_details_form = socket.assigns.ticket_details_form || %{}
+      current_user = socket.assigns.current_user
+
+      ticket_details_list =
+        build_ticket_details_list(
+          tickets_requiring_registration,
+          tickets_for_me,
+          ticket_details_form,
+          current_user
+        )
+
+      all_valid =
+        validate_ticket_details(
+          tickets_requiring_registration,
+          ticket_details_list,
+          tickets_for_me,
+          current_user
+        )
+
+      if all_valid do
+        save_ticket_details_and_process(ticket_details_list, socket, fn ->
+          process_free_tickets(socket)
+        end)
+      else
+        handle_registration_validation_failure(
+          tickets_requiring_registration,
+          ticket_details_list,
+          tickets_for_me,
+          ticket_details_form,
+          current_user,
+          socket,
+          "Please fill in all required registration fields before confirming."
+        )
+      end
+    else
+      # No registration required, proceed with free ticket processing
+      process_free_tickets(socket)
+    end
+  end
+
+  defp process_free_tickets(socket) do
+    ticket_order =
+      Ysc.Tickets.get_user_ticket_order(
+        socket.assigns.current_user.id,
+        socket.assigns.ticket_order.id
+      )
+
+    case ticket_order do
+      nil ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      order ->
+        case Ysc.Tickets.process_free_ticket_order(order) do
+          {:ok, updated_order} ->
+            # Update user tickets for this event
+            updated_user_tickets =
+              Ysc.Tickets.list_user_tickets_for_event(
+                socket.assigns.current_user.id,
+                socket.assigns.event.id
+              )
+
+            {:noreply,
+             socket
+             |> assign(:show_free_ticket_confirmation, false)
+             |> assign(:show_order_completion, true)
+             |> assign(:ticket_order, updated_order)
+             |> assign(:user_tickets, updated_user_tickets)
+             |> assign(:selected_tickets, %{})
+             |> assign(:tickets_requiring_registration, [])
+             |> assign(:ticket_details_form, %{})
+             |> redirect(
+               to: ~p"/orders/#{updated_order.id}/confirmation?confetti=true"
+             )}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               free_ticket_confirm_error_message(reason),
+               title: "Tickets"
+             )
+             |> assign(:show_free_ticket_confirmation, false)}
+        end
+    end
+  end
+
+  defp free_ticket_confirm_error_message(:payment_required),
+    do: "This order requires payment."
+
+  defp free_ticket_confirm_error_message(:order_expired),
+    do: "This reservation has expired."
+
+  defp free_ticket_confirm_error_message(:order_not_pending),
+    do: "This order is no longer available."
+
+  defp free_ticket_confirm_error_message(_),
+    do: "Unable to confirm free tickets. Please try again."
 
   # Helper function to get form value from either atom or string key
   defp get_form_value(form_data, field) when is_atom(field) do
@@ -7374,6 +7481,8 @@ defmodule YscWeb.EventDetailsLive do
              customer_id: socket.assigns.current_user.stripe_id
            ) do
         {:ok, payment_intent} ->
+          ticket_order = %{ticket_order | payment_intent_id: payment_intent.id}
+
           # Show payment form with Stripe Elements
           # Update URL to reflect checkout state
           {:noreply,

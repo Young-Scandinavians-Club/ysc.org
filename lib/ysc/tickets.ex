@@ -833,14 +833,15 @@ defmodule Ysc.Tickets do
     end
   end
 
-  defp complete_ticket_order_if_pending(ticket_order, payment_id) do
+  defp complete_ticket_order_if_pending(ticket_order, payment_id, opts \\ []) do
+    from_statuses = Keyword.get(opts, :from_statuses, [:pending, :expired])
     now = DateTime.utc_now()
 
     # Allow :expired so a succeeded Stripe payment can still fulfill tickets when
     # TimeoutWorker wins the race against payment_intent.succeeded / redirect return.
     {count, _} =
       from(to in TicketOrder,
-        where: to.id == ^ticket_order.id and to.status in [:pending, :expired]
+        where: to.id == ^ticket_order.id and to.status in ^from_statuses
       )
       |> Repo.update_all(
         set: [
@@ -891,6 +892,13 @@ defmodule Ysc.Tickets do
     |> where([t], t.id == ^id and t.status == :completed)
     |> Repo.exists?()
   end
+
+  defp ticket_order_expired?(%{expires_at: expires_at})
+       when not is_nil(expires_at) do
+    DateTime.compare(DateTime.utc_now(), expires_at) == :gt
+  end
+
+  defp ticket_order_expired?(_), do: false
 
   defp ticket_order_fully_finalized?(%TicketOrder{} = ticket_order) do
     ticket_order.status == :completed and not is_nil(ticket_order.payment_id) and
@@ -979,18 +987,39 @@ defmodule Ysc.Tickets do
   @doc """
   Processes a free ticket order (no payment required).
   """
-  def process_free_ticket_order(ticket_order) do
-    with {:ok, completed_order} <- complete_ticket_order(ticket_order, nil),
-         :ok <- confirm_tickets(completed_order) do
-      # Reload the completed order with all necessary associations for email
-      reloaded_order = get_ticket_order(completed_order.id)
-      # Send confirmation email
-      send_ticket_confirmation_email(reloaded_order)
-      # Broadcast ticket availability update
-      broadcast_ticket_availability_update(ticket_order.event_id)
-      {:ok, reloaded_order}
+  def process_free_ticket_order(%TicketOrder{} = ticket_order) do
+    cond do
+      ticket_order.status != :pending ->
+        {:error, :order_not_pending}
+
+      ticket_order_expired?(ticket_order) ->
+        {:error, :order_expired}
+
+      not Money.zero?(ticket_order.total_amount) ->
+        {:error, :payment_required}
+
+      true ->
+        case complete_ticket_order_if_pending(ticket_order, nil,
+               from_statuses: [:pending]
+             ) do
+          {:ok, completed_order, :newly_completed} ->
+            with :ok <- confirm_tickets(completed_order) do
+              reloaded_order = get_ticket_order(completed_order.id)
+              send_ticket_confirmation_email(reloaded_order)
+              broadcast_ticket_availability_update(ticket_order.event_id)
+              {:ok, reloaded_order}
+            end
+
+          {:ok, completed_order, :already_completed} ->
+            {:ok, completed_order}
+
+          {:error, _} = error ->
+            error
+        end
     end
   end
+
+  def process_free_ticket_order(_ticket_order), do: {:error, :order_not_pending}
 
   ## Timeout Management
 

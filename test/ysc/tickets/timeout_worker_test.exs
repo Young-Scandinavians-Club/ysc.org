@@ -150,7 +150,7 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
           reference_id: "TO-SPECIFIC",
           expires_at:
             DateTime.utc_now()
-            |> DateTime.add(3600, :second)
+            |> DateTime.add(-60, :second)
             |> DateTime.truncate(:second)
         }
         |> Repo.insert!()
@@ -162,6 +162,33 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
 
       updated_order = Tickets.get_ticket_order(order.id)
       assert updated_order.status == :expired
+    end
+
+    test "skips specific order expiration before expires_at", %{
+      user: user,
+      event: event
+    } do
+      order =
+        %TicketOrder{
+          user_id: user.id,
+          event_id: event.id,
+          status: :pending,
+          total_amount: Money.new(1000, :USD),
+          reference_id: "TO-SPECIFIC-SOON",
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(3600, :second)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert {:ok, "Expired specific ticket order"} =
+               TimeoutWorker.perform(%Oban.Job{
+                 args: %{"ticket_order_id" => order.id}
+               })
+
+      updated_order = Tickets.get_ticket_order(order.id)
+      assert updated_order.status == :pending
     end
   end
 
@@ -215,6 +242,50 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
       assert :ok = TimeoutWorker.expire_specific_order(order.id)
 
       assert Tickets.get_ticket_order(order.id).status == :completed
+    end
+
+    test "returns ok without expiring when order is pending but not yet due", %{
+      user: user,
+      event: event
+    } do
+      order =
+        %TicketOrder{
+          user_id: user.id,
+          event_id: event.id,
+          status: :pending,
+          total_amount: Money.new(0, :USD),
+          reference_id: "TO-NOT-YET-DUE",
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(3600, :second)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert :ok = TimeoutWorker.expire_specific_order(order.id)
+      assert Tickets.get_ticket_order(order.id).status == :pending
+    end
+
+    test "expires pending orders that are past expires_at", %{
+      user: user,
+      event: event
+    } do
+      order =
+        %TicketOrder{
+          user_id: user.id,
+          event_id: event.id,
+          status: :pending,
+          total_amount: Money.new(0, :USD),
+          reference_id: "TO-PAST-DUE",
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(-60, :second)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert :ok = TimeoutWorker.expire_specific_order(order.id)
+      assert Tickets.get_ticket_order(order.id).status == :expired
     end
 
     test "batch expiration does not revert completed orders", %{

@@ -27,6 +27,10 @@ defmodule YscWeb.EventDetailsLiveTest do
       {:ok, build_payment_intent(%{amount: params.amount})}
     end)
 
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+      {:ok, build_payment_intent(%{id: id})}
+    end)
+
     {:ok, conn: conn}
   end
 

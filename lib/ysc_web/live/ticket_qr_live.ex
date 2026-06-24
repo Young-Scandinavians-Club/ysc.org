@@ -7,6 +7,7 @@ defmodule YscWeb.TicketQrLive do
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet
   alias Ysc.GoogleWallet
+  alias YscWeb.UserAuth
 
   @impl true
   def render(assigns) do
@@ -554,11 +555,9 @@ defmodule YscWeb.TicketQrLive do
 
   defp safe_return_to(path)
        when is_binary(path) and byte_size(path) > 0 do
-    if String.starts_with?(path, "/") and
-         not String.starts_with?(path, "//") and
-         not String.contains?(path, "://"),
-       do: path,
-       else: ~p"/users/tickets"
+    if UserAuth.valid_internal_redirect?(path),
+      do: path,
+      else: ~p"/users/tickets"
   end
 
   defp safe_return_to(_), do: ~p"/users/tickets"
