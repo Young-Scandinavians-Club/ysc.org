@@ -42,15 +42,15 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_enter_guests do
-    "Enter the name of every guest who will stay in your room(s)"
+    "Enter the names of everyone else staying with you (you're already counted as a guest)"
   end
 
   def checkout_guest_info_step_continue_payment do
-    "Continue to payment — your hold on these dates expires soon, so please finish checkout"
+    "Continue to payment — we've temporarily reserved these dates for you, but they will be released if you don't finish checkout soon"
   end
 
   def checkout_guest_info_step_continue_complimentary do
-    "Continue to confirm your booking — your hold on these dates expires soon, so please finish checkout"
+    "Continue to confirm your booking — we've temporarily reserved these dates for you, but they will be released if you don't finish checkout soon"
   end
 
   def insufficient_capacity_error(opts \\ []) do
