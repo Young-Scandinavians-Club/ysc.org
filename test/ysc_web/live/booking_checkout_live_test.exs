@@ -697,6 +697,74 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert reloaded.status == :complete
     end
 
+    test "rejects complimentary confirmation when recalculated price is no longer zero",
+         %{
+           conn: conn,
+           user: user
+         } do
+      ensure_buyout_base_pricing!()
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      buyout_total = booking.total_price
+
+      {:ok, ent} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: buyout_total,
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> change(%{applied_booking_entitlement_id: ent.id})
+        |> Repo.update!()
+
+      {:ok, view, html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert html =~ "confirm-complimentary-booking"
+
+      buyout_rule =
+        Bookings.list_pricing_rules()
+        |> Enum.find(fn rule ->
+          rule.property == :tahoe and rule.booking_mode == :buyout and
+            rule.price_unit == :buyout_fixed
+        end)
+
+      assert buyout_rule
+
+      assert {:ok, _} =
+               Bookings.update_pricing_rule(buyout_rule, %{
+                 amount: Money.mult!(buyout_total, 2)
+               })
+
+      html =
+        view
+        |> element("#confirm-complimentary-booking")
+        |> render_click()
+
+      assert html =~ "requires payment"
+
+      reloaded = Repo.get!(Bookings.Booking, booking.id)
+      assert reloaded.status == :hold
+    end
+
     test "shows entitlement summary on checkout with partial fixed discount",
          %{conn: conn, user: user} do
       checkin = Date.utc_today() |> Date.add(7)
