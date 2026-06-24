@@ -2472,7 +2472,7 @@ defmodule YscWeb.AdminBookingsLive do
                   <% end %>
                 </:col>
                 <:col :let={{_, booking}} label="Checked In">
-                  <%= if Ecto.assoc_loaded?(booking.check_ins) && length(booking.check_ins) > 0 do %>
+                  <%= if booking.checked_in do %>
                     <div class="flex items-center gap-1.5">
                       <.icon
                         name="hero-check-circle"
@@ -6747,7 +6747,7 @@ defmodule YscWeb.AdminBookingsLive do
 
     # Add checkmark if checked in (to the right of the name)
     checked_in_indicator =
-      if Ecto.assoc_loaded?(booking.check_ins) && booking.check_ins != [] do
+      if booking.checked_in do
         "<svg class=\"w-3.5 h-3.5 text-green-600 flex-shrink-0 mt-0.5\" fill=\"currentColor\" viewBox=\"0 0 20 20\">
           <path fill-rule=\"evenodd\" d=\"M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z\" clip-rule=\"evenodd\" />
         </svg>"
@@ -6811,7 +6811,7 @@ defmodule YscWeb.AdminBookingsLive do
           end),
           Task.async(fn ->
             Bookings.list_bookings(property, start_date, end_date,
-              preload: [:rooms, {:user, :current_avatar}, :check_ins]
+              preload: [:rooms, {:user, :current_avatar}]
             )
           end)
         ],
