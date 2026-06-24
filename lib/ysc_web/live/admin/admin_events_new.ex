@@ -1005,20 +1005,15 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    if connected?(socket) do
-      {:ok, inserted_event} =
-        Events.create_event(%{
-          title: "New Event",
-          description: "",
-          state: :draft,
-          organizer_id: socket.assigns.current_user.id
-        })
+    {:ok, inserted_event} =
+      Events.create_event(%{
+        title: "New Event",
+        description: "",
+        state: :draft,
+        organizer_id: socket.assigns.current_user.id
+      })
 
-      {:ok,
-       push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
-    else
-      {:ok, socket}
-    end
+    {:ok, push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
   end
 
   @impl true
