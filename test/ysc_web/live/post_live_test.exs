@@ -112,7 +112,9 @@ defmodule YscWeb.PostLiveTest do
                ~s(content="Read this article on the Young Scandinavians Club news feed.")
     end
 
-    test "meta description uses raw_body when preview_text is nil", %{conn: conn} do
+    test "meta description uses raw_body when preview_text is nil", %{
+      conn: conn
+    } do
       marker = "Body meta#{System.unique_integer()}"
 
       post =
