@@ -33,6 +33,36 @@ defmodule YscWeb.FeedControllerTest do
       assert body =~ "Feed Post Title"
       assert body =~ "/posts/#{url_name}"
     end
+
+    test "entry summary is plain text without raw HTML from preview_text", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: :admin})
+      url_name = "feed-plain-#{System.unique_integer([:positive])}"
+      marker = "Atom summary#{System.unique_integer([:positive])}"
+
+      {:ok, _post} =
+        Posts.create_post(
+          %{
+            "title" => "Plain Text Feed Post",
+            "preview_text" => "Line one<br>Line two<strong>#{marker}</strong>",
+            "raw_body" => "<p>Body</p>",
+            "rendered_body" => "<p>Body</p>",
+            "url_name" => url_name,
+            "state" => "published",
+            "published_on" => DateTime.utc_now() |> DateTime.truncate(:second)
+          },
+          admin
+        )
+
+      body = get(conn, ~p"/feeds/posts.atom") |> response(200)
+
+      assert body =~ marker
+      assert body =~ "Line one"
+      assert body =~ "Line two"
+      refute body =~ "<strong>"
+      refute body =~ "<br>"
+    end
   end
 
   describe "GET /feeds/events.atom" do
