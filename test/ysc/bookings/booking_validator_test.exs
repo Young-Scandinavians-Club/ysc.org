@@ -532,6 +532,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       refute changeset.valid?
       assert Keyword.has_key?(changeset.errors, :user_id)
+
+      {message, _} = Keyword.fetch!(changeset.errors, :user_id)
+      assert message =~ "one active booking at a time"
     end
 
     test "Family member: allows up to 2 overlapping bookings", %{
@@ -637,6 +640,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       changeset = Booking.changeset(%Booking{}, attrs3, user: user)
 
       refute changeset.valid?
+
+      {message, _} = Keyword.fetch!(changeset.errors, :checkin_date)
+      assert message =~ "2 cabin bookings at the same time"
     end
 
     test "allows new booking after previous one is cancelled", %{

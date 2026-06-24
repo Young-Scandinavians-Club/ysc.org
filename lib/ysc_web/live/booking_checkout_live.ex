@@ -655,7 +655,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     3
                   </span>
                   <span>
-                    Receive instant confirmation email with booking details
+                    {YscWeb.BookingUserMessages.checkout_confirmation_email_step()}
                   </span>
                 </li>
                 <li class="flex items-start gap-3">
@@ -663,7 +663,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     4
                   </span>
                   <span>
-                    Get cabin access information (door code or key instructions) via email before check-in
+                    {YscWeb.BookingUserMessages.checkout_cabin_access_step()}
                   </span>
                 </li>
               <% else %>
@@ -684,7 +684,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     2
                   </span>
                   <span>
-                    Receive instant confirmation email with booking details
+                    {YscWeb.BookingUserMessages.checkout_confirmation_email_step()}
                   </span>
                 </li>
                 <li class="flex items-start gap-3">
@@ -692,7 +692,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     3
                   </span>
                   <span>
-                    Get cabin access information (door code or key instructions) via email before check-in
+                    {YscWeb.BookingUserMessages.checkout_cabin_access_step()}
                   </span>
                 </li>
                 <li class="flex items-start gap-3">
@@ -1950,6 +1950,21 @@ defmodule YscWeb.BookingCheckoutLive do
          }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
+          booking =
+            case Bookings.sync_hold_pricing_from_calculation(booking) do
+              {:ok, updated_booking} ->
+                updated_booking
+
+              {:error, reason} ->
+                Ysc.Logging.warning(
+                  "[BookingCheckout] Failed to sync recalculated hold pricing before payment verification",
+                  booking_id: booking.id,
+                  reason: inspect(reason)
+                )
+
+                booking
+            end
+
           case Bookings.verify_booking_payment_intent(payment_intent, booking) do
             :ok ->
               process_verified_booking_payment_success(

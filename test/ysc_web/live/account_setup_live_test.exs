@@ -546,7 +546,7 @@ defmodule YscWeb.AccountSetupLiveTest do
       })
       |> render_change()
 
-      assert render(view) =~ "does not match"
+      assert render(view) =~ "Please enter the same password in both fields"
     end
 
     test "password too short shows validation error", %{conn: conn, user: user} do

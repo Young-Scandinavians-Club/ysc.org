@@ -1306,6 +1306,48 @@ defmodule Ysc.EventsTest do
       counts = Events.get_ticket_counts_per_user(event.id)
       assert Map.get(counts, user.id) == 2
     end
+
+    test "attendee_ticket_data_for_event/1 returns sold count, buyers, and per-user counts" do
+      {:ok, event} = create_event_fixture()
+      user1 = user_fixture()
+      user2 = user_fixture()
+
+      {:ok, tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      {:ok, donation_tier} =
+        create_ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user1.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed
+      })
+
+      for _ <- 1..2 do
+        create_ticket_fixture(%{
+          event_id: event.id,
+          user_id: user2.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed
+        })
+      end
+
+      create_ticket_fixture(%{
+        event_id: event.id,
+        user_id: user1.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed
+      })
+
+      data = Events.attendee_ticket_data_for_event(event.id)
+
+      assert data.sold_count == 3
+      assert Map.get(data.ticket_counts, user1.id) == 1
+      assert Map.get(data.ticket_counts, user2.id) == 2
+      assert Enum.map(data.ticket_buyers, & &1.id) == [user1.id, user2.id]
+    end
   end
 
   # Helper functions

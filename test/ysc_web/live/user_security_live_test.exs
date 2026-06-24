@@ -154,7 +154,7 @@ defmodule YscWeb.UserSecurityLiveTest do
         )
         |> render_change()
 
-      assert result =~ "does not match password"
+      assert result =~ "Please enter the same password in both fields"
     end
   end
 

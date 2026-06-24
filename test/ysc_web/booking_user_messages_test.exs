@@ -55,6 +55,12 @@ defmodule YscWeb.BookingUserMessagesTest do
              "reservation timer"
 
     assert BookingUserMessages.checkout_payment_step_pay() =~ "payment details"
+
+    assert BookingUserMessages.checkout_confirmation_email_step() =~
+             "confirmation email"
+
+    assert BookingUserMessages.checkout_cabin_access_step() =~
+             "cabin access details"
   end
 
   test "cabin availability error copy" do

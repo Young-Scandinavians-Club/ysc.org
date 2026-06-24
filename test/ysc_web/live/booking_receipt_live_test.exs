@@ -521,6 +521,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert result =~ "Cancel Booking"
       assert result =~ "Cancellation Reason"
+      assert result =~ "Cancel this reservation?"
+      assert result =~ "be undone"
     end
 
     test "hide-cancel-modal hides the modal", %{conn: conn} do

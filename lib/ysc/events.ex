@@ -1727,37 +1727,9 @@ defmodule Ysc.Events do
   Returns users ordered by first ticket purchase date.
   """
   def list_unique_attendees_for_event(event_id) do
-    import Ecto.Query
-    alias Ysc.Accounts.User
-
-    # First, get distinct user IDs with their first ticket purchase date
-    user_ids_with_dates =
-      Ticket
-      |> join(:inner, [t], tt in TicketTier, on: t.ticket_tier_id == tt.id)
-      |> where([t, tt], t.event_id == ^event_id and t.status == :confirmed)
-      |> where([t, tt], tt.type != :donation)
-      |> group_by([t], t.user_id)
-      |> select([t], %{user_id: t.user_id, first_purchase: min(t.inserted_at)})
-      |> order_by([t], asc: min(t.inserted_at))
-      |> Repo.all()
-
-    # Extract user IDs
-    user_ids = Enum.map(user_ids_with_dates, & &1.user_id)
-
-    # Fetch users in the same order
-    if Enum.empty?(user_ids) do
-      []
-    else
-      # Create a map for ordering
-      order_map = user_ids |> Enum.with_index() |> Map.new()
-
-      from(u in User,
-        where: u.id in ^user_ids,
-        preload: [:current_avatar]
-      )
-      |> Repo.all()
-      |> Enum.sort_by(fn user -> Map.get(order_map, user.id, 999_999) end)
-    end
+    event_id
+    |> attendee_ticket_data_for_event()
+    |> Map.fetch!(:ticket_buyers)
   end
 
   @doc """
@@ -1765,17 +1737,67 @@ defmodule Ysc.Events do
   Returns a map where keys are user IDs and values are the number of tickets purchased.
   """
   def get_ticket_counts_per_user(event_id) do
+    event_id
+    |> non_donation_ticket_stats_by_user()
+    |> Enum.map(fn %{user_id: user_id, ticket_count: count} ->
+      {user_id, count}
+    end)
+    |> Map.new()
+  end
+
+  @doc """
+  Loads attendee ticket data for an event in two queries instead of three.
+
+  Returns sold ticket count, per-user ticket counts, and ticket buyers ordered
+  by first purchase (excluding donation tiers).
+  """
+  def attendee_ticket_data_for_event(event_id) do
+    stats = non_donation_ticket_stats_by_user(event_id)
+
+    sold_count =
+      Enum.reduce(stats, 0, fn %{ticket_count: count}, acc -> acc + count end)
+
+    ticket_counts =
+      Map.new(stats, fn %{user_id: id, ticket_count: count} ->
+        {id, count}
+      end)
+
+    user_ids = Enum.map(stats, & &1.user_id)
+
+    ticket_buyers =
+      if Enum.empty?(user_ids) do
+        []
+      else
+        order_map = user_ids |> Enum.with_index() |> Map.new()
+
+        from(u in User,
+          where: u.id in ^user_ids,
+          preload: [:current_avatar]
+        )
+        |> Repo.all()
+        |> Enum.sort_by(fn user -> Map.get(order_map, user.id, 999_999) end)
+      end
+
+    %{
+      sold_count: sold_count,
+      ticket_counts: ticket_counts,
+      ticket_buyers: ticket_buyers
+    }
+  end
+
+  defp non_donation_ticket_stats_by_user(event_id) do
     Ticket
     |> join(:inner, [t], tt in TicketTier, on: t.ticket_tier_id == tt.id)
     |> where([t, tt], t.event_id == ^event_id and t.status == :confirmed)
     |> where([t, tt], tt.type != :donation)
     |> group_by([t], t.user_id)
-    |> select([t], %{user_id: t.user_id, ticket_count: count(t.id)})
+    |> select([t], %{
+      user_id: t.user_id,
+      ticket_count: count(t.id),
+      first_purchase: min(t.inserted_at)
+    })
+    |> order_by([t], asc: min(t.inserted_at))
     |> Repo.all()
-    |> Enum.map(fn %{user_id: user_id, ticket_count: count} ->
-      {user_id, count}
-    end)
-    |> Map.new()
   end
 
   @doc """
