@@ -76,6 +76,58 @@ defmodule YscWeb.PostLiveTest do
       assert html =~ "Club News"
     end
 
+    test "meta description uses plain text from preview_text without HTML", %{
+      conn: conn
+    } do
+      marker = "Meta preview#{System.unique_integer()}"
+
+      post =
+        create_post(%{
+          title: "Meta Description Post",
+          preview_text: "Line one<br>Line two<strong>#{marker}</strong>"
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ ~s(name="description")
+      assert html =~ marker
+      assert html =~ "Line one"
+      assert html =~ "Line two"
+      refute html =~ "<strong>"
+      refute html =~ "<br>"
+    end
+
+    test "meta description falls back to default when preview and body are empty",
+         %{conn: conn} do
+      post =
+        create_post(%{
+          title: "Empty Meta Post",
+          preview_text: "   ",
+          raw_body: ""
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~
+               ~s(content="Read this article on the Young Scandinavians Club news feed.")
+    end
+
+    test "meta description uses raw_body when preview_text is nil", %{conn: conn} do
+      marker = "Body meta#{System.unique_integer()}"
+
+      post =
+        create_post(%{
+          title: "Body Meta Post",
+          preview_text: nil,
+          raw_body: "<p>#{marker}</p>"
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ ~s(content="#{marker}")
+      refute html =~ ~s(content="<p>#{marker}</p>")
+    end
+
     test "draft posts are not accessible on the public post page", %{conn: conn} do
       post =
         create_post(%{
