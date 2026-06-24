@@ -74,6 +74,11 @@ defmodule Ysc.TrixScrubberTest do
       assert scrub("") == ""
     end
 
+    test "does not crash on truncated processing-instruction marker" do
+      assert scrub("<?") == "&lt;?"
+      assert scrub("<p>Hello <?</p>") =~ "Hello"
+    end
+
     test "allows blockquote and code" do
       html = "<blockquote><p>Q</p></blockquote><pre><code>x</code></pre>"
       out = scrub(html)
