@@ -463,4 +463,150 @@ defmodule YscWeb.AdminCheckInComponentsTest do
       assert html =~ ~s(data-copy-target="source-field")
     end
   end
+
+  describe "admin_event_check_in_pending_row/1" do
+    test "renders interactive desktop row with check-in control and order tooltip" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_pending_row
+          variant={:desktop}
+          ticket_id={42}
+          name="Ada Lovelace"
+          email="ada@example.com"
+          tier="General"
+          ticket_ref="TKT-001"
+          order_ref="ORD-001"
+          order_ref_tooltip="ORD-001-full"
+        />
+        """)
+
+      assert html =~ "Ada Lovelace"
+      assert html =~ "ada@example.com"
+      assert html =~ "General"
+      assert html =~ "TKT-001"
+      assert html =~ "ORD-001"
+      assert html =~ ~s(phx-value-ticket-id="42")
+      assert html =~ "data-checkin-row"
+      assert html =~ "data-checkin-btn"
+      assert html =~ "checkin-kbd-badge"
+    end
+
+    test "renders static desktop row for ghost previews" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_pending_row
+          variant={:desktop}
+          interactive={false}
+          name="Ghost Guest"
+          email="ghost@example.com"
+          tier="VIP"
+          ticket_ref="TKT-ghost"
+          order_ref="ORD-ghost"
+        />
+        """)
+
+      assert html =~ "Ghost Guest"
+      assert html =~ "VIP"
+      refute html =~ "phx-click"
+      refute html =~ "data-checkin-row"
+      refute html =~ "data-checkin-btn"
+    end
+
+    test "renders mobile pending row with check-in button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_pending_row
+          variant={:mobile}
+          ticket_id={7}
+          name="Mobile Guest"
+          email="mobile@example.com"
+          ticket_ref="TKT-007"
+        />
+        """)
+
+      assert html =~ "Mobile Guest"
+      assert html =~ "Check in"
+      assert html =~ ~s(phx-value-ticket-id="7")
+      assert html =~ "data-checkin-row"
+    end
+  end
+
+  describe "admin_event_check_in_checked_in_row/1" do
+    test "renders interactive desktop row with undo control and check-in time" do
+      checked_in_at = ~U[2026-06-24 14:30:00Z]
+      assigns = %{checked_in_at: checked_in_at}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_checked_in_row
+          id="checked-1"
+          variant={:desktop}
+          ticket_id={99}
+          name="Checked Guest"
+          email="checked@example.com"
+          tier="General"
+          ticket_ref="TKT-099"
+          checked_in_at={@checked_in_at}
+          checked_in_time_label="Jun 24, 14:30 UTC"
+        />
+        """)
+
+      assert html =~ ~s(id="checked-1")
+      assert html =~ "Checked Guest"
+      assert html =~ "line-through"
+      assert html =~ ~s(phx-value-ticket-id="99")
+      assert html =~ "Undo check-in"
+      assert html =~ "checkin-time-99"
+      assert html =~ "Jun 24, 14:30 UTC"
+      assert html =~ "hero-clock"
+    end
+
+    test "renders static desktop row for ghost previews" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_checked_in_row
+          variant={:desktop}
+          interactive={false}
+          name="Ghost Checked"
+          email="ghost-checked@example.com"
+          tier="VIP"
+          ticket_ref="TKT-done"
+        />
+        """)
+
+      assert html =~ "Ghost Checked"
+      assert html =~ "hero-check"
+      refute html =~ "phx-click"
+      refute html =~ "hero-clock"
+    end
+
+    test "renders mobile checked-in row with undo button" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_event_check_in_checked_in_row
+          id="mobile-checked-1"
+          variant={:mobile}
+          ticket_id={12}
+          name="Mobile Checked"
+          email="mobile-checked@example.com"
+          ticket_ref="TKT-012"
+        />
+        """)
+
+      assert html =~ ~s(id="mobile-checked-1")
+      assert html =~ "Mobile Checked"
+      assert html =~ "Undo"
+      assert html =~ ~s(phx-value-ticket-id="12")
+    end
+  end
 end

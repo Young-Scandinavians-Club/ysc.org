@@ -745,6 +745,242 @@ defmodule YscWeb.AdminComponents do
   end
 
   # ---------------------------------------------------------------------------
+  # admin_event_check_in_pending_row
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Pending ticket row for event check-in lists.
+
+  Use `variant={:desktop}` inside the 12-column table layout; `variant={:mobile}`
+  for the stacked card list. Set `interactive={false}` for static ghost previews.
+  """
+  attr :variant, :atom, required: true, values: [:desktop, :mobile]
+  attr :id, :string, default: nil
+  attr :name, :string, required: true
+  attr :email, :string, required: true
+  attr :ticket_ref, :string, required: true
+  attr :tier, :string, default: nil
+  attr :order_ref, :string, default: nil
+  attr :order_ref_tooltip, :string, default: nil
+  attr :ticket_id, :any, default: nil
+
+  attr :interactive, :boolean,
+    default: true,
+    doc: "When false, renders static controls (ghost preview)"
+
+  def admin_event_check_in_pending_row(assigns) do
+    ~H"""
+    <%= case @variant do %>
+      <% :desktop -> %>
+        <div
+          id={@id}
+          data-checkin-row={@interactive}
+          class={[
+            "grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0",
+            @interactive &&
+              "hover:bg-zinc-50/60 transition-all duration-100 ease-out"
+          ]}
+        >
+          <div class="col-span-1 flex items-center justify-center gap-1.5">
+            <%= if @interactive do %>
+              <button
+                phx-click="toggle-check-in"
+                phx-value-ticket-id={@ticket_id}
+                data-checkin-btn
+                class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
+                aria-label="Mark as checked in"
+              ></button>
+              <span
+                class="checkin-kbd-badge hidden select-none gap-0.5"
+                hidden
+              ></span>
+            <% else %>
+              <span
+                class="w-5 h-5 rounded border-2 border-zinc-300 flex items-center justify-center"
+                aria-hidden="true"
+              ></span>
+            <% end %>
+          </div>
+          <div class="col-span-3">
+            <p class="text-sm font-medium text-zinc-900">{@name}</p>
+          </div>
+          <div class="col-span-2">
+            <p class="text-sm text-zinc-600 truncate">{@email}</p>
+          </div>
+          <div class="col-span-2">
+            <.badge :if={@tier} type="sky">{@tier}</.badge>
+          </div>
+          <div class="col-span-2">
+            <span class="text-xs font-mono text-zinc-500 whitespace-nowrap">
+              {@ticket_ref}
+            </span>
+          </div>
+          <div class="col-span-2">
+            <%= if @order_ref_tooltip do %>
+              <.tooltip tooltip_text={@order_ref_tooltip}>
+                <span class="text-xs font-mono text-zinc-400 hover:text-zinc-600 cursor-default whitespace-nowrap">
+                  {@order_ref}
+                </span>
+              </.tooltip>
+            <% else %>
+              <span
+                :if={@order_ref}
+                class="text-xs font-mono text-zinc-400 whitespace-nowrap"
+              >
+                {@order_ref}
+              </span>
+            <% end %>
+          </div>
+        </div>
+      <% :mobile -> %>
+        <div
+          data-checkin-row
+          class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0 transition-all duration-100 ease-out"
+        >
+          <div class="min-w-0 flex-1 mr-3">
+            <p class="text-sm font-medium text-zinc-900">{@name}</p>
+            <p class="text-xs text-zinc-500 truncate">{@email}</p>
+            <div class="flex items-center gap-2 mt-1">
+              <.badge :if={@tier} type="sky">{@tier}</.badge>
+              <span class="text-xs font-mono text-zinc-400">{@ticket_ref}</span>
+            </div>
+          </div>
+          <button
+            phx-click="toggle-check-in"
+            phx-value-ticket-id={@ticket_id}
+            data-checkin-btn
+            class="shrink-0 border border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-400 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
+            aria-label="Mark as checked in"
+          >
+            <.icon name="hero-check" class="w-3.5 h-3.5" /> Check in
+          </button>
+        </div>
+    <% end %>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_event_check_in_checked_in_row
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Checked-in ticket row for event check-in lists.
+
+  Use `variant={:desktop}` inside the 12-column table layout; `variant={:mobile}`
+  for the stacked card list. Set `interactive={false}` for static ghost previews.
+  """
+  attr :variant, :atom, required: true, values: [:desktop, :mobile]
+  attr :id, :string, default: nil
+  attr :name, :string, required: true
+  attr :email, :string, required: true
+  attr :ticket_ref, :string, required: true
+  attr :tier, :string, default: nil
+  attr :ticket_id, :any, default: nil
+  attr :checked_in_at, :any, default: nil
+  attr :checked_in_time_label, :string, default: nil
+
+  attr :interactive, :boolean,
+    default: true,
+    doc: "When false, renders static controls (ghost preview)"
+
+  def admin_event_check_in_checked_in_row(assigns) do
+    ~H"""
+    <%= case @variant do %>
+      <% :desktop -> %>
+        <div
+          id={@id}
+          class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0 opacity-60 bg-zinc-50/50"
+        >
+          <div class="col-span-1 flex justify-center">
+            <%= if @interactive do %>
+              <.tooltip tooltip_text="Undo check-in">
+                <button
+                  phx-click="toggle-check-in"
+                  phx-value-ticket-id={@ticket_id}
+                  class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 hover:bg-red-500 hover:border-red-500 transition-colors flex items-center justify-center group"
+                  aria-label="Undo check-in"
+                >
+                  <.icon
+                    name="hero-check"
+                    class="w-3 h-3 text-white group-hover:hidden"
+                  />
+                  <.icon
+                    name="hero-x-mark"
+                    class="w-3 h-3 text-white hidden group-hover:block"
+                  />
+                </button>
+              </.tooltip>
+            <% else %>
+              <span
+                class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center"
+                aria-hidden="true"
+              >
+                <.icon name="hero-check" class="w-3 h-3 text-white" />
+              </span>
+            <% end %>
+          </div>
+          <div class="col-span-3">
+            <p class="text-sm font-medium text-zinc-400 line-through">{@name}</p>
+          </div>
+          <div class="col-span-2">
+            <p class="text-sm text-zinc-400 truncate">{@email}</p>
+          </div>
+          <div class="col-span-2">
+            <.badge :if={@tier} type="default">{@tier}</.badge>
+          </div>
+          <div class="col-span-2">
+            <span class="text-xs font-mono text-zinc-400 whitespace-nowrap">
+              {@ticket_ref}
+            </span>
+          </div>
+          <div class="col-span-2">
+            <.tooltip_special :if={@interactive and @checked_in_at}>
+              <.icon
+                name="hero-clock"
+                class="w-3.5 h-3.5 text-zinc-400 cursor-default"
+              />
+              <:tooltip_body>
+                Checked in:
+                <span
+                  id={"checkin-time-#{@ticket_id}"}
+                  phx-hook="LocalTime"
+                  phx-update="ignore"
+                  data-utc-time={DateTime.to_iso8601(@checked_in_at)}
+                >
+                  {@checked_in_time_label}
+                </span>
+              </:tooltip_body>
+            </.tooltip_special>
+          </div>
+        </div>
+      <% :mobile -> %>
+        <div id={@id} class="bg-white rounded border border-zinc-200 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3">
+            <div class="min-w-0 flex-1 mr-3">
+              <p class="text-sm font-medium text-zinc-400 line-through">
+                {@name}
+              </p>
+              <p class="text-xs text-zinc-400 truncate">{@email}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <.badge :if={@tier} type="default">{@tier}</.badge>
+                <span class="text-xs font-mono text-zinc-400">{@ticket_ref}</span>
+              </div>
+            </div>
+            <button
+              phx-click="toggle-check-in"
+              phx-value-ticket-id={@ticket_id}
+              class="shrink-0 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
+              aria-label="Undo check-in"
+            >
+              <.icon name="hero-check" class="w-3.5 h-3.5" /> Undo
+            </button>
+          </div>
+        </div>
+    <% end %>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_responsive_icon_button
   # ---------------------------------------------------------------------------
 

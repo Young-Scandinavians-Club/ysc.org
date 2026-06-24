@@ -782,36 +782,16 @@ defmodule YscWeb.AdminGhostComponents do
                 id="ghost-check-in-order-all"
                 interactive={false}
               />
-              <div
+              <.admin_event_check_in_pending_row
                 :for={ticket <- group.tickets}
-                class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0"
-              >
-                <div class="col-span-1 flex items-center justify-center">
-                  <span
-                    class="w-5 h-5 rounded border-2 border-zinc-300 flex items-center justify-center"
-                    aria-hidden="true"
-                  ></span>
-                </div>
-                <div class="col-span-3">
-                  <p class="text-sm font-medium text-zinc-900">{ticket.name}</p>
-                </div>
-                <div class="col-span-2">
-                  <p class="text-sm text-zinc-600 truncate">{ticket.email}</p>
-                </div>
-                <div class="col-span-2">
-                  <.badge type="sky">{ticket.tier}</.badge>
-                </div>
-                <div class="col-span-2">
-                  <span class="text-xs font-mono text-zinc-500 whitespace-nowrap">
-                    {ticket.ticket_ref}
-                  </span>
-                </div>
-                <div class="col-span-2">
-                  <span class="text-xs font-mono text-zinc-400 whitespace-nowrap">
-                    {ticket.order_ref}
-                  </span>
-                </div>
-              </div>
+                variant={:desktop}
+                interactive={false}
+                name={ticket.name}
+                email={ticket.email}
+                tier={ticket.tier}
+                ticket_ref={ticket.ticket_ref}
+                order_ref={ticket.order_ref}
+              />
             </div>
           </div>
         </div>
@@ -824,36 +804,15 @@ defmodule YscWeb.AdminGhostComponents do
           </div>
 
           <div class="hidden md:block bg-white rounded border border-zinc-200">
-            <div
+            <.admin_event_check_in_checked_in_row
               :for={ticket <- @checked_in}
-              class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0 opacity-60 bg-zinc-50/50"
-            >
-              <div class="col-span-1 flex justify-center">
-                <span
-                  class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 flex items-center justify-center"
-                  aria-hidden="true"
-                >
-                  <.icon name="hero-check" class="w-3 h-3 text-white" />
-                </span>
-              </div>
-              <div class="col-span-3">
-                <p class="text-sm font-medium text-zinc-400 line-through">
-                  {ticket.name}
-                </p>
-              </div>
-              <div class="col-span-2">
-                <p class="text-sm text-zinc-400 truncate">{ticket.email}</p>
-              </div>
-              <div class="col-span-2">
-                <.badge type="default">{ticket.tier}</.badge>
-              </div>
-              <div class="col-span-2">
-                <span class="text-xs font-mono text-zinc-400 whitespace-nowrap">
-                  {ticket.ticket_ref}
-                </span>
-              </div>
-              <div class="col-span-2"></div>
-            </div>
+              variant={:desktop}
+              interactive={false}
+              name={ticket.name}
+              email={ticket.email}
+              tier={ticket.tier}
+              ticket_ref={ticket.ticket_ref}
+            />
           </div>
         </div>
       </.admin_check_in_content>
