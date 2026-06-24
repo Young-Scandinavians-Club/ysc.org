@@ -266,7 +266,10 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
       assert Tickets.get_ticket_order(order.id).status == :pending
     end
 
-    test "expires pending orders that are past expires_at", %{user: user, event: event} do
+    test "expires pending orders that are past expires_at", %{
+      user: user,
+      event: event
+    } do
       order =
         %TicketOrder{
           user_id: user.id,
