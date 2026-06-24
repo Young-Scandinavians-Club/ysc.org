@@ -279,145 +279,151 @@ defmodule YscWeb.ClearLakeBookingLive do
     info_tab = requested_info_tab || socket.assigns[:info_tab] || :general
     info_tab_changed = info_tab != socket.assigns[:info_tab]
 
-    # Only update if something actually changed
-    # This prevents unnecessary updates on initial page load when mount already set everything
-    if dates_changed || guests_changed || tab_changed || booking_mode_changed ||
-         can_book_changed || info_tab_changed do
-      # Only recalculate today and max_booking_date if dates changed
-      # This prevents unnecessary component updates
-      {today, max_booking_date, current_season, season_start_date,
-       season_end_date} =
-        if dates_changed do
-          timezone = socket.assigns[:timezone] || "America/Los_Angeles"
-          today = today_in_timezone(timezone)
+    if info_tab_changed && !dates_changed && !guests_changed && !tab_changed &&
+         !booking_mode_changed && !can_book_changed do
+      {:noreply, assign(socket, info_tab: info_tab)}
+    else
+      # Only update if something actually changed
+      # This prevents unnecessary updates on initial page load when mount already set everything
+      if dates_changed || guests_changed || tab_changed || booking_mode_changed ||
+           can_book_changed || info_tab_changed do
+        # Only recalculate today and max_booking_date if dates changed
+        # This prevents unnecessary component updates
+        {today, max_booking_date, current_season, season_start_date,
+         season_end_date} =
+          if dates_changed do
+            timezone = socket.assigns[:timezone] || "America/Los_Angeles"
+            today = today_in_timezone(timezone)
 
-          seasons = socket.assigns.seasons
+            seasons = socket.assigns.seasons
 
-          {current_season, season_start_date, season_end_date} =
-            SeasonHelpers.get_current_season_info(:clear_lake, today, seasons)
+            {current_season, season_start_date, season_end_date} =
+              SeasonHelpers.get_current_season_info(:clear_lake, today, seasons)
 
-          max_booking_date =
-            SeasonHelpers.calculate_max_booking_date(
-              :clear_lake,
-              today,
-              seasons
-            )
-
-          {today, max_booking_date, current_season, season_start_date,
-           season_end_date}
-        else
-          {
-            socket.assigns.today,
-            socket.assigns.max_booking_date,
-            socket.assigns.current_season,
-            socket.assigns.season_start_date,
-            socket.assigns.season_end_date
-          }
-        end
-
-      date_form =
-        to_form(
-          %{
-            "checkin_date" => date_to_datetime_string(checkin_date),
-            "checkout_date" => date_to_datetime_string(checkout_date)
-          },
-          as: "booking_dates"
-        )
-
-      # Check which booking modes are allowed based on selected dates
-      {day_booking_allowed, buyout_booking_allowed} =
-        allowed_booking_modes(
-          :clear_lake,
-          checkin_date,
-          checkout_date,
-          current_season,
-          socket.assigns.seasons
-        )
-
-      # Resolve booking mode based on allowed modes
-      # This ensures we default to a valid mode if the requested one is not allowed
-      # or if no mode was requested (booking_mode is nil)
-      resolved_booking_mode =
-        resolve_booking_mode(
-          booking_mode,
-          day_booking_allowed,
-          buyout_booking_allowed
-        )
-
-      # Validate availability and price only after connect, and only when booking
-      # inputs changed (skip tab-only navigation work on the dead render path).
-      needs_booking_recalculation =
-        dates_changed || guests_changed || booking_mode_changed
-
-      socket =
-        socket
-        |> assign(
-          page_title: "Clear Lake Cabin",
-          meta_description:
-            "Book a stay at the Young Scandinavians Club Clear Lake cabin. Choose your dates and guests.",
-          checkin_date: checkin_date,
-          checkout_date: checkout_date,
-          today: today,
-          max_booking_date: max_booking_date,
-          current_season: current_season,
-          season_start_date: season_start_date,
-          season_end_date: season_end_date,
-          guests_count: guests_count,
-          selected_booking_mode: resolved_booking_mode,
-          guests_dropdown_open: socket.assigns[:guests_dropdown_open] || false,
-          calculated_price: nil,
-          price_error: nil,
-          availability_error: nil,
-          form_errors: %{},
-          date_form: date_form,
-          date_validation_errors: %{},
-          active_tab: active_tab,
-          info_tab: info_tab,
-          scroll_to_section: scroll_to_section_from_uri(uri),
-          can_book: can_book,
-          booking_error_title: booking_error_title,
-          booking_disabled_reason: booking_disabled_reason,
-          day_booking_allowed: day_booking_allowed,
-          buyout_booking_allowed: buyout_booking_allowed,
-          active_bookings: active_bookings
-        )
-
-      socket =
-        if connected?(socket) && needs_booking_recalculation do
-          socket
-          |> validate_all_conditions(
-            checkin_date,
-            checkout_date,
-            resolved_booking_mode,
-            guests_count,
-            current_season
-          )
-          |> then(fn s ->
-            # Update date form with validated/corrected dates
-            validated_date_form =
-              to_form(
-                %{
-                  "checkin_date" =>
-                    date_to_datetime_string(s.assigns.checkin_date),
-                  "checkout_date" =>
-                    date_to_datetime_string(s.assigns.checkout_date)
-                },
-                as: "booking_dates"
+            max_booking_date =
+              SeasonHelpers.calculate_max_booking_date(
+                :clear_lake,
+                today,
+                seasons
               )
 
-            s
-            |> assign(:date_form, validated_date_form)
-            |> calculate_price_if_ready()
-          end)
-        else
-          socket
-        end
+            {today, max_booking_date, current_season, season_start_date,
+             season_end_date}
+          else
+            {
+              socket.assigns.today,
+              socket.assigns.max_booking_date,
+              socket.assigns.current_season,
+              socket.assigns.season_start_date,
+              socket.assigns.season_end_date
+            }
+          end
 
-      {:noreply, socket}
-    else
-      # Even if nothing changed, update scroll_to_section if hash is present
-      socket = update_scroll_section(socket, uri)
-      {:noreply, socket}
+        date_form =
+          to_form(
+            %{
+              "checkin_date" => date_to_datetime_string(checkin_date),
+              "checkout_date" => date_to_datetime_string(checkout_date)
+            },
+            as: "booking_dates"
+          )
+
+        # Check which booking modes are allowed based on selected dates
+        {day_booking_allowed, buyout_booking_allowed} =
+          allowed_booking_modes(
+            :clear_lake,
+            checkin_date,
+            checkout_date,
+            current_season,
+            socket.assigns.seasons
+          )
+
+        # Resolve booking mode based on allowed modes
+        # This ensures we default to a valid mode if the requested one is not allowed
+        # or if no mode was requested (booking_mode is nil)
+        resolved_booking_mode =
+          resolve_booking_mode(
+            booking_mode,
+            day_booking_allowed,
+            buyout_booking_allowed
+          )
+
+        # Validate availability and price only after connect, and only when booking
+        # inputs changed (skip tab-only navigation work on the dead render path).
+        needs_booking_recalculation =
+          dates_changed || guests_changed || booking_mode_changed
+
+        socket =
+          socket
+          |> assign(
+            page_title: "Clear Lake Cabin",
+            meta_description:
+              "Book a stay at the Young Scandinavians Club Clear Lake cabin. Choose your dates and guests.",
+            checkin_date: checkin_date,
+            checkout_date: checkout_date,
+            today: today,
+            max_booking_date: max_booking_date,
+            current_season: current_season,
+            season_start_date: season_start_date,
+            season_end_date: season_end_date,
+            guests_count: guests_count,
+            selected_booking_mode: resolved_booking_mode,
+            guests_dropdown_open:
+              socket.assigns[:guests_dropdown_open] || false,
+            calculated_price: nil,
+            price_error: nil,
+            availability_error: nil,
+            form_errors: %{},
+            date_form: date_form,
+            date_validation_errors: %{},
+            active_tab: active_tab,
+            info_tab: info_tab,
+            scroll_to_section: scroll_to_section_from_uri(uri),
+            can_book: can_book,
+            booking_error_title: booking_error_title,
+            booking_disabled_reason: booking_disabled_reason,
+            day_booking_allowed: day_booking_allowed,
+            buyout_booking_allowed: buyout_booking_allowed,
+            active_bookings: active_bookings
+          )
+
+        socket =
+          if connected?(socket) && needs_booking_recalculation do
+            socket
+            |> validate_all_conditions(
+              checkin_date,
+              checkout_date,
+              resolved_booking_mode,
+              guests_count,
+              current_season
+            )
+            |> then(fn s ->
+              # Update date form with validated/corrected dates
+              validated_date_form =
+                to_form(
+                  %{
+                    "checkin_date" =>
+                      date_to_datetime_string(s.assigns.checkin_date),
+                    "checkout_date" =>
+                      date_to_datetime_string(s.assigns.checkout_date)
+                  },
+                  as: "booking_dates"
+                )
+
+              s
+              |> assign(:date_form, validated_date_form)
+              |> calculate_price_if_ready()
+            end)
+          else
+            socket
+          end
+
+        {:noreply, socket}
+      else
+        # Even if nothing changed, update scroll_to_section if hash is present
+        socket = update_scroll_section(socket, uri)
+        {:noreply, socket}
+      end
     end
   end
 
