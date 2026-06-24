@@ -954,7 +954,10 @@ defmodule YscWeb.AdminComponents do
           </div>
         </div>
       <% :mobile -> %>
-        <div id={@id} class="bg-white rounded border border-zinc-200 overflow-hidden">
+        <div
+          id={@id}
+          class="bg-white rounded border border-zinc-200 overflow-hidden"
+        >
           <div class="flex items-center justify-between px-4 py-3">
             <div class="min-w-0 flex-1 mr-3">
               <p class="text-sm font-medium text-zinc-400 line-through">

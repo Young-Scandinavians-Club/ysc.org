@@ -126,7 +126,8 @@ defmodule YscWeb.AdminEventCheckInLive do
                     tier={ticket.ticket_tier && ticket.ticket_tier.name}
                     ticket_ref={ticket.reference_id}
                     order_ref={
-                      ticket.ticket_order && short_ref(ticket.ticket_order.reference_id)
+                      ticket.ticket_order &&
+                        short_ref(ticket.ticket_order.reference_id)
                     }
                     order_ref_tooltip={
                       ticket.ticket_order && ticket.ticket_order.reference_id
@@ -192,7 +193,8 @@ defmodule YscWeb.AdminEventCheckInLive do
                   ticket_ref={ticket.reference_id}
                   checked_in_at={ticket.checked_in_at}
                   checked_in_time_label={
-                    ticket.checked_in_at && format_checkin_time(ticket.checked_in_at)
+                    ticket.checked_in_at &&
+                      format_checkin_time(ticket.checked_in_at)
                   }
                 />
               </div>
