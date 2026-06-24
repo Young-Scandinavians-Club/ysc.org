@@ -117,55 +117,22 @@ defmodule YscWeb.AdminEventCheckInLive do
                     order_id={group.order_id}
                   />
                   <%!-- Ticket rows --%>
-                  <div
+                  <.admin_event_check_in_pending_row
                     :for={ticket <- group.tickets}
-                    data-checkin-row
-                    class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 hover:bg-zinc-50/60 transition-all duration-100 ease-out items-center last:border-0"
-                  >
-                    <div class="col-span-1 flex items-center justify-center gap-1.5">
-                      <button
-                        phx-click="toggle-check-in"
-                        phx-value-ticket-id={ticket.id}
-                        data-checkin-btn
-                        class="w-5 h-5 rounded border-2 border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 transition-colors flex items-center justify-center"
-                        aria-label="Mark as checked in"
-                      ></button>
-                      <span
-                        class="checkin-kbd-badge hidden select-none gap-0.5"
-                        hidden
-                      ></span>
-                    </div>
-                    <div class="col-span-3">
-                      <p class="text-sm font-medium text-zinc-900">
-                        {attendee_name(ticket)}
-                      </p>
-                    </div>
-                    <div class="col-span-2">
-                      <p class="text-sm text-zinc-600 truncate">
-                        {attendee_email(ticket)}
-                      </p>
-                    </div>
-                    <div class="col-span-2">
-                      <.badge :if={ticket.ticket_tier} type="sky">
-                        {ticket.ticket_tier.name}
-                      </.badge>
-                    </div>
-                    <div class="col-span-2">
-                      <span class="text-xs font-mono text-zinc-500 whitespace-nowrap">
-                        {ticket.reference_id}
-                      </span>
-                    </div>
-                    <div class="col-span-2">
-                      <.tooltip
-                        :if={ticket.ticket_order}
-                        tooltip_text={ticket.ticket_order.reference_id}
-                      >
-                        <span class="text-xs font-mono text-zinc-400 hover:text-zinc-600 cursor-default whitespace-nowrap">
-                          {short_ref(ticket.ticket_order.reference_id)}
-                        </span>
-                      </.tooltip>
-                    </div>
-                  </div>
+                    variant={:desktop}
+                    ticket_id={ticket.id}
+                    name={attendee_name(ticket)}
+                    email={attendee_email(ticket)}
+                    tier={ticket.ticket_tier && ticket.ticket_tier.name}
+                    ticket_ref={ticket.reference_id}
+                    order_ref={
+                      ticket.ticket_order &&
+                        short_ref(ticket.ticket_order.reference_id)
+                    }
+                    order_ref_tooltip={
+                      ticket.ticket_order && ticket.ticket_order.reference_id
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -187,37 +154,15 @@ defmodule YscWeb.AdminEventCheckInLive do
                     ticket_count={length(group.tickets)}
                     order_id={group.order_id}
                   />
-                  <div
+                  <.admin_event_check_in_pending_row
                     :for={ticket <- group.tickets}
-                    data-checkin-row
-                    class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 last:border-0 transition-all duration-100 ease-out"
-                  >
-                    <div class="min-w-0 flex-1 mr-3">
-                      <p class="text-sm font-medium text-zinc-900">
-                        {attendee_name(ticket)}
-                      </p>
-                      <p class="text-xs text-zinc-500 truncate">
-                        {attendee_email(ticket)}
-                      </p>
-                      <div class="flex items-center gap-2 mt-1">
-                        <.badge :if={ticket.ticket_tier} type="sky">
-                          {ticket.ticket_tier.name}
-                        </.badge>
-                        <span class="text-xs font-mono text-zinc-400">
-                          {ticket.reference_id}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      phx-click="toggle-check-in"
-                      phx-value-ticket-id={ticket.id}
-                      data-checkin-btn
-                      class="shrink-0 border border-zinc-300 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 text-zinc-400 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
-                      aria-label="Mark as checked in"
-                    >
-                      <.icon name="hero-check" class="w-3.5 h-3.5" /> Check in
-                    </button>
-                  </div>
+                    variant={:mobile}
+                    ticket_id={ticket.id}
+                    name={attendee_name(ticket)}
+                    email={attendee_email(ticket)}
+                    tier={ticket.ticket_tier && ticket.ticket_tier.name}
+                    ticket_ref={ticket.reference_id}
+                  />
                 </div>
               </div>
             </div>
@@ -237,108 +182,37 @@ defmodule YscWeb.AdminEventCheckInLive do
             <%!-- Desktop --%>
             <div class="hidden md:block bg-white rounded border border-zinc-200">
               <div id="checked-in-tickets" phx-update="stream">
-                <div
+                <.admin_event_check_in_checked_in_row
                   :for={{dom_id, ticket} <- @streams.checked_in_tickets}
                   id={dom_id}
-                  class="grid grid-cols-12 gap-4 px-4 py-3 border-b border-zinc-100 items-center last:border-0 opacity-60 bg-zinc-50/50"
-                >
-                  <div class="col-span-1 flex justify-center">
-                    <.tooltip tooltip_text="Undo check-in">
-                      <button
-                        phx-click="toggle-check-in"
-                        phx-value-ticket-id={ticket.id}
-                        class="w-5 h-5 rounded border-2 border-emerald-500 bg-emerald-500 hover:bg-red-500 hover:border-red-500 transition-colors flex items-center justify-center group"
-                        aria-label="Undo check-in"
-                      >
-                        <.icon
-                          name="hero-check"
-                          class="w-3 h-3 text-white group-hover:hidden"
-                        />
-                        <.icon
-                          name="hero-x-mark"
-                          class="w-3 h-3 text-white hidden group-hover:block"
-                        />
-                      </button>
-                    </.tooltip>
-                  </div>
-                  <div class="col-span-3">
-                    <p class="text-sm font-medium text-zinc-400 line-through">
-                      {attendee_name(ticket)}
-                    </p>
-                  </div>
-                  <div class="col-span-2">
-                    <p class="text-sm text-zinc-400 truncate">
-                      {attendee_email(ticket)}
-                    </p>
-                  </div>
-                  <div class="col-span-2">
-                    <.badge :if={ticket.ticket_tier} type="default">
-                      {ticket.ticket_tier.name}
-                    </.badge>
-                  </div>
-                  <div class="col-span-2">
-                    <span class="text-xs font-mono text-zinc-400 whitespace-nowrap">
-                      {ticket.reference_id}
-                    </span>
-                  </div>
-                  <div class="col-span-2">
-                    <.tooltip_special :if={ticket.checked_in_at}>
-                      <.icon
-                        name="hero-clock"
-                        class="w-3.5 h-3.5 text-zinc-400 cursor-default"
-                      />
-                      <:tooltip_body>
-                        Checked in:
-                        <span
-                          id={"checkin-time-#{ticket.id}"}
-                          phx-hook="LocalTime"
-                          phx-update="ignore"
-                          data-utc-time={DateTime.to_iso8601(ticket.checked_in_at)}
-                        >
-                          {format_checkin_time(ticket.checked_in_at)}
-                        </span>
-                      </:tooltip_body>
-                    </.tooltip_special>
-                  </div>
-                </div>
+                  variant={:desktop}
+                  ticket_id={ticket.id}
+                  name={attendee_name(ticket)}
+                  email={attendee_email(ticket)}
+                  tier={ticket.ticket_tier && ticket.ticket_tier.name}
+                  ticket_ref={ticket.reference_id}
+                  checked_in_at={ticket.checked_in_at}
+                  checked_in_time_label={
+                    ticket.checked_in_at &&
+                      format_checkin_time(ticket.checked_in_at)
+                  }
+                />
               </div>
             </div>
 
             <%!-- Mobile --%>
             <div class="md:hidden space-y-2 opacity-60">
               <div id="checked-in-tickets-mobile" phx-update="stream">
-                <div
+                <.admin_event_check_in_checked_in_row
                   :for={{dom_id, ticket} <- @streams.checked_in_tickets}
                   id={"mobile-checked-#{dom_id}"}
-                  class="bg-white rounded border border-zinc-200 overflow-hidden"
-                >
-                  <div class="flex items-center justify-between px-4 py-3">
-                    <div class="min-w-0 flex-1 mr-3">
-                      <p class="text-sm font-medium text-zinc-400 line-through">
-                        {attendee_name(ticket)}
-                      </p>
-                      <p class="text-xs text-zinc-400 truncate">
-                        {attendee_email(ticket)}
-                      </p>
-                      <div class="flex items-center gap-2 mt-1">
-                        <.badge :if={ticket.ticket_tier} type="default">
-                          {ticket.ticket_tier.name}
-                        </.badge>
-                        <span class="text-xs font-mono text-zinc-400">
-                          {ticket.reference_id}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      phx-click="toggle-check-in"
-                      phx-value-ticket-id={ticket.id}
-                      class="shrink-0 border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition-colors rounded px-2.5 py-1.5 text-xs font-medium flex items-center gap-1"
-                      aria-label="Undo check-in"
-                    >
-                      <.icon name="hero-check" class="w-3.5 h-3.5" /> Undo
-                    </button>
-                  </div>
-                </div>
+                  variant={:mobile}
+                  ticket_id={ticket.id}
+                  name={attendee_name(ticket)}
+                  email={attendee_email(ticket)}
+                  tier={ticket.ticket_tier && ticket.ticket_tier.name}
+                  ticket_ref={ticket.reference_id}
+                />
               </div>
             </div>
           </div>
