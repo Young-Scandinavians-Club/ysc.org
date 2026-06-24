@@ -1499,119 +1499,6 @@ defmodule YscWeb.BookingCheckoutLive do
     end
   end
 
-  defp confirm_complimentary_checkout(socket, booking) do
-    case calculate_booking_price(booking) do
-      {:ok, total_price, price_breakdown} ->
-        if Money.zero?(total_price) do
-          case sync_checkout_hold_pricing(booking, total_price, price_breakdown) do
-            {:ok, synced_booking} ->
-              confirm_synced_complimentary_booking(
-                socket,
-                synced_booking,
-                total_price,
-                price_breakdown
-              )
-
-            {:error, reason} ->
-              Ysc.Logging.warning(
-                "[BookingCheckout] Failed to sync recalculated hold pricing before complimentary confirmation",
-                booking_id: booking.id,
-                reason: inspect(reason)
-              )
-
-              return_complimentary_pricing_error(socket)
-          end
-        else
-          {:noreply,
-           socket
-           |> assign(
-             booking: booking,
-             total_price: total_price,
-             price_breakdown: price_breakdown,
-             complimentary_checkout: false,
-             payment_error: nil,
-             show_payment_form: false,
-             stripe_payment_element_ready: false
-           )
-           |> YscWeb.Flash.put_toast(:error, "This booking requires payment.",
-             title: "Checkout"
-           )}
-        end
-
-      {:error, reason}
-      when reason in [
-             :entitlement_no_longer_valid,
-             :entitlement_not_eligible_for_booking
-           ] ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Your member discount or free night is no longer valid for this reservation, so we can't finish checkout at this price. Please start a new booking from the cabin page — your previous dates may no longer be available.",
-           title: "Checkout"
-         )
-         |> redirect(to: get_property_redirect_path(booking.property))}
-
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "[BookingCheckout] Failed to recalculate price for complimentary confirmation",
-          reason: inspect(reason),
-          booking_id: booking.id
-        )
-
-        return_complimentary_pricing_error(socket)
-    end
-  end
-
-  defp confirm_synced_complimentary_booking(
-         socket,
-         booking,
-         total_price,
-         price_breakdown
-       ) do
-    case process_complimentary_booking_confirmation(booking) do
-      {:ok, confirmed} ->
-        {:noreply,
-         socket
-         |> assign(
-           booking: confirmed,
-           total_price: total_price,
-           price_breakdown: price_breakdown,
-           complimentary_checkout: true
-         )
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "Your booking is confirmed.",
-           title: "Booking confirmed",
-           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
-         )
-         |> push_navigate(
-           to: ~p"/bookings/#{confirmed.id}/receipt?confetti=true"
-         )}
-
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "[BookingCheckout] Complimentary booking confirmation failed",
-          reason: inspect(reason),
-          booking_id: booking.id
-        )
-
-        {:noreply,
-         assign(socket,
-           payment_error:
-             "We couldn't confirm your booking. Please try again or contact us for help."
-         )}
-    end
-  end
-
-  defp return_complimentary_pricing_error(socket) do
-    {:noreply,
-     assign(socket,
-       payment_error:
-         "We couldn't verify the current price for this booking. Please refresh the page or start a new booking."
-     )}
-  end
-
   @impl true
   def handle_event("cancel-booking", _params, socket) do
     case BookingLocker.release_hold(socket.assigns.booking.id) do
@@ -1735,6 +1622,119 @@ defmodule YscWeb.BookingCheckoutLive do
   end
 
   ## Private Functions
+
+  defp confirm_complimentary_checkout(socket, booking) do
+    case calculate_booking_price(booking) do
+      {:ok, total_price, price_breakdown} ->
+        if Money.zero?(total_price) do
+          case sync_checkout_hold_pricing(booking, total_price, price_breakdown) do
+            {:ok, synced_booking} ->
+              confirm_synced_complimentary_booking(
+                socket,
+                synced_booking,
+                total_price,
+                price_breakdown
+              )
+
+            {:error, reason} ->
+              Ysc.Logging.warning(
+                "[BookingCheckout] Failed to sync recalculated hold pricing before complimentary confirmation",
+                booking_id: booking.id,
+                reason: inspect(reason)
+              )
+
+              return_complimentary_pricing_error(socket)
+          end
+        else
+          {:noreply,
+           socket
+           |> assign(
+             booking: booking,
+             total_price: total_price,
+             price_breakdown: price_breakdown,
+             complimentary_checkout: false,
+             payment_error: nil,
+             show_payment_form: false,
+             stripe_payment_element_ready: false
+           )
+           |> YscWeb.Flash.put_toast(:error, "This booking requires payment.",
+             title: "Checkout"
+           )}
+        end
+
+      {:error, reason}
+      when reason in [
+             :entitlement_no_longer_valid,
+             :entitlement_not_eligible_for_booking
+           ] ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Your member discount or free night is no longer valid for this reservation, so we can't finish checkout at this price. Please start a new booking from the cabin page — your previous dates may no longer be available.",
+           title: "Checkout"
+         )
+         |> redirect(to: get_property_redirect_path(booking.property))}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "[BookingCheckout] Failed to recalculate price for complimentary confirmation",
+          reason: inspect(reason),
+          booking_id: booking.id
+        )
+
+        return_complimentary_pricing_error(socket)
+    end
+  end
+
+  defp confirm_synced_complimentary_booking(
+         socket,
+         booking,
+         total_price,
+         price_breakdown
+       ) do
+    case process_complimentary_booking_confirmation(booking) do
+      {:ok, confirmed} ->
+        {:noreply,
+         socket
+         |> assign(
+           booking: confirmed,
+           total_price: total_price,
+           price_breakdown: price_breakdown,
+           complimentary_checkout: true
+         )
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your booking is confirmed.",
+           title: "Booking confirmed",
+           icon: &YscWeb.CoreComponents.flash_toast_icon_calendar/1
+         )
+         |> push_navigate(
+           to: ~p"/bookings/#{confirmed.id}/receipt?confetti=true"
+         )}
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "[BookingCheckout] Complimentary booking confirmation failed",
+          reason: inspect(reason),
+          booking_id: booking.id
+        )
+
+        {:noreply,
+         assign(socket,
+           payment_error:
+             "We couldn't confirm your booking. Please try again or contact us for help."
+         )}
+    end
+  end
+
+  defp return_complimentary_pricing_error(socket) do
+    {:noreply,
+     assign(socket,
+       payment_error:
+         "We couldn't verify the current price for this booking. Please refresh the page or start a new booking."
+     )}
+  end
 
   defp sync_checkout_hold_pricing(booking, total_price, price_breakdown) do
     Bookings.sync_hold_checkout_pricing(booking, %{
