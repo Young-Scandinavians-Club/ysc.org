@@ -44,4 +44,34 @@ defmodule YscWeb.AdminEventsQueryTest do
       assert author_queries == 0
     end
   end
+
+  describe "event editor deferred queries" do
+    setup %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      ticket_tier_fixture(%{event_id: event.id, name: "General Admission"})
+
+      %{conn: log_in_user(conn, admin), event: event}
+    end
+
+    test "dead render does not count ticket tiers before connect", %{
+      conn: conn,
+      event: event
+    } do
+      tier_count_pattern = ~r/FROM "ticket_tiers"/i
+
+      {html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/admin/events/#{event.id}/edit")
+            |> html_response(200)
+          end,
+          pattern: tier_count_pattern
+        )
+
+      assert query_count == 0
+      assert html =~ event.title
+    end
+  end
 end

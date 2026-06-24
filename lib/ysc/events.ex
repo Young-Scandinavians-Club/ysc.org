@@ -2882,8 +2882,8 @@ defmodule Ysc.Events do
     EventUpdate
     |> where([u], u.event_id == ^event_id)
     |> order_by([u], desc: u.inserted_at)
+    |> preload(:sent_by)
     |> Repo.all()
-    |> Repo.preload(:sent_by)
   end
 
   @doc """
@@ -2893,8 +2893,8 @@ defmodule Ysc.Events do
     EventUpdate
     |> where([u], u.event_id == ^event_id and u.show_on_event_page == true)
     |> order_by([u], desc: u.inserted_at)
+    |> preload(:sent_by)
     |> Repo.all()
-    |> Repo.preload(:sent_by)
   end
 
   @doc """
@@ -2904,54 +2904,48 @@ defmodule Ysc.Events do
   registrants (TicketDetail.email) for all confirmed tickets.
   """
   def list_event_update_recipients(event_id) do
-    tickets =
-      Ticket
-      |> where([t], t.event_id == ^event_id and t.status == :confirmed)
-      |> join(:left, [t], tt in TicketTier, on: t.ticket_tier_id == tt.id)
-      |> where([t, tt], tt.type != :donation)
-      |> join(:left, [t, _tt], u in User, on: t.user_id == u.id)
-      |> preload([t, _tt, u], user: u)
-      |> Repo.all()
+    purchaser_recipients =
+      from t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        join: u in User,
+        on: t.user_id == u.id,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        where: not is_nil(u.email) and u.email != "",
+        select: %{
+          email: u.email,
+          first_name: u.first_name,
+          normalized: fragment("lower(?)", u.email),
+          priority: 1
+        }
 
-    ticket_ids = Enum.map(tickets, & &1.id)
+    detail_recipients =
+      from t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        join: td in TicketDetail,
+        on: td.ticket_id == t.id,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        where: not is_nil(td.email) and td.email != "",
+        select: %{
+          email: td.email,
+          first_name: td.first_name,
+          normalized: fragment("lower(?)", td.email),
+          priority: 2
+        }
 
-    details_map =
-      if ticket_ids == [] do
-        %{}
-      else
-        TicketDetail
-        |> where([td], td.ticket_id in ^ticket_ids)
-        |> Repo.all()
-        |> Map.new(&{&1.ticket_id, &1})
-      end
+    union_query = union(purchaser_recipients, ^detail_recipients)
 
-    recipients =
-      Enum.reduce(tickets, %{}, fn ticket, acc ->
-        acc =
-          if ticket.user do
-            email = String.downcase(ticket.user.email)
-
-            Map.put_new(acc, email, %{
-              email: ticket.user.email,
-              first_name: ticket.user.first_name
-            })
-          else
-            acc
-          end
-
-        case Map.get(details_map, ticket.id) do
-          %TicketDetail{email: detail_email, first_name: first_name}
-          when is_binary(detail_email) and detail_email != "" ->
-            key = String.downcase(detail_email)
-
-            Map.put_new(acc, key, %{email: detail_email, first_name: first_name})
-
-          _ ->
-            acc
-        end
-      end)
-
-    Map.values(recipients)
+    from(r in subquery(union_query),
+      distinct: r.normalized,
+      order_by: [asc: r.normalized, asc: r.priority],
+      select: %{email: r.email, first_name: r.first_name}
+    )
+    |> Repo.all()
   end
 
   @doc """

@@ -384,7 +384,7 @@ defmodule Ysc.Bookings do
 
     base_query =
       from(b in Booking,
-        preload: [:user, rooms: :room_category, check_ins: :check_in_vehicles]
+        preload: [:user, rooms: :room_category]
       )
 
     # Apply property filter
@@ -504,7 +504,7 @@ defmodule Ysc.Bookings do
           fragment("SIMILARITY(?, ?) > 0.2", u.first_name, ^search_term) or
           fragment("SIMILARITY(?, ?) > 0.2", u.last_name, ^search_term) or
           ilike(b.reference_id, ^search_like),
-      preload: [:user, rooms: :room_category, check_ins: :check_in_vehicles]
+      preload: [:user, rooms: :room_category]
     )
   end
 

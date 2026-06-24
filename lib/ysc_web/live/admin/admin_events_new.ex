@@ -974,10 +974,7 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:start_time, event.start_time)
      |> assign(:end_time, event.end_time)
      |> assign(:can_publish, can_publish?(event.start_date, event.title))
-     |> assign(
-       :ticket_tier_count,
-       Events.count_ticket_tiers_for_event(event.id)
-     )
+     |> assign(:ticket_tier_count, 0)
      |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
      |> assign(trigger_submit: false, check_errors: false)
      |> assign(:hosts, [])
@@ -1031,6 +1028,7 @@ defmodule YscWeb.AdminEventsNewLive do
       end
       |> assign(:list_params, Map.drop(params, ["id"]))
       |> maybe_refresh_tab_data()
+      |> maybe_assign_ticket_tier_count()
 
     {:noreply, socket}
   end
@@ -1040,6 +1038,7 @@ defmodule YscWeb.AdminEventsNewLive do
       socket
       |> assign(:list_params, Map.drop(params, ["id"]))
       |> maybe_refresh_tab_data()
+      |> maybe_assign_ticket_tier_count()
 
     {:noreply, socket}
   end
@@ -1074,10 +1073,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:start_time, event.start_time)
     |> assign(:end_time, event.end_time)
     |> assign(:can_publish, can_publish?(event.start_date, event.title))
-    |> assign(
-      :ticket_tier_count,
-      Events.count_ticket_tiers_for_event(event.id)
-    )
+    |> assign(:ticket_tier_count, 0)
     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
     |> assign(trigger_submit: false, check_errors: false)
     |> assign(:hosts, [])
@@ -1215,6 +1211,24 @@ defmodule YscWeb.AdminEventsNewLive do
             _ ->
               socket
           end
+      end
+    else
+      socket
+    end
+  end
+
+  defp maybe_assign_ticket_tier_count(socket) do
+    if connected?(socket) do
+      case socket.assigns[:event] do
+        %{id: event_id} ->
+          assign(
+            socket,
+            :ticket_tier_count,
+            Events.count_ticket_tiers_for_event(event_id)
+          )
+
+        _ ->
+          socket
       end
     else
       socket

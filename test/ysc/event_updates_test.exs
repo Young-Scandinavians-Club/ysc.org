@@ -62,6 +62,7 @@ defmodule Ysc.EventUpdatesTest do
       assert length(updates) == 2
       titles = Enum.map(updates, & &1.title) |> Enum.sort()
       assert titles == ["First", "Second"]
+      assert Enum.all?(updates, &Ecto.assoc_loaded?(&1.sent_by))
     end
 
     test "returns empty list for event with no updates", %{event: _event} do
@@ -234,6 +235,50 @@ defmodule Ysc.EventUpdatesTest do
     test "returns empty for event with no tickets" do
       event = event_fixture()
       assert Events.list_event_update_recipients(event.id) == []
+    end
+
+    test "loads recipients in a single SQL round-trip", %{
+      event: event,
+      user: user
+    } do
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          type: :paid,
+          requires_registration: true
+        })
+
+      ticket =
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: user.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      %TicketDetail{
+        id: Ecto.ULID.generate(),
+        ticket_id: ticket.id,
+        first_name: "Guest",
+        last_name: "User",
+        email: "guest@example.com"
+      }
+      |> Repo.insert!()
+
+      recipient_pattern = ~r/FROM "tickets"/i
+
+      {_recipients, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Events.list_event_update_recipients(event.id) end,
+          pattern: recipient_pattern
+        )
+
+      assert query_count == 1
     end
   end
 
