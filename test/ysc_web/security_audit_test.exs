@@ -1353,8 +1353,26 @@ defmodule YscWeb.SecurityAuditTest do
       order =
         ticket_order_fixture(%{user: user, event: event, status: :completed})
 
-      assert {:error, :payment_required} =
+      assert {:error, :order_not_pending} =
                Tickets.process_free_ticket_order(order)
+    end
+
+    test "process_free_ticket_order rejects expired pending orders" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+      order =
+        ticket_order_fixture(%{user: user, event: event, status: :pending})
+        |> stabilize_pending_ticket_order!()
+        |> Ecto.Changeset.change(%{
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(-60, :second)
+            |> DateTime.truncate(:second)
+        })
+        |> Ysc.Repo.update!()
+
+      assert {:error, :order_expired} = Tickets.process_free_ticket_order(order)
     end
 
     test "checkout=free URL cannot confirm a pending paid ticket order", %{

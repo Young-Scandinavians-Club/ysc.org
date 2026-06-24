@@ -6464,11 +6464,29 @@ defmodule YscWeb.EventDetailsLive do
 
   # Helper function to process free tickets
   defp confirm_free_tickets_if_allowed(socket, ticket_order) do
+    now = DateTime.utc_now()
+
     cond do
       is_nil(ticket_order) or ticket_order.status != :pending ->
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      ticket_order.event_id != socket.assigns.event.id ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+           title: "Tickets"
+         )
+         |> assign(:show_free_ticket_confirmation, false)}
+
+      DateTime.compare(now, ticket_order.expires_at) == :gt ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:error, "This reservation has expired.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -6536,40 +6554,68 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp process_free_tickets(socket) do
-    # Process the free ticket order directly without payment
-    case Ysc.Tickets.process_free_ticket_order(socket.assigns.ticket_order) do
-      {:ok, updated_order} ->
-        # Update user tickets for this event
-        updated_user_tickets =
-          Ysc.Tickets.list_user_tickets_for_event(
-            socket.assigns.current_user.id,
-            socket.assigns.event.id
-          )
+    ticket_order =
+      Ysc.Tickets.get_user_ticket_order(
+        socket.assigns.current_user.id,
+        socket.assigns.ticket_order.id
+      )
 
+    case ticket_order do
+      nil ->
         {:noreply,
          socket
-         |> assign(:show_free_ticket_confirmation, false)
-         |> assign(:show_order_completion, true)
-         |> assign(:ticket_order, updated_order)
-         |> assign(:user_tickets, updated_user_tickets)
-         |> assign(:selected_tickets, %{})
-         |> assign(:tickets_requiring_registration, [])
-         |> assign(:ticket_details_form, %{})
-         |> redirect(
-           to: ~p"/orders/#{updated_order.id}/confirmation?confetti=true"
-         )}
-
-      {:error, reason} ->
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :error,
-           "Failed to confirm free tickets: #{reason}",
+         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
+
+      order ->
+        case Ysc.Tickets.process_free_ticket_order(order) do
+          {:ok, updated_order} ->
+            # Update user tickets for this event
+            updated_user_tickets =
+              Ysc.Tickets.list_user_tickets_for_event(
+                socket.assigns.current_user.id,
+                socket.assigns.event.id
+              )
+
+            {:noreply,
+             socket
+             |> assign(:show_free_ticket_confirmation, false)
+             |> assign(:show_order_completion, true)
+             |> assign(:ticket_order, updated_order)
+             |> assign(:user_tickets, updated_user_tickets)
+             |> assign(:selected_tickets, %{})
+             |> assign(:tickets_requiring_registration, [])
+             |> assign(:ticket_details_form, %{})
+             |> redirect(
+               to: ~p"/orders/#{updated_order.id}/confirmation?confetti=true"
+             )}
+
+          {:error, reason} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               free_ticket_confirm_error_message(reason),
+               title: "Tickets"
+             )
+             |> assign(:show_free_ticket_confirmation, false)}
+        end
     end
   end
+
+  defp free_ticket_confirm_error_message(:payment_required),
+    do: "This order requires payment."
+
+  defp free_ticket_confirm_error_message(:order_expired),
+    do: "This reservation has expired."
+
+  defp free_ticket_confirm_error_message(:order_not_pending),
+    do: "This order is no longer available."
+
+  defp free_ticket_confirm_error_message(_),
+    do: "Unable to confirm free tickets. Please try again."
 
   # Helper function to get form value from either atom or string key
   defp get_form_value(form_data, field) when is_atom(field) do

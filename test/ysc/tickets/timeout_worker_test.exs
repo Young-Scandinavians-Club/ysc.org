@@ -244,6 +244,47 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
       assert Tickets.get_ticket_order(order.id).status == :completed
     end
 
+    test "returns ok without expiring when order is pending but not yet due", %{
+      user: user,
+      event: event
+    } do
+      order =
+        %TicketOrder{
+          user_id: user.id,
+          event_id: event.id,
+          status: :pending,
+          total_amount: Money.new(0, :USD),
+          reference_id: "TO-NOT-YET-DUE",
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(3600, :second)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert :ok = TimeoutWorker.expire_specific_order(order.id)
+      assert Tickets.get_ticket_order(order.id).status == :pending
+    end
+
+    test "expires pending orders that are past expires_at", %{user: user, event: event} do
+      order =
+        %TicketOrder{
+          user_id: user.id,
+          event_id: event.id,
+          status: :pending,
+          total_amount: Money.new(0, :USD),
+          reference_id: "TO-PAST-DUE",
+          expires_at:
+            DateTime.utc_now()
+            |> DateTime.add(-60, :second)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+      assert :ok = TimeoutWorker.expire_specific_order(order.id)
+      assert Tickets.get_ticket_order(order.id).status == :expired
+    end
+
     test "batch expiration does not revert completed orders", %{
       user: user,
       event: event
