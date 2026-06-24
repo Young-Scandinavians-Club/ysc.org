@@ -43,16 +43,22 @@ defmodule YscWeb.BookingUserMessagesTest do
 
   test "checkout step copy" do
     assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
-             "every guest"
+             "everyone else staying with you"
+
+    assert BookingUserMessages.checkout_guest_info_step_enter_guests() =~
+             "already counted as a guest"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_payment() =~
-             "hold on these dates expires soon"
+             "temporarily reserved these dates"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_complimentary() =~
-             "hold on these dates expires soon"
+             "temporarily reserved these dates"
 
     refute BookingUserMessages.checkout_guest_info_step_continue_payment() =~
              "reservation timer"
+
+    refute BookingUserMessages.checkout_guest_info_step_continue_payment() =~
+             "hold on these dates"
 
     assert BookingUserMessages.checkout_payment_step_pay() =~ "payment details"
 
