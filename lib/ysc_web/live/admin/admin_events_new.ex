@@ -1014,7 +1014,8 @@ defmodule YscWeb.AdminEventsNewLive do
           organizer_id: socket.assigns.current_user.id
         })
 
-      {:ok, push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
+      {:ok,
+       push_navigate(socket, to: "/admin/events/#{inserted_event.id}/edit")}
     else
       {:ok, socket}
     end
