@@ -3821,7 +3821,8 @@ defmodule YscWeb.EventDetailsLive do
        :subscribed_to_save_the_date,
        Map.get(results, :save_the_date_subscription, false)
      )
-     |> assign(:async_data_loaded, true)}
+     |> assign(:async_data_loaded, true)
+     |> assign_checkout_pricing()}
   end
 
   def handle_async(:load_event_data, {:exit, reason}, socket) do

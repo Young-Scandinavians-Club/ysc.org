@@ -142,17 +142,12 @@ export default {
         const linesEl = this.el.querySelector("[data-ticket-order-lines]");
         const emptyEl = this.el.querySelector("[data-ticket-order-empty]");
         const totalEl = this.el.querySelector("[data-ticket-order-total]");
-        const discountSection = this.el.querySelector("[data-ticket-order-discounts]");
 
-        const entries = Object.entries(this.selected).filter(([, qty]) => qty > 0);
-        const hasRegularTickets = entries.some(([tierId]) =>
-            this.tiers.some((tier) => tier.id === tierId)
-        );
+        const entries = Object.entries(this.selected).filter(([, value]) => value > 0);
 
-        if (!hasRegularTickets) {
+        if (entries.length === 0) {
             if (emptyEl) emptyEl.classList.remove("hidden");
             if (linesEl) linesEl.classList.add("hidden");
-            if (discountSection) discountSection.classList.add("hidden");
             if (totalEl) totalEl.textContent = formatCents(0);
             return;
         }
@@ -161,21 +156,55 @@ export default {
         if (linesEl) linesEl.classList.remove("hidden");
 
         let totalCents = 0;
-        let html = "";
+        const fragment = document.createDocumentFragment();
 
-        for (const [tierId, qty] of entries) {
+        for (const [tierId, value] of entries) {
             const tier = this.tiers.find((t) => t.id === tierId);
-            if (!tier) continue;
 
-            const lineCents = tier.price_cents * qty;
-            totalCents += lineCents;
-            const qtyLabel = qty > 1 ? ` × ${qty}` : "";
+            if (tier) {
+                const lineCents = tier.price_cents * value;
+                totalCents += lineCents;
+                const qtyLabel = value > 1 ? ` × ${value}` : "";
 
-            html += `<div class="space-y-1"><div class="flex justify-between text-base"><span>${tier.name}${qtyLabel}</span><span class="font-medium">${formatCents(lineCents)}</span></div></div>`;
+                const wrapper = document.createElement("div");
+                wrapper.className = "space-y-1";
+
+                const row = document.createElement("div");
+                row.className = "flex justify-between text-base";
+
+                const nameEl = document.createElement("span");
+                nameEl.textContent = `${tier.name}${qtyLabel}`;
+
+                const priceEl = document.createElement("span");
+                priceEl.className = "font-medium";
+                priceEl.textContent = formatCents(lineCents);
+
+                row.append(nameEl, priceEl);
+                wrapper.appendChild(row);
+                fragment.appendChild(wrapper);
+            } else {
+                totalCents += value;
+
+                const wrapper = document.createElement("div");
+                wrapper.className = "space-y-1";
+
+                const row = document.createElement("div");
+                row.className = "flex justify-between text-base";
+
+                const nameEl = document.createElement("span");
+                nameEl.textContent = "Donation";
+
+                const priceEl = document.createElement("span");
+                priceEl.className = "font-medium";
+                priceEl.textContent = formatCents(value);
+
+                row.append(nameEl, priceEl);
+                wrapper.appendChild(row);
+                fragment.appendChild(wrapper);
+            }
         }
 
-        if (linesEl) linesEl.innerHTML = html;
-        if (discountSection) discountSection.classList.add("hidden");
+        if (linesEl) linesEl.replaceChildren(fragment);
         if (totalEl) totalEl.textContent = formatCents(totalCents);
     },
 
