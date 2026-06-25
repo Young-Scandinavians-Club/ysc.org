@@ -3104,6 +3104,52 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "has_conflicting_bookings?/3" do
+    test "returns true when a complete booking overlaps the requested range" do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          status: :complete,
+          checkin_date: ~D[2026-08-01],
+          checkout_date: ~D[2026-08-05]
+        })
+
+      assert Bookings.has_conflicting_bookings?(
+               :tahoe,
+               ~D[2026-08-03],
+               ~D[2026-08-07]
+             )
+
+      refute Bookings.has_conflicting_bookings?(
+               :tahoe,
+               booking.checkout_date,
+               Date.add(booking.checkout_date, 3)
+             )
+    end
+
+    test "ignores cancelled bookings" do
+      user = user_fixture()
+
+      _booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          status: :cancelled,
+          checkin_date: ~D[2026-09-01],
+          checkout_date: ~D[2026-09-05]
+        })
+
+      refute Bookings.has_conflicting_bookings?(
+               :tahoe,
+               ~D[2026-09-02],
+               ~D[2026-09-04]
+             )
+    end
+  end
+
   describe "calculate_booking_price/5 non-Date date arguments" do
     test "returns invalid_checkin_date when checkin is not a Date" do
       assert {:error, :invalid_checkin_date} =

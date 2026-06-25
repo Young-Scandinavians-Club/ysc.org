@@ -4,6 +4,7 @@ defmodule YscWeb.EventDetailsLive do
   import YscWeb.Live.AsyncHelpers
 
   @attendees_preview_count 10
+  @availability_refresh_debounce_ms 300
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -3627,7 +3628,12 @@ defmodule YscWeb.EventDetailsLive do
         availability_data
       )
 
-    event_selling_fast = Events.event_selling_fast?(event_id)
+    event_selling_fast =
+      if socket.assigns[:event_selling_fast] do
+        true
+      else
+        Events.event_selling_fast?(event_id)
+      end
     available_capacity = get_available_capacity_from_data(availability_data)
     sold_percentage = compute_sold_percentage(event, availability_data)
 
@@ -3638,6 +3644,68 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:event_selling_fast, event_selling_fast)
     |> assign(:available_capacity, available_capacity)
     |> assign(:sold_percentage, sold_percentage)
+  end
+
+  defp refresh_reservation_availability(socket, event_id, reservation) do
+    resolved_event_id = event_id || reservation_event_id_from_tier(reservation)
+
+    if resolved_event_id == socket.assigns.event.id do
+      {:noreply, assign_ticket_tier_availability(socket, resolved_event_id)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp reservation_event_id_from_tier(%{ticket_tier_id: tier_id}) do
+    case Events.get_ticket_tier(tier_id) do
+      nil -> nil
+      tier -> tier.event_id
+    end
+  end
+
+  defp reservation_event_id_from_tier(_), do: nil
+
+  defp schedule_ticket_availability_refresh(socket, event_id) do
+    if ref = socket.assigns[:availability_refresh_timer] do
+      Process.cancel_timer(ref)
+    end
+
+    ref =
+      Process.send_after(
+        self(),
+        {:refresh_ticket_availability, event_id},
+        @availability_refresh_debounce_ms
+      )
+
+    assign(socket, :availability_refresh_timer, ref)
+  end
+
+  defp refresh_ticket_availability(socket, event_id) do
+    ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
+
+    event_with_pricing =
+      add_pricing_info_from_tiers(socket.assigns.event, ticket_tiers_with_counts)
+
+    socket =
+      socket
+      |> assign(:event, event_with_pricing)
+      |> assign_ticket_tier_availability(event_id, ticket_tiers_with_counts)
+      |> assign(:availability_refresh_timer, nil)
+      |> push_event("animate-availability-update", %{})
+
+    if socket.assigns.active_membership? do
+      {_sold_ticket_count, attendees_count, attendees_list, ticket_counts_per_user,
+       host_ids} =
+        load_attendees(true, socket.assigns.current_user, event_id)
+
+      socket
+      |> assign(:attendees_count, attendees_count)
+      |> assign(:attendees_list, attendees_list)
+      |> assign(:ticket_counts_per_user, ticket_counts_per_user)
+      |> assign(:host_ids, host_ids)
+    else
+      socket
+    end
   end
 
   defp assign_ticket_tier_pricing_and_list(socket, event_id) do
@@ -4384,7 +4452,9 @@ defmodule YscWeb.EventDetailsLive do
     # Only update if this is the event we're viewing
     if event.id == socket.assigns.event.id do
       event = Repo.preload(event, [:ticket_tiers, :cover_image])
-      event_with_pricing = add_pricing_info(event)
+
+      event_with_pricing =
+        add_pricing_info_from_tiers(event, event.ticket_tiers)
 
       subscribed =
         Events.subscribed_to_event_notification?(
@@ -4699,57 +4769,36 @@ defmodule YscWeb.EventDetailsLive do
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCreated{
-           ticket_reservation: reservation
+           ticket_reservation: reservation,
+           event_id: event_id
          }},
         socket
       ) do
-    # Reservations affect availability - refresh availability if for this event
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier && ticket_tier.event_id == socket.assigns.event.id do
-      {:noreply,
-       assign_ticket_tier_availability(socket, socket.assigns.event.id)}
-    else
-      {:noreply, socket}
-    end
+    refresh_reservation_availability(socket, event_id, reservation)
   end
 
   @impl true
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationFulfilled{
-           ticket_reservation: reservation
+           ticket_reservation: reservation,
+           event_id: event_id
          }},
         socket
       ) do
-    # Reservations affect availability - refresh availability if for this event
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier && ticket_tier.event_id == socket.assigns.event.id do
-      {:noreply,
-       assign_ticket_tier_availability(socket, socket.assigns.event.id)}
-    else
-      {:noreply, socket}
-    end
+    refresh_reservation_availability(socket, event_id, reservation)
   end
 
   @impl true
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCancelled{
-           ticket_reservation: reservation
+           ticket_reservation: reservation,
+           event_id: event_id
          }},
         socket
       ) do
-    # Reservations affect availability - refresh availability if for this event
-    ticket_tier = Events.get_ticket_tier(reservation.ticket_tier_id)
-
-    if ticket_tier && ticket_tier.event_id == socket.assigns.event.id do
-      {:noreply,
-       assign_ticket_tier_availability(socket, socket.assigns.event.id)}
-    else
-      {:noreply, socket}
-    end
+    refresh_reservation_availability(socket, event_id, reservation)
   end
 
   @impl true
@@ -4783,34 +4832,17 @@ defmodule YscWeb.EventDetailsLive do
          %Ysc.MessagePassingEvents.TicketAvailabilityUpdated{event_id: event_id}},
         socket
       ) do
-    # Handle ticket availability updates - refresh the event to get updated availability counts
-    # Only process if this is for the current event
     if socket.assigns.event.id == event_id do
-      ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
+      {:noreply, schedule_ticket_availability_refresh(socket, event_id)}
+    else
+      {:noreply, socket}
+    end
+  end
 
-      event_with_pricing =
-        add_pricing_info_from_tiers(
-          socket.assigns.event,
-          ticket_tiers_with_counts
-        )
-
-      {_sold_ticket_count, attendees_count, attendees_list,
-       ticket_counts_per_user, host_ids} =
-        load_attendees(
-          socket.assigns.active_membership?,
-          socket.assigns.current_user,
-          event_id
-        )
-
-      {:noreply,
-       socket
-       |> assign(:event, event_with_pricing)
-       |> assign_ticket_tier_availability(event_id, ticket_tiers_with_counts)
-       |> assign(:attendees_count, attendees_count)
-       |> assign(:attendees_list, attendees_list)
-       |> assign(:ticket_counts_per_user, ticket_counts_per_user)
-       |> assign(:host_ids, host_ids)
-       |> push_event("animate-availability-update", %{})}
+  @impl true
+  def handle_info({:refresh_ticket_availability, event_id}, socket) do
+    if socket.assigns.event.id == event_id do
+      {:noreply, refresh_ticket_availability(socket, event_id)}
     else
       {:noreply, socket}
     end
