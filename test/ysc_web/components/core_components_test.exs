@@ -67,4 +67,79 @@ defmodule YscWeb.CoreComponentsTest do
       refute Enum.join(classes, " ") =~ "min-h-72"
     end
   end
+
+  describe "at_glance_grid/1 and at_glance_stat/1" do
+    test "renders responsive grid with blue accent stat tiles" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.at_glance_grid>
+          <.at_glance_stat
+            icon="🛏️"
+            label="Capacity"
+            value="17 Guests"
+            detail="7 Bedrooms"
+          />
+        </.at_glance_grid>
+        """)
+
+      assert html =~ "grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12"
+      assert html =~ "hover:border-blue-200"
+      assert html =~ "bg-blue-50"
+      assert html =~ "Capacity"
+      assert html =~ "17 Guests"
+      assert html =~ "7 Bedrooms"
+    end
+
+    test "renders teal accent styling" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.at_glance_stat
+          accent={:teal}
+          icon="⚓"
+          label="Dock"
+          value="100-Foot Private"
+          detail="Boat mooring & swimming"
+        />
+        """)
+
+      assert html =~ "hover:border-teal-200"
+      assert html =~ "bg-teal-50"
+      assert html =~ "Dock"
+      assert html =~ "100-Foot Private"
+      assert html =~ "Boat mooring &amp; swimming"
+    end
+
+    test "omits detail line when not provided" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.at_glance_stat icon="🔥" label="Features" value="Wood Fireplace" />
+        """)
+
+      assert html =~ "Features"
+      assert html =~ "Wood Fireplace"
+      refute html =~ "text-xs text-zinc-500 text-center mt-1"
+    end
+
+    test "merges custom class onto stat tile" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.at_glance_stat
+          icon="🛶"
+          label="Summer"
+          value="Kayaks"
+          class="custom-stat"
+        />
+        """)
+
+      assert html =~ "custom-stat"
+    end
+  end
 end
