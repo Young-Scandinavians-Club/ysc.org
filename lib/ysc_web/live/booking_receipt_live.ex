@@ -1497,7 +1497,10 @@ defmodule YscWeb.BookingReceiptLive do
 
           verification_result =
             if modification_payment_intent?(payment_intent) do
-              :ok
+              Bookings.verify_modification_redirect_payment_intent(
+                payment_intent,
+                booking
+              )
             else
               Bookings.verify_booking_payment_intent(payment_intent, booking)
             end
