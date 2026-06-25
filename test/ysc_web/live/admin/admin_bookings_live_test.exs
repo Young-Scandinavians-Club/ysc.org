@@ -580,9 +580,10 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert render(view) =~ unique
     end
 
-    test "reservations table shows checked-in status when booking.checked_in is true", %{
-      conn: conn
-    } do
+    test "reservations table shows checked-in status when booking.checked_in is true",
+         %{
+           conn: conn
+         } do
       unique = "CheckedIn#{System.unique_integer([:positive])}"
       user = user_fixture(%{first_name: unique, last_name: "Guest"})
       booking = booking_fixture(%{user_id: user.id, property: :tahoe})
