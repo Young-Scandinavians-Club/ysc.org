@@ -1191,18 +1191,19 @@ defmodule YscWeb.TahoeBookingLive do
                     </div>
                   </div>
                 </div>
-                <!-- Winter Policy Notice -->
+                <!-- Season booking options notice -->
                 <div
                   :if={@checkin_date}
                   class="p-3 bg-blue-50 border border-blue-200 rounded-xl"
                 >
                   <p class="text-xs text-blue-900">
-                    <strong>Winter Policy:</strong>
-                    {if can_select_booking_mode?(@seasons, @checkin_date) do
-                      "May–November: you can rent the entire cabin or book individual rooms."
-                    else
-                      "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
-                    end}
+                    <%= if can_select_booking_mode?(@seasons, @checkin_date) do %>
+                      <strong>Booking options for your dates:</strong>
+                      You can rent the entire cabin or book individual rooms (May–November only).
+                    <% else %>
+                      <strong>Winter booking (Dec–Apr):</strong>
+                      Individual rooms only. Renting the entire cabin is not available in winter.
+                    <% end %>
                   </p>
                 </div>
                 <!-- Pricing & Membership Info -->
@@ -5091,7 +5092,7 @@ defmodule YscWeb.TahoeBookingLive do
              |> assign(
                form_errors: %{general: "Please fill in all required fields."},
                calculated_price: nil,
-               price_error: "Invalid parameters",
+               price_error: "Please fill in all required fields.",
                show_confirm_modal: false
              )}
 
