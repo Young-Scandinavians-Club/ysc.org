@@ -900,6 +900,7 @@ defmodule Ysc.BookingsTest do
       check_in = Ysc.Repo.preload(check_in, :bookings)
       assert length(check_in.bookings) == 1
       assert Enum.at(check_in.bookings, 0).id == booking.id
+      assert Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in == true
     end
 
     test "create_check_in/1 persists vehicles when provided" do
