@@ -3133,19 +3133,23 @@ defmodule Ysc.BookingsTest do
     test "ignores cancelled bookings" do
       user = user_fixture()
 
-      _booking =
+      booking =
         booking_fixture(%{
           user_id: user.id,
           property: :tahoe,
-          status: :cancelled,
-          checkin_date: ~D[2026-09-01],
-          checkout_date: ~D[2026-09-05]
+          checkin_date: ~D[2026-09-07],
+          checkout_date: ~D[2026-09-10]
         })
+
+      {:ok, _cancelled} =
+        booking
+        |> Ecto.Changeset.change(%{status: :canceled})
+        |> Ysc.Repo.update()
 
       refute Bookings.has_conflicting_bookings?(
                :tahoe,
-               ~D[2026-09-02],
-               ~D[2026-09-04]
+               ~D[2026-09-08],
+               ~D[2026-09-09]
              )
     end
   end

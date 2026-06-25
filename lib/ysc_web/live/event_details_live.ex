@@ -3634,6 +3634,7 @@ defmodule YscWeb.EventDetailsLive do
       else
         Events.event_selling_fast?(event_id)
       end
+
     available_capacity = get_available_capacity_from_data(availability_data)
     sold_percentage = compute_sold_percentage(event, availability_data)
 
@@ -3684,7 +3685,10 @@ defmodule YscWeb.EventDetailsLive do
     ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
 
     event_with_pricing =
-      add_pricing_info_from_tiers(socket.assigns.event, ticket_tiers_with_counts)
+      add_pricing_info_from_tiers(
+        socket.assigns.event,
+        ticket_tiers_with_counts
+      )
 
     socket =
       socket
@@ -3694,8 +3698,8 @@ defmodule YscWeb.EventDetailsLive do
       |> push_event("animate-availability-update", %{})
 
     if socket.assigns.active_membership? do
-      {_sold_ticket_count, attendees_count, attendees_list, ticket_counts_per_user,
-       host_ids} =
+      {_sold_ticket_count, attendees_count, attendees_list,
+       ticket_counts_per_user, host_ids} =
         load_attendees(true, socket.assigns.current_user, event_id)
 
       socket
@@ -6032,13 +6036,6 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   # Helper function to add pricing information to events (same logic as Events module)
-  defp add_pricing_info(event) do
-    ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
-    pricing_info = pricing_info_for_event(event, ticket_tiers)
-    Map.put(event, :pricing_info, pricing_info)
-  end
-
-  # Optimized version that uses pre-loaded ticket tiers
   defp add_pricing_info_from_tiers(event, ticket_tiers) do
     pricing_info = pricing_info_for_event(event, ticket_tiers)
     Map.put(event, :pricing_info, pricing_info)

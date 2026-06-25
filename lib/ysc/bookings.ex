@@ -2073,14 +2073,24 @@ defmodule Ysc.Bookings do
   Uses strict overlap semantics (same-day turnarounds are allowed), matching
   `bookings_overlap?/4` and Tahoe buyout validation.
   """
-  def has_conflicting_bookings?(property, checkin_date, checkout_date, opts \\ []) do
+  def has_conflicting_bookings?(
+        property,
+        checkin_date,
+        checkout_date,
+        opts \\ []
+      ) do
     property
     |> conflicting_bookings_query(checkin_date, checkout_date, opts)
     |> Repo.exists?()
   end
 
   @doc false
-  def conflicting_bookings_query(property, checkin_date, checkout_date, opts \\ []) do
+  def conflicting_bookings_query(
+        property,
+        checkin_date,
+        checkout_date,
+        opts \\ []
+      ) do
     statuses = Keyword.get(opts, :statuses, [:hold, :complete])
 
     from b in Booking,
