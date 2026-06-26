@@ -92,7 +92,7 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="How do you qualify for membership? Check every statement that is true for you. You only need one to apply.*"
+                    label="How do you qualify for membership? Check all that apply — you only need one to apply.*"
                     options={SignupApplication.eligibility_options()}
                   />
                   <p class="text-sm leading-6 text-zinc-600 mt-4">
