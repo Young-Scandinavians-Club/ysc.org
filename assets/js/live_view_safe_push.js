@@ -14,12 +14,17 @@ function liveViewConnected(hook) {
 }
 
 /**
+ * @param {((reply: unknown) => void) | undefined} onReply
  * @returns {boolean} whether the event was sent
  */
-export function pushEventIfConnected(hook, event, payload = {}) {
+export function pushEventIfConnected(hook, event, payload = {}, onReply) {
     if (!liveViewConnected(hook)) return false;
     try {
-        hook.pushEvent(event, payload);
+        if (onReply) {
+            hook.pushEvent(event, payload, onReply);
+        } else {
+            hook.pushEvent(event, payload);
+        }
         return true;
     } catch (err) {
         console.error("[live_view_safe_push] pushEvent failed", event, err);

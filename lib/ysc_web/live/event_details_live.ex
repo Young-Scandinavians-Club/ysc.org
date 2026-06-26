@@ -1256,7 +1256,6 @@ defmodule YscWeb.EventDetailsLive do
         phx-hook="TicketCheckout"
         data-tiers={checkout_tiers_json(@ticket_tiers)}
         data-selected={selected_tickets_json(@selected_tickets)}
-        data-reservations={Jason.encode!(@reservations_by_tier)}
         class="flex flex-col lg:flex-row gap-8 min-h-[600px]"
       >
         <!-- Left Panel: Ticket Tiers -->
@@ -4180,7 +4179,12 @@ defmodule YscWeb.EventDetailsLive do
 
     availability_data = checkout_availability_data(socket, ticket_tiers)
 
-    socket = assign_selected_tickets(socket, selected_tickets)
+    socket =
+      if socket.assigns.async_data_loaded do
+        assign_selected_tickets(socket, selected_tickets)
+      else
+        assign(socket, :selected_tickets, selected_tickets)
+      end
 
     case checkout_step do
       "free" ->
@@ -5723,7 +5727,7 @@ defmodule YscWeb.EventDetailsLive do
     # Only handle quantity changes for non-donation tiers
     if ticket_tier &&
          (ticket_tier.type == "donation" || ticket_tier.type == :donation) do
-      {:noreply, socket}
+      {:reply, %{ok: false}, socket}
     else
       current_quantity =
         get_ticket_quantity(socket.assigns.selected_tickets, tier_id)
@@ -5748,7 +5752,7 @@ defmodule YscWeb.EventDetailsLive do
         {:noreply, assign_selected_tickets(socket, updated_tickets)}
       else
         # Don't increase if we've reached the limit
-        {:noreply, socket}
+        {:reply, %{ok: false}, socket}
       end
     end
   end

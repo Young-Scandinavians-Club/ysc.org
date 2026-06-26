@@ -10,10 +10,8 @@ function parseJsonAttr(el, name, fallback) {
     }
 }
 
-function formatCents(cents) {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(
-        cents / 100
-    );
+function cloneSelected(selected) {
+    return { ...selected };
 }
 
 export default {
@@ -39,6 +37,7 @@ export default {
             const serverQty = this.selected[pendingTier] || 0;
             if (serverQty !== pendingQty) {
                 this.playReject(pendingTier);
+                this.refreshTierUI(pendingTier, serverQty);
             }
         }
 
@@ -62,6 +61,7 @@ export default {
         const tierId = btn.getAttribute("data-tier-id");
         if (!tierId || !action) return;
 
+        const previousSelected = cloneSelected(this.selected);
         const current = this.selected[tierId] || 0;
         const delta = action === "increase" ? 1 : -1;
         const next = Math.max(0, current + delta);
@@ -81,15 +81,39 @@ export default {
 
         const event =
             action === "increase" ? "increase-ticket-quantity" : "decrease-ticket-quantity";
-        pushEventIfConnected(this, event, { "tier-id": tierId });
+
+        const sent = pushEventIfConnected(this, event, { "tier-id": tierId }, (reply) => {
+            if (reply && reply.ok === false) {
+                this.revertSelection(previousSelected, tierId);
+            }
+        });
+
+        if (!sent) {
+            this.revertSelection(previousSelected, tierId);
+        }
     },
 
     applyOptimisticUI(tierId, qty) {
         this.updateQtyDisplay(tierId, qty);
         this.updateTierCard(tierId, qty > 0);
-        this.updateButtons(tierId, qty);
-        this.updateOrderSummary();
-        this.updateProceedButton();
+        this.setButtonsPending(tierId);
+    },
+
+    revertSelection(previousSelected, tierId) {
+        this.selected = cloneSelected(previousSelected);
+        this._pendingTier = null;
+        this._pendingQty = null;
+
+        const qty = this.selected[tierId] || 0;
+        this.playReject(tierId);
+        this.refreshTierUI(tierId, qty);
+        this.syncButtonStatesFromDOM();
+        this.syncProceedButtonFromDOM();
+    },
+
+    refreshTierUI(tierId, qty) {
+        this.updateQtyDisplay(tierId, qty);
+        this.updateTierCard(tierId, qty > 0);
     },
 
     updateQtyDisplay(tierId, qty) {
@@ -128,87 +152,40 @@ export default {
         }
     },
 
-    updateButtons(tierId, qty) {
-        const decreaseBtn = this.el.querySelector(
-            `[data-ticket-action="decrease"][data-tier-id="${tierId}"]`
-        );
+    setButtonsPending(tierId) {
+        for (const action of ["increase", "decrease"]) {
+            const btn = this.el.querySelector(
+                `[data-ticket-action="${action}"][data-tier-id="${tierId}"]`
+            );
 
-        if (!decreaseBtn || decreaseBtn.hasAttribute("data-locked-disabled")) return;
+            if (!btn || btn.hasAttribute("data-locked-disabled")) continue;
 
-        decreaseBtn.disabled = qty === 0;
+            btn.disabled = true;
+        }
     },
 
-    updateOrderSummary() {
-        const linesEl = this.el.querySelector("[data-ticket-order-lines]");
-        const emptyEl = this.el.querySelector("[data-ticket-order-empty]");
-        const totalEl = this.el.querySelector("[data-ticket-order-total]");
+    syncButtonStatesFromDOM() {
+        for (const btn of this.el.querySelectorAll("[data-ticket-action]")) {
+            if (btn.hasAttribute("data-locked-disabled")) {
+                btn.disabled = true;
+                continue;
+            }
 
-        const entries = Object.entries(this.selected).filter(([, value]) => value > 0);
+            const tierId = btn.getAttribute("data-tier-id");
+            const action = btn.getAttribute("data-ticket-action");
+            if (!tierId || !action) continue;
 
-        if (entries.length === 0) {
-            if (emptyEl) emptyEl.classList.remove("hidden");
-            if (linesEl) linesEl.classList.add("hidden");
-            if (totalEl) totalEl.textContent = formatCents(0);
-            return;
-        }
+            const qty = this.selected[tierId] || 0;
 
-        if (emptyEl) emptyEl.classList.add("hidden");
-        if (linesEl) linesEl.classList.remove("hidden");
-
-        let totalCents = 0;
-        const fragment = document.createDocumentFragment();
-
-        for (const [tierId, value] of entries) {
-            const tier = this.tiers.find((t) => t.id === tierId);
-
-            if (tier) {
-                const lineCents = tier.price_cents * value;
-                totalCents += lineCents;
-                const qtyLabel = value > 1 ? ` × ${value}` : "";
-
-                const wrapper = document.createElement("div");
-                wrapper.className = "space-y-1";
-
-                const row = document.createElement("div");
-                row.className = "flex justify-between text-base";
-
-                const nameEl = document.createElement("span");
-                nameEl.textContent = `${tier.name}${qtyLabel}`;
-
-                const priceEl = document.createElement("span");
-                priceEl.className = "font-medium";
-                priceEl.textContent = formatCents(lineCents);
-
-                row.append(nameEl, priceEl);
-                wrapper.appendChild(row);
-                fragment.appendChild(wrapper);
-            } else {
-                totalCents += value;
-
-                const wrapper = document.createElement("div");
-                wrapper.className = "space-y-1";
-
-                const row = document.createElement("div");
-                row.className = "flex justify-between text-base";
-
-                const nameEl = document.createElement("span");
-                nameEl.textContent = "Donation";
-
-                const priceEl = document.createElement("span");
-                priceEl.className = "font-medium";
-                priceEl.textContent = formatCents(value);
-
-                row.append(nameEl, priceEl);
-                wrapper.appendChild(row);
-                fragment.appendChild(wrapper);
+            if (action === "decrease") {
+                btn.disabled = qty === 0;
+            } else if (action === "increase") {
+                btn.disabled = false;
             }
         }
-
-        if (linesEl) linesEl.replaceChildren(fragment);
-        if (totalEl) totalEl.textContent = formatCents(totalCents);
     },
 
-    updateProceedButton() {
+    syncProceedButtonFromDOM() {
         const btn = this.el.querySelector("#ticket-proceed-checkout");
         if (!btn) return;
 
