@@ -3061,64 +3061,32 @@ defmodule YscWeb.TahoeBookingLive do
                     The Lake Tahoe region offers endless outdoor opportunities:
                   </p>
                   <!-- At-A-Glance Hero Grid -->
-                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🛏️
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Capacity
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        17 Guests
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        7 Bedrooms
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🧖
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Sauna
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Traditional
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Scandinavian Style
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🔥
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Features
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Wood Fireplace
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        And Fully Equipped Kitchen!
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🛶
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Summer
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Kayaks
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Available for use
-                      </div>
-                    </div>
-                  </div>
+                  <.at_glance_grid>
+                    <.at_glance_stat
+                      icon="🛏️"
+                      label="Capacity"
+                      value="17 Guests"
+                      detail="7 Bedrooms"
+                    />
+                    <.at_glance_stat
+                      icon="🧖"
+                      label="Sauna"
+                      value="Traditional"
+                      detail="Scandinavian Style"
+                    />
+                    <.at_glance_stat
+                      icon="🔥"
+                      label="Features"
+                      value="Wood Fireplace"
+                      detail="And Fully Equipped Kitchen!"
+                    />
+                    <.at_glance_stat
+                      icon="🛶"
+                      label="Summer"
+                      value="Kayaks"
+                      detail="Available for use"
+                    />
+                  </.at_glance_grid>
 
                   <YscWeb.Components.ImageCarousel.image_carousel
                     id="about-the-tahoe-cabin-carousel"

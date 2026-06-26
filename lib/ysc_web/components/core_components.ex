@@ -2733,6 +2733,88 @@ defmodule YscWeb.CoreComponents do
       "text-sm font-black text-blue-600 uppercase tracking-[0.2em] mb-3 md:mb-4"
 
   @doc """
+  Responsive grid wrapper for `at_glance_stat/1` tiles on booking landing pages.
+
+  ## Examples
+
+      <.at_glance_grid>
+        <.at_glance_stat icon="🛏️" label="Capacity" value="17 Guests" detail="7 Bedrooms" />
+        <.at_glance_stat icon="🧖" label="Sauna" value="Traditional" detail="Scandinavian Style" />
+      </.at_glance_grid>
+  """
+  attr :class, :any, default: nil
+
+  slot :inner_block, required: true
+
+  def at_glance_grid(assigns) do
+    ~H"""
+    <div class={["grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12", @class]}>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
+  @doc """
+  Compact stat tile for property "at a glance" grids on booking landing pages.
+
+  Pass `accent={:teal}` for Clear Lake styling; Tahoe uses the default `:blue`.
+
+  ## Examples
+
+      <.at_glance_stat
+        icon="🛏️"
+        label="Capacity"
+        value="17 Guests"
+        detail="7 Bedrooms"
+      />
+
+      <.at_glance_stat
+        accent={:teal}
+        icon="⚓"
+        label="Dock"
+        value="100-Foot Private"
+        detail="Boat mooring & swimming"
+      />
+  """
+  attr :icon, :string, required: true, doc: "Emoji or short icon text"
+  attr :label, :string, required: true
+  attr :value, :string, required: true
+  attr :detail, :string, default: nil
+  attr :accent, :atom, default: :blue, values: [:blue, :teal]
+  attr :class, :any, default: nil
+
+  def at_glance_stat(assigns) do
+    ~H"""
+    <div class={[
+      "bg-white border border-zinc-200 rounded-xl p-5 shadow-sm transition-colors",
+      at_glance_hover_border(@accent),
+      @class
+    ]}>
+      <div class={[
+        "w-10 h-10 rounded-full flex items-center justify-center text-xl mb-4 mx-auto",
+        at_glance_icon_bg(@accent)
+      ]}>
+        {@icon}
+      </div>
+      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
+        {@label}
+      </div>
+      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
+        {@value}
+      </div>
+      <div :if={@detail} class="text-xs text-zinc-500 text-center mt-1">
+        {@detail}
+      </div>
+    </div>
+    """
+  end
+
+  defp at_glance_hover_border(:blue), do: "hover:border-blue-200"
+  defp at_glance_hover_border(:teal), do: "hover:border-teal-200"
+  defp at_glance_icon_bg(:blue), do: "bg-blue-50"
+  defp at_glance_icon_bg(:teal), do: "bg-teal-50"
+
+  @doc """
   Compact bordered notice for forms (info, error, or success), used in modals and inline forms.
 
   For `:info`, a default information icon is shown unless `:icon` is set to another
