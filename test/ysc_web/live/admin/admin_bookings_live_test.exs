@@ -704,9 +704,10 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert html =~ ~s(text-green-700 font-medium">Yes<)
     end
 
-    test "reservations table omits checked-in indicator for unchecked bookings", %{
-      conn: conn
-    } do
+    test "reservations table omits checked-in indicator for unchecked bookings",
+         %{
+           conn: conn
+         } do
       unique = "NotChecked#{System.unique_integer([:positive])}"
       user = user_fixture(%{first_name: unique, last_name: "Guest"})
       _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
