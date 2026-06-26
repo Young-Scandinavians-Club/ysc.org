@@ -2266,7 +2266,8 @@ defmodule Ysc.Events do
         invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCreated{
-          ticket_reservation: reservation
+          ticket_reservation: reservation,
+          event_id: reservation_event_id(reservation.ticket_tier_id)
         })
 
         schedule_ticket_reservation_created_notification(reservation)
@@ -2572,7 +2573,8 @@ defmodule Ysc.Events do
         invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationFulfilled{
-          ticket_reservation: reservation
+          ticket_reservation: reservation,
+          event_id: reservation_event_id(reservation.ticket_tier_id)
         })
 
         {:ok, reservation}
@@ -2604,7 +2606,8 @@ defmodule Ysc.Events do
         invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
-          ticket_reservation: reservation
+          ticket_reservation: reservation,
+          event_id: reservation_event_id(reservation.ticket_tier_id)
         })
 
         {:ok, reservation}
@@ -2696,7 +2699,8 @@ defmodule Ysc.Events do
         invalidate_event_caches()
 
         broadcast(%Ysc.MessagePassingEvents.TicketReservationCancelled{
-          ticket_reservation: reservation
+          ticket_reservation: reservation,
+          event_id: reservation_event_id(reservation.ticket_tier_id)
         })
 
         {:ok, reservation}
@@ -3072,6 +3076,13 @@ defmodule Ysc.Events do
 
   defp broadcast(event) do
     Phoenix.PubSub.broadcast(Ysc.PubSub, topic(), {__MODULE__, event})
+  end
+
+  defp reservation_event_id(ticket_tier_id) do
+    TicketTier
+    |> where([tt], tt.id == ^ticket_tier_id)
+    |> select([tt], tt.event_id)
+    |> Repo.one()
   end
 
   @doc """

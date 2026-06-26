@@ -6408,18 +6408,27 @@ defmodule YscWeb.TahoeBookingLive do
       # 1. Check if user has ANY active or future bookings (stricter rule for buyout)
       if socket.assigns.user do
         user = socket.assigns.user
-        family_user_ids = get_family_group_user_ids(user)
         today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
-        # Check for any active bookings (status = :complete) with checkout_date >= today
         has_active_booking =
-          Repo.exists?(
-            from b in Booking,
-              where: b.user_id in ^family_user_ids,
-              where: b.property == :tahoe,
-              where: b.status == :complete,
-              where: b.checkout_date >= ^today
-          )
+          case socket.assigns[:active_bookings] do
+            bookings when is_list(bookings) and bookings != [] ->
+              Enum.any?(bookings, fn booking ->
+                booking.status == :complete &&
+                  Date.compare(booking.checkout_date, today) != :lt
+              end)
+
+            _ ->
+              family_user_ids = get_family_group_user_ids(user)
+
+              Repo.exists?(
+                from b in Booking,
+                  where: b.user_id in ^family_user_ids,
+                  where: b.property == :tahoe,
+                  where: b.status == :complete,
+                  where: b.checkout_date >= ^today
+              )
+          end
 
         if has_active_booking do
           Map.put(
@@ -6438,22 +6447,7 @@ defmodule YscWeb.TahoeBookingLive do
             )
           else
             # 3. Check for ANY existing active bookings on the selected dates (rooms or buyouts)
-            # list_bookings returns potentially overlapping bookings (inclusive)
-            # We filter for status and strict overlap to be precise
-            overlaps = Bookings.list_bookings(:tahoe, checkin, checkout)
-
-            has_conflict =
-              Enum.any?(overlaps, fn booking ->
-                booking.status in [:hold, :complete] &&
-                  Bookings.bookings_overlap?(
-                    checkin,
-                    checkout,
-                    booking.checkin_date,
-                    booking.checkout_date
-                  )
-              end)
-
-            if has_conflict do
+            if Bookings.has_conflicting_bookings?(:tahoe, checkin, checkout) do
               Map.put(
                 errors,
                 :availability,
