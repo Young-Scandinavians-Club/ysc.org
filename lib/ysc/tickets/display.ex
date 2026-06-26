@@ -25,6 +25,7 @@ defmodule Ysc.Tickets.Display do
     tickets
     |> tickets_for_summary(opts)
     |> Enum.group_by(&tier_name_from_ticket/1)
+    |> Enum.sort_by(fn {tier_name, _tier_tickets} -> tier_name(tier_name) end)
     |> Enum.map_join(", ", fn {tier_name, tier_tickets} ->
       "#{length(tier_tickets)}x #{tier_name(tier_name)}"
     end)

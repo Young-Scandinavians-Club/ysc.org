@@ -28,7 +28,7 @@ defmodule Ysc.Tickets.DisplayTest do
         ticket("Early Bird")
       ]
 
-      assert Display.format_tier_quantities(tickets) == "2x VIP, 1x Early Bird"
+      assert Display.format_tier_quantities(tickets) == "1x Early Bird, 2x VIP"
     end
 
     test "uses General Admission when tier name is missing" do
