@@ -1399,6 +1399,35 @@ defmodule YscWeb.SecurityAuditTest do
         assert order.status == :pending
       end)
     end
+
+    test "process_free_ticket_order rejects stale zero-dollar order after tier becomes paid" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 0, state: :upcoming)
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "Complimentary GA",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      order =
+        ticket_order_fixture(%{user: user, event: event, tier: tier, status: :pending})
+        |> stabilize_pending_ticket_order!()
+
+      assert Money.zero?(order.total_amount)
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier, %{
+          type: :paid,
+          price: Money.new(50, :USD)
+        })
+
+      refute Tickets.pending_order_still_complimentary?(order)
+      assert {:error, :payment_required} = Tickets.process_free_ticket_order(order)
+    end
   end
 
   describe "Finding 20: booking payment intent validation" do

@@ -4072,7 +4072,7 @@ defmodule YscWeb.EventDetailsLive do
             )
           else
             checkout_step =
-              if Money.zero?(ticket_order.total_amount),
+              if Ysc.Tickets.pending_order_still_complimentary?(ticket_order),
                 do: "free",
                 else: "payment"
 
@@ -4117,7 +4117,9 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp effective_checkout_step("free", ticket_order) do
-    if Money.zero?(ticket_order.total_amount), do: "free", else: "payment"
+    if Ysc.Tickets.pending_order_still_complimentary?(ticket_order),
+      do: "free",
+      else: "payment"
   end
 
   defp effective_checkout_step(checkout_step, _ticket_order), do: checkout_step
@@ -6494,7 +6496,7 @@ defmodule YscWeb.EventDetailsLive do
          )
          |> assign(:show_free_ticket_confirmation, false)}
 
-      not Money.zero?(ticket_order.total_amount) ->
+      not Ysc.Tickets.pending_order_still_complimentary?(ticket_order) ->
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:error, "This order requires payment.",
@@ -7452,8 +7454,8 @@ defmodule YscWeb.EventDetailsLive do
         socket.assigns.current_user
       )
 
-    # Check if this is a free order (zero amount)
-    if Money.zero?(ticket_order.total_amount) do
+    # Check if this is a free order (zero amount at current tier prices)
+    if Ysc.Tickets.pending_order_still_complimentary?(ticket_order) do
       # For free tickets, show confirmation modal instead of payment form
       # Update URL to reflect checkout state
       {:noreply,
