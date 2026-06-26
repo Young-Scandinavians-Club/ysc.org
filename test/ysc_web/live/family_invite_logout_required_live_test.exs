@@ -83,7 +83,9 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLiveTest do
       assert html =~ other.email
       assert html =~ "finish accepting"
       assert has_element?(view, "button", "Log out and sign in with")
-      assert render(view) =~ "/users/log-in?redirect_to=/family-invite/#{invite.token}/accept"
+
+      assert render(view) =~
+               "/users/log-in?redirect_to=/family-invite/#{invite.token}/accept"
     end
 
     test "shows create-account path when invite email has no account yet", %{
