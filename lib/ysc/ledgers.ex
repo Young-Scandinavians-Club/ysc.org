@@ -13,6 +13,7 @@ defmodule Ysc.Ledgers do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.Tickets.Display, as: TicketDisplay
 
   alias Ysc.Ledgers.{
     LedgerAccount,
@@ -2628,25 +2629,7 @@ defmodule Ysc.Ledgers do
   end
 
   defp build_ticket_order_description(ticket_order) do
-    event_title =
-      if ticket_order.event, do: ticket_order.event.title, else: "Event"
-
-    if ticket_order.tickets && ticket_order.tickets != [] do
-      tickets = ticket_order.tickets
-
-      ticket_summary =
-        tickets
-        |> Enum.group_by(fn t -> t.ticket_tier && t.ticket_tier.name end)
-        |> Enum.map_join(", ", fn {tier_name, tier_tickets} ->
-          count = length(tier_tickets)
-          tier_display = tier_name || "General Admission"
-          "#{count}x #{tier_display}"
-        end)
-
-      "Free Tickets: #{event_title} (#{ticket_summary})"
-    else
-      "Free Tickets: #{event_title}"
-    end
+    TicketDisplay.format_ledger_order_description(ticket_order)
   end
 
   defp build_payment_description(%{

@@ -23,6 +23,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Repo
   alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.S3.SimpleS3Upload
@@ -5905,33 +5906,7 @@ defmodule YscWeb.UserSettingsLive do
             end}
           </p>
           <p class="text-xs">
-            {if @ticket_order.tickets do
-              tickets = @ticket_order.tickets
-              refunded_count = Enum.count(tickets, fn t -> t.status == :cancelled end)
-              active_tickets = Enum.filter(tickets, fn t -> t.status != :cancelled end)
-
-              ticket_summary =
-                if length(active_tickets) > 0 do
-                  active_tickets
-                  |> Enum.group_by(fn t -> t.ticket_tier && t.ticket_tier.name end)
-                  |> Enum.map(fn {tier_name, tier_tickets} ->
-                    count = length(tier_tickets)
-                    tier_display = tier_name || "General Admission"
-                    "#{count}x #{tier_display}"
-                  end)
-                  |> Enum.join(", ")
-                else
-                  "All tickets refunded"
-                end
-
-              if refunded_count > 0 do
-                "#{ticket_summary} (#{refunded_count} refunded)"
-              else
-                ticket_summary
-              end
-            else
-              "No ticket details"
-            end}
+            {TicketDisplay.format_order_ticket_summary(@ticket_order.tickets)}
           </p>
         </div>
         """
@@ -6026,33 +6001,7 @@ defmodule YscWeb.UserSettingsLive do
           end}
         </p>
         <p class="text-xs mt-0.5">
-          {if @ticket_order.tickets do
-            tickets = @ticket_order.tickets
-            refunded_count = Enum.count(tickets, fn t -> t.status == :cancelled end)
-            active_tickets = Enum.filter(tickets, fn t -> t.status != :cancelled end)
-
-            ticket_summary =
-              if length(active_tickets) > 0 do
-                active_tickets
-                |> Enum.group_by(fn t -> t.ticket_tier && t.ticket_tier.name end)
-                |> Enum.map(fn {tier_name, tier_tickets} ->
-                  count = length(tier_tickets)
-                  tier_display = tier_name || "General Admission"
-                  "#{count}x #{tier_display}"
-                end)
-                |> Enum.join(", ")
-              else
-                "All tickets refunded"
-              end
-
-            if refunded_count > 0 do
-              "#{ticket_summary} (#{refunded_count} refunded)"
-            else
-              ticket_summary
-            end
-          else
-            "No ticket details"
-          end}
+          {TicketDisplay.format_order_ticket_summary(@ticket_order.tickets)}
         </p>
         """
 
