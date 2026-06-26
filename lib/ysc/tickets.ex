@@ -985,6 +985,42 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Builds tier selection counts/amounts from a ticket order for pricing lookups.
+  """
+  def ticket_selections_from_order(%TicketOrder{} = ticket_order) do
+    ticket_order
+    |> ensure_ticket_order_for_payment()
+    |> Map.update!(:tickets, fn tickets ->
+      Enum.filter(tickets, &(&1.status == :pending))
+    end)
+    |> do_ticket_selections_from_order()
+  end
+
+  @doc """
+  Recalculates a pending order total using current tier prices and reservations.
+  """
+  def recalculate_pending_order_total(%TicketOrder{} = ticket_order) do
+    selections = ticket_selections_from_order(ticket_order)
+
+    {:ok, total, _discount} =
+      BookingLocker.estimate_order_total(
+        ticket_order.user_id,
+        ticket_order.event_id,
+        selections
+      )
+
+    {:ok, total}
+  end
+
+  @doc """
+  Returns true when a pending order is still complimentary at current tier prices.
+  """
+  def pending_order_still_complimentary?(%TicketOrder{} = ticket_order) do
+    {:ok, total} = recalculate_pending_order_total(ticket_order)
+    Money.zero?(total)
+  end
+
+  @doc """
   Processes a free ticket order (no payment required).
   """
   def process_free_ticket_order(%TicketOrder{} = ticket_order) do
@@ -995,7 +1031,7 @@ defmodule Ysc.Tickets do
       ticket_order_expired?(ticket_order) ->
         {:error, :order_expired}
 
-      not Money.zero?(ticket_order.total_amount) ->
+      not pending_order_still_complimentary?(ticket_order) ->
         {:error, :payment_required}
 
       true ->
@@ -1020,6 +1056,51 @@ defmodule Ysc.Tickets do
   end
 
   def process_free_ticket_order(_ticket_order), do: {:error, :order_not_pending}
+
+  defp do_ticket_selections_from_order(%TicketOrder{tickets: []}), do: %{}
+
+  defp do_ticket_selections_from_order(%TicketOrder{} = ticket_order) do
+    tickets = ticket_order.tickets
+
+    tickets
+    |> Enum.group_by(& &1.ticket_tier_id)
+    |> Enum.reduce(%{}, fn {tier_id, tier_tickets}, acc ->
+      first_ticket = List.first(tier_tickets)
+      tier = first_ticket.ticket_tier
+      quantity = length(tier_tickets)
+
+      if tier.type in [:donation, "donation"] do
+        {_gross_event_amount, donation_amount, _discount_amount} =
+          calculate_event_and_donation_amounts(ticket_order)
+
+        donation_tickets_count =
+          Enum.count(tickets, fn t ->
+            t.ticket_tier.type in [:donation, "donation"]
+          end)
+
+        if donation_tickets_count > 0 do
+          case Money.div(donation_amount, donation_tickets_count) do
+            {:ok, amount_per_ticket} ->
+              {:ok, tier_donation_total} =
+                Money.mult(amount_per_ticket, quantity)
+
+              Map.put(
+                acc,
+                tier_id,
+                MoneyHelper.money_to_cents(tier_donation_total)
+              )
+
+            _ ->
+              acc
+          end
+        else
+          acc
+        end
+      else
+        Map.put(acc, tier_id, quantity)
+      end
+    end)
+  end
 
   ## Timeout Management
 
