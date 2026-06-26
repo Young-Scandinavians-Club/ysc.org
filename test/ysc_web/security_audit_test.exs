@@ -1414,7 +1414,12 @@ defmodule YscWeb.SecurityAuditTest do
         })
 
       order =
-        ticket_order_fixture(%{user: user, event: event, tier: tier, status: :pending})
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :pending
+        })
         |> stabilize_pending_ticket_order!()
 
       assert Money.zero?(order.total_amount)
@@ -1426,7 +1431,9 @@ defmodule YscWeb.SecurityAuditTest do
         })
 
       refute Tickets.pending_order_still_complimentary?(order)
-      assert {:error, :payment_required} = Tickets.process_free_ticket_order(order)
+
+      assert {:error, :payment_required} =
+               Tickets.process_free_ticket_order(order)
     end
   end
 

@@ -1002,24 +1002,22 @@ defmodule Ysc.Tickets do
   def recalculate_pending_order_total(%TicketOrder{} = ticket_order) do
     selections = ticket_selections_from_order(ticket_order)
 
-    case BookingLocker.estimate_order_total(
-           ticket_order.user_id,
-           ticket_order.event_id,
-           selections
-         ) do
-      {:ok, total, _discount} -> {:ok, total}
-      {:error, _} = error -> error
-    end
+    {:ok, total, _discount} =
+      BookingLocker.estimate_order_total(
+        ticket_order.user_id,
+        ticket_order.event_id,
+        selections
+      )
+
+    {:ok, total}
   end
 
   @doc """
   Returns true when a pending order is still complimentary at current tier prices.
   """
   def pending_order_still_complimentary?(%TicketOrder{} = ticket_order) do
-    case recalculate_pending_order_total(ticket_order) do
-      {:ok, total} -> Money.zero?(total)
-      {:error, _} -> false
-    end
+    {:ok, total} = recalculate_pending_order_total(ticket_order)
+    Money.zero?(total)
   end
 
   @doc """
@@ -1083,13 +1081,14 @@ defmodule Ysc.Tickets do
         if donation_tickets_count > 0 do
           case Money.div(donation_amount, donation_tickets_count) do
             {:ok, amount_per_ticket} ->
-              case Money.mult(amount_per_ticket, quantity) do
-                {:ok, tier_donation_total} ->
-                  Map.put(acc, tier_id, MoneyHelper.money_to_cents(tier_donation_total))
+              {:ok, tier_donation_total} =
+                Money.mult(amount_per_ticket, quantity)
 
-                _ ->
-                  acc
-              end
+              Map.put(
+                acc,
+                tier_id,
+                MoneyHelper.money_to_cents(tier_donation_total)
+              )
 
             _ ->
               acc

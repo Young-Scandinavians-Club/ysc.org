@@ -553,10 +553,11 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert html =~ "This order is no longer available."
     end
 
-    test "confirm-free-tickets rejects stale zero-dollar order after tier becomes paid", %{
-      conn: conn,
-      user: user
-    } do
+    test "confirm-free-tickets rejects stale zero-dollar order after tier becomes paid",
+         %{
+           conn: conn,
+           user: user
+         } do
       Oban.Testing.with_testing_mode(:manual, fn ->
         event = event_with_tickets(tier_count: 0, state: :upcoming, user: user)
 
