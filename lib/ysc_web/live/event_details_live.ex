@@ -4384,7 +4384,9 @@ defmodule YscWeb.EventDetailsLive do
     # Only update if this is the event we're viewing
     if event.id == socket.assigns.event.id do
       event = Repo.preload(event, [:ticket_tiers, :cover_image])
-      event_with_pricing = add_pricing_info(event)
+
+      event_with_pricing =
+        add_pricing_info_from_tiers(event, event.ticket_tiers)
 
       subscribed =
         Events.subscribed_to_event_notification?(
@@ -5752,9 +5754,11 @@ defmodule YscWeb.EventDetailsLive do
 
     case Ysc.Tickets.create_ticket_order(user_id, event_id, ticket_selections) do
       {:ok, ticket_order} ->
-        # Reload the ticket order with tickets and their tiers
         ticket_order_with_tickets =
-          Ysc.Tickets.get_ticket_order(ticket_order.id)
+          Ysc.Tickets.get_user_ticket_order_for_checkout(
+            user_id,
+            ticket_order.id
+          )
 
         # Proceed directly to payment/free confirmation with registration integrated
         proceed_to_payment_or_free(socket, ticket_order_with_tickets)
@@ -5997,13 +6001,6 @@ defmodule YscWeb.EventDetailsLive do
 
   defp new_active_agenda(_, active_agenda_id, _) do
     active_agenda_id
-  end
-
-  # Helper function to add pricing information to events (same logic as Events module)
-  defp add_pricing_info(event) do
-    ticket_tiers = Events.list_ticket_tiers_for_event(event.id)
-    pricing_info = pricing_info_for_event(event, ticket_tiers)
-    Map.put(event, :pricing_info, pricing_info)
   end
 
   # Optimized version that uses pre-loaded ticket tiers

@@ -2591,7 +2591,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
-      |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2625,7 +2624,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
-      |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2659,52 +2657,21 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
-      |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
   end
 
   def handle_event("booking-mode-changed", %{"booking_mode" => "day"}, socket) do
-    # Re-check allowed booking modes based on current dates
-    {day_booking_allowed, buyout_booking_allowed} =
-      allowed_booking_modes(
-        socket.assigns.property,
-        socket.assigns.checkin_date,
-        socket.assigns.checkout_date,
-        socket.assigns.current_season,
-        socket.assigns.seasons
-      )
-
-    # Validate availability for the new booking mode if dates are selected
-    availability_error =
-      if socket.assigns.checkin_date && socket.assigns.checkout_date do
-        validate_date_range_for_booking_mode(
-          socket.assigns.checkin_date,
-          socket.assigns.checkout_date,
-          :day,
-          socket.assigns.guests_count,
-          socket.assigns
-        )
-      else
-        nil
-      end
-
     socket =
       socket
       |> assign(
         selected_booking_mode: :day,
         calculated_price: nil,
         price_error: nil,
-        availability_error: availability_error,
-        day_booking_allowed: day_booking_allowed,
-        buyout_booking_allowed: buyout_booking_allowed
+        availability_error: nil
       )
-      |> calculate_price_if_ready()
-      |> then(fn updated_socket ->
-        # Update URL with new booking mode
-        update_url_with_booking_mode(updated_socket)
-      end)
+      |> update_url_with_booking_mode()
 
     {:noreply, socket}
   end
@@ -2714,45 +2681,15 @@ defmodule YscWeb.ClearLakeBookingLive do
         %{"booking_mode" => "buyout"},
         socket
       ) do
-    # Re-check allowed booking modes based on current dates
-    {day_booking_allowed, buyout_booking_allowed} =
-      allowed_booking_modes(
-        socket.assigns.property,
-        socket.assigns.checkin_date,
-        socket.assigns.checkout_date,
-        socket.assigns.current_season,
-        socket.assigns.seasons
-      )
-
-    # Validate availability for the new booking mode if dates are selected
-    availability_error =
-      if socket.assigns.checkin_date && socket.assigns.checkout_date do
-        validate_date_range_for_booking_mode(
-          socket.assigns.checkin_date,
-          socket.assigns.checkout_date,
-          :buyout,
-          socket.assigns.guests_count,
-          socket.assigns
-        )
-      else
-        nil
-      end
-
     socket =
       socket
       |> assign(
         selected_booking_mode: :buyout,
         calculated_price: nil,
         price_error: nil,
-        availability_error: availability_error,
-        day_booking_allowed: day_booking_allowed,
-        buyout_booking_allowed: buyout_booking_allowed
+        availability_error: nil
       )
-      |> calculate_price_if_ready()
-      |> then(fn updated_socket ->
-        # Update URL with new booking mode
-        update_url_with_booking_mode(updated_socket)
-      end)
+      |> update_url_with_booking_mode()
 
     {:noreply, socket}
   end
