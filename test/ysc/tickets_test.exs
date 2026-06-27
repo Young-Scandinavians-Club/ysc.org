@@ -315,11 +315,10 @@ defmodule Ysc.TicketsTest do
       assert Enum.any?(upcoming, &(&1.id == order.id))
     end
 
-    test "respects limit option", %{user: user, tier1: tier1} do
+    test "respects limit option", %{user: user} do
       for i <- 1..3 do
         {:ok, event} =
-          %Ysc.Events.Event{}
-          |> Ysc.Events.Event.changeset(%{
+          Ysc.Events.create_event(%{
             title: "Future Event #{i}",
             description: "Test",
             start_date: DateTime.add(DateTime.utc_now(), 7 + i, :day),
@@ -331,10 +330,18 @@ defmodule Ysc.TicketsTest do
             max_attendees: 100,
             organizer_id: user.id
           })
-          |> Ysc.Repo.insert()
+
+        {:ok, tier} =
+          Ysc.Events.create_ticket_tier(%{
+            name: "General #{i}",
+            type: :paid,
+            price: Money.new(50, :USD),
+            quantity: 50,
+            event_id: event.id
+          })
 
         {:ok, _order} =
-          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
       end
 
       assert length(Tickets.list_user_upcoming_ticket_orders(user.id, limit: 2)) == 2
