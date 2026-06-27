@@ -34,7 +34,8 @@ defmodule Ysc.Tickets.DisplayTest do
     test "uses General Admission when tier name is missing" do
       tickets = [ticket(nil), ticket("VIP")]
 
-      assert Display.format_tier_quantities(tickets) == "1x General Admission, 1x VIP"
+      assert Display.format_tier_quantities(tickets) ==
+               "1x General Admission, 1x VIP"
     end
 
     test "exclude_cancelled omits cancelled tickets" do
@@ -43,7 +44,8 @@ defmodule Ysc.Tickets.DisplayTest do
         ticket("VIP", :cancelled)
       ]
 
-      assert Display.format_tier_quantities(tickets, exclude_cancelled: true) == "1x VIP"
+      assert Display.format_tier_quantities(tickets, exclude_cancelled: true) ==
+               "1x VIP"
     end
   end
 
@@ -61,7 +63,8 @@ defmodule Ysc.Tickets.DisplayTest do
     test "reports all tickets refunded when every ticket is cancelled" do
       tickets = [ticket("VIP", :cancelled), ticket("VIP", :cancelled)]
 
-      assert Display.format_order_ticket_summary(tickets) == "All tickets refunded (2 refunded)"
+      assert Display.format_order_ticket_summary(tickets) ==
+               "All tickets refunded (2 refunded)"
     end
 
     test "appends refunded count for mixed orders" do
@@ -89,7 +92,8 @@ defmodule Ysc.Tickets.DisplayTest do
     test "falls back to Event when event is missing" do
       ticket_order = %{event: nil, tickets: []}
 
-      assert Display.format_ledger_order_description(ticket_order) == "Free Tickets: Event"
+      assert Display.format_ledger_order_description(ticket_order) ==
+               "Free Tickets: Event"
     end
   end
 end
