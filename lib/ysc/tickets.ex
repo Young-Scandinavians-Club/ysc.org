@@ -1001,10 +1001,8 @@ defmodule Ysc.Tickets do
   Recalculates a pending order total using current tier prices and reservations.
   """
   def recalculate_pending_order_total(%TicketOrder{} = ticket_order) do
-    case recalculate_pending_order_pricing(ticket_order) do
-      {:ok, total, _discount} -> {:ok, total}
-      {:error, _} = error -> error
-    end
+    {:ok, total, _discount} = recalculate_pending_order_pricing(ticket_order)
+    {:ok, total}
   end
 
   @doc """
@@ -1012,6 +1010,23 @@ defmodule Ysc.Tickets do
 
   Returns `{:ok, total, discount}`.
   """
+  def recalculate_pending_order_pricing(
+        %TicketOrder{status: :expired} = ticket_order
+      ) do
+    selections = expired_ticket_selections(ticket_order.id)
+
+    if map_size(selections) == 0 do
+      {:ok, ticket_order.total_amount,
+       ticket_order.discount_amount || Money.new(0, :USD)}
+    else
+      BookingLocker.estimate_order_total(
+        ticket_order.user_id,
+        ticket_order.event_id,
+        selections
+      )
+    end
+  end
+
   def recalculate_pending_order_pricing(%TicketOrder{} = ticket_order) do
     selections = ticket_selections_from_order(ticket_order)
 
@@ -1033,7 +1048,8 @@ defmodule Ysc.Tickets do
       when status in [:pending, :expired] do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
-    with {:ok, total, discount} <- recalculate_pending_order_pricing(ticket_order) do
+    with {:ok, total, discount} <-
+           recalculate_pending_order_pricing(ticket_order) do
       attrs = pending_order_pricing_attrs(total, discount)
 
       if pending_order_pricing_unchanged?(ticket_order, attrs) do
@@ -1050,7 +1066,9 @@ defmodule Ysc.Tickets do
     end
   end
 
-  def sync_pending_order_pricing(%TicketOrder{}), do: {:error, :invalid_status}
+  def sync_pending_order_pricing(%TicketOrder{} = ticket_order) do
+    {:ok, ensure_ticket_order_for_payment(ticket_order)}
+  end
 
   @doc """
   Returns true when a pending order is still complimentary at current tier prices.
@@ -1099,26 +1117,6 @@ defmodule Ysc.Tickets do
 
   defp do_ticket_selections_from_order(%TicketOrder{tickets: []}), do: %{}
 
-  defp pending_order_pricing_attrs(total, discount) do
-    zero = Money.new(0, :USD)
-
-    %{
-      total_amount: total,
-      discount_amount:
-        if(discount && Money.positive?(discount), do: discount, else: zero)
-    }
-  end
-
-  defp pending_order_pricing_unchanged?(ticket_order, attrs) do
-    money_equal?(ticket_order.total_amount, attrs.total_amount) and
-      money_equal?(ticket_order.discount_amount, attrs.discount_amount)
-  end
-
-  defp money_equal?(%Money{} = left, %Money{} = right), do: Money.equals?(left, right)
-  defp money_equal?(nil, %Money{} = right), do: Money.zero?(right)
-  defp money_equal?(%Money{} = left, nil), do: Money.zero?(left)
-  defp money_equal?(nil, nil), do: true
-
   defp do_ticket_selections_from_order(%TicketOrder{} = ticket_order) do
     tickets = ticket_order.tickets
 
@@ -1161,6 +1159,28 @@ defmodule Ysc.Tickets do
       end
     end)
   end
+
+  defp pending_order_pricing_attrs(total, discount) do
+    zero = Money.new(0, :USD)
+
+    %{
+      total_amount: total,
+      discount_amount:
+        if(discount && Money.positive?(discount), do: discount, else: zero)
+    }
+  end
+
+  defp pending_order_pricing_unchanged?(ticket_order, attrs) do
+    money_equal?(ticket_order.total_amount, attrs.total_amount) and
+      money_equal?(ticket_order.discount_amount, attrs.discount_amount)
+  end
+
+  defp money_equal?(%Money{} = left, %Money{} = right),
+    do: Money.equal?(left, right)
+
+  defp money_equal?(nil, %Money{} = right), do: Money.zero?(right)
+  defp money_equal?(%Money{} = left, nil), do: Money.zero?(left)
+  defp money_equal?(nil, nil), do: true
 
   ## Timeout Management
 

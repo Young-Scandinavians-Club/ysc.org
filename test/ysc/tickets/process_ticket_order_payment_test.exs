@@ -368,10 +368,11 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     )
   end
 
-  test "rejects payment when tier price increased after order and PI were created", %{
-    user: user,
-    event: event
-  } do
+  test "rejects payment when tier price increased after order and PI were created",
+       %{
+         user: user,
+         event: event
+       } do
     {:ok, tier} =
       Ysc.Events.create_ticket_tier(%{
         name: "Early Bird",
@@ -386,7 +387,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
         Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
       end)
 
-    assert Money.cmp(order.total_amount, Money.new(30, :USD)) == :eq
+    assert Money.equal?(order.total_amount, Money.new(30, :USD))
 
     {:ok, _tier} =
       Ysc.Events.update_ticket_tier(tier, %{
@@ -405,7 +406,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
 
         reloaded = Tickets.get_ticket_order(order.id)
         assert reloaded.status == :pending
-        assert Money.cmp(reloaded.total_amount, Money.new(50, :USD)) == :eq
+        assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
       end
     )
   end

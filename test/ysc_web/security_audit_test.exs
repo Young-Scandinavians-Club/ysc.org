@@ -1458,7 +1458,7 @@ defmodule YscWeb.SecurityAuditTest do
         })
         |> stabilize_pending_ticket_order!()
 
-      assert Money.cmp(order.total_amount, Money.new(30, :USD)) == :eq
+      assert Money.equal?(order.total_amount, Money.new(30, :USD))
 
       {:ok, _tier} =
         Ysc.Events.update_ticket_tier(tier, %{
@@ -1477,7 +1477,7 @@ defmodule YscWeb.SecurityAuditTest do
 
       reloaded = Tickets.get_ticket_order(order.id)
       assert reloaded.status == :pending
-      assert Money.cmp(reloaded.total_amount, Money.new(50, :USD)) == :eq
+      assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
     end
   end
 

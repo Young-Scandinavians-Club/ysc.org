@@ -4405,7 +4405,8 @@ defmodule YscWeb.EventDetailsLive do
   defp retrieve_or_create_payment_intent(ticket_order, user) do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
-    with {:ok, ticket_order} <- Ysc.Tickets.sync_pending_order_pricing(ticket_order) do
+    with {:ok, ticket_order} <-
+           Ysc.Tickets.sync_pending_order_pricing(ticket_order) do
       expected_cents = Ysc.MoneyHelper.money_to_cents(ticket_order.total_amount)
 
       if ticket_order.payment_intent_id do
