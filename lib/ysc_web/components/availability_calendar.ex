@@ -158,7 +158,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2">
             <div class="w-4 h-4 bg-red-800 border border-red-900 rounded"></div>
-            <span>Blackout dates</span>
+            <span>Not available for booking</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-4 h-4 bg-red-200 border border-red-300 rounded"></div>
@@ -830,7 +830,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         "Check-in allowed"
 
       true ->
-        "Blackout date"
+        "Not available for booking"
     end
   end
 
@@ -1090,7 +1090,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
       cond do
         info.is_blacked_out ->
-          "Blackout"
+          "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
           if is_valid_checkout do

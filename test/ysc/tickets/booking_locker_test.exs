@@ -541,6 +541,97 @@ defmodule Ysc.Tickets.BookingLockerTest do
                BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
     end
 
+    test "another user's active reservation blocks booking when capacity is exhausted",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      other_user = user_fixture() |> with_lifetime_membership()
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 2})
+
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: other_user.id,
+        quantity: 1,
+        created_by_id: organizer.id,
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+
+      assert {:error, :tier_validation_failed} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 2})
+    end
+
+    test "another user's active reservation blocks booking when tier is fully held",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      other_user = user_fixture() |> with_lifetime_membership()
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 1})
+
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: other_user.id,
+        quantity: 1,
+        created_by_id: organizer.id,
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      assert {:error, :tier_validation_failed} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
+    test "expired reservation from another user does not block booking",
+         %{
+           user: user,
+           event: event,
+           tier: tier,
+           organizer: organizer
+         } do
+      other_user = user_fixture() |> with_lifetime_membership()
+      {:ok, _} = Events.update_ticket_tier(tier, %{quantity: 1})
+
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
+      past =
+        DateTime.utc_now()
+        |> DateTime.add(-120, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, reservation} =
+        %TicketReservation{}
+        |> TicketReservation.changeset(%{
+          ticket_tier_id: tier.id,
+          user_id: other_user.id,
+          quantity: 1,
+          created_by_id: organizer.id,
+          status: "active",
+          expires_at: future
+        })
+        |> Repo.insert()
+
+      reservation
+      |> Ecto.Changeset.change(%{expires_at: past})
+      |> Repo.update!()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
+    end
+
     test "reservation with discount reduces order total", %{
       user: user,
       event: event,
