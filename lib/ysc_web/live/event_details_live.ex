@@ -4307,51 +4307,51 @@ defmodule YscWeb.EventDetailsLive do
                  ticket_order,
                  socket.assigns.current_user
                ) do
-          {:ok, payment_intent} ->
-            Ysc.Logging.debug(
-              "restore_payment_state_from_url: Payment intent retrieved/created successfully",
-              order_id: ticket_order.id,
-              payment_intent_id: payment_intent.id,
-              payment_intent_status: payment_intent.status
-            )
+            {:ok, payment_intent} ->
+              Ysc.Logging.debug(
+                "restore_payment_state_from_url: Payment intent retrieved/created successfully",
+                order_id: ticket_order.id,
+                payment_intent_id: payment_intent.id,
+                payment_intent_status: payment_intent.status
+              )
 
-            socket
-            |> assign(:show_ticket_modal, false)
-            |> assign(:show_payment_modal, true)
-            |> assign(:checkout_expired, false)
-            |> assign(:stripe_payment_element_ready, false)
-            |> assign(:payment_intent, payment_intent)
-            |> assign(:ticket_order, ticket_order)
-            |> assign(
-              :tickets_requiring_registration,
-              tickets_requiring_registration
-            )
-            |> assign(:ticket_details_form, ticket_details_form)
-            |> assign(:tickets_for_me, tickets_for_me)
-            |> assign(:selected_family_members, selected_family_members)
-            |> assign(:family_members, family_members)
-            |> assign(
-              :ticket_registration_details_by_id,
-              ticket_registration_details_by_id
-            )
-            |> assign(:ticket_tiers, ticket_tiers)
-            |> assign(:availability_data, availability_data)
-            |> assign(:payment_redirect_in_progress, false)
+              socket
+              |> assign(:show_ticket_modal, false)
+              |> assign(:show_payment_modal, true)
+              |> assign(:checkout_expired, false)
+              |> assign(:stripe_payment_element_ready, false)
+              |> assign(:payment_intent, payment_intent)
+              |> assign(:ticket_order, ticket_order)
+              |> assign(
+                :tickets_requiring_registration,
+                tickets_requiring_registration
+              )
+              |> assign(:ticket_details_form, ticket_details_form)
+              |> assign(:tickets_for_me, tickets_for_me)
+              |> assign(:selected_family_members, selected_family_members)
+              |> assign(:family_members, family_members)
+              |> assign(
+                :ticket_registration_details_by_id,
+                ticket_registration_details_by_id
+              )
+              |> assign(:ticket_tiers, ticket_tiers)
+              |> assign(:availability_data, availability_data)
+              |> assign(:payment_redirect_in_progress, false)
 
-          {:error, reason} ->
-            Ysc.Logging.error(
-              "restore_payment_state_from_url: Failed to retrieve/create payment intent",
-              order_id: ticket_order.id,
-              error: reason
-            )
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "restore_payment_state_from_url: Failed to retrieve/create payment intent",
+                order_id: ticket_order.id,
+                error: reason
+              )
 
-            socket
-            |> YscWeb.Flash.put_toast(
-              :error,
-              "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
-              title: "Payment"
-            )
-            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
+              socket
+              |> YscWeb.Flash.put_toast(
+                :error,
+                "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
+                title: "Payment"
+              )
+              |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
           end
         end
 
