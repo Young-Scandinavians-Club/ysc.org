@@ -344,7 +344,8 @@ defmodule Ysc.TicketsTest do
           Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
       end
 
-      assert length(Tickets.list_user_upcoming_ticket_orders(user.id, limit: 2)) == 2
+      assert length(Tickets.list_user_upcoming_ticket_orders(user.id, limit: 2)) ==
+               2
     end
   end
 

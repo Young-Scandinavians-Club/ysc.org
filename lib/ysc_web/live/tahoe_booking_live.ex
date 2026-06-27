@@ -297,12 +297,16 @@ defmodule YscWeb.TahoeBookingLive do
       parsed_params.children_count != socket.assigns.children_count
 
     booking_mode_changed =
-      (parsed_params.booking_mode || :room) != socket.assigns.selected_booking_mode
+      (parsed_params.booking_mode || :room) !=
+        socket.assigns.selected_booking_mode
 
-    info_tab = parsed_params.requested_info_tab || socket.assigns[:info_tab] || :general
+    info_tab =
+      parsed_params.requested_info_tab || socket.assigns[:info_tab] || :general
+
     info_tab_changed = info_tab != socket.assigns[:info_tab]
 
-    if info_tab_changed && !dates_changed && !guests_changed && !children_changed &&
+    if info_tab_changed && !dates_changed && !guests_changed &&
+         !children_changed &&
          !tab_changed && !booking_mode_changed do
       {:noreply, assign(socket, info_tab: info_tab)}
     else
@@ -321,7 +325,8 @@ defmodule YscWeb.TahoeBookingLive do
           calculate_restricted_dates(socket, today, max_booking_date)
 
         needs_booking_recalculation =
-          dates_changed || guests_changed || children_changed || booking_mode_changed
+          dates_changed || guests_changed || children_changed ||
+            booking_mode_changed
 
         # Only regenerate date tooltips after connect, when the selectable range changes
         socket =
