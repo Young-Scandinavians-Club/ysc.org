@@ -275,8 +275,19 @@ defmodule YscWeb.ClearLakeBookingLive do
         booking_error_title != socket.assigns.booking_error_title ||
         booking_disabled_reason != socket.assigns.booking_disabled_reason
 
-    # Update info_tab from URL when present
-    info_tab = requested_info_tab || socket.assigns[:info_tab] || :general
+    # Update info_tab from URL when present; omitting it on the information tab means :general
+    info_tab =
+      cond do
+        requested_info_tab != nil ->
+          requested_info_tab
+
+        active_tab == :information ->
+          :general
+
+        true ->
+          socket.assigns[:info_tab] || :general
+      end
+
     info_tab_changed = info_tab != socket.assigns[:info_tab]
 
     if info_tab_changed && !dates_changed && !guests_changed && !tab_changed &&
@@ -3017,7 +3028,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket.assigns.selected_booking_mode,
         info_tab
       )
-      |> Map.put("info_tab", Atom.to_string(info_tab))
 
     {:noreply,
      push_patch(socket,
