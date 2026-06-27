@@ -305,31 +305,34 @@ defmodule YscWeb.EventsLive do
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCreated{
-           ticket_reservation: reservation
+           ticket_reservation: reservation,
+           event_id: event_id
          }},
         socket
       ) do
-    refresh_events_list_for_reservation(socket, reservation)
+    refresh_events_list_for_reservation(socket, event_id, reservation)
   end
 
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationFulfilled{
-           ticket_reservation: reservation
+           ticket_reservation: reservation,
+           event_id: event_id
          }},
         socket
       ) do
-    refresh_events_list_for_reservation(socket, reservation)
+    refresh_events_list_for_reservation(socket, event_id, reservation)
   end
 
   def handle_info(
         {Ysc.Events,
          %Ysc.MessagePassingEvents.TicketReservationCancelled{
-           ticket_reservation: reservation
+           ticket_reservation: reservation,
+           event_id: event_id
          }},
         socket
       ) do
-    refresh_events_list_for_reservation(socket, reservation)
+    refresh_events_list_for_reservation(socket, event_id, reservation)
   end
 
   # Catch-all for event messages that do not affect the events index (e.g.
@@ -387,7 +390,12 @@ defmodule YscWeb.EventsLive do
     end
   end
 
-  defp refresh_events_list_for_reservation(socket, reservation) do
+  defp refresh_events_list_for_reservation(socket, event_id, _reservation)
+       when not is_nil(event_id) do
+    refresh_events_list_for_event_id(socket, event_id)
+  end
+
+  defp refresh_events_list_for_reservation(socket, _event_id, reservation) do
     case Events.get_ticket_tier(reservation.ticket_tier_id) do
       nil ->
         {:noreply, socket}

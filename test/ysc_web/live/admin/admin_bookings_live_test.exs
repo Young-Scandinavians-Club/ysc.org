@@ -580,6 +580,57 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert render(view) =~ unique
     end
 
+    test "reservations table shows checked-in status when booking.checked_in is true",
+         %{
+           conn: conn
+         } do
+      unique = "CheckedIn#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      assert {:ok, _} =
+               Bookings.create_check_in(%{
+                 bookings: [booking],
+                 rules_agreed: true,
+                 checked_in_at: DateTime.utc_now()
+               })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      html = render(view)
+      assert html =~ unique
+      assert html =~ "text-green-700 font-medium\">Yes<"
+    end
+
+    test "reservations table shows unchecked status when booking.checked_in is false",
+         %{
+           conn: conn
+         } do
+      unique = "NotChecked#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      view
+      |> form("form[phx-change=change-reservation-search]", %{
+        "search" => %{"query" => unique}
+      })
+      |> render_change()
+
+      html = render(view)
+      assert html =~ unique
+      refute html =~ "text-green-700 font-medium\">Yes<"
+    end
+
     test "keeps reservations table populated after switching section tabs", %{
       conn: conn
     } do

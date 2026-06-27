@@ -412,7 +412,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 type="button"
                 phx-click="cancel-booking"
                 phx-disable-with="Cancelling..."
-                phx-confirm="Are you sure you want to cancel this booking? The availability will be released immediately."
+                phx-confirm={leave_checkout_confirm()}
                 class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
               >
                 Cancel
@@ -464,7 +464,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     type="button"
                     phx-click="cancel-booking"
                     phx-disable-with="Cancelling..."
-                    phx-confirm="Are you sure you want to cancel this booking? The availability will be released immediately."
+                    phx-confirm={leave_checkout_confirm()}
                     class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
                   >
                     Cancel
@@ -508,7 +508,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     type="button"
                     phx-click="cancel-booking"
                     phx-disable-with="Cancelling..."
-                    phx-confirm="Are you sure you want to cancel this booking? The availability will be released immediately."
+                    phx-confirm={leave_checkout_confirm()}
                     class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
                   >
                     Cancel
@@ -3061,5 +3061,9 @@ defmodule YscWeb.BookingCheckoutLive do
       {:ok, guests} -> {:ok, guests}
       {:error, changeset} -> {:error, changeset}
     end
+  end
+
+  defp leave_checkout_confirm do
+    "Leave checkout and release these dates? Your reservation is not confirmed until payment is complete."
   end
 end

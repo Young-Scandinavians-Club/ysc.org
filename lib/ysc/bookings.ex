@@ -2068,6 +2068,45 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Returns whether any hold or complete bookings conflict with a date range.
+
+  Uses strict overlap semantics (same-day turnarounds are allowed), matching
+  `bookings_overlap?/4` and Tahoe buyout validation.
+  """
+  def has_conflicting_bookings?(
+        property,
+        checkin_date,
+        checkout_date,
+        opts \\ []
+      ) do
+    property
+    |> conflicting_bookings_query(checkin_date, checkout_date, opts)
+    |> Repo.exists?()
+  end
+
+  @doc false
+  def conflicting_bookings_query(
+        property,
+        checkin_date,
+        checkout_date,
+        opts \\ []
+      ) do
+    statuses = Keyword.get(opts, :statuses, [:hold, :complete])
+
+    from b in Booking,
+      where: b.property == ^property,
+      where: b.status in ^statuses,
+      where:
+        fragment(
+          "? < ? AND ? > ?",
+          b.checkin_date,
+          ^checkout_date,
+          b.checkout_date,
+          ^checkin_date
+        )
+  end
+
+  @doc """
   Gets the check-in time (3:00 PM).
   """
   def checkin_time, do: @checkin_time
@@ -4950,6 +4989,15 @@ defmodule Ysc.Bookings do
     from(b in Booking,
       preload: [:user, rooms: :room_category, check_ins: :check_in_vehicles],
       limit: 50
+    )
+  end
+
+  @doc false
+  def ci_query_explain_conflicting_bookings_query do
+    conflicting_bookings_query(
+      :tahoe,
+      Ysc.Ci.QueryExplain.Fixtures.today(),
+      Date.add(Ysc.Ci.QueryExplain.Fixtures.today(), 3)
     )
   end
 end

@@ -900,6 +900,7 @@ defmodule Ysc.BookingsTest do
       check_in = Ysc.Repo.preload(check_in, :bookings)
       assert length(check_in.bookings) == 1
       assert Enum.at(check_in.bookings, 0).id == booking.id
+      assert Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in == true
     end
 
     test "create_check_in/1 persists vehicles when provided" do
@@ -3100,6 +3101,56 @@ defmodule Ysc.BookingsTest do
                ~D[2025-06-03],
                ~D[2025-06-10],
                ~D[2025-06-12]
+             )
+    end
+  end
+
+  describe "has_conflicting_bookings?/3" do
+    test "returns true when a complete booking overlaps the requested range" do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          status: :complete,
+          checkin_date: ~D[2026-08-01],
+          checkout_date: ~D[2026-08-05]
+        })
+
+      assert Bookings.has_conflicting_bookings?(
+               :tahoe,
+               ~D[2026-08-03],
+               ~D[2026-08-07]
+             )
+
+      refute Bookings.has_conflicting_bookings?(
+               :tahoe,
+               booking.checkout_date,
+               Date.add(booking.checkout_date, 3)
+             )
+    end
+
+    test "ignores cancelled bookings" do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          checkin_date: ~D[2026-09-07],
+          checkout_date: ~D[2026-09-10]
+        })
+
+      {:ok, _cancelled} =
+        booking
+        |> Ecto.Changeset.change(%{status: :canceled})
+        |> Ysc.Repo.update()
+
+      refute Bookings.has_conflicting_bookings?(
+               :tahoe,
+               ~D[2026-09-08],
+               ~D[2026-09-09]
              )
     end
   end

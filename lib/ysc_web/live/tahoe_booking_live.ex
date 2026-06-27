@@ -1191,18 +1191,19 @@ defmodule YscWeb.TahoeBookingLive do
                     </div>
                   </div>
                 </div>
-                <!-- Winter Policy Notice -->
+                <!-- Season booking options notice -->
                 <div
                   :if={@checkin_date}
                   class="p-3 bg-blue-50 border border-blue-200 rounded-xl"
                 >
                   <p class="text-xs text-blue-900">
-                    <strong>Winter Policy:</strong>
-                    {if can_select_booking_mode?(@seasons, @checkin_date) do
-                      "May–November: you can rent the entire cabin or book individual rooms."
-                    else
-                      "December–April: book individual rooms only. May–November: you can rent the entire cabin or book rooms."
-                    end}
+                    <%= if can_select_booking_mode?(@seasons, @checkin_date) do %>
+                      <strong>Booking options for your dates:</strong>
+                      You can rent the entire cabin or book individual rooms (May–November only).
+                    <% else %>
+                      <strong>Winter booking (Dec–Apr):</strong>
+                      Individual rooms only. Renting the entire cabin is not available in winter.
+                    <% end %>
                   </p>
                 </div>
                 <!-- Pricing & Membership Info -->
@@ -3061,64 +3062,32 @@ defmodule YscWeb.TahoeBookingLive do
                     The Lake Tahoe region offers endless outdoor opportunities:
                   </p>
                   <!-- At-A-Glance Hero Grid -->
-                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🛏️
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Capacity
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        17 Guests
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        7 Bedrooms
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🧖
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Sauna
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Traditional
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Scandinavian Style
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🔥
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Features
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Wood Fireplace
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        And Fully Equipped Kitchen!
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-blue-200 transition-colors">
-                      <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🛶
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Summer
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Kayaks
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Available for use
-                      </div>
-                    </div>
-                  </div>
+                  <.at_glance_grid>
+                    <.at_glance_stat
+                      icon="🛏️"
+                      label="Capacity"
+                      value="17 Guests"
+                      detail="7 Bedrooms"
+                    />
+                    <.at_glance_stat
+                      icon="🧖"
+                      label="Sauna"
+                      value="Traditional"
+                      detail="Scandinavian Style"
+                    />
+                    <.at_glance_stat
+                      icon="🔥"
+                      label="Features"
+                      value="Wood Fireplace"
+                      detail="And Fully Equipped Kitchen!"
+                    />
+                    <.at_glance_stat
+                      icon="🛶"
+                      label="Summer"
+                      value="Kayaks"
+                      detail="Available for use"
+                    />
+                  </.at_glance_grid>
 
                   <YscWeb.Components.ImageCarousel.image_carousel
                     id="about-the-tahoe-cabin-carousel"
@@ -5091,7 +5060,7 @@ defmodule YscWeb.TahoeBookingLive do
              |> assign(
                form_errors: %{general: "Please fill in all required fields."},
                calculated_price: nil,
-               price_error: "Invalid parameters",
+               price_error: "Please fill in all required fields.",
                show_confirm_modal: false
              )}
 
@@ -6408,18 +6377,27 @@ defmodule YscWeb.TahoeBookingLive do
       # 1. Check if user has ANY active or future bookings (stricter rule for buyout)
       if socket.assigns.user do
         user = socket.assigns.user
-        family_user_ids = get_family_group_user_ids(user)
         today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
-        # Check for any active bookings (status = :complete) with checkout_date >= today
         has_active_booking =
-          Repo.exists?(
-            from b in Booking,
-              where: b.user_id in ^family_user_ids,
-              where: b.property == :tahoe,
-              where: b.status == :complete,
-              where: b.checkout_date >= ^today
-          )
+          case socket.assigns[:active_bookings] do
+            bookings when is_list(bookings) and bookings != [] ->
+              Enum.any?(bookings, fn booking ->
+                booking.status == :complete &&
+                  Date.compare(booking.checkout_date, today) != :lt
+              end)
+
+            _ ->
+              family_user_ids = get_family_group_user_ids(user)
+
+              Repo.exists?(
+                from b in Booking,
+                  where: b.user_id in ^family_user_ids,
+                  where: b.property == :tahoe,
+                  where: b.status == :complete,
+                  where: b.checkout_date >= ^today
+              )
+          end
 
         if has_active_booking do
           Map.put(
@@ -6438,22 +6416,7 @@ defmodule YscWeb.TahoeBookingLive do
             )
           else
             # 3. Check for ANY existing active bookings on the selected dates (rooms or buyouts)
-            # list_bookings returns potentially overlapping bookings (inclusive)
-            # We filter for status and strict overlap to be precise
-            overlaps = Bookings.list_bookings(:tahoe, checkin, checkout)
-
-            has_conflict =
-              Enum.any?(overlaps, fn booking ->
-                booking.status in [:hold, :complete] &&
-                  Bookings.bookings_overlap?(
-                    checkin,
-                    checkout,
-                    booking.checkin_date,
-                    booking.checkout_date
-                  )
-              end)
-
-            if has_conflict do
+            if Bookings.has_conflicting_bookings?(:tahoe, checkin, checkout) do
               Map.put(
                 errors,
                 :availability,

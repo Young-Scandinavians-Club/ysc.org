@@ -1028,8 +1028,8 @@ defmodule YscWeb.BookingReceiptLive do
                             class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0"
                           />
                           <p class="text-xs text-amber-800">
-                            <strong>Pending Review:</strong>
-                            This refund is pending admin approval and will be processed once approved.
+                            <strong>Refund under review:</strong>
+                            We're reviewing your refund. You'll get an email when it's approved. No action is needed on your side.
                           </p>
                         </div>
                       </div>
