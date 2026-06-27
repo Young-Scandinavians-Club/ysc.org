@@ -808,7 +808,8 @@ defmodule Ysc.Tickets do
   defp do_process_ticket_order_payment(ticket_order, payment_intent) do
     # Complete the order before recording ledger payment so a concurrent cancel
     # cannot leave a Stripe charge recorded without tickets (see booking checkout).
-    with :ok <- validate_payment_intent(payment_intent, ticket_order),
+    with {:ok, ticket_order} <- sync_pending_order_pricing(ticket_order),
+         :ok <- validate_payment_intent(payment_intent, ticket_order),
          :ok <- validate_fulfillable_order_status(ticket_order),
          :ok <- validate_expired_order_fulfillment_capacity(ticket_order),
          {:ok, completed_order, completion_status} <-
@@ -1000,17 +1001,56 @@ defmodule Ysc.Tickets do
   Recalculates a pending order total using current tier prices and reservations.
   """
   def recalculate_pending_order_total(%TicketOrder{} = ticket_order) do
+    case recalculate_pending_order_pricing(ticket_order) do
+      {:ok, total, _discount} -> {:ok, total}
+      {:error, _} = error -> error
+    end
+  end
+
+  @doc """
+  Recalculates pending order pricing using current tier prices and reservations.
+
+  Returns `{:ok, total, discount}`.
+  """
+  def recalculate_pending_order_pricing(%TicketOrder{} = ticket_order) do
     selections = ticket_selections_from_order(ticket_order)
 
-    {:ok, total, _discount} =
-      BookingLocker.estimate_order_total(
-        ticket_order.user_id,
-        ticket_order.event_id,
-        selections
-      )
-
-    {:ok, total}
+    BookingLocker.estimate_order_total(
+      ticket_order.user_id,
+      ticket_order.event_id,
+      selections
+    )
   end
+
+  @doc """
+  Persists recalculated pricing for a pending or expired ticket order.
+
+  Mirrors booking hold checkout pricing sync so Stripe PaymentIntents and
+  payment verification use current tier prices instead of the snapshot taken
+  when the order was created.
+  """
+  def sync_pending_order_pricing(%TicketOrder{status: status} = ticket_order)
+      when status in [:pending, :expired] do
+    ticket_order = ensure_ticket_order_for_payment(ticket_order)
+
+    with {:ok, total, discount} <- recalculate_pending_order_pricing(ticket_order) do
+      attrs = pending_order_pricing_attrs(total, discount)
+
+      if pending_order_pricing_unchanged?(ticket_order, attrs) do
+        {:ok, ticket_order}
+      else
+        ticket_order
+        |> Ecto.Changeset.change(attrs)
+        |> Repo.update()
+        |> case do
+          {:ok, updated} -> {:ok, ensure_ticket_order_for_payment(updated)}
+          {:error, _} = error -> error
+        end
+      end
+    end
+  end
+
+  def sync_pending_order_pricing(%TicketOrder{}), do: {:error, :invalid_status}
 
   @doc """
   Returns true when a pending order is still complimentary at current tier prices.
@@ -1058,6 +1098,26 @@ defmodule Ysc.Tickets do
   def process_free_ticket_order(_ticket_order), do: {:error, :order_not_pending}
 
   defp do_ticket_selections_from_order(%TicketOrder{tickets: []}), do: %{}
+
+  defp pending_order_pricing_attrs(total, discount) do
+    zero = Money.new(0, :USD)
+
+    %{
+      total_amount: total,
+      discount_amount:
+        if(discount && Money.positive?(discount), do: discount, else: zero)
+    }
+  end
+
+  defp pending_order_pricing_unchanged?(ticket_order, attrs) do
+    money_equal?(ticket_order.total_amount, attrs.total_amount) and
+      money_equal?(ticket_order.discount_amount, attrs.discount_amount)
+  end
+
+  defp money_equal?(%Money{} = left, %Money{} = right), do: Money.equals?(left, right)
+  defp money_equal?(nil, %Money{} = right), do: Money.zero?(right)
+  defp money_equal?(%Money{} = left, nil), do: Money.zero?(left)
+  defp money_equal?(nil, nil), do: true
 
   defp do_ticket_selections_from_order(%TicketOrder{} = ticket_order) do
     tickets = ticket_order.tickets

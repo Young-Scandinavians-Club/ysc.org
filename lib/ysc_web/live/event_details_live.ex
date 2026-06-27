@@ -4405,38 +4405,45 @@ defmodule YscWeb.EventDetailsLive do
   defp retrieve_or_create_payment_intent(ticket_order, user) do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
-    if ticket_order.payment_intent_id do
-      # Try to retrieve existing payment intent
-      case stripe_client.retrieve_payment_intent(
-             ticket_order.payment_intent_id,
-             %{}
-           ) do
-        {:ok, payment_intent} ->
-          # Check if payment intent is still valid (not succeeded or canceled)
-          if payment_intent.status in [
-               "requires_payment_method",
-               "requires_confirmation",
-               "requires_action"
-             ] do
-            {:ok, payment_intent}
-          else
-            # Payment intent is in a final state, create a new one
+    with {:ok, ticket_order} <- Ysc.Tickets.sync_pending_order_pricing(ticket_order) do
+      expected_cents = Ysc.MoneyHelper.money_to_cents(ticket_order.total_amount)
+
+      if ticket_order.payment_intent_id do
+        # Try to retrieve existing payment intent
+        case stripe_client.retrieve_payment_intent(
+               ticket_order.payment_intent_id,
+               %{}
+             ) do
+          {:ok, payment_intent} ->
+            # Check if payment intent is still valid (not succeeded or canceled)
+            if payment_intent.status in [
+                 "requires_payment_method",
+                 "requires_confirmation",
+                 "requires_action"
+               ] and payment_intent.amount == expected_cents do
+              {:ok, payment_intent}
+            else
+              Ysc.Tickets.StripeService.cancel_payment_intent(
+                ticket_order.payment_intent_id
+              )
+
+              Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
+                customer_id: user.stripe_id
+              )
+            end
+
+          {:error, _} ->
+            # Payment intent not found, create a new one
             Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
               customer_id: user.stripe_id
             )
-          end
-
-        {:error, _} ->
-          # Payment intent not found, create a new one
-          Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
-            customer_id: user.stripe_id
-          )
+        end
+      else
+        # No payment intent exists, create a new one
+        Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
+          customer_id: user.stripe_id
+        )
       end
-    else
-      # No payment intent exists, create a new one
-      Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
-        customer_id: user.stripe_id
-      )
     end
   end
 
