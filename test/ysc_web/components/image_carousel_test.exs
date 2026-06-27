@@ -30,7 +30,7 @@ defmodule YscWeb.Components.ImageCarouselTest do
       assert html =~ ~s(id="hero-wrapper")
       assert html =~ ~s(phx-hook="ImageCarouselAutoplay")
       assert html =~ "absolute inset-0 h-full w-full z-[2]"
-      assert html =~ ~s(id="hero-carousel")
+      assert html =~ "slide-hero-carousel-0"
       assert html =~ "/images/test.jpg"
       assert html =~ "bg-black/40"
       assert html =~ ~s(aria-hidden="true")

@@ -30,20 +30,6 @@ defmodule YscWeb.Components.ImageCarousel do
   """
   use Phoenix.Component
 
-  attr :id, :string, required: true, doc: "Unique ID for the carousel"
-
-  attr :images, :list,
-    required: true,
-    doc: "List of image maps with :src and :alt keys"
-
-  attr :class, :string,
-    default: "",
-    doc: "Additional CSS classes for the container"
-
-  slot :overlay,
-    doc:
-      "Optional overlay content (e.g., title section) that appears over the carousel"
-
   @doc """
   Full-bleed hero background with autoplay carousel and dark overlay.
 
@@ -58,15 +44,12 @@ defmodule YscWeb.Components.ImageCarousel do
         images={clear_lake_hero_carousel_images()}
       />
   """
-  attr :wrapper_id, :string, required: true, doc: "DOM id for the autoplay hook container"
-  attr :carousel_id, :string, required: true, doc: "Unique id passed to image_carousel/1"
-  attr :images, :list, required: true, doc: "List of image maps with :src and :alt keys"
-
-  attr :overlay_class, :string,
-    default: "absolute inset-0 z-[5] bg-black/40 pointer-events-none",
-    doc: "CSS classes for the dark overlay above the carousel"
-
   def image_carousel_hero_background(assigns) do
+    assigns =
+      assign_new(assigns, :overlay_class, fn ->
+        "absolute inset-0 z-[5] bg-black/40 pointer-events-none"
+      end)
+
     ~H"""
     <div
       id={@wrapper_id}
@@ -78,6 +61,20 @@ defmodule YscWeb.Components.ImageCarousel do
     </div>
     """
   end
+
+  attr :id, :string, required: true, doc: "Unique ID for the carousel"
+
+  attr :images, :list,
+    required: true,
+    doc: "List of image maps with :src and :alt keys"
+
+  attr :class, :string,
+    default: "",
+    doc: "Additional CSS classes for the container"
+
+  slot :overlay,
+    doc:
+      "Optional overlay content (e.g., title section) that appears over the carousel"
 
   def image_carousel(assigns) do
     assigns =
