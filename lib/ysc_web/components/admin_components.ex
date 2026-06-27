@@ -1206,6 +1206,67 @@ defmodule YscWeb.AdminComponents do
   defp clipboard_button_icon_class(:labeled_feedback), do: "w-3.5 h-3.5"
 
   # ---------------------------------------------------------------------------
+  # admin_readonly_copy_field
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Read-only text field with a copy-to-clipboard button.
+
+  Used for shareable admin URLs (e.g. event photo upload links). Provide `value`
+  for inline copy text or `copy_target` to copy from the readonly input id.
+  """
+  attr :id, :string, required: true, doc: "DOM id for the readonly input"
+  attr :value, :string, required: true, doc: "Displayed and copied text value"
+
+  attr :copy_button_id, :string,
+    required: true,
+    doc: "DOM id for the copy button"
+
+  attr :label, :string, default: "Copy link", doc: "Copy button label"
+  attr :input_class, :string, default: nil, doc: "Optional extra input classes"
+
+  attr :button_variant, :string,
+    default: "outline",
+    values: ["solid", "outline"],
+    doc: "Copy button variant"
+
+  attr :button_color, :string,
+    default: "zinc",
+    values: ["blue", "zinc"],
+    doc: "Copy button color"
+
+  def admin_readonly_copy_field(assigns) do
+    input_class =
+      assigns.input_class ||
+        "flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
+
+    assigns = assign(assigns, :input_class, input_class)
+
+    ~H"""
+    <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+      <input
+        type="text"
+        readonly
+        id={@id}
+        value={@value}
+        class={@input_class}
+      />
+      <.button
+        id={@copy_button_id}
+        type="button"
+        variant={@button_variant}
+        color={@button_color}
+        phx-hook="ClipboardCopy"
+        data-copy={@value}
+        class="shrink-0"
+      >
+        <.icon name="hero-clipboard" class="w-5 h-5" /> {@label}
+      </.button>
+    </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
   # admin_check_in_qr_scanner
   # ---------------------------------------------------------------------------
 

@@ -44,6 +44,41 @@ defmodule YscWeb.Components.ImageCarousel do
     doc:
       "Optional overlay content (e.g., title section) that appears over the carousel"
 
+  @doc """
+  Full-bleed hero background with autoplay carousel and dark overlay.
+
+  Wraps `image_carousel/1` in the `ImageCarouselAutoplay` hook container used on
+  booking page hero sections.
+
+  ## Examples
+
+      <.image_carousel_hero_background
+        wrapper_id="clear-lake-carousel-wrapper"
+        carousel_id="about-the-clear-lake-cabin-carousel"
+        images={clear_lake_hero_carousel_images()}
+      />
+  """
+  attr :wrapper_id, :string, required: true, doc: "DOM id for the autoplay hook container"
+  attr :carousel_id, :string, required: true, doc: "Unique id passed to image_carousel/1"
+  attr :images, :list, required: true, doc: "List of image maps with :src and :alt keys"
+
+  attr :overlay_class, :string,
+    default: "absolute inset-0 z-[5] bg-black/40 pointer-events-none",
+    doc: "CSS classes for the dark overlay above the carousel"
+
+  def image_carousel_hero_background(assigns) do
+    ~H"""
+    <div
+      id={@wrapper_id}
+      phx-hook="ImageCarouselAutoplay"
+      class="absolute inset-0 h-full w-full z-[2]"
+    >
+      <.image_carousel id={@carousel_id} images={@images} class="h-full w-full" />
+      <div class={@overlay_class} aria-hidden="true" />
+    </div>
+    """
+  end
+
   def image_carousel(assigns) do
     assigns =
       assigns
