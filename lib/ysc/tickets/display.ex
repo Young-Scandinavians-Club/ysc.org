@@ -84,7 +84,10 @@ defmodule Ysc.Tickets.Display do
 
   defp tier_name_from_ticket(%{ticket_tier: %{name: name}}), do: name
   defp tier_name_from_ticket(%{ticket_tier: nil}), do: nil
-  defp tier_name_from_ticket(%{ticket_tier: %Ecto.Association.NotLoaded{}}), do: nil
+
+  defp tier_name_from_ticket(%{ticket_tier: %Ecto.Association.NotLoaded{}}),
+    do: nil
+
   defp tier_name_from_ticket(_), do: nil
 
   defp cancelled?(%{status: :cancelled}), do: true
