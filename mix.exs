@@ -174,6 +174,9 @@ defmodule Ysc.MixProject do
       # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
       # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
       {:hackney, "~> 4.0", override: true},
+      # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
+      # otherwise resolves to 2.0, which blocks the calendars upgrade.
+      {:digital_token, "~> 1.0", override: true},
       {:argon2_elixir, "~> 4.1"},
       {:atomex, "~> 0.5"},
       {:blurhash, "~> 0.1", hex: :rinpatch_blurhash},
