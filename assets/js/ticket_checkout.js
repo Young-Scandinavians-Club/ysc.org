@@ -43,6 +43,7 @@ export default {
 
         this._pendingTier = null;
         this._pendingQty = null;
+        this.syncButtonStatesFromDOM();
     },
 
     syncFromDOM() {
@@ -53,6 +54,8 @@ export default {
     onClick(e) {
         const btn = e.target.closest("[data-ticket-action]");
         if (!btn || btn.disabled || !this.el.contains(btn)) return;
+
+        if (this._pendingTier != null) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -152,13 +155,9 @@ export default {
         }
     },
 
-    setButtonsPending(tierId) {
-        for (const action of ["increase", "decrease"]) {
-            const btn = this.el.querySelector(
-                `[data-ticket-action="${action}"][data-tier-id="${tierId}"]`
-            );
-
-            if (!btn || btn.hasAttribute("data-locked-disabled")) continue;
+    setButtonsPending(_tierId) {
+        for (const btn of this.el.querySelectorAll("[data-ticket-action]")) {
+            if (btn.hasAttribute("data-locked-disabled")) continue;
 
             btn.disabled = true;
         }
