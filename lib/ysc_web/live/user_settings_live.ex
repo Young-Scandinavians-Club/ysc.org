@@ -11,7 +11,7 @@ defmodule YscWeb.UserSettingsLive do
   @email_verification_token_max_age 1800
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.{FamilyInvites, MembershipCache}
+  alias Ysc.Accounts.{Address, FamilyInvites, MembershipCache}
   alias Ysc.Accounts.UserNotifier
   alias Ysc.Avatars
   alias Ysc.Bookings.Entitlements
@@ -2680,8 +2680,8 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:profile_form, to_form(profile_changeset))
       |> assign(:notification_form, to_form(notification_changeset))
       |> assign(:pending_family_invites, pending_family_invites)
-      # Address form with placeholder - will be populated when connected
-      |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
+      # Address form placeholder — billing_address is loaded in `:load_settings_data`
+      |> assign(:address_form, to_form(empty_billing_address_changeset(user)))
       |> assign(
         :membership_form,
         to_form(%{"membership_type" => nil})
@@ -5248,6 +5248,10 @@ defmodule YscWeb.UserSettingsLive do
         "single"
       end
     end
+  end
+
+  defp empty_billing_address_changeset(user) do
+    Address.changeset(%Address{user_id: user.id}, %{"user_id" => user.id})
   end
 
   defp payment_secret(:payment_method, user) do

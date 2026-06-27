@@ -266,9 +266,11 @@ defmodule Ysc.Tickets do
   and the event start is strictly after `now` (same filter semantics as `UserTicketsLive`).
 
   This avoids loading the full order history and filtering in application code.
+  Results are capped at 50 by default; pass `limit:` to override.
   """
   def list_user_upcoming_ticket_orders(user_id, opts \\ []) do
     now = Keyword.get(opts, :now, DateTime.utc_now())
+    limit = Keyword.get(opts, :limit, 50)
 
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
@@ -276,6 +278,7 @@ defmodule Ysc.Tickets do
       join: e in assoc(to, :event),
       where: e.start_date > ^now,
       order_by: [desc: to.inserted_at],
+      limit: ^limit,
       preload: [:tickets, :event, tickets: :ticket_tier]
     )
     |> Repo.all()
