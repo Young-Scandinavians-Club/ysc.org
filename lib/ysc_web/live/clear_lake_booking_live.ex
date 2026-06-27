@@ -3018,20 +3018,15 @@ defmodule YscWeb.ClearLakeBookingLive do
         info_tab
       )
 
-    socket =
-      socket
-      |> assign(info_tab: info_tab)
-      |> then(fn s ->
-        if map_size(query_params) > 0 do
-          push_patch(s,
-            to: ~p"/bookings/clear-lake?#{URI.encode_query(query_params)}"
-          )
-        else
-          push_patch(s, to: ~p"/bookings/clear-lake")
-        end
-      end)
-
-    {:noreply, socket}
+    {:noreply,
+     push_patch(socket,
+       to:
+         if map_size(query_params) > 0 do
+           ~p"/bookings/clear-lake?#{URI.encode_query(query_params)}"
+         else
+           ~p"/bookings/clear-lake"
+         end
+     )}
   end
 
   def handle_event("switch-tab", %{"tab" => tab}, socket) do
