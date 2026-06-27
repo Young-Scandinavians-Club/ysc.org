@@ -3017,6 +3017,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket.assigns.selected_booking_mode,
         info_tab
       )
+      |> Map.put("info_tab", Atom.to_string(info_tab))
 
     {:noreply,
      push_patch(socket,
