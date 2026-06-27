@@ -891,6 +891,27 @@ defmodule Ysc.Tickets.BookingLocker do
     |> order_by([tr], asc: tr.inserted_at)
   end
 
+  @doc """
+  Estimates an order total from current tier prices and active reservations.
+
+  Used before complimentary checkout to detect stale zero-dollar orders when
+  tier pricing changed after the pending order was created.
+  """
+  def estimate_order_total(user_id, event_id, ticket_selections)
+      when is_map(ticket_selections) do
+    tier_ids = Map.keys(ticket_selections)
+
+    if tier_ids == [] do
+      {:ok, Money.new(0, :USD), Money.new(0, :USD)}
+    else
+      tiers =
+        from(t in TicketTier, where: t.id in ^tier_ids)
+        |> Repo.all()
+
+      calculate_total_amount(tiers, ticket_selections, user_id, event_id)
+    end
+  end
+
   @doc false
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures

@@ -1554,64 +1554,36 @@ defmodule YscWeb.ClearLakeBookingLive do
                     Clear Lake and the surrounding region offer year-round outdoor opportunities:
                   </p>
                   <!-- At-A-Glance Hero Grid -->
-                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-teal-200 transition-colors">
-                      <div class="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        ⚓
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Dock
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        100-Foot Private
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Boat mooring & swimming
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-teal-200 transition-colors">
-                      <div class="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🎵
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Social Hall
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Dance Floor
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Fireplace & games
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-teal-200 transition-colors">
-                      <div class="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🛏️
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Capacity
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        12 Guests
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Summer lawn & winter beds
-                      </div>
-                    </div>
-                    <div class="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm hover:border-teal-200 transition-colors">
-                      <div class="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-xl mb-4 mx-auto">
-                        🌅
-                      </div>
-                      <div class="text-xs uppercase tracking-widest text-zinc-500 font-bold mb-1 text-center">
-                        Season
-                      </div>
-                      <div class="text-lg font-bold text-zinc-900 leading-tight text-center">
-                        Year-Round
-                      </div>
-                      <div class="text-xs text-zinc-500 text-center mt-1">
-                        Summer & winter stays
-                      </div>
-                    </div>
-                  </div>
+                  <.at_glance_grid>
+                    <.at_glance_stat
+                      accent={:teal}
+                      icon="⚓"
+                      label="Dock"
+                      value="100-Foot Private"
+                      detail="Boat mooring & swimming"
+                    />
+                    <.at_glance_stat
+                      accent={:teal}
+                      icon="🎵"
+                      label="Social Hall"
+                      value="Dance Floor"
+                      detail="Fireplace & games"
+                    />
+                    <.at_glance_stat
+                      accent={:teal}
+                      icon="🛏️"
+                      label="Capacity"
+                      value="12 Guests"
+                      detail="Summer lawn & winter beds"
+                    />
+                    <.at_glance_stat
+                      accent={:teal}
+                      icon="🌅"
+                      label="Season"
+                      value="Year-Round"
+                      detail="Summer & winter stays"
+                    />
+                  </.at_glance_grid>
 
                   <YscWeb.Components.ImageCarousel.image_carousel
                     id="clear-lake-experience-carousel"

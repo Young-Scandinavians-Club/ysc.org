@@ -97,17 +97,17 @@ defmodule Ysc.MessagePassingEvents do
 
   defmodule TicketReservationCreated do
     @moduledoc false
-    defstruct ticket_reservation: nil
+    defstruct ticket_reservation: nil, event_id: nil
   end
 
   defmodule TicketReservationFulfilled do
     @moduledoc false
-    defstruct ticket_reservation: nil
+    defstruct ticket_reservation: nil, event_id: nil
   end
 
   defmodule TicketReservationCancelled do
     @moduledoc false
-    defstruct ticket_reservation: nil
+    defstruct ticket_reservation: nil, event_id: nil
   end
 
   defmodule MembershipUpdated do
