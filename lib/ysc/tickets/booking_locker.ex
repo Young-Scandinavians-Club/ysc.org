@@ -894,8 +894,8 @@ defmodule Ysc.Tickets.BookingLocker do
   @doc """
   Estimates an order total from current tier prices and active reservations.
 
-  Used before complimentary checkout to detect stale zero-dollar orders when
-  tier pricing changed after the pending order was created.
+  Used before checkout to detect stale pending orders when tier pricing changed
+  after the order was created.
   """
   def estimate_order_total(user_id, event_id, ticket_selections)
       when is_map(ticket_selections) do

@@ -32,6 +32,20 @@ defmodule Ysc.Tickets.StripeService do
     customer_id = Keyword.get(opts, :customer_id)
     payment_method_id = Keyword.get(opts, :payment_method_id)
 
+    with {:ok, ticket_order} <- Tickets.sync_pending_order_pricing(ticket_order) do
+      create_payment_intent_for_order(
+        ticket_order,
+        customer_id,
+        payment_method_id
+      )
+    end
+  end
+
+  defp create_payment_intent_for_order(
+         ticket_order,
+         customer_id,
+         payment_method_id
+       ) do
     amount_cents = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
     # Note: Stripe PaymentIntents don't support expires_at parameter.
@@ -115,6 +129,7 @@ defmodule Ysc.Tickets.StripeService do
   def process_successful_payment(%Stripe.PaymentIntent{} = payment_intent) do
     with {:ok, ticket_order} <-
            get_ticket_order_from_payment_intent(payment_intent),
+         {:ok, ticket_order} <- Tickets.sync_pending_order_pricing(ticket_order),
          :ok <- validate_payment_intent(payment_intent, ticket_order) do
       Tickets.process_ticket_order_payment(ticket_order, payment_intent)
     end

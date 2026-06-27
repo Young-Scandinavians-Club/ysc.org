@@ -367,4 +367,47 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
       end
     )
   end
+
+  test "rejects payment when tier price increased after order and PI were created",
+       %{
+         user: user,
+         event: event
+       } do
+    {:ok, tier} =
+      Ysc.Events.create_ticket_tier(%{
+        name: "Early Bird",
+        type: :paid,
+        price: Money.new(30, :USD),
+        quantity: 50,
+        event_id: event.id
+      })
+
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      end)
+
+    assert Money.equal?(order.total_amount, Money.new(30, :USD))
+
+    {:ok, _tier} =
+      Ysc.Events.update_ticket_tier(tier, %{
+        price: Money.new(50, :USD)
+      })
+
+    payment_intent_id = "pi_stale_paid_#{order.id}"
+    stale_amount_cents = Ysc.MoneyHelper.money_to_cents(order.total_amount)
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      stale_amount_cents,
+      fn pi_id ->
+        assert {:error, :amount_mismatch} =
+                 Tickets.process_ticket_order_payment(order, pi_id)
+
+        reloaded = Tickets.get_ticket_order(order.id)
+        assert reloaded.status == :pending
+        assert Money.equal?(reloaded.total_amount, Money.new(50, :USD))
+      end
+    )
+  end
 end
