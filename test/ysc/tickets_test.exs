@@ -1050,10 +1050,11 @@ defmodule Ysc.TicketsTest do
              }
     end
 
-    test "pending_order_still_complimentary?/1 is true for a free tier order", %{
-      user: user,
-      event: event
-    } do
+    test "pending_order_still_complimentary?/1 is true for a free tier order",
+         %{
+           user: user,
+           event: event
+         } do
       {:ok, free_tier} =
         Events.create_ticket_tier(%{
           name: "Complimentary",
@@ -1107,7 +1108,9 @@ defmodule Ysc.TicketsTest do
           price: Money.new(50, :USD)
         })
 
-      assert {:ok, recalculated} = Tickets.recalculate_pending_order_total(order)
+      assert {:ok, recalculated} =
+               Tickets.recalculate_pending_order_total(order)
+
       assert Money.equal?(recalculated, Money.new(50, :USD))
       refute Tickets.pending_order_still_complimentary?(order)
     end
