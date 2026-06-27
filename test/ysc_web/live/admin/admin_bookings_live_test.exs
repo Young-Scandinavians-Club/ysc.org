@@ -727,6 +727,55 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert badge_queries == 0
       assert has_element?(view, "#booking-modal")
     end
+
+    test "reservations table shows checked-in status from denormalized flag", %{
+      conn: conn
+    } do
+      unique = "CheckedIn#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      assert {:ok, _} =
+               Bookings.create_check_in(%{
+                 bookings: [booking],
+                 rules_agreed: true
+               })
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      html =
+        view
+        |> form("form[phx-change=change-reservation-search]", %{
+          "search" => %{"query" => unique}
+        })
+        |> render_change()
+
+      assert html =~ unique
+      assert html =~ ~s(text-green-700 font-medium">Yes<)
+    end
+
+    test "reservations table omits checked-in indicator for unchecked bookings",
+         %{
+           conn: conn
+         } do
+      unique = "NotChecked#{System.unique_integer([:positive])}"
+      user = user_fixture(%{first_name: unique, last_name: "Guest"})
+      _booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/bookings?property=tahoe&section=reservations")
+
+      html =
+        view
+        |> form("form[phx-change=change-reservation-search]", %{
+          "search" => %{"query" => unique}
+        })
+        |> render_change()
+
+      assert html =~ unique
+      refute html =~ ~s(text-green-700 font-medium">Yes<)
+    end
   end
 
   describe "new booking form" do

@@ -994,8 +994,14 @@ defmodule Ysc.BookingsTest do
 
     test "mark_booking_checked_in/1 marks booking as checked in" do
       booking = booking_fixture()
+      refute booking.checked_in
+
       # mark_booking_checked_in now preloads rooms internally
-      assert {:ok, _} = Bookings.mark_booking_checked_in(booking.id)
+      assert {:ok, updated} = Bookings.mark_booking_checked_in(booking.id)
+      assert updated.checked_in == true
+
+      reloaded = Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id)
+      assert reloaded.checked_in == true
     end
   end
 
