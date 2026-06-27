@@ -6,8 +6,9 @@ defmodule Ysc.TicketsTest do
 
   import Ecto.Query
   alias Ysc.Events
+  alias Ysc.Events.Ticket
   alias Ysc.Tickets
-  alias Ysc.Tickets.{Ticket, TicketOrder}
+  alias Ysc.Tickets.TicketOrder
   import Ysc.AccountsFixtures
   import Ysc.TicketsFixtures
 
