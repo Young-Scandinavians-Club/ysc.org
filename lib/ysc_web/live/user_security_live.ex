@@ -684,7 +684,9 @@ defmodule YscWeb.UserSecurityLive do
                             </.button>
                           <% else %>
                             <%= if !event.success do %>
-                              <span class="text-xs text-zinc-500">Details</span>
+                              <span class="text-xs text-zinc-500">
+                                Failed sign-in attempt — no action needed unless you don't recognize this device.
+                              </span>
                             <% end %>
                           <% end %>
                         </div>

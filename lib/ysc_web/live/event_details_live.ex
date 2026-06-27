@@ -6688,7 +6688,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Payment processed but there was an issue confirming your tickets. Please contact support.",
+           "Your payment went through, but we couldn't finish saving your tickets right away. Check your email and Your Tickets page in the next few minutes. If your tickets don't appear, email info@ysc.org with the event name and payment date — do not pay again.",
            title: "Tickets"
          )
          |> assign(:show_payment_modal, false)
