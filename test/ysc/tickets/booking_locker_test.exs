@@ -957,7 +957,11 @@ defmodule Ysc.Tickets.BookingLockerTest do
                BookingLocker.atomic_booking(user.id, event.id, selections)
 
       assert Money.equal?(estimated_total, order.total_amount)
-      assert Money.equal?(estimated_discount, order.discount_amount || Money.new(0, :USD))
+
+      assert Money.equal?(
+               estimated_discount,
+               order.discount_amount || Money.new(0, :USD)
+             )
     end
 
     test "applies active reservation discounts", %{
@@ -978,7 +982,9 @@ defmodule Ysc.Tickets.BookingLockerTest do
       |> Repo.insert!()
 
       assert {:ok, estimated_total, estimated_discount} =
-               BookingLocker.estimate_order_total(user.id, event.id, %{tier.id => 1})
+               BookingLocker.estimate_order_total(user.id, event.id, %{
+                 tier.id => 1
+               })
 
       {:ok, expected_total} =
         Money.sub(Money.new(25, :USD), Money.new("12.50", :USD))
