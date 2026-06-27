@@ -582,6 +582,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       html = render(view)
       assert html =~ "Recent Activity"
       assert html =~ "Failed sign-in"
+      assert html =~ "no action needed unless you"
       assert html =~ "10.0.xxx.xxx"
     end
 

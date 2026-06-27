@@ -999,7 +999,7 @@ defmodule YscWeb.UserSettingsLive do
                         phx-disable-with="Updating..."
                         variant="outline"
                         color="amber"
-                        data-confirm="Keep your current membership level instead of switching plans on the scheduled date?"
+                        data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
                       >
                         Keep my current plan
                       </.button>
@@ -1092,7 +1092,7 @@ defmodule YscWeb.UserSettingsLive do
                         phx-disable-with="Updating..."
                         variant="outline"
                         color="amber"
-                        data-confirm="Keep your current membership level instead of switching plans on the scheduled date?"
+                        data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
                       >
                         Keep my current plan
                       </.button>
@@ -1491,7 +1491,7 @@ defmodule YscWeb.UserSettingsLive do
                           phx-disable-with="Updating..."
                           variant="outline"
                           color="amber"
-                          data-confirm="Keep your current membership level instead of switching plans on the scheduled date?"
+                          data-confirm="Cancel your scheduled plan change and keep your current membership? You will stay on your current plan and will not switch on the date shown above."
                         >
                           Keep my current plan
                         </.button>
