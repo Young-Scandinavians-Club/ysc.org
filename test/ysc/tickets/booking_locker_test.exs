@@ -933,4 +933,58 @@ defmodule Ysc.Tickets.BookingLockerTest do
                )
     end
   end
+
+  describe "estimate_order_total/3" do
+    test "returns zero for empty selections", %{user: user, event: event} do
+      assert {:ok, total, discount} =
+               BookingLocker.estimate_order_total(user.id, event.id, %{})
+
+      assert Money.zero?(total)
+      assert Money.zero?(discount)
+    end
+
+    test "matches atomic_booking total for paid tiers", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      selections = %{tier.id => 2}
+
+      assert {:ok, estimated_total, estimated_discount} =
+               BookingLocker.estimate_order_total(user.id, event.id, selections)
+
+      assert {:ok, order} =
+               BookingLocker.atomic_booking(user.id, event.id, selections)
+
+      assert Money.equal?(estimated_total, order.total_amount)
+      assert Money.equal?(estimated_discount, order.discount_amount || Money.new(0, :USD))
+    end
+
+    test "applies active reservation discounts", %{
+      user: user,
+      event: event,
+      tier: tier,
+      organizer: organizer
+    } do
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        quantity: 1,
+        created_by_id: organizer.id,
+        discount_percentage: Decimal.new(50),
+        status: "active"
+      })
+      |> Repo.insert!()
+
+      assert {:ok, estimated_total, estimated_discount} =
+               BookingLocker.estimate_order_total(user.id, event.id, %{tier.id => 1})
+
+      {:ok, expected_total} =
+        Money.sub(Money.new(25, :USD), Money.new("12.50", :USD))
+
+      assert Money.equal?(estimated_total, expected_total)
+      assert Money.positive?(estimated_discount)
+    end
+  end
 end
