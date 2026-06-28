@@ -28,22 +28,11 @@ export default {
     },
 
     updated() {
-        const pendingTier = this._pendingTier;
-        const pendingQty = this._pendingQty;
-
         this.syncFromDOM();
-
-        if (pendingTier != null) {
-            const serverQty = this.selected[pendingTier] || 0;
-            if (serverQty !== pendingQty) {
-                this.playReject(pendingTier);
-                this.refreshTierUI(pendingTier, serverQty);
-            }
-        }
-
         this._pendingTier = null;
         this._pendingQty = null;
         this.syncButtonStatesFromDOM();
+        this.syncProceedButtonFromDOM();
     },
 
     syncFromDOM() {
