@@ -1051,7 +1051,7 @@ defmodule Ysc.TicketsTest do
           Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
         end)
 
-      now = DateTime.utc_now()
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       completed =
         order
