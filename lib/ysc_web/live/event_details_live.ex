@@ -4274,42 +4274,31 @@ defmodule YscWeb.EventDetailsLive do
         # For paid tickets, retrieve or create payment intent and show payment modal with registration
         require Ysc.Logging
 
+        restore_context = %{
+          tickets_requiring_registration: tickets_requiring_registration,
+          ticket_details_form: ticket_details_form,
+          tickets_for_me: tickets_for_me,
+          selected_family_members: selected_family_members,
+          family_members: family_members,
+          active_ticket_index: active_ticket_index,
+          ticket_registration_details_by_id: ticket_registration_details_by_id,
+          ticket_tiers: ticket_tiers,
+          availability_data: availability_data
+        }
+
         case synced_checkout_if_ready(socket, ticket_order) do
           {:ready, ticket_order} ->
-            socket
-            |> assign(:show_ticket_modal, false)
-            |> assign(:show_payment_modal, true)
-            |> assign(:checkout_expired, false)
-            |> assign(:ticket_order, ticket_order)
-            |> assign(
-              :tickets_requiring_registration,
-              tickets_requiring_registration
+            assign_restored_payment_checkout(
+              socket,
+              ticket_order,
+              restore_context
             )
-            |> assign(:ticket_details_form, ticket_details_form)
-            |> assign(:tickets_for_me, tickets_for_me)
-            |> assign(:selected_family_members, selected_family_members)
-            |> assign(:family_members, family_members)
-            |> assign(:active_ticket_index, active_ticket_index)
-            |> assign(
-              :ticket_registration_details_by_id,
-              ticket_registration_details_by_id
-            )
-            |> assign(:ticket_tiers, ticket_tiers)
-            |> assign(:availability_data, availability_data)
 
           {:not_ready, ticket_order} ->
             restore_payment_intent_for_order(
               socket,
               ticket_order,
-              tickets_requiring_registration,
-              ticket_details_form,
-              tickets_for_me,
-              selected_family_members,
-              family_members,
-              active_ticket_index,
-              ticket_registration_details_by_id,
-              ticket_tiers,
-              availability_data
+              restore_context
             )
 
           :not_ready ->
@@ -4319,15 +4308,7 @@ defmodule YscWeb.EventDetailsLive do
             restore_payment_intent_for_order(
               socket,
               ticket_order,
-              tickets_requiring_registration,
-              ticket_details_form,
-              tickets_for_me,
-              selected_family_members,
-              family_members,
-              active_ticket_index,
-              ticket_registration_details_by_id,
-              ticket_tiers,
-              availability_data
+              restore_context
             )
         end
 
@@ -4358,19 +4339,30 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp restore_payment_intent_for_order(
-         socket,
-         ticket_order,
-         tickets_requiring_registration,
-         ticket_details_form,
-         tickets_for_me,
-         selected_family_members,
-         family_members,
-         active_ticket_index,
-         ticket_registration_details_by_id,
-         ticket_tiers,
-         availability_data
-       ) do
+  defp assign_restored_payment_checkout(socket, ticket_order, restore_context) do
+    socket
+    |> assign(:show_ticket_modal, false)
+    |> assign(:show_payment_modal, true)
+    |> assign(:checkout_expired, false)
+    |> assign(:ticket_order, ticket_order)
+    |> assign(
+      :tickets_requiring_registration,
+      restore_context.tickets_requiring_registration
+    )
+    |> assign(:ticket_details_form, restore_context.ticket_details_form)
+    |> assign(:tickets_for_me, restore_context.tickets_for_me)
+    |> assign(:selected_family_members, restore_context.selected_family_members)
+    |> assign(:family_members, restore_context.family_members)
+    |> assign(:active_ticket_index, restore_context.active_ticket_index)
+    |> assign(
+      :ticket_registration_details_by_id,
+      restore_context.ticket_registration_details_by_id
+    )
+    |> assign(:ticket_tiers, restore_context.ticket_tiers)
+    |> assign(:availability_data, restore_context.availability_data)
+  end
+
+  defp restore_payment_intent_for_order(socket, ticket_order, restore_context) do
     require Ysc.Logging
 
     Ysc.Logging.debug(
@@ -4401,19 +4393,22 @@ defmodule YscWeb.EventDetailsLive do
         |> assign(:ticket_order, ticket_order)
         |> assign(
           :tickets_requiring_registration,
-          tickets_requiring_registration
+          restore_context.tickets_requiring_registration
         )
-        |> assign(:ticket_details_form, ticket_details_form)
-        |> assign(:tickets_for_me, tickets_for_me)
-        |> assign(:selected_family_members, selected_family_members)
-        |> assign(:family_members, family_members)
-        |> assign(:active_ticket_index, active_ticket_index)
+        |> assign(:ticket_details_form, restore_context.ticket_details_form)
+        |> assign(:tickets_for_me, restore_context.tickets_for_me)
+        |> assign(
+          :selected_family_members,
+          restore_context.selected_family_members
+        )
+        |> assign(:family_members, restore_context.family_members)
+        |> assign(:active_ticket_index, restore_context.active_ticket_index)
         |> assign(
           :ticket_registration_details_by_id,
-          ticket_registration_details_by_id
+          restore_context.ticket_registration_details_by_id
         )
-        |> assign(:ticket_tiers, ticket_tiers)
-        |> assign(:availability_data, availability_data)
+        |> assign(:ticket_tiers, restore_context.ticket_tiers)
+        |> assign(:availability_data, restore_context.availability_data)
         |> assign(:payment_redirect_in_progress, false)
 
       {:error, reason} ->
