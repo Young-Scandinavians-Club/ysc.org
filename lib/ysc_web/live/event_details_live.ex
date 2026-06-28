@@ -4340,12 +4340,15 @@ defmodule YscWeb.EventDetailsLive do
 
   defp synced_checkout_if_ready(socket, ticket_order) do
     with %{id: order_id} = socket_order <- socket.assigns[:ticket_order],
-         %Stripe.PaymentIntent{id: payment_intent_id} <- socket.assigns[:payment_intent],
+         %Stripe.PaymentIntent{id: payment_intent_id} <-
+           socket.assigns[:payment_intent],
          %{payment_intent_id: ^payment_intent_id} <- socket_order,
          true <- socket.assigns[:show_payment_modal],
          true <- order_id == ticket_order.id,
-         {:ok, synced_order} <- Ysc.Tickets.sync_pending_order_pricing(ticket_order) do
-      if Money.compare(socket_order.total_amount, synced_order.total_amount) == :eq do
+         {:ok, synced_order} <-
+           Ysc.Tickets.sync_pending_order_pricing(ticket_order) do
+      if Money.compare(socket_order.total_amount, synced_order.total_amount) ==
+           :eq do
         {:ready, synced_order}
       else
         {:not_ready, synced_order}
