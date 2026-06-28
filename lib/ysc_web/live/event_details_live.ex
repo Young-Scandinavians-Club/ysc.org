@@ -4274,6 +4274,9 @@ defmodule YscWeb.EventDetailsLive do
         # For paid tickets, retrieve or create payment intent and show payment modal with registration
         require Ysc.Logging
 
+        {:ok, ticket_order} =
+          Ysc.Tickets.sync_pending_order_pricing(ticket_order)
+
         if payment_checkout_already_ready?(socket, ticket_order) do
           socket
           |> assign(:show_ticket_modal, false)
@@ -4365,10 +4368,12 @@ defmodule YscWeb.EventDetailsLive do
   defp payment_checkout_already_ready?(socket, ticket_order) do
     with %{id: order_id, payment_intent_id: payment_intent_id}
          when is_binary(payment_intent_id) <- socket.assigns[:ticket_order],
-         %{id: ^payment_intent_id} <- socket.assigns[:payment_intent],
+         %Stripe.PaymentIntent{id: ^payment_intent_id} = payment_intent <-
+           socket.assigns[:payment_intent],
          true <- socket.assigns[:show_payment_modal],
          true <- order_id == ticket_order.id do
-      true
+      expected_cents = Ysc.MoneyHelper.money_to_cents(ticket_order.total_amount)
+      payment_intent.amount == expected_cents
     else
       _ -> false
     end
