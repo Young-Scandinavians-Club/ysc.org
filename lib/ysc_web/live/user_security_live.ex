@@ -348,81 +348,14 @@ defmodule YscWeb.UserSecurityLive do
       />
 
       <div class="md:flex md:flex-row md:flex-auto md:grow container mx-auto">
-        <ul class="flex-column space-y space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
-          <li>
-            <h2 class="text-zinc-800 text-2xl font-semibold leading-8 mb-10">
-              Account
-            </h2>
-          </li>
-          <li>
-            <.link
-              navigate={~p"/users/settings"}
-              class={[
-                "inline-flex items-center px-4 py-3 rounded w-full",
-                "hover:bg-zinc-100 hover:text-zinc-900"
-              ]}
-            >
-              <.icon name="hero-user" class="w-5 h-5 me-2" /> Profile
-            </.link>
-          </li>
-          <li>
-            <.link
-              navigate={~p"/users/membership"}
-              class={[
-                "inline-flex items-center px-4 py-3 rounded w-full",
-                "hover:bg-zinc-100 hover:text-zinc-900"
-              ]}
-            >
-              <.icon name="hero-heart" class="w-5 h-5 me-2" /> Membership
-            </.link>
-          </li>
-          <li>
-            <.link
-              navigate={~p"/users/payments"}
-              class={[
-                "inline-flex items-center px-4 py-3 rounded w-full",
-                "hover:bg-zinc-100 hover:text-zinc-900"
-              ]}
-            >
-              <.icon name="hero-wallet" class="w-5 h-5 me-2" /> Payments
-            </.link>
-          </li>
-          <%= if @current_user && (Accounts.primary_user?(@current_user) || Accounts.sub_account?(@current_user)) && (@active_plan_type == :family || @active_plan_type == :lifetime) do %>
-            <li>
-              <.link
-                navigate={~p"/users/settings/family"}
-                class={[
-                  "inline-flex items-center px-4 py-3 rounded w-full",
-                  "hover:bg-zinc-100 hover:text-zinc-900"
-                ]}
-              >
-                <.icon name="hero-user-group" class="w-5 h-5 me-2" /> Family
-              </.link>
-            </li>
-          <% end %>
-          <li>
-            <.link
-              navigate={~p"/users/settings/security"}
-              class={[
-                "inline-flex items-center px-4 py-3 rounded w-full",
-                "bg-blue-600 active text-zinc-100"
-              ]}
-            >
-              <.icon name="hero-shield-check" class="w-5 h-5 me-2" /> Security
-            </.link>
-          </li>
-          <li>
-            <.link
-              navigate={~p"/users/notifications"}
-              class={[
-                "inline-flex items-center px-4 py-3 rounded w-full",
-                "hover:bg-zinc-100 hover:text-zinc-900"
-              ]}
-            >
-              <.icon name="hero-bell-alert" class="w-5 h-5 me-2" /> Notifications
-            </.link>
-          </li>
-        </ul>
+        <.account_settings_nav
+          current={:security}
+          show_family_link?={
+            @current_user &&
+              (Accounts.primary_user?(@current_user) || Accounts.sub_account?(@current_user)) &&
+              (@active_plan_type == :family || @active_plan_type == :lifetime)
+          }
+        />
 
         <div class="text-medium px-2 text-zinc-500 rounded w-full md:border-l md:border-1 md:border-zinc-100 md:pl-16">
           <div class="space-y-8">
