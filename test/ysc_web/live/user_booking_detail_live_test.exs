@@ -1080,7 +1080,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> form("#cancel-booking-form", %{"reason" => "Testing"})
         |> render_submit()
 
-      assert render(view) =~ "payment not found"
+      assert render(view) =~ "couldn't find your payment record"
     end
 
     test "payment summary shows card ending in when payment method has last four",

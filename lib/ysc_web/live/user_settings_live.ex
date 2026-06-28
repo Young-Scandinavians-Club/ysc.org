@@ -6240,7 +6240,7 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "Invalid invoice ID. Please use the link from your email or contact support.",
+       "This payment link didn't work — it may have expired. Go to Membership in your account settings to update your card and try again, or email memberships@ysc.org for help.",
        title: "Invoice"
      )}
   end

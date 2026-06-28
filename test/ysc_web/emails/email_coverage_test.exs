@@ -490,7 +490,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       html = MembershipPaymentFailure.render(assigns)
       assert is_binary(html)
       assert html =~ "Membership Renewal Payment Failed"
-      assert html =~ "Urgent Action Required"
+      assert html =~ "Action needed"
     end
 
     test "renders with invoice_id and retry_payment_url", %{user: user} do
@@ -507,7 +507,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       }
 
       html = MembershipPaymentFailure.render(assigns)
-      assert html =~ "in_123"
+      assert html =~ user.email
       assert html =~ "Retry Payment Now"
     end
 

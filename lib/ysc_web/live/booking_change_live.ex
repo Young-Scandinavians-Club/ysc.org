@@ -164,11 +164,11 @@ defmodule YscWeb.BookingChangeLive do
      |> assign(:finalize_payment_intent_id, nil)
      |> assign(
        :payment_error,
-       "Your payment was received but we could not update your reservation. Please open your confirmation page or contact support."
+       "Your payment went through, but we couldn't save your new dates. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your booking confirmation number."
      )
      |> YscWeb.Flash.put_toast(
        :error,
-       "Your payment was received but we could not update your reservation. Please open your confirmation page or contact support.",
+       "Your payment went through, but we couldn't save your new dates. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your booking confirmation number.",
        title: "Payment received"
      )}
   end
@@ -1232,9 +1232,9 @@ defmodule YscWeb.BookingChangeLive do
   end
 
   defp modification_error_message_after_payment(reason) do
-    "Your payment was received. " <>
+    "Your payment went through. " <>
       modification_error_message(reason) <>
-      " Please open your confirmation page or contact support if your dates did not update."
+      " Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your booking confirmation number."
   end
 
   defp proceed_after_modification_details(socket, params, preview) do

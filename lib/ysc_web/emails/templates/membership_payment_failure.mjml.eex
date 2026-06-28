@@ -31,7 +31,7 @@
     <mj-spacer height="24px"></mj-spacer>
     <%= if @is_renewal do %>
       <mj-text align="center" font-size="18px" line-height="1.5" padding="16px" style="background-color: #FEF2F2; border-radius: 6px; border-left: 4px solid #DC2626;">
-        <strong>⚠️ Urgent Action Required:</strong> Your <%= @membership_type %> membership renewal payment could not be processed. Your membership will expire if we cannot successfully process the payment.
+        <strong>Action needed:</strong> We couldn't process your <%= @membership_type %> membership renewal. Update your payment method and try again so your membership stays active.
       </mj-text>
       <mj-spacer height="24px"></mj-spacer>
       <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
@@ -63,12 +63,10 @@
       </ul>
     </mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <%= if @invoice_id do %>
-      <mj-text align="center" font-size="16px" line-height="1.5" padding="0px" color="#6b7280">
-        <strong>Invoice Reference:</strong> <%= @invoice_id %>
-      </mj-text>
-      <mj-spacer height="12px"></mj-spacer>
-    <% end %>
+    <mj-text align="center" font-size="16px" line-height="1.5" padding="0px" color="#6b7280">
+      If you contact us, mention the email address on your account: <%= @email %>
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
     <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
       <%= if @is_renewal do %>
         To keep your membership active and ensure uninterrupted access to all member benefits, please update your payment method and retry the payment as soon as possible.

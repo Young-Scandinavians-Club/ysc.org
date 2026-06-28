@@ -1695,7 +1695,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       send(view.pid, {:retry_invoice_payment, nil})
 
-      assert render(view) =~ "Invalid invoice ID"
+      assert render(view) =~ "payment link didn't work"
     end
 
     test "refresh_payment_methods handle_info ignores other user id", %{
