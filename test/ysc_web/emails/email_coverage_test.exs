@@ -524,6 +524,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert data.is_renewal == true
       assert data.invoice_id == "in_123"
+      assert data.email == user.email
       assert data.retry_payment_url =~ "retry_invoice"
     end
 
