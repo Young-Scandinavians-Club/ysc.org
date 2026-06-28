@@ -4274,88 +4274,61 @@ defmodule YscWeb.EventDetailsLive do
         # For paid tickets, retrieve or create payment intent and show payment modal with registration
         require Ysc.Logging
 
-        if payment_checkout_already_ready?(socket, ticket_order) do
-          socket
-          |> assign(:show_ticket_modal, false)
-          |> assign(:show_payment_modal, true)
-          |> assign(:checkout_expired, false)
-          |> assign(:ticket_order, ticket_order)
-          |> assign(
-            :tickets_requiring_registration,
-            tickets_requiring_registration
-          )
-          |> assign(:ticket_details_form, ticket_details_form)
-          |> assign(:tickets_for_me, tickets_for_me)
-          |> assign(:selected_family_members, selected_family_members)
-          |> assign(:family_members, family_members)
-          |> assign(:active_ticket_index, active_ticket_index)
-          |> assign(
-            :ticket_registration_details_by_id,
-            ticket_registration_details_by_id
-          )
-          |> assign(:ticket_tiers, ticket_tiers)
-          |> assign(:availability_data, availability_data)
-        else
-          {:ok, ticket_order} =
-            Ysc.Tickets.sync_pending_order_pricing(ticket_order)
+        case synced_checkout_if_ready(socket, ticket_order) do
+          {:ready, ticket_order} ->
+            socket
+            |> assign(:show_ticket_modal, false)
+            |> assign(:show_payment_modal, true)
+            |> assign(:checkout_expired, false)
+            |> assign(:ticket_order, ticket_order)
+            |> assign(
+              :tickets_requiring_registration,
+              tickets_requiring_registration
+            )
+            |> assign(:ticket_details_form, ticket_details_form)
+            |> assign(:tickets_for_me, tickets_for_me)
+            |> assign(:selected_family_members, selected_family_members)
+            |> assign(:family_members, family_members)
+            |> assign(:active_ticket_index, active_ticket_index)
+            |> assign(
+              :ticket_registration_details_by_id,
+              ticket_registration_details_by_id
+            )
+            |> assign(:ticket_tiers, ticket_tiers)
+            |> assign(:availability_data, availability_data)
 
-          Ysc.Logging.debug(
-            "restore_payment_state_from_url: Retrieving/creating payment intent",
-            order_id: ticket_order.id,
-            payment_intent_id: ticket_order.payment_intent_id,
-            user_stripe_id: socket.assigns.current_user.stripe_id
-          )
+          {:not_ready, ticket_order} ->
+            restore_payment_intent_for_order(
+              socket,
+              ticket_order,
+              tickets_requiring_registration,
+              ticket_details_form,
+              tickets_for_me,
+              selected_family_members,
+              family_members,
+              active_ticket_index,
+              ticket_registration_details_by_id,
+              ticket_tiers,
+              availability_data
+            )
 
-          case retrieve_or_create_payment_intent(
-                 ticket_order,
-                 socket.assigns.current_user
-               ) do
-            {:ok, payment_intent} ->
-              Ysc.Logging.debug(
-                "restore_payment_state_from_url: Payment intent retrieved/created successfully",
-                order_id: ticket_order.id,
-                payment_intent_id: payment_intent.id,
-                payment_intent_status: payment_intent.status
-              )
+          :not_ready ->
+            {:ok, ticket_order} =
+              Ysc.Tickets.sync_pending_order_pricing(ticket_order)
 
-              socket
-              |> assign(:show_ticket_modal, false)
-              |> assign(:show_payment_modal, true)
-              |> assign(:checkout_expired, false)
-              |> assign(:stripe_payment_element_ready, false)
-              |> assign(:payment_intent, payment_intent)
-              |> assign(:ticket_order, ticket_order)
-              |> assign(
-                :tickets_requiring_registration,
-                tickets_requiring_registration
-              )
-              |> assign(:ticket_details_form, ticket_details_form)
-              |> assign(:tickets_for_me, tickets_for_me)
-              |> assign(:selected_family_members, selected_family_members)
-              |> assign(:family_members, family_members)
-              |> assign(
-                :ticket_registration_details_by_id,
-                ticket_registration_details_by_id
-              )
-              |> assign(:ticket_tiers, ticket_tiers)
-              |> assign(:availability_data, availability_data)
-              |> assign(:payment_redirect_in_progress, false)
-
-            {:error, reason} ->
-              Ysc.Logging.error(
-                "restore_payment_state_from_url: Failed to retrieve/create payment intent",
-                order_id: ticket_order.id,
-                error: reason
-              )
-
-              socket
-              |> YscWeb.Flash.put_toast(
-                :error,
-                "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
-                title: "Payment"
-              )
-              |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
-          end
+            restore_payment_intent_for_order(
+              socket,
+              ticket_order,
+              tickets_requiring_registration,
+              ticket_details_form,
+              tickets_for_me,
+              selected_family_members,
+              family_members,
+              active_ticket_index,
+              ticket_registration_details_by_id,
+              ticket_tiers,
+              availability_data
+            )
         end
 
       _ ->
@@ -4365,16 +4338,95 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp payment_checkout_already_ready?(socket, ticket_order) do
-    with %{id: order_id, payment_intent_id: payment_intent_id}
-         when is_binary(payment_intent_id) <- socket.assigns[:ticket_order],
-         %Stripe.PaymentIntent{id: ^payment_intent_id} <-
-           socket.assigns[:payment_intent],
+  defp synced_checkout_if_ready(socket, ticket_order) do
+    with %{id: order_id} = socket_order <- socket.assigns[:ticket_order],
+         %Stripe.PaymentIntent{id: payment_intent_id} <- socket.assigns[:payment_intent],
+         %{payment_intent_id: ^payment_intent_id} <- socket_order,
          true <- socket.assigns[:show_payment_modal],
-         true <- order_id == ticket_order.id do
-      true
+         true <- order_id == ticket_order.id,
+         {:ok, synced_order} <- Ysc.Tickets.sync_pending_order_pricing(ticket_order) do
+      if Money.compare(socket_order.total_amount, synced_order.total_amount) == :eq do
+        {:ready, synced_order}
+      else
+        {:not_ready, synced_order}
+      end
     else
-      _ -> false
+      _ -> :not_ready
+    end
+  end
+
+  defp restore_payment_intent_for_order(
+         socket,
+         ticket_order,
+         tickets_requiring_registration,
+         ticket_details_form,
+         tickets_for_me,
+         selected_family_members,
+         family_members,
+         active_ticket_index,
+         ticket_registration_details_by_id,
+         ticket_tiers,
+         availability_data
+       ) do
+    require Ysc.Logging
+
+    Ysc.Logging.debug(
+      "restore_payment_state_from_url: Retrieving/creating payment intent",
+      order_id: ticket_order.id,
+      payment_intent_id: ticket_order.payment_intent_id,
+      user_stripe_id: socket.assigns.current_user.stripe_id
+    )
+
+    case retrieve_or_create_payment_intent(
+           ticket_order,
+           socket.assigns.current_user
+         ) do
+      {:ok, payment_intent} ->
+        Ysc.Logging.debug(
+          "restore_payment_state_from_url: Payment intent retrieved/created successfully",
+          order_id: ticket_order.id,
+          payment_intent_id: payment_intent.id,
+          payment_intent_status: payment_intent.status
+        )
+
+        socket
+        |> assign(:show_ticket_modal, false)
+        |> assign(:show_payment_modal, true)
+        |> assign(:checkout_expired, false)
+        |> assign(:stripe_payment_element_ready, false)
+        |> assign(:payment_intent, payment_intent)
+        |> assign(:ticket_order, ticket_order)
+        |> assign(
+          :tickets_requiring_registration,
+          tickets_requiring_registration
+        )
+        |> assign(:ticket_details_form, ticket_details_form)
+        |> assign(:tickets_for_me, tickets_for_me)
+        |> assign(:selected_family_members, selected_family_members)
+        |> assign(:family_members, family_members)
+        |> assign(:active_ticket_index, active_ticket_index)
+        |> assign(
+          :ticket_registration_details_by_id,
+          ticket_registration_details_by_id
+        )
+        |> assign(:ticket_tiers, ticket_tiers)
+        |> assign(:availability_data, availability_data)
+        |> assign(:payment_redirect_in_progress, false)
+
+      {:error, reason} ->
+        Ysc.Logging.error(
+          "restore_payment_state_from_url: Failed to retrieve/create payment intent",
+          order_id: ticket_order.id,
+          error: reason
+        )
+
+        socket
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't reload your payment page. Please select your tickets again and try checkout once more. If this keeps happening, email info@ysc.org.",
+          title: "Payment"
+        )
+        |> push_patch(to: ~p"/events/#{socket.assigns.event.id}")
     end
   end
 
