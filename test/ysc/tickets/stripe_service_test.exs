@@ -118,6 +118,26 @@ defmodule Ysc.Tickets.StripeServiceTest do
       assert {:error, "Card declined"} =
                StripeService.create_payment_intent(ticket_order)
     end
+
+    test "syncs order pricing before creating payment intent when tier price increased",
+         %{ticket_order: ticket_order} do
+      order = Ysc.Tickets.get_ticket_order(ticket_order.id)
+      [%{ticket_tier: tier} | _] = order.tickets
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier, %{price: Money.new(75, :USD)})
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        assert params.amount == 7500
+        assert params.metadata[:ticket_order_id] == order.id
+        {:ok, %{id: "pi_synced_#{order.id}", status: "requires_payment_method"}}
+      end)
+
+      assert {:ok, payment_intent} =
+               StripeService.create_payment_intent(order)
+
+      assert payment_intent.id == "pi_synced_#{order.id}"
+    end
   end
 
   describe "cancel_payment_intent/1" do
