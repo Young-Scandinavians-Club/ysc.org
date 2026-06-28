@@ -615,15 +615,6 @@ defmodule YscWeb.TicketQrLive do
       {:error, :not_configured} ->
         %{}
 
-      {:error, reason} ->
-        Ysc.Logging.error(
-          "Failed to generate Google Wallet ticket URLs",
-          user_id: user_id,
-          error: inspect(reason)
-        )
-
-        %{}
-
       {:ok, results} ->
         Enum.reduce(results, %{}, fn
           {ticket_id, {:ok, url}}, acc ->

@@ -78,39 +78,37 @@ defmodule Ysc.GoogleWallet do
   `{:error, :not_configured | reason}` when credentials or signing fail globally.
   """
   def generate_ticket_save_urls(ticket_ids, user_id) when is_list(ticket_ids) do
-    with {:creds, {:ok, creds}} <- {:creds, Credentials.get_credentials()} do
-      tickets_by_id = load_tickets(ticket_ids, user_id)
+    case Credentials.get_credentials() do
+      {:ok, creds} ->
+        tickets_by_id = load_tickets(ticket_ids, user_id)
 
-      results =
-        Enum.reduce(ticket_ids, %{}, fn ticket_id, acc ->
-          case Map.get(tickets_by_id, ticket_id) do
-            %Ticket{} = ticket ->
-              case sign_ticket_jwt(ticket, creds) do
-                {:ok, jwt} ->
-                  Map.put(acc, ticket_id, {:ok, "#{@save_url_base}/#{jwt}"})
+        results =
+          Enum.reduce(ticket_ids, %{}, fn ticket_id, acc ->
+            case Map.get(tickets_by_id, ticket_id) do
+              %Ticket{} = ticket ->
+                case sign_ticket_jwt(ticket, creds) do
+                  {:ok, jwt} ->
+                    Map.put(acc, ticket_id, {:ok, "#{@save_url_base}/#{jwt}"})
 
-                {:error, reason} ->
-                  Ysc.Logging.error(
-                    "Google Wallet: failed to generate ticket save URL",
-                    ticket_id: ticket_id,
-                    error: inspect(reason)
-                  )
+                  {:error, reason} ->
+                    Ysc.Logging.error(
+                      "Google Wallet: failed to generate ticket save URL",
+                      ticket_id: ticket_id,
+                      error: inspect(reason)
+                    )
 
-                  Map.put(acc, ticket_id, {:error, reason})
-              end
+                    Map.put(acc, ticket_id, {:error, reason})
+                end
 
-            nil ->
-              Map.put(acc, ticket_id, {:error, :not_found})
-          end
-        end)
+              nil ->
+                Map.put(acc, ticket_id, {:error, :not_found})
+            end
+          end)
 
-      {:ok, results}
-    else
-      {:creds, {:error, :not_configured}} ->
+        {:ok, results}
+
+      {:error, :not_configured} ->
         {:error, :not_configured}
-
-      {:error, reason} ->
-        {:error, reason}
     end
   end
 
@@ -209,13 +207,6 @@ defmodule Ysc.GoogleWallet do
   # ---------------------------------------------------------------------------
   # Private — ticket JWT
   # ---------------------------------------------------------------------------
-
-  defp load_ticket(ticket_id, user_id) do
-    case load_tickets([ticket_id], user_id) do
-      %{^ticket_id => ticket} -> ticket
-      _ -> nil
-    end
-  end
 
   defp load_tickets(ticket_ids, user_id) do
     ticket_ids = Enum.uniq(ticket_ids)

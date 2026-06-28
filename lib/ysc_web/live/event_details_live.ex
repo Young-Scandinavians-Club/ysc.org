@@ -3700,7 +3700,7 @@ defmodule YscWeb.EventDetailsLive do
 
     if socket.assigns.active_membership? &&
          attendees_need_reload?(previous_sold_count, new_sold_count) do
-      {_sold_ticket_count, attendees_count, attendees_list,
+      {sold_ticket_count, attendees_count, attendees_list,
        ticket_counts_per_user, host_ids} =
         load_attendees(true, socket.assigns.current_user, event_id)
 
@@ -3709,7 +3709,7 @@ defmodule YscWeb.EventDetailsLive do
       |> assign(:attendees_list, attendees_list)
       |> assign(:ticket_counts_per_user, ticket_counts_per_user)
       |> assign(:host_ids, host_ids)
-      |> assign(:attendee_sold_ticket_count, _sold_ticket_count || 0)
+      |> assign(:attendee_sold_ticket_count, sold_ticket_count || 0)
     else
       socket
     end
@@ -3833,8 +3833,8 @@ defmodule YscWeb.EventDetailsLive do
     {user_tickets, all_tickets_by_order} =
       Map.get(results, :user_tickets, {[], %{}})
 
-    {_sold_ticket_count, attendees_count, attendees_list,
-     ticket_counts_per_user, host_ids} =
+    {sold_ticket_count, attendees_count, attendees_list, ticket_counts_per_user,
+     host_ids} =
       Map.get(results, :attendees, {nil, nil, nil, %{}, MapSet.new()})
 
     user_reservations = Map.get(results, :user_reservations, [])
@@ -3889,7 +3889,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:attendees_list, attendees_list)
      |> assign(:ticket_counts_per_user, ticket_counts_per_user)
      |> assign(:host_ids, host_ids)
-     |> assign(:attendee_sold_ticket_count, _sold_ticket_count || 0)
+     |> assign(:attendee_sold_ticket_count, sold_ticket_count || 0)
      |> assign(:user_reservations, user_reservations)
      |> assign(:reservations_by_tier, reservations_by_tier)
      |> assign(:event_updates, Map.get(results, :event_updates, []))
@@ -3911,7 +3911,7 @@ defmodule YscWeb.EventDetailsLive do
   def handle_async(
         :reload_attendees,
         {:ok,
-         {_sold_ticket_count, attendees_count, attendees_list,
+         {sold_ticket_count, attendees_count, attendees_list,
           ticket_counts_per_user, host_ids}},
         socket
       ) do
@@ -3921,7 +3921,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:attendees_list, attendees_list)
      |> assign(:ticket_counts_per_user, ticket_counts_per_user)
      |> assign(:host_ids, host_ids)
-     |> assign(:attendee_sold_ticket_count, _sold_ticket_count || 0)}
+     |> assign(:attendee_sold_ticket_count, sold_ticket_count || 0)}
   end
 
   def handle_async(:reload_attendees, {:exit, reason}, socket) do

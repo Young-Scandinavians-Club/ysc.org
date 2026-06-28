@@ -207,7 +207,10 @@ defmodule Ysc.GoogleWalletTest do
 
       with_fake_credentials(fn ->
         assert {:ok, results} =
-                 GoogleWallet.generate_ticket_save_urls([ticket.id], other_user.id)
+                 GoogleWallet.generate_ticket_save_urls(
+                   [ticket.id],
+                   other_user.id
+                 )
 
         assert {:error, :not_found} = Map.fetch!(results, ticket.id)
       end)

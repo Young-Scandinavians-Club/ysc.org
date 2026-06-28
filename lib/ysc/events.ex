@@ -1759,7 +1759,8 @@ defmodule Ysc.Events do
     end)
     |> Enum.reduce(0, fn tier, acc ->
       sold =
-        Map.get(tier, :sold_tickets_count) || Map.get(tier, "sold_tickets_count") ||
+        Map.get(tier, :sold_tickets_count) ||
+          Map.get(tier, "sold_tickets_count") ||
           0
 
       acc + sold
