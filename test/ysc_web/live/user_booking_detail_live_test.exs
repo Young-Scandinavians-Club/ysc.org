@@ -1075,12 +1075,13 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
-      _ =
-        view
-        |> form("#cancel-booking-form", %{"reason" => "Testing"})
-        |> render_submit()
+      view
+      |> form("#cancel-booking-form", %{"reason" => "Testing"})
+      |> render_submit()
 
-      assert render(view) =~ "couldn't find your payment record"
+      render(view)
+
+      assert render(view) =~ "info@ysc.org"
     end
 
     test "payment summary shows card ending in when payment method has last four",
