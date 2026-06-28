@@ -3445,6 +3445,7 @@ defmodule YscWeb.EventDetailsLive do
     # Attendees - will be loaded async if user has membership
     |> assign(:attendees_count, nil)
     |> assign(:attendees_list, nil)
+    |> assign(:attendee_sold_ticket_count, nil)
     |> assign(:ticket_counts_per_user, %{})
     |> assign(:host_ids, MapSet.new())
     # UI state
@@ -3543,13 +3544,7 @@ defmodule YscWeb.EventDetailsLive do
   defp compute_availability_from_tiers(event, ticket_tiers) do
     # Calculate event-level capacity info
     # Count only non-donation tickets (donations don't count toward capacity)
-    total_sold =
-      ticket_tiers
-      |> Enum.reject(fn tier ->
-        tier_type = tier.type
-        tier_type == :donation or tier_type == "donation"
-      end)
-      |> Enum.reduce(0, fn tier, acc -> acc + (tier.sold_tickets_count || 0) end)
+    total_sold = Events.non_donation_sold_count_from_tiers(ticket_tiers)
 
     event_capacity =
       case event.max_attendees do
@@ -3690,14 +3685,21 @@ defmodule YscWeb.EventDetailsLive do
         ticket_tiers_with_counts
       )
 
+    new_sold_count =
+      Events.non_donation_sold_count_from_tiers(ticket_tiers_with_counts)
+
+    previous_sold_count = socket.assigns.attendee_sold_ticket_count
+
     socket =
       socket
       |> assign(:event, event_with_pricing)
       |> assign_ticket_tier_availability(event_id, ticket_tiers_with_counts)
       |> assign(:availability_refresh_timer, nil)
+      |> assign(:attendee_sold_ticket_count, new_sold_count)
       |> push_event("animate-availability-update", %{})
 
-    if socket.assigns.active_membership? do
+    if socket.assigns.active_membership? &&
+         attendees_need_reload?(previous_sold_count, new_sold_count) do
       {_sold_ticket_count, attendees_count, attendees_list,
        ticket_counts_per_user, host_ids} =
         load_attendees(true, socket.assigns.current_user, event_id)
@@ -3707,10 +3709,19 @@ defmodule YscWeb.EventDetailsLive do
       |> assign(:attendees_list, attendees_list)
       |> assign(:ticket_counts_per_user, ticket_counts_per_user)
       |> assign(:host_ids, host_ids)
+      |> assign(:attendee_sold_ticket_count, _sold_ticket_count || 0)
     else
       socket
     end
   end
+
+  defp attendees_need_reload?(previous_sold_count, new_sold_count) do
+    normalize_attendee_sold_count(previous_sold_count) !=
+      normalize_attendee_sold_count(new_sold_count)
+  end
+
+  defp normalize_attendee_sold_count(nil), do: 0
+  defp normalize_attendee_sold_count(count) when is_integer(count), do: count
 
   defp assign_ticket_tier_pricing_and_list(socket, event_id) do
     ticket_tiers_with_counts = Events.list_ticket_tiers_for_event(event_id)
@@ -3878,6 +3889,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:attendees_list, attendees_list)
      |> assign(:ticket_counts_per_user, ticket_counts_per_user)
      |> assign(:host_ids, host_ids)
+     |> assign(:attendee_sold_ticket_count, _sold_ticket_count || 0)
      |> assign(:user_reservations, user_reservations)
      |> assign(:reservations_by_tier, reservations_by_tier)
      |> assign(:event_updates, Map.get(results, :event_updates, []))
@@ -3908,7 +3920,8 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:attendees_count, attendees_count)
      |> assign(:attendees_list, attendees_list)
      |> assign(:ticket_counts_per_user, ticket_counts_per_user)
-     |> assign(:host_ids, host_ids)}
+     |> assign(:host_ids, host_ids)
+     |> assign(:attendee_sold_ticket_count, _sold_ticket_count || 0)}
   end
 
   def handle_async(:reload_attendees, {:exit, reason}, socket) do

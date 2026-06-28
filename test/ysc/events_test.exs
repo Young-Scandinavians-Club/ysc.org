@@ -1071,6 +1071,16 @@ defmodule Ysc.EventsTest do
       assert Enum.any?(tiers, &(&1.id == tier.id))
     end
 
+    test "non_donation_sold_count_from_tiers/1 excludes donation tier sales" do
+      tiers = [
+        %{type: :paid, sold_tickets_count: 3},
+        %{type: :donation, sold_tickets_count: 5},
+        %{"type" => "paid", "sold_tickets_count" => 2}
+      ]
+
+      assert Events.non_donation_sold_count_from_tiers(tiers) == 5
+    end
+
     test "get_ticket_tier!/1 returns tier by id" do
       {:ok, tier} = create_ticket_tier_fixture()
       found = Events.get_ticket_tier!(tier.id)
