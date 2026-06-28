@@ -3878,23 +3878,53 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp clear_lake_hero_carousel_images do
     [
-      %{src: ~p"/images/clear_lake/clear_lake_main.webp", alt: "Clear Lake Cabin Exterior"},
-      %{src: ~p"/images/history/clear_lake_from_above.webp", alt: "Clear Lake Aerial View"},
-      %{src: ~p"/images/clear_lake/clear_lake_dock.webp", alt: "Clear Lake Dock"},
-      %{src: ~p"/images/clear_lake/clear_lake_dock_2.webp", alt: "Clear Lake Dock"},
+      %{
+        src: ~p"/images/clear_lake/clear_lake_main.webp",
+        alt: "Clear Lake Cabin Exterior"
+      },
+      %{
+        src: ~p"/images/history/clear_lake_from_above.webp",
+        alt: "Clear Lake Aerial View"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock.webp",
+        alt: "Clear Lake Dock"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+        alt: "Clear Lake Dock"
+      },
       %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Clear Lake"},
-      %{src: ~p"/images/clear_lake/clear_lake_cabin.webp", alt: "Clear Lake Cabin"}
+      %{
+        src: ~p"/images/clear_lake/clear_lake_cabin.webp",
+        alt: "Clear Lake Cabin"
+      }
     ]
   end
 
   defp clear_lake_experience_carousel_images do
     [
-      %{src: ~p"/images/clear_lake/clear_lake_main.webp", alt: "Clear Lake Cabin Exterior"},
-      %{src: ~p"/images/history/clear_lake_from_above.webp", alt: "Clear Lake Aerial View"},
-      %{src: ~p"/images/clear_lake/clear_lake_dock.webp", alt: "Private Dock on Clear Lake"},
-      %{src: ~p"/images/clear_lake/clear_lake_dock_2.webp", alt: "Dock View at Sunset"},
+      %{
+        src: ~p"/images/clear_lake/clear_lake_main.webp",
+        alt: "Clear Lake Cabin Exterior"
+      },
+      %{
+        src: ~p"/images/history/clear_lake_from_above.webp",
+        alt: "Clear Lake Aerial View"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock.webp",
+        alt: "Private Dock on Clear Lake"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+        alt: "Dock View at Sunset"
+      },
       %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Lake Views"},
-      %{src: ~p"/images/clear_lake/clear_lake_cabin.webp", alt: "Cabin Interior"}
+      %{
+        src: ~p"/images/clear_lake/clear_lake_cabin.webp",
+        alt: "Cabin Interior"
+      }
     ]
   end
 
