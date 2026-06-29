@@ -1252,7 +1252,13 @@ defmodule YscWeb.EventDetailsLive do
       on_cancel={JS.push("close-ticket-modal")}
       max_width="max-w-6xl"
     >
-      <div class="flex flex-col lg:flex-row gap-8 min-h-[600px]">
+      <div
+        id="ticket-checkout-hook"
+        phx-hook="TicketCheckout"
+        data-tiers={checkout_tiers_json(@ticket_tiers)}
+        data-selected={selected_tickets_json(@selected_tickets)}
+        class="flex flex-col lg:flex-row gap-8 min-h-[600px]"
+      >
         <!-- Left Panel: Ticket Tiers -->
         <div class="lg:w-2/3 space-y-8">
           <div class="w-full border-b border-zinc-200 pb-4">
@@ -1310,16 +1316,20 @@ defmodule YscWeb.EventDetailsLive do
                 <% has_discount =
                   reservation_info.discount_percentage != nil &&
                     reservation_info.discount_percentage > 0 %>
-                <div class={[
-                  "border rounded-xl p-6 transition-all duration-200",
-                  cond do
-                    is_sold_out -> "border-zinc-200 bg-zinc-50 opacity-60"
-                    is_sale_ended -> "border-zinc-200 bg-zinc-50 opacity-60"
-                    is_pre_sale -> "border-zinc-200 bg-zinc-50 opacity-70"
-                    has_selected_tickets -> "border-blue-500 bg-blue-50"
-                    true -> "border-zinc-200 bg-white"
-                  end
-                ]}>
+                <div
+                  data-tier-card
+                  data-tier-id={ticket_tier.id}
+                  class={[
+                    "border rounded-xl p-6 transition-all duration-200",
+                    cond do
+                      is_sold_out -> "border-zinc-200 bg-zinc-50 opacity-60"
+                      is_sale_ended -> "border-zinc-200 bg-zinc-50 opacity-60"
+                      is_pre_sale -> "border-zinc-200 bg-zinc-50 opacity-70"
+                      has_selected_tickets -> "border-blue-500 bg-blue-50"
+                      true -> "border-zinc-200 bg-white"
+                    end
+                  ]}
+                >
                   <div class="flex justify-between items-start mb-4">
                     <div>
                       <div class="flex items-center gap-2">
@@ -1501,11 +1511,15 @@ defmodule YscWeb.EventDetailsLive do
                     <div class="flex items-center justify-end mt-4">
                       <div class="flex items-center space-x-3">
                         <button
-                          phx-click="decrease-ticket-quantity"
-                          phx-value-tier-id={ticket_tier.id}
-                          phx-debounce="150"
+                          type="button"
+                          data-ticket-action="decrease"
+                          data-tier-id={ticket_tier.id}
+                          data-locked-disabled={
+                            is_sold_out or is_sale_ended or is_pre_sale
+                          }
+                          phx-click-stop
                           class={[
-                            "w-10 h-10 rounded-full border flex items-center justify-center transition-colors",
+                            "w-10 h-10 rounded-full border flex items-center justify-center transition-colors active:scale-95",
                             if(
                               is_sold_out or is_sale_ended or is_pre_sale or
                                 get_ticket_quantity(
@@ -1527,13 +1541,17 @@ defmodule YscWeb.EventDetailsLive do
                         >
                           <.icon name="hero-minus" class="w-5 h-5" />
                         </button>
-                        <span class={[
-                          "w-12 text-center font-medium text-lg",
-                          if(is_sold_out or is_sale_ended or is_pre_sale,
-                            do: "text-zinc-400",
-                            else: "text-zinc-900"
-                          )
-                        ]}>
+                        <span
+                          id={"ticket-qty-#{ticket_tier.id}"}
+                          aria-live="polite"
+                          class={[
+                            "w-12 text-center font-medium text-lg",
+                            if(is_sold_out or is_sale_ended or is_pre_sale,
+                              do: "text-zinc-400",
+                              else: "text-zinc-900"
+                            )
+                          ]}
+                        >
                           {get_ticket_quantity(@selected_tickets, ticket_tier.id)}
                         </span>
                         <% current_qty =
@@ -1549,11 +1567,16 @@ defmodule YscWeb.EventDetailsLive do
                             @reservations_by_tier
                           ) %>
                         <button
-                          phx-click="increase-ticket-quantity"
-                          phx-value-tier-id={ticket_tier.id}
-                          phx-debounce="150"
+                          type="button"
+                          data-ticket-action="increase"
+                          data-tier-id={ticket_tier.id}
+                          data-locked-disabled={
+                            is_sold_out or is_sale_ended or is_pre_sale or
+                              !can_increase
+                          }
+                          phx-click-stop
                           class={[
-                            "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold",
+                            "w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all duration-200 font-semibold active:scale-95",
                             if(
                               is_sold_out or is_sale_ended or is_pre_sale or
                                 !can_increase
@@ -1663,129 +1686,113 @@ defmodule YscWeb.EventDetailsLive do
               <h3 class="font-semibold mb-2">Order Summary</h3>
             </div>
 
-            <div class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between">
-              <%= if has_any_tickets_selected?(@selected_tickets) do %>
-                <% pricing =
-                  calculate_pricing_with_discounts(
-                    @selected_tickets,
-                    @event.id,
-                    @ticket_tiers,
-                    @reservations_by_tier,
-                    @current_user,
-                    @user_reservations
-                  ) %>
-                <%= for breakdown <- pricing.tier_breakdowns do %>
-                  <div class="space-y-1">
-                    <div class="flex justify-between text-base">
-                      <span>
-                        {breakdown.tier_name}
-                        <%= if breakdown.quantity > 1 do %>
-                          × {breakdown.quantity}
-                        <% end %>
-                      </span>
-                      <span class={[
-                        "font-medium",
-                        if @event_at_capacity && !@event.tickets_tbd do
-                          "line-through"
-                        else
-                          ""
-                        end
-                      ]}>
-                        <%= if Money.positive?(breakdown.original_price) && Money.positive?(breakdown.discount_amount) do %>
-                          <span class="text-zinc-400 line-through mr-2">
-                            {format_price(breakdown.original_price)}
-                          </span>
-                        <% end %>
-                        {format_price(breakdown.final_price)}
-                      </span>
-                    </div>
-                    <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
-                      <div class="flex justify-between text-sm text-green-600">
+            <div
+              class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between"
+              data-ticket-order-summary
+            >
+              <div
+                data-ticket-order-empty
+                class={[
+                  "text-center py-4",
+                  if(@checkout_pricing, do: "hidden", else: "")
+                ]}
+              >
+                <div class="text-zinc-400 mb-2">
+                  <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
+                </div>
+                <p class="text-zinc-500 text-sm">No tickets selected</p>
+                <p class="hidden lg:block text-zinc-400 text-sm mt-1">
+                  Select tickets from the left to see your order
+                </p>
+              </div>
+
+              <div
+                data-ticket-order-lines
+                class={if(@checkout_pricing, do: "space-y-4", else: "hidden")}
+              >
+                <%= if @checkout_pricing do %>
+                  <%= for breakdown <- @checkout_pricing.tier_breakdowns do %>
+                    <div class="space-y-1">
+                      <div class="flex justify-between text-base">
                         <span>
-                          Member discount ({breakdown.discount_percentage
-                          |> Float.round(2)}%)
+                          {breakdown.tier_name}
+                          <%= if breakdown.quantity > 1 do %>
+                            × {breakdown.quantity}
+                          <% end %>
                         </span>
-                        <span class="font-medium">
-                          -{format_price(breakdown.discount_amount)}
+                        <span class={[
+                          "font-medium",
+                          if @event_at_capacity && !@event.tickets_tbd do
+                            "line-through"
+                          else
+                            ""
+                          end
+                        ]}>
+                          <%= if Money.positive?(breakdown.original_price) && Money.positive?(breakdown.discount_amount) do %>
+                            <span class="text-zinc-400 line-through mr-2">
+                              {format_price(breakdown.original_price)}
+                            </span>
+                          <% end %>
+                          {format_price(breakdown.final_price)}
                         </span>
                       </div>
-                    <% end %>
-                  </div>
+                      <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
+                        <div class="flex justify-between text-sm text-green-600">
+                          <span>
+                            Member discount ({breakdown.discount_percentage
+                            |> Float.round(2)}%)
+                          </span>
+                          <span class="font-medium">
+                            -{format_price(breakdown.discount_amount)}
+                          </span>
+                        </div>
+                      <% end %>
+                    </div>
+                  <% end %>
                 <% end %>
-              <% else %>
-                <div class="text-center py-4">
-                  <div class="text-zinc-400 mb-2">
-                    <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
-                  </div>
-                  <p class="text-zinc-500 text-sm">No tickets selected</p>
-                  <p class="hidden lg:block text-zinc-400 text-sm mt-1">
-                    Select tickets from the left to see your order
-                  </p>
-                </div>
-              <% end %>
+              </div>
 
-              <%= if has_any_tickets_selected?(@selected_tickets) do %>
-                <% pricing =
-                  calculate_pricing_with_discounts(
-                    @selected_tickets,
-                    @event.id,
-                    @ticket_tiers,
-                    @reservations_by_tier,
-                    @current_user,
-                    @user_reservations
-                  ) %>
-                <div class="border-t border-zinc-200 pt-4 space-y-2">
-                  <%= if Money.positive?(pricing.discount_amount) do %>
+              <div class="border-t border-zinc-200 pt-4 space-y-2">
+                <%= if @checkout_pricing && Money.positive?(@checkout_pricing.discount_amount) do %>
+                  <div data-ticket-order-discounts class="space-y-2">
                     <div class="flex justify-between text-sm text-zinc-600">
                       <span>Subtotal:</span>
-                      <span>{format_price(pricing.subtotal)}</span>
+                      <span>{format_price(@checkout_pricing.subtotal)}</span>
                     </div>
                     <div class="flex justify-between text-sm text-green-600 font-medium">
                       <span>Discount:</span>
-                      <span>-{format_price(pricing.discount_amount)}</span>
+                      <span>-{format_price(@checkout_pricing.discount_amount)}</span>
                     </div>
-                  <% end %>
-                  <div class="flex justify-between font-semibold text-lg">
-                    <span>Total:</span>
-                    <span class={[
+                  </div>
+                <% else %>
+                  <div data-ticket-order-discounts class="hidden"></div>
+                <% end %>
+                <div class="flex justify-between font-semibold text-lg">
+                  <span>Total:</span>
+                  <span
+                    data-ticket-order-total
+                    class={[
                       if @event_at_capacity && !@event.tickets_tbd do
                         "line-through"
                       else
                         ""
                       end
-                    ]}>
-                      {format_price(pricing.total)}
-                    </span>
-                  </div>
+                    ]}
+                  >
+                    <%= if @checkout_pricing do %>
+                      {format_price(@checkout_pricing.total)}
+                    <% else %>
+                      $0.00
+                    <% end %>
+                  </span>
                 </div>
-              <% else %>
-                <div class="border-t border-zinc-200 pt-4">
-                  <div class="flex justify-between font-semibold text-lg">
-                    <span>Total:</span>
-                    <span class={[
-                      if @event_at_capacity && !@event.tickets_tbd do
-                        "line-through"
-                      else
-                        ""
-                      end
-                    ]}>
-                      {calculate_total_price(
-                        @selected_tickets,
-                        @event.id,
-                        @ticket_tiers,
-                        @reservations_by_tier,
-                        @current_user,
-                        @user_reservations
-                      )}
-                    </span>
-                  </div>
-                </div>
-              <% end %>
+              </div>
             </div>
           </div>
 
           <div class="mt-8 space-y-4">
             <.button
+              id="ticket-proceed-checkout"
               class="w-full text-lg py-3"
               phx-click="proceed-to-checkout"
               disabled={!has_any_tickets_selected?(@selected_tickets)}
@@ -3455,7 +3462,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:payment_intent, nil)
     |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
     |> assign(:ticket_order, nil)
-    |> assign(:selected_tickets, %{})
+    |> clear_selected_tickets()
     |> assign(:checkout_expired, false)
     |> assign(:show_registration_modal, false)
     |> assign(:ticket_details_form, %{})
@@ -3885,7 +3892,8 @@ defmodule YscWeb.EventDetailsLive do
        :subscribed_to_save_the_date,
        Map.get(results, :save_the_date_subscription, false)
      )
-     |> assign(:async_data_loaded, true)}
+     |> assign(:async_data_loaded, true)
+     |> assign_checkout_pricing()}
   end
 
   def handle_async(:load_event_data, {:exit, reason}, socket) do
@@ -4245,7 +4253,12 @@ defmodule YscWeb.EventDetailsLive do
 
     availability_data = checkout_availability_data(socket, ticket_tiers)
 
-    socket = socket |> assign(:selected_tickets, selected_tickets)
+    socket =
+      if socket.assigns.async_data_loaded do
+        assign_selected_tickets(socket, selected_tickets)
+      else
+        assign(socket, :selected_tickets, selected_tickets)
+      end
 
     case checkout_step do
       "free" ->
@@ -4771,7 +4784,7 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_intent, nil)
        |> assign(:ticket_order, nil)
-       |> assign(:selected_tickets, %{})}
+       |> clear_selected_tickets()}
     end
   end
 
@@ -4810,7 +4823,7 @@ defmodule YscWeb.EventDetailsLive do
        |> assign(:stripe_payment_element_ready, false)
        |> assign(:payment_intent, nil)
        |> assign(:ticket_order, nil)
-       |> assign(:selected_tickets, %{})}
+       |> clear_selected_tickets()}
     end
   end
 
@@ -5060,12 +5073,12 @@ defmodule YscWeb.EventDetailsLive do
        socket
        |> push_navigate(to: ~p"/events/#{socket.assigns.event.id}")
        |> assign(:show_ticket_modal, false)
-       |> assign(:selected_tickets, %{})}
+       |> clear_selected_tickets()}
     else
       {:noreply,
        socket
        |> assign(:show_ticket_modal, false)
-       |> assign(:selected_tickets, %{})}
+       |> clear_selected_tickets()}
     end
   end
 
@@ -5318,7 +5331,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)
      |> assign(:ticket_order, nil)
-     |> assign(:selected_tickets, %{})
+     |> clear_selected_tickets()
      |> assign(:tickets_requiring_registration, [])
      |> assign(:ticket_details_form, %{})
      |> assign(:tickets_for_me, %{})
@@ -5335,7 +5348,7 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)
      |> assign(:ticket_order, nil)
-     |> assign(:selected_tickets, %{})
+     |> clear_selected_tickets()
      |> assign(:tickets_requiring_registration, [])
      |> assign(:ticket_details_form, %{})
      |> assign(:tickets_for_me, %{})
@@ -5744,7 +5757,7 @@ defmodule YscWeb.EventDetailsLive do
           else: socket.assigns.selected_tickets
       end
 
-    {:noreply, assign(socket, :selected_tickets, updated_tickets)}
+    {:noreply, assign_selected_tickets(socket, updated_tickets)}
   end
 
   @impl true
@@ -5760,7 +5773,7 @@ defmodule YscWeb.EventDetailsLive do
         updated_tickets =
           Map.put(socket.assigns.selected_tickets, tier_id, amount_cents)
 
-        {:noreply, assign(socket, :selected_tickets, updated_tickets)}
+        {:noreply, assign_selected_tickets(socket, updated_tickets)}
 
       _ ->
         # Invalid amount, don't update
@@ -5782,7 +5795,7 @@ defmodule YscWeb.EventDetailsLive do
         Map.put(socket.assigns.selected_tickets, tier_id, new_quantity)
       end
 
-    {:noreply, assign(socket, :selected_tickets, updated_tickets)}
+    {:noreply, assign_selected_tickets(socket, updated_tickets)}
   end
 
   @impl true
@@ -5795,7 +5808,7 @@ defmodule YscWeb.EventDetailsLive do
     # Only handle quantity changes for non-donation tiers
     if ticket_tier &&
          (ticket_tier.type == "donation" || ticket_tier.type == :donation) do
-      {:noreply, socket}
+      {:reply, %{ok: false}, socket}
     else
       current_quantity =
         get_ticket_quantity(socket.assigns.selected_tickets, tier_id)
@@ -5817,10 +5830,10 @@ defmodule YscWeb.EventDetailsLive do
         updated_tickets =
           Map.put(socket.assigns.selected_tickets, tier_id, new_quantity)
 
-        {:noreply, assign(socket, :selected_tickets, updated_tickets)}
+        {:noreply, assign_selected_tickets(socket, updated_tickets)}
       else
         # Don't increase if we've reached the limit
-        {:noreply, socket}
+        {:reply, %{ok: false}, socket}
       end
     end
   end
@@ -6284,6 +6297,62 @@ defmodule YscWeb.EventDetailsLive do
     Map.get(selected_tickets, tier_id, 0)
   end
 
+  defp assign_selected_tickets(socket, selected_tickets) do
+    socket
+    |> assign(:selected_tickets, selected_tickets)
+    |> assign_checkout_pricing()
+  end
+
+  defp clear_selected_tickets(socket) do
+    socket
+    |> assign(:selected_tickets, %{})
+    |> assign(:checkout_pricing, nil)
+  end
+
+  defp assign_checkout_pricing(socket) do
+    selected = socket.assigns.selected_tickets
+
+    pricing =
+      if has_any_tickets_selected?(selected) do
+        calculate_pricing_with_discounts(
+          selected,
+          socket.assigns.event.id,
+          socket.assigns.ticket_tiers,
+          socket.assigns.reservations_by_tier,
+          socket.assigns.current_user,
+          socket.assigns.user_reservations
+        )
+      else
+        nil
+      end
+
+    assign(socket, :checkout_pricing, pricing)
+  end
+
+  defp checkout_tiers_json(ticket_tiers) do
+    ticket_tiers
+    |> Enum.reject(&donation_tier?/1)
+    |> Enum.map(fn tier ->
+      type =
+        case tier.type do
+          t when is_atom(t) -> Atom.to_string(t)
+          t -> t
+        end
+
+      %{
+        id: tier.id,
+        name: tier.name,
+        price_cents: Ysc.MoneyHelper.money_to_cents(tier.price),
+        type: type
+      }
+    end)
+    |> Jason.encode!()
+  end
+
+  defp selected_tickets_json(selected_tickets) do
+    Jason.encode!(selected_tickets)
+  end
+
   defp get_available_quantity(ticket_tier) do
     quantity =
       Map.get(ticket_tier, :quantity) || Map.get(ticket_tier, "quantity")
@@ -6662,7 +6731,7 @@ defmodule YscWeb.EventDetailsLive do
              |> assign(:show_order_completion, true)
              |> assign(:ticket_order, updated_order)
              |> assign(:user_tickets, updated_user_tickets)
-             |> assign(:selected_tickets, %{})
+             |> clear_selected_tickets()
              |> assign(:tickets_requiring_registration, [])
              |> assign(:ticket_details_form, %{})
              |> redirect(
@@ -6719,7 +6788,7 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:ticket_order, completed_order)
          |> assign(:user_tickets, updated_user_tickets)
          |> assign(:payment_intent, nil)
-         |> assign(:selected_tickets, %{})
+         |> clear_selected_tickets()
          |> assign(:tickets_requiring_registration, [])
          |> assign(:ticket_details_form, %{})
          |> redirect(
