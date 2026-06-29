@@ -368,6 +368,92 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     )
   end
 
+  test "completes payment when tier price increased and PI matches synced total",
+       %{
+         user: user,
+         event: event
+       } do
+    {:ok, tier} =
+      Ysc.Events.create_ticket_tier(%{
+        name: "Early Bird",
+        type: :paid,
+        price: Money.new(30, :USD),
+        quantity: 50,
+        event_id: event.id
+      })
+
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      end)
+
+    assert Money.equal?(order.total_amount, Money.new(30, :USD))
+
+    {:ok, _tier} =
+      Ysc.Events.update_ticket_tier(tier, %{
+        price: Money.new(50, :USD)
+      })
+
+    payment_intent_id = "pi_repriced_paid_#{order.id}"
+    synced_amount_cents = 5_000
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      synced_amount_cents,
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(order, pi_id)
+
+        assert completed.status == :completed
+        assert completed.payment_id
+        assert Money.equal?(completed.total_amount, Money.new(50, :USD))
+        assert Ledgers.get_payment_by_external_id(pi_id)
+      end
+    )
+  end
+
+  test "completes expired order when tier price increased after expiry and PI matches synced total",
+       %{
+         user: user,
+         event: event,
+         tier1: tier1
+       } do
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+      end)
+
+    assert {:ok, expired} = Tickets.expire_ticket_order(order)
+    assert expired.status == :expired
+
+    {:ok, _tier} =
+      Ysc.Events.update_ticket_tier(tier1, %{
+        price: Money.new(75, :USD)
+      })
+
+    payment_intent_id = "pi_expired_repriced_#{order.id}"
+    synced_amount_cents = 7_500
+
+    with_stripe_payment_intent_mock(
+      payment_intent_id,
+      synced_amount_cents,
+      fn pi_id ->
+        assert {:ok, completed} =
+                 Tickets.process_ticket_order_payment(expired, pi_id)
+
+        assert completed.status == :completed
+        assert Money.equal?(completed.total_amount, Money.new(75, :USD))
+
+        tickets =
+          Ysc.Repo.all(
+            from t in Ysc.Events.Ticket, where: t.ticket_order_id == ^order.id
+          )
+
+        assert Enum.all?(tickets, &(&1.status == :confirmed))
+      end
+    )
+  end
+
   test "rejects payment when tier price increased after order and PI were created",
        %{
          user: user,
