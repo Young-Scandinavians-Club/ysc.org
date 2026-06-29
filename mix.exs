@@ -184,6 +184,11 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
+      # EEF-CVE-2026-43969/43966: no patched Hex release yet; track erlef fork with security fixes.
+      {:cowlib,
+       github: "erlef/cowlib",
+       ref: "16aad3fb9f81f5cda4d1706ff0c54237c619c282",
+       override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
