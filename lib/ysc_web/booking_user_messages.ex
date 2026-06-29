@@ -100,5 +100,53 @@ defmodule YscWeb.BookingUserMessages do
     "You'll receive cabin access details (door code or key instructions) by email before check-in"
   end
 
+  def checkout_pricing_load_failed do
+    trim("""
+    We couldn't load the pricing for this booking. Please go back and try again, or email info@ysc.org if this keeps happening.
+    """)
+  end
+
+  def checkout_payment_setup_failed do
+    trim("""
+    We couldn't set up payment. Please try again, or email info@ysc.org for help.
+    """)
+  end
+
+  def checkout_payment_confirmation_failed do
+    trim("""
+    Something went wrong while confirming your booking. If you see a charge on your card, email info@ysc.org with the date and amount before trying to pay again — we'll make sure you're not charged twice.
+    """)
+  end
+
+  def checkout_booking_confirmation_failed do
+    trim("""
+    We couldn't confirm your booking. Please try again, or email info@ysc.org for help.
+    """)
+  end
+
+  def checkout_cancel_failed do
+    trim("""
+    We couldn't cancel this booking from here. Please try again, or email info@ysc.org if you need help.
+    """)
+  end
+
+  def modification_redirect_hold_expired do
+    trim("""
+    Your payment went through, but we couldn't save your new dates in time. Your original reservation is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with your confirmation number.
+    """)
+  end
+
+  def modification_redirect_ledger_payment_failed do
+    trim("""
+    Your payment went through, but we couldn't record it for your updated reservation. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
+    """)
+  end
+
+  def modification_redirect_update_failed do
+    trim("""
+    Your payment went through, but we couldn't update your reservation. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
+    """)
+  end
+
   defp trim(string), do: String.trim(string)
 end

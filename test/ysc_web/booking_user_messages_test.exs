@@ -97,4 +97,36 @@ defmodule YscWeb.BookingUserMessagesTest do
            ) =~
              "Membership page"
   end
+
+  test "checkout error messages include contact email" do
+    assert BookingUserMessages.checkout_pricing_load_failed() =~ "info@ysc.org"
+    assert BookingUserMessages.checkout_payment_setup_failed() =~ "info@ysc.org"
+    assert BookingUserMessages.checkout_cancel_failed() =~ "info@ysc.org"
+
+    assert BookingUserMessages.checkout_booking_confirmation_failed() =~
+             "info@ysc.org"
+
+    assert BookingUserMessages.checkout_payment_confirmation_failed() =~
+             "not charged twice"
+
+    refute BookingUserMessages.checkout_payment_confirmation_failed() =~
+             "contact us"
+  end
+
+  test "modification redirect error messages" do
+    assert BookingUserMessages.modification_redirect_hold_expired() =~
+             "original reservation is unchanged"
+
+    assert BookingUserMessages.modification_redirect_hold_expired() =~
+             "info@ysc.org"
+
+    refute BookingUserMessages.modification_redirect_hold_expired() =~
+             "reservation hold"
+
+    assert BookingUserMessages.modification_redirect_ledger_payment_failed() =~
+             "My Bookings"
+
+    assert BookingUserMessages.modification_redirect_update_failed() =~
+             "couldn't update your reservation"
+  end
 end

@@ -13,6 +13,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     BookingLocker
   }
 
+  alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
@@ -1959,7 +1960,12 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </li>
                         <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder or contact the Cabin Master
+                          If you don't receive the code, check your spam folder. Still nothing? Email the Clear Lake Cabin Master at <a
+                            href={"mailto:#{EmailConfig.clear_lake_email()}"}
+                            class="text-teal-200 hover:text-white underline"
+                          >
+                            {EmailConfig.clear_lake_email()}
+                          </a>.
                         </li>
                       </ul>
                     </div>
@@ -2354,7 +2360,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </p>
                           <p>
                             <strong>Boating & Dock Access:</strong>
-                            Members enjoy free mooring at our private dock. Please notify the Cabin Master in advance.
+                            Members enjoy free mooring at our private dock. Please email the Cabin Master at {EmailConfig.clear_lake_email()} in advance.
                             <em>Note: trailers must be parked off-site.</em>
                           </p>
                           <div class="p-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
