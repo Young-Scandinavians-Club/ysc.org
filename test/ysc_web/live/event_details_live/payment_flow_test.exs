@@ -341,14 +341,17 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       assert is_binary(result)
     end
 
-    test "close-payment-modal keeps pending order when payment intent is processing", %{
-      conn: conn,
-      user: user
-    } do
+    test "close-payment-modal keeps pending order when payment intent is processing",
+         %{
+           conn: conn,
+           user: user
+         } do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
-      payment_intent_id = "pi_processing_close_#{System.unique_integer([:positive])}"
+
+      payment_intent_id =
+        "pi_processing_close_#{System.unique_integer([:positive])}"
 
       expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
         {:ok,
