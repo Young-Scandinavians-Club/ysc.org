@@ -473,6 +473,15 @@ defmodule Ysc.Tickets do
           Repo.rollback({:error, :no_valid_tickets})
         end
 
+        donation_tickets_count =
+          from(t in Ticket,
+            join: tt in TicketTier,
+            on: t.ticket_tier_id == tt.id,
+            where: t.ticket_order_id == ^ticket_order.id,
+            where: tt.type == :donation
+          )
+          |> Repo.aggregate(:count, :id)
+
         # Calculate refund amount
         refund_amount =
           tickets_to_refund
@@ -486,16 +495,6 @@ defmodule Ysc.Tickets do
                 # Since donation tickets store the amount in the payment, we'll use a proportional split
                 # This is a simplification - ideally we'd store the donation amount per ticket
                 if ticket_order.total_amount && ticket_order.payment_id do
-                  # Count total donation tickets in the order
-                  donation_tickets_count =
-                    from(t in Ticket,
-                      join: tt in TicketTier,
-                      on: t.ticket_tier_id == tt.id,
-                      where: t.ticket_order_id == ^ticket_order.id,
-                      where: tt.type == :donation
-                    )
-                    |> Repo.aggregate(:count, :id)
-
                   if donation_tickets_count > 0 do
                     case Money.div(
                            ticket_order.total_amount,
@@ -882,7 +881,7 @@ defmodule Ysc.Tickets do
     if ticket_order_ready_for_payment?(ticket_order) do
       ticket_order
     else
-      get_ticket_order(ticket_order.id)
+      get_ticket_order_for_checkout(ticket_order.id)
     end
   end
 

@@ -227,6 +227,37 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "sync_pending_order_pricing/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "reloads with checkout preloads only when associations are missing", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      bare_order = %TicketOrder{
+        id: order.id,
+        user_id: user.id,
+        event_id: event.id,
+        status: :pending,
+        total_amount: order.total_amount,
+        discount_amount: order.discount_amount
+      }
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(bare_order)
+      assert synced.id == order.id
+      assert Ecto.assoc_loaded?(synced.user)
+      refute Ecto.assoc_loaded?(synced.event)
+      assert Ecto.assoc_loaded?(synced.tickets)
+      assert Enum.all?(synced.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+  end
+
   describe "get_ticket_order_by_reference/1" do
     setup do
       tickets_setup()
