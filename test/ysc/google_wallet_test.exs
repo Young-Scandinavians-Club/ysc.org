@@ -178,6 +178,46 @@ defmodule Ysc.GoogleWalletTest do
   end
 
   # ---------------------------------------------------------------------------
+  # generate_ticket_save_urls/2
+  # ---------------------------------------------------------------------------
+
+  describe "generate_ticket_save_urls/2" do
+    test "returns {:error, :not_configured} when credentials are not set" do
+      {user, ticket} = member_with_confirmed_ticket()
+
+      assert {:error, :not_configured} =
+               GoogleWallet.generate_ticket_save_urls([ticket.id], user.id)
+    end
+
+    test "loads tickets in one batch and returns per-ticket results" do
+      {user, ticket} = member_with_confirmed_ticket()
+
+      with_fake_credentials(fn ->
+        assert {:ok, results} =
+                 GoogleWallet.generate_ticket_save_urls([ticket.id], user.id)
+
+        assert {:ok, url} = Map.fetch!(results, ticket.id)
+        assert String.starts_with?(url, "https://pay.google.com/gp/v/save/")
+      end)
+    end
+
+    test "returns :not_found for tickets that do not belong to the user" do
+      {_owner, ticket} = member_with_confirmed_ticket()
+      other_user = user_fixture()
+
+      with_fake_credentials(fn ->
+        assert {:ok, results} =
+                 GoogleWallet.generate_ticket_save_urls(
+                   [ticket.id],
+                   other_user.id
+                 )
+
+        assert {:error, :not_found} = Map.fetch!(results, ticket.id)
+      end)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # generate_membership_save_url/1
   # ---------------------------------------------------------------------------
 
