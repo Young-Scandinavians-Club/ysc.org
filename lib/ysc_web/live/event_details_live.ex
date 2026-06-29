@@ -4988,7 +4988,8 @@ defmodule YscWeb.EventDetailsLive do
       maybe_cancel_pending_ticket_order(
         socket.assigns.ticket_order,
         "User left checkout",
-        payment_redirect_in_progress: socket.assigns[:payment_redirect_in_progress],
+        payment_redirect_in_progress:
+          socket.assigns[:payment_redirect_in_progress],
         context: "terminate/2"
       )
     end
