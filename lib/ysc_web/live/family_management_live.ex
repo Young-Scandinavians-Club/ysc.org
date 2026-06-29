@@ -426,7 +426,8 @@ defmodule YscWeb.FamilyManagementLive do
           current={:family}
           show_family_link?={
             @current_user &&
-              (Accounts.primary_user?(@current_user) || Accounts.sub_account?(@current_user))
+              (Accounts.primary_user?(@current_user) ||
+                 Accounts.sub_account?(@current_user))
           }
         />
 

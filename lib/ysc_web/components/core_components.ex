@@ -2624,7 +2624,14 @@ defmodule YscWeb.CoreComponents do
   """
   attr :current, :atom,
     required: true,
-    values: [:profile, :membership, :payments, :family, :security, :notifications]
+    values: [
+      :profile,
+      :membership,
+      :payments,
+      :family,
+      :security,
+      :notifications
+    ]
 
   attr :show_family_link?, :boolean, default: false
 

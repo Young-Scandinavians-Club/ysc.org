@@ -352,7 +352,8 @@ defmodule YscWeb.UserSecurityLive do
           current={:security}
           show_family_link?={
             @current_user &&
-              (Accounts.primary_user?(@current_user) || Accounts.sub_account?(@current_user)) &&
+              (Accounts.primary_user?(@current_user) ||
+                 Accounts.sub_account?(@current_user)) &&
               (@active_plan_type == :family || @active_plan_type == :lifetime)
           }
         />
