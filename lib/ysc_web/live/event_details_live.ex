@@ -4897,86 +4897,100 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
+  defp pending_checkout_safe_to_cancel?(
+         %Ysc.Tickets.TicketOrder{} = ticket_order,
+         opts
+       ) do
+    if Keyword.get(opts, :payment_redirect_in_progress, false) do
+      false
+    else
+      case ticket_order.payment_intent_id do
+        nil ->
+          true
+
+        payment_intent_id ->
+          payment_intent_allows_checkout_cancel?(
+            payment_intent_id,
+            ticket_order.id,
+            Keyword.get(opts, :context, "checkout")
+          )
+      end
+    end
+  end
+
+  defp pending_checkout_safe_to_cancel?(_ticket_order, _opts), do: true
+
+  defp payment_intent_allows_checkout_cancel?(
+         payment_intent_id,
+         ticket_order_id,
+         context
+       ) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
+      {:ok, payment_intent} ->
+        case payment_intent.status do
+          status
+          when status in [
+                 "requires_action",
+                 "processing",
+                 "requires_confirmation"
+               ] ->
+            false
+
+          "succeeded" ->
+            require Ysc.Logging
+
+            Ysc.Logging.warning(
+              "Payment intent already succeeded, not cancelling order",
+              context: context,
+              payment_intent_id: payment_intent_id,
+              ticket_order_id: ticket_order_id
+            )
+
+            false
+
+          _ ->
+            true
+        end
+
+      {:error, _} ->
+        require Ysc.Logging
+
+        Ysc.Logging.warning(
+          "Could not retrieve payment intent status, not cancelling order",
+          context: context,
+          payment_intent_id: payment_intent_id,
+          ticket_order_id: ticket_order_id
+        )
+
+        false
+    end
+  end
+
+  defp maybe_cancel_pending_ticket_order(ticket_order, reason, opts) do
+    if pending_checkout_safe_to_cancel?(ticket_order, opts) do
+      case Ysc.Tickets.cancel_ticket_order(ticket_order, reason) do
+        {:ok, _} -> :cancelled
+        _ -> :cancel_failed
+      end
+    else
+      :unsafe
+    end
+  end
+
   @impl true
   def terminate(_reason, socket) do
     # Cancel any pending ticket order when the LiveView terminates
     # BUT don't cancel if a payment redirect is in progress (e.g., Amazon Pay, CashApp)
     # The payment success page will handle the redirect back
-    if socket.assigns.ticket_order && socket.assigns.show_payment_modal &&
-         !socket.assigns[:payment_redirect_in_progress] do
-      # Check payment intent status to see if a redirect is required
-      # Payment methods like Amazon Pay, CashApp require redirects and set status to "requires_action"
-      should_cancel =
-        case socket.assigns.ticket_order.payment_intent_id do
-          nil ->
-            # No payment intent yet, safe to cancel
-            true
-
-          payment_intent_id ->
-            # Check payment intent status from Stripe
-            # If it requires action (redirect), don't cancel - user is completing payment
-            stripe_client =
-              Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
-
-            case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
-              {:ok, payment_intent} ->
-                # Don't cancel if payment intent is in a state that indicates active payment processing
-                # Statuses that indicate redirect/action required: requires_action (Amazon Pay, CashApp, etc.)
-                # Statuses that indicate in-progress: processing, requires_confirmation
-                # Statuses that indicate completion: succeeded, canceled (order already handled)
-                # Status that indicates no payment method: requires_payment_method (user hasn't started payment yet, safe to cancel)
-                case payment_intent.status do
-                  "requires_action" ->
-                    # Redirect payment method in progress - don't cancel
-                    false
-
-                  "processing" ->
-                    # Payment is being processed - don't cancel
-                    false
-
-                  "requires_confirmation" ->
-                    # Payment needs confirmation - don't cancel
-                    false
-
-                  "succeeded" ->
-                    # Payment already succeeded - order should be completed, but if we're here,
-                    # something went wrong. Don't cancel to be safe.
-                    require Ysc.Logging
-
-                    Ysc.Logging.warning(
-                      "Payment intent already succeeded in terminate/2, not cancelling order",
-                      payment_intent_id: payment_intent_id,
-                      ticket_order_id: socket.assigns.ticket_order.id
-                    )
-
-                    false
-
-                  _ ->
-                    # Other statuses (requires_payment_method, canceled, etc.) - safe to cancel
-                    true
-                end
-
-              {:error, _} ->
-                # If we can't retrieve payment intent, err on the side of caution
-                # and don't cancel (might be a temporary Stripe API issue or payment in progress)
-                require Ysc.Logging
-
-                Ysc.Logging.warning(
-                  "Could not retrieve payment intent status in terminate/2, not cancelling order",
-                  payment_intent_id: payment_intent_id,
-                  ticket_order_id: socket.assigns.ticket_order.id
-                )
-
-                false
-            end
-        end
-
-      if should_cancel do
-        Ysc.Tickets.cancel_ticket_order(
-          socket.assigns.ticket_order,
-          "User left checkout"
-        )
-      end
+    if socket.assigns.ticket_order && socket.assigns.show_payment_modal do
+      maybe_cancel_pending_ticket_order(
+        socket.assigns.ticket_order,
+        "User left checkout",
+        payment_redirect_in_progress: socket.assigns[:payment_redirect_in_progress],
+        context: "terminate/2"
+      )
     end
   end
 
@@ -5071,13 +5085,32 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("close-payment-modal", _params, socket) do
-    # Cancel the ticket order to release reserved tickets
-    if socket.assigns.ticket_order do
-      Ysc.Tickets.cancel_ticket_order(
-        socket.assigns.ticket_order,
-        "User cancelled checkout"
-      )
-    end
+    skipped_cancel? =
+      case socket.assigns.ticket_order do
+        %Ysc.Tickets.TicketOrder{} = ticket_order ->
+          maybe_cancel_pending_ticket_order(
+            ticket_order,
+            "User cancelled checkout",
+            payment_redirect_in_progress:
+              socket.assigns[:payment_redirect_in_progress],
+            context: "close-payment-modal"
+          ) == :unsafe
+
+        _ ->
+          false
+      end
+
+    socket =
+      if skipped_cancel? do
+        YscWeb.Flash.put_toast(
+          socket,
+          :info,
+          "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
+          title: "Payment"
+        )
+      else
+        socket
+      end
 
     {:noreply,
      socket
