@@ -1151,7 +1151,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking_b.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
         )
 
-      assert html =~ "issue updating your reservation"
+      assert html =~ "update your reservation"
+      assert html =~ "info@ysc.org"
 
       reloaded = Repo.get!(Booking, booking_b.id)
       assert reloaded.status == :hold
