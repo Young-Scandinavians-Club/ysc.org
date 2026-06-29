@@ -188,6 +188,7 @@ defmodule YscWeb.BookingReceiptLive do
           {:noreply,
            socket
            |> assign(:show_cancel_modal, false)
+           |> sync_booking_after_partial_cancel(booking, reason)
            |> YscWeb.Flash.put_toast(:error, error_message)}
       end
     else
@@ -2618,4 +2619,27 @@ defmodule YscWeb.BookingReceiptLive do
       Stripe.PaymentMethod
     )
   end
+
+  defp sync_booking_after_partial_cancel(socket, booking, reason) do
+    if partial_cancel_post_booking_error?(reason) do
+      updated_booking =
+        Repo.get!(Booking, booking.id)
+        |> Repo.preload([:user, :booking_guests, rooms: :room_category])
+
+      socket
+      |> assign(:booking, updated_booking)
+      |> assign(
+        :can_cancel,
+        BookingActions.can_cancel_booking?(updated_booking)
+      )
+    else
+      socket
+    end
+  end
+
+  defp partial_cancel_post_booking_error?({:payment_not_found, _}), do: true
+  defp partial_cancel_post_booking_error?({:calculation_failed, _}), do: true
+  defp partial_cancel_post_booking_error?({:refund_failed, _}), do: true
+  defp partial_cancel_post_booking_error?({:pending_refund_failed, _}), do: true
+  defp partial_cancel_post_booking_error?(_), do: false
 end

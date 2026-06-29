@@ -124,7 +124,7 @@ defmodule YscWeb.BookingUserMessagesTest do
              "reservation hold"
 
     assert BookingUserMessages.modification_redirect_ledger_payment_failed() =~
-             "My Bookings"
+             "My Bookings & Tickets"
 
     assert BookingUserMessages.modification_redirect_update_failed() =~
              "couldn't update your reservation"

@@ -138,13 +138,13 @@ defmodule YscWeb.BookingUserMessages do
 
   def modification_redirect_ledger_payment_failed do
     trim("""
-    Your payment went through, but we couldn't record it for your updated reservation. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
+    Your payment went through, but we couldn't record it for your updated reservation. Open this booking from My Bookings & Tickets and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
     """)
   end
 
   def modification_redirect_update_failed do
     trim("""
-    Your payment went through, but we couldn't update your reservation. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
+    Your payment went through, but we couldn't update your reservation. Open this booking from My Bookings & Tickets and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
     """)
   end
 
