@@ -249,6 +249,8 @@ defmodule Ysc.MixProject do
       {:phoenix_test, "~> 0.11", only: :test, runtime: false},
       {:phoenix_turnstile, "~> 1.2"},
       {:phoenix, "~> 1.8"},
+      # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
+      {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
