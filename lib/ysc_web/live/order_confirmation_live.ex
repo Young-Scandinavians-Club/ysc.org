@@ -139,7 +139,7 @@ defmodule YscWeb.OrderConfirmationLive do
         </div>
         <!-- Right Column skeleton -->
         <aside class="space-y-6">
-          <.payment_summary_skeleton />
+          <.payment_summary_skeleton announce?={false} />
           <.skeleton_block class="h-12 w-full rounded-lg" />
           <.skeleton_block class="h-12 w-full rounded-lg" />
         </aside>

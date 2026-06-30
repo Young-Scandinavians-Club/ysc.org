@@ -2628,14 +2628,16 @@ defmodule YscWeb.CoreComponents do
       <div :for={_ <- 1..2}><.ticket_order_card_skeleton /></div>
   """
   attr :class, :any, default: nil
+  attr :announce?, :boolean, default: true
 
   def ticket_order_card_skeleton(assigns) do
     ~H"""
     <div
       class={["bg-white border border-zinc-200 rounded-2xl p-8", @class]}
-      role="status"
-      aria-label="Loading ticket order"
+      role={@announce? && "status"}
+      aria-label={@announce? && "Loading ticket order"}
     >
+      <span :if={@announce?} class="sr-only">Loading ticket order…</span>
       <div class="flex justify-between items-start mb-6">
         <.skeleton_block class="h-5 w-20 rounded-full" />
         <.skeleton_block class="h-3 w-24 rounded" />
@@ -2714,14 +2716,16 @@ defmodule YscWeb.CoreComponents do
       <.payment_summary_skeleton :if={!@async_data_loaded} />
   """
   attr :class, :any, default: nil
+  attr :announce?, :boolean, default: true
 
   def payment_summary_skeleton(assigns) do
     ~H"""
     <div
       class={["rounded-lg p-8 shadow-xl bg-zinc-900", @class]}
-      role="status"
-      aria-label="Loading payment summary"
+      role={@announce? && "status"}
+      aria-label={@announce? && "Loading payment summary"}
     >
+      <span :if={@announce?} class="sr-only">Loading payment summary…</span>
       <.skeleton_block class="h-3 w-32 rounded mb-6 bg-zinc-700" />
       <div class="space-y-4">
         <div class="flex justify-between">

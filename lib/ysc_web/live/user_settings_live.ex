@@ -1,5 +1,6 @@
 defmodule YscWeb.UserSettingsLive do
   use YscWeb, :live_view
+  require Ysc.Logging
 
   import YscWeb.Live.AsyncHelpers
 
@@ -2731,133 +2732,164 @@ defmodule YscWeb.UserSettingsLive do
 
   @impl true
   def handle_info(:load_settings_data, socket) do
-    user = socket.assigns.current_user
-    live_action = socket.assigns[:live_action] || :edit
+    socket =
+      try do
+        user = socket.assigns.current_user
+        live_action = socket.assigns[:live_action] || :edit
 
-    # Ensure Stripe customer exists - create if missing or invalid
-    user = ensure_stripe_customer_exists(user)
-    # Reload user with billing_address after ensure_stripe_customer_exists
-    user = Repo.preload(user, :billing_address)
+        # Ensure Stripe customer exists - create if missing or invalid
+        user = ensure_stripe_customer_exists(user)
+        # Reload user with billing_address after ensure_stripe_customer_exists
+        user = Repo.preload(user, :billing_address)
 
-    # Load payment methods
-    all_payment_methods =
-      Ysc.Payments.list_payment_methods(user)
-      |> Enum.sort_by(fn pm -> {!pm.is_default, pm.inserted_at} end)
+        # Load payment methods
+        all_payment_methods =
+          Ysc.Payments.list_payment_methods(user)
+          |> Enum.sort_by(fn pm -> {!pm.is_default, pm.inserted_at} end)
 
-    default_payment_method = Enum.find(all_payment_methods, & &1.is_default)
+        default_payment_method = Enum.find(all_payment_methods, & &1.is_default)
 
-    # Get membership type from current or past subscriptions
-    membership_type_to_select = get_membership_type_for_selection(user)
+        # Get membership type from current or past subscriptions
+        membership_type_to_select = get_membership_type_for_selection(user)
 
-    # Get primary user if sub-account
-    primary_user =
-      if socket.assigns.is_sub_account,
-        do: Accounts.get_primary_user(user),
-        else: nil
+        # Get primary user if sub-account
+        primary_user =
+          if socket.assigns.is_sub_account,
+            do: Accounts.get_primary_user(user),
+            else: nil
 
-    # Rebuild address changeset with loaded billing_address
-    address_changeset = Accounts.change_billing_address(user)
+        # Rebuild address changeset with loaded billing_address
+        address_changeset = Accounts.change_billing_address(user)
 
-    # Fetch scheduled downgrade info from Stripe (if user has membership with schedule)
-    scheduled_downgrade_info =
-      case socket.assigns.current_membership do
-        nil -> nil
-        membership -> Subscriptions.get_scheduled_downgrade_info(membership)
+        # Fetch scheduled downgrade info from Stripe (if user has membership with schedule)
+        scheduled_downgrade_info =
+          case socket.assigns.current_membership do
+            nil -> nil
+            membership -> Subscriptions.get_scheduled_downgrade_info(membership)
+          end
+
+        payment_intent_secret = payment_secret(live_action, user)
+
+        # Auto-show the new payment form when the modal opens with no existing methods
+        show_new_payment_form =
+          live_action == :payment_method && all_payment_methods == [] &&
+            not is_nil(payment_intent_secret)
+
+        board_member = Accounts.household_board_member(user)
+
+        effective_newsletter =
+          case Newsletter.get_subscriber_by_email(user.email) do
+            nil -> false
+            subscriber -> subscriber.subscribed
+          end
+
+        notification_changeset =
+          Accounts.change_notification_preferences(user, %{
+            "newsletter_notifications" => effective_newsletter
+          })
+
+        pending_family_invites =
+          FamilyInvites.list_pending_invites_for_email(user.email)
+
+        socket
+        |> assign(:user, user)
+        |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
+        |> assign(:primary_user, primary_user)
+        |> assign(:membership_paused_by_board, board_member)
+        |> assign(:payment_intent_secret, payment_intent_secret)
+        |> assign(:default_payment_method, default_payment_method)
+        |> assign(:all_payment_methods, all_payment_methods)
+        |> assign(:show_new_payment_form, show_new_payment_form)
+        |> assign(:address_form, to_form(address_changeset))
+        |> assign(
+          :membership_form,
+          to_form(%{"membership_type" => membership_type_to_select})
+        )
+        |> assign(:notification_form, to_form(notification_changeset))
+        |> assign(:pending_family_invites, pending_family_invites)
+        |> assign(:user_avatars, load_user_avatars(user))
+        |> assign(:current_avatar_url, resolve_current_avatar_url(user))
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load user settings async data",
+            error: Exception.message(error)
+          )
+
+          socket
       end
-
-    payment_intent_secret = payment_secret(live_action, user)
-
-    # Auto-show the new payment form when the modal opens with no existing methods
-    show_new_payment_form =
-      live_action == :payment_method && all_payment_methods == [] &&
-        not is_nil(payment_intent_secret)
-
-    board_member = Accounts.household_board_member(user)
-
-    effective_newsletter =
-      case Newsletter.get_subscriber_by_email(user.email) do
-        nil -> false
-        subscriber -> subscriber.subscribed
-      end
-
-    notification_changeset =
-      Accounts.change_notification_preferences(user, %{
-        "newsletter_notifications" => effective_newsletter
-      })
-
-    pending_family_invites =
-      FamilyInvites.list_pending_invites_for_email(user.email)
 
     {:noreply,
      socket
-     |> assign(:user, user)
-     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
-     |> assign(:primary_user, primary_user)
-     |> assign(:membership_paused_by_board, board_member)
-     |> assign(:payment_intent_secret, payment_intent_secret)
-     |> assign(:default_payment_method, default_payment_method)
-     |> assign(:all_payment_methods, all_payment_methods)
      |> assign(:loading_payment_methods, false)
-     |> assign(:show_new_payment_form, show_new_payment_form)
-     |> assign(:address_form, to_form(address_changeset))
-     |> assign(
-       :membership_form,
-       to_form(%{"membership_type" => membership_type_to_select})
-     )
-     |> assign(:notification_form, to_form(notification_changeset))
-     |> assign(:pending_family_invites, pending_family_invites)
      |> assign(:loading_notification_preferences, false)
-     |> assign(:user_avatars, load_user_avatars(user))
-     |> assign(:loading_avatars, false)
-     |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
+     |> assign(:loading_avatars, false)}
   end
 
   # Handle async data loading for payments tab
   def handle_info(:load_payments_data, socket) do
-    user = socket.assigns.user
-    per_page = socket.assigns.payments_per_page
+    socket =
+      try do
+        user = socket.assigns.user
+        per_page = socket.assigns.payments_per_page
 
-    parallel =
-      [
-        {:payments,
-         fn -> Ledgers.list_user_payments_paginated(user.id, 1, per_page) end},
-        {:entitlements, fn -> Entitlements.list_usable_for_user(user.id) end},
-        {:reservations,
-         fn -> Events.list_active_ticket_holds_for_user(user.id) end}
-      ]
-      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
-        max_concurrency: 3,
-        timeout: :infinity
-      )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
-        Map.put(acc, key, value)
-      end)
+        parallel =
+          [
+            {:payments,
+             fn ->
+               Ledgers.list_user_payments_paginated(user.id, 1, per_page)
+             end},
+            {:entitlements,
+             fn -> Entitlements.list_usable_for_user(user.id) end},
+            {:reservations,
+             fn -> Events.list_active_ticket_holds_for_user(user.id) end}
+          ]
+          |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+            max_concurrency: 3,
+            timeout: :infinity
+          )
+          |> Enum.reduce(%{}, fn
+            {:ok, {key, value}}, acc -> Map.put(acc, key, value)
+            {:exit, _reason}, acc -> acc
+          end)
 
-    {all_payments, total_count} = Map.fetch!(parallel, :payments)
-    booking_entitlements = Map.fetch!(parallel, :entitlements)
-    ticket_reservations = Map.fetch!(parallel, :reservations)
+        {all_payments, total_count} =
+          Map.get(parallel, :payments, {[], 0})
 
-    total_pages = div(total_count + per_page - 1, per_page)
+        booking_entitlements = Map.get(parallel, :entitlements, [])
+        ticket_reservations = Map.get(parallel, :reservations, [])
 
-    {:noreply,
-     socket
-     |> assign(:payments_total, total_count)
-     |> assign(:payments_total_pages, total_pages)
-     |> assign(:all_payments, all_payments)
-     |> stream(:payments, all_payments, reset: true, dom_id: &payment_dom_id/1)
-     |> assign(:filtered_payments_count, length(all_payments))
-     |> assign(:filtered_payments_list, all_payments)
-     |> assign(:booking_entitlements_count, length(booking_entitlements))
-     |> assign(:ticket_reservations_count, length(ticket_reservations))
-     |> stream(:booking_entitlements, booking_entitlements,
-       reset: true,
-       dom_id: &booking_entitlement_dom_id/1
-     )
-     |> stream(:ticket_reservations, ticket_reservations,
-       reset: true,
-       dom_id: &ticket_reservation_dom_id/1
-     )
-     |> assign(:loading_payments, false)}
+        total_pages = div(total_count + per_page - 1, per_page)
+
+        socket
+        |> assign(:payments_total, total_count)
+        |> assign(:payments_total_pages, total_pages)
+        |> assign(:all_payments, all_payments)
+        |> stream(:payments, all_payments,
+          reset: true,
+          dom_id: &payment_dom_id/1
+        )
+        |> assign(:filtered_payments_count, length(all_payments))
+        |> assign(:filtered_payments_list, all_payments)
+        |> assign(:booking_entitlements_count, length(booking_entitlements))
+        |> assign(:ticket_reservations_count, length(ticket_reservations))
+        |> stream(:booking_entitlements, booking_entitlements,
+          reset: true,
+          dom_id: &booking_entitlement_dom_id/1
+        )
+        |> stream(:ticket_reservations, ticket_reservations,
+          reset: true,
+          dom_id: &ticket_reservation_dom_id/1
+        )
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load payment history async data",
+            error: Exception.message(error)
+          )
+
+          socket
+      end
+
+    {:noreply, assign(socket, :loading_payments, false)}
   end
 
   def handle_info(

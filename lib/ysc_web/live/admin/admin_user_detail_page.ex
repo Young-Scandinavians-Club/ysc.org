@@ -315,11 +315,14 @@ defmodule YscWeb.AdminUserDetailsLive do
         <div :if={@live_action == :orders} class="max-w-full py-8 px-2">
           <h2 class="text-xl font-semibold text-zinc-800 mb-4">Ticket Orders</h2>
           <.admin_table_skeleton
-            :if={@ticket_orders_meta == nil}
+            :if={is_nil(@ticket_orders_meta)}
             rows={6}
             columns={6}
           />
-          <div :if={@ticket_orders_meta != nil} class="w-full">
+          <div
+            :if={show_ticket_orders_table?(@ticket_orders_meta)}
+            class="w-full"
+          >
             <Flop.Phoenix.table
               id="user_ticket_orders_list"
               items={@streams.ticket_orders}
@@ -406,8 +409,11 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :bookings} class="max-w-full py-8 px-2">
           <h2 class="text-xl font-semibold text-zinc-800 mb-4">Bookings</h2>
-          <.admin_table_skeleton :if={@bookings_meta == nil} rows={6} columns={6} />
-          <div :if={@bookings_meta != nil} class="w-full">
+          <.admin_table_skeleton :if={is_nil(@bookings_meta)} rows={6} columns={6} />
+          <div
+            :if={show_bookings_table?(@bookings_meta)}
+            class="w-full"
+          >
             <Flop.Phoenix.table
               id="user_bookings_list"
               items={@streams.bookings}
@@ -2470,8 +2476,16 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> stream(:ticket_orders, [], reset: true)}
   end
 
-  def handle_async(:load_ticket_orders, {:exit, _}, socket) do
-    {:noreply, socket}
+  def handle_async(:load_ticket_orders, {:exit, reason}, socket) do
+    Ysc.Logging.warning("Failed to load user ticket orders",
+      error: inspect(reason),
+      extra: %{user_id: socket.assigns.user_id}
+    )
+
+    {:noreply,
+     socket
+     |> assign(:ticket_orders_meta, false)
+     |> stream(:ticket_orders, [], reset: true)}
   end
 
   def handle_async(:load_bookings, {:ok, {:ok, {bookings, meta}}}, socket) do
@@ -2488,8 +2502,16 @@ defmodule YscWeb.AdminUserDetailsLive do
      |> stream(:bookings, [], reset: true)}
   end
 
-  def handle_async(:load_bookings, {:exit, _}, socket) do
-    {:noreply, socket}
+  def handle_async(:load_bookings, {:exit, reason}, socket) do
+    Ysc.Logging.warning("Failed to load user bookings",
+      error: inspect(reason),
+      extra: %{user_id: socket.assigns.user_id}
+    )
+
+    {:noreply,
+     socket
+     |> assign(:bookings_meta, false)
+     |> stream(:bookings, [], reset: true)}
   end
 
   def handle_async(:load_booking_entitlements, {:ok, list}, socket) do
@@ -4343,6 +4365,9 @@ defmodule YscWeb.AdminUserDetailsLive do
         "#{format_admin_money(ent.amount_off)} off"
     end
   end
+
+  defp show_ticket_orders_table?(meta), do: meta not in [nil, false]
+  defp show_bookings_table?(meta), do: meta not in [nil, false]
 
   defp format_admin_money(nil), do: "—"
   defp format_admin_money(m), do: Ysc.MoneyHelper.format_money!(m)
