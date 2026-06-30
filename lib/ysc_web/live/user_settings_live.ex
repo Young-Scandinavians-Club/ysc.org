@@ -4117,7 +4117,7 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to initialize payment form: #{error_message}",
+             "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a card.",
              title: "Payment"
            )
            |> assign(:show_new_payment_form, false)}

@@ -185,6 +185,7 @@ defmodule YscWeb.UserBookingDetailLive do
             {:noreply,
              socket
              |> assign(:show_cancel_modal, false)
+             |> sync_booking_after_partial_cancel(booking, reason)
              |> YscWeb.Flash.put_toast(:error, error_message, title: "Booking")}
         end
 
@@ -773,4 +774,27 @@ defmodule YscWeb.UserBookingDetailLive do
 
   defp booking_status_label(status),
     do: status |> to_string() |> String.capitalize()
+
+  defp sync_booking_after_partial_cancel(socket, booking, reason) do
+    if partial_cancel_post_booking_error?(reason) do
+      updated_booking =
+        Repo.get!(Booking, booking.id)
+        |> Repo.preload([:user, rooms: :room_category])
+
+      refund_info = get_refund_info(updated_booking, socket.assigns.payment)
+
+      socket
+      |> assign(:booking, updated_booking)
+      |> assign(:refund_info, refund_info)
+      |> assign(:can_cancel, false)
+    else
+      socket
+    end
+  end
+
+  defp partial_cancel_post_booking_error?({:payment_not_found, _}), do: true
+  defp partial_cancel_post_booking_error?({:calculation_failed, _}), do: true
+  defp partial_cancel_post_booking_error?({:refund_failed, _}), do: true
+  defp partial_cancel_post_booking_error?({:pending_refund_failed, _}), do: true
+  defp partial_cancel_post_booking_error?(_), do: false
 end
