@@ -658,7 +658,9 @@ defmodule YscWeb.FamilyManagementLive do
                     {sub_account.email}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {FamilyDisplay.relationship_label(sub_account.family_relationship)}
+                    {FamilyDisplay.relationship_label(
+                      sub_account.family_relationship
+                    )}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm">
                     <button

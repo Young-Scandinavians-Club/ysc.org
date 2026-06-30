@@ -1884,7 +1884,9 @@ defmodule YscWeb.HomeLive do
                         {member.first_name} {member.last_name}
                       </span>
                       <span class="text-zinc-500 text-xs">
-                        {FamilyDisplay.relationship_label(member.family_relationship)}
+                        {FamilyDisplay.relationship_label(
+                          member.family_relationship
+                        )}
                       </span>
                     </div>
                   <% end %>
