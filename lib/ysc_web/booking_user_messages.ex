@@ -84,6 +84,14 @@ defmodule YscWeb.BookingUserMessages do
     "You need an active YSC membership to book the cabin. Go to your #{link} to pay or renew."
   end
 
+  def membership_required_plain_message do
+    "You need an active YSC membership to book the cabin. Visit your membership page to pay or renew."
+  end
+
+  def application_pending_approval_message do
+    "Your membership application is still being reviewed by the board. You'll be able to make bookings after your application is approved and your membership is active."
+  end
+
   def checkout_payment_step_pay do
     "Enter your payment details in the payment section to complete your booking"
   end

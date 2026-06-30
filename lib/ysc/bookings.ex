@@ -19,6 +19,7 @@ defmodule Ysc.Bookings do
   import Ecto.Query, warn: false
   require Ysc.Logging
 
+  alias Ysc.Accounts
   alias Ysc.Repo
   alias Stripe
   alias Ysc.Ledgers
@@ -47,6 +48,25 @@ defmodule Ysc.Bookings do
   # Check-in and check-out times
   @checkin_time ~T[15:00:00]
   @checkout_time ~T[11:00:00]
+
+  @doc """
+  Returns `:ok` when `user` may create or pay for a cabin booking.
+
+  Mirrors the booking LiveViews' UI eligibility checks: account must be
+  `:active` and the user (or their primary account) must have active membership.
+  """
+  def ensure_user_may_book(%Accounts.User{} = user) do
+    cond do
+      user.state != :active ->
+        {:error, :application_pending_approval}
+
+      not Accounts.has_active_membership?(user) ->
+        {:error, :membership_required}
+
+      true ->
+        :ok
+    end
+  end
 
   ## Seasons
 

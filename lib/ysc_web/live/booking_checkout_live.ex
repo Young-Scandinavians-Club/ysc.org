@@ -91,10 +91,24 @@ defmodule YscWeb.BookingCheckoutLive do
   defp validate_user_signed_in(_user), do: :ok
 
   defp load_checkout(socket, booking_id, user, timezone) do
-    with {:ok, booking} <- load_booking(booking_id, user),
+    with :ok <- Bookings.ensure_user_may_book(user),
+         {:ok, booking} <- load_booking(booking_id, user),
          :ok <- validate_booking_status(booking),
          :ok <- validate_booking_not_expired(booking) do
       initialize_checkout(socket, booking, user, timezone)
+    else
+      {:error, :application_pending_approval} ->
+        {:error,
+         {:redirect, ~p"/pending-review",
+          YscWeb.BookingUserMessages.application_pending_approval_message()}}
+
+      {:error, :membership_required} ->
+        {:error,
+         {:redirect, ~p"/users/membership",
+          YscWeb.BookingUserMessages.membership_required_plain_message()}}
+
+      {:error, {:redirect, _, _} = redirect} ->
+        {:error, redirect}
     end
   end
 
