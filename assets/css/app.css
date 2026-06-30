@@ -3367,6 +3367,53 @@ body.overflow-hidden {
 }
 
 
+/* Ticket checkout quantity feedback */
+
+@keyframes ticket-qty-pop {
+    0% {
+        transform: scale(1);
+    }
+    40% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes ticket-qty-reject {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    20%,
+    60% {
+        transform: translateX(-4px);
+    }
+    40%,
+    80% {
+        transform: translateX(4px);
+    }
+}
+
+.ticket-qty-pop {
+    display: inline-block;
+    animation: ticket-qty-pop 150ms ease-out;
+}
+
+.ticket-qty-reject {
+    display: inline-block;
+    animation: ticket-qty-reject 300ms ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ticket-qty-pop,
+    .ticket-qty-reject {
+        animation: none;
+    }
+}
+
+
 /* Hero text shadows for better legibility - only on sm+ screens where text overlays image */
 
 @media (min-width: 640px) {

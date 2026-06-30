@@ -1746,6 +1746,28 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Sums confirmed ticket sales across non-donation tiers.
+
+  Accepts the maps returned by `list_ticket_tiers_for_event/1`.
+  """
+  def non_donation_sold_count_from_tiers(ticket_tiers_with_counts)
+      when is_list(ticket_tiers_with_counts) do
+    ticket_tiers_with_counts
+    |> Enum.reject(fn tier ->
+      tier_type = Map.get(tier, :type) || Map.get(tier, "type")
+      tier_type == :donation or tier_type == "donation"
+    end)
+    |> Enum.reduce(0, fn tier, acc ->
+      sold =
+        Map.get(tier, :sold_tickets_count) ||
+          Map.get(tier, "sold_tickets_count") ||
+          0
+
+      acc + sold
+    end)
+  end
+
+  @doc """
   Loads attendee ticket data for an event in two queries instead of three.
 
   Returns sold ticket count, per-user ticket counts, and ticket buyers ordered

@@ -2586,6 +2586,103 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @account_settings_nav_keys [
+    {:profile, "Profile", "hero-user"},
+    {:membership, "Membership", "hero-heart"},
+    {:payments, "Payments", "hero-wallet"},
+    {:family, "Family", "hero-user-group"},
+    {:security, "Security", "hero-shield-check"},
+    {:notifications, "Notifications", "hero-bell-alert"}
+  ]
+
+  defp account_settings_nav_items do
+    paths = %{
+      profile: ~p"/users/settings",
+      membership: ~p"/users/membership",
+      payments: ~p"/users/payments",
+      family: ~p"/users/settings/family",
+      security: ~p"/users/settings/security",
+      notifications: ~p"/users/notifications"
+    }
+
+    Enum.map(@account_settings_nav_keys, fn {key, label, icon} ->
+      {key, label, icon, Map.fetch!(paths, key)}
+    end)
+  end
+
+  @doc """
+  Sidebar navigation for account settings pages (profile, membership, payments, family, security, notifications).
+
+  Pass `current` for the active section and `show_family_link?` when the Family link should appear
+  (eligibility differs by page — e.g. family/lifetime plan vs. any primary or sub-account holder).
+
+  ## Examples
+
+      <.account_settings_nav current={:profile} show_family_link?={@show_family_link?} />
+
+      <.account_settings_nav current={:security} show_family_link?={false} />
+  """
+  attr :current, :atom,
+    required: true,
+    values: [
+      :profile,
+      :membership,
+      :payments,
+      :family,
+      :security,
+      :notifications
+    ]
+
+  attr :show_family_link?, :boolean, default: false
+
+  def account_settings_nav(assigns) do
+    assigns = assign(assigns, :nav_items, account_settings_nav_items())
+
+    ~H"""
+    <ul class="flex-column space-y space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
+      <li>
+        <h2 class="text-zinc-800 text-2xl font-semibold leading-8 mb-10">
+          Account
+        </h2>
+      </li>
+      <%= for {key, label, icon, path} <- @nav_items do %>
+        <%= if key != :family || @show_family_link? do %>
+          <li>
+            <.account_settings_nav_link
+              navigate={path}
+              icon={icon}
+              label={label}
+              active?={@current == key}
+            />
+          </li>
+        <% end %>
+      <% end %>
+    </ul>
+    """
+  end
+
+  attr :navigate, :string, required: true
+  attr :icon, :string, required: true
+  attr :label, :string, required: true
+  attr :active?, :boolean, default: false
+
+  @doc "Single link in the account settings sidebar."
+  def account_settings_nav_link(assigns) do
+    ~H"""
+    <.link
+      navigate={@navigate}
+      class={[
+        "inline-flex items-center px-4 py-3 rounded w-full",
+        @active? && "bg-blue-600 active text-zinc-100",
+        !@active? && "hover:bg-zinc-100 hover:text-zinc-900"
+      ]}
+      aria-active={@active?}
+    >
+      <.icon name={@icon} class="w-5 h-5 me-2" /> {@label}
+    </.link>
+    """
+  end
+
   @doc """
   Bordered page masthead used on public index pages (events, news, newsletters, booking landing).
 

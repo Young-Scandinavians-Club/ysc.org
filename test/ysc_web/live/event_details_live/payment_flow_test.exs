@@ -340,6 +340,49 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
 
       assert is_binary(result)
     end
+
+    test "close-payment-modal keeps pending order when payment intent is processing",
+         %{
+           conn: conn,
+           user: user
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      payment_intent_id =
+        "pi_processing_close_#{System.unique_integer([:positive])}"
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: payment_intent_id,
+           status: "requires_payment_method"
+         })}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      view =
+        wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      order =
+        Tickets.list_user_ticket_orders(user.id)
+        |> List.first()
+
+      assert order.status == :pending
+      assert order.payment_intent_id == payment_intent_id
+
+      expect_payment_processing(payment_intent_id)
+
+      render_click(view, "close-payment-modal")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :pending
+    end
   end
 
   describe "idempotency key usage" do
@@ -631,6 +674,92 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         html = render(view)
         assert html =~ "This order is no longer available."
         assert Tickets.get_ticket_order(order.id).status == :completed
+      end)
+    end
+  end
+
+  describe "payment intent refresh on checkout restore (#610)" do
+    test "re-syncs payment intent when tier price changes during open checkout",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+        event = Repo.preload(event, :ticket_tiers, force: true)
+        tier = hd(event.ticket_tiers)
+
+        order =
+          ticket_order_fixture(%{
+            user: user,
+            event: event,
+            tier: tier,
+            status: :pending
+          })
+          |> stabilize_pending_ticket_order!()
+
+        old_amount_cents = money_to_cents(order.total_amount)
+        pi_id = "pi_stale_fast_path_#{System.unique_integer([:positive])}"
+        new_price = Money.mult!(order.total_amount, 2)
+        new_amount_cents = money_to_cents(new_price)
+
+        order =
+          order
+          |> Ecto.Changeset.change(payment_intent_id: pi_id)
+          |> Repo.update!()
+
+        old_pi =
+          build_payment_intent(%{
+            id: pi_id,
+            amount: old_amount_cents,
+            status: "requires_payment_method"
+          })
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn id, _opts ->
+          {:ok, Map.put(old_pi, :id, id)}
+        end)
+
+        {:ok, view, _html} =
+          live(
+            conn,
+            ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}"
+          )
+
+        view = wait_for_async(view)
+        assert has_element?(view, "#payment-modal")
+
+        {:ok, _tier} =
+          Events.update_ticket_tier(tier, %{
+            price: new_price
+          })
+
+        reloaded_order = Tickets.get_ticket_order(order.id)
+
+        {:ok, recalculated_total} =
+          Tickets.recalculate_pending_order_total(reloaded_order)
+
+        assert money_to_cents(recalculated_total) == new_amount_cents
+
+        expect(Ysc.StripeMock, :cancel_payment_intent, fn ^pi_id, _opts ->
+          {:ok, build_payment_intent(%{id: pi_id, status: "canceled"})}
+        end)
+
+        expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+          assert params.amount == new_amount_cents
+
+          {:ok,
+           build_payment_intent(%{
+             id: "pi_repriced_#{System.unique_integer([:positive])}",
+             amount: new_amount_cents
+           })}
+        end)
+
+        render_patch(
+          view,
+          ~p"/events/#{event.id}?checkout=payment&order_id=#{order.id}&refresh=1"
+        )
+
+        wait_for_async(view)
       end)
     end
   end
