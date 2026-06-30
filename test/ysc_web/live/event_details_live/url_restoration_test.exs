@@ -207,7 +207,7 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       view = wait_for_async(view)
 
       assert has_element?(view, "#payment-modal")
-      assert has_element?(view, "h2", "Payment failed")
+      assert has_element?(view, "#payment-failed-state")
       refute has_element?(view, "#ticket-modal")
     end
 

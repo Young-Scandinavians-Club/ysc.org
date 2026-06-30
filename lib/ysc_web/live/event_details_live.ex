@@ -1846,7 +1846,10 @@ defmodule YscWeb.EventDetailsLive do
       <% else %>
         <%= if @checkout_payment_failed do %>
           <!-- Payment Failed State (redirect methods like CashApp) -->
-          <div class="flex flex-col items-center justify-center py-16 space-y-6">
+          <div
+            id="payment-failed-state"
+            class="flex flex-col items-center justify-center py-16 space-y-6"
+          >
             <div class="text-center">
               <div class="text-red-500 mb-4">
                 <.icon name="hero-x-circle" class="w-16 h-16 mx-auto" />
@@ -4915,26 +4918,30 @@ defmodule YscWeb.EventDetailsLive do
 
     expired_order_id = event.ticket_order && event.ticket_order.id
 
-    if socket.assigns.show_payment_modal &&
-         (current_order_id == expired_order_id || current_order_id == nil) do
-      # Show expired message for the current session or if no specific session is active
-      {:noreply,
-       socket
-       |> assign(:checkout_expired, true)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)}
-    else
-      # This is a different session, just clear the current state without showing expired message
-      {:noreply,
-       socket
-       |> assign(:show_payment_modal, false)
-       |> assign(:checkout_expired, false)
-       |> assign(:checkout_payment_failed, false)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)
-       |> clear_selected_tickets()}
+    cond do
+      socket.assigns.checkout_payment_failed ->
+        {:noreply, socket}
+
+      socket.assigns.show_payment_modal && current_order_id == expired_order_id ->
+        # Show expired message only when this is the active checkout session
+        {:noreply,
+         socket
+         |> assign(:checkout_expired, true)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)}
+
+      true ->
+        # This is a different session, just clear the current state without showing expired message
+        {:noreply,
+         socket
+         |> assign(:show_payment_modal, false)
+         |> assign(:checkout_expired, false)
+         |> assign(:checkout_payment_failed, false)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)
+         |> clear_selected_tickets()}
     end
   end
 
@@ -4961,6 +4968,7 @@ defmodule YscWeb.EventDetailsLive do
       if payment_failure_cancellation?(event.reason) do
         {:noreply,
          socket
+         |> assign(:show_payment_modal, true)
          |> assign(:checkout_payment_failed, true)
          |> assign(:checkout_expired, false)
          |> assign(:stripe_payment_element_ready, false)
@@ -6560,6 +6568,7 @@ defmodule YscWeb.EventDetailsLive do
   defp checkout_session_cancelled_matches?(socket, event) do
     same_ticket_order?(socket.assigns.ticket_order, event.ticket_order) ||
       (is_nil(socket.assigns.ticket_order) &&
+         socket.assigns.preserve_failed_checkout_state &&
          payment_failure_cancellation?(event.reason) &&
          socket.assigns.show_payment_modal &&
          same_user_and_event?(socket, event))
