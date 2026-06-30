@@ -23,6 +23,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Repo
   alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias Ysc.Payments.PaymentDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
@@ -5510,20 +5511,20 @@ defmodule YscWeb.UserSettingsLive do
     <div class="flex items-center gap-4 mb-4">
       <div class={[
         "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
-        get_payment_icon_bg(@payment_info)
+        PaymentDisplay.get_payment_icon_bg(@payment_info)
       ]}>
         <.icon
-          name={get_payment_icon(@payment_info)}
+          name={PaymentDisplay.get_payment_icon(@payment_info)}
           class={[
             "w-6 h-6",
-            get_payment_icon_color(@payment_info)
+            PaymentDisplay.get_payment_icon_color(@payment_info)
           ]}
         />
       </div>
       <div class="flex-1">
         <div class="flex items-center gap-2">
           <h3 class="font-bold text-zinc-900 text-lg leading-tight">
-            {get_payment_title(@payment_info)}
+            {PaymentDisplay.get_payment_title(@payment_info)}
           </h3>
           <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
             <.badge type="red">Cancelled</.badge>
@@ -5533,7 +5534,7 @@ defmodule YscWeb.UserSettingsLive do
           <% end %>
         </div>
         <p class="text-xs font-mono text-zinc-400 mt-1">
-          {get_payment_reference(@payment_info)}
+          {PaymentDisplay.get_payment_reference(@payment_info)}
         </p>
       </div>
     </div>
@@ -5645,20 +5646,20 @@ defmodule YscWeb.UserSettingsLive do
         <div class="flex items-center gap-4">
           <div class={[
             "w-10 h-10 rounded-full flex items-center justify-center",
-            get_payment_icon_bg(@payment_info)
+            PaymentDisplay.get_payment_icon_bg(@payment_info)
           ]}>
             <.icon
-              name={get_payment_icon(@payment_info)}
+              name={PaymentDisplay.get_payment_icon(@payment_info)}
               class={[
                 "w-5 h-5",
-                get_payment_icon_color(@payment_info)
+                PaymentDisplay.get_payment_icon_color(@payment_info)
               ]}
             />
           </div>
           <div>
             <div class="flex items-center gap-2">
               <h3 class="font-bold text-zinc-900 text-sm">
-                {get_payment_title(@payment_info)}
+                {PaymentDisplay.get_payment_title(@payment_info)}
               </h3>
               <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
                 <.badge type="red" class="text-xs">Cancelled</.badge>
@@ -5668,7 +5669,7 @@ defmodule YscWeb.UserSettingsLive do
               <% end %>
             </div>
             <p class="text-xs font-mono text-zinc-400 mt-0.5">
-              {get_payment_reference(@payment_info)}
+              {PaymentDisplay.get_payment_reference(@payment_info)}
             </p>
           </div>
         </div>
@@ -5704,95 +5705,6 @@ defmodule YscWeb.UserSettingsLive do
     </tr>
     """
   end
-
-  # Helper functions for payment rendering
-  defp get_payment_icon(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    "hero-home"
-  end
-
-  defp get_payment_icon(%{type: :ticket}), do: "hero-ticket"
-  defp get_payment_icon(%{type: :membership}), do: "hero-heart"
-  defp get_payment_icon(%{type: :donation}), do: "hero-gift"
-  defp get_payment_icon(_), do: "hero-credit-card"
-
-  defp get_payment_icon_bg(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    case booking.property do
-      :tahoe -> "bg-blue-50 group-hover:bg-blue-600"
-      :clear_lake -> "bg-emerald-50 group-hover:bg-emerald-600"
-      _ -> "bg-purple-50 group-hover:bg-purple-600"
-    end
-  end
-
-  defp get_payment_icon_bg(%{type: :ticket}),
-    do: "bg-purple-50 group-hover:bg-purple-600"
-
-  defp get_payment_icon_bg(%{type: :membership}),
-    do: "bg-teal-50 group-hover:bg-teal-600"
-
-  defp get_payment_icon_bg(%{type: :donation}),
-    do: "bg-yellow-50 group-hover:bg-yellow-600"
-
-  defp get_payment_icon_bg(_), do: "bg-zinc-50 group-hover:bg-zinc-600"
-
-  defp get_payment_icon_color(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    case booking.property do
-      :tahoe -> "text-blue-600 group-hover:text-white"
-      :clear_lake -> "text-emerald-600 group-hover:text-white"
-      _ -> "text-purple-600 group-hover:text-white"
-    end
-  end
-
-  defp get_payment_icon_color(%{type: :ticket}),
-    do: "text-purple-600 group-hover:text-white"
-
-  defp get_payment_icon_color(%{type: :membership}),
-    do: "text-teal-600 group-hover:text-white"
-
-  defp get_payment_icon_color(%{type: :donation}),
-    do: "text-yellow-600 group-hover:text-white"
-
-  defp get_payment_icon_color(_), do: "text-zinc-600 group-hover:text-white"
-
-  defp get_payment_title(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    property_name =
-      case booking.property do
-        :tahoe -> "Tahoe"
-        :clear_lake -> "Clear Lake"
-        _ -> "Cabin"
-      end
-
-    "#{property_name} Booking"
-  end
-
-  defp get_payment_title(%{type: :ticket, event: event})
-       when not is_nil(event) do
-    event.title
-  end
-
-  defp get_payment_title(%{type: :ticket}), do: "Event Tickets"
-  defp get_payment_title(%{type: :membership}), do: "Membership Payment"
-  defp get_payment_title(%{type: :donation}), do: "Donation"
-  defp get_payment_title(%{description: description}), do: description
-  defp get_payment_title(_), do: "Payment"
-
-  defp get_payment_reference(%{booking: booking}) when not is_nil(booking) do
-    booking.reference_id || "—"
-  end
-
-  defp get_payment_reference(%{ticket_order: ticket_order})
-       when not is_nil(ticket_order) do
-    ticket_order.reference_id || "—"
-  end
-
-  defp get_payment_reference(%{payment: payment}) when not is_nil(payment) do
-    payment.reference_id || "—"
-  end
-
-  defp get_payment_reference(_), do: "—"
 
   defp render_payment_details(assigns) do
     payment_info = assigns.payment_info

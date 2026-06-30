@@ -11,6 +11,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
   alias Ysc.GoogleWallet
+  alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.PlainText
   import Ecto.Query
 
@@ -2154,12 +2155,6 @@ defmodule YscWeb.HomeLive do
     |> Enum.flat_map(fn {_event_datetime, event_tickets} -> event_tickets end)
   end
 
-  defp group_tickets_by_tier(tickets) do
-    tickets
-    |> Enum.group_by(& &1.ticket_tier.name)
-    |> Enum.sort_by(fn {_tier_name, tickets} -> length(tickets) end, :desc)
-  end
-
   # Helper function to get event datetime for sorting (combines date and time)
   # Returns a DateTime in PST timezone that can be used for sorting
   defp get_event_datetime_for_sorting(event) do
@@ -2228,7 +2223,7 @@ defmodule YscWeb.HomeLive do
     |> Enum.group_by(& &1.event.id)
     |> Enum.map(fn {_event_id, event_tickets} ->
       event = List.first(event_tickets).event
-      grouped_tiers = group_tickets_by_tier(event_tickets)
+      grouped_tiers = TicketDisplay.group_tickets_by_tier(event_tickets)
       {event, grouped_tiers}
     end)
     |> Enum.sort_by(

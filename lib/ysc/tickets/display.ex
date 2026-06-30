@@ -15,6 +15,19 @@ defmodule Ysc.Tickets.Display do
   def tier_name(name) when is_binary(name), do: name
 
   @doc """
+  Groups tickets by tier name, sorted by quantity (largest groups first).
+
+  Returns a list of `{tier_name, tickets}` tuples for rendering tier badges
+  in home and event detail views.
+  """
+  def group_tickets_by_tier(tickets) when is_list(tickets) do
+    tickets
+    |> Enum.group_by(&tier_name_from_ticket/1)
+    |> Enum.map(fn {name, tier_tickets} -> {tier_name(name), tier_tickets} end)
+    |> Enum.sort_by(fn {_tier_name, tier_tickets} -> length(tier_tickets) end, :desc)
+  end
+
+  @doc """
   Groups tickets by tier and returns a comma-separated quantity summary.
 
   ## Options

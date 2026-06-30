@@ -5,6 +5,7 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
 
   alias Money
@@ -689,6 +690,38 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "#notification_form")
       assert html =~ "notification" or html =~ "Notification"
     end
+  end
+
+  test "payment card uses PaymentDisplay helpers for booking icons", %{conn: conn} do
+    user = user_fixture(%{state: :active})
+    conn = log_in_user(conn, user)
+
+    booking =
+      booking_fixture(%{
+        user_id: user.id,
+        status: :complete,
+        property: :tahoe
+      })
+
+    {:ok, {_payment, _, _}} =
+      Ysc.Ledgers.process_payment(%{
+        user_id: user.id,
+        amount: booking.total_price,
+        entity_type: :booking,
+        entity_id: booking.id,
+        external_payment_id: "pi_settings_payment_#{booking.id}",
+        stripe_fee: Money.new(50, :USD),
+        description: "Booking payment",
+        property: booking.property,
+        payment_method_id: nil
+      })
+
+    {:ok, view, _html} = live(conn, ~p"/users/payments")
+
+    assert has_element?(view, "#payments-list")
+    html = render(view)
+    assert html =~ "Tahoe Booking"
+    assert html =~ booking.reference_id
   end
 
   describe "settings page — payments tab" do
