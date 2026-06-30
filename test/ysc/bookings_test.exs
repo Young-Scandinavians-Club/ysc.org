@@ -3637,6 +3637,55 @@ defmodule Ysc.BookingsTest do
       assert {:error, :invalid_status} =
                Bookings.sync_hold_pricing_from_calculation(booking)
     end
+
+    test "preserves minimum billable occupancy for room holds" do
+      room =
+        create_room_fixture(%{
+          property: :tahoe,
+          min_billable_occupancy: 2,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      user = user_fixture()
+
+      assert {:ok, booking} =
+               Ysc.Bookings.BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 1,
+                 children_count: 0
+               )
+
+      min_occupancy_total = Money.new(600, :USD)
+      assert Money.equal?(booking.total_price, min_occupancy_total)
+
+      {:ok, priced} = Bookings.calculate_modification_pricing(booking)
+      assert Money.equal?(priced.total, min_occupancy_total)
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(total_price: Money.new(200, :USD))
+        |> Ysc.Repo.update!()
+
+      assert {:ok, updated} =
+               Bookings.sync_hold_pricing_from_calculation(booking)
+
+      assert Money.equal?(updated.total_price, min_occupancy_total)
+    end
   end
 
   describe "verify_booking_payment_intent/2" do

@@ -1498,8 +1498,7 @@ defmodule Ysc.Bookings do
               :room,
               room_id: List.first(room_ids),
               guests_count: booking.guests_count,
-              children_count: booking.children_count || 0,
-              use_actual_guests: true
+              children_count: booking.children_count || 0
             )
           end
 
