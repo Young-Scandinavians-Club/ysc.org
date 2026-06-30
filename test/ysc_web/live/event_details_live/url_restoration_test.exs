@@ -195,6 +195,20 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
       assert is_binary(html)
     end
 
+    test "opens ticket modal when returning from failed redirect payment", %{
+      conn: conn
+    } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/events/#{event.id}?payment_failed=1")
+
+      view = wait_for_async(view)
+
+      assert has_element?(view, "#ticket-modal")
+      refute has_element?(view, "#payment-modal")
+    end
+
     test "handles invalid order ID", %{conn: conn} do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
 

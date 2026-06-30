@@ -342,10 +342,10 @@ defmodule YscWeb.PaymentSuccessLive do
             end
 
           not is_nil(ticket_order_id) ->
-            # Redirect to event page with error
+            # Redirect to event page with error — open ticket selection
             case verify_ticket_order_access(ticket_order_id, user) do
               {:ok, event_id} ->
-                {:ok, ~p"/events/#{event_id}"}
+                {:ok, ~p"/events/#{event_id}?payment_failed=1"}
 
               error ->
                 error
