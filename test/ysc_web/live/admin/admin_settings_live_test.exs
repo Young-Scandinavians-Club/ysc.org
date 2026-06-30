@@ -1,5 +1,11 @@
 defmodule YscWeb.AdminSettingsLiveTest do
-  use YscWeb.ConnCase
+  @moduledoc """
+  Admin settings LiveView tests.
+
+  Runs with `async: false` because the settings form uses `temporary_assigns` and
+  connected-mount timing can otherwise submit before settings fields are in the DOM.
+  """
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
@@ -69,9 +75,13 @@ defmodule YscWeb.AdminSettingsLiveTest do
     test "updates settings", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
 
-      # We need to find a setting to update. Settings are grouped by scope.
-      # Let's just check if the form is there.
+      # Drain connected mount work before submitting. temporary_assigns clears
+      # form/scopes after the dead render, so an immediate submit can post %{} and
+      # raise FunctionClauseError in handle_event/3 under CI load.
+      html = render(view)
+      assert html =~ "Save"
       assert has_element?(view, "#admin-settings-form")
+      assert has_element?(view, "input[name^='settings']")
 
       view
       |> form("#admin-settings-form", %{settings: %{}})
