@@ -2591,6 +2591,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            title: "Bookings"
          )
          |> assign(:entitlement_form, entitlement_form_defaults())
+         |> assign(:booking_entitlements_loading?, true)
          |> start_async(:load_booking_entitlements, fn ->
            Entitlements.list_all_for_user(user_id)
          end)}
@@ -2618,6 +2619,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            title: "Bookings"
          )
          |> assign(:entitlement_form, entitlement_form_defaults())
+         |> assign(:booking_entitlements_loading?, true)
          |> start_async(:load_booking_entitlements, fn ->
            Entitlements.list_all_for_user(user_id)
          end)}
@@ -2648,6 +2650,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                |> YscWeb.Flash.put_toast(:info, "Benefit revoked.",
                  title: "Bookings"
                )
+               |> assign(:booking_entitlements_loading?, true)
                |> start_async(:load_booking_entitlements, fn ->
                  Entitlements.list_all_for_user(user_id)
                end)}

@@ -348,12 +348,12 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               role="status"
               aria-live="polite"
             >
-              <tr :for={_ <- 1..5}>
-                <td class="px-4 py-3" colspan="7">
-                  <span class="sr-only">Loading entitlements…</span>
-                  <.skeleton_block class="h-4 w-full rounded" />
-                </td>
-              </tr>
+              <.table_rows_skeleton
+                rows={5}
+                colspan={7}
+                label="Loading entitlements…"
+                padding_class="px-4 py-3"
+              />
             </tbody>
             <tbody
               :if={!@loading_outstanding_entitlements?}

@@ -2189,7 +2189,12 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="flex flex-wrap gap-2 pb-4 border-b border-zinc-200">
                   <.skeleton_block :for={_ <- 1..4} class="h-9 w-20 rounded-full" />
                 </div>
-                <.table_skeleton rows={5} columns={4} class="mt-4" />
+                <.table_skeleton
+                  rows={5}
+                  columns={4}
+                  class="mt-4"
+                  announce?={false}
+                />
               </div>
               <!-- Filter Chips (hidden while loading) -->
               <div :if={!assigns[:loading_payments]}>

@@ -2674,10 +2674,19 @@ defmodule YscWeb.CoreComponents do
     default: nil,
     doc: "Additional Tailwind classes merged onto the outer container"
 
+  attr :announce?, :boolean,
+    default: true,
+    doc: "When false, suppresses internal status live-region announcement"
+
   def table_skeleton(assigns) do
     ~H"""
-    <div id={@id} class={@class} role="status" aria-live="polite">
-      <span class="sr-only">Loading…</span>
+    <div
+      id={@id}
+      class={@class}
+      role={@announce? && "status"}
+      aria-live={@announce? && "polite"}
+    >
+      <span :if={@announce?} class="sr-only">Loading…</span>
       <div class="hidden md:block overflow-hidden rounded-lg border border-zinc-200 divide-y divide-zinc-100">
         <div :for={_row <- 1..@rows} class="flex items-center gap-6 px-4 py-3.5">
           <.skeleton_block :for={_col <- 1..@columns} class="h-4 flex-1 rounded" />
@@ -2751,14 +2760,14 @@ defmodule YscWeb.CoreComponents do
         trailing_class="h-8 w-20 rounded"
       />
   """
-  attr :class, :any, default: "flex items-center gap-3"
+  attr :class, :any, default: nil
   attr :leading_class, :any, default: nil
   attr :lines, :list, default: ["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]
   attr :trailing_class, :any, default: nil
 
   def skeleton_list_row(assigns) do
     ~H"""
-    <div class={@class}>
+    <div class={["flex items-center gap-3", @class]}>
       <.skeleton_block :if={@leading_class} class={@leading_class} />
       <div class="flex-1 space-y-2">
         <.skeleton_block :for={line <- @lines} class={line} />
