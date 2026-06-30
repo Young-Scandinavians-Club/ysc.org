@@ -347,10 +347,7 @@ defmodule YscWeb.AdminNewslettersLive do
           </div>
 
           <%!-- Editions content --%>
-          <.admin_flop_loading_state
-            :if={is_nil(@meta)}
-            message="Loading editions…"
-          />
+          <.admin_table_skeleton :if={is_nil(@meta)} rows={6} columns={4} />
 
           <div :if={@meta} class="space-y-6">
             <%!-- Mobile Card View --%>
@@ -597,12 +594,11 @@ defmodule YscWeb.AdminNewslettersLive do
           </div>
 
           <%!-- Subscribers content --%>
-          <div
+          <.admin_table_skeleton
             :if={subscribers_loading?(@sub_meta)}
-            class="py-12 flex justify-center"
-          >
-            <.spinner />
-          </div>
+            rows={6}
+            columns={4}
+          />
 
           <div :if={!subscribers_loading?(@sub_meta)}>
             <%!-- Mobile card view --%>

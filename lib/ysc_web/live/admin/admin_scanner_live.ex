@@ -31,12 +31,24 @@ defmodule YscWeb.AdminScannerLive do
           </.link>
         </div>
 
-        <div :if={!@data_loaded?} class="py-16 text-center">
-          <.icon
-            name="hero-arrow-path"
-            class="w-8 h-8 text-zinc-400 animate-spin mx-auto mb-3"
-          />
-          <p class="text-zinc-500 font-medium">Loading sessions…</p>
+        <div
+          :if={!@data_loaded?}
+          id="scanner-sessions-loading"
+          class="space-y-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading sessions…</span>
+          <div
+            :for={_ <- 1..4}
+            class="bg-white border border-zinc-200 rounded-lg p-4 space-y-2"
+          >
+            <div class="flex items-center justify-between">
+              <.skeleton_block class="h-4 w-40 rounded" />
+              <.skeleton_block class="h-5 w-16 rounded-full" />
+            </div>
+            <.skeleton_block class="h-3 w-24 rounded" />
+          </div>
         </div>
 
         <.admin_icon_empty_state
@@ -151,12 +163,26 @@ defmodule YscWeb.AdminScannerLive do
       role={@admin_role}
     >
       <div class="py-6">
-        <div :if={!@data_loaded?} class="py-16 text-center">
-          <.icon
-            name="hero-arrow-path"
-            class="w-8 h-8 text-zinc-400 animate-spin mx-auto mb-3"
-          />
-          <p class="text-zinc-500 font-medium">Loading session…</p>
+        <div
+          :if={!@data_loaded?}
+          id="scanner-session-detail-loading"
+          class="space-y-6"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading session…</span>
+          <div class="flex items-center gap-2 mb-6">
+            <.skeleton_block class="h-5 w-5 rounded shrink-0" />
+            <.skeleton_block class="h-7 w-64 rounded" />
+          </div>
+          <.skeleton_block class="h-4 w-80 rounded mb-6" />
+          <div class="divide-y divide-zinc-100 border-t border-zinc-100">
+            <.skeleton_list_row
+              :for={_ <- 1..5}
+              class="py-4"
+              lines={["h-4 w-1/3 rounded", "h-3 w-1/2 rounded"]}
+            />
+          </div>
         </div>
 
         <div :if={@data_loaded?}>

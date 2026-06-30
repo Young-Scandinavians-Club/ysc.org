@@ -32,10 +32,11 @@ defmodule YscWeb.UserTicketsLive do
           :if={@loading_user_tickets}
           id="user-tickets-loading"
           class="grid grid-cols-1 lg:grid-cols-2 gap-8"
+          role="status"
+          aria-live="polite"
         >
-          <div class="lg:col-span-2 text-center py-16">
-            <p class="text-zinc-600 text-sm font-medium">Loading your tickets…</p>
-          </div>
+          <span class="sr-only">Loading your tickets…</span>
+          <.ticket_order_card_skeleton :for={_ <- 1..2} />
         </div>
 
         <div

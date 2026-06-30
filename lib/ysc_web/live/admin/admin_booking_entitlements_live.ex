@@ -342,7 +342,23 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
                 <th class="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-zinc-100">
+            <tbody
+              :if={@loading_outstanding_entitlements?}
+              id="entitlements-org-loading"
+              role="status"
+              aria-live="polite"
+            >
+              <tr :for={_ <- 1..5}>
+                <td class="px-4 py-3" colspan="7">
+                  <span class="sr-only">Loading entitlements…</span>
+                  <.skeleton_block class="h-4 w-full rounded" />
+                </td>
+              </tr>
+            </tbody>
+            <tbody
+              :if={!@loading_outstanding_entitlements?}
+              class="divide-y divide-zinc-100"
+            >
               <tr :for={ent <- @outstanding_entitlements} class="hover:bg-zinc-50">
                 <td class="px-4 py-3">
                   <.link
@@ -393,12 +409,6 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               </tr>
             </tbody>
           </table>
-          <.admin_table_message
-            :if={@loading_outstanding_entitlements?}
-            id="entitlements-loading"
-          >
-            Loading entitlements…
-          </.admin_table_message>
           <.admin_table_message
             :if={
               !@loading_outstanding_entitlements? and

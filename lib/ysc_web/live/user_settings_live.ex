@@ -1216,16 +1216,10 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                     </div>
 
-                    <div
+                    <.payment_method_row_skeleton
                       :if={@loading_payment_methods}
-                      class="flex items-center gap-3 py-3"
-                    >
-                      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600">
-                      </div>
-                      <span class="text-sm text-zinc-500">
-                        Loading payment methods...
-                      </span>
-                    </div>
+                      id="membership-payment-method-loading"
+                    />
 
                     <%!-- No payment method: dashed "add" prompt --%>
                     <.link
@@ -1653,14 +1647,10 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                     </div>
 
-                    <div
+                    <.payment_method_row_skeleton
                       :if={@loading_payment_methods}
-                      class="flex items-center gap-3 py-3"
-                    >
-                      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600">
-                      </div>
-                      <span class="text-sm text-zinc-500">Loading...</span>
-                    </div>
+                      id="change-payment-method-loading"
+                    />
 
                     <.link
                       :if={
@@ -1855,11 +1845,23 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
               </div>
 
-              <.async_section_loader
+              <div
                 :if={@loading_notification_preferences}
                 id="notification-preferences-loading"
-                label="Loading notification preferences…"
-              />
+                class="overflow-x-auto rounded-lg border border-zinc-200 divide-y divide-zinc-100"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="sr-only">Loading notification preferences…</span>
+                <div :for={_ <- 1..4} class="flex items-center gap-4 px-6 py-4">
+                  <div class="flex-1 space-y-2">
+                    <.skeleton_block class="h-4 w-40 rounded" />
+                    <.skeleton_block class="h-3 w-64 rounded" />
+                  </div>
+                  <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                  <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                </div>
+              </div>
 
               <.simple_form
                 :if={!@loading_notification_preferences}
@@ -2179,11 +2181,15 @@ defmodule YscWeb.UserSettingsLive do
               <!-- Loading state for payments -->
               <div
                 :if={assigns[:loading_payments]}
-                class="flex items-center justify-center py-12"
+                id="payment-history-loading"
+                role="status"
+                aria-live="polite"
               >
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600">
+                <span class="sr-only">Loading payment history…</span>
+                <div class="flex flex-wrap gap-2 pb-4 border-b border-zinc-200">
+                  <.skeleton_block :for={_ <- 1..4} class="h-9 w-20 rounded-full" />
                 </div>
-                <span class="ml-3 text-zinc-600">Loading payment history...</span>
+                <.table_skeleton rows={5} columns={4} class="mt-4" />
               </div>
               <!-- Filter Chips (hidden while loading) -->
               <div :if={!assigns[:loading_payments]}>

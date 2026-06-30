@@ -314,12 +314,11 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :orders} class="max-w-full py-8 px-2">
           <h2 class="text-xl font-semibold text-zinc-800 mb-4">Ticket Orders</h2>
-          <div
+          <.admin_table_skeleton
             :if={@ticket_orders_meta == nil}
-            class="text-zinc-400 text-sm py-8 text-center"
-          >
-            Loading...
-          </div>
+            rows={6}
+            columns={6}
+          />
           <div :if={@ticket_orders_meta != nil} class="w-full">
             <Flop.Phoenix.table
               id="user_ticket_orders_list"
@@ -407,12 +406,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
         <div :if={@live_action == :bookings} class="max-w-full py-8 px-2">
           <h2 class="text-xl font-semibold text-zinc-800 mb-4">Bookings</h2>
-          <div
-            :if={@bookings_meta == nil}
-            class="text-zinc-400 text-sm py-8 text-center"
-          >
-            Loading...
-          </div>
+          <.admin_table_skeleton :if={@bookings_meta == nil} rows={6} columns={6} />
           <div :if={@bookings_meta != nil} class="w-full">
             <Flop.Phoenix.table
               id="user_bookings_list"
@@ -637,7 +631,23 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <th class="px-4 py-3"></th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-100">
+                <tbody
+                  :if={@booking_entitlements_loading?}
+                  id="booking-entitlements-loading"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <.table_rows_skeleton
+                    rows={3}
+                    colspan={6}
+                    label="Loading entitlements…"
+                    padding_class="px-4 py-3"
+                  />
+                </tbody>
+                <tbody
+                  :if={!@booking_entitlements_loading?}
+                  class="divide-y divide-zinc-100"
+                >
                   <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
                     <td class="px-4 py-3">
                       <span class="font-medium text-zinc-800">
@@ -682,7 +692,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </tbody>
               </table>
               <p
-                :if={@booking_entitlements == []}
+                :if={!@booking_entitlements_loading? && @booking_entitlements == []}
                 class="px-4 py-6 text-center text-zinc-500 text-sm"
               >
                 No entitlements yet for this member.
@@ -1520,14 +1530,23 @@ defmodule YscWeb.AdminUserDetailsLive do
                 Notifications
               </h2>
               <div class="w-full">
+                <.admin_table_skeleton
+                  :if={@notifications_loading?}
+                  rows={5}
+                  columns={4}
+                />
+
                 <div
-                  :if={length(@notifications) == 0}
+                  :if={!@notifications_loading? && length(@notifications) == 0}
                   class="text-sm text-zinc-600 py-8"
                 >
                   <p>No notifications found for this user.</p>
                 </div>
 
-                <div :if={length(@notifications) > 0} class="overflow-x-auto">
+                <div
+                  :if={!@notifications_loading? && length(@notifications) > 0}
+                  class="overflow-x-auto"
+                >
                   <table class="min-w-full divide-y divide-zinc-200">
                     <thead class="bg-zinc-50">
                       <tr>
@@ -2237,6 +2256,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:ticket_orders_meta, nil)
       |> assign(:bookings_meta, nil)
       |> assign(:notifications, [])
+      |> assign(:notifications_loading?, true)
       |> assign(:selected_notification, nil)
       |> assign(:panel_width, nil)
       |> assign(:is_treasurer, is_treasurer)
@@ -2266,6 +2286,7 @@ defmodule YscWeb.AdminUserDetailsLive do
         to_form(override_rejection_changeset(%{}), as: "override")
       )
       |> assign(:booking_entitlements, [])
+      |> assign(:booking_entitlements_loading?, true)
       |> assign(:entitlement_form, entitlement_form_defaults())
       |> assign(form: user_form)
 
@@ -2361,6 +2382,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
             :bookings ->
               socket
+              |> assign(:booking_entitlements_loading?, true)
               |> stream(:bookings, [], reset: true)
               |> start_async(:load_bookings, fn ->
                 Bookings.list_user_bookings_paginated(user_id, params)
@@ -2372,7 +2394,9 @@ defmodule YscWeb.AdminUserDetailsLive do
             :notifications ->
               user_email = socket.assigns.selected_user.email
 
-              start_async(socket, :load_notifications, fn ->
+              socket
+              |> assign(:notifications_loading?, true)
+              |> start_async(:load_notifications, fn ->
                 Messages.list_user_messages(user_id,
                   limit: 100,
                   email: user_email
@@ -2469,7 +2493,10 @@ defmodule YscWeb.AdminUserDetailsLive do
   end
 
   def handle_async(:load_booking_entitlements, {:ok, list}, socket) do
-    {:noreply, assign(socket, :booking_entitlements, list)}
+    {:noreply,
+     socket
+     |> assign(:booking_entitlements, list)
+     |> assign(:booking_entitlements_loading?, false)}
   end
 
   def handle_async(:load_booking_entitlements, {:exit, reason}, socket) do
@@ -2477,16 +2504,19 @@ defmodule YscWeb.AdminUserDetailsLive do
       error: inspect(reason)
     )
 
-    {:noreply, socket}
+    {:noreply, assign(socket, :booking_entitlements_loading?, false)}
   end
 
   def handle_async(:load_notifications, {:ok, notifications}, socket) do
-    {:noreply, assign(socket, :notifications, notifications)}
+    {:noreply,
+     socket
+     |> assign(:notifications, notifications)
+     |> assign(:notifications_loading?, false)}
   end
 
   def handle_async(:load_notifications, {:exit, reason}, socket) do
     Ysc.Logging.warning("Failed to load notifications", error: inspect(reason))
-    {:noreply, socket}
+    {:noreply, assign(socket, :notifications_loading?, false)}
   end
 
   def handle_async(:load_bank_accounts, {:ok, bank_accounts}, socket) do

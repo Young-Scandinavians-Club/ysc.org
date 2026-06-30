@@ -1220,7 +1220,27 @@ defmodule YscWeb.AdminMoneyLive do
         collapsed?={@sections_collapsed.accounts}
         content_variant={:padded}
       >
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          :if={!@sections_loaded.accounts}
+          id="account-balances-loading"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading account balances…</span>
+          <div :for={_ <- 1..6} class="bg-white p-4 rounded border space-y-3">
+            <div class="flex justify-between items-start">
+              <.skeleton_block class="h-4 w-28 rounded" />
+              <.skeleton_block class="h-5 w-20 rounded" />
+            </div>
+            <.skeleton_block class="h-3 w-full rounded" />
+            <.skeleton_block class="h-6 w-24 rounded" />
+          </div>
+        </div>
+        <div
+          :if={@sections_loaded.accounts}
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
           <div
             :for={account_data <- @accounts_with_balances}
             class="bg-white p-4 rounded border"
@@ -1279,7 +1299,22 @@ defmodule YscWeb.AdminMoneyLive do
               </th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-zinc-200">
+          <tbody
+            :if={!@sections_loaded.payments}
+            id="recent-payments-loading"
+            role="status"
+            aria-live="polite"
+          >
+            <.table_rows_skeleton
+              rows={5}
+              colspan={7}
+              label="Loading recent payments…"
+            />
+          </tbody>
+          <tbody
+            :if={@sections_loaded.payments}
+            class="bg-white divide-y divide-zinc-200"
+          >
             <tr :for={payment <- @recent_payments}>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
                 {payment.reference_id}

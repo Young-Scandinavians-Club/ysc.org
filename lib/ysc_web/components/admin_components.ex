@@ -574,7 +574,9 @@ defmodule YscWeb.AdminComponents do
   @doc """
   Centered spinner shown while Flop list `@meta` is still loading (async assign).
 
-  Pair with `<div :if={@meta}>` for the loaded table content.
+  Pair with `<div :if={@meta}>` for the loaded table content. Prefer
+  `<.admin_table_skeleton>` instead for list/table pages where the column layout
+  is already known — it better matches the loaded shape and reduces layout shift.
   """
   attr :message, :string, required: true
 
@@ -584,13 +586,46 @@ defmodule YscWeb.AdminComponents do
 
   def admin_flop_loading_state(assigns) do
     ~H"""
-    <div class={["py-16 text-center", @class]}>
+    <div class={["py-16 text-center", @class]} role="status" aria-live="polite">
       <.icon
         name="hero-arrow-path"
         class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
+        aria-hidden="true"
       />
       <p class="text-zinc-500 font-medium">{@message}</p>
     </div>
+    """
+  end
+
+  # ---------------------------------------------------------------------------
+  # admin_table_skeleton
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Thin admin-namespaced alias for `YscWeb.CoreComponents.table_skeleton/1`, kept
+  so admin list pages can keep using the `admin_*` naming convention.
+
+  ## Examples
+
+      <.admin_table_skeleton :if={is_nil(@meta)} rows={8} columns={5} />
+  """
+  attr :id, :string, default: nil
+
+  attr :rows, :integer,
+    default: 6,
+    doc: "Number of shimmer rows/cards to render"
+
+  attr :columns, :integer,
+    default: 4,
+    doc: "Number of shimmer cells per desktop row"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the outer container"
+
+  def admin_table_skeleton(assigns) do
+    ~H"""
+    <.table_skeleton id={@id} rows={@rows} columns={@columns} class={@class} />
     """
   end
 

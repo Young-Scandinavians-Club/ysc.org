@@ -473,9 +473,15 @@ defmodule YscWeb.BookingChangeLive do
         <div
           :if={!@change_data_loaded?}
           id="change-data-loading"
-          class="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600"
+          class="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600"
+          role="status"
+          aria-live="polite"
         >
-          Loading availability and price preview…
+          <.icon
+            name="hero-arrow-path"
+            class="w-4 h-4 shrink-0 text-blue-600 animate-spin"
+            aria-hidden="true"
+          /> Loading availability and price preview…
         </div>
 
         <.form
@@ -523,7 +529,13 @@ defmodule YscWeb.BookingChangeLive do
               checkout_date_tooltips={@checkout_date_tooltips}
             />
             <%= if @checkin_date_tooltips_loading? do %>
-              <p class="mt-2 text-xs text-zinc-500">Loading available dates…</p>
+              <p class="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+                <.icon
+                  name="hero-arrow-path"
+                  class="w-3 h-3 shrink-0 animate-spin"
+                  aria-hidden="true"
+                /> Loading available dates…
+              </p>
             <% end %>
           </div>
 

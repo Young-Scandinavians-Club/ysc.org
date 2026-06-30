@@ -560,15 +560,31 @@ defmodule YscWeb.AdminDashboardLive do
               </.link>
             </div>
 
+            <div
+              :if={@loading_dashboard}
+              id="dashboard-events-timeline-loading"
+              class="space-y-4"
+              role="status"
+              aria-live="polite"
+            >
+              <span class="sr-only">Loading upcoming events…</span>
+              <.skeleton_list_row
+                :for={_ <- 1..3}
+                class="flex items-start gap-3"
+                leading_class="h-3 w-3 rounded-full mt-1.5 shrink-0"
+                lines={["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]}
+              />
+            </div>
+
             <.admin_icon_empty_state
-              :if={Enum.empty?(@events_with_tickets)}
+              :if={!@loading_dashboard && Enum.empty?(@events_with_tickets)}
               variant={:dashed}
               icon="hero-calendar"
               title="No upcoming events"
             />
 
             <ul
-              :if={not Enum.empty?(@events_with_tickets)}
+              :if={!@loading_dashboard && not Enum.empty?(@events_with_tickets)}
               class="relative border-l-2 border-zinc-200 ml-2.5 sm:ml-3 space-y-0"
             >
               <li
@@ -983,8 +999,19 @@ defmodule YscWeb.AdminDashboardLive do
           </.link>
         </div>
 
+        <div
+          :if={@loading_dashboard}
+          id="dashboard-pending-applications-loading"
+          class="space-y-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading pending applications…</span>
+          <.skeleton_block :for={_ <- 1..2} class="h-16 w-full rounded-lg" />
+        </div>
+
         <.admin_icon_empty_state
-          :if={Enum.empty?(@pending_users)}
+          :if={!@loading_dashboard && Enum.empty?(@pending_users)}
           variant={:dashed}
           icon="hero-check-circle"
           title="No pending applications"
@@ -992,7 +1019,10 @@ defmodule YscWeb.AdminDashboardLive do
           icon_class="w-7 h-7 text-zinc-200 mx-auto mb-2"
         />
 
-        <div :if={not Enum.empty?(@pending_users)} class="space-y-3">
+        <div
+          :if={!@loading_dashboard && not Enum.empty?(@pending_users)}
+          class="space-y-3"
+        >
           <div
             :for={user <- Enum.take(@pending_users, 3)}
             class={[
@@ -1059,13 +1089,32 @@ defmodule YscWeb.AdminDashboardLive do
             View all posts
           </.link>
         </div>
+        <div
+          :if={@loading_dashboard}
+          id="dashboard-recent-discussions-loading"
+          class="space-y-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading recent discussions…</span>
+          <div
+            :for={_ <- 1..3}
+            class="space-y-2 border-b border-zinc-100 pb-3 last:border-0 last:pb-0"
+          >
+            <.skeleton_block class="h-3 w-1/3 rounded" />
+            <.skeleton_block class="h-4 w-full rounded" />
+          </div>
+        </div>
         <p
-          :if={Enum.empty?(@latest_comments)}
+          :if={!@loading_dashboard && Enum.empty?(@latest_comments)}
           class="text-xs text-zinc-400 italic py-1"
         >
           No new comments to moderate
         </p>
-        <ul :if={not Enum.empty?(@latest_comments)} class="space-y-3">
+        <ul
+          :if={!@loading_dashboard && not Enum.empty?(@latest_comments)}
+          class="space-y-3"
+        >
           <li
             :for={comment <- @latest_comments}
             class="border-b border-zinc-100 pb-3 last:border-0 last:pb-0"

@@ -2339,13 +2339,12 @@ defmodule YscWeb.AdminBookingsLive do
                 clear_event="clear-reservation-search"
               />
             </div>
-            <div
+            <.admin_table_skeleton
               :if={is_nil(@reservation_meta)}
               id="reservations-loading"
-              class="py-16 text-center text-sm text-zinc-500"
-            >
-              Loading reservations…
-            </div>
+              rows={8}
+              columns={6}
+            />
             <div :if={@reservation_meta} class="py-6 w-full overflow-x-auto">
               <Flop.Phoenix.table
                 id="admin_reservations_list"

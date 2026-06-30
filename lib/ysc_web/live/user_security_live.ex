@@ -384,11 +384,25 @@ defmodule YscWeb.UserSecurityLive do
                 </div>
               </div>
 
-              <.async_section_loader
+              <div
                 :if={@passkeys_loading}
                 id="user-security-passkeys-loading"
-                label="Loading passkeys..."
-              />
+                class="space-y-3"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="sr-only">Loading passkeys…</span>
+                <.skeleton_list_row
+                  :for={_ <- 1..2}
+                  class="flex items-center justify-between p-4 border border-zinc-200 rounded-lg"
+                  lines={[
+                    "h-4 w-40 rounded",
+                    "h-3 w-32 rounded",
+                    "h-3 w-28 rounded"
+                  ]}
+                  trailing_class="h-8 w-20 rounded"
+                />
+              </div>
 
               <div
                 :if={@passkeys_loaded && @passkeys == []}
@@ -519,11 +533,23 @@ defmodule YscWeb.UserSecurityLive do
                 Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out other sessions.
               </p>
 
-              <.async_section_loader
+              <div
                 :if={@login_history_loading}
                 id="user-security-login-history-loading"
-                label="Loading activity..."
-              />
+                class="space-y-3"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="sr-only">Loading activity…</span>
+                <div
+                  :for={_ <- 1..3}
+                  class="p-4 border border-zinc-200 rounded-lg space-y-2"
+                >
+                  <.skeleton_block class="h-3 w-24 rounded-md" />
+                  <.skeleton_block class="h-4 w-48 rounded" />
+                  <.skeleton_block class="h-3 w-36 rounded" />
+                </div>
+              </div>
 
               <div
                 :if={!@login_history_loading && @login_history == []}

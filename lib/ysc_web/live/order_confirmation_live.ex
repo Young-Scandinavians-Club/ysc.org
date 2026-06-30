@@ -103,9 +103,47 @@ defmodule YscWeb.OrderConfirmationLive do
     <div
       :if={@loading_order_confirmation}
       id="order-confirmation-loading"
-      class="py-16 max-w-screen-xl mx-auto px-4 text-center"
+      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      role="status"
+      aria-live="polite"
     >
-      <p class="text-zinc-600 text-sm font-medium">Loading order confirmation…</p>
+      <span class="sr-only">Loading order confirmation…</span>
+      <!-- Header skeleton -->
+      <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-100 pb-8">
+        <div class="space-y-3">
+          <.skeleton_block class="h-3 w-32 rounded" />
+          <.skeleton_block class="h-9 w-80 rounded" />
+          <.skeleton_block class="h-4 w-64 rounded" />
+        </div>
+        <div class="space-y-2 md:text-right">
+          <.skeleton_block class="h-3 w-28 rounded md:ml-auto" />
+          <.skeleton_block class="h-5 w-24 rounded md:ml-auto" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <!-- Left Column skeleton -->
+        <div class="lg:col-span-2 space-y-8">
+          <div class="bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden">
+            <.skeleton_block class="h-48 w-full rounded-none" />
+            <div class="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div :for={_ <- 1..3} class="space-y-2">
+                <.skeleton_block class="h-3 w-16 rounded" />
+                <.skeleton_block class="h-5 w-24 rounded" />
+              </div>
+            </div>
+          </div>
+          <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+            <.skeleton_block :for={_ <- 1..2} class="h-20 w-full rounded-lg" />
+          </div>
+        </div>
+        <!-- Right Column skeleton -->
+        <aside class="space-y-6">
+          <.payment_summary_skeleton />
+          <.skeleton_block class="h-12 w-full rounded-lg" />
+          <.skeleton_block class="h-12 w-full rounded-lg" />
+        </aside>
+      </div>
     </div>
     <div
       :if={!@loading_order_confirmation}
