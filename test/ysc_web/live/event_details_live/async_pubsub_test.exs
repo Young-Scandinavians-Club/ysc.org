@@ -507,6 +507,94 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
     end
   end
 
+  describe "attendee list refresh on availability updates (#613)" do
+    defp confirmed_ticket(event, tier, user) do
+      %Ticket{
+        event_id: event.id,
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.utc_now()
+          |> DateTime.add(365, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+    end
+
+    defp trigger_availability_refresh(view, event_id) do
+      send(view.pid, {:refresh_ticket_availability, event_id})
+      render(view)
+    end
+
+    defp attendee_assigns(view) do
+      :sys.get_state(view.pid).socket.assigns
+    end
+
+    test "availability refresh without sold-count change keeps attendees list",
+         %{conn: conn, user: user} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      buyer = user_with_membership(:lifetime)
+      confirmed_ticket(event, tier, buyer)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assigns_before = attendee_assigns(view)
+      count_before = assigns_before.attendees_count
+      sold_before = assigns_before.attendee_sold_ticket_count
+      assert count_before != nil
+      assert sold_before == 1
+
+      expires_at =
+        DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 1, :day)
+
+      %TicketReservation{}
+      |> TicketReservation.changeset(%{
+        ticket_tier_id: tier.id,
+        user_id: user.id,
+        created_by_id: user.id,
+        quantity: 1,
+        expires_at: expires_at
+      })
+      |> Repo.insert!()
+
+      trigger_availability_refresh(view, event.id)
+
+      assigns_after = attendee_assigns(view)
+      assert assigns_after.attendees_count == count_before
+      assert assigns_after.attendee_sold_ticket_count == sold_before
+    end
+
+    test "availability refresh reloads attendees when sold count increases",
+         %{conn: conn} do
+      event = event_with_tickets(tier_count: 1, state: :upcoming)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assigns_before = attendee_assigns(view)
+      count_before = assigns_before.attendees_count
+      sold_before = assigns_before.attendee_sold_ticket_count
+      assert count_before != nil
+      assert sold_before == 0
+
+      new_buyer = user_with_membership(:lifetime)
+      confirmed_ticket(event, tier, new_buyer)
+
+      trigger_availability_refresh(view, event.id)
+
+      assigns_after = attendee_assigns(view)
+      assert assigns_after.attendees_count == count_before + 1
+      assert assigns_after.attendee_sold_ticket_count == sold_before + 1
+    end
+  end
+
   describe "real-time UI updates" do
     test "updates ticket counts in real-time", %{conn: conn} do
       event = event_with_tickets(tier_count: 1, state: :upcoming)
