@@ -483,6 +483,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
         assert redirect_path == "/bookings/checkout/#{booking.id}"
         assert flash["error"] =~ "Payment failed"
+        assert flash["error"] =~ "info@ysc.org"
       after
         Application.put_env(:ysc, :stripe_client, original_client)
         Process.delete(:test_metadata)
@@ -588,6 +589,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
         assert redirect_path == "/events/#{event.id}"
         assert flash["error"] =~ "Payment failed"
+        assert flash["error"] =~ "info@ysc.org"
       after
         Application.put_env(:ysc, :stripe_client, original_client)
         Process.delete(:test_metadata)

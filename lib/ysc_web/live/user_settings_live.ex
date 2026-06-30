@@ -4074,7 +4074,7 @@ defmodule YscWeb.UserSettingsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Failed to create payment account. Please try again or contact support.",
+         "Failed to create payment account. Please try again, or contact us at info@ysc.org if this continues.",
          title: "Payment"
        )
        |> assign(:show_new_payment_form, false)}
@@ -6063,7 +6063,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Invoice not found. Please contact support if this issue persists.",
+             "Invoice not found. Please use the link from your email, or contact info@ysc.org if this persists.",
              title: "Invoice"
            )}
 
@@ -6115,7 +6115,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, contact support.",
+             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, email info@ysc.org.",
              title: "Invoice"
            )}
       end
@@ -6127,7 +6127,7 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "Invalid invoice ID. Please use the link from your email or contact support.",
+       "Invalid invoice ID. Please use the link from your email or contact info@ysc.org for help.",
        title: "Invoice"
      )}
   end
