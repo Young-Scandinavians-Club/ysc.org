@@ -4012,12 +4012,7 @@ defmodule YscWeb.EventDetailsLive do
         query_params["resume_order"] ||
         query_params[:resume_order]
 
-    redirect_status =
-      query_params["redirect_status"] || query_params[:redirect_status]
-
-    payment_failed_return? =
-      query_params["payment_failed"] == "1" ||
-        redirect_status in ["failed", "canceled"]
+    payment_failed_return? = query_params["payment_failed"] == "1"
 
     socket =
       if connected?(socket) do

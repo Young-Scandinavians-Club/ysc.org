@@ -345,8 +345,16 @@ defmodule YscWeb.PaymentSuccessLive do
             # Redirect to event page with error — open ticket selection
             case verify_ticket_order_access(ticket_order_id, user) do
               {:ok, event_id} ->
-                release_failed_ticket_order(payment_intent_id, redirect_status)
-                {:ok, ~p"/events/#{event_id}?payment_failed=1"}
+                case release_failed_ticket_order(
+                       payment_intent_id,
+                       redirect_status
+                     ) do
+                  :ok ->
+                    {:ok, ~p"/events/#{event_id}?payment_failed=1"}
+
+                  {:error, reason} ->
+                    {:error, {:ticket_order_release_failed, reason}}
+                end
 
               error ->
                 error
@@ -411,7 +419,7 @@ defmodule YscWeb.PaymentSuccessLive do
           error: reason
         )
 
-        :ok
+        {:error, reason}
     end
   end
 
