@@ -511,6 +511,24 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       assert html =~ "Retry Payment Now"
     end
 
+    test "renders invoice reference when invoice_id is present", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+        membership_type: "Single",
+        is_renewal: true,
+        pay_membership_url: "https://example.com/users/membership",
+        invoice_id: "in_123",
+        retry_payment_url:
+          "https://example.com/users/membership?retry_invoice=in_123"
+      }
+
+      html = MembershipPaymentFailure.render(assigns)
+      assert html =~ "in_123"
+      assert html =~ user.email
+    end
+
     test "prepare_email_data with renewal and invoice" do
       user = user_fixture()
 

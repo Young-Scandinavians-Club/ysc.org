@@ -6114,7 +6114,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Invoice not found. Please contact support if this issue persists.",
+             retry_invoice_link_help_message(),
              title: "Invoice"
            )}
 
@@ -6141,7 +6141,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This invoice cannot be paid in its current state. Please update your payment method and try again.",
+             retry_invoice_link_help_message(),
              title: "Invoice"
            )}
 
@@ -6178,9 +6178,13 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "This payment link didn't work — it may have expired. Go to Membership in your account settings to update your card and try again, or email memberships@ysc.org for help.",
+       retry_invoice_link_help_message(),
        title: "Invoice"
      )}
+  end
+
+  defp retry_invoice_link_help_message do
+    "This payment link didn't work — it may have expired. Go to Membership in your account settings to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
   end
 
   defp subscription_items_contain_price?(subscription, price_id) do

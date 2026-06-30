@@ -786,7 +786,7 @@ defmodule YscWeb.UserBookingDetailLive do
       socket
       |> assign(:booking, updated_booking)
       |> assign(:refund_info, refund_info)
-      |> assign(:can_cancel, false)
+      |> assign(:can_cancel, BookingActions.can_cancel_booking?(updated_booking))
     else
       socket
     end
