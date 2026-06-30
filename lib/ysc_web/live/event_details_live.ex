@@ -3531,6 +3531,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:attendees_preview_count, @attendees_preview_count)
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
+    |> assign(:preserve_failed_checkout_state, false)
     |> assign(:stripe_payment_element_ready, false)
     # Reservations - will be loaded async
     |> assign(:user_reservations, [])
@@ -4020,15 +4021,20 @@ defmodule YscWeb.EventDetailsLive do
         cond do
           payment_failed_return? && socket.assigns.current_user ->
             socket
-            |> assign(:show_payment_modal, false)
+            |> assign(:show_payment_modal, true)
             |> assign(:checkout_expired, false)
-            |> assign(:checkout_payment_failed, false)
+            |> assign(:checkout_payment_failed, true)
             |> assign(:stripe_payment_element_ready, false)
-            |> assign(:show_ticket_modal, true)
+            |> assign(:show_ticket_modal, false)
             |> assign(:payment_intent, nil)
             |> assign(:ticket_order, nil)
             |> clear_selected_tickets()
+            |> assign(:preserve_failed_checkout_state, true)
             |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")
+
+          socket.assigns.preserve_failed_checkout_state ->
+            socket
+            |> assign(:preserve_failed_checkout_state, false)
 
           # If we have checkout step and order_id, restore that state
           checkout_step && order_id && socket.assigns.current_user ->
@@ -4960,7 +4966,8 @@ defmodule YscWeb.EventDetailsLive do
          |> assign(:stripe_payment_element_ready, false)
          |> assign(:payment_intent, nil)
          |> assign(:ticket_order, nil)
-         |> assign(:payment_redirect_in_progress, false)}
+         |> assign(:payment_redirect_in_progress, false)
+         |> clear_selected_tickets()}
       else
         {:noreply,
          socket
@@ -4974,16 +4981,7 @@ defmodule YscWeb.EventDetailsLive do
          |> clear_selected_tickets()}
       end
     else
-      # This is a different session, just clear the current state without showing expired message
-      {:noreply,
-       socket
-       |> assign(:show_payment_modal, false)
-       |> assign(:checkout_expired, false)
-       |> assign(:checkout_payment_failed, false)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)
-       |> clear_selected_tickets()}
+      {:noreply, socket}
     end
   end
 
@@ -6561,7 +6559,8 @@ defmodule YscWeb.EventDetailsLive do
 
   defp checkout_session_cancelled_matches?(socket, event) do
     same_ticket_order?(socket.assigns.ticket_order, event.ticket_order) ||
-      (payment_failure_cancellation?(event.reason) &&
+      (is_nil(socket.assigns.ticket_order) &&
+         payment_failure_cancellation?(event.reason) &&
          socket.assigns.show_payment_modal &&
          same_user_and_event?(socket, event))
   end

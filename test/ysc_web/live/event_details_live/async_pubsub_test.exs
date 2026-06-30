@@ -303,8 +303,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
 
       view = wait_for_async(view)
       assert has_element?(view, "#payment-modal")
-      assert render(view) =~ "Complete Your Purchase"
-      assert render(view) =~ order.reference_id
+      assert has_element?(view, "h2", "Complete Your Purchase")
+      assert has_element?(view, "#payment-modal", order.reference_id)
 
       cancelled_event = %CheckoutSessionCancelled{
         ticket_order: Repo.get!(TicketOrder, order.id),
@@ -320,9 +320,8 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
           {Ysc.Tickets, cancelled_event}
         )
 
-      html = render(view)
-      assert html =~ "Payment failed"
-      refute html =~ "Time ran out"
+      assert has_element?(view, "h2", "Payment failed")
+      refute has_element?(view, "h2", "Time ran out")
     end
 
     test "receives checkout session expired event", %{conn: conn, user: user} do
