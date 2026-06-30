@@ -20,6 +20,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
   import Mox
 
   alias Ysc.Bookings
@@ -69,7 +70,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "buyout checkout — Tahoe" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = buyout_stay_dates()
 
       %{
@@ -397,7 +398,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "buyout checkout — Clear Lake" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = buyout_stay_dates()
 
       %{
@@ -585,7 +586,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "room checkout — Tahoe" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = room_stay_dates()
 
       {:ok, category} =
@@ -831,7 +832,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "room checkout — Clear Lake" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = room_stay_dates()
 
       {:ok, category} =
@@ -1058,7 +1059,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
          %{
            conn: conn
          } do
-      user = user_fixture()
+      user = user_with_membership()
       conn = log_in_user(conn, user)
       {checkin, checkout} = room_stay_dates()
 
@@ -1135,7 +1136,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
          %{
            conn: conn
          } do
-      user = user_fixture()
+      user = user_with_membership()
       conn = log_in_user(conn, user)
       {checkin, checkout} = room_stay_dates()
 
