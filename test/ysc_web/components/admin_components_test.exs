@@ -380,4 +380,46 @@ defmodule YscWeb.AdminComponentsTest do
       assert html =~ "data-copy-feedback-label"
     end
   end
+
+  describe "admin_readonly_copy_field/1" do
+    test "renders readonly input and copy button with shared value" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_readonly_copy_field
+          id="share-url-input"
+          copy_button_id="copy-share-url-btn"
+          value="https://ysc.org/events/abc/photos"
+        />
+        """)
+
+      assert html =~ ~s(id="share-url-input")
+      assert html =~ ~s(readonly)
+      assert html =~ ~s(value="https://ysc.org/events/abc/photos")
+      assert html =~ ~s(id="copy-share-url-btn")
+      assert html =~ ~s(phx-hook="ClipboardCopy")
+      assert html =~ ~s(data-copy="https://ysc.org/events/abc/photos")
+      assert html =~ "Copy link"
+      assert html =~ "hero-clipboard"
+    end
+
+    test "supports custom label and input classes" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.admin_readonly_copy_field
+          id="custom-input"
+          copy_button_id="custom-copy-btn"
+          value="https://example.com"
+          label="Copy URL"
+          input_class="flex-1 font-mono text-xs"
+        />
+        """)
+
+      assert html =~ "Copy URL"
+      assert html =~ "font-mono text-xs"
+    end
+  end
 end
