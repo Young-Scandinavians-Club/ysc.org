@@ -3784,4 +3784,74 @@ defmodule Ysc.BookingsTest do
                Bookings.verify_booking_payment_intent(payment_intent, booking_b)
     end
   end
+
+  describe "verify_modification_redirect_payment_intent/2" do
+    test "accepts a modification intent for a complete booking with matching metadata" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :complete)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_mod_redirect_valid",
+        status: "succeeded",
+        amount: 5_000,
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id,
+          "modification" => "true"
+        }
+      }
+
+      assert :ok =
+               Bookings.verify_modification_redirect_payment_intent(
+                 payment_intent,
+                 booking
+               )
+    end
+
+    test "rejects modification intents on hold bookings" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_mod_redirect_hold",
+        status: "succeeded",
+        amount: 5_000,
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id,
+          "modification" => "true"
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_modification_redirect_payment_intent(
+                 payment_intent,
+                 booking
+               )
+    end
+
+    test "rejects modification intents bound to another booking" do
+      user_a = user_fixture()
+      user_b = user_fixture()
+      booking_a = booking_fixture(user_id: user_a.id, status: :complete)
+      booking_b = booking_fixture(user_id: user_b.id, status: :complete)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_mod_redirect_foreign",
+        status: "succeeded",
+        amount: 5_000,
+        metadata: %{
+          "booking_id" => booking_a.id,
+          "user_id" => user_a.id,
+          "modification" => "true"
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_modification_redirect_payment_intent(
+                 payment_intent,
+                 booking_b
+               )
+    end
+  end
 end

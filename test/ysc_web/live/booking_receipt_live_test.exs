@@ -1459,6 +1459,80 @@ defmodule YscWeb.BookingReceiptLiveTest do
              )
     end
 
+    test "rejects modification payment intent on another booking's hold receipt",
+         %{conn: conn} do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      hold_booking = booking_fixture(%{user_id: user.id, status: :hold})
+      complete_booking = booking_fixture(%{user_id: user.id, status: :complete})
+
+      payment_intent_id =
+        "pi_mod_wrong_receipt_#{System.unique_integer([:positive])}"
+
+      stripe_metadata = %{
+        "booking_id" => to_string(complete_booking.id),
+        "user_id" => to_string(user.id),
+        "modification" => "true"
+      }
+
+      module_name =
+        :"ReceiptModificationBypassStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: 5_000,
+                 metadata: unquote(Macro.escape(stripe_metadata)),
+                 latest_charge: %Stripe.Charge{id: "ch_#{id}"}
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{hold_booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}"
+        )
+
+      refute html =~ "Payment successful"
+      assert Repo.get!(Booking, hold_booking.id).status == :hold
+      refute Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
+    end
+
     test "applies paid modification after redirect-based Stripe payment", %{
       conn: conn
     } do
