@@ -204,6 +204,25 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Gets a ticket order for the post-checkout confirmation page.
+
+  Lighter than `get_user_ticket_order/2` — no event agendas; includes cover image,
+  payment method, and ticket registrations needed by the confirmation UI.
+  """
+  def get_user_ticket_order_for_confirmation(user_id, order_id) do
+    from(to in TicketOrder,
+      where: to.id == ^order_id and to.user_id == ^user_id,
+      preload: [
+        :user,
+        event: :cover_image,
+        payment: :payment_method,
+        tickets: [:ticket_tier, :registration]
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Returns `event_id` when the user owns the ticket order, otherwise `nil`.
 
   Use for redirect/authorization checks that do not need full order preloads.

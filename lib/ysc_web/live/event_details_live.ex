@@ -3338,12 +3338,20 @@ defmodule YscWeb.EventDetailsLive do
   def mount(%{"id" => id_or_ref}, _session, socket) do
     viewer = socket.assigns.current_user
 
-    # Support lookup by either ULID (id) or reference_id (e.g. "EVT-XXXX")
+    # LiveView calls mount twice (dead render, then WebSocket). Reuse event assigns
+    # from the dead render to avoid a second get_event + tier preload on connect.
+    connected_remount? =
+      connected?(socket) && Map.has_key?(socket.assigns, :event)
+
     event =
-      if String.starts_with?(id_or_ref, "EVT-") do
-        Events.get_event_for_page_by_reference(id_or_ref, viewer)
+      if connected_remount? do
+        socket.assigns.event
       else
-        Events.get_event_for_page(id_or_ref, viewer)
+        if String.starts_with?(id_or_ref, "EVT-") do
+          Events.get_event_for_page_by_reference(id_or_ref, viewer)
+        else
+          Events.get_event_for_page(id_or_ref, viewer)
+        end
       end
 
     case event do
@@ -3356,14 +3364,16 @@ defmodule YscWeb.EventDetailsLive do
       event ->
         event_id = event.id
 
-        # For disconnected mount: minimal data for fast static HTML
-        # For connected mount: full data loading via assign_async
         socket =
-          mount_minimal_assigns(socket, event, event_id)
-          |> assign(
-            :content_preview?,
-            event.state not in [:published, :cancelled]
-          )
+          if connected_remount? do
+            socket
+          else
+            mount_minimal_assigns(socket, event, event_id)
+            |> assign(
+              :content_preview?,
+              event.state not in [:published, :cancelled]
+            )
+          end
 
         if connected?(socket) do
           # Subscribe to real-time updates only when connected

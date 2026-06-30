@@ -5,7 +5,7 @@ defmodule YscWeb.OrderConfirmationLive do
 
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
-  alias Ysc.Tickets.TicketOrder
+  alias Ysc.Tickets
   alias Ysc.Tickets.DonationDisplay
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
@@ -26,71 +26,58 @@ defmodule YscWeb.OrderConfirmationLive do
        )
        |> redirect(to: ~p"/events")}
     else
-      # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-      # This ensures we only fetch orders that belong to the current user
-      # Show confetti only if confetti=true parameter is present (from checkout redirect)
       show_confetti = Map.get(params, "confetti") == "true"
 
-      # PERFORMANCE: Preload everything in a single query to avoid N+1 and duplicate queries
-      # - Include cover_image via event preload
-      # - Include registration via tickets preload
-      # This eliminates 3 separate queries (event, cover_image, registration)
-      case from(to in TicketOrder,
-             where: to.id == ^order_id and to.user_id == ^user.id,
-             preload: [
-               :user,
-               event: :cover_image,
-               payment: :payment_method,
-               tickets: [:ticket_tier, :registration]
-             ]
-           )
-           |> Repo.one() do
-        nil ->
-          {:ok,
-           socket
-           |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
-           |> redirect(to: ~p"/events")}
+      socket =
+        socket
+        |> assign(:loading_order_confirmation, true)
+        |> assign(:order_id, order_id)
+        |> assign(:show_confetti, show_confetti)
+        |> assign(:page_title, "Order Confirmation")
+        |> assign(
+          :meta_description,
+          "Your ticket order confirmation from Young Scandinavians Club."
+        )
 
-        ticket_order ->
-          # Use the already-preloaded event (no additional query needed)
-          event = ticket_order.event
-
-          # Essential assigns for initial render
-          socket =
-            socket
-            |> assign(:ticket_order, ticket_order)
-            |> assign(:event, event)
-            |> assign(:user_first_name, user.first_name || "Member")
-            |> assign(:event_in_past, event_in_past?(event))
-            |> assign(:show_confetti, show_confetti)
-            |> assign(:page_title, "Order Confirmation")
-            |> assign(
-              :meta_description,
-              "Your ticket order confirmation from Young Scandinavians Club."
-            )
-            # Placeholder for async-loaded data
-            |> assign(:refund_data, nil)
-            |> assign(
-              :payment_method_description,
-              payment_method_description_without_stripe(ticket_order.payment)
-            )
-            |> assign(
-              :payment_method_logo,
-              PaymentMethodLogo.path_for_payment(ticket_order.payment)
-            )
-            |> assign(
-              :donation_amounts_by_ticket_id,
-              DonationDisplay.amounts_by_ticket_id(ticket_order)
-            )
-            |> assign(:async_data_loaded, false)
-
-          if connected?(socket) do
-            # Load refund data asynchronously (only needed for cancelled orders with payments)
-            {:ok, load_order_data_async(socket, ticket_order)}
-          else
-            {:ok, socket}
-          end
+      if connected?(socket) do
+        {:ok, load_order_confirmation(socket, user, order_id)}
+      else
+        {:ok, socket}
       end
+    end
+  end
+
+  defp load_order_confirmation(socket, user, order_id) do
+    case Tickets.get_user_ticket_order_for_confirmation(user.id, order_id) do
+      nil ->
+        socket
+        |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
+        |> redirect(to: ~p"/events")
+
+      ticket_order ->
+        event = ticket_order.event
+
+        socket
+        |> assign(:loading_order_confirmation, false)
+        |> assign(:ticket_order, ticket_order)
+        |> assign(:event, event)
+        |> assign(:user_first_name, user.first_name || "Member")
+        |> assign(:event_in_past, event_in_past?(event))
+        |> assign(:refund_data, nil)
+        |> assign(
+          :payment_method_description,
+          payment_method_description_without_stripe(ticket_order.payment)
+        )
+        |> assign(
+          :payment_method_logo,
+          PaymentMethodLogo.path_for_payment(ticket_order.payment)
+        )
+        |> assign(
+          :donation_amounts_by_ticket_id,
+          DonationDisplay.amounts_by_ticket_id(ticket_order)
+        )
+        |> assign(:async_data_loaded, false)
+        |> load_order_data_async(ticket_order)
     end
   end
 
@@ -114,6 +101,14 @@ defmodule YscWeb.OrderConfirmationLive do
   def render(assigns) do
     ~H"""
     <div
+      :if={@loading_order_confirmation}
+      id="order-confirmation-loading"
+      class="py-16 max-w-screen-xl mx-auto px-4 text-center"
+    >
+      <p class="text-zinc-600 text-sm font-medium">Loading order confirmation…</p>
+    </div>
+    <div
+      :if={!@loading_order_confirmation}
       id="order-confirmation"
       phx-hook="Confetti"
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
