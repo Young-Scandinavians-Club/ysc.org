@@ -4642,6 +4642,81 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
+  defp maybe_refresh_open_checkout_payment_intent(socket) do
+    require Ysc.Logging
+
+    with true <- socket.assigns[:show_payment_modal],
+         %Ysc.Tickets.TicketOrder{status: :pending} = order <-
+           socket.assigns[:ticket_order],
+         user when not is_nil(user) <- socket.assigns[:current_user],
+         {:ok, synced_order} <- Ysc.Tickets.sync_pending_order_pricing(order) do
+      current_pi = socket.assigns[:payment_intent]
+      current_cents = current_pi && current_pi.amount
+      expected_cents = Ysc.MoneyHelper.money_to_cents(synced_order.total_amount)
+
+      cond do
+        current_cents == expected_cents ->
+          assign(socket, :ticket_order, synced_order)
+
+        Ysc.Tickets.pending_order_still_complimentary?(synced_order) ->
+          socket
+          |> assign(:show_payment_modal, false)
+          |> assign(:payment_intent, nil)
+          |> assign(:stripe_payment_element_ready, false)
+          |> assign(:ticket_order, synced_order)
+          |> YscWeb.Flash.put_toast(
+            :info,
+            "Ticket prices were updated. Please review your order before continuing.",
+            title: "Prices updated"
+          )
+
+        true ->
+          case retrieve_or_create_payment_intent(synced_order, user) do
+            {:ok, payment_intent} ->
+              updated_order = %{
+                synced_order
+                | payment_intent_id: payment_intent.id
+              }
+
+              Ysc.Logging.info(
+                "Refreshed checkout payment intent after tier repricing",
+                order_id: updated_order.id,
+                previous_amount_cents: current_cents,
+                new_amount_cents: payment_intent.amount
+              )
+
+              send(
+                self(),
+                {:remount_payment_modal, updated_order, payment_intent}
+              )
+
+              socket
+              |> assign(:show_payment_modal, false)
+              |> assign(:payment_intent, nil)
+              |> assign(:ticket_order, updated_order)
+              |> assign(:stripe_payment_element_ready, false)
+
+            {:error, reason} ->
+              Ysc.Logging.warning(
+                "Failed to refresh checkout payment intent after tier repricing",
+                order_id: synced_order.id,
+                reason: inspect(reason)
+              )
+
+              socket
+              |> assign(:ticket_order, synced_order)
+              |> YscWeb.Flash.put_toast(
+                :error,
+                "Ticket prices were updated but we couldn't refresh checkout. Please close and reopen checkout.",
+                title: "Checkout"
+              )
+          end
+      end
+    else
+      _ -> socket
+    end
+  end
+
   @impl true
   def handle_info(
         {Ysc.Events, %Ysc.MessagePassingEvents.EventAdded{event: _event}},
@@ -4708,7 +4783,10 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
+      socket
+      |> assign_ticket_tier_pricing_and_list(current_event_id)
+      |> maybe_refresh_open_checkout_payment_intent()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
@@ -4723,7 +4801,10 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
+      socket
+      |> assign_ticket_tier_pricing_and_list(current_event_id)
+      |> maybe_refresh_open_checkout_payment_intent()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
@@ -4738,10 +4819,31 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
+      socket
+      |> assign_ticket_tier_pricing_and_list(current_event_id)
+      |> maybe_refresh_open_checkout_payment_intent()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_info(
+        {:remount_payment_modal, ticket_order, payment_intent},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:show_payment_modal, true)
+     |> assign(:ticket_order, ticket_order)
+     |> assign(:payment_intent, payment_intent)
+     |> assign(:stripe_payment_element_ready, false)
+     |> YscWeb.Flash.put_toast(
+       :info,
+       "Ticket prices changed. Your total has been updated.",
+       title: "Prices updated"
+     )}
   end
 
   @impl true
