@@ -390,15 +390,17 @@ defmodule YscWeb.PaymentSuccessLive do
   end
 
   defp get_failure_message(redirect_status) do
+    contact_email = Ysc.EmailConfig.contact_email()
+
     case redirect_status do
       "failed" ->
-        "Payment failed. Please try again or contact support if the problem persists."
+        "Payment failed. Please try again, or email #{contact_email} if the problem persists."
 
       "canceled" ->
         "Payment was canceled. You can try again when you're ready."
 
       _ ->
-        "Payment was not successful. Please try again or contact support if the problem persists."
+        "Payment was not successful. Please try again, or email #{contact_email} if the problem persists."
     end
   end
 end

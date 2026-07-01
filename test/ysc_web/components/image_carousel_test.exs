@@ -15,6 +15,44 @@ defmodule YscWeb.Components.ImageCarouselTest do
     )
   end
 
+  describe "image_carousel_hero_background/1" do
+    test "renders autoplay wrapper with carousel and overlay" do
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &ImageCarousel.image_carousel_hero_background/1,
+          %{
+            wrapper_id: "hero-wrapper",
+            carousel_id: "hero-carousel",
+            images: [%{src: "/images/test.jpg", alt: "Test"}]
+          }
+        )
+
+      assert html =~ ~s(id="hero-wrapper")
+      assert html =~ ~s(phx-hook="ImageCarouselAutoplay")
+      assert html =~ "absolute inset-0 h-full w-full z-[2]"
+      assert html =~ "slide-hero-carousel-0"
+      assert html =~ "/images/test.jpg"
+      assert html =~ "bg-black/40"
+      assert html =~ ~s(aria-hidden="true")
+    end
+
+    test "supports custom overlay classes" do
+      html =
+        Phoenix.LiveViewTest.render_component(
+          &ImageCarousel.image_carousel_hero_background/1,
+          %{
+            wrapper_id: "hero-wrapper",
+            carousel_id: "hero-carousel",
+            images: [%{src: "/images/test.jpg", alt: "Test"}],
+            overlay_class: "absolute inset-0 bg-black/60"
+          }
+        )
+
+      assert html =~ "bg-black/60"
+      refute html =~ "bg-black/40"
+    end
+  end
+
   describe "image_carousel/1" do
     test "renders carousel with single image" do
       html =

@@ -70,7 +70,7 @@ defmodule YscWeb.AuthController do
       |> UserAuth.clear_reauth_session()
       |> YscWeb.Flash.put_toast(
         :error,
-        "Unable to retrieve email from your account. Please contact support.",
+        "Unable to retrieve email from your account. Please email #{Ysc.EmailConfig.contact_email()} for help.",
         title: "Authentication"
       )
       |> redirect(to: ~p"/users/log-in")
@@ -197,7 +197,7 @@ defmodule YscWeb.AuthController do
         conn
         |> YscWeb.Flash.put_toast(
           :error,
-          "Unable to sign in. Please try again or contact support.",
+          "Unable to sign in. Please try again, or email #{Ysc.EmailConfig.contact_email()} for help.",
           title: "Authentication"
         )
         |> redirect(to: ~p"/users/log-in")

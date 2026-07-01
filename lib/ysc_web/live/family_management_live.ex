@@ -481,6 +481,10 @@ defmodule YscWeb.FamilyManagementLive do
       <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
         With a Family or Lifetime membership, you can add family members to your account and invite them to share your member benefits.
       </p>
+      <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
+        <strong>How this works:</strong>
+        Add names to your family roster first. To give someone their own login and member benefits, send them an invite. After they accept, they appear under <strong>Linked family members</strong>.
+      </p>
       <%= if not @can_send_invite do %>
         <div class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p class="text-sm text-amber-800">

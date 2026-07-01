@@ -57,6 +57,7 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
       assert String.contains?(message, "123456")
       assert String.contains?(message, user.first_name)
       assert String.contains?(message, "[YSC]")
+      assert String.contains?(message, "info@ysc.org")
 
       assert TwoFactorVerification.get_template_name() ==
                "two_factor_verification"
