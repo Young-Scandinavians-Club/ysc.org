@@ -4572,7 +4572,8 @@ defmodule YscWeb.EventDetailsLive do
     require Ysc.Logging
 
     with true <- socket.assigns[:show_payment_modal],
-         %Ysc.Tickets.TicketOrder{status: :pending} = order <- socket.assigns[:ticket_order],
+         %Ysc.Tickets.TicketOrder{status: :pending} = order <-
+           socket.assigns[:ticket_order],
          user when not is_nil(user) <- socket.assigns[:current_user],
          {:ok, synced_order} <- Ysc.Tickets.sync_pending_order_pricing(order) do
       current_pi = socket.assigns[:payment_intent]
@@ -4598,7 +4599,10 @@ defmodule YscWeb.EventDetailsLive do
         true ->
           case retrieve_or_create_payment_intent(synced_order, user) do
             {:ok, payment_intent} ->
-              updated_order = %{synced_order | payment_intent_id: payment_intent.id}
+              updated_order = %{
+                synced_order
+                | payment_intent_id: payment_intent.id
+              }
 
               Ysc.Logging.info(
                 "Refreshed checkout payment intent after tier repricing",
@@ -4607,7 +4611,10 @@ defmodule YscWeb.EventDetailsLive do
                 new_amount_cents: payment_intent.amount
               )
 
-              send(self(), {:remount_payment_modal, updated_order, payment_intent})
+              send(
+                self(),
+                {:remount_payment_modal, updated_order, payment_intent}
+              )
 
               socket
               |> assign(:show_payment_modal, false)
@@ -4748,7 +4755,10 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   @impl true
-  def handle_info({:remount_payment_modal, ticket_order, payment_intent}, socket) do
+  def handle_info(
+        {:remount_payment_modal, ticket_order, payment_intent},
+        socket
+      ) do
     {:noreply,
      socket
      |> assign(:show_payment_modal, true)
