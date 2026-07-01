@@ -5,6 +5,7 @@ defmodule Ysc.TicketsTest do
   use Ysc.DataCase, async: true
 
   import Ecto.Query
+  alias Ysc.Agendas
   alias Ysc.Events
   alias Ysc.Events.Ticket
   alias Ysc.Tickets
@@ -715,6 +716,60 @@ defmodule Ysc.TicketsTest do
 
       found = Tickets.get_user_ticket_order_by_payment_id(user.id, payment.id)
       assert found.id == order.id
+    end
+  end
+
+  describe "get_user_ticket_order_for_confirmation/2 (#624)" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns order for owner with confirmation preloads", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      found = Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
+
+      assert found.id == order.id
+      assert Ecto.assoc_loaded?(found.user)
+      assert Ecto.assoc_loaded?(found.event)
+      assert Ecto.assoc_loaded?(found.event.cover_image)
+      assert Ecto.assoc_loaded?(found.payment)
+      assert Ecto.assoc_loaded?(found.tickets)
+      assert Enum.all?(found.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+
+    test "returns nil for another user", %{user: user, event: event, tier1: tier1} do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      refute Tickets.get_user_ticket_order_for_confirmation(
+               user_fixture_unique().id,
+               order.id
+             )
+    end
+
+    test "omits event agenda preloads unlike get_user_ticket_order/2", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, _agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      full = Tickets.get_user_ticket_order(user.id, order.id)
+      assert Ecto.assoc_loaded?(full.event.agendas)
+
+      confirmation =
+        Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
+
+      refute Ecto.assoc_loaded?(confirmation.event.agendas)
     end
   end
 

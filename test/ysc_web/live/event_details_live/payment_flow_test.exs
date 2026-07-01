@@ -383,6 +383,92 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       reloaded = Tickets.get_ticket_order(order.id)
       assert reloaded.status == :pending
     end
+
+    test "close-payment-modal keeps pending order when payment intent requires action",
+         %{
+           conn: conn,
+           user: user
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      payment_intent_id =
+        "pi_requires_action_close_#{System.unique_integer([:positive])}"
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: payment_intent_id,
+           status: "requires_payment_method"
+         })}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      view =
+        wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      order =
+        Tickets.list_user_ticket_orders(user.id)
+        |> List.first()
+
+      assert order.status == :pending
+      assert order.payment_intent_id == payment_intent_id
+
+      expect_payment_requires_action(payment_intent_id)
+
+      render_click(view, "close-payment-modal")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :pending
+    end
+
+    test "close-payment-modal keeps pending order when payment intent requires confirmation",
+         %{
+           conn: conn,
+           user: user
+         } do
+      event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
+      event = Repo.preload(event, :ticket_tiers, force: true)
+      tier = hd(event.ticket_tiers)
+
+      payment_intent_id =
+        "pi_requires_confirm_close_#{System.unique_integer([:positive])}"
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: payment_intent_id,
+           status: "requires_payment_method"
+         })}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      view =
+        wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
+
+      order =
+        Tickets.list_user_ticket_orders(user.id)
+        |> List.first()
+
+      assert order.status == :pending
+      assert order.payment_intent_id == payment_intent_id
+
+      expect_payment_requires_confirmation(payment_intent_id)
+
+      render_click(view, "close-payment-modal")
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert reloaded.status == :pending
+    end
   end
 
   describe "idempotency key usage" do
