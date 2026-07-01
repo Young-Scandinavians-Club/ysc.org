@@ -19,6 +19,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
   Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
   Finding 21 (HIGH)     Paid ticket checkout bypassed via checkout=free URL / confirm-free-tickets
+  Finding 22 (MEDIUM)   Kiosk check-in API accepted ineligible bookings (draft/canceled/future)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1503,6 +1504,43 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:error, :payment_metadata_mismatch} =
                Bookings.verify_booking_payment_intent(payment_intent, booking_b)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 22 (MEDIUM): Kiosk check-in API accepted ineligible bookings
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 22: kiosk check-in booking eligibility" do
+    import Ysc.BookingsFixtures
+
+    setup do
+      prev = Application.get_env(:ysc, :kiosk_api_key)
+      Application.put_env(:ysc, :kiosk_api_key, "security-audit-kiosk-key")
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :kiosk_api_key, prev)
+      end)
+
+      :ok
+    end
+
+    test "rejects draft bookings at the kiosk check-in API", %{conn: conn} do
+      booking = booking_fixture(%{status: :draft})
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
+        |> put_req_header("content-type", "application/json")
+        |> post(~p"/api/v1/mobile/check-in", %{
+          property: "tahoe",
+          booking_ids: [to_string(booking.id)],
+          rules_agreed: true
+        })
+
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "not confirmed"
+      refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
     end
   end
 

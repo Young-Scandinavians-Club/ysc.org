@@ -140,4 +140,22 @@ defmodule Ysc.BookingsFixtures do
       booking
     end
   end
+
+  @doc """
+  Creates a confirmed booking in an active stay window for kiosk check-in tests.
+  """
+  def active_check_in_booking_fixture(attrs \\ %{}) do
+    today_pst =
+      DateTime.now!("America/Los_Angeles")
+      |> DateTime.to_date()
+
+    attrs =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:status, :complete)
+      |> Map.put_new(:checkin_date, Date.add(today_pst, -1))
+      |> Map.put_new(:checkout_date, Date.add(today_pst, 2))
+
+    booking_fixture(attrs)
+  end
 end
