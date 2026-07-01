@@ -7,7 +7,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Phoenix.LiveView.JS
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.{FamilyInvites, MembershipCache}
+  alias Ysc.Accounts.{FamilyDisplay, FamilyInvites, MembershipCache}
   alias Ysc.Bookings
   alias Ysc.Bookings.Entitlements
   alias Ysc.ExpenseReports
@@ -1051,7 +1051,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   <div class="text-sm text-zinc-600">{@primary_user.email}</div>
                   <%= if @selected_user.family_relationship do %>
                     <.badge type="sky" class="mt-1 text-xs">
-                      {format_family_relationship(
+                      {FamilyDisplay.relationship_label(
                         @selected_user.family_relationship
                       )}
                     </.badge>
@@ -1810,7 +1810,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           {sub_account.first_name} {sub_account.last_name}
                         </span>
                         <.badge type="sky" class="ml-2 text-xs">
-                          {format_family_relationship(
+                          {FamilyDisplay.relationship_label(
                             sub_account.family_relationship
                           )}
                         </.badge>
@@ -1853,7 +1853,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           {invite.email}
                         </span>
                         <.badge type="sky" class="ml-2 text-xs">
-                          {format_family_relationship(invite.relationship)}
+                          {FamilyDisplay.relationship_label(invite.relationship)}
                         </.badge>
                         <span class="text-xs text-zinc-500 ml-2">
                           Expires {format_utc_date(invite.expires_at)}
@@ -3815,11 +3815,6 @@ defmodule YscWeb.AdminUserDetailsLive do
       "Unknown Membership"
     end
   end
-
-  defp format_family_relationship(nil), do: "Child"
-  defp format_family_relationship("spouse"), do: "Spouse"
-  defp format_family_relationship("child"), do: "Child"
-  defp format_family_relationship(_), do: "Child"
 
   defp format_event_date(%DateTime{} = dt) do
     dt |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")

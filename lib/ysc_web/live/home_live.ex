@@ -6,7 +6,7 @@ defmodule YscWeb.HomeLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
-  alias Ysc.Accounts.UserProfileCache
+  alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
@@ -1884,7 +1884,9 @@ defmodule YscWeb.HomeLive do
                         {member.first_name} {member.last_name}
                       </span>
                       <span class="text-zinc-500 text-xs">
-                        {format_family_relationship(member.family_relationship)}
+                        {FamilyDisplay.relationship_label(
+                          member.family_relationship
+                        )}
                       </span>
                     </div>
                   <% end %>
@@ -2789,13 +2791,6 @@ defmodule YscWeb.HomeLive do
     do: Calendar.strftime(date, "%b %-d, %Y")
 
   defp format_membership_date(_), do: ""
-
-  defp format_family_relationship(nil), do: "Child"
-  defp format_family_relationship("spouse"), do: "Spouse"
-  defp format_family_relationship("child"), do: "Child"
-  defp format_family_relationship(:spouse), do: "Spouse"
-  defp format_family_relationship(:child), do: "Child"
-  defp format_family_relationship(_), do: "Child"
 
   defp format_booking_date(%Date{} = date) do
     Calendar.strftime(date, "%b %d")
