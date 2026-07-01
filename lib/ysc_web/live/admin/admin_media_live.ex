@@ -480,14 +480,16 @@ defmodule YscWeb.AdminMediaLive do
             <% else %>
               <div
                 id="media-gallery-loading"
-                class="flex justify-center py-16"
+                class="space-y-4"
                 role="status"
                 aria-live="polite"
               >
-                <div class="flex flex-col items-center gap-3 text-zinc-500">
-                  <.icon name="hero-arrow-path" class="w-10 h-10 animate-spin" />
-                  <p class="text-sm font-medium">Loading images…</p>
-                </div>
+                <span class="sr-only">Loading images…</span>
+                <.skeleton_block class="h-5 w-20 rounded" />
+                <.thumbnail_grid_skeleton
+                  count={12}
+                  class="grid-cols-2 sm:grid-cols-3 md:grid-cols-4"
+                />
               </div>
             <% end %>
           </div>

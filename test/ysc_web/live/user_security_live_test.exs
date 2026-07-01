@@ -60,8 +60,8 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/users/settings/security")
 
-      assert html =~ "Loading passkeys..."
       assert html =~ ~s|id="user-security-passkeys-loading"|
+      assert html =~ "Loading passkeys"
     end
 
     test "requires authentication", %{conn: conn} do

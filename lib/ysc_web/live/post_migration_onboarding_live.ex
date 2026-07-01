@@ -93,12 +93,22 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </.link>
         </div>
 
-        <.async_section_loader
+        <div
           :if={@loading_onboarding_data}
           id="onboarding-loading"
-          label="Loading your account..."
-          class="py-16"
-        />
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading your account…</span>
+          <div class="mb-8 flex items-center justify-center gap-2">
+            <.skeleton_block :for={_ <- 1..6} class="h-2 flex-1 rounded-full" />
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8 space-y-4">
+            <.skeleton_block class="h-6 w-1/2 rounded" />
+            <.skeleton_block :for={_ <- 1..3} class="h-11 w-full rounded-lg" />
+            <.skeleton_block class="h-11 w-1/3 rounded-lg" />
+          </div>
+        </div>
 
         <div :if={!@loading_onboarding_data}>
           <%!-- Stepper --%>

@@ -424,11 +424,24 @@ defmodule YscWeb.UserBookingDetailLive do
               <% end %>
             </div>
           </div>
-          <.async_section_loader
+          <div
             :if={@loading_booking_payment_details}
             id="booking-payment-loading"
-            label="Loading payment details..."
-          />
+            class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="sr-only">Loading payment details…</span>
+            <.skeleton_block class="h-5 w-40 rounded mb-2" />
+            <div :for={_ <- 1..3} class="flex justify-between">
+              <.skeleton_block class="h-4 w-28 rounded" />
+              <.skeleton_block class="h-4 w-20 rounded" />
+            </div>
+            <div class="border-t border-zinc-200 pt-3 flex justify-between items-center">
+              <.skeleton_block class="h-5 w-24 rounded" />
+              <.skeleton_block class="h-7 w-28 rounded" />
+            </div>
+          </div>
           <!-- Payment Summary -->
           <%= if @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">

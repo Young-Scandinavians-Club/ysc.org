@@ -1657,11 +1657,12 @@ defmodule YscWeb.CoreComponents do
   attr :name, :string, required: true
   attr :id, :string, default: nil
   attr :class, :any, default: nil
+  attr :rest, :global
 
   def icon(%{name: "hero-" <> _} = assigns) do
     ~H"""
-    <span :if={@id != nil} id={@id} class={[@name, @class]} />
-    <span :if={@id == nil} class={[@name, @class]} />
+    <span :if={@id != nil} id={@id} class={[@name, @class]} {@rest} />
+    <span :if={@id == nil} class={[@name, @class]} {@rest} />
     """
   end
 
@@ -2559,6 +2560,11 @@ defmodule YscWeb.CoreComponents do
 
   Uses the standard hero refresh icon with `animate-spin`. Override vertical padding
   via `class` when the default `py-8` is too tight (e.g. modal bodies often use `py-12`).
+  Announces itself to screen readers via `role="status"` / `aria-live="polite"`.
+
+  Prefer `<.skeleton_block>` (or a shape-aware skeleton) instead when the loaded
+  content's layout is predictable — skeletons reduce perceived loading time and avoid
+  layout shift. Reach for `async_section_loader` for short, unpredictable-shape gaps.
 
   ## Examples
 
@@ -2576,13 +2582,284 @@ defmodule YscWeb.CoreComponents do
 
   def async_section_loader(assigns) do
     ~H"""
-    <div id={@id} class={["flex items-center justify-center", @class]}>
+    <div
+      id={@id}
+      class={["flex items-center justify-center", @class]}
+      role="status"
+      aria-live="polite"
+    >
       <.icon
         name="hero-arrow-path"
         class="w-6 h-6 shrink-0 text-blue-600 animate-spin"
+        aria-hidden="true"
       />
       <span class="ml-3 text-zinc-600 text-sm">{@label}</span>
     </div>
+    """
+  end
+
+  @doc """
+  Generic shimmer placeholder block for skeleton loading layouts.
+
+  Combine with Tailwind sizing/spacing/color classes via `class` to match the shape
+  of the content that will replace it once loaded. Building block for the more
+  specific skeleton components below (`ticket_order_card_skeleton/1`,
+  `payment_summary_skeleton/1`, `admin_table_skeleton/1`, etc).
+
+  ## Examples
+
+      <.skeleton_block class="h-4 w-1/3 rounded" />
+      <.skeleton_block class="h-20 w-20 rounded-lg bg-zinc-700" />
+  """
+  attr :class, :any, default: "h-4 rounded"
+
+  def skeleton_block(assigns) do
+    ~H"""
+    <div class={["skeleton-shimmer bg-zinc-200/70", @class]} aria-hidden="true" />
+    """
+  end
+
+  @doc """
+  Skeleton placeholder mimicking a ticket-order card (badge/order-ref row, title,
+  meta row). Reuse while ticket orders are streamed in asynchronously.
+
+  ## Examples
+
+      <div :for={_ <- 1..2}><.ticket_order_card_skeleton /></div>
+  """
+  attr :class, :any, default: nil
+  attr :announce?, :boolean, default: true
+
+  def ticket_order_card_skeleton(assigns) do
+    ~H"""
+    <div
+      class={["bg-white border border-zinc-200 rounded-2xl p-8", @class]}
+      role={@announce? && "status"}
+      aria-label={@announce? && "Loading ticket order"}
+    >
+      <span :if={@announce?} class="sr-only">Loading ticket order…</span>
+      <div class="flex justify-between items-start mb-6">
+        <.skeleton_block class="h-5 w-20 rounded-full" />
+        <.skeleton_block class="h-3 w-24 rounded" />
+      </div>
+      <.skeleton_block class="h-7 w-3/4 rounded mb-3" />
+      <div class="flex gap-4">
+        <.skeleton_block class="h-4 w-32 rounded" />
+        <.skeleton_block class="h-4 w-24 rounded" />
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton placeholder for table/list pages: shimmer rows for the desktop table
+  and shimmer cards for the mobile list, matching the dual layouts used across
+  Flop-backed list pages (admin and account settings alike).
+
+  Pair with `<div :if={@meta}>` (or equivalent) for the loaded table/card content.
+
+  ## Examples
+
+      <.table_skeleton :if={is_nil(@meta)} rows={8} columns={5} />
+  """
+  attr :id, :string, default: nil
+
+  attr :rows, :integer,
+    default: 6,
+    doc: "Number of shimmer rows/cards to render"
+
+  attr :columns, :integer,
+    default: 4,
+    doc: "Number of shimmer cells per desktop row"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional Tailwind classes merged onto the outer container"
+
+  attr :announce?, :boolean,
+    default: true,
+    doc: "When false, suppresses internal status live-region announcement"
+
+  def table_skeleton(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={@class}
+      role={@announce? && "status"}
+      aria-live={@announce? && "polite"}
+    >
+      <span :if={@announce?} class="sr-only">Loading…</span>
+      <div class="hidden md:block overflow-hidden rounded-lg border border-zinc-200 divide-y divide-zinc-100">
+        <div :for={_row <- 1..@rows} class="flex items-center gap-6 px-4 py-3.5">
+          <.skeleton_block :for={_col <- 1..@columns} class="h-4 flex-1 rounded" />
+        </div>
+      </div>
+      <div class="md:hidden space-y-3">
+        <div
+          :for={_row <- 1..min(@rows, 4)}
+          class="rounded-lg border border-zinc-200 p-4 space-y-2"
+        >
+          <.skeleton_block class="h-4 w-2/3 rounded" />
+          <.skeleton_block class="h-3 w-1/3 rounded" />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton placeholder mimicking the dark payment summary sidebar card used on
+  order/booking confirmation pages (subtotal/total rows + payment method line).
+
+  ## Examples
+
+      <.payment_summary_skeleton :if={!@async_data_loaded} />
+  """
+  attr :class, :any, default: nil
+  attr :announce?, :boolean, default: true
+
+  def payment_summary_skeleton(assigns) do
+    ~H"""
+    <div
+      class={["rounded-lg p-8 shadow-xl bg-zinc-900", @class]}
+      role={@announce? && "status"}
+      aria-label={@announce? && "Loading payment summary"}
+    >
+      <span :if={@announce?} class="sr-only">Loading payment summary…</span>
+      <.skeleton_block class="h-3 w-32 rounded mb-6 bg-zinc-700" />
+      <div class="space-y-4">
+        <div class="flex justify-between">
+          <.skeleton_block class="h-4 w-24 rounded bg-zinc-700" />
+          <.skeleton_block class="h-4 w-16 rounded bg-zinc-700" />
+        </div>
+        <div class="border-t border-zinc-700 pt-4 flex justify-between">
+          <.skeleton_block class="h-4 w-20 rounded bg-zinc-700" />
+          <.skeleton_block class="h-6 w-24 rounded bg-zinc-700" />
+        </div>
+        <div class="border-t border-zinc-700 pt-4 space-y-2">
+          <.skeleton_block class="h-3 w-28 rounded bg-zinc-700" />
+          <.skeleton_block class="h-3 w-40 rounded bg-zinc-700" />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Flexible skeleton row: an optional leading accessory (dot/avatar/icon-sized
+  block), one or more stacked text lines, and an optional trailing accessory
+  (e.g. an action button placeholder). Building block for list-style loading
+  rows reused across dashboard widgets, member/passkey lists, etc.
+
+  ## Examples
+
+      <.skeleton_list_row
+        leading_class="h-3 w-3 rounded-full mt-1.5 shrink-0"
+        lines={["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]}
+      />
+
+      <.skeleton_list_row
+        class="flex items-center justify-between p-4 border border-zinc-200 rounded-lg"
+        lines={["h-4 w-40 rounded", "h-3 w-32 rounded", "h-3 w-28 rounded"]}
+        trailing_class="h-8 w-20 rounded"
+      />
+  """
+  attr :class, :any, default: nil
+  attr :leading_class, :any, default: nil
+  attr :lines, :list, default: ["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]
+  attr :trailing_class, :any, default: nil
+
+  def skeleton_list_row(assigns) do
+    ~H"""
+    <div class={["flex items-center gap-3", @class]}>
+      <.skeleton_block :if={@leading_class} class={@leading_class} />
+      <div class="flex-1 space-y-2">
+        <.skeleton_block :for={line <- @lines} class={line} />
+      </div>
+      <.skeleton_block :if={@trailing_class} class={@trailing_class} />
+    </div>
+    """
+  end
+
+  @doc """
+  Skeleton placeholder for a saved payment-method row (card icon, masked
+  number, expiry) used on settings/membership/checkout pages while the
+  default payment method loads.
+
+  ## Examples
+
+      <.payment_method_row_skeleton :if={@loading_payment_methods} id="membership-payment-method-loading" />
+  """
+  attr :id, :string, default: nil
+
+  attr :class, :any,
+    default:
+      "flex items-center justify-between p-4 bg-white border border-zinc-200 rounded-lg"
+
+  def payment_method_row_skeleton(assigns) do
+    ~H"""
+    <div id={@id} class={@class} role="status" aria-live="polite">
+      <span class="sr-only">Loading payment methods…</span>
+      <div class="flex items-center gap-3">
+        <.skeleton_block class="h-8 w-12 rounded" />
+        <div class="space-y-1.5">
+          <.skeleton_block class="h-4 w-32 rounded" />
+          <.skeleton_block class="h-3 w-20 rounded" />
+        </div>
+      </div>
+      <.skeleton_block class="h-4 w-16 rounded" />
+    </div>
+    """
+  end
+
+  @doc """
+  Grid of square shimmer thumbnails for image/post/event picker grids that
+  load asynchronously (media library, newsletter post/event pickers).
+
+  ## Examples
+
+      <.thumbnail_grid_skeleton count={12} class="grid-cols-2 sm:grid-cols-3 md:grid-cols-4" />
+  """
+  attr :count, :integer, default: 10
+  attr :class, :any, default: "grid-cols-3 sm:grid-cols-4 md:grid-cols-5"
+  attr :gap, :any, default: "gap-3"
+
+  def thumbnail_grid_skeleton(assigns) do
+    ~H"""
+    <div class={["grid", @class, @gap]}>
+      <.skeleton_block
+        :for={_ <- 1..@count}
+        class="aspect-square w-full rounded-lg"
+      />
+    </div>
+    """
+  end
+
+  @doc """
+  Shimmer `<tr>` rows for a table `<tbody>` while paginated/async list data
+  loads — each row spans `colspan` columns with a single shimmer line. Wrap
+  in a `<tbody id="..." role="status" aria-live="polite">` at the call site
+  (the sr-only label is rendered once, on the first row).
+
+  ## Examples
+
+      <tbody :if={!@sections_loaded.payments} id="recent-payments-loading" role="status" aria-live="polite">
+        <.table_rows_skeleton rows={5} colspan={7} label="Loading recent payments…" />
+      </tbody>
+  """
+  attr :rows, :integer, default: 5
+  attr :colspan, :integer, required: true
+  attr :label, :string, default: "Loading…"
+  attr :padding_class, :any, default: "px-6 py-4"
+
+  def table_rows_skeleton(assigns) do
+    ~H"""
+    <tr :for={i <- 1..@rows}>
+      <td class={@padding_class} colspan={@colspan}>
+        <span :if={i == 1} class="sr-only">{@label}</span>
+        <.skeleton_block class="h-4 w-full rounded" />
+      </td>
+    </tr>
     """
   end
 

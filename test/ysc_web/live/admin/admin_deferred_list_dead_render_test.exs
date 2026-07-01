@@ -51,7 +51,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       )
 
     assert query_count == 0
-    assert html =~ "Loading posts"
+    assert html =~ ~s|id="admin-posts-loading"|
     refute html =~ "Static Render Post"
   end
 
@@ -74,7 +74,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       )
 
     assert query_count == 0
-    assert html =~ "Loading events"
+    assert html =~ ~s|id="admin-events-loading"|
     refute html =~ "Static Render Event"
   end
 
@@ -96,7 +96,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       )
 
     assert query_count == 0
-    assert html =~ "Loading users"
+    assert html =~ ~s|id="admin-users-loading"|
     refute html =~ "Static User"
   end
 
@@ -117,7 +117,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
 
     assert html =~ "Review Application"
     assert html =~ "Review Render"
-    assert html =~ "Loading users"
+    assert html =~ ~s|id="admin-users-loading"|
   end
 
   test "dead render skips scanner sessions query and shows loading state", %{

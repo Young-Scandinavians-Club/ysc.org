@@ -1,5 +1,6 @@
 defmodule YscWeb.UserTicketsLive do
   use YscWeb, :live_view
+  require Ysc.Logging
 
   import YscWeb.Live.AsyncHelpers
 
@@ -32,10 +33,11 @@ defmodule YscWeb.UserTicketsLive do
           :if={@loading_user_tickets}
           id="user-tickets-loading"
           class="grid grid-cols-1 lg:grid-cols-2 gap-8"
+          role="status"
+          aria-live="polite"
         >
-          <div class="lg:col-span-2 text-center py-16">
-            <p class="text-zinc-600 text-sm font-medium">Loading your tickets…</p>
-          </div>
+          <span class="sr-only">Loading your tickets…</span>
+          <.ticket_order_card_skeleton :for={_ <- 1..2} announce?={false} />
         </div>
 
         <div
@@ -298,28 +300,39 @@ defmodule YscWeb.UserTicketsLive do
   def handle_info(:load_user_tickets_data, socket) do
     user_id = socket.assigns.current_user.id
 
-    parallel =
-      [
-        {:upcoming,
-         fn -> Tickets.list_user_upcoming_ticket_orders(user_id) end},
-        {:past, fn -> memory_gallery_items(user_id) end}
-      ]
-      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
-        max_concurrency: 2,
-        timeout: :infinity
-      )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
-        Map.put(acc, key, value)
-      end)
+    socket =
+      try do
+        parallel =
+          [
+            {:upcoming,
+             fn -> Tickets.list_user_upcoming_ticket_orders(user_id) end},
+            {:past, fn -> memory_gallery_items(user_id) end}
+          ]
+          |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+            max_concurrency: 2,
+            timeout: :infinity
+          )
+          |> Enum.reduce(%{}, fn
+            {:ok, {key, value}}, acc -> Map.put(acc, key, value)
+            {:exit, _reason}, acc -> acc
+          end)
 
-    upcoming = Map.fetch!(parallel, :upcoming)
-    past_items = Map.fetch!(parallel, :past)
+        upcoming = Map.get(parallel, :upcoming, [])
+        past_items = Map.get(parallel, :past, [])
 
-    {:noreply,
-     socket
-     |> assign(:loading_user_tickets, false)
-     |> assign(:past_items, past_items)
-     |> stream(:ticket_orders, upcoming, reset: true, limit: -50)}
+        socket
+        |> assign(:past_items, past_items)
+        |> stream(:ticket_orders, upcoming, reset: true, limit: -50)
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load user tickets data",
+            error: Exception.message(error)
+          )
+
+          socket
+      end
+
+    {:noreply, assign(socket, :loading_user_tickets, false)}
   end
 
   @impl true
