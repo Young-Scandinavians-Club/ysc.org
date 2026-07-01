@@ -743,7 +743,11 @@ defmodule Ysc.TicketsTest do
       assert Enum.all?(found.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
     end
 
-    test "returns nil for another user", %{user: user, event: event, tier1: tier1} do
+    test "returns nil for another user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
       {:ok, order} =
         Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
 
