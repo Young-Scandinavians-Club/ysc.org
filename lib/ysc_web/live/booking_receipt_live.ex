@@ -1498,7 +1498,10 @@ defmodule YscWeb.BookingReceiptLive do
 
           verification_result =
             if modification_payment_intent?(payment_intent) do
-              :ok
+              Bookings.verify_modification_redirect_payment_intent(
+                payment_intent,
+                booking
+              )
             else
               Bookings.verify_booking_payment_intent(payment_intent, booking)
             end
@@ -1724,15 +1727,15 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp modification_redirect_error_message(:modification_hold_expired) do
-    "Payment was successful, but your reservation hold expired before the change could be saved. Please contact support with your booking reference."
+    YscWeb.BookingUserMessages.modification_redirect_hold_expired()
   end
 
   defp modification_redirect_error_message({:ledger_payment_failed, _reason}) do
-    "Payment was successful, but we could not record it for your updated reservation. Please contact support with your booking reference."
+    YscWeb.BookingUserMessages.modification_redirect_ledger_payment_failed()
   end
 
   defp modification_redirect_error_message(_reason) do
-    "Payment was successful, but there was an issue updating your reservation. Please contact support with your booking reference."
+    YscWeb.BookingUserMessages.modification_redirect_update_failed()
   end
 
   defp modification_payment_intent?(payment_intent) do

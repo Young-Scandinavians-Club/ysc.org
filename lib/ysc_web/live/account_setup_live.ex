@@ -1449,7 +1449,7 @@ defmodule YscWeb.AccountSetupLive do
         {:error, _} ->
           YscWeb.Flash.send_toast(
             :error,
-            "Still unable to load the payment form. Please try again or contact support.",
+            "Still unable to load the payment form. Please email #{Ysc.EmailConfig.contact_email()} and we'll help you complete your application.",
             title: "Payment"
           )
 

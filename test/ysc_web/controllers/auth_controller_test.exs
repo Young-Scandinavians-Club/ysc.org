@@ -257,8 +257,8 @@ defmodule YscWeb.AuthControllerTest do
 
       assert redirected_to(conn) == ~p"/users/log-in"
       # Generic message to avoid user enumeration
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Unable to sign in. Please try again or contact support."
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) =~
+               "Unable to sign in. Please try again, or email info@ysc.org for help."
     end
   end
 

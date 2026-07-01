@@ -776,25 +776,11 @@ defmodule YscWeb.AdminEventsNewLive do
                     Reminder emails are sent automatically the morning after the event ends.
                   </p>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                  <input
-                    type="text"
-                    readonly
-                    id="event-photo-upload-url"
-                    value={@photo_upload_url}
-                    class="flex-1 rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800"
-                  />
-                  <.button
-                    id="copy-photo-upload-url-btn"
-                    type="button"
-                    variant="outline"
-                    phx-hook="ClipboardCopy"
-                    data-copy={@photo_upload_url}
-                    class="shrink-0"
-                  >
-                    <.icon name="hero-clipboard" class="w-5 h-5" /> Copy link
-                  </.button>
-                </div>
+                <.admin_readonly_copy_field
+                  id="event-photo-upload-url"
+                  copy_button_id="copy-photo-upload-url-btn"
+                  value={@photo_upload_url}
+                />
                 <div
                   :if={@dev_routes?}
                   class="pt-2 border-t border-zinc-100 space-y-2"

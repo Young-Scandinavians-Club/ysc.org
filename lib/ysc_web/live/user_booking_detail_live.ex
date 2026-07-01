@@ -273,16 +273,16 @@ defmodule YscWeb.UserBookingDetailLive do
 
                           cond do
                             refund_percentage == 0.0 ->
-                              "Any reservation cancelled less than #{rule.days_before_checkin} days before your arrival date will not receive a refund."
+                              "If you cancel within #{rule.days_before_checkin} days of your check-in date, you will not receive a refund."
 
                             refund_percentage > 0 and refund_percentage < 100.0 ->
                               refund_pct =
                                 refund_percentage |> Float.round(0) |> trunc()
 
-                              "Reservations cancelled less than #{rule.days_before_checkin} days before your arrival date receive a #{refund_pct}% refund."
+                              "If you cancel within #{rule.days_before_checkin} days of your check-in date, you receive a #{refund_pct}% refund."
 
                             true ->
-                              "Reservations cancelled #{rule.days_before_checkin} or more days before your arrival date are eligible for a full refund."
+                              "If you cancel #{rule.days_before_checkin} or more days before your check-in date, you are eligible for a full refund."
                           end
                         end
                         |> Enum.map(fn text -> "<p>#{text}</p>" end)
@@ -786,7 +786,10 @@ defmodule YscWeb.UserBookingDetailLive do
       socket
       |> assign(:booking, updated_booking)
       |> assign(:refund_info, refund_info)
-      |> assign(:can_cancel, BookingActions.can_cancel_booking?(updated_booking))
+      |> assign(
+        :can_cancel,
+        BookingActions.can_cancel_booking?(updated_booking)
+      )
     else
       socket
     end

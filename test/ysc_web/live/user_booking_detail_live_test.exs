@@ -380,11 +380,15 @@ defmodule YscWeb.UserBookingDetailLiveTest do
              property: :tahoe,
              season_id: nil
            }) do
-        {:ok, _} -> :ok
+        {:ok, _} ->
+          :ok
+
         {:error, %Ecto.Changeset{errors: errors}} ->
-          if Enum.any?(errors, fn {_f, {_m, meta}} -> meta[:constraint] == :unique end),
-            do: :ok,
-            else: raise("unexpected pricing rule error: #{inspect(errors)}")
+          if Enum.any?(errors, fn {_f, {_m, meta}} ->
+               meta[:constraint] == :unique
+             end),
+             do: :ok,
+             else: raise("unexpected pricing rule error: #{inspect(errors)}")
       end
 
       user =
@@ -531,11 +535,15 @@ defmodule YscWeb.UserBookingDetailLiveTest do
              property: :tahoe,
              season_id: nil
            }) do
-        {:ok, _} -> :ok
+        {:ok, _} ->
+          :ok
+
         {:error, %Ecto.Changeset{errors: errors}} ->
-          if Enum.any?(errors, fn {_f, {_m, meta}} -> meta[:constraint] == :unique end),
-            do: :ok,
-            else: raise("unexpected pricing rule error: #{inspect(errors)}")
+          if Enum.any?(errors, fn {_f, {_m, meta}} ->
+               meta[:constraint] == :unique
+             end),
+             do: :ok,
+             else: raise("unexpected pricing rule error: #{inspect(errors)}")
       end
 
       user =
@@ -692,8 +700,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       view |> element("button[phx-click='show-cancel-modal']") |> render_click()
 
       view
-        |> form("#cancel-booking-form", %{"reason" => "No longer needed"})
-        |> render_submit()
+      |> form("#cancel-booking-form", %{"reason" => "No longer needed"})
+      |> render_submit()
 
       refute has_element?(view, "#cancel-booking-modal")
     end
@@ -1077,6 +1085,61 @@ defmodule YscWeb.UserBookingDetailLiveTest do
 
       refute html =~
                "If you cancel today, you may be eligible for a refund of approximately"
+    end
+
+    test "confirm-cancel without payment shows payment not found toast", %{
+      conn: conn
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(500, :USD),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{state: :active})
+        |> Repo.update!()
+
+      year = Date.utc_today().year + 1
+      july_first = Date.new!(year, 7, 1)
+
+      checkin_date =
+        case Date.day_of_week(july_first, :monday) do
+          1 ->
+            july_first
+
+          n ->
+            Date.add(july_first, 8 - n)
+        end
+
+      checkout_date = Date.add(checkin_date, 3)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin_date,
+          checkout_date,
+          2
+        )
+
+      {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_booking_detail(conn, confirmed.id)
+
+      view |> element("button[phx-click='show-cancel-modal']") |> render_click()
+
+      _ =
+        view
+        |> form("#cancel-booking-form", %{"reason" => "Testing"})
+        |> render_submit()
+
+      assert render(view) =~ "Unable to process cancellation: payment not found"
     end
 
     test "payment summary shows card ending in when payment method has last four",

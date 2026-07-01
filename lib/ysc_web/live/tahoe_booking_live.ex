@@ -29,6 +29,7 @@ defmodule YscWeb.TahoeBookingLive do
 
   alias Ysc.Bookings.SeasonHelpers
   alias Ysc.Bookings.PricingHelpers
+  alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
@@ -2966,7 +2967,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </p>
                         <p class="mt-2">
                           <strong>Note:</strong>
-                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the Cabin Master for credit.
+                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the Cabin Master at {EmailConfig.tahoe_email()} for credit.
                         </p>
                       </div>
                     </div>
@@ -3339,7 +3340,12 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder or contact the Cabin Master
+                          If you don't receive the code, check your spam folder. Still nothing? Email the Tahoe Cabin Master at <a
+                            href={"mailto:#{EmailConfig.tahoe_email()}"}
+                            class="text-blue-200 hover:text-white underline"
+                          >
+                            {EmailConfig.tahoe_email()}
+                          </a>.
                         </li>
                       </ul>
                     </div>
@@ -4107,7 +4113,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li>
                           <strong>Road closure cancellations</strong>
-                          may be credited for a future stay (contact the Cabin Master).
+                          may be credited for a future stay (email the Cabin Master at {EmailConfig.tahoe_email()}).
                         </li>
                         <li>
                           <strong>Cash refunds</strong>

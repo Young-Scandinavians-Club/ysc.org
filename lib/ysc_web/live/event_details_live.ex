@@ -3338,12 +3338,20 @@ defmodule YscWeb.EventDetailsLive do
   def mount(%{"id" => id_or_ref}, _session, socket) do
     viewer = socket.assigns.current_user
 
-    # Support lookup by either ULID (id) or reference_id (e.g. "EVT-XXXX")
+    # LiveView calls mount twice (dead render, then WebSocket). Reuse event assigns
+    # from the dead render to avoid a second get_event + tier preload on connect.
+    connected_remount? =
+      connected?(socket) && Map.has_key?(socket.assigns, :event)
+
     event =
-      if String.starts_with?(id_or_ref, "EVT-") do
-        Events.get_event_for_page_by_reference(id_or_ref, viewer)
+      if connected_remount? do
+        socket.assigns.event
       else
-        Events.get_event_for_page(id_or_ref, viewer)
+        if String.starts_with?(id_or_ref, "EVT-") do
+          Events.get_event_for_page_by_reference(id_or_ref, viewer)
+        else
+          Events.get_event_for_page(id_or_ref, viewer)
+        end
       end
 
     case event do
@@ -3356,14 +3364,16 @@ defmodule YscWeb.EventDetailsLive do
       event ->
         event_id = event.id
 
-        # For disconnected mount: minimal data for fast static HTML
-        # For connected mount: full data loading via assign_async
         socket =
-          mount_minimal_assigns(socket, event, event_id)
-          |> assign(
-            :content_preview?,
-            event.state not in [:published, :cancelled]
-          )
+          if connected_remount? do
+            socket
+          else
+            mount_minimal_assigns(socket, event, event_id)
+            |> assign(
+              :content_preview?,
+              event.state not in [:published, :cancelled]
+            )
+          end
 
         if connected?(socket) do
           # Subscribe to real-time updates only when connected
@@ -4179,7 +4189,7 @@ defmodule YscWeb.EventDetailsLive do
             restore_payment_state_from_url(
               socket,
               ticket_order,
-              effective_checkout_step(checkout_step, ticket_order)
+              checkout_step
             )
           end
         else
@@ -4459,6 +4469,23 @@ defmodule YscWeb.EventDetailsLive do
   # For donation tickets: tier_id => amount_cents (total donation amount in cents)
   defp build_selected_tickets_from_order(ticket_order) do
     if ticket_order.tickets && ticket_order.tickets != [] do
+      {_gross_event_amount, donation_amount, _discount_amount} =
+        Ysc.Tickets.calculate_event_and_donation_amounts(ticket_order)
+
+      donation_tickets_count =
+        ticket_order.tickets
+        |> Enum.count(fn t ->
+          t.ticket_tier.type == "donation" || t.ticket_tier.type == :donation
+        end)
+
+      amount_per_donation_ticket =
+        if donation_tickets_count > 0 do
+          case Money.div(donation_amount, donation_tickets_count) do
+            {:ok, amount} -> amount
+            _ -> nil
+          end
+        end
+
       # Group tickets by tier_id
       tickets_by_tier =
         ticket_order.tickets
@@ -4475,34 +4502,12 @@ defmodule YscWeb.EventDetailsLive do
         is_donation = tier.type == "donation" || tier.type == :donation
 
         if is_donation do
-          # For donations, calculate the total donation amount for this tier
-          # The donation amount is stored in the ticket_order.total_amount
-          # We need to calculate how much of the total is for this specific donation tier
-          {_gross_event_amount, donation_amount, _discount_amount} =
-            Ysc.Tickets.calculate_event_and_donation_amounts(ticket_order)
+          if amount_per_donation_ticket do
+            {:ok, tier_donation_total} =
+              Money.mult(amount_per_donation_ticket, quantity)
 
-          # Count all donation tickets in the order
-          donation_tickets_count =
-            ticket_order.tickets
-            |> Enum.count(fn t ->
-              t.ticket_tier.type == "donation" ||
-                t.ticket_tier.type == :donation
-            end)
-
-          # Calculate donation amount per ticket, then multiply by quantity for this tier
-          if donation_tickets_count > 0 do
-            case Money.div(donation_amount, donation_tickets_count) do
-              {:ok, amount_per_ticket} ->
-                # Multiply by quantity for this tier and convert to cents
-                {:ok, tier_donation_total} =
-                  Money.mult(amount_per_ticket, quantity)
-
-                amount_cents = MoneyHelper.money_to_cents(tier_donation_total)
-                Map.put(acc, tier_id, amount_cents)
-
-              _ ->
-                acc
-            end
+            amount_cents = MoneyHelper.money_to_cents(tier_donation_total)
+            Map.put(acc, tier_id, amount_cents)
           else
             acc
           end
@@ -5947,9 +5952,11 @@ defmodule YscWeb.EventDetailsLive do
 
     case Ysc.Tickets.create_ticket_order(user_id, event_id, ticket_selections) do
       {:ok, ticket_order} ->
-        # Reload the ticket order with tickets and their tiers
         ticket_order_with_tickets =
-          Ysc.Tickets.get_ticket_order(ticket_order.id)
+          Ysc.Tickets.get_user_ticket_order_for_checkout(
+            user_id,
+            ticket_order.id
+          )
 
         # Proceed directly to payment/free confirmation with registration integrated
         proceed_to_payment_or_free(socket, ticket_order_with_tickets)

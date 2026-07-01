@@ -23,6 +23,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Repo
   alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.S3.SimpleS3Upload
@@ -4073,7 +4074,7 @@ defmodule YscWeb.UserSettingsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Failed to create payment account. Please try again or contact support.",
+         "Failed to create payment account. Please try again, or contact us at info@ysc.org if this continues.",
          title: "Payment"
        )
        |> assign(:show_new_payment_form, false)}
@@ -4116,7 +4117,7 @@ defmodule YscWeb.UserSettingsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to initialize payment form: #{error_message}",
+             "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a card.",
              title: "Payment"
            )
            |> assign(:show_new_payment_form, false)}
@@ -5843,33 +5844,7 @@ defmodule YscWeb.UserSettingsLive do
             end}
           </p>
           <p class="text-xs">
-            {if @ticket_order.tickets do
-              tickets = @ticket_order.tickets
-              refunded_count = Enum.count(tickets, fn t -> t.status == :cancelled end)
-              active_tickets = Enum.filter(tickets, fn t -> t.status != :cancelled end)
-
-              ticket_summary =
-                if length(active_tickets) > 0 do
-                  active_tickets
-                  |> Enum.group_by(fn t -> t.ticket_tier && t.ticket_tier.name end)
-                  |> Enum.map(fn {tier_name, tier_tickets} ->
-                    count = length(tier_tickets)
-                    tier_display = tier_name || "General Admission"
-                    "#{count}x #{tier_display}"
-                  end)
-                  |> Enum.join(", ")
-                else
-                  "All tickets refunded"
-                end
-
-              if refunded_count > 0 do
-                "#{ticket_summary} (#{refunded_count} refunded)"
-              else
-                ticket_summary
-              end
-            else
-              "No ticket details"
-            end}
+            {TicketDisplay.format_order_ticket_summary(@ticket_order.tickets)}
           </p>
         </div>
         """
@@ -5964,33 +5939,7 @@ defmodule YscWeb.UserSettingsLive do
           end}
         </p>
         <p class="text-xs mt-0.5">
-          {if @ticket_order.tickets do
-            tickets = @ticket_order.tickets
-            refunded_count = Enum.count(tickets, fn t -> t.status == :cancelled end)
-            active_tickets = Enum.filter(tickets, fn t -> t.status != :cancelled end)
-
-            ticket_summary =
-              if length(active_tickets) > 0 do
-                active_tickets
-                |> Enum.group_by(fn t -> t.ticket_tier && t.ticket_tier.name end)
-                |> Enum.map(fn {tier_name, tier_tickets} ->
-                  count = length(tier_tickets)
-                  tier_display = tier_name || "General Admission"
-                  "#{count}x #{tier_display}"
-                end)
-                |> Enum.join(", ")
-              else
-                "All tickets refunded"
-              end
-
-            if refunded_count > 0 do
-              "#{ticket_summary} (#{refunded_count} refunded)"
-            else
-              ticket_summary
-            end
-          else
-            "No ticket details"
-          end}
+          {TicketDisplay.format_order_ticket_summary(@ticket_order.tickets)}
         </p>
         """
 
@@ -6166,7 +6115,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, contact support.",
+             "Your payment could not be processed. Please try a different payment method or contact your bank. If the issue persists, email info@ysc.org.",
              title: "Invoice"
            )}
       end
