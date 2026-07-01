@@ -12,6 +12,7 @@ defmodule Ysc.Messages do
   alias Ysc.Messages.MessageIdempotency
 
   alias Ysc.Mailer
+  alias Ysc.Email.LinkTracking
   alias Ysc.Flowroute.Client
   alias Ysc.SmsRateLimit
 
@@ -71,7 +72,10 @@ defmodule Ysc.Messages do
 
   @dialyzer {:nowarn_function, build_and_run_email_transaction: 2}
   defp build_and_run_email_transaction(email, attrs) do
-    tracked_email = attach_ses_tracking(email, attrs)
+    tracked_email =
+      email
+      |> maybe_disable_ses_link_tracking(attrs[:message_template])
+      |> attach_ses_tracking(attrs)
 
     Ecto.Multi.new()
     |> Ecto.Multi.insert(
@@ -82,6 +86,20 @@ defmodule Ysc.Messages do
       send_email_via_mailer(tracked_email, attrs)
     end)
     |> Repo.transaction()
+  end
+
+  defp maybe_disable_ses_link_tracking(email, template) do
+    if LinkTracking.enabled_for_template?(template) do
+      email
+    else
+      case email.html_body do
+        html when is_binary(html) and html != "" ->
+          Swoosh.Email.html_body(email, LinkTracking.disable_tracking(html))
+
+        _ ->
+          email
+      end
+    end
   end
 
   defp attach_ses_tracking(email, attrs) do
