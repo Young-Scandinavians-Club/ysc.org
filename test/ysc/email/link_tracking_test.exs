@@ -68,5 +68,25 @@ defmodule Ysc.Email.LinkTrackingTest do
       assert LinkTracking.disable_tracking(nil) == ""
       assert LinkTracking.disable_tracking("") == ""
     end
+
+    test "adds ses:no-track when HTML contains Outlook conditional comments" do
+      html = """
+      <!--[if mso]>
+      <table><tr><td><a href="https://example.com/mso">MSO layout</a></td></tr></table>
+      <![endif]-->
+      <a href="https://ysc.org/outside">Outside comment</a>
+      """
+
+      result = LinkTracking.disable_tracking(html)
+
+      assert result =~ "<!--[if mso]>"
+      assert result =~ ~s(href="https://ysc.org/outside")
+      assert result =~ "ses:no-track"
+
+      assert {:ok, document} = Floki.parse_fragment(result)
+      outside = Floki.find(document, "a[href=\"https://ysc.org/outside\"]")
+      assert length(outside) == 1
+      assert Floki.attribute(outside, "ses:no-track") != []
+    end
   end
 end

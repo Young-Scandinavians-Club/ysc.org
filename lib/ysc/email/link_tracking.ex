@@ -45,19 +45,9 @@ defmodule Ysc.Email.LinkTracking do
   def disable_tracking(html) when is_binary(html) do
     case Floki.parse_fragment(html) do
       {:ok, document} ->
-        try do
-          document
-          |> add_no_track_to_anchors()
-          |> Floki.raw_html()
-        rescue
-          error ->
-            Ysc.Logging.warning(
-              "Failed to serialize email HTML for SES link tracking disable",
-              error: inspect(error)
-            )
-
-            html
-        end
+        document
+        |> Floki.traverse_and_update(&add_no_track_to_anchor/1)
+        |> Floki.raw_html()
 
       {:error, reason} ->
         Ysc.Logging.warning(
@@ -69,26 +59,15 @@ defmodule Ysc.Email.LinkTracking do
     end
   end
 
-  defp add_no_track_to_anchors(nodes) when is_list(nodes) do
-    Enum.map(nodes, &add_no_track_to_anchors/1)
-  end
-
-  defp add_no_track_to_anchors({"a", attrs, children} = node) do
+  defp add_no_track_to_anchor({"a", attrs, children} = node) do
     if has_no_track_attr?(attrs) do
       node
     else
-      {"a", attrs ++ [{@ses_no_track_attr, ""}],
-       add_no_track_to_anchors(children)}
+      {"a", attrs ++ [{@ses_no_track_attr, ""}], children}
     end
   end
 
-  defp add_no_track_to_anchors({"comment", _, _} = node), do: node
-
-  defp add_no_track_to_anchors({tag, attrs, children}) when is_binary(tag) do
-    {tag, attrs, add_no_track_to_anchors(children)}
-  end
-
-  defp add_no_track_to_anchors(text) when is_binary(text), do: text
+  defp add_no_track_to_anchor(node), do: node
 
   defp has_no_track_attr?(attrs) do
     Enum.any?(attrs, fn
