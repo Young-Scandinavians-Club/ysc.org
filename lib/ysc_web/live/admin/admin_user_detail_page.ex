@@ -7,7 +7,14 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Phoenix.LiveView.JS
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.{FamilyDisplay, FamilyInvites, MembershipCache}
+
+  alias Ysc.Accounts.{
+    FamilyDisplay,
+    FamilyInvites,
+    MembershipCache,
+    UserDisplay
+  }
+
   alias Ysc.Bookings
   alias Ysc.Bookings.Entitlements
   alias Ysc.ExpenseReports
@@ -801,7 +808,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                 <div class="py-2">
                   <dt class="text-sm font-semibold text-zinc-600">Birth Date</dt>
                   <dd class="mt-0.5 text-sm text-zinc-900">
-                    {format_birth_date(@selected_user_application.birth_date)}
+                    {UserDisplay.birth_date_label(
+                      @selected_user_application.birth_date
+                    )}
                   </dd>
                 </div>
                 <div
@@ -817,7 +826,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         <span class="text-xs font-medium me-2 px-2.5 py-1 rounded bg-blue-100 text-blue-800">
                           {String.capitalize("#{family_member.type}")}
                         </span>
-                        {"#{family_member.first_name} #{family_member.last_name} (#{format_birth_date(family_member.birth_date)})"}
+                        {"#{family_member.first_name} #{family_member.last_name} (#{UserDisplay.birth_date_label(family_member.birth_date)})"}
                       </li>
                     </ul>
                   </dd>
@@ -873,7 +882,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
                       <span
                         :if={
-                          country_to_flag_class(
+                          UserDisplay.country_flag_class(
                             @selected_user_application.place_of_birth
                           )
                         }
@@ -881,14 +890,14 @@ defmodule YscWeb.AdminUserDetailsLive do
                       >
                         <.flag
                           country={
-                            country_to_flag_class(
+                            UserDisplay.country_flag_class(
                               @selected_user_application.place_of_birth
                             )
                           }
                           class="h-4 w-6 rounded inline-block align-middle"
                         />
                       </span>
-                      {nordic_country_display_name(
+                      {UserDisplay.country_label(
                         @selected_user_application.place_of_birth
                       )}
                     </dd>
@@ -898,7 +907,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
                       <span
                         :if={
-                          country_to_flag_class(
+                          UserDisplay.country_flag_class(
                             @selected_user_application.citizenship
                           )
                         }
@@ -906,14 +915,14 @@ defmodule YscWeb.AdminUserDetailsLive do
                       >
                         <.flag
                           country={
-                            country_to_flag_class(
+                            UserDisplay.country_flag_class(
                               @selected_user_application.citizenship
                             )
                           }
                           class="h-4 w-6 rounded inline-block align-middle"
                         />
                       </span>
-                      {nordic_country_display_name(
+                      {UserDisplay.country_label(
                         @selected_user_application.citizenship
                       )}
                     </dd>
@@ -925,7 +934,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
                       <span
                         :if={
-                          country_to_flag_class(
+                          UserDisplay.country_flag_class(
                             @selected_user_application.most_connected_nordic_country
                           )
                         }
@@ -933,14 +942,14 @@ defmodule YscWeb.AdminUserDetailsLive do
                       >
                         <.flag
                           country={
-                            country_to_flag_class(
+                            UserDisplay.country_flag_class(
                               @selected_user_application.most_connected_nordic_country
                             )
                           }
                           class="h-4 w-6 rounded inline-block align-middle"
                         />
                       </span>
-                      {nordic_country_display_name(
+                      {UserDisplay.country_label(
                         @selected_user_application.most_connected_nordic_country
                       )}
                     </dd>
@@ -4299,44 +4308,6 @@ defmodule YscWeb.AdminUserDetailsLive do
   defp format_changeset_errors(changeset) do
     YscWeb.FormHelpers.format_changeset_errors(changeset)
   end
-
-  defp country_to_flag_class(nil), do: nil
-
-  defp country_to_flag_class(code) when is_binary(code) do
-    normalized = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
-
-    if normalized in ["SE", "NO", "FI", "DK", "IS", "US"] do
-      "fi-#{String.downcase(normalized)}"
-    else
-      nil
-    end
-  end
-
-  defp nordic_country_display_name(nil), do: ""
-
-  defp nordic_country_display_name(code) when is_binary(code) do
-    key = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
-
-    Map.get(
-      %{
-        "SE" => "Sweden",
-        "NO" => "Norway",
-        "FI" => "Finland",
-        "DK" => "Denmark",
-        "IS" => "Iceland",
-        "US" => "United States"
-      },
-      key,
-      code
-    )
-  end
-
-  defp format_birth_date(nil), do: ""
-
-  defp format_birth_date(%Date{} = date),
-    do: Timex.format!(date, "%b %d, %Y", :strftime)
-
-  defp format_birth_date(other), do: to_string(other)
 
   defp entitlement_form_defaults do
     to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)
