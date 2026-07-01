@@ -1139,7 +1139,11 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> form("#cancel-booking-form", %{"reason" => "Testing"})
         |> render_submit()
 
-      assert render(view) =~ "Unable to process cancellation: payment not found"
+      page = render(view)
+
+      assert page =~ "Cancelled"
+      refute has_element?(view, "button[phx-click='show-cancel-modal']")
+      assert Repo.get!(Bookings.Booking, confirmed.id).status == :canceled
     end
 
     test "payment summary shows card ending in when payment method has last four",
