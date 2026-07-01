@@ -204,6 +204,25 @@ defmodule Ysc.Tickets do
   end
 
   @doc """
+  Gets a ticket order for the post-checkout confirmation page.
+
+  Lighter than `get_user_ticket_order/2` — no event agendas; includes cover image,
+  payment method, and ticket registrations needed by the confirmation UI.
+  """
+  def get_user_ticket_order_for_confirmation(user_id, order_id) do
+    from(to in TicketOrder,
+      where: to.id == ^order_id and to.user_id == ^user_id,
+      preload: [
+        :user,
+        event: :cover_image,
+        payment: :payment_method,
+        tickets: [:ticket_tier, :registration]
+      ]
+    )
+    |> Repo.one()
+  end
+
+  @doc """
   Returns `event_id` when the user owns the ticket order, otherwise `nil`.
 
   Use for redirect/authorization checks that do not need full order preloads.
@@ -266,9 +285,11 @@ defmodule Ysc.Tickets do
   and the event start is strictly after `now` (same filter semantics as `UserTicketsLive`).
 
   This avoids loading the full order history and filtering in application code.
+  Results are capped at 50 by default; pass `limit:` to override.
   """
   def list_user_upcoming_ticket_orders(user_id, opts \\ []) do
     now = Keyword.get(opts, :now, DateTime.utc_now())
+    limit = Keyword.get(opts, :limit, 50)
 
     from(to in TicketOrder,
       where: to.user_id == ^user_id,
@@ -276,6 +297,7 @@ defmodule Ysc.Tickets do
       join: e in assoc(to, :event),
       where: e.start_date > ^now,
       order_by: [desc: to.inserted_at],
+      limit: ^limit,
       preload: [:tickets, :event, tickets: :ticket_tier]
     )
     |> Repo.all()
@@ -473,6 +495,15 @@ defmodule Ysc.Tickets do
           Repo.rollback({:error, :no_valid_tickets})
         end
 
+        donation_tickets_count =
+          from(t in Ticket,
+            join: tt in TicketTier,
+            on: t.ticket_tier_id == tt.id,
+            where: t.ticket_order_id == ^ticket_order.id,
+            where: tt.type == :donation
+          )
+          |> Repo.aggregate(:count, :id)
+
         # Calculate refund amount
         refund_amount =
           tickets_to_refund
@@ -486,16 +517,6 @@ defmodule Ysc.Tickets do
                 # Since donation tickets store the amount in the payment, we'll use a proportional split
                 # This is a simplification - ideally we'd store the donation amount per ticket
                 if ticket_order.total_amount && ticket_order.payment_id do
-                  # Count total donation tickets in the order
-                  donation_tickets_count =
-                    from(t in Ticket,
-                      join: tt in TicketTier,
-                      on: t.ticket_tier_id == tt.id,
-                      where: t.ticket_order_id == ^ticket_order.id,
-                      where: tt.type == :donation
-                    )
-                    |> Repo.aggregate(:count, :id)
-
                   if donation_tickets_count > 0 do
                     case Money.div(
                            ticket_order.total_amount,
@@ -882,7 +903,7 @@ defmodule Ysc.Tickets do
     if ticket_order_ready_for_payment?(ticket_order) do
       ticket_order
     else
-      get_ticket_order(ticket_order.id)
+      get_ticket_order_for_checkout(ticket_order.id)
     end
   end
 

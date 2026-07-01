@@ -29,6 +29,7 @@ defmodule YscWeb.TahoeBookingLive do
 
   alias Ysc.Bookings.SeasonHelpers
   alias Ysc.Bookings.PricingHelpers
+  alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
@@ -282,7 +283,7 @@ defmodule YscWeb.TahoeBookingLive do
     # Parse all params from URI
     parsed_params = parse_all_params_from_uri(params, uri)
 
-    # Get booking eligibility
+    # Reuse eligibility data from mount when already computed (avoid duplicate queries)
     {can_book, booking_error_title, booking_disabled_reason} =
       get_booking_eligibility(socket, parsed_params)
 
@@ -290,70 +291,99 @@ defmodule YscWeb.TahoeBookingLive do
     active_tab = determine_active_tab(parsed_params.requested_tab, can_book)
     tab_changed = active_tab != socket.assigns.active_tab
 
-    # Update if dates, guest counts, or tab have changed
-    if should_update_availability(socket, parsed_params, tab_changed) do
-      today = today_in_timezone(cabin_timezone())
-      seasons = socket.assigns.seasons
+    dates_changed = booking_dates_changed?(parsed_params, socket.assigns)
+    guests_changed = parsed_params.guests_count != socket.assigns.guests_count
 
-      {current_season, season_start_date, season_end_date} =
-        get_current_season_info_cached(seasons, today)
+    children_changed =
+      parsed_params.children_count != socket.assigns.children_count
 
-      max_booking_date = calculate_max_booking_date_cached(seasons, today)
+    booking_mode_changed =
+      (parsed_params.booking_mode || :room) !=
+        socket.assigns.selected_booking_mode
 
-      # Calculate restricted date range for family/lifetime members with 1 room booking
-      {restricted_min_date, restricted_max_date, dates_restricted} =
-        calculate_restricted_dates(socket, today, max_booking_date)
+    info_tab =
+      parsed_params.requested_info_tab || socket.assigns[:info_tab] || :general
 
-      # Only regenerate date tooltips if the date range actually changed
-      socket =
-        maybe_load_date_tooltips(
-          socket,
-          restricted_min_date,
-          restricted_max_date,
-          today,
-          seasons
-        )
+    info_tab_changed = info_tab != socket.assigns[:info_tab]
 
-      date_tooltips = socket.assigns[:date_tooltips] || %{}
-
-      socket =
-        update_socket_with_parsed_params(
-          socket,
-          parsed_params,
-          %{
-            today: today,
-            max_booking_date: max_booking_date,
-            restricted_min_date: restricted_min_date,
-            restricted_max_date: restricted_max_date,
-            dates_restricted: dates_restricted,
-            current_season: current_season,
-            season_start_date: season_start_date,
-            season_end_date: season_end_date,
-            can_book: can_book,
-            booking_error_title: booking_error_title,
-            booking_disabled_reason: booking_disabled_reason,
-            active_tab: active_tab,
-            date_tooltips: date_tooltips
-          }
-        )
-        |> then(fn s ->
-          # Only run validation/room updates if dates changed, not just tab
-          if connected?(socket) && should_update_rooms(socket, parsed_params) do
-            s
-            |> enforce_season_booking_mode()
-            |> validate_dates()
-            |> update_available_rooms()
-            |> calculate_price_if_ready()
-          else
-            s
-          end
-        end)
-
-      {:noreply, socket}
+    if info_tab_changed && !dates_changed && !guests_changed &&
+         !children_changed &&
+         !tab_changed && !booking_mode_changed do
+      {:noreply, assign(socket, info_tab: info_tab)}
     else
-      # Even if nothing changed, update scroll_to_section if hash is present
-      socket = update_scroll_section(socket, uri)
-      {:noreply, socket}
+      if dates_changed || guests_changed || children_changed || tab_changed ||
+           booking_mode_changed do
+        today = today_in_timezone(cabin_timezone())
+        seasons = socket.assigns.seasons
+
+        {current_season, season_start_date, season_end_date} =
+          get_current_season_info_cached(seasons, today)
+
+        max_booking_date = calculate_max_booking_date_cached(seasons, today)
+
+        # Calculate restricted date range for family/lifetime members with 1 room booking
+        {restricted_min_date, restricted_max_date, dates_restricted} =
+          calculate_restricted_dates(socket, today, max_booking_date)
+
+        needs_booking_recalculation =
+          dates_changed || guests_changed || children_changed ||
+            booking_mode_changed
+
+        # Only regenerate date tooltips after connect, when the selectable range changes
+        socket =
+          if connected?(socket) do
+            maybe_load_date_tooltips(
+              socket,
+              restricted_min_date,
+              restricted_max_date,
+              today,
+              seasons
+            )
+          else
+            socket
+          end
+
+        date_tooltips = socket.assigns[:date_tooltips] || %{}
+
+        socket =
+          update_socket_with_parsed_params(
+            socket,
+            parsed_params,
+            %{
+              today: today,
+              max_booking_date: max_booking_date,
+              restricted_min_date: restricted_min_date,
+              restricted_max_date: restricted_max_date,
+              dates_restricted: dates_restricted,
+              current_season: current_season,
+              season_start_date: season_start_date,
+              season_end_date: season_end_date,
+              can_book: can_book,
+              booking_error_title: booking_error_title,
+              booking_disabled_reason: booking_disabled_reason,
+              active_tab: active_tab,
+              info_tab: info_tab,
+              date_tooltips: date_tooltips
+            }
+          )
+          |> then(fn s ->
+            if connected?(socket) && needs_booking_recalculation do
+              s
+              |> enforce_season_booking_mode()
+              |> validate_dates()
+              |> update_available_rooms()
+              |> calculate_price_if_ready()
+            else
+              s
+            end
+          end)
+
+        {:noreply, socket}
+      else
+        # Even if nothing changed, update scroll_to_section if hash is present
+        socket = update_scroll_section(socket, uri)
+        {:noreply, socket}
+      end
     end
   end
 
@@ -403,7 +433,7 @@ defmodule YscWeb.TahoeBookingLive do
       user = socket.assigns.current_user
 
       active_bookings_loaded =
-        if user && !socket.assigns[:active_bookings] do
+        if user && connected?(socket) && !socket.assigns[:active_bookings] do
           get_family_group_active_bookings(user)
         else
           socket.assigns[:active_bookings] || []
@@ -439,23 +469,18 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
-  # Helper function to check if we should update availability
-  defp should_update_availability(socket, parsed_params, tab_changed) do
-    parsed_params.checkin_date != socket.assigns.checkin_date ||
-      parsed_params.checkout_date != socket.assigns.checkout_date ||
-      parsed_params.guests_count != socket.assigns.guests_count ||
-      parsed_params.children_count != socket.assigns.children_count ||
-      parsed_params.booking_mode != socket.assigns.selected_booking_mode ||
-      tab_changed
+  defp booking_dates_changed?(parsed_params, assigns) do
+    booking_date_changed?(parsed_params.checkin_date, assigns.checkin_date) ||
+      booking_date_changed?(parsed_params.checkout_date, assigns.checkout_date)
   end
 
-  # Helper function to check if we should update rooms
-  defp should_update_rooms(socket, parsed_params) do
-    parsed_params.checkin_date != socket.assigns.checkin_date ||
-      parsed_params.checkout_date != socket.assigns.checkout_date ||
-      parsed_params.guests_count != socket.assigns.guests_count ||
-      parsed_params.children_count != socket.assigns.children_count ||
-      parsed_params.booking_mode != socket.assigns.selected_booking_mode
+  defp booking_date_changed?(left, right) do
+    case {left, right} do
+      {nil, nil} -> false
+      {nil, _} -> true
+      {_, nil} -> true
+      {c1, c2} -> Date.compare(c1, c2) != :eq
+    end
   end
 
   # Helper function to calculate restricted dates
@@ -2942,7 +2967,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </p>
                         <p class="mt-2">
                           <strong>Note:</strong>
-                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the Cabin Master for credit.
+                          All cash refunds are subject to a 3% processing fee. Road closure cancellations must be reported immediately to the Cabin Master at {EmailConfig.tahoe_email()} for credit.
                         </p>
                       </div>
                     </div>
@@ -3315,7 +3340,12 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder or contact the Cabin Master
+                          If you don't receive the code, check your spam folder. Still nothing? Email the Tahoe Cabin Master at <a
+                            href={"mailto:#{EmailConfig.tahoe_email()}"}
+                            class="text-blue-200 hover:text-white underline"
+                          >
+                            {EmailConfig.tahoe_email()}
+                          </a>.
                         </li>
                       </ul>
                     </div>
@@ -4083,7 +4113,7 @@ defmodule YscWeb.TahoeBookingLive do
                         </li>
                         <li>
                           <strong>Road closure cancellations</strong>
-                          may be credited for a future stay (contact the Cabin Master).
+                          may be credited for a future stay (email the Cabin Master at {EmailConfig.tahoe_email()}).
                         </li>
                         <li>
                           <strong>Cash refunds</strong>

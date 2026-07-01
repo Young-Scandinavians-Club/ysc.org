@@ -173,7 +173,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "We couldn't load the pricing for this booking. Please go back and try again, or contact us if this keeps happening.",
+           YscWeb.BookingUserMessages.checkout_pricing_load_failed(),
            title: "Checkout"
          )
          |> redirect(to: get_property_redirect_path(booking.property))}
@@ -307,7 +307,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 booking_id: booking.id
               )
 
-              "We couldn't set up payment. Please try again or contact us for help."
+              YscWeb.BookingUserMessages.checkout_payment_setup_failed()
             end
 
           {:ok,
@@ -1408,7 +1408,7 @@ defmodule YscWeb.BookingCheckoutLive do
                         booking_id: booking.id
                       )
 
-                      "We couldn't set up payment. Please try again or contact us for help."
+                      YscWeb.BookingUserMessages.checkout_payment_setup_failed()
                     end
 
                   {:noreply,
@@ -1525,7 +1525,7 @@ defmodule YscWeb.BookingCheckoutLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "We couldn't cancel this booking from here. Please try again, or contact us if you need help.",
+           YscWeb.BookingUserMessages.checkout_cancel_failed(),
            title: "Checkout"
          )}
     end
@@ -1577,7 +1577,7 @@ defmodule YscWeb.BookingCheckoutLive do
         {:noreply,
          assign(socket,
            payment_error:
-             "Something went wrong while confirming your booking. If you were charged, please contact us before paying again."
+             YscWeb.BookingUserMessages.checkout_payment_confirmation_failed()
          )}
     end
   end
@@ -1723,7 +1723,7 @@ defmodule YscWeb.BookingCheckoutLive do
         {:noreply,
          assign(socket,
            payment_error:
-             "We couldn't confirm your booking. Please try again or contact us for help."
+             YscWeb.BookingUserMessages.checkout_booking_confirmation_failed()
          )}
     end
   end

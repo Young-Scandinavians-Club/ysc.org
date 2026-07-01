@@ -5,9 +5,12 @@ defmodule Ysc.TicketsTest do
   use Ysc.DataCase, async: true
 
   import Ecto.Query
+  alias Ysc.Events
+  alias Ysc.Events.Ticket
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
   import Ysc.AccountsFixtures
+  import Ysc.TicketsFixtures
 
   defp user_fixture_unique(attrs \\ %{}) do
     email =
@@ -227,6 +230,37 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "sync_pending_order_pricing/1" do
+    setup do
+      tickets_setup()
+    end
+
+    test "reloads with checkout preloads only when associations are missing", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      bare_order = %TicketOrder{
+        id: order.id,
+        user_id: user.id,
+        event_id: event.id,
+        status: :pending,
+        total_amount: order.total_amount,
+        discount_amount: order.discount_amount
+      }
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(bare_order)
+      assert synced.id == order.id
+      assert Ecto.assoc_loaded?(synced.user)
+      refute Ecto.assoc_loaded?(synced.event)
+      assert Ecto.assoc_loaded?(synced.tickets)
+      assert Enum.all?(synced.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+  end
+
   describe "get_ticket_order_by_reference/1" do
     setup do
       tickets_setup()
@@ -313,6 +347,39 @@ defmodule Ysc.TicketsTest do
 
       upcoming = Tickets.list_user_upcoming_ticket_orders(user.id)
       assert Enum.any?(upcoming, &(&1.id == order.id))
+    end
+
+    test "respects limit option", %{user: user} do
+      for i <- 1..3 do
+        {:ok, event} =
+          Ysc.Events.create_event(%{
+            title: "Future Event #{i}",
+            description: "Test",
+            start_date: DateTime.add(DateTime.utc_now(), 7 + i, :day),
+            end_date: DateTime.add(DateTime.utc_now(), 8 + i, :day),
+            state: :published,
+            ticket_sales_start: DateTime.utc_now(),
+            ticket_sales_end: DateTime.add(DateTime.utc_now(), 6 + i, :day),
+            location_name: "Test",
+            max_attendees: 100,
+            organizer_id: user.id
+          })
+
+        {:ok, tier} =
+          Ysc.Events.create_ticket_tier(%{
+            name: "General #{i}",
+            type: :paid,
+            price: Money.new(50, :USD),
+            quantity: 50,
+            event_id: event.id
+          })
+
+        {:ok, _order} =
+          Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      end
+
+      assert length(Tickets.list_user_upcoming_ticket_orders(user.id, limit: 2)) ==
+               2
     end
   end
 
@@ -1083,6 +1150,154 @@ defmodule Ysc.TicketsTest do
 
       assert {:ok, synced} = Tickets.sync_pending_order_pricing(expired)
       assert Money.equal?(synced.total_amount, Money.new(80, :USD))
+    end
+  end
+
+  describe "pending order complimentary recalculation (#604)" do
+    setup do
+      tickets_setup()
+    end
+
+    test "ticket_selections_from_order/1 maps paid tiers to quantities", %{
+      user: user,
+      event: event,
+      tier1: tier1,
+      tier2: tier2
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{
+          tier1.id => 2,
+          tier2.id => 1
+        })
+
+      order = Tickets.get_ticket_order(order.id)
+
+      assert Tickets.ticket_selections_from_order(order) == %{
+               tier1.id => 2,
+               tier2.id => 1
+             }
+    end
+
+    test "ticket_selections_from_order/1 ignores non-pending tickets", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      [ticket | rest] =
+        from(t in Ticket, where: t.ticket_order_id == ^order.id)
+        |> Repo.all()
+
+      ticket
+      |> Ecto.Changeset.change(status: :confirmed)
+      |> Repo.update!()
+
+      order = Tickets.get_ticket_order(order.id)
+
+      assert Tickets.ticket_selections_from_order(order) == %{
+               tier1.id => length(rest)
+             }
+    end
+
+    test "pending_order_still_complimentary?/1 is true for a free tier order",
+         %{
+           user: user,
+           event: event
+         } do
+      {:ok, free_tier} =
+        Events.create_ticket_tier(%{
+          name: "Complimentary",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 20,
+          event_id: event.id
+        })
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: free_tier,
+          status: :pending
+        })
+
+      order = Tickets.get_ticket_order(order.id)
+
+      assert Tickets.pending_order_still_complimentary?(order)
+    end
+
+    test "recalculate_pending_order_total/1 reflects current tier price after stale zero total",
+         %{
+           user: user,
+           event: event
+         } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Complimentary GA",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :pending
+        })
+
+      order = Tickets.get_ticket_order(order.id)
+      assert Money.zero?(order.total_amount)
+
+      {:ok, _tier} =
+        Events.update_ticket_tier(tier, %{
+          type: :paid,
+          price: Money.new(50, :USD)
+        })
+
+      assert {:ok, recalculated} =
+               Tickets.recalculate_pending_order_total(order)
+
+      assert Money.equal?(recalculated, Money.new(50, :USD))
+      refute Tickets.pending_order_still_complimentary?(order)
+    end
+
+    test "process_free_ticket_order/1 rejects stale complimentary total after tier becomes paid",
+         %{
+           user: user,
+           event: event
+         } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Complimentary GA",
+          type: :free,
+          price: Money.new(0, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :pending
+        })
+
+      {:ok, _tier} =
+        Events.update_ticket_tier(tier, %{
+          type: :paid,
+          price: Money.new(50, :USD)
+        })
+
+      order = Tickets.get_ticket_order(order.id)
+
+      assert {:error, :payment_required} =
+               Tickets.process_free_ticket_order(order)
     end
   end
 end

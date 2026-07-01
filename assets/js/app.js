@@ -59,6 +59,7 @@ import AutoResizeIframe from "./auto_resize_iframe";
 import AutoResizeTextarea from "./auto_resize_textarea";
 import AgendaTracksScroller from "./agenda_tracks_scroller";
 import TicketSlider from "./ticket_slider";
+import TicketCheckout from "./ticket_checkout";
 import WalletPlatform, { detectWalletPlatform } from "./wallet_platform";
 import AvatarCropper from "./avatar_cropper";
 import { createLiveToastHook } from "../vendor/live_toast.esm.js";
@@ -99,6 +100,7 @@ let Hooks = {
     AutoResizeTextarea,
     AgendaTracksScroller,
     TicketSlider,
+    TicketCheckout,
     WalletPlatform,
     AvatarCropper,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),

@@ -267,6 +267,34 @@ defmodule Ysc.Tickets.StripeServiceTest do
                StripeService.process_successful_payment(payment_intent)
     end
 
+    test "syncs order pricing and completes when tier price increased and PI matches updated total",
+         %{
+           ticket_order: ticket_order
+         } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        order = Ysc.Tickets.get_ticket_order(ticket_order.id)
+        [%{ticket_tier: tier} | _] = order.tickets
+
+        {:ok, _tier} =
+          Ysc.Events.update_ticket_tier(tier, %{price: Money.new(75, :USD)})
+
+        payment_intent =
+          payment_intent_for_order(order,
+            id: "pi_repriced_webhook_#{order.id}",
+            amount: 7_500
+          )
+
+        cancel_timeout_jobs_for_order!(order.id)
+        deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+
+        assert {:ok, completed} =
+                 StripeService.process_successful_payment(payment_intent)
+
+        assert completed.status == :completed
+        assert Money.equal?(completed.total_amount, Money.new(75, :USD))
+      end)
+    end
+
     test "returns error when payment intent amount does not match order total",
          %{
            ticket_order: ticket_order

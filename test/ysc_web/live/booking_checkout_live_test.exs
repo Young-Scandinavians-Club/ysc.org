@@ -555,6 +555,92 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "payment-success accepts Stripe amount charged at minimum billable occupancy",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Ysc.TestHelpers.setup_quickbooks_mocks()
+
+      {:ok, category} =
+        %RoomCategory{}
+        |> RoomCategory.changeset(%{
+          name: "Min Occ Cat #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Min Occ Room #{System.unique_integer([:positive])}",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4,
+          min_billable_occupancy: 2
+        })
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      assert {:ok, booking} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 1,
+                 children_count: 0
+               )
+
+      pi_id = "pi_min_occ_#{System.unique_integer([:positive])}"
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      synced_booking = Repo.get!(Booking, booking.id)
+      min_occupancy_total = synced_booking.total_price
+      one_guest_total = Money.mult!(Money.new(100, :USD), 3)
+      assert Money.compare(min_occupancy_total, one_guest_total) == :gt
+
+      amount_cents =
+        Ysc.MoneyHelper.money_to_cents(min_occupancy_total)
+
+      expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: pi_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => booking.user_id
+           },
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      assert {:error, {:live_redirect, %{to: receipt_path}}} =
+               render_click(view, "payment-success", %{
+                 "payment_intent_id" => pi_id
+               })
+
+      assert receipt_path =~ "/receipt"
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.status == :complete
+      assert Money.equal?(reloaded.total_price, min_occupancy_total)
+      assert booking_ledger_payment_count(booking.id) == 1
+      Mox.verify!(StripeMock)
+    end
+
     test "handle_info :check_booking_expiration marks expired when hold was released in DB",
          %{
            conn: conn,
