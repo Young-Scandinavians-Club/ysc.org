@@ -94,7 +94,12 @@ defmodule YscWeb.PaymentSuccessLive do
 
         true ->
           if connected?(socket) do
-            process_payment_redirect(socket, user, redirect_status, payment_intent_id)
+            process_payment_redirect(
+              socket,
+              user,
+              redirect_status,
+              payment_intent_id
+            )
           else
             {:ok, socket}
           end
@@ -115,7 +120,12 @@ defmodule YscWeb.PaymentSuccessLive do
 
   ## Private Functions
 
-  defp process_payment_redirect(socket, user, redirect_status, payment_intent_id) do
+  defp process_payment_redirect(
+         socket,
+         user,
+         redirect_status,
+         payment_intent_id
+       ) do
     cond do
       redirect_status == "succeeded" ->
         case redirect_to_success_page_with_retry(payment_intent_id, user) do
@@ -147,7 +157,9 @@ defmodule YscWeb.PaymentSuccessLive do
           {:ok, redirect_path} ->
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, failure_message, title: "Payment")
+             |> YscWeb.Flash.put_toast(:error, failure_message,
+               title: "Payment"
+             )
              |> redirect(to: redirect_path)}
 
           {:error, reason} ->
@@ -160,7 +172,9 @@ defmodule YscWeb.PaymentSuccessLive do
 
             {:ok,
              socket
-             |> YscWeb.Flash.put_toast(:error, failure_message, title: "Payment")
+             |> YscWeb.Flash.put_toast(:error, failure_message,
+               title: "Payment"
+             )
              |> redirect(to: ~p"/")}
         end
 

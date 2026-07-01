@@ -296,10 +296,11 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       assert updated.assigns.price_breakdown.room_count == 2
     end
 
-    test "batch-loads rooms not yet in available_rooms for multi-room pricing", %{
-      room: room,
-      room2: room2
-    } do
+    test "batch-loads rooms not yet in available_rooms for multi-room pricing",
+         %{
+           room: room,
+           room2: room2
+         } do
       socket =
         lv_socket(%{
           checkin_date: @checkin,
