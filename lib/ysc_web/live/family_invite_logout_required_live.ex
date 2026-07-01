@@ -48,7 +48,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
 
         redirect_to =
           if existing_user do
-            "/users/log-in?redirect_to=/users/membership"
+            "/users/log-in?redirect_to=/family-invite/#{token}/accept"
           else
             # Send to invite acceptance page so they get the same flow as when
             # opening the link logged out (create-account form, no "choose membership" step)
@@ -90,9 +90,7 @@ defmodule YscWeb.FamilyInviteLogoutRequiredLive do
                 <li>Click the button below to log out.</li>
                 <li>Sign in with <strong>{@invite.email}</strong>.</li>
                 <li>
-                  On your <strong>Membership</strong>
-                  page, find <strong>Pending Family Invitations</strong>
-                  and click <strong>Accept invitation</strong>.
+                  You'll return to this invitation page to finish accepting.
                 </li>
               </ol>
             </div>

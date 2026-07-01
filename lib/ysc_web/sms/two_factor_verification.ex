@@ -26,7 +26,7 @@ defmodule YscWeb.Sms.TwoFactorVerification do
   def render(variables) do
     code = Map.get(variables, :code, "")
 
-    "Your secure login code is: #{code}. Do not share this code. If you did not request this, please contact support."
+    "Your secure login code is: #{code}. Do not share this code. If you did not request this, email #{Ysc.EmailConfig.contact_email()}."
     |> Template.greeting(Template.optional_first_name(variables))
     |> Template.format()
   end

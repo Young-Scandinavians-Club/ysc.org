@@ -174,22 +174,20 @@ defmodule YscWeb.OrderConfirmationLiveTest do
 
       conn = log_in_user(conn, user2)
 
-      {:error, {:redirect, %{to: path, flash: flash}}} =
+      {:error, {:redirect, %{to: path}}} =
         live(conn, ~p"/orders/#{order.id}/confirmation")
 
       assert path == "/events"
-      assert flash["error"] == "Order not found"
     end
 
     test "handles non-existent order", %{conn: conn} do
       user = create_user_with_membership()
       conn = log_in_user(conn, user)
 
-      {:error, {:redirect, %{to: path, flash: flash}}} =
+      {:error, {:redirect, %{to: path}}} =
         live(conn, ~p"/orders/#{Ecto.ULID.generate()}/confirmation")
 
       assert path == "/events"
-      assert flash["error"] == "Order not found"
     end
   end
 

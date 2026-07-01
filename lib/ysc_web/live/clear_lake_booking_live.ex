@@ -13,6 +13,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     BookingLocker
   }
 
+  alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
@@ -481,47 +482,11 @@ defmodule YscWeb.ClearLakeBookingLive do
         id="hero-section"
         class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
       >
-        <div
-          id="clear-lake-carousel-wrapper"
-          phx-hook="ImageCarouselAutoplay"
-          class="absolute inset-0 h-full w-full z-[2]"
-        >
-          <YscWeb.Components.ImageCarousel.image_carousel
-            id="about-the-clear-lake-cabin-carousel-logged-in"
-            images={[
-              %{
-                src: ~p"/images/clear_lake/clear_lake_main.webp",
-                alt: "Clear Lake Cabin Exterior"
-              },
-              %{
-                src: ~p"/images/history/clear_lake_from_above.webp",
-                alt: "Clear Lake Aerial View"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_sweep.webp",
-                alt: "Clear Lake"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_cabin.webp",
-                alt: "Clear Lake Cabin"
-              }
-            ]}
-            class="h-full w-full"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
-          </div>
-        </div>
+        <YscWeb.Components.ImageCarousel.image_carousel_hero_background
+          wrapper_id="clear-lake-carousel-wrapper"
+          carousel_id="about-the-clear-lake-cabin-carousel-logged-in"
+          images={clear_lake_hero_carousel_images()}
+        />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-16 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
@@ -1598,32 +1563,7 @@ defmodule YscWeb.ClearLakeBookingLive do
 
                   <YscWeb.Components.ImageCarousel.image_carousel
                     id="clear-lake-experience-carousel"
-                    images={[
-                      %{
-                        src: ~p"/images/clear_lake/clear_lake_main.webp",
-                        alt: "Clear Lake Cabin Exterior"
-                      },
-                      %{
-                        src: ~p"/images/history/clear_lake_from_above.webp",
-                        alt: "Clear Lake Aerial View"
-                      },
-                      %{
-                        src: ~p"/images/clear_lake/clear_lake_dock.webp",
-                        alt: "Private Dock on Clear Lake"
-                      },
-                      %{
-                        src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
-                        alt: "Dock View at Sunset"
-                      },
-                      %{
-                        src: ~p"/images/clear_lake/clear_lake_sweep.webp",
-                        alt: "Lake Views"
-                      },
-                      %{
-                        src: ~p"/images/clear_lake/clear_lake_cabin.webp",
-                        alt: "Cabin Interior"
-                      }
-                    ]}
+                    images={clear_lake_experience_carousel_images()}
                     class="mb-12 rounded-xl overflow-hidden"
                   />
                   <!-- Nearby Destinations -->
@@ -1959,7 +1899,12 @@ defmodule YscWeb.ClearLakeBookingLive do
                         </li>
                         <li>The door code is unique to your booking period</li>
                         <li>
-                          If you don't receive the code, check your spam folder or contact the Cabin Master
+                          If you don't receive the code, check your spam folder. Still nothing? Email the Clear Lake Cabin Master at <a
+                            href={"mailto:#{EmailConfig.clear_lake_email()}"}
+                            class="text-teal-200 hover:text-white underline"
+                          >
+                            {EmailConfig.clear_lake_email()}
+                          </a>.
                         </li>
                       </ul>
                     </div>
@@ -2354,7 +2299,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                           </p>
                           <p>
                             <strong>Boating & Dock Access:</strong>
-                            Members enjoy free mooring at our private dock. Please notify the Cabin Master in advance.
+                            Members enjoy free mooring at our private dock. Please email the Cabin Master at {EmailConfig.clear_lake_email()} in advance.
                             <em>Note: trailers must be parked off-site.</em>
                           </p>
                           <div class="p-4 bg-rose-50 border border-rose-100 rounded-lg text-rose-800 text-xs">
@@ -2418,47 +2363,11 @@ defmodule YscWeb.ClearLakeBookingLive do
         id="hero-section"
         class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
       >
-        <div
-          id="clear-lake-carousel-wrapper-nonuser"
-          phx-hook="ImageCarouselAutoplay"
-          class="absolute inset-0 h-full w-full z-[2]"
-        >
-          <YscWeb.Components.ImageCarousel.image_carousel
-            id="about-the-clear-lake-cabin-carousel"
-            images={[
-              %{
-                src: ~p"/images/clear_lake/clear_lake_main.webp",
-                alt: "Clear Lake Cabin Exterior"
-              },
-              %{
-                src: ~p"/images/history/clear_lake_from_above.webp",
-                alt: "Clear Lake Aerial View"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
-                alt: "Clear Lake Dock"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_sweep.webp",
-                alt: "Clear Lake"
-              },
-              %{
-                src: ~p"/images/clear_lake/clear_lake_cabin.webp",
-                alt: "Clear Lake Cabin"
-              }
-            ]}
-            class="h-full w-full"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
-          </div>
-        </div>
+        <YscWeb.Components.ImageCarousel.image_carousel_hero_background
+          wrapper_id="clear-lake-carousel-wrapper-nonuser"
+          carousel_id="about-the-clear-lake-cabin-carousel"
+          images={clear_lake_hero_carousel_images()}
+        />
         <%!-- Title Text Section --%>
         <div class="absolute bottom-0 left-0 right-0 z-[10] px-4 py-12 md:py-20 pointer-events-none">
           <div class="max-w-screen-xl mx-auto pointer-events-auto">
@@ -2574,7 +2483,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
-      |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2608,7 +2516,6 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
-      |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
@@ -2642,52 +2549,21 @@ defmodule YscWeb.ClearLakeBookingLive do
         form_errors: %{},
         date_form: date_form
       )
-      |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
 
     {:noreply, socket}
   end
 
   def handle_event("booking-mode-changed", %{"booking_mode" => "day"}, socket) do
-    # Re-check allowed booking modes based on current dates
-    {day_booking_allowed, buyout_booking_allowed} =
-      allowed_booking_modes(
-        socket.assigns.property,
-        socket.assigns.checkin_date,
-        socket.assigns.checkout_date,
-        socket.assigns.current_season,
-        socket.assigns.seasons
-      )
-
-    # Validate availability for the new booking mode if dates are selected
-    availability_error =
-      if socket.assigns.checkin_date && socket.assigns.checkout_date do
-        validate_date_range_for_booking_mode(
-          socket.assigns.checkin_date,
-          socket.assigns.checkout_date,
-          :day,
-          socket.assigns.guests_count,
-          socket.assigns
-        )
-      else
-        nil
-      end
-
     socket =
       socket
       |> assign(
         selected_booking_mode: :day,
         calculated_price: nil,
         price_error: nil,
-        availability_error: availability_error,
-        day_booking_allowed: day_booking_allowed,
-        buyout_booking_allowed: buyout_booking_allowed
+        availability_error: nil
       )
-      |> calculate_price_if_ready()
-      |> then(fn updated_socket ->
-        # Update URL with new booking mode
-        update_url_with_booking_mode(updated_socket)
-      end)
+      |> update_url_with_booking_mode()
 
     {:noreply, socket}
   end
@@ -2697,45 +2573,15 @@ defmodule YscWeb.ClearLakeBookingLive do
         %{"booking_mode" => "buyout"},
         socket
       ) do
-    # Re-check allowed booking modes based on current dates
-    {day_booking_allowed, buyout_booking_allowed} =
-      allowed_booking_modes(
-        socket.assigns.property,
-        socket.assigns.checkin_date,
-        socket.assigns.checkout_date,
-        socket.assigns.current_season,
-        socket.assigns.seasons
-      )
-
-    # Validate availability for the new booking mode if dates are selected
-    availability_error =
-      if socket.assigns.checkin_date && socket.assigns.checkout_date do
-        validate_date_range_for_booking_mode(
-          socket.assigns.checkin_date,
-          socket.assigns.checkout_date,
-          :buyout,
-          socket.assigns.guests_count,
-          socket.assigns
-        )
-      else
-        nil
-      end
-
     socket =
       socket
       |> assign(
         selected_booking_mode: :buyout,
         calculated_price: nil,
         price_error: nil,
-        availability_error: availability_error,
-        day_booking_allowed: day_booking_allowed,
-        buyout_booking_allowed: buyout_booking_allowed
+        availability_error: nil
       )
-      |> calculate_price_if_ready()
-      |> then(fn updated_socket ->
-        # Update URL with new booking mode
-        update_url_with_booking_mode(updated_socket)
-      end)
+      |> update_url_with_booking_mode()
 
     {:noreply, socket}
   end
@@ -3992,6 +3838,58 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp today_in_timezone(_),
     do: DateTime.now!(default_timezone()) |> DateTime.to_date()
+
+  defp clear_lake_hero_carousel_images do
+    [
+      %{
+        src: ~p"/images/clear_lake/clear_lake_main.webp",
+        alt: "Clear Lake Cabin Exterior"
+      },
+      %{
+        src: ~p"/images/history/clear_lake_from_above.webp",
+        alt: "Clear Lake Aerial View"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock.webp",
+        alt: "Clear Lake Dock"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+        alt: "Clear Lake Dock"
+      },
+      %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Clear Lake"},
+      %{
+        src: ~p"/images/clear_lake/clear_lake_cabin.webp",
+        alt: "Clear Lake Cabin"
+      }
+    ]
+  end
+
+  defp clear_lake_experience_carousel_images do
+    [
+      %{
+        src: ~p"/images/clear_lake/clear_lake_main.webp",
+        alt: "Clear Lake Cabin Exterior"
+      },
+      %{
+        src: ~p"/images/history/clear_lake_from_above.webp",
+        alt: "Clear Lake Aerial View"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock.webp",
+        alt: "Private Dock on Clear Lake"
+      },
+      %{
+        src: ~p"/images/clear_lake/clear_lake_dock_2.webp",
+        alt: "Dock View at Sunset"
+      },
+      %{src: ~p"/images/clear_lake/clear_lake_sweep.webp", alt: "Lake Views"},
+      %{
+        src: ~p"/images/clear_lake/clear_lake_cabin.webp",
+        alt: "Cabin Interior"
+      }
+    ]
+  end
 
   defp default_timezone,
     do: Application.get_env(:ysc, :default_timezone, "America/Los_Angeles")

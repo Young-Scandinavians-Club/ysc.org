@@ -3637,6 +3637,55 @@ defmodule Ysc.BookingsTest do
       assert {:error, :invalid_status} =
                Bookings.sync_hold_pricing_from_calculation(booking)
     end
+
+    test "preserves minimum billable occupancy for room holds" do
+      room =
+        create_room_fixture(%{
+          property: :tahoe,
+          min_billable_occupancy: 2,
+          capacity_max: 4
+        })
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          room_id: room.id,
+          season_id: nil
+        })
+
+      user = user_fixture()
+
+      assert {:ok, booking} =
+               Ysc.Bookings.BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 1,
+                 children_count: 0
+               )
+
+      min_occupancy_total = Money.new(600, :USD)
+      assert Money.equal?(booking.total_price, min_occupancy_total)
+
+      {:ok, priced} = Bookings.calculate_modification_pricing(booking)
+      assert Money.equal?(priced.total, min_occupancy_total)
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(total_price: Money.new(200, :USD))
+        |> Ysc.Repo.update!()
+
+      assert {:ok, updated} =
+               Bookings.sync_hold_pricing_from_calculation(booking)
+
+      assert Money.equal?(updated.total_price, min_occupancy_total)
+    end
   end
 
   describe "verify_booking_payment_intent/2" do
@@ -3782,6 +3831,76 @@ defmodule Ysc.BookingsTest do
 
       assert {:error, :payment_already_used} =
                Bookings.verify_booking_payment_intent(payment_intent, booking_b)
+    end
+  end
+
+  describe "verify_modification_redirect_payment_intent/2" do
+    test "accepts a modification intent for a complete booking with matching metadata" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :complete)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_mod_redirect_valid",
+        status: "succeeded",
+        amount: 5_000,
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id,
+          "modification" => "true"
+        }
+      }
+
+      assert :ok =
+               Bookings.verify_modification_redirect_payment_intent(
+                 payment_intent,
+                 booking
+               )
+    end
+
+    test "rejects modification intents on hold bookings" do
+      user = user_fixture()
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_mod_redirect_hold",
+        status: "succeeded",
+        amount: 5_000,
+        metadata: %{
+          "booking_id" => booking.id,
+          "user_id" => user.id,
+          "modification" => "true"
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_modification_redirect_payment_intent(
+                 payment_intent,
+                 booking
+               )
+    end
+
+    test "rejects modification intents bound to another booking" do
+      user_a = user_fixture()
+      user_b = user_fixture()
+      booking_a = booking_fixture(user_id: user_a.id, status: :complete)
+      booking_b = booking_fixture(user_id: user_b.id, status: :complete)
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_mod_redirect_foreign",
+        status: "succeeded",
+        amount: 5_000,
+        metadata: %{
+          "booking_id" => booking_a.id,
+          "user_id" => user_a.id,
+          "modification" => "true"
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Bookings.verify_modification_redirect_payment_intent(
+                 payment_intent,
+                 booking_b
+               )
     end
   end
 end

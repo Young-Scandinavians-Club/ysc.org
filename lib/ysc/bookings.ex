@@ -934,6 +934,43 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @doc false
+  def verify_modification_redirect_payment_intent(
+        payment_intent,
+        %Booking{} = booking
+      ) do
+    metadata = payment_intent.metadata || %{}
+
+    metadata_booking_id =
+      Map.get(metadata, "booking_id") || Map.get(metadata, :booking_id)
+
+    metadata_user_id =
+      Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
+    modification_flag =
+      Map.get(metadata, "modification") || Map.get(metadata, :modification)
+
+    cond do
+      payment_intent.status != "succeeded" ->
+        {:error, :payment_not_succeeded}
+
+      booking.status != :complete ->
+        {:error, :payment_metadata_mismatch}
+
+      modification_flag not in ["true", true] ->
+        {:error, :payment_metadata_mismatch}
+
+      to_string(metadata_booking_id || "") != to_string(booking.id) ->
+        {:error, :payment_metadata_mismatch}
+
+      to_string(metadata_user_id || "") != to_string(booking.user_id) ->
+        {:error, :payment_metadata_mismatch}
+
+      true ->
+        :ok
+    end
+  end
+
   defp payment_intent_recorded_for_other_booking?(payment_intent_id, booking_id) do
     case Ledgers.get_payment_by_external_id(payment_intent_id) do
       nil ->
@@ -1481,8 +1518,7 @@ defmodule Ysc.Bookings do
               :room,
               room_id: List.first(room_ids),
               guests_count: booking.guests_count,
-              children_count: booking.children_count || 0,
-              use_actual_guests: true
+              children_count: booking.children_count || 0
             )
           end
 
