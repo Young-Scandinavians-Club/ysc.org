@@ -254,6 +254,23 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Fetches rooms by ID in a single query.
+
+  Used for pricing helpers when selected room IDs are not yet in
+  `available_rooms` — avoids one `get_room!/1` call per room.
+  """
+  def list_rooms_by_ids(ids) when is_list(ids) do
+    ids = ids |> Enum.reject(&is_nil/1) |> Enum.uniq()
+
+    if ids == [] do
+      []
+    else
+      from(r in Room, where: r.id in ^ids)
+      |> Repo.all()
+    end
+  end
+
+  @doc """
   Creates a room.
   """
   def create_room(attrs \\ %{}) do
@@ -581,6 +598,23 @@ defmodule Ysc.Bookings do
        from(bg in BookingGuest, order_by: [asc: bg.order_index])},
       :rooms,
       :user
+    ])
+  end
+
+  @doc """
+  Gets a booking with associations needed for admin view and edit modals.
+
+  Loads everything in one preload pass instead of `get_booking!/1` followed by
+  a second `Repo.preload/2`.
+  """
+  def get_booking_for_admin_view!(id) do
+    Repo.get!(Booking, id)
+    |> Repo.preload([
+      {:booking_guests,
+       from(bg in BookingGuest, order_by: [asc: bg.order_index])},
+      rooms: :room_category,
+      user: :current_avatar,
+      check_ins: :check_in_vehicles
     ])
   end
 

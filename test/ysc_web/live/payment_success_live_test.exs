@@ -623,15 +623,14 @@ defmodule YscWeb.PaymentSuccessLiveTest do
   end
 
   describe "render/1" do
-    test "renders processing message (should never be seen in practice)" do
-      # This tests the render function directly, though in practice it should
-      # never render because mount always redirects
+    test "renders processing message while payment redirect is pending" do
       user = user_fixture()
 
       assigns = %{
         current_user: user,
         flash: %{},
-        live_action: nil
+        live_action: nil,
+        processing_payment?: true
       }
 
       html = YscWeb.PaymentSuccessLive.render(assigns)

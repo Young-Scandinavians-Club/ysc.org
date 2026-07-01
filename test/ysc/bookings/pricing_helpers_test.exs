@@ -296,6 +296,33 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       assert updated.assigns.price_breakdown.room_count == 2
     end
 
+    test "batch-loads rooms not yet in available_rooms for multi-room pricing", %{
+      room: room,
+      room2: room2
+    } do
+      socket =
+        lv_socket(%{
+          checkin_date: @checkin,
+          checkout_date: @checkout,
+          selected_booking_mode: :room,
+          selected_room_ids: [room.id, room2.id],
+          guests_count: 1,
+          children_count: 0,
+          available_rooms: []
+        })
+
+      updated =
+        PricingHelpers.calculate_price_if_ready(
+          socket,
+          :tahoe,
+          can_select_multiple_rooms_fn: fn _ -> true end
+        )
+
+      assert updated.assigns.price_error == nil
+      assert updated.assigns.price_breakdown.room_count == 2
+      assert updated.assigns.price_breakdown.billable_people >= 1
+    end
+
     test "returns error when date range is invalid for pricing" do
       socket =
         lv_socket(%{
