@@ -88,5 +88,42 @@ defmodule Ysc.Email.LinkTrackingTest do
       assert length(outside) == 1
       assert Floki.attribute(outside, "ses:no-track") != []
     end
+
+    test "regex fallback injects ses:no-track on anchor open tags" do
+      html = ~s(<p><a href="https://example.com">click</a></p>)
+
+      result = LinkTracking.inject_no_track_regex(html)
+
+      assert result =~ ~s(<a href="https://example.com" ses:no-track>click</a>)
+    end
+
+    test "regex fallback skips anchors that already have ses:no-track" do
+      html = ~s(<a href="https://example.com" ses:no-track>ok</a>)
+
+      assert LinkTracking.inject_no_track_regex(html) == html
+    end
+
+    test "regex fallback handles multiple anchors and mj-button style markup" do
+      html = """
+      <a href="https://example.com/reset" style="display:inline-block">Reset</a>
+      <a href="mailto:info@ysc.org">Email</a>
+      """
+
+      result = LinkTracking.inject_no_track_regex(html)
+
+      assert result =~
+               ~s(<a href="https://example.com/reset" style="display:inline-block" ses:no-track>)
+
+      assert result =~ ~s(<a href="mailto:info@ysc.org" ses:no-track>)
+      assert result |> String.split("ses:no-track") |> length() == 3
+    end
+
+    test "regex fallback does not match area or abbr tags" do
+      html = ~s(<area href="https://example.com"><abbr title="link">text</abbr>)
+
+      result = LinkTracking.inject_no_track_regex(html)
+
+      refute result =~ "ses:no-track"
+    end
   end
 end

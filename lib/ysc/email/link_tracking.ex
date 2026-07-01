@@ -36,7 +36,8 @@ defmodule Ysc.Email.LinkTracking do
   Adds `ses:no-track` to every `<a>` tag in the HTML that lacks it.
 
   Returns the original string unchanged when `html` is nil or empty.
-  On parse failure, logs a warning and returns the original HTML.
+  On parse failure, logs a warning and applies a conservative regex fallback
+  so transactional links are still protected from SES click rewriting.
   """
   @spec disable_tracking(String.t() | nil) :: String.t()
   def disable_tracking(nil), do: ""
@@ -51,12 +52,22 @@ defmodule Ysc.Email.LinkTracking do
 
       {:error, reason} ->
         Ysc.Logging.warning(
-          "Failed to parse email HTML for SES link tracking disable",
+          "Failed to parse email HTML for SES link tracking disable, using regex fallback",
           reason: inspect(reason)
         )
 
-        html
+        inject_no_track_regex(html)
     end
+  end
+
+  # Conservative fallback when Floki cannot parse the fragment. Matches opening
+  # <a> tags that lack ses:no-track and injects the attribute before ">".
+  @anchor_without_no_track ~r/<a\b(?![^>]*\bses:no-track\b)([^>]*?)>/i
+
+  @doc false
+  @spec inject_no_track_regex(String.t()) :: String.t()
+  def inject_no_track_regex(html) when is_binary(html) do
+    Regex.replace(@anchor_without_no_track, html, "<a\\1 ses:no-track>")
   end
 
   defp add_no_track_to_anchor({"a", attrs, children} = node) do
