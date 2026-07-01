@@ -360,7 +360,11 @@ defmodule YscWeb.Api.CheckInsControllerTest do
         rules_agreed: true
       }
 
-      assert %{"data" => _} = json_response(post(conn, ~p"/api/v1/mobile/check-in", first_payload), 201)
+      assert %{"data" => _} =
+               json_response(
+                 post(conn, ~p"/api/v1/mobile/check-in", first_payload),
+                 201
+               )
 
       second_response = post(conn, ~p"/api/v1/mobile/check-in", first_payload)
 
