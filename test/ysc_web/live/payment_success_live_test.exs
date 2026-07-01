@@ -587,9 +587,10 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                    ~p"/payment/success?redirect_status=failed&payment_intent=#{payment_intent_id}"
                  )
 
-        assert redirect_path == "/events/#{event.id}"
+        assert redirect_path == "/events/#{event.id}?payment_failed=1"
         assert flash["error"] =~ "Payment failed"
         assert flash["error"] =~ "info@ysc.org"
+        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :cancelled
       after
         Application.put_env(:ysc, :stripe_client, original_client)
         Process.delete(:test_metadata)
