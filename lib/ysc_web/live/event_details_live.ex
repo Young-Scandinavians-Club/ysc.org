@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.DonationDisplay
+  alias Ysc.Tickets.Display, as: TicketDisplay
 
   alias Ysc.Agendas
 
@@ -245,10 +246,10 @@ defmodule YscWeb.EventDetailsLive do
                     <% partial_refund =
                       length(confirmed_tickets) > 0 && length(refunded_tickets) > 0 %>
                     <% all_tiers_by_name =
-                      group_tickets_by_tier(order_event_tickets) %>
+                      TicketDisplay.group_tickets_by_tier(order_event_tickets) %>
                     <% confirmed_tiers_by_name =
                       if length(confirmed_tickets) > 0,
-                        do: group_tickets_by_tier(confirmed_tickets),
+                        do: TicketDisplay.group_tickets_by_tier(confirmed_tickets),
                         else: [] %>
                     <% dot_class =
                       cond do
@@ -7766,12 +7767,6 @@ defmodule YscWeb.EventDetailsLive do
         discount_savings: Money.new(0, :USD)
       }
     end
-  end
-
-  defp group_tickets_by_tier(tickets) do
-    tickets
-    |> Enum.group_by(& &1.ticket_tier.name)
-    |> Enum.sort_by(fn {_tier_name, tickets} -> length(tickets) end, :desc)
   end
 
   defp group_tickets_by_order(tickets) do

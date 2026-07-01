@@ -20,6 +20,30 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "group_tickets_by_tier/1" do
+    test "groups tickets by tier name sorted by quantity descending" do
+      tickets = [
+        ticket("VIP"),
+        ticket("VIP"),
+        ticket("Early Bird")
+      ]
+
+      assert Display.group_tickets_by_tier(tickets) == [
+               {"VIP", [ticket("VIP"), ticket("VIP")]},
+               {"Early Bird", [ticket("Early Bird")]}
+             ]
+    end
+
+    test "defaults missing tier names to General Admission" do
+      tickets = [ticket(nil), ticket("VIP")]
+
+      assert Display.group_tickets_by_tier(tickets) == [
+               {"General Admission", [ticket(nil)]},
+               {"VIP", [ticket("VIP")]}
+             ]
+    end
+  end
+
   describe "format_tier_quantities/1" do
     test "groups tickets by tier name" do
       tickets = [
