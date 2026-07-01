@@ -10,6 +10,8 @@ defmodule YscWeb.Api.BookingsControllerTest do
   import Ysc.BookingsFixtures
   import Ysc.AccountsFixtures
 
+  alias Ysc.Test.KioskAPIKeyHelper
+
   @test_token "test-kiosk-secret"
 
   # Creates a booking that is currently active (checked in already, not yet checked out),
@@ -58,11 +60,10 @@ defmodule YscWeb.Api.BookingsControllerTest do
   end
 
   setup %{conn: conn} do
-    previous = Application.get_env(:ysc, :kiosk_api_key)
-    Application.put_env(:ysc, :kiosk_api_key, @test_token)
+    original = KioskAPIKeyHelper.capture_kiosk_api_key!(@test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, previous)
+      KioskAPIKeyHelper.restore_kiosk_api_key!(original)
     end)
 
     authed_conn =

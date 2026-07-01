@@ -5,15 +5,15 @@ defmodule YscWeb.Plugs.MobileAPIAuthTest do
   use YscWeb.ConnCase, async: false
 
   alias YscWeb.Plugs.MobileAPIAuth
+  alias Ysc.Test.KioskAPIKeyHelper
 
   @test_token "test-kiosk-secret"
 
   setup do
-    original_kiosk_key = Application.get_env(:ysc, :kiosk_api_key)
-    Application.put_env(:ysc, :kiosk_api_key, @test_token)
+    original = KioskAPIKeyHelper.capture_kiosk_api_key!(@test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, original_kiosk_key)
+      KioskAPIKeyHelper.restore_kiosk_api_key!(original)
     end)
 
     :ok
@@ -89,35 +89,35 @@ defmodule YscWeb.Plugs.MobileAPIAuthTest do
 
   describe "call/2 when kiosk API key not configured" do
     test "returns 401 when kiosk_api_key is nil", %{conn: conn} do
-      Application.put_env(:ysc, :kiosk_api_key, nil)
+      KioskAPIKeyHelper.with_kiosk_api_key(nil, fn ->
+        conn =
+          conn
+          |> put_req_header("authorization", "Bearer #{@test_token}")
+          |> MobileAPIAuth.call([])
 
-      conn =
-        conn
-        |> put_req_header("authorization", "Bearer #{@test_token}")
-        |> MobileAPIAuth.call([])
+        assert conn.halted
+        assert conn.status == 401
 
-      assert conn.halted
-      assert conn.status == 401
-
-      assert Jason.decode!(conn.resp_body) == %{
-               "error" => "Kiosk API key not configured"
-             }
+        assert Jason.decode!(conn.resp_body) == %{
+                 "error" => "Kiosk API key not configured"
+               }
+      end)
     end
 
     test "returns 401 when kiosk_api_key is empty string", %{conn: conn} do
-      Application.put_env(:ysc, :kiosk_api_key, "")
+      KioskAPIKeyHelper.with_kiosk_api_key("", fn ->
+        conn =
+          conn
+          |> put_req_header("authorization", "Bearer #{@test_token}")
+          |> MobileAPIAuth.call([])
 
-      conn =
-        conn
-        |> put_req_header("authorization", "Bearer #{@test_token}")
-        |> MobileAPIAuth.call([])
+        assert conn.halted
+        assert conn.status == 401
 
-      assert conn.halted
-      assert conn.status == 401
-
-      assert Jason.decode!(conn.resp_body) == %{
-               "error" => "Kiosk API key not configured"
-             }
+        assert Jason.decode!(conn.resp_body) == %{
+                 "error" => "Kiosk API key not configured"
+               }
+      end)
     end
   end
 end
