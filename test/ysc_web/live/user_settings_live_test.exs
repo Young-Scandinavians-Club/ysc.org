@@ -692,7 +692,9 @@ defmodule YscWeb.UserSettingsLiveTest do
     end
   end
 
-  test "payment card uses PaymentDisplay helpers for booking icons", %{conn: conn} do
+  test "payment card uses PaymentDisplay helpers for booking icons", %{
+    conn: conn
+  } do
     user = user_fixture(%{state: :active})
     conn = log_in_user(conn, user)
 

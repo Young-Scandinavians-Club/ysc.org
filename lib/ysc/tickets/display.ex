@@ -24,7 +24,10 @@ defmodule Ysc.Tickets.Display do
     tickets
     |> Enum.group_by(&tier_name_from_ticket/1)
     |> Enum.map(fn {name, tier_tickets} -> {tier_name(name), tier_tickets} end)
-    |> Enum.sort_by(fn {_tier_name, tier_tickets} -> length(tier_tickets) end, :desc)
+    |> Enum.sort_by(
+      fn {_tier_name, tier_tickets} -> length(tier_tickets) end,
+      :desc
+    )
   end
 
   @doc """
