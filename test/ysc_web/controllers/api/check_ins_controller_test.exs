@@ -30,7 +30,7 @@ defmodule YscWeb.Api.CheckInsControllerTest do
 
   describe "POST /api/v1/mobile/check-in (create)" do
     test "successfully checks in a booking by ULID id", %{conn: conn} do
-      booking = booking_fixture()
+      booking = active_check_in_booking_fixture()
 
       payload = %{
         property: "tahoe",
@@ -48,7 +48,7 @@ defmodule YscWeb.Api.CheckInsControllerTest do
     end
 
     test "successfully checks in using reference_id", %{conn: conn} do
-      booking = booking_fixture()
+      booking = active_check_in_booking_fixture()
 
       payload = %{
         property: "tahoe",
@@ -63,7 +63,7 @@ defmodule YscWeb.Api.CheckInsControllerTest do
     end
 
     test "successfully checks in with vehicles", %{conn: conn} do
-      booking = booking_fixture()
+      booking = active_check_in_booking_fixture()
 
       payload = %{
         property: "tahoe",
@@ -84,7 +84,7 @@ defmodule YscWeb.Api.CheckInsControllerTest do
     end
 
     test "check-in response includes expected fields", %{conn: conn} do
-      booking = booking_fixture()
+      booking = active_check_in_booking_fixture()
 
       payload = %{
         property: "tahoe",
@@ -242,7 +242,7 @@ defmodule YscWeb.Api.CheckInsControllerTest do
 
   describe "POST /api/v1/mobile/check-in - vehicle handling" do
     test "proceeds with empty vehicles list when none provided", %{conn: conn} do
-      booking = booking_fixture()
+      booking = active_check_in_booking_fixture()
 
       payload = %{
         property: "tahoe",
@@ -258,7 +258,7 @@ defmodule YscWeb.Api.CheckInsControllerTest do
     end
 
     test "ignores invalid vehicle entries (non-maps) gracefully", %{conn: conn} do
-      booking = booking_fixture()
+      booking = active_check_in_booking_fixture()
 
       payload = %{
         property: "tahoe",
@@ -271,6 +271,105 @@ defmodule YscWeb.Api.CheckInsControllerTest do
 
       assert %{"data" => data} = json_response(response, 201)
       assert data["vehicles"] == []
+    end
+  end
+
+  describe "POST /api/v1/mobile/check-in - booking eligibility" do
+    test "rejects draft bookings", %{conn: conn} do
+      booking = booking_fixture(%{status: :draft})
+
+      payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(booking.id)],
+        rules_agreed: true
+      }
+
+      response = post(conn, ~p"/api/v1/mobile/check-in", payload)
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "not confirmed"
+    end
+
+    test "rejects canceled bookings", %{conn: conn} do
+      booking = active_check_in_booking_fixture(%{status: :canceled})
+
+      payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(booking.id)],
+        rules_agreed: true
+      }
+
+      response = post(conn, ~p"/api/v1/mobile/check-in", payload)
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "not confirmed"
+    end
+
+    test "rejects bookings that have not started yet", %{conn: conn} do
+      today_pst =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+      booking =
+        active_check_in_booking_fixture(%{
+          checkin_date: Date.add(today_pst, 3),
+          checkout_date: Date.add(today_pst, 5)
+        })
+
+      payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(booking.id)],
+        rules_agreed: true
+      }
+
+      response = post(conn, ~p"/api/v1/mobile/check-in", payload)
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "not yet active"
+    end
+
+    test "rejects bookings that have already ended", %{conn: conn} do
+      today_pst =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+      booking =
+        active_check_in_booking_fixture(%{
+          checkin_date: Date.add(today_pst, -5),
+          checkout_date: Date.add(today_pst, -1)
+        })
+
+      payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(booking.id)],
+        rules_agreed: true
+      }
+
+      response = post(conn, ~p"/api/v1/mobile/check-in", payload)
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "already ended"
+    end
+
+    test "rejects bookings that are already checked in", %{conn: conn} do
+      booking = active_check_in_booking_fixture()
+
+      first_payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(booking.id)],
+        rules_agreed: true
+      }
+
+      assert %{"data" => _} =
+               json_response(
+                 post(conn, ~p"/api/v1/mobile/check-in", first_payload),
+                 201
+               )
+
+      second_response = post(conn, ~p"/api/v1/mobile/check-in", first_payload)
+
+      assert %{"error" => error} = json_response(second_response, 422)
+      assert error =~ "already checked in"
     end
   end
 
