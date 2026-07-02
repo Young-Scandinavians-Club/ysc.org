@@ -11,6 +11,7 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
   import Phoenix.LiveViewTest
 
   alias Ysc.Newsletter
+  alias Ysc.Repo
 
   describe "mount - invalid or missing token" do
     test "shows invalid link message for unknown token", %{conn: conn} do
@@ -204,6 +205,20 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       view |> element("button", "Unsubscribe") |> render_click()
 
       assert render(view) =~ "unsubscribed from our newsletter"
+    end
+
+    test "survives unsubscribe failure and shows contact guidance toast", %{conn: conn} do
+      {:ok, sub} =
+        Newsletter.subscribe("fail@example.com", source: "public_signup")
+
+      {:ok, view, _html} =
+        live(conn, ~p"/newsletter/unsubscribe/#{sub.subscription_token}")
+
+      Repo.delete!(sub)
+
+      html = view |> element("button", "Unsubscribe") |> render_click()
+      assert is_binary(html)
+      assert Newsletter.get_subscriber_by_email("fail@example.com") == nil
     end
   end
 
