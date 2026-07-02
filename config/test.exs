@@ -178,6 +178,10 @@ config :ysc, :season_cache_enabled, false
 # Disable process-global Cachex caches in tests (DB sandbox is per-test; Cachex is not).
 config :ysc, :process_caches_enabled, false
 
+# Default kiosk API key for tests; suites that need a different value must use
+# Ysc.Test.KioskAPIKeyHelper so async tests do not race on Application env.
+config :ysc, :kiosk_api_key, "test-kiosk-secret"
+
 # Fail fast on accidental real Stripe HTTP (no retries; dummy key if unset)
 config :stripity_stripe,
   api_key: System.get_env("STRIPE_SECRET") || "sk_test_stub_no_network",

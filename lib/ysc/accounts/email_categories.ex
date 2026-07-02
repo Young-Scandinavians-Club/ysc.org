@@ -98,6 +98,23 @@ defmodule Ysc.Accounts.EmailCategories do
   def get_category(_), do: :account
 
   @doc """
+  Returns whether Amazon SES should rewrite links for click tracking.
+
+  Only `:newsletter` category templates keep click tracking. All other templates
+  get `ses:no-track` injected on anchor tags at send time via
+  `Ysc.Email.LinkTracking`.
+
+  To enable click tracking on a new email type, add it to `@template_categories`
+  with category `:newsletter`.
+  """
+  @spec link_tracking_enabled?(String.t()) :: boolean()
+  def link_tracking_enabled?(template_name) when is_binary(template_name) do
+    get_category(template_name) == :newsletter
+  end
+
+  def link_tracking_enabled?(_), do: false
+
+  @doc """
   Returns the reply-to email for membership-related templates, or nil for others.
 
   Membership emails use memberships@ysc.org so replies go to the membership team.

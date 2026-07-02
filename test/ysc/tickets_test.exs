@@ -5,6 +5,7 @@ defmodule Ysc.TicketsTest do
   use Ysc.DataCase, async: true
 
   import Ecto.Query
+  alias Ysc.Agendas
   alias Ysc.Events
   alias Ysc.Events.Ticket
   alias Ysc.Tickets
@@ -718,6 +719,64 @@ defmodule Ysc.TicketsTest do
     end
   end
 
+  describe "get_user_ticket_order_for_confirmation/2 (#624)" do
+    setup do
+      tickets_setup()
+    end
+
+    test "returns order for owner with confirmation preloads", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      found = Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
+
+      assert found.id == order.id
+      assert Ecto.assoc_loaded?(found.user)
+      assert Ecto.assoc_loaded?(found.event)
+      assert Ecto.assoc_loaded?(found.event.cover_image)
+      assert Ecto.assoc_loaded?(found.payment)
+      assert Ecto.assoc_loaded?(found.tickets)
+      assert Enum.all?(found.tickets, &Ecto.assoc_loaded?(&1.ticket_tier))
+    end
+
+    test "returns nil for another user", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      refute Tickets.get_user_ticket_order_for_confirmation(
+               user_fixture_unique().id,
+               order.id
+             )
+    end
+
+    test "omits event agenda preloads unlike get_user_ticket_order/2", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, _agenda} = Agendas.create_agenda(event, %{title: "Day 1"})
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      full = Tickets.get_user_ticket_order(user.id, order.id)
+      assert Ecto.assoc_loaded?(full.event.agendas)
+
+      confirmation =
+        Tickets.get_user_ticket_order_for_confirmation(user.id, order.id)
+
+      refute Ecto.assoc_loaded?(confirmation.event.agendas)
+    end
+  end
+
   describe "complete_ticket_order/2 and cancel_ticket_order/2" do
     setup do
       tickets_setup()
@@ -1063,6 +1122,93 @@ defmodule Ysc.TicketsTest do
     test "uses id from map for capacity check", %{event: event} do
       map = %{id: event.id, max_attendees: 10_000}
       refute Tickets.event_at_capacity?(map)
+    end
+  end
+
+  describe "sync_pending_order_pricing/1 (#610)" do
+    setup do
+      tickets_setup()
+    end
+
+    test "persists recalculated total when tier price increases", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+        end)
+
+      assert Money.equal?(order.total_amount, Money.new(50, :USD))
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier1, %{price: Money.new(75, :USD)})
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(order)
+      assert Money.equal?(synced.total_amount, Money.new(75, :USD))
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert Money.equal?(reloaded.total_amount, Money.new(75, :USD))
+    end
+
+    test "returns unchanged order when pricing is already current", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+        end)
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(order)
+      assert synced.id == order.id
+      assert Money.equal?(synced.total_amount, order.total_amount)
+    end
+
+    test "passes through completed orders without modifying pricing", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+        end)
+
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      completed =
+        order
+        |> Ecto.Changeset.change(status: :completed, completed_at: now)
+        |> Repo.update!()
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier1, %{price: Money.new(99, :USD)})
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(completed)
+      assert Money.equal?(synced.total_amount, Money.new(50, :USD))
+    end
+
+    test "recalculates pricing for expired orders from expired tickets", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      {:ok, order} =
+        Oban.Testing.with_testing_mode(:manual, fn ->
+          Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+        end)
+
+      assert {:ok, expired} = Tickets.expire_ticket_order(order)
+      assert expired.status == :expired
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier1, %{price: Money.new(80, :USD)})
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(expired)
+      assert Money.equal?(synced.total_amount, Money.new(80, :USD))
     end
   end
 

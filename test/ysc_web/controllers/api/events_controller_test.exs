@@ -7,15 +7,15 @@ defmodule YscWeb.Api.EventsControllerTest do
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
 
+  alias Ysc.Test.KioskAPIKeyHelper
+
   @test_token "test-kiosk-secret-events-api"
 
   setup %{conn: conn} do
-    prev = Application.get_env(:ysc, :kiosk_api_key)
-    Application.put_env(:ysc, :kiosk_api_key, @test_token)
-    Ysc.Settings.clear_cache()
+    original = KioskAPIKeyHelper.capture_kiosk_api_key!(@test_token)
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, prev)
+      KioskAPIKeyHelper.restore_kiosk_api_key!(original)
     end)
 
     authed_conn =

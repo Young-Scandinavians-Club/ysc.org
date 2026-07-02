@@ -350,9 +350,36 @@ defmodule YscWeb.BookingCheckoutLive do
         <h1>Complete Your Booking</h1>
       </div>
 
-      <p :if={!@checkout_data_loaded?} class="text-zinc-600">
-        Loading checkout details…
-      </p>
+      <div
+        :if={!@checkout_data_loaded?}
+        id="checkout-loading"
+        class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="sr-only">Loading checkout details…</span>
+        <div class="lg:col-span-2 space-y-6">
+          <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
+            <.skeleton_block class="h-20 w-20 rounded-lg shrink-0" />
+            <div class="flex-1 space-y-2">
+              <.skeleton_block class="h-6 w-1/2 rounded" />
+              <.skeleton_block class="h-4 w-2/3 rounded" />
+              <.skeleton_block class="h-4 w-1/3 rounded" />
+            </div>
+          </div>
+          <div class="bg-white rounded-lg border border-zinc-200 p-8 space-y-4">
+            <.skeleton_block class="h-6 w-40 rounded" />
+            <.payment_element_loading />
+          </div>
+        </div>
+        <aside class="space-y-6">
+          <.skeleton_block class="h-20 w-full rounded-lg" />
+          <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+            <.skeleton_block class="h-4 w-1/3 rounded" />
+            <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded" />
+          </div>
+        </aside>
+      </div>
 
       <div
         :if={@checkout_data_loaded?}

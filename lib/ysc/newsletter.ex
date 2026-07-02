@@ -597,7 +597,7 @@ defmodule Ysc.Newsletter do
   def send_test_email(%Edition{} = edition, user) do
     alias Ysc.Posts
     alias Ysc.Events
-    alias Ysc.Mailer
+    alias Ysc.Messages
     alias YscWeb.Emails.NewsletterEdition
 
     edition = Repo.preload(edition, :cover_image)
@@ -620,18 +620,32 @@ defmodule Ysc.Newsletter do
 
     html = NewsletterEdition.render(assigns)
 
+    subject = "[YSC] [TEST] #{edition.subject || edition.title}"
+
     email =
       Swoosh.Email.new()
       |> Swoosh.Email.to(user.email)
       |> Swoosh.Email.from(
         {Ysc.EmailConfig.from_name(), Ysc.EmailConfig.from_email()}
       )
-      |> Swoosh.Email.subject(
-        "[YSC] [TEST] #{edition.subject || edition.title}"
-      )
+      |> Swoosh.Email.subject(subject)
       |> Swoosh.Email.html_body(html)
 
-    case Mailer.deliver(email) do
+    idempotency_key =
+      "newsletter_test_#{edition.id}_#{user.id}_#{System.unique_integer([:positive])}"
+
+    attrs = %{
+      message_type: :email,
+      idempotency_key: idempotency_key,
+      message_template: "newsletter_edition",
+      params: %{edition_id: edition.id, test: true},
+      email: user.email,
+      user_id: user.id,
+      rendered_message: html,
+      edition_id: edition.id
+    }
+
+    case Messages.run_send_message_idempotent(email, attrs) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
     end

@@ -43,6 +43,16 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
     end
   end
 
+  describe "link_tracking_enabled?/1" do
+    test "returns true only for newsletter category templates" do
+      assert EmailCategories.link_tracking_enabled?("newsletter_edition")
+      refute EmailCategories.link_tracking_enabled?("reset_password")
+      refute EmailCategories.link_tracking_enabled?("newsletter_stats_snapshot")
+      refute EmailCategories.link_tracking_enabled?("unknown")
+      refute EmailCategories.link_tracking_enabled?(:newsletter_edition)
+    end
+  end
+
   describe "get_reply_to/1" do
     test "returns membership email for membership-related templates" do
       membership_email = Ysc.EmailConfig.membership_email()

@@ -253,9 +253,9 @@ defmodule Ysc.TestDataFactory do
     event =
       event_with_state(state, with_image: true, attrs: event_attrs, user: user)
 
-    # Create ticket tiers
+    # Create ticket tiers (//1 avoids Elixir 1.20 warning when tier_count is 0)
     tiers =
-      Enum.map(1..tier_count, fn i ->
+      Enum.map(1..tier_count//1, fn i ->
         attrs =
           tier_attrs
           |> Map.merge(%{

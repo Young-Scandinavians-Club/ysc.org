@@ -2,6 +2,7 @@ defmodule YscWeb.FamilyManagementLive do
   use YscWeb, :live_view
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.FamilyDisplay
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.FamilyMembers
@@ -432,11 +433,26 @@ defmodule YscWeb.FamilyManagementLive do
         />
 
         <div class="text-medium px-2 text-zinc-500 w-full md:border-l md:border-zinc-200 md:pl-10">
-          <.async_section_loader
+          <div
             :if={@loading_family_data}
             id="family-management-loading"
-            label="Loading family settings..."
-          />
+            class="space-y-6"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="sr-only">Loading family settings…</span>
+            <.skeleton_block class="h-6 w-48 rounded" />
+            <.skeleton_list_row
+              :for={_ <- 1..2}
+              class="flex items-center gap-3 p-4 border border-zinc-200 rounded-lg"
+              leading_class="h-10 w-10 rounded-full shrink-0"
+              lines={["h-4 w-40 rounded", "h-3 w-28 rounded"]}
+            />
+            <div class="space-y-2">
+              <.skeleton_block class="h-4 w-32 rounded" />
+              <.skeleton_block class="h-11 w-full rounded-lg" />
+            </div>
+          </div>
           <div :if={!@loading_family_data} class="space-y-10">
             <%= if @is_sub_account do %>
               <.sub_account_view
@@ -560,7 +576,7 @@ defmodule YscWeb.FamilyManagementLive do
                   {member.first_name} {member.last_name}
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                  {format_member_type(member.type)}
+                  {FamilyDisplay.relationship_label(member.type)}
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
                   {format_birth_date(member.birth_date)}
@@ -661,7 +677,9 @@ defmodule YscWeb.FamilyManagementLive do
                     {sub_account.email}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {format_relationship(sub_account.family_relationship)}
+                    {FamilyDisplay.relationship_label(
+                      sub_account.family_relationship
+                    )}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm">
                     <button
@@ -723,7 +741,7 @@ defmodule YscWeb.FamilyManagementLive do
                     {invite.email}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {format_relationship(invite.relationship)}
+                    {FamilyDisplay.relationship_label(invite.relationship)}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
                     {Calendar.strftime(invite.expires_at, "%B %d, %Y")}
@@ -1043,20 +1061,6 @@ defmodule YscWeb.FamilyManagementLive do
       "relationship" => relationship
     }
   end
-
-  defp format_relationship(nil), do: "Child"
-  defp format_relationship("spouse"), do: "Spouse"
-  defp format_relationship("child"), do: "Child"
-  defp format_relationship(:spouse), do: "Spouse"
-  defp format_relationship(:child), do: "Child"
-  defp format_relationship(_), do: "Child"
-
-  defp format_member_type(nil), do: "Child"
-  defp format_member_type(:spouse), do: "Spouse"
-  defp format_member_type("spouse"), do: "Spouse"
-  defp format_member_type(:child), do: "Child"
-  defp format_member_type("child"), do: "Child"
-  defp format_member_type(_), do: "Child"
 
   defp format_birth_date(nil), do: "—"
 

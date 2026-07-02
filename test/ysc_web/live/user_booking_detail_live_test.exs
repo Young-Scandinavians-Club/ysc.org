@@ -91,7 +91,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn = get(conn, ~p"/bookings/#{booking.id}")
       html = html_response(conn, 200)
 
-      assert html =~ "Loading payment details..."
+      assert html =~ ~s|id="booking-payment-loading"|
+      assert html =~ "Loading payment details"
       refute html =~ "Payment Method"
       refute html =~ "Total Paid"
     end
