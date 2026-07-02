@@ -100,7 +100,9 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static User"
   end
 
-  test "dead render loads review route with deferred modal content", %{conn: conn} do
+  test "dead render loads review route with deferred modal content", %{
+    conn: conn
+  } do
     pending_user =
       user_fixture(%{
         state: "pending_approval",
@@ -327,7 +329,9 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       assert has_element?(view, "#admin_users_list")
     end
 
-    test "review modal replaces loading placeholder after connect", %{conn: conn} do
+    test "review modal replaces loading placeholder after connect", %{
+      conn: conn
+    } do
       pending_user =
         user_fixture(%{
           state: "pending_approval",
