@@ -39,12 +39,13 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
     Application.put_env(:ysc, :stripe_client, StripeMock)
 
-    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
       {:ok,
        %Stripe.PaymentIntent{
          id: "pi_test_#{System.unique_integer([:positive])}",
          client_secret: "pi_test_secret",
-         status: "requires_payment_method"
+         status: "requires_payment_method",
+         amount: params.amount
        }}
     end)
 

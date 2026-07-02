@@ -1951,9 +1951,10 @@ defmodule YscWeb.BookingCheckoutLive do
         payment_intent_params
       end
 
-    # Use booking reference ID as idempotency key to prevent duplicate charges
-    # If the same reference is used again, Stripe will return the existing payment intent
-    idempotency_key = "booking_#{booking.reference_id}"
+    # Include amount in the idempotency key so repriced holds get a fresh PI.
+    # A reference-only key caused Stripe to return a stale PI after checkout
+    # recalculated entitlements or min-occupancy pricing.
+    idempotency_key = "booking_#{booking.reference_id}_#{amount_cents}"
 
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
@@ -1961,7 +1962,19 @@ defmodule YscWeb.BookingCheckoutLive do
            headers: %{"Idempotency-Key" => idempotency_key}
          ) do
       {:ok, payment_intent} ->
-        {:ok, payment_intent}
+        if payment_intent.amount == amount_cents do
+          {:ok, payment_intent}
+        else
+          Ysc.Logging.warning(
+            "[BookingCheckout] Stripe returned payment intent with stale amount",
+            booking_id: booking.id,
+            expected_amount_cents: amount_cents,
+            payment_intent_id: payment_intent.id,
+            payment_intent_amount_cents: payment_intent.amount
+          )
+
+          {:error, YscWeb.BookingUserMessages.checkout_payment_setup_failed()}
+        end
 
       {:error, %Stripe.Error{} = error} ->
         Ysc.Logging.error(
