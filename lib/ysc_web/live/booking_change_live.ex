@@ -26,43 +26,12 @@ defmodule YscWeb.BookingChangeLive do
        )
        |> redirect(to: ~p"/")}
     else
-      case load_booking(booking_id, user) do
-        {:ok, booking} ->
-          if BookingActions.can_change_booking?(booking) do
-            calendar =
-              ModificationDateAvailability.calendar_placeholder(booking)
+      socket = assign_change_loading_shell(socket, booking_id)
 
-            form = modification_form(booking)
-
-            socket =
-              socket
-              |> assign_change_page_shell(booking, calendar, form)
-
-            if connected?(socket) do
-              {:ok, load_change_data_async(socket, booking, form)}
-            else
-              {:ok, socket}
-            end
-          else
-            {:ok,
-             socket
-             |> YscWeb.Flash.put_toast(
-               :error,
-               "This booking can no longer be changed.",
-               title: "Booking"
-             )
-             |> redirect(to: ~p"/bookings/#{booking_id}/receipt")}
-          end
-
-        {:error, :not_found} ->
-          {:ok,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             YscWeb.BookingUserMessages.reservation_not_found(),
-             title: "Booking"
-           )
-           |> redirect(to: ~p"/")}
+      if connected?(socket) do
+        {:ok, load_booking_for_change(socket, booking_id, user)}
+      else
+        {:ok, socket}
       end
     end
   end
@@ -439,7 +408,27 @@ defmodule YscWeb.BookingChangeLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="max-w-3xl mx-auto px-4 py-8">
+    <div
+      :if={@loading_booking?}
+      id="booking-change-loading"
+      class="max-w-3xl mx-auto px-4 py-8"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="sr-only">Loading change reservation…</span>
+      <.skeleton_block class="h-4 w-40 rounded mb-6" />
+      <.skeleton_block class="h-9 w-72 rounded mb-2" />
+      <.skeleton_block class="h-5 w-56 rounded mb-6" />
+      <.skeleton_block class="h-24 w-full rounded-lg mb-6" />
+      <div class="bg-white border border-zinc-200 rounded-xl p-6 space-y-4">
+        <.skeleton_block :for={_ <- 1..4} class="h-10 w-full rounded" />
+      </div>
+    </div>
+    <div
+      :if={!@loading_booking?}
+      id="booking-change"
+      class="max-w-3xl mx-auto px-4 py-8"
+    >
       <div class="mb-6">
         <.link
           navigate={~p"/bookings/#{@booking.id}/receipt"}
@@ -728,6 +717,74 @@ defmodule YscWeb.BookingChangeLive do
       <% end %>
     </div>
     """
+  end
+
+  defp assign_change_loading_shell(socket, booking_id) do
+    assign(socket,
+      booking_id: booking_id,
+      loading_booking?: true,
+      booking: nil,
+      page_title: "Change Reservation"
+    )
+  end
+
+  defp load_booking_for_change(socket, booking_id, user) do
+    if loaded_change_booking_matches?(socket, booking_id) do
+      socket
+      |> assign(:loading_booking?, false)
+      |> maybe_restart_change_data_load()
+    else
+      case load_booking(booking_id, user) do
+        {:ok, booking} ->
+          if BookingActions.can_change_booking?(booking) do
+            calendar =
+              ModificationDateAvailability.calendar_placeholder(booking)
+
+            form = modification_form(booking)
+
+            socket
+            |> assign(:loading_booking?, false)
+            |> assign_change_page_shell(booking, calendar, form)
+            |> load_change_data_async(booking, form)
+          else
+            socket
+            |> YscWeb.Flash.put_toast(
+              :error,
+              "This booking can no longer be changed.",
+              title: "Booking"
+            )
+            |> redirect(to: ~p"/bookings/#{booking_id}/receipt")
+          end
+
+        {:error, :not_found} ->
+          socket
+          |> YscWeb.Flash.put_toast(
+            :error,
+            YscWeb.BookingUserMessages.reservation_not_found(),
+            title: "Booking"
+          )
+          |> redirect(to: ~p"/")
+      end
+    end
+  end
+
+  defp loaded_change_booking_matches?(socket, booking_id) do
+    case socket.assigns[:booking] do
+      %Booking{id: id} -> to_string(id) == to_string(booking_id)
+      _ -> false
+    end
+  end
+
+  defp maybe_restart_change_data_load(socket) do
+    if socket.assigns[:change_data_loaded?] do
+      socket
+    else
+      load_change_data_async(
+        socket,
+        socket.assigns.booking,
+        socket.assigns.form
+      )
+    end
   end
 
   defp assign_change_page_shell(socket, booking, calendar, form) do

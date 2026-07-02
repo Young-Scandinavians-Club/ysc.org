@@ -178,6 +178,17 @@ defmodule YscWeb.AdminUsersLiveTest do
       refute String.contains?(patched, "search")
     end
 
+    test "direct edit route static HTML shows modal loading shell before websocket connects",
+         %{conn: conn} do
+      user = user_fixture(%{first_name: "Direct", last_name: "EditUser"})
+
+      conn = get(conn, ~p"/admin/users/#{user.id}")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s|id="admin-user-edit-modal-loading"|
+      refute html =~ "Direct EditUser"
+    end
+
     test "change event accepts flat search query param", %{conn: conn} do
       user_fixture(%{first_name: "FlatSearch", last_name: "Hit"})
 
