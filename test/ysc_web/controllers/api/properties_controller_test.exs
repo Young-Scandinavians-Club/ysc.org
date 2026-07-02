@@ -14,18 +14,18 @@ defmodule YscWeb.Api.PropertiesControllerTest do
   alias Ysc.Repo
   alias Ysc.Settings
   alias Ysc.SiteSettings.SiteSetting
+  alias Ysc.Test.KioskAPIKeyHelper
 
   @test_token "test-kiosk-secret"
   @expected_tab_ids ~w(welcome bears checkout emergency)
   @expected_clear_lake_tab_ids ~w(welcome cleaning checkout emergency)
 
   setup %{conn: conn} do
-    prev = Application.get_env(:ysc, :kiosk_api_key)
-    Application.put_env(:ysc, :kiosk_api_key, @test_token)
+    original = KioskAPIKeyHelper.capture_kiosk_api_key!(@test_token)
     Settings.clear_cache()
 
     on_exit(fn ->
-      Application.put_env(:ysc, :kiosk_api_key, prev)
+      KioskAPIKeyHelper.restore_kiosk_api_key!(original)
     end)
 
     authed_conn =

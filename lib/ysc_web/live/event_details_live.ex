@@ -13,6 +13,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.DonationDisplay
+  alias Ysc.Tickets.Display, as: TicketDisplay
 
   alias Ysc.Agendas
 
@@ -245,10 +246,10 @@ defmodule YscWeb.EventDetailsLive do
                     <% partial_refund =
                       length(confirmed_tickets) > 0 && length(refunded_tickets) > 0 %>
                     <% all_tiers_by_name =
-                      group_tickets_by_tier(order_event_tickets) %>
+                      TicketDisplay.group_tickets_by_tier(order_event_tickets) %>
                     <% confirmed_tiers_by_name =
                       if length(confirmed_tickets) > 0,
-                        do: group_tickets_by_tier(confirmed_tickets),
+                        do: TicketDisplay.group_tickets_by_tier(confirmed_tickets),
                         else: [] %>
                     <% dot_class =
                       cond do
@@ -1844,187 +1845,548 @@ defmodule YscWeb.EventDetailsLive do
           </div>
         </div>
       <% else %>
-        <!-- Normal Payment Flow -->
-        <!-- Sticky Timer Banner at Top -->
-        <div class="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 -mx-6 -mt-2 px-6 pt-3 pb-3 mb-6">
-          <div class="flex items-center justify-center space-x-2">
-            <.icon name="hero-clock" class="w-5 h-5 text-blue-600" />
-            <span class="text-sm font-medium text-blue-800">
-              Time remaining to complete purchase:
-            </span>
-            <div
-              id="checkout-timer"
-              class="font-bold text-blue-900"
-              phx-hook="Countdown"
-              phx-update="ignore"
-              data-expires-at={@ticket_order.expires_at}
-              data-expire-event="checkout-expired"
-              data-expire-text="Time expired"
-              data-color-self
-            >
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col lg:flex-row gap-8 min-h-[600px]">
-          <!-- Left Panel: Payment Details -->
-          <div class="lg:w-2/3 space-y-6">
+        <%= if @checkout_payment_failed do %>
+          <!-- Payment Failed State (redirect methods like CashApp) -->
+          <div
+            id="payment-failed-state"
+            class="flex flex-col items-center justify-center py-16 space-y-6"
+          >
             <div class="text-center">
-              <h2 class="text-2xl font-semibold">Complete Your Purchase</h2>
-              <p class="text-zinc-600 mt-2">
-                Order: {@ticket_order.reference_id}
+              <div class="text-red-500 mb-4">
+                <.icon name="hero-x-circle" class="w-16 h-16 mx-auto" />
+              </div>
+              <h2 class="text-2xl font-semibold text-red-700 mb-2">
+                Payment failed
+              </h2>
+              <p class="text-zinc-600 max-w-md">
+                Your payment did not go through. Your ticket selection was released — please select tickets again and try a different payment method if needed.
               </p>
             </div>
 
-            <%!-- Registration Section - Show if tickets require registration --%>
-            <% tickets_requiring_registration =
-              get_tickets_requiring_registration(@ticket_order.tickets || []) %>
-            <%= if Enum.any?(tickets_requiring_registration) do %>
-              <div class="space-y-4 border-b border-zinc-200 pb-6">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <% all_registrations_complete_for_step1 =
-                      if Enum.any?(tickets_requiring_registration) do
-                        tickets_requiring_registration
-                        |> Enum.all?(fn ticket ->
-                          tickets_for_me = @tickets_for_me || %{}
+            <div class="flex space-x-4">
+              <.button
+                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                phx-click="retry-checkout"
+              >
+                <.icon name="hero-arrow-path" class="w-5 h-5 me-2" />
+                Select tickets again
+              </.button>
+              <.button
+                class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+                phx-click="close-payment-modal"
+              >
+                Close
+              </.button>
+            </div>
+          </div>
+        <% else %>
+          <!-- Normal Payment Flow -->
+        <!-- Sticky Timer Banner at Top -->
+          <div class="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 -mx-6 -mt-2 px-6 pt-3 pb-3 mb-6">
+            <div class="flex items-center justify-center space-x-2">
+              <.icon name="hero-clock" class="w-5 h-5 text-blue-600" />
+              <span class="text-sm font-medium text-blue-800">
+                Time remaining to complete purchase:
+              </span>
+              <div
+                id="checkout-timer"
+                class="font-bold text-blue-900"
+                phx-hook="Countdown"
+                phx-update="ignore"
+                data-expires-at={@ticket_order.expires_at}
+                data-expire-event="checkout-expired"
+                data-expire-text="Time expired"
+                data-color-self
+              >
+              </div>
+            </div>
+          </div>
 
-                          is_for_me =
-                            Map.get(tickets_for_me, ticket.id, false) ||
-                              Map.get(tickets_for_me, to_string(ticket.id), false)
+          <div class="flex flex-col lg:flex-row gap-8 min-h-[600px]">
+            <!-- Left Panel: Payment Details -->
+            <div class="lg:w-2/3 space-y-6">
+              <div class="text-center">
+                <h2 class="text-2xl font-semibold">Complete Your Purchase</h2>
+                <p class="text-zinc-600 mt-2">
+                  Order: {@ticket_order.reference_id}
+                </p>
+              </div>
 
-                          selected_family_members = @selected_family_members || %{}
+              <%!-- Registration Section - Show if tickets require registration --%>
+              <% tickets_requiring_registration =
+                get_tickets_requiring_registration(@ticket_order.tickets || []) %>
+              <%= if Enum.any?(tickets_requiring_registration) do %>
+                <div class="space-y-4 border-b border-zinc-200 pb-6">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <% all_registrations_complete_for_step1 =
+                        if Enum.any?(tickets_requiring_registration) do
+                          tickets_requiring_registration
+                          |> Enum.all?(fn ticket ->
+                            tickets_for_me = @tickets_for_me || %{}
 
-                          selected_family_member_id =
-                            Map.get(selected_family_members, ticket.id) ||
-                              Map.get(selected_family_members, to_string(ticket.id))
+                            is_for_me =
+                              Map.get(tickets_for_me, ticket.id, false) ||
+                                Map.get(tickets_for_me, to_string(ticket.id), false)
 
-                          family_members = @family_members || []
+                            selected_family_members =
+                              @selected_family_members || %{}
 
-                          selected_family_member =
-                            if selected_family_member_id,
-                              do:
-                                Enum.find(family_members, fn u ->
-                                  u.id == selected_family_member_id ||
-                                    to_string(u.id) ==
-                                      to_string(selected_family_member_id)
-                                end),
-                              else: nil
+                            selected_family_member_id =
+                              Map.get(selected_family_members, ticket.id) ||
+                                Map.get(
+                                  selected_family_members,
+                                  to_string(ticket.id)
+                                )
 
-                          has_selected_family_member =
-                            not is_nil(selected_family_member)
+                            family_members = @family_members || []
 
-                          ticket_id_str = to_string(ticket.id)
+                            selected_family_member =
+                              if selected_family_member_id,
+                                do:
+                                  Enum.find(family_members, fn u ->
+                                    u.id == selected_family_member_id ||
+                                      to_string(u.id) ==
+                                        to_string(selected_family_member_id)
+                                  end),
+                                else: nil
 
-                          cond do
-                            is_for_me ->
-                              @current_user.first_name &&
-                                @current_user.first_name != "" &&
-                                (@current_user.last_name &&
-                                   @current_user.last_name != "") &&
-                                (@current_user.email && @current_user.email != "")
+                            has_selected_family_member =
+                              not is_nil(selected_family_member)
 
-                            has_selected_family_member ->
-                              selected_family_member.first_name &&
-                                selected_family_member.first_name != "" &&
-                                (selected_family_member.last_name &&
-                                   selected_family_member.last_name != "") &&
-                                (selected_family_member.email &&
-                                   selected_family_member.email != "")
+                            ticket_id_str = to_string(ticket.id)
 
-                            true ->
-                              form_map =
-                                Map.get(@ticket_details_form, ticket_id_str) ||
-                                  Map.get(@ticket_details_form, ticket.id) || %{}
+                            cond do
+                              is_for_me ->
+                                @current_user.first_name &&
+                                  @current_user.first_name != "" &&
+                                  (@current_user.last_name &&
+                                     @current_user.last_name != "") &&
+                                  (@current_user.email && @current_user.email != "")
 
-                              first_name =
-                                Map.get(form_map, :first_name) ||
-                                  Map.get(form_map, "first_name") ||
-                                  ""
+                              has_selected_family_member ->
+                                selected_family_member.first_name &&
+                                  selected_family_member.first_name != "" &&
+                                  (selected_family_member.last_name &&
+                                     selected_family_member.last_name != "") &&
+                                  (selected_family_member.email &&
+                                     selected_family_member.email != "")
 
-                              last_name =
-                                Map.get(form_map, :last_name) ||
-                                  Map.get(form_map, "last_name") || ""
+                              true ->
+                                form_map =
+                                  Map.get(@ticket_details_form, ticket_id_str) ||
+                                    Map.get(@ticket_details_form, ticket.id) || %{}
 
-                              email =
-                                Map.get(form_map, :email) ||
-                                  Map.get(form_map, "email") || ""
+                                first_name =
+                                  Map.get(form_map, :first_name) ||
+                                    Map.get(form_map, "first_name") ||
+                                    ""
 
-                              first_name != "" && last_name != "" && email != "" &&
-                                String.contains?(email, "@")
-                          end
-                        end)
-                      else
-                        true
-                      end %>
-                    <div class="flex items-center gap-2 mb-1">
-                      <span class={[
-                        "flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold",
-                        if(all_registrations_complete_for_step1,
-                          do: "bg-green-600 text-white",
-                          else: "bg-blue-600 text-white"
-                        )
-                      ]}>
-                        <%= if all_registrations_complete_for_step1 do %>
-                          <.icon name="hero-check" class="w-4 h-4" />
-                        <% else %>
-                          1
-                        <% end %>
-                      </span>
-                      <h3 class="font-semibold text-lg">Who's going?</h3>
+                                last_name =
+                                  Map.get(form_map, :last_name) ||
+                                    Map.get(form_map, "last_name") || ""
+
+                                email =
+                                  Map.get(form_map, :email) ||
+                                    Map.get(form_map, "email") || ""
+
+                                first_name != "" && last_name != "" && email != "" &&
+                                  String.contains?(email, "@")
+                            end
+                          end)
+                        else
+                          true
+                        end %>
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class={[
+                          "flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold",
+                          if(all_registrations_complete_for_step1,
+                            do: "bg-green-600 text-white",
+                            else: "bg-blue-600 text-white"
+                          )
+                        ]}>
+                          <%= if all_registrations_complete_for_step1 do %>
+                            <.icon name="hero-check" class="w-4 h-4" />
+                          <% else %>
+                            1
+                          <% end %>
+                        </span>
+                        <h3 class="font-semibold text-lg">Who's going?</h3>
+                      </div>
+                      <p class="text-sm text-zinc-600 ml-8">
+                        Please provide details for each ticket that requires registration.
+                      </p>
                     </div>
-                    <p class="text-sm text-zinc-600 ml-8">
-                      Please provide details for each ticket that requires registration.
-                    </p>
                   </div>
+
+                  <%= for {ticket, index} <- Enum.with_index(tickets_requiring_registration) do %>
+                    <% tickets_for_me = @tickets_for_me || %{} %>
+                    <% is_for_me =
+                      Map.get(tickets_for_me, ticket.id, false) ||
+                        Map.get(tickets_for_me, to_string(ticket.id), false) %>
+
+                    <%!-- Check if "Me" is already selected for any other ticket --%>
+                    <% me_already_selected_for_other_ticket =
+                      tickets_requiring_registration
+                      |> Enum.any?(fn other_ticket ->
+                        other_ticket.id != ticket.id &&
+                          (Map.get(tickets_for_me, other_ticket.id, false) ||
+                             Map.get(
+                               tickets_for_me,
+                               to_string(other_ticket.id),
+                               false
+                             ))
+                      end) %>
+
+                    <% selected_family_members = @selected_family_members || %{} %>
+                    <% selected_family_member_id =
+                      Map.get(selected_family_members, ticket.id) ||
+                        Map.get(selected_family_members, to_string(ticket.id)) %>
+                    <% family_members = @family_members || [] %>
+                    <% selected_family_member =
+                      if selected_family_member_id,
+                        do:
+                          Enum.find(family_members, fn u ->
+                            u.id == selected_family_member_id ||
+                              to_string(u.id) ==
+                                to_string(selected_family_member_id)
+                          end),
+                        else: nil %>
+                    <% has_selected_family_member =
+                      not is_nil(selected_family_member) %>
+                    <% ticket_id_str = to_string(ticket.id)
+
+                    # Check if this ticket registration is complete
+                    is_registration_complete =
+                      cond do
+                        is_for_me ->
+                          # "Me" is selected - check if user has required fields
+                          @current_user.first_name && @current_user.first_name != "" &&
+                            (@current_user.last_name &&
+                               @current_user.last_name != "") &&
+                            (@current_user.email && @current_user.email != "")
+
+                        has_selected_family_member ->
+                          # Family member is selected - check if they have required fields
+                          selected_family_member.first_name &&
+                            selected_family_member.first_name != "" &&
+                            (selected_family_member.last_name &&
+                               selected_family_member.last_name != "") &&
+                            (selected_family_member.email &&
+                               selected_family_member.email != "")
+
+                        true ->
+                          # Manual entry - check if all fields are filled
+                          form_map =
+                            Map.get(@ticket_details_form, ticket_id_str) ||
+                              Map.get(@ticket_details_form, ticket.id) || %{}
+
+                          first_name =
+                            Map.get(form_map, :first_name) ||
+                              Map.get(form_map, "first_name") || ""
+
+                          last_name =
+                            Map.get(form_map, :last_name) ||
+                              Map.get(form_map, "last_name") || ""
+
+                          email =
+                            Map.get(form_map, :email) || Map.get(form_map, "email") ||
+                              ""
+
+                          first_name != "" && last_name != "" && email != "" &&
+                            String.contains?(email, "@")
+                      end
+
+                    form_data =
+                      cond do
+                        is_for_me ->
+                          # Auto-fill with current user's details
+                          %{
+                            first_name: @current_user.first_name || "",
+                            last_name: @current_user.last_name || "",
+                            email: @current_user.email || ""
+                          }
+
+                        has_selected_family_member ->
+                          # Use selected family member's details
+                          %{
+                            first_name: selected_family_member.first_name || "",
+                            last_name: selected_family_member.last_name || "",
+                            email: selected_family_member.email || ""
+                          }
+
+                        true ->
+                          # Use form data from @ticket_details_form (in-memory state only)
+                          # Don't query database on every render - form data is managed in memory
+                          case Map.get(@ticket_details_form, ticket_id_str) ||
+                                 Map.get(@ticket_details_form, ticket.id) do
+                            nil ->
+                              # No form data yet, use empty values
+                              %{
+                                first_name: "",
+                                last_name: "",
+                                email: ""
+                              }
+
+                            form_map ->
+                              # Use form data, but ensure all fields exist (fill missing ones with empty string)
+                              %{
+                                first_name:
+                                  Map.get(form_map, :first_name) ||
+                                    Map.get(form_map, "first_name") ||
+                                    "",
+                                last_name:
+                                  Map.get(form_map, :last_name) ||
+                                    Map.get(form_map, "last_name") || "",
+                                email:
+                                  Map.get(form_map, :email) ||
+                                    Map.get(form_map, "email") || ""
+                              }
+                          end
+                      end %>
+                    <div class={[
+                      "rounded-xl p-4 space-y-4 transition-all duration-200",
+                      if(is_registration_complete,
+                        do: "border-2 border-green-500 bg-green-50/30",
+                        else: "border border-zinc-200"
+                      )
+                    ]}>
+                      <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                          <div>
+                            <h4 class="text-base font-semibold text-zinc-900">
+                              Ticket {index + 1} of {length(
+                                tickets_requiring_registration
+                              )}
+                            </h4>
+                            <p class="text-xs text-zinc-600">
+                              {ticket.ticket_tier.name}
+                            </p>
+                          </div>
+                          <%= if is_registration_complete do %>
+                            <div class="flex-shrink-0">
+                              <.icon
+                                name="hero-check-circle"
+                                class="w-6 h-6 text-green-600"
+                              />
+                            </div>
+                          <% end %>
+                        </div>
+                      </div>
+
+                      <% other_family_members =
+                        Enum.reject(family_members, fn member ->
+                          member.id == @current_user.id
+                        end) %>
+
+                      <%!-- Streamlined Dropdown for "Who is this ticket for?" --%>
+                      <form
+                        id={"ticket-#{ticket.id}-attendee-form"}
+                        phx-change="select-ticket-attendee"
+                        phx-debounce="100"
+                      >
+                        <input
+                          type="hidden"
+                          name="ticket_id"
+                          value={to_string(ticket.id)}
+                        />
+                        <div class="mb-4">
+                          <label
+                            for={"ticket_#{ticket.id}_attendee_select"}
+                            class="block text-sm font-medium text-zinc-700 mb-2"
+                          >
+                            Who is this ticket for?
+                          </label>
+                          <select
+                            id={"ticket_#{ticket.id}_attendee_select"}
+                            name={"ticket_#{ticket.id}_attendee_select"}
+                            value={
+                              cond do
+                                is_for_me ->
+                                  "me"
+
+                                has_selected_family_member ->
+                                  "family_#{selected_family_member.id}"
+
+                                true ->
+                                  "other"
+                              end
+                            }
+                            class="block w-full rounded-md border-zinc-300 py-2.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          >
+                            <option
+                              value="me"
+                              disabled={
+                                me_already_selected_for_other_ticket && !is_for_me
+                              }
+                            >
+                              Me ({@current_user.first_name || @current_user.email})
+                              <%= if me_already_selected_for_other_ticket && !is_for_me do %>
+                                (Already selected for another ticket)
+                              <% end %>
+                            </option>
+                            <%= if length(other_family_members) > 0 do %>
+                              <optgroup label="Family Members">
+                                <%= for family_member <- other_family_members do %>
+                                  <option value={"family_#{family_member.id}"}>
+                                    {family_member.first_name} {family_member.last_name}
+                                  </option>
+                                <% end %>
+                              </optgroup>
+                            <% end %>
+                            <option
+                              value="other"
+                              selected={!is_for_me && !has_selected_family_member}
+                            >
+                              Someone else (Enter details)
+                            </option>
+                          </select>
+                        </div>
+                      </form>
+
+                      <%!-- Manual Entry Form (shown when "Someone else" is selected) --%>
+                      <form
+                        id={"ticket-#{ticket.id}-registration-form"}
+                        phx-change="update-registration-field"
+                        phx-debounce="500"
+                      >
+                        <div
+                          id={"ticket_#{ticket.id}_registration_fields"}
+                          class={[
+                            !is_for_me && !has_selected_family_member && "block",
+                            (is_for_me || has_selected_family_member) && "hidden"
+                          ]}
+                        >
+                          <div class="space-y-4">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              <div>
+                                <label
+                                  for={"ticket_#{ticket.id}_first_name"}
+                                  class="block text-sm font-medium text-zinc-700"
+                                >
+                                  First Name
+                                </label>
+                                <input
+                                  type="text"
+                                  id={"ticket_#{ticket.id}_first_name"}
+                                  name={"ticket_#{ticket.id}_first_name"}
+                                  value={form_data.first_name}
+                                  required={
+                                    !is_for_me && !has_selected_family_member
+                                  }
+                                  disabled={is_for_me || has_selected_family_member}
+                                  phx-value-ticket-id={ticket.id}
+                                  phx-value-field="first_name"
+                                  enterkeyhint="next"
+                                  class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                                />
+                              </div>
+                              <div>
+                                <label
+                                  for={"ticket_#{ticket.id}_last_name"}
+                                  class="block text-sm font-medium text-zinc-700"
+                                >
+                                  Last Name
+                                </label>
+                                <input
+                                  type="text"
+                                  id={"ticket_#{ticket.id}_last_name"}
+                                  name={"ticket_#{ticket.id}_last_name"}
+                                  value={form_data.last_name}
+                                  required={
+                                    !is_for_me && !has_selected_family_member
+                                  }
+                                  disabled={is_for_me || has_selected_family_member}
+                                  phx-value-ticket-id={ticket.id}
+                                  phx-value-field="last_name"
+                                  enterkeyhint="next"
+                                  class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                                />
+                              </div>
+                            </div>
+                            <div>
+                              <label
+                                for={"ticket_#{ticket.id}_email"}
+                                class="block text-sm font-medium text-zinc-700"
+                              >
+                                Email
+                              </label>
+                              <input
+                                type="email"
+                                id={"ticket_#{ticket.id}_email"}
+                                name={"ticket_#{ticket.id}_email"}
+                                value={form_data.email}
+                                required={!is_for_me && !has_selected_family_member}
+                                disabled={is_for_me || has_selected_family_member}
+                                autocomplete="email"
+                                enterkeyhint="done"
+                                phx-value-ticket-id={ticket.id}
+                                phx-value-field="email"
+                                class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </form>
+
+                      <%!-- Summary Display (shown when "Me" or "Family Member" is selected) --%>
+                      <div class={[
+                        (is_for_me || has_selected_family_member) && "block",
+                        !is_for_me && !has_selected_family_member && "hidden"
+                      ]}>
+                        <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                          <p class="text-sm text-blue-800">
+                            <strong>
+                              {form_data.first_name} {form_data.last_name}
+                            </strong>
+                            <br />
+                            <span class="text-blue-600">{form_data.email}</span>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  <% end %>
                 </div>
+              <% end %>
+              <!-- Stripe Elements Payment Form -->
+              <% all_registrations_complete =
+                if Enum.any?(tickets_requiring_registration) do
+                  tickets_requiring_registration
+                  |> Enum.all?(fn ticket ->
+                    tickets_for_me = @tickets_for_me || %{}
 
-                <%= for {ticket, index} <- Enum.with_index(tickets_requiring_registration) do %>
-                  <% tickets_for_me = @tickets_for_me || %{} %>
-                  <% is_for_me =
-                    Map.get(tickets_for_me, ticket.id, false) ||
-                      Map.get(tickets_for_me, to_string(ticket.id), false) %>
+                    is_for_me =
+                      Map.get(tickets_for_me, ticket.id, false) ||
+                        Map.get(tickets_for_me, to_string(ticket.id), false)
 
-                  <%!-- Check if "Me" is already selected for any other ticket --%>
-                  <% me_already_selected_for_other_ticket =
-                    tickets_requiring_registration
-                    |> Enum.any?(fn other_ticket ->
-                      other_ticket.id != ticket.id &&
-                        (Map.get(tickets_for_me, other_ticket.id, false) ||
-                           Map.get(
-                             tickets_for_me,
-                             to_string(other_ticket.id),
-                             false
-                           ))
-                    end) %>
+                    selected_family_members = @selected_family_members || %{}
 
-                  <% selected_family_members = @selected_family_members || %{} %>
-                  <% selected_family_member_id =
-                    Map.get(selected_family_members, ticket.id) ||
-                      Map.get(selected_family_members, to_string(ticket.id)) %>
-                  <% family_members = @family_members || [] %>
-                  <% selected_family_member =
-                    if selected_family_member_id,
-                      do:
-                        Enum.find(family_members, fn u ->
-                          u.id == selected_family_member_id ||
-                            to_string(u.id) == to_string(selected_family_member_id)
-                        end),
-                      else: nil %>
-                  <% has_selected_family_member = not is_nil(selected_family_member) %>
-                  <% ticket_id_str = to_string(ticket.id)
+                    selected_family_member_id =
+                      Map.get(selected_family_members, ticket.id) ||
+                        Map.get(selected_family_members, to_string(ticket.id))
 
-                  # Check if this ticket registration is complete
-                  is_registration_complete =
+                    family_members = @family_members || []
+
+                    selected_family_member =
+                      if selected_family_member_id,
+                        do:
+                          Enum.find(family_members, fn u ->
+                            u.id == selected_family_member_id ||
+                              to_string(u.id) ==
+                                to_string(selected_family_member_id)
+                          end),
+                        else: nil
+
+                    has_selected_family_member = not is_nil(selected_family_member)
+                    ticket_id_str = to_string(ticket.id)
+
                     cond do
                       is_for_me ->
-                        # "Me" is selected - check if user has required fields
                         @current_user.first_name && @current_user.first_name != "" &&
                           (@current_user.last_name && @current_user.last_name != "") &&
                           (@current_user.email && @current_user.email != "")
 
                       has_selected_family_member ->
-                        # Family member is selected - check if they have required fields
                         selected_family_member.first_name &&
                           selected_family_member.first_name != "" &&
                           (selected_family_member.last_name &&
@@ -2033,7 +2395,6 @@ defmodule YscWeb.EventDetailsLive do
                              selected_family_member.email != "")
 
                       true ->
-                        # Manual entry - check if all fields are filled
                         form_map =
                           Map.get(@ticket_details_form, ticket_id_str) ||
                             Map.get(@ticket_details_form, ticket.id) || %{}
@@ -2053,524 +2414,213 @@ defmodule YscWeb.EventDetailsLive do
                         first_name != "" && last_name != "" && email != "" &&
                           String.contains?(email, "@")
                     end
-
-                  form_data =
-                    cond do
-                      is_for_me ->
-                        # Auto-fill with current user's details
-                        %{
-                          first_name: @current_user.first_name || "",
-                          last_name: @current_user.last_name || "",
-                          email: @current_user.email || ""
-                        }
-
-                      has_selected_family_member ->
-                        # Use selected family member's details
-                        %{
-                          first_name: selected_family_member.first_name || "",
-                          last_name: selected_family_member.last_name || "",
-                          email: selected_family_member.email || ""
-                        }
-
-                      true ->
-                        # Use form data from @ticket_details_form (in-memory state only)
-                        # Don't query database on every render - form data is managed in memory
-                        case Map.get(@ticket_details_form, ticket_id_str) ||
-                               Map.get(@ticket_details_form, ticket.id) do
-                          nil ->
-                            # No form data yet, use empty values
-                            %{
-                              first_name: "",
-                              last_name: "",
-                              email: ""
-                            }
-
-                          form_map ->
-                            # Use form data, but ensure all fields exist (fill missing ones with empty string)
-                            %{
-                              first_name:
-                                Map.get(form_map, :first_name) ||
-                                  Map.get(form_map, "first_name") ||
-                                  "",
-                              last_name:
-                                Map.get(form_map, :last_name) ||
-                                  Map.get(form_map, "last_name") || "",
-                              email:
-                                Map.get(form_map, :email) ||
-                                  Map.get(form_map, "email") || ""
-                            }
-                        end
-                    end %>
-                  <div class={[
-                    "rounded-xl p-4 space-y-4 transition-all duration-200",
-                    if(is_registration_complete,
-                      do: "border-2 border-green-500 bg-green-50/30",
-                      else: "border border-zinc-200"
+                  end)
+                else
+                  true
+                end %>
+              <div class={[
+                "space-y-4 transition-opacity duration-300",
+                if(all_registrations_complete,
+                  do: "opacity-100",
+                  else: "opacity-40 pointer-events-none"
+                )
+              ]}>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class={[
+                    "flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold",
+                    if(all_registrations_complete,
+                      do: "bg-green-600 text-white",
+                      else: "bg-blue-600 text-white"
                     )
                   ]}>
-                    <div class="flex items-center justify-between mb-4">
-                      <div class="flex items-center gap-3">
-                        <div>
-                          <h4 class="text-base font-semibold text-zinc-900">
-                            Ticket {index + 1} of {length(
-                              tickets_requiring_registration
-                            )}
-                          </h4>
-                          <p class="text-xs text-zinc-600">
-                            {ticket.ticket_tier.name}
-                          </p>
+                    <%= if all_registrations_complete do %>
+                      <.icon name="hero-check" class="w-4 h-4" />
+                    <% else %>
+                      2
+                    <% end %>
+                  </span>
+                  <h3 class="font-semibold text-lg">Payment Information</h3>
+                </div>
+                <div
+                  id="payment-element"
+                  phx-hook="StripeElements"
+                  phx-update="ignore"
+                  data-publicKey={@public_key}
+                  data-public-key={@public_key}
+                  data-client-secret={@payment_intent.client_secret}
+                  data-clientSecret={@payment_intent.client_secret}
+                  data-ticket-order-id={@ticket_order.id}
+                >
+                  <!-- Stripe Elements will be mounted here -->
+                </div>
+                <div id="payment-message" class="hidden text-sm"></div>
+              </div>
+              <!-- Checkout Zone: Payment Action Area -->
+              <div class="mt-8 border-t border-zinc-200 pt-6">
+                <div class="max-w-md mx-auto space-y-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <span class="text-zinc-600">Amount due:</span>
+                    <span class="text-2xl font-bold text-zinc-900">
+                      {calculate_total_price(
+                        @selected_tickets,
+                        @event.id,
+                        @ticket_tiers,
+                        @reservations_by_tier,
+                        @current_user,
+                        @user_reservations
+                      )}
+                    </span>
+                  </div>
+                  <div class="flex flex-col sm:flex-row gap-3">
+                    <.button
+                      class="sm:flex-[2] w-full sm:w-auto py-4"
+                      id="submit-payment"
+                      disabled={
+                        !all_registrations_complete ||
+                          !@stripe_payment_element_ready
+                      }
+                    >
+                      Confirm and Pay {calculate_total_price(
+                        @selected_tickets,
+                        @event.id,
+                        @ticket_tiers,
+                        @reservations_by_tier,
+                        @current_user,
+                        @user_reservations
+                      )}
+                    </.button>
+                    <.button
+                      variant="outline"
+                      class="sm:flex-1 w-full sm:w-auto py-4"
+                      phx-click="close-payment-modal"
+                    >
+                      Cancel
+                    </.button>
+                  </div>
+                  <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
+                    <.icon name="hero-lock-closed" class="w-3 h-3" />
+                    Secure, encrypted payment
+                  </p>
+                </div>
+              </div>
+            </div>
+            <!-- Right Panel: Order Summary (Sticky on large screens) -->
+            <div class="lg:w-1/3 space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
+              <div class="space-y-4">
+                <div class="w-full hidden lg:block max-h-32 overflow-hidden rounded-xl">
+                  <.live_component
+                    id={"event-checkout-#{@event.id}"}
+                    module={YscWeb.Components.Image}
+                    image_id={@event.image_id}
+                  />
+                </div>
+
+                <div>
+                  <h2 class="text-lg font-semibold mb-6">{@event.title}</h2>
+                  <h3 class="font-semibold mb-2">Order Summary</h3>
+                </div>
+
+                <div class="bg-zinc-50 rounded-xl p-6 space-y-4">
+                  <%= if has_any_tickets_selected?(@selected_tickets) do %>
+                    <% pricing =
+                      calculate_pricing_with_discounts(
+                        @selected_tickets,
+                        @event.id,
+                        @ticket_tiers,
+                        @reservations_by_tier,
+                        @current_user,
+                        @user_reservations
+                      ) %>
+                    <%= for breakdown <- pricing.tier_breakdowns do %>
+                      <div class="space-y-1">
+                        <div class="flex justify-between text-base">
+                          <span>
+                            {breakdown.tier_name}
+                            <%= if breakdown.quantity > 1 do %>
+                              × {breakdown.quantity}
+                            <% end %>
+                          </span>
+                          <span class="font-medium">
+                            <%= if Money.positive?(breakdown.original_price) && Money.positive?(breakdown.discount_amount) do %>
+                              <span class="text-zinc-400 line-through mr-2">
+                                {format_price(breakdown.original_price)}
+                              </span>
+                            <% end %>
+                            {format_price(breakdown.final_price)}
+                          </span>
                         </div>
-                        <%= if is_registration_complete do %>
-                          <div class="flex-shrink-0">
-                            <.icon
-                              name="hero-check-circle"
-                              class="w-6 h-6 text-green-600"
-                            />
+                        <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
+                          <div class="flex justify-between text-sm text-green-600">
+                            <span>
+                              Member discount ({breakdown.discount_percentage
+                              |> Float.round(2)}%)
+                            </span>
+                            <span class="font-medium">
+                              -{format_price(breakdown.discount_amount)}
+                            </span>
                           </div>
                         <% end %>
                       </div>
-                    </div>
-
-                    <% other_family_members =
-                      Enum.reject(family_members, fn member ->
-                        member.id == @current_user.id
-                      end) %>
-
-                    <%!-- Streamlined Dropdown for "Who is this ticket for?" --%>
-                    <form
-                      id={"ticket-#{ticket.id}-attendee-form"}
-                      phx-change="select-ticket-attendee"
-                      phx-debounce="100"
-                    >
-                      <input
-                        type="hidden"
-                        name="ticket_id"
-                        value={to_string(ticket.id)}
-                      />
-                      <div class="mb-4">
-                        <label
-                          for={"ticket_#{ticket.id}_attendee_select"}
-                          class="block text-sm font-medium text-zinc-700 mb-2"
-                        >
-                          Who is this ticket for?
-                        </label>
-                        <select
-                          id={"ticket_#{ticket.id}_attendee_select"}
-                          name={"ticket_#{ticket.id}_attendee_select"}
-                          value={
-                            cond do
-                              is_for_me ->
-                                "me"
-
-                              has_selected_family_member ->
-                                "family_#{selected_family_member.id}"
-
-                              true ->
-                                "other"
-                            end
-                          }
-                          class="block w-full rounded-md border-zinc-300 py-2.5 pl-3 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        >
-                          <option
-                            value="me"
-                            disabled={
-                              me_already_selected_for_other_ticket && !is_for_me
-                            }
-                          >
-                            Me ({@current_user.first_name || @current_user.email})
-                            <%= if me_already_selected_for_other_ticket && !is_for_me do %>
-                              (Already selected for another ticket)
-                            <% end %>
-                          </option>
-                          <%= if length(other_family_members) > 0 do %>
-                            <optgroup label="Family Members">
-                              <%= for family_member <- other_family_members do %>
-                                <option value={"family_#{family_member.id}"}>
-                                  {family_member.first_name} {family_member.last_name}
-                                </option>
-                              <% end %>
-                            </optgroup>
-                          <% end %>
-                          <option
-                            value="other"
-                            selected={!is_for_me && !has_selected_family_member}
-                          >
-                            Someone else (Enter details)
-                          </option>
-                        </select>
-                      </div>
-                    </form>
-
-                    <%!-- Manual Entry Form (shown when "Someone else" is selected) --%>
-                    <form
-                      id={"ticket-#{ticket.id}-registration-form"}
-                      phx-change="update-registration-field"
-                      phx-debounce="500"
-                    >
-                      <div
-                        id={"ticket_#{ticket.id}_registration_fields"}
-                        class={[
-                          !is_for_me && !has_selected_family_member && "block",
-                          (is_for_me || has_selected_family_member) && "hidden"
-                        ]}
-                      >
-                        <div class="space-y-4">
-                          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <div>
-                              <label
-                                for={"ticket_#{ticket.id}_first_name"}
-                                class="block text-sm font-medium text-zinc-700"
-                              >
-                                First Name
-                              </label>
-                              <input
-                                type="text"
-                                id={"ticket_#{ticket.id}_first_name"}
-                                name={"ticket_#{ticket.id}_first_name"}
-                                value={form_data.first_name}
-                                required={!is_for_me && !has_selected_family_member}
-                                disabled={is_for_me || has_selected_family_member}
-                                phx-value-ticket-id={ticket.id}
-                                phx-value-field="first_name"
-                                enterkeyhint="next"
-                                class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
-                              />
-                            </div>
-                            <div>
-                              <label
-                                for={"ticket_#{ticket.id}_last_name"}
-                                class="block text-sm font-medium text-zinc-700"
-                              >
-                                Last Name
-                              </label>
-                              <input
-                                type="text"
-                                id={"ticket_#{ticket.id}_last_name"}
-                                name={"ticket_#{ticket.id}_last_name"}
-                                value={form_data.last_name}
-                                required={!is_for_me && !has_selected_family_member}
-                                disabled={is_for_me || has_selected_family_member}
-                                phx-value-ticket-id={ticket.id}
-                                phx-value-field="last_name"
-                                enterkeyhint="next"
-                                class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label
-                              for={"ticket_#{ticket.id}_email"}
-                              class="block text-sm font-medium text-zinc-700"
-                            >
-                              Email
-                            </label>
-                            <input
-                              type="email"
-                              id={"ticket_#{ticket.id}_email"}
-                              name={"ticket_#{ticket.id}_email"}
-                              value={form_data.email}
-                              required={!is_for_me && !has_selected_family_member}
-                              disabled={is_for_me || has_selected_family_member}
-                              autocomplete="email"
-                              enterkeyhint="done"
-                              phx-value-ticket-id={ticket.id}
-                              phx-value-field="email"
-                              class="mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 border-zinc-300 focus:border-zinc-400"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </form>
-
-                    <%!-- Summary Display (shown when "Me" or "Family Member" is selected) --%>
-                    <div class={[
-                      (is_for_me || has_selected_family_member) && "block",
-                      !is_for_me && !has_selected_family_member && "hidden"
-                    ]}>
-                      <div class="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                        <p class="text-sm text-blue-800">
-                          <strong>
-                            {form_data.first_name} {form_data.last_name}
-                          </strong>
-                          <br />
-                          <span class="text-blue-600">{form_data.email}</span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                <% end %>
-              </div>
-            <% end %>
-            <!-- Stripe Elements Payment Form -->
-            <% all_registrations_complete =
-              if Enum.any?(tickets_requiring_registration) do
-                tickets_requiring_registration
-                |> Enum.all?(fn ticket ->
-                  tickets_for_me = @tickets_for_me || %{}
-
-                  is_for_me =
-                    Map.get(tickets_for_me, ticket.id, false) ||
-                      Map.get(tickets_for_me, to_string(ticket.id), false)
-
-                  selected_family_members = @selected_family_members || %{}
-
-                  selected_family_member_id =
-                    Map.get(selected_family_members, ticket.id) ||
-                      Map.get(selected_family_members, to_string(ticket.id))
-
-                  family_members = @family_members || []
-
-                  selected_family_member =
-                    if selected_family_member_id,
-                      do:
-                        Enum.find(family_members, fn u ->
-                          u.id == selected_family_member_id ||
-                            to_string(u.id) == to_string(selected_family_member_id)
-                        end),
-                      else: nil
-
-                  has_selected_family_member = not is_nil(selected_family_member)
-                  ticket_id_str = to_string(ticket.id)
-
-                  cond do
-                    is_for_me ->
-                      @current_user.first_name && @current_user.first_name != "" &&
-                        (@current_user.last_name && @current_user.last_name != "") &&
-                        (@current_user.email && @current_user.email != "")
-
-                    has_selected_family_member ->
-                      selected_family_member.first_name &&
-                        selected_family_member.first_name != "" &&
-                        (selected_family_member.last_name &&
-                           selected_family_member.last_name != "") &&
-                        (selected_family_member.email &&
-                           selected_family_member.email != "")
-
-                    true ->
-                      form_map =
-                        Map.get(@ticket_details_form, ticket_id_str) ||
-                          Map.get(@ticket_details_form, ticket.id) || %{}
-
-                      first_name =
-                        Map.get(form_map, :first_name) ||
-                          Map.get(form_map, "first_name") || ""
-
-                      last_name =
-                        Map.get(form_map, :last_name) ||
-                          Map.get(form_map, "last_name") || ""
-
-                      email =
-                        Map.get(form_map, :email) || Map.get(form_map, "email") ||
-                          ""
-
-                      first_name != "" && last_name != "" && email != "" &&
-                        String.contains?(email, "@")
-                  end
-                end)
-              else
-                true
-              end %>
-            <div class={[
-              "space-y-4 transition-opacity duration-300",
-              if(all_registrations_complete,
-                do: "opacity-100",
-                else: "opacity-40 pointer-events-none"
-              )
-            ]}>
-              <div class="flex items-center gap-2 mb-2">
-                <span class={[
-                  "flex items-center justify-center w-6 h-6 rounded-full text-sm font-semibold",
-                  if(all_registrations_complete,
-                    do: "bg-green-600 text-white",
-                    else: "bg-blue-600 text-white"
-                  )
-                ]}>
-                  <%= if all_registrations_complete do %>
-                    <.icon name="hero-check" class="w-4 h-4" />
+                    <% end %>
                   <% else %>
-                    2
-                  <% end %>
-                </span>
-                <h3 class="font-semibold text-lg">Payment Information</h3>
-              </div>
-              <div
-                id="payment-element"
-                phx-hook="StripeElements"
-                phx-update="ignore"
-                data-publicKey={@public_key}
-                data-public-key={@public_key}
-                data-client-secret={@payment_intent.client_secret}
-                data-clientSecret={@payment_intent.client_secret}
-                data-ticket-order-id={@ticket_order.id}
-              >
-                <!-- Stripe Elements will be mounted here -->
-              </div>
-              <div id="payment-message" class="hidden text-sm"></div>
-            </div>
-            <!-- Checkout Zone: Payment Action Area -->
-            <div class="mt-8 border-t border-zinc-200 pt-6">
-              <div class="max-w-md mx-auto space-y-4">
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-zinc-600">Amount due:</span>
-                  <span class="text-2xl font-bold text-zinc-900">
-                    {calculate_total_price(
-                      @selected_tickets,
-                      @event.id,
-                      @ticket_tiers,
-                      @reservations_by_tier,
-                      @current_user,
-                      @user_reservations
-                    )}
-                  </span>
-                </div>
-                <div class="flex flex-col sm:flex-row gap-3">
-                  <.button
-                    class="sm:flex-[2] w-full sm:w-auto py-4"
-                    id="submit-payment"
-                    disabled={
-                      !all_registrations_complete || !@stripe_payment_element_ready
-                    }
-                  >
-                    Confirm and Pay {calculate_total_price(
-                      @selected_tickets,
-                      @event.id,
-                      @ticket_tiers,
-                      @reservations_by_tier,
-                      @current_user,
-                      @user_reservations
-                    )}
-                  </.button>
-                  <.button
-                    variant="outline"
-                    class="sm:flex-1 w-full sm:w-auto py-4"
-                    phx-click="close-payment-modal"
-                  >
-                    Cancel
-                  </.button>
-                </div>
-                <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
-                  <.icon name="hero-lock-closed" class="w-3 h-3" />
-                  Secure, encrypted payment
-                </p>
-              </div>
-            </div>
-          </div>
-          <!-- Right Panel: Order Summary (Sticky on large screens) -->
-          <div class="lg:w-1/3 space-y-4 lg:sticky lg:top-6 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-            <div class="space-y-4">
-              <div class="w-full hidden lg:block max-h-32 overflow-hidden rounded-xl">
-                <.live_component
-                  id={"event-checkout-#{@event.id}"}
-                  module={YscWeb.Components.Image}
-                  image_id={@event.image_id}
-                />
-              </div>
-
-              <div>
-                <h2 class="text-lg font-semibold mb-6">{@event.title}</h2>
-                <h3 class="font-semibold mb-2">Order Summary</h3>
-              </div>
-
-              <div class="bg-zinc-50 rounded-xl p-6 space-y-4">
-                <%= if has_any_tickets_selected?(@selected_tickets) do %>
-                  <% pricing =
-                    calculate_pricing_with_discounts(
-                      @selected_tickets,
-                      @event.id,
-                      @ticket_tiers,
-                      @reservations_by_tier,
-                      @current_user,
-                      @user_reservations
-                    ) %>
-                  <%= for breakdown <- pricing.tier_breakdowns do %>
-                    <div class="space-y-1">
-                      <div class="flex justify-between text-base">
-                        <span>
-                          {breakdown.tier_name}
-                          <%= if breakdown.quantity > 1 do %>
-                            × {breakdown.quantity}
-                          <% end %>
-                        </span>
-                        <span class="font-medium">
-                          <%= if Money.positive?(breakdown.original_price) && Money.positive?(breakdown.discount_amount) do %>
-                            <span class="text-zinc-400 line-through mr-2">
-                              {format_price(breakdown.original_price)}
-                            </span>
-                          <% end %>
-                          {format_price(breakdown.final_price)}
-                        </span>
+                    <div class="text-center py-8">
+                      <div class="text-zinc-400 mb-2">
+                        <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
                       </div>
-                      <%= if breakdown.discount_percentage && breakdown.discount_percentage > 0 do %>
-                        <div class="flex justify-between text-sm text-green-600">
-                          <span>
-                            Member discount ({breakdown.discount_percentage
-                            |> Float.round(2)}%)
-                          </span>
-                          <span class="font-medium">
-                            -{format_price(breakdown.discount_amount)}
-                          </span>
+                      <p class="text-zinc-500 text-sm">No tickets selected</p>
+                    </div>
+                  <% end %>
+
+                  <%= if has_any_tickets_selected?(@selected_tickets) do %>
+                    <% pricing =
+                      calculate_pricing_with_discounts(
+                        @selected_tickets,
+                        @event.id,
+                        @ticket_tiers,
+                        @reservations_by_tier,
+                        @current_user,
+                        @user_reservations
+                      ) %>
+                    <div class="border-t border-zinc-200 pt-4 space-y-2">
+                      <%= if Money.positive?(pricing.discount_amount) do %>
+                        <div class="flex justify-between text-sm text-zinc-600">
+                          <span>Subtotal:</span>
+                          <span>{format_price(pricing.subtotal)}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-green-600 font-medium">
+                          <span>Discount:</span>
+                          <span>-{format_price(pricing.discount_amount)}</span>
                         </div>
                       <% end %>
+                      <div class="flex justify-between font-semibold text-lg">
+                        <span>Total:</span>
+                        <span>
+                          {format_price(pricing.total)}
+                        </span>
+                      </div>
+                    </div>
+                  <% else %>
+                    <div class="border-t border-zinc-200 pt-4">
+                      <div class="flex justify-between font-semibold text-lg">
+                        <span>Total:</span>
+                        <span>
+                          {calculate_total_price(
+                            @selected_tickets,
+                            @event.id,
+                            @ticket_tiers,
+                            @reservations_by_tier,
+                            @current_user,
+                            @user_reservations
+                          )}
+                        </span>
+                      </div>
                     </div>
                   <% end %>
-                <% else %>
-                  <div class="text-center py-8">
-                    <div class="text-zinc-400 mb-2">
-                      <.icon name="hero-shopping-cart" class="w-8 h-8 mx-auto" />
-                    </div>
-                    <p class="text-zinc-500 text-sm">No tickets selected</p>
-                  </div>
-                <% end %>
-
-                <%= if has_any_tickets_selected?(@selected_tickets) do %>
-                  <% pricing =
-                    calculate_pricing_with_discounts(
-                      @selected_tickets,
-                      @event.id,
-                      @ticket_tiers,
-                      @reservations_by_tier,
-                      @current_user,
-                      @user_reservations
-                    ) %>
-                  <div class="border-t border-zinc-200 pt-4 space-y-2">
-                    <%= if Money.positive?(pricing.discount_amount) do %>
-                      <div class="flex justify-between text-sm text-zinc-600">
-                        <span>Subtotal:</span>
-                        <span>{format_price(pricing.subtotal)}</span>
-                      </div>
-                      <div class="flex justify-between text-sm text-green-600 font-medium">
-                        <span>Discount:</span>
-                        <span>-{format_price(pricing.discount_amount)}</span>
-                      </div>
-                    <% end %>
-                    <div class="flex justify-between font-semibold text-lg">
-                      <span>Total:</span>
-                      <span>
-                        {format_price(pricing.total)}
-                      </span>
-                    </div>
-                  </div>
-                <% else %>
-                  <div class="border-t border-zinc-200 pt-4">
-                    <div class="flex justify-between font-semibold text-lg">
-                      <span>Total:</span>
-                      <span>
-                        {calculate_total_price(
-                          @selected_tickets,
-                          @event.id,
-                          @ticket_tiers,
-                          @reservations_by_tier,
-                          @current_user,
-                          @user_reservations
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                <% end %>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        <% end %>
       <% end %>
     </.modal>
     <!-- Registration Modal -->
@@ -3475,6 +3525,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:ticket_order, nil)
     |> clear_selected_tickets()
     |> assign(:checkout_expired, false)
+    |> assign(:checkout_payment_failed, false)
     |> assign(:show_registration_modal, false)
     |> assign(:ticket_details_form, %{})
     |> assign(:ticket_registration_details_by_id, %{})
@@ -3484,6 +3535,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:attendees_preview_count, @attendees_preview_count)
     |> assign(:load_calendar, true)
     |> assign(:payment_redirect_in_progress, false)
+    |> assign(:preserve_failed_checkout_state, false)
     |> assign(:stripe_payment_element_ready, false)
     # Reservations - will be loaded async
     |> assign(:user_reservations, [])
@@ -3961,9 +4013,28 @@ defmodule YscWeb.EventDetailsLive do
         query_params["resume_order"] ||
         query_params[:resume_order]
 
+    payment_failed_return? = query_params["payment_failed"] == "1"
+
     socket =
       if connected?(socket) do
         cond do
+          payment_failed_return? && socket.assigns.current_user ->
+            socket
+            |> assign(:show_payment_modal, true)
+            |> assign(:checkout_expired, false)
+            |> assign(:checkout_payment_failed, true)
+            |> assign(:stripe_payment_element_ready, false)
+            |> assign(:show_ticket_modal, false)
+            |> assign(:payment_intent, nil)
+            |> assign(:ticket_order, nil)
+            |> clear_selected_tickets()
+            |> assign(:preserve_failed_checkout_state, true)
+            |> push_patch(to: ~p"/events/#{socket.assigns.event.id}/tickets")
+
+          socket.assigns.preserve_failed_checkout_state ->
+            socket
+            |> assign(:preserve_failed_checkout_state, false)
+
           # If we have checkout step and order_id, restore that state
           checkout_step && order_id && socket.assigns.current_user ->
             restore_checkout_state_from_url(
@@ -3987,6 +4058,8 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> assign(:show_ticket_modal, false)
             |> assign(:show_payment_modal, false)
+            |> assign(:checkout_expired, false)
+            |> assign(:checkout_payment_failed, false)
             |> assign(:stripe_payment_element_ready, false)
             |> assign(:show_free_ticket_confirmation, false)
         end
@@ -4096,7 +4169,7 @@ defmodule YscWeb.EventDetailsLive do
           error_message =
             case ticket_order.status do
               :cancelled ->
-                "This order was cancelled. Please select your tickets again to create a new order."
+                cancelled_order_error_message(ticket_order)
 
               :completed ->
                 "This order has already been completed. Please check your tickets."
@@ -4201,7 +4274,7 @@ defmodule YscWeb.EventDetailsLive do
           error_message =
             case ticket_order.status do
               :cancelled ->
-                "This order was cancelled. Please select your tickets again to create a new order."
+                cancelled_order_error_message(ticket_order)
 
               :completed ->
                 "This order has already been completed. Please check your tickets."
@@ -4380,6 +4453,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:show_ticket_modal, false)
     |> assign(:show_payment_modal, true)
     |> assign(:checkout_expired, false)
+    |> assign(:checkout_payment_failed, false)
     |> assign(:ticket_order, ticket_order)
     |> assign(
       :tickets_requiring_registration,
@@ -4424,6 +4498,7 @@ defmodule YscWeb.EventDetailsLive do
         |> assign(:show_ticket_modal, false)
         |> assign(:show_payment_modal, true)
         |> assign(:checkout_expired, false)
+        |> assign(:checkout_payment_failed, false)
         |> assign(:stripe_payment_element_ready, false)
         |> assign(:payment_intent, payment_intent)
         |> assign(:ticket_order, ticket_order)
@@ -4568,6 +4643,81 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
+  defp maybe_refresh_open_checkout_payment_intent(socket) do
+    require Ysc.Logging
+
+    with true <- socket.assigns[:show_payment_modal],
+         %Ysc.Tickets.TicketOrder{status: :pending} = order <-
+           socket.assigns[:ticket_order],
+         user when not is_nil(user) <- socket.assigns[:current_user],
+         {:ok, synced_order} <- Ysc.Tickets.sync_pending_order_pricing(order) do
+      current_pi = socket.assigns[:payment_intent]
+      current_cents = current_pi && current_pi.amount
+      expected_cents = Ysc.MoneyHelper.money_to_cents(synced_order.total_amount)
+
+      cond do
+        current_cents == expected_cents ->
+          assign(socket, :ticket_order, synced_order)
+
+        Ysc.Tickets.pending_order_still_complimentary?(synced_order) ->
+          socket
+          |> assign(:show_payment_modal, false)
+          |> assign(:payment_intent, nil)
+          |> assign(:stripe_payment_element_ready, false)
+          |> assign(:ticket_order, synced_order)
+          |> YscWeb.Flash.put_toast(
+            :info,
+            "Ticket prices were updated. Please review your order before continuing.",
+            title: "Prices updated"
+          )
+
+        true ->
+          case retrieve_or_create_payment_intent(synced_order, user) do
+            {:ok, payment_intent} ->
+              updated_order = %{
+                synced_order
+                | payment_intent_id: payment_intent.id
+              }
+
+              Ysc.Logging.info(
+                "Refreshed checkout payment intent after tier repricing",
+                order_id: updated_order.id,
+                previous_amount_cents: current_cents,
+                new_amount_cents: payment_intent.amount
+              )
+
+              send(
+                self(),
+                {:remount_payment_modal, updated_order, payment_intent}
+              )
+
+              socket
+              |> assign(:show_payment_modal, false)
+              |> assign(:payment_intent, nil)
+              |> assign(:ticket_order, updated_order)
+              |> assign(:stripe_payment_element_ready, false)
+
+            {:error, reason} ->
+              Ysc.Logging.warning(
+                "Failed to refresh checkout payment intent after tier repricing",
+                order_id: synced_order.id,
+                reason: inspect(reason)
+              )
+
+              socket
+              |> assign(:ticket_order, synced_order)
+              |> YscWeb.Flash.put_toast(
+                :error,
+                "Ticket prices were updated but we couldn't refresh checkout. Please close and reopen checkout.",
+                title: "Checkout"
+              )
+          end
+      end
+    else
+      _ -> socket
+    end
+  end
+
   @impl true
   def handle_info(
         {Ysc.Events, %Ysc.MessagePassingEvents.EventAdded{event: _event}},
@@ -4634,7 +4784,10 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
+      socket
+      |> assign_ticket_tier_pricing_and_list(current_event_id)
+      |> maybe_refresh_open_checkout_payment_intent()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
@@ -4649,7 +4802,10 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
+      socket
+      |> assign_ticket_tier_pricing_and_list(current_event_id)
+      |> maybe_refresh_open_checkout_payment_intent()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
@@ -4664,10 +4820,31 @@ defmodule YscWeb.EventDetailsLive do
     current_event_id = get_in(socket.assigns, [:event, Access.key(:id)])
 
     if current_event_id && tier.event_id == current_event_id do
-      {:noreply, assign_ticket_tier_pricing_and_list(socket, current_event_id)}
+      socket
+      |> assign_ticket_tier_pricing_and_list(current_event_id)
+      |> maybe_refresh_open_checkout_payment_intent()
+      |> then(&{:noreply, &1})
     else
       {:noreply, socket}
     end
+  end
+
+  @impl true
+  def handle_info(
+        {:remount_payment_modal, ticket_order, payment_intent},
+        socket
+      ) do
+    {:noreply,
+     socket
+     |> assign(:show_payment_modal, true)
+     |> assign(:ticket_order, ticket_order)
+     |> assign(:payment_intent, payment_intent)
+     |> assign(:stripe_payment_element_ready, false)
+     |> YscWeb.Flash.put_toast(
+       :info,
+       "Ticket prices changed. Your total has been updated.",
+       title: "Prices updated"
+     )}
   end
 
   @impl true
@@ -4839,24 +5016,30 @@ defmodule YscWeb.EventDetailsLive do
 
     expired_order_id = event.ticket_order && event.ticket_order.id
 
-    if socket.assigns.show_payment_modal &&
-         (current_order_id == expired_order_id || current_order_id == nil) do
-      # Show expired message for the current session or if no specific session is active
-      {:noreply,
-       socket
-       |> assign(:checkout_expired, true)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)}
-    else
-      # This is a different session, just clear the current state without showing expired message
-      {:noreply,
-       socket
-       |> assign(:show_payment_modal, false)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)
-       |> clear_selected_tickets()}
+    cond do
+      socket.assigns.checkout_payment_failed ->
+        {:noreply, socket}
+
+      socket.assigns.show_payment_modal && current_order_id == expired_order_id ->
+        # Show expired message only when this is the active checkout session
+        {:noreply,
+         socket
+         |> assign(:checkout_expired, true)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)}
+
+      true ->
+        # This is a different session, just clear the current state without showing expired message
+        {:noreply,
+         socket
+         |> assign(:show_payment_modal, false)
+         |> assign(:checkout_expired, false)
+         |> assign(:checkout_payment_failed, false)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)
+         |> clear_selected_tickets()}
     end
   end
 
@@ -4878,24 +5061,33 @@ defmodule YscWeb.EventDetailsLive do
       cancelled_ticket_order_id: event.ticket_order && event.ticket_order.id
     )
 
-    # Only show expired message if this is the same session that was cancelled
-    if socket.assigns.ticket_order && event.ticket_order &&
-         socket.assigns.ticket_order.id == event.ticket_order.id do
-      {:noreply,
-       socket
-       |> assign(:checkout_expired, true)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)}
+    # Only show a modal message if this is the same session that was cancelled
+    if checkout_session_cancelled_matches?(socket, event) do
+      if payment_failure_cancellation?(event.reason) do
+        {:noreply,
+         socket
+         |> assign(:show_payment_modal, true)
+         |> assign(:checkout_payment_failed, true)
+         |> assign(:checkout_expired, false)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)
+         |> assign(:payment_redirect_in_progress, false)
+         |> clear_selected_tickets()}
+      else
+        {:noreply,
+         socket
+         |> assign(:show_payment_modal, false)
+         |> assign(:checkout_expired, false)
+         |> assign(:checkout_payment_failed, false)
+         |> assign(:stripe_payment_element_ready, false)
+         |> assign(:payment_intent, nil)
+         |> assign(:ticket_order, nil)
+         |> assign(:payment_redirect_in_progress, false)
+         |> clear_selected_tickets()}
+      end
     else
-      # This is a different session, just clear the current state without showing expired message
-      {:noreply,
-       socket
-       |> assign(:show_payment_modal, false)
-       |> assign(:stripe_payment_element_ready, false)
-       |> assign(:payment_intent, nil)
-       |> assign(:ticket_order, nil)
-       |> clear_selected_tickets()}
+      {:noreply, socket}
     end
   end
 
@@ -5202,6 +5394,7 @@ defmodule YscWeb.EventDetailsLive do
      socket
      |> assign(:show_payment_modal, false)
      |> assign(:checkout_expired, false)
+     |> assign(:checkout_payment_failed, false)
      |> assign(:payment_intent, nil)
      |> assign(:ticket_order, nil)
      |> assign(:tickets_requiring_registration, [])
@@ -5450,6 +5643,7 @@ defmodule YscWeb.EventDetailsLive do
     {:noreply,
      socket
      |> assign(:checkout_expired, false)
+     |> assign(:checkout_payment_failed, false)
      |> assign(:show_payment_modal, false)
      |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)
@@ -6459,6 +6653,46 @@ defmodule YscWeb.EventDetailsLive do
 
   defp selected_tickets_json(selected_tickets) do
     Jason.encode!(selected_tickets)
+  end
+
+  @payment_failure_cancellation_reasons ["Payment failed", "Payment canceled"]
+
+  defp payment_failure_cancellation?(reason) when is_binary(reason) do
+    reason in @payment_failure_cancellation_reasons
+  end
+
+  defp payment_failure_cancellation?(_), do: false
+
+  defp checkout_session_cancelled_matches?(socket, event) do
+    same_ticket_order?(socket.assigns.ticket_order, event.ticket_order) ||
+      (is_nil(socket.assigns.ticket_order) &&
+         socket.assigns.preserve_failed_checkout_state &&
+         payment_failure_cancellation?(event.reason) &&
+         socket.assigns.show_payment_modal &&
+         same_user_and_event?(socket, event))
+  end
+
+  defp same_ticket_order?(nil, _), do: false
+  defp same_ticket_order?(_, nil), do: false
+
+  defp same_ticket_order?(order_a, order_b) do
+    to_string(order_a.id) == to_string(order_b.id)
+  end
+
+  defp same_user_and_event?(socket, event) do
+    socket.assigns.current_user &&
+      event.user_id &&
+      event.event_id &&
+      to_string(socket.assigns.current_user.id) == to_string(event.user_id) &&
+      to_string(socket.assigns.event.id) == to_string(event.event_id)
+  end
+
+  defp cancelled_order_error_message(ticket_order) do
+    if payment_failure_cancellation?(ticket_order.cancellation_reason) do
+      "Your payment did not go through. Please select your tickets again to try again."
+    else
+      "This order was cancelled. Please select your tickets again to create a new order."
+    end
   end
 
   defp get_available_quantity(ticket_tier) do
@@ -7535,12 +7769,6 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp group_tickets_by_tier(tickets) do
-    tickets
-    |> Enum.group_by(& &1.ticket_tier.name)
-    |> Enum.sort_by(fn {_tier_name, tickets} -> length(tickets) end, :desc)
-  end
-
   defp group_tickets_by_order(tickets) do
     tickets
     |> Enum.filter(&(&1.ticket_order_id != nil))
@@ -7744,6 +7972,7 @@ defmodule YscWeb.EventDetailsLive do
            |> assign(:show_ticket_modal, false)
            |> assign(:show_payment_modal, true)
            |> assign(:checkout_expired, false)
+           |> assign(:checkout_payment_failed, false)
            |> assign(:stripe_payment_element_ready, false)
            |> assign(:payment_intent, payment_intent)
            |> assign(:ticket_order, ticket_order)

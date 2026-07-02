@@ -347,7 +347,7 @@ defmodule YscWeb.PaymentSuccessLive do
     end
   end
 
-  defp redirect_to_failure_page(payment_intent_id, user, _redirect_status) do
+  defp redirect_to_failure_page(payment_intent_id, user, redirect_status) do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
@@ -369,10 +369,19 @@ defmodule YscWeb.PaymentSuccessLive do
             end
 
           not is_nil(ticket_order_id) ->
-            # Redirect to event page with error
+            # Redirect to event page with error — open ticket selection
             case verify_ticket_order_access(ticket_order_id, user) do
               {:ok, event_id} ->
-                {:ok, ~p"/events/#{event_id}"}
+                case release_failed_ticket_order(
+                       payment_intent_id,
+                       redirect_status
+                     ) do
+                  :ok ->
+                    {:ok, ~p"/events/#{event_id}?payment_failed=1"}
+
+                  {:error, reason} ->
+                    {:error, {:ticket_order_release_failed, reason}}
+                end
 
               error ->
                 error
@@ -413,6 +422,31 @@ defmodule YscWeb.PaymentSuccessLive do
     case Tickets.get_user_ticket_order_event_id(user.id, ticket_order_id) do
       nil -> {:error, :ticket_order_not_found}
       event_id -> {:ok, event_id}
+    end
+  end
+
+  defp release_failed_ticket_order(payment_intent_id, redirect_status) do
+    cancellation_reason =
+      if redirect_status == "canceled",
+        do: "Payment canceled",
+        else: "Payment failed"
+
+    case StripeService.handle_failed_payment(
+           payment_intent_id,
+           cancellation_reason
+         ) do
+      {:ok, _ticket_order} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Failed to proactively release ticket order on payment failure redirect",
+          payment_intent_id: payment_intent_id,
+          redirect_status: redirect_status,
+          error: reason
+        )
+
+        {:error, reason}
     end
   end
 

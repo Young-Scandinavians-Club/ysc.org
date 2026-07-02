@@ -151,13 +151,7 @@ defmodule YscWeb.AdminMembershipsLive do
             </div>
           </div>
 
-          <div :if={@loading_memberships?} class="py-16 text-center">
-            <.icon
-              name="hero-arrow-path"
-              class="w-8 h-8 text-zinc-300 mx-auto mb-4 animate-spin"
-            />
-            <p class="text-zinc-500 font-medium">Loading memberships…</p>
-          </div>
+          <.admin_table_skeleton :if={@loading_memberships?} rows={8} columns={5} />
 
           <div :if={not @loading_memberships?} class="overflow-x-auto">
             <table class="min-w-full divide-y divide-zinc-200">

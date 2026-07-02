@@ -1703,6 +1703,51 @@ defmodule Ysc.Bookings do
   ## Check-ins
 
   @doc """
+  Validates that bookings are eligible for property check-in.
+
+  Requires confirmed (`:complete`) status, an active stay window in PST
+  (check-in date reached and checkout not yet passed), and that the booking
+  has not already been marked checked in.
+  """
+  def validate_bookings_for_check_in(bookings) when is_list(bookings) do
+    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+    Enum.reduce_while(bookings, :ok, fn booking, :ok ->
+      case check_in_eligibility_error(booking, today_pst) do
+        nil -> {:cont, :ok}
+        message -> {:halt, {:error, message}}
+      end
+    end)
+  end
+
+  defp check_in_eligibility_error(%Booking{} = booking, today_pst) do
+    label = booking_check_in_label(booking)
+
+    cond do
+      booking.status != :complete ->
+        "booking #{label} is not confirmed (status: #{booking.status})"
+
+      booking.checked_in ->
+        "booking #{label} is already checked in"
+
+      Date.compare(booking.checkin_date, today_pst) == :gt ->
+        "booking #{label} is not yet active (check-in: #{booking.checkin_date})"
+
+      Date.compare(booking.checkout_date, today_pst) != :gt ->
+        "booking #{label} has already ended (checkout: #{booking.checkout_date})"
+
+      true ->
+        nil
+    end
+  end
+
+  defp booking_check_in_label(%Booking{reference_id: ref})
+       when is_binary(ref) and ref != "",
+       do: ref
+
+  defp booking_check_in_label(%Booking{id: id}), do: to_string(id)
+
+  @doc """
   Creates a check-in with associated bookings and vehicles.
   """
   @dialyzer {:nowarn_function, create_check_in: 1}

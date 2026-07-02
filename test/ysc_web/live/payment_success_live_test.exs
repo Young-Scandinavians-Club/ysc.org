@@ -433,8 +433,10 @@ defmodule YscWeb.PaymentSuccessLiveTest do
         {:ok, conn} = follow_redirect(redirect, conn)
 
         assert conn.request_path == "/events/#{event.id}"
+        assert conn.query_params["payment_failed"] == "1"
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "Payment failed"
         assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "info@ysc.org"
+        assert Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :cancelled
       after
         Application.put_env(:ysc, :stripe_client, original_client)
       end

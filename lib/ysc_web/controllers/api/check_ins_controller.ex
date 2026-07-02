@@ -36,6 +36,7 @@ defmodule YscWeb.Api.CheckInsController do
          {:ok, booking_ids} <- extract_booking_ids(params),
          {:ok, rules_agreed} <- extract_rules_agreed(params),
          {:ok, bookings} <- resolve_bookings(booking_ids, property),
+         :ok <- Bookings.validate_bookings_for_check_in(bookings),
          vehicles = extract_vehicles(params),
          attrs = %{
            rules_agreed: rules_agreed,

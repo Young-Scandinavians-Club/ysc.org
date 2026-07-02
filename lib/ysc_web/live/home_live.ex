@@ -6,11 +6,12 @@ defmodule YscWeb.HomeLive do
   import YscWeb.Live.AsyncHelpers
 
   alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
-  alias Ysc.Accounts.UserProfileCache
+  alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{Booking, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
   alias Ysc.GoogleWallet
+  alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.PlainText
   import Ecto.Query
 
@@ -1884,7 +1885,9 @@ defmodule YscWeb.HomeLive do
                         {member.first_name} {member.last_name}
                       </span>
                       <span class="text-zinc-500 text-xs">
-                        {format_family_relationship(member.family_relationship)}
+                        {FamilyDisplay.relationship_label(
+                          member.family_relationship
+                        )}
                       </span>
                     </div>
                   <% end %>
@@ -2154,12 +2157,6 @@ defmodule YscWeb.HomeLive do
     |> Enum.flat_map(fn {_event_datetime, event_tickets} -> event_tickets end)
   end
 
-  defp group_tickets_by_tier(tickets) do
-    tickets
-    |> Enum.group_by(& &1.ticket_tier.name)
-    |> Enum.sort_by(fn {_tier_name, tickets} -> length(tickets) end, :desc)
-  end
-
   # Helper function to get event datetime for sorting (combines date and time)
   # Returns a DateTime in PST timezone that can be used for sorting
   defp get_event_datetime_for_sorting(event) do
@@ -2228,7 +2225,7 @@ defmodule YscWeb.HomeLive do
     |> Enum.group_by(& &1.event.id)
     |> Enum.map(fn {_event_id, event_tickets} ->
       event = List.first(event_tickets).event
-      grouped_tiers = group_tickets_by_tier(event_tickets)
+      grouped_tiers = TicketDisplay.group_tickets_by_tier(event_tickets)
       {event, grouped_tiers}
     end)
     |> Enum.sort_by(
@@ -2789,13 +2786,6 @@ defmodule YscWeb.HomeLive do
     do: Calendar.strftime(date, "%b %-d, %Y")
 
   defp format_membership_date(_), do: ""
-
-  defp format_family_relationship(nil), do: "Child"
-  defp format_family_relationship("spouse"), do: "Spouse"
-  defp format_family_relationship("child"), do: "Child"
-  defp format_family_relationship(:spouse), do: "Spouse"
-  defp format_family_relationship(:child), do: "Child"
-  defp format_family_relationship(_), do: "Child"
 
   defp format_booking_date(%Date{} = date) do
     Calendar.strftime(date, "%b %d")

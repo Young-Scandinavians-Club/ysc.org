@@ -143,6 +143,20 @@ defmodule EventDetailsLiveHelpers do
   end
 
   @doc """
+  Expects payment intent retrieval with requires_confirmation status.
+  """
+  def expect_payment_requires_confirmation(payment_intent_id) do
+    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+      {:ok,
+       build_payment_intent(%{
+         id: payment_intent_id,
+         status: "requires_confirmation"
+       })}
+    end)
+  end
+
+  @doc """
   Expects payment intent retrieval with failed status.
   """
   def expect_payment_failure(payment_intent_id, reason \\ "card_declined") do

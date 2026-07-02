@@ -589,10 +589,20 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           <div
             :if={@loading_edition?}
             id="newsletter-editor-loading"
-            class="flex items-center justify-center py-24 text-zinc-500 text-sm"
+            class="space-y-6"
+            role="status"
+            aria-live="polite"
           >
-            <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
-            Loading newsletter…
+            <span class="sr-only">Loading newsletter…</span>
+            <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
+              <.skeleton_block class="h-5 w-32 rounded" />
+              <.skeleton_block class="h-40 w-full rounded-lg" />
+            </div>
+            <div class="border border-zinc-200 rounded-lg p-4 bg-white space-y-3">
+              <.skeleton_block class="h-5 w-24 rounded" />
+              <.skeleton_block class="h-11 w-full rounded-lg" />
+              <.skeleton_block class="h-24 w-full rounded-lg" />
+            </div>
           </div>
           <div :if={!@loading_edition?} class="space-y-6">
             <div class="border border-zinc-200 rounded-lg p-4 bg-white">
@@ -720,10 +730,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 </p>
                 <div
                   :if={!@picker_data_loaded? && !@readonly?}
-                  class="flex items-center justify-center py-12 text-zinc-500 text-sm"
+                  id="newsletter-posts-picker-loading"
+                  role="status"
+                  aria-live="polite"
                 >
-                  <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
-                  Loading posts…
+                  <span class="sr-only">Loading posts…</span>
+                  <.thumbnail_grid_skeleton count={10} />
                 </div>
                 <div :if={@picker_data_loaded? && !@readonly?}>
                   <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
@@ -807,10 +819,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 </p>
                 <div
                   :if={!@picker_data_loaded? && !@readonly?}
-                  class="flex items-center justify-center py-12 text-zinc-500 text-sm"
+                  id="newsletter-events-picker-loading"
+                  role="status"
+                  aria-live="polite"
                 >
-                  <.icon name="hero-arrow-path" class="w-6 h-6 animate-spin mr-2" />
-                  Loading events…
+                  <span class="sr-only">Loading events…</span>
+                  <.thumbnail_grid_skeleton count={10} />
                 </div>
                 <div :if={@picker_data_loaded? && !@readonly?}>
                   <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
