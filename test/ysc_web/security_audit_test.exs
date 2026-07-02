@@ -1508,6 +1508,140 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Cabin booking: server-side membership eligibility (UI can_book bypass)
+  # ---------------------------------------------------------------------------
+
+  describe "cabin booking requires active membership server-side" do
+    import Ysc.BookingsFixtures
+    import Ysc.TestDataFactory
+
+    alias Ysc.Bookings
+    alias Ysc.Bookings.Booking
+
+    test "ensure_user_may_book rejects users without membership" do
+      user = user_with_membership(:none)
+
+      assert {:error, :membership_required} =
+               Bookings.ensure_user_may_book(user)
+    end
+
+    test "ensure_user_may_book rejects pending_approval users" do
+      user = user_fixture(%{state: :pending_approval})
+
+      assert {:error, :application_pending_approval} =
+               Bookings.ensure_user_may_book(user)
+    end
+
+    test "create-booking LiveView event does not create a hold without membership",
+         %{conn: conn} do
+      user = user_with_membership(:none)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 60)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "4",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
+
+      render_async(view, 5_000)
+
+      hold_count_before =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      render_click(view, "create-booking", %{})
+
+      hold_count_after =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      assert hold_count_before == hold_count_after
+      assert render(view) =~ "active YSC membership"
+    end
+
+    test "tahoe create-booking LiveView event does not create a hold without membership",
+         %{conn: conn} do
+      user = user_with_membership(:none)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 60)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "4",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 5_000)
+
+      hold_count_before =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      render_click(view, "create-booking", %{})
+
+      hold_count_after =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      assert hold_count_before == hold_count_after
+      assert render(view) =~ "active YSC membership"
+    end
+
+    test "checkout redirects pending_approval users to pending-review", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :pending_approval})
+      booking = booking_fixture(%{user_id: user.id, status: :hold})
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/pending-review"}}} =
+               live(conn, ~p"/bookings/checkout/#{booking.id}")
+    end
+
+    test "checkout redirects ineligible users even when a hold already exists",
+         %{conn: conn} do
+      user = user_with_membership(:none)
+
+      booking =
+        booking_fixture(%{user_id: user.id, status: :hold})
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/users/membership"}}} =
+               live(conn, ~p"/bookings/checkout/#{booking.id}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Finding 22 (MEDIUM): Kiosk check-in API accepted ineligible bookings
   # ---------------------------------------------------------------------------
 

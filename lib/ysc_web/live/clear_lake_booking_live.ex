@@ -3036,6 +3036,14 @@ defmodule YscWeb.ClearLakeBookingLive do
   end
 
   defp validate_and_create_booking(socket) do
+    user = socket.assigns.user
+
+    with :ok <- Bookings.ensure_user_may_book(user) do
+      do_validate_and_create_booking(socket)
+    end
+  end
+
+  defp do_validate_and_create_booking(socket) do
     property = socket.assigns.property
     checkin_date = socket.assigns.checkin_date
     checkout_date = socket.assigns.checkout_date
@@ -3095,6 +3103,12 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   defp format_booking_error(:invalid_booking_mode),
     do: "Invalid booking mode selected."
+
+  defp format_booking_error(:membership_required),
+    do: YscWeb.BookingUserMessages.membership_required_plain_message()
+
+  defp format_booking_error(:application_pending_approval),
+    do: YscWeb.BookingUserMessages.application_pending_approval_message()
 
   defp format_booking_error(_),
     do: "An error occurred while creating your booking. Please try again."

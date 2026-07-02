@@ -5,6 +5,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
   import Mox
 
   alias Money
@@ -69,7 +70,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "Booking Checkout page" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       booking = booking_fixture(user_id: user.id, status: :hold)
 
       %{conn: log_in_user(conn, user), user: user, booking: booking}
@@ -113,7 +114,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     end
 
     test "redirects if not owner", %{conn: conn, booking: booking} do
-      other_user = user_fixture()
+      other_user = user_with_membership()
       conn = log_in_user(conn, other_user)
 
       assert {:error, {:redirect, %{to: path}}} =
@@ -1037,7 +1038,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "payment-success with shared booking entitlement" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       admin = user_fixture()
 
       {:ok, entitlement} =
@@ -1131,7 +1132,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "payment-success rejects foreign payment intent" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       %{conn: log_in_user(conn, user), user: user}
     end
 
@@ -1201,7 +1202,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "room booking guest step" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
 
       {:ok, category} =
         %RoomCategory{}

@@ -3,6 +3,7 @@ defmodule YscWeb.CoverageRoutesSmokeTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ysc.TestDataFactory
 
   import Mox
 
@@ -78,7 +79,7 @@ defmodule YscWeb.CoverageRoutesSmokeTest do
 
   describe "authenticated routes (smoke)" do
     test "renders key authenticated LiveViews without crashing", %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       conn = log_in_user(conn, user)
 
       booking =

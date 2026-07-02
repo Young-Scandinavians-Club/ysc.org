@@ -8,6 +8,7 @@ defmodule YscWeb.AuthorizationTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
   import Ysc.TicketsFixtures
   import Mox
 
@@ -87,10 +88,10 @@ defmodule YscWeb.AuthorizationTest do
          }}
       end)
 
-      user = user_fixture()
+      user = user_with_membership()
       booking = booking_fixture(user_id: user.id, status: :hold)
 
-      other_user = user_fixture()
+      other_user = user_with_membership()
       other_booking = booking_fixture(user_id: other_user.id, status: :hold)
 
       %{
