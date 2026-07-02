@@ -884,6 +884,154 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "validate_bookings_for_check_in/1" do
+    defp today_pst,
+      do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+    defp check_in_booking(overrides \\ %{}) do
+      today = today_pst()
+
+      defaults = %{
+        status: :complete,
+        checked_in: false,
+        checkin_date: Date.add(today, -1),
+        checkout_date: Date.add(today, 2),
+        reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
+      }
+
+      struct!(Booking, Map.merge(defaults, Map.new(overrides)))
+    end
+
+    test "returns :ok for eligible confirmed bookings in an active stay window" do
+      assert :ok = Bookings.validate_bookings_for_check_in([check_in_booking()])
+    end
+
+    test "returns :ok for multiple eligible bookings" do
+      assert :ok =
+               Bookings.validate_bookings_for_check_in([
+                 check_in_booking(),
+                 check_in_booking()
+               ])
+    end
+
+    test "returns :ok on check-in date (first day of stay)" do
+      today = today_pst()
+
+      booking =
+        check_in_booking(%{
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        })
+
+      assert :ok = Bookings.validate_bookings_for_check_in([booking])
+    end
+
+    test "returns :ok when checkout date is tomorrow (last night of stay)" do
+      today = today_pst()
+
+      booking =
+        check_in_booking(%{
+          checkin_date: Date.add(today, -2),
+          checkout_date: Date.add(today, 1)
+        })
+
+      assert :ok = Bookings.validate_bookings_for_check_in([booking])
+    end
+
+    test "rejects bookings that are not confirmed" do
+      booking = check_in_booking(%{status: :hold})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ "not confirmed"
+      assert message =~ "hold"
+    end
+
+    test "rejects canceled bookings" do
+      booking = check_in_booking(%{status: :canceled})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ "not confirmed"
+    end
+
+    test "rejects future bookings" do
+      today = today_pst()
+
+      booking =
+        check_in_booking(%{
+          checkin_date: Date.add(today, 3),
+          checkout_date: Date.add(today, 5)
+        })
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ "not yet active"
+    end
+
+    test "rejects ended bookings" do
+      today = today_pst()
+
+      booking =
+        check_in_booking(%{
+          checkin_date: Date.add(today, -5),
+          checkout_date: Date.add(today, -1)
+        })
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ "already ended"
+    end
+
+    test "rejects bookings on checkout day (stay has ended)" do
+      today = today_pst()
+
+      booking =
+        check_in_booking(%{
+          checkin_date: Date.add(today, -3),
+          checkout_date: today
+        })
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ "already ended"
+    end
+
+    test "rejects already checked-in bookings" do
+      booking = check_in_booking(%{checked_in: true})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ "already checked in"
+    end
+
+    test "halts on first ineligible booking when validating multiple" do
+      valid = check_in_booking()
+      invalid = check_in_booking(%{status: :canceled})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([valid, invalid])
+
+      assert message =~ "not confirmed"
+    end
+
+    test "uses reference_id in error messages when available" do
+      ref = "BK-TEST-#{System.unique_integer([:positive])}"
+      booking = check_in_booking(%{status: :canceled, reference_id: ref})
+
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
+      assert message =~ ref
+    end
+  end
+
   describe "check-ins" do
     test "create_check_in/1 creates a check-in" do
       booking = booking_fixture()
