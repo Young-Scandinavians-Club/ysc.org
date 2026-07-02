@@ -293,7 +293,7 @@ defmodule YscWeb.FamilyManagementLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "Could not remove this family member. Please try again.",
+               "We couldn't remove this family member. Please try again, or email info@ysc.org if this keeps happening.",
                title: "Family"
              )}
         end
@@ -369,7 +369,7 @@ defmodule YscWeb.FamilyManagementLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Could not remove this family member. Please try again.",
+             "We couldn't remove this family member. Please try again, or email info@ysc.org if this keeps happening.",
              title: "Family"
            )}
       end
@@ -412,7 +412,7 @@ defmodule YscWeb.FamilyManagementLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Could not leave the family membership. Please try again.",
+           "We couldn't leave this family membership. Please try again, or email info@ysc.org if this keeps happening.",
            title: "Family"
          )}
     end
@@ -1024,7 +1024,7 @@ defmodule YscWeb.FamilyManagementLive do
           "Failed to send invitation. Please check the email address."
 
         _ ->
-          "Failed to send invitation. Please try again."
+          "We couldn't send this invitation. Please try again, or email info@ysc.org if this keeps happening."
       end
 
     socket =

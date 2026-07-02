@@ -5464,7 +5464,7 @@ defmodule YscWeb.EventDetailsLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to save registration details. Please try again.",
+             "We couldn't save your registration details. Please try again, or email info@ysc.org if this keeps happening.",
              title: "Registration"
            )}
       end
@@ -6213,7 +6213,7 @@ defmodule YscWeb.EventDetailsLive do
               "You need an active YSC membership to buy tickets. Go to Membership to check your status or pay dues, then try again."
 
             _ ->
-              "There was an error processing your ticket order. Please try again."
+              "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening."
           end
 
         {:noreply,
@@ -6234,7 +6234,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "There was an unexpected error processing your ticket order. Please try again.",
+           "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening.",
            title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}
@@ -6814,7 +6814,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Failed to save registration details. Please try again.",
+           "We couldn't save your registration details. Please try again, or email info@ysc.org if this keeps happening.",
            title: "Registration"
          )}
     end
@@ -7103,7 +7103,8 @@ defmodule YscWeb.EventDetailsLive do
     do: "This order is no longer available."
 
   defp free_ticket_confirm_error_message(_),
-    do: "Unable to confirm free tickets. Please try again."
+    do:
+      "We couldn't confirm your free tickets. Please try again, or email info@ysc.org with the event name if this keeps happening."
 
   # Helper function to get form value from either atom or string key
   defp get_form_value(form_data, field) when is_atom(field) do
