@@ -354,16 +354,12 @@ defmodule Ysc.Bookings.PricingHelpers do
          guests_count,
          children_count
        ) do
-    available_rooms = socket.assigns[:available_rooms] || []
+    rooms_by_id = rooms_by_id(socket, room_ids)
 
     room_minimums =
       room_ids
       |> Enum.map(fn room_id ->
-        room =
-          find_room_in_available(available_rooms, room_id) ||
-            fetch_room_safely(room_id)
-
-        case room do
+        case lookup_room(rooms_by_id, room_id) do
           nil -> 1
           r -> Map.get(r, :min_billable_occupancy) || 1
         end
@@ -388,32 +384,55 @@ defmodule Ysc.Bookings.PricingHelpers do
          guests_count,
          children_count
        ) do
+    rooms_by_id = rooms_by_id(socket, [room_id])
+
+    case lookup_room(rooms_by_id, room_id) do
+      nil ->
+        guests_count
+
+      room ->
+        min_occupancy = room.min_billable_occupancy || 1
+        min_adults_needed = max(0, min_occupancy - children_count)
+        max(guests_count, min_adults_needed)
+    end
+  end
+
+  defp rooms_by_id(socket, room_ids) do
     available_rooms = socket.assigns[:available_rooms] || []
 
-    room =
-      Enum.find(available_rooms, &(&1.id == room_id)) ||
-        fetch_room_safely(room_id)
+    available_by_id =
+      Enum.reduce(available_rooms, %{}, fn room, acc ->
+        acc
+        |> Map.put(room.id, room)
+        |> Map.put(to_string(room.id), room)
+      end)
 
-    if room do
-      min_occupancy = room.min_billable_occupancy || 1
-      min_adults_needed = max(0, min_occupancy - children_count)
-      max(guests_count, min_adults_needed)
-    else
-      guests_count
-    end
+    missing_ids =
+      room_ids
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.reject(fn room_id ->
+        Map.has_key?(available_by_id, room_id) or
+          Map.has_key?(available_by_id, to_string(room_id))
+      end)
+
+    fetched_by_id =
+      case Bookings.list_rooms_by_ids(missing_ids) do
+        [] ->
+          %{}
+
+        rooms ->
+          Enum.reduce(rooms, %{}, fn room, acc ->
+            acc
+            |> Map.put(room.id, room)
+            |> Map.put(to_string(room.id), room)
+          end)
+      end
+
+    Map.merge(available_by_id, fetched_by_id)
   end
 
-  defp find_room_in_available(available_rooms, room_id) do
-    Enum.find(available_rooms, fn r ->
-      to_string(r.id) == to_string(room_id)
-    end)
-  end
-
-  defp fetch_room_safely(room_id) do
-    try do
-      Bookings.get_room!(room_id)
-    rescue
-      _ -> nil
-    end
+  defp lookup_room(rooms_by_id, room_id) do
+    Map.get(rooms_by_id, room_id) || Map.get(rooms_by_id, to_string(room_id))
   end
 end
