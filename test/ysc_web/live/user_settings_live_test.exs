@@ -854,7 +854,10 @@ defmodule YscWeb.UserSettingsLiveTest do
         live(conn, ~p"/users/membership?retry_invoice=in_test_missing")
 
       render(view)
-      assert render(view) =~ "Invoice"
+      html = render(view)
+      assert html =~ "Invoice"
+      assert html =~ "expired"
+      assert html =~ Ysc.EmailConfig.membership_email()
     end
   end
 
