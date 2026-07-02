@@ -885,7 +885,8 @@ defmodule Ysc.BookingsTest do
   end
 
   describe "validate_bookings_for_check_in/1" do
-    defp today_pst, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+    defp today_pst,
+      do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
     defp check_in_booking(overrides \\ %{}) do
       today = today_pst()
@@ -940,7 +941,9 @@ defmodule Ysc.BookingsTest do
     test "rejects bookings that are not confirmed" do
       booking = check_in_booking(%{status: :hold})
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ "not confirmed"
       assert message =~ "hold"
     end
@@ -948,7 +951,9 @@ defmodule Ysc.BookingsTest do
     test "rejects canceled bookings" do
       booking = check_in_booking(%{status: :canceled})
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ "not confirmed"
     end
 
@@ -961,7 +966,9 @@ defmodule Ysc.BookingsTest do
           checkout_date: Date.add(today, 5)
         })
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ "not yet active"
     end
 
@@ -974,7 +981,9 @@ defmodule Ysc.BookingsTest do
           checkout_date: Date.add(today, -1)
         })
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ "already ended"
     end
 
@@ -987,14 +996,18 @@ defmodule Ysc.BookingsTest do
           checkout_date: today
         })
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ "already ended"
     end
 
     test "rejects already checked-in bookings" do
       booking = check_in_booking(%{checked_in: true})
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ "already checked in"
     end
 
@@ -1012,7 +1025,9 @@ defmodule Ysc.BookingsTest do
       ref = "BK-TEST-#{System.unique_integer([:positive])}"
       booking = check_in_booking(%{status: :canceled, reference_id: ref})
 
-      assert {:error, message} = Bookings.validate_bookings_for_check_in([booking])
+      assert {:error, message} =
+               Bookings.validate_bookings_for_check_in([booking])
+
       assert message =~ ref
     end
   end
