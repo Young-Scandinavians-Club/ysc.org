@@ -149,13 +149,16 @@ defmodule Ysc.BookingsFixtures do
       DateTime.now!("America/Los_Angeles")
       |> DateTime.to_date()
 
-    attrs =
-      attrs
-      |> Map.new()
-      |> Map.put_new(:status, :complete)
-      |> Map.put_new(:checkin_date, Date.add(today_pst, -1))
-      |> Map.put_new(:checkout_date, Date.add(today_pst, 2))
+    attrs = Map.new(attrs)
 
-    booking_fixture(attrs)
+    checkin = Map.get(attrs, :checkin_date, Date.add(today_pst, -1))
+    checkout = Map.get(attrs, :checkout_date, Date.add(today_pst, 2))
+    checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+
+    attrs
+    |> Map.put_new(:status, :complete)
+    |> Map.put_new(:checkin_date, checkin)
+    |> Map.put_new(:checkout_date, checkout)
+    |> booking_fixture()
   end
 end

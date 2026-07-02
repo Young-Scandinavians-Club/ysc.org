@@ -25,12 +25,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
     Application.put_env(:ysc, :stripe_client, StripeMock)
 
-    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
       {:ok,
        %Stripe.PaymentIntent{
          id: "pi_test_123",
          client_secret: "pi_test_123_secret_456",
-         status: "requires_payment_method"
+         status: "requires_payment_method",
+         amount: params.amount
        }}
     end)
 
@@ -672,7 +673,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
         assert params.amount == synced_cents
 
         idempotency_key =
-          opts[:headers]["Idempotency-Key"] || opts[:headers][:"Idempotency-Key"]
+          opts[:headers]["Idempotency-Key"] ||
+            opts[:headers][:"Idempotency-Key"]
 
         assert idempotency_key ==
                  "booking_#{booking.reference_id}_#{synced_cents}"
