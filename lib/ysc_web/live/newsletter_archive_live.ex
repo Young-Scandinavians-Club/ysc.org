@@ -453,7 +453,10 @@ defmodule YscWeb.NewsletterArchiveLive do
 
     {:noreply,
      socket
-     |> put_flash(:error, "We couldn't load this newsletter. Please try again, or email info@ysc.org if the problem continues.")
+     |> put_flash(
+       :error,
+       "We couldn't load this newsletter. Please try again, or email info@ysc.org if the problem continues."
+     )
      |> push_navigate(to: ~p"/newsletters")}
   end
 
@@ -597,7 +600,9 @@ defmodule YscWeb.NewsletterArchiveLive do
       {:error, %Ecto.Changeset{} = changeset} ->
         error =
           case changeset.errors do
-            [{:email, {msg, _}} | _] -> msg
+            [{:email, {msg, _}} | _] ->
+              msg
+
             _ ->
               "We couldn't subscribe you right now. Please try again later, or email info@ysc.org if this keeps happening."
           end
