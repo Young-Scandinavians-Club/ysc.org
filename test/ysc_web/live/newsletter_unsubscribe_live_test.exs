@@ -207,7 +207,9 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       assert render(view) =~ "unsubscribed from our newsletter"
     end
 
-    test "survives unsubscribe failure and shows contact guidance toast", %{conn: conn} do
+    test "survives unsubscribe failure and shows contact guidance toast", %{
+      conn: conn
+    } do
       {:ok, sub} =
         Newsletter.subscribe("fail@example.com", source: "public_signup")
 
