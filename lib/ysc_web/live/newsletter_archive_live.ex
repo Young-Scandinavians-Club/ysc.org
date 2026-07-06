@@ -453,7 +453,10 @@ defmodule YscWeb.NewsletterArchiveLive do
 
     {:noreply,
      socket
-     |> put_flash(:error, "Something went wrong. Please try again.")
+     |> put_flash(
+       :error,
+       "We couldn't load this newsletter. Please try again, or email info@ysc.org if the problem continues."
+     )
      |> push_navigate(to: ~p"/newsletters")}
   end
 
@@ -517,7 +520,11 @@ defmodule YscWeb.NewsletterArchiveLive do
 
       {:error, _} ->
         {:noreply,
-         put_flash(socket, :error, "Something went wrong. Please try again.")}
+         put_flash(
+           socket,
+           :error,
+           "We couldn't update your newsletter subscription. Please try again, or email info@ysc.org if this keeps happening."
+         )}
     end
   end
 
@@ -593,8 +600,11 @@ defmodule YscWeb.NewsletterArchiveLive do
       {:error, %Ecto.Changeset{} = changeset} ->
         error =
           case changeset.errors do
-            [{:email, {msg, _}} | _] -> msg
-            _ -> "Something went wrong. Please try again later."
+            [{:email, {msg, _}} | _] ->
+              msg
+
+            _ ->
+              "We couldn't subscribe you right now. Please try again later, or email info@ysc.org if this keeps happening."
           end
 
         {:noreply,

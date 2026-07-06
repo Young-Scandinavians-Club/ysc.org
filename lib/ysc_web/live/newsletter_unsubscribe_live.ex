@@ -135,7 +135,10 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
         # Always show a safe message; never crash. User can use contact or try again.
         {:noreply,
          socket
-         |> assign(:error, "Something went wrong. Please try again.")
+         |> assign(
+           :error,
+           "We couldn't unsubscribe you right now. Please try again in a few minutes, or email info@ysc.org if you still receive newsletters."
+         )
          |> YscWeb.Flash.put_toast(
            :error,
            "We couldn't unsubscribe you right now. Please try again in a few minutes, or email info@ysc.org if you still receive newsletters.",

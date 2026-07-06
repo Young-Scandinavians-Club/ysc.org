@@ -1338,7 +1338,7 @@ defmodule YscWeb.BookingChangeLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Unable to start payment. Please try again or contact support."
+             "We couldn't start the payment form for your date change. Please try again, or email info@ysc.org if this keeps happening."
            )}
       end
     else
