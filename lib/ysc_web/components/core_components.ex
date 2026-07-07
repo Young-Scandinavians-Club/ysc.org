@@ -1954,12 +1954,14 @@ defmodule YscWeb.CoreComponents do
     assigns = derive_user_card_assigns(assigns)
 
     ~H"""
-    <div class="relative">
+    <div class="relative" phx-click-away={hide_dropdown("#avatar-menu")}>
       <button
+        type="button"
         data-dropdown-toggle="avatar-menu"
-        id="avatar-menu-link"
+        id="avatar-menuLink"
+        aria-expanded="false"
         class="flex flex-row items-center h-10 rounded hover:bg-zinc-100 pl-3"
-        phx-click={show_dropdown("#avatar-menu")}
+        phx-click={toggle_dropdown("#avatar-menu")}
       >
         <.user_card
           user={@user}
@@ -1977,7 +1979,6 @@ defmodule YscWeb.CoreComponents do
       <div
         id="avatar-menu"
         class="absolute z-[110] hidden w-60 mt-0 font-normal bg-white divide-y rounded shadow divide-zinc-100 right-4 mt-1"
-        phx-click-away={hide_dropdown("#avatar-menu")}
       >
         {render_slot(@inner_block)}
       </div>

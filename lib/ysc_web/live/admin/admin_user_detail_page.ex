@@ -2436,9 +2436,11 @@ defmodule YscWeb.AdminUserDetailsLive do
     socket = assign(socket, :list_params, list_params)
 
     if socket.assigns.live_action == :booking_benefits do
+      redirect_params = Map.put(list_params, "benefits", "open")
+
       {:noreply,
        push_navigate(socket,
-         to: ~p"/admin/users/#{user_id}/details/bookings?#{list_params}"
+         to: ~p"/admin/users/#{user_id}/details/bookings?#{redirect_params}"
        )}
     else
       socket =
@@ -2457,6 +2459,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               |> start_async(:load_bookings, fn ->
                 Bookings.list_user_bookings_paginated(user_id, params)
               end)
+              |> maybe_open_booking_benefits(params)
 
             :notifications ->
               user_email = socket.assigns.selected_user.email
@@ -2591,6 +2594,8 @@ defmodule YscWeb.AdminUserDetailsLive do
 
     {:noreply,
      socket
+     |> assign(:booking_entitlements, [])
+     |> assign(:booking_entitlements_loaded?, false)
      |> assign(:booking_entitlements_load_error?, true)
      |> assign(:booking_entitlements_loading?, false)}
   end
@@ -4388,6 +4393,24 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> start_async(:load_booking_entitlements, fn ->
       Entitlements.list_all_for_user(user_id)
     end)
+  end
+
+  defp maybe_open_booking_benefits(socket, %{"benefits" => "open"}) do
+    socket
+    |> assign(:show_booking_benefits?, true)
+    |> maybe_start_booking_entitlements_load()
+  end
+
+  defp maybe_open_booking_benefits(socket, _params), do: socket
+
+  defp maybe_start_booking_entitlements_load(socket) do
+    if connected?(socket) &&
+         !socket.assigns.booking_entitlements_loaded? &&
+         !socket.assigns.booking_entitlements_loading? do
+      start_booking_entitlements_load(socket)
+    else
+      socket
+    end
   end
 
   defp entitlement_form_defaults do

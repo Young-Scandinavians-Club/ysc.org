@@ -159,13 +159,12 @@ defmodule YscWeb.CoreComponentsTest do
 
       document = LazyHTML.from_fragment(html)
 
-      assert Enum.count(
+      assert [_wrapper] =
                LazyHTML.filter(document, "div.relative[phx-click-away]")
-             ) == 1
+               |> Enum.to_list()
 
-      assert Enum.count(
-               LazyHTML.filter(document, "div#test-dropdown[phx-click-away]")
-             ) == 0
+      assert LazyHTML.filter(document, "div#test-dropdown[phx-click-away]")
+             |> Enum.empty?()
 
       button = LazyHTML.query_by_id(document, "test-dropdownLink")
       assert LazyHTML.attribute(button, "aria-expanded") == ["false"]
