@@ -157,10 +157,19 @@ defmodule YscWeb.CoreComponentsTest do
         </.dropdown>
         """)
 
-      assert Regex.match?(~r/<div class="relative"[^>]*phx-click-away/, html)
-      assert html =~ ~s(phx-click="[[&quot;toggle&quot;,{&quot;ins&quot;)
-      assert html =~ ~s(&quot;to&quot;:&quot;#test-dropdown&quot;)
-      refute Regex.match?(~r/<div id="test-dropdown"[^>]*phx-click-away/, html)
+      document = LazyHTML.from_fragment(html)
+
+      assert Enum.count(
+               LazyHTML.filter(document, "div.relative[phx-click-away]")
+             ) == 1
+
+      assert Enum.count(
+               LazyHTML.filter(document, "div#test-dropdown[phx-click-away]")
+             ) == 0
+
+      button = LazyHTML.query_by_id(document, "test-dropdownLink")
+      assert LazyHTML.attribute(button, "aria-expanded") == ["false"]
+      assert hd(LazyHTML.attribute(button, "phx-click")) =~ "toggle"
     end
   end
 end

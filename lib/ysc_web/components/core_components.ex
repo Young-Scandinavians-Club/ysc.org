@@ -1798,6 +1798,7 @@ defmodule YscWeb.CoreComponents do
         type="button"
         id={"#{@id}Link"}
         data-dropdown-toggle={@id}
+        aria-expanded="false"
         class={"group flex items-center justify-between w-full px-3 py-2 font-bold transition duration-200 ease-in-out rounded lg:w-auto #{@class}"}
         phx-click={toggle_dropdown("##{@id}")}
       >
@@ -3605,48 +3606,54 @@ defmodule YscWeb.CoreComponents do
   end
 
   def toggle_dropdown(to) do
-    id = String.replace(to, "#", "")
-    button_id = "##{id}Link"
+    %{
+      menu: menu,
+      button: button,
+      show_transition: show_in,
+      hide_transition: hide_out
+    } =
+      dropdown_js_targets(to)
 
-    dropdown_in =
-      {"transition ease-out duration-75", "transform opacity-0 scale-95",
-       "transform opacity-100 scale-100"}
-
-    dropdown_out =
-      {"transition ease-in duration-75", "transform opacity-100 scale-100",
-       "transform opacity-0 scale-95"}
-
-    JS.toggle(to: to, in: dropdown_in, out: dropdown_out)
-    |> JS.toggle_class("dropdown-open", to: button_id)
-    |> JS.toggle_attribute({"aria-expanded", "true"}, to: button_id)
+    JS.toggle(to: menu, in: show_in, out: hide_out)
+    |> JS.toggle_class("dropdown-open", to: button)
+    |> JS.toggle_attribute({"aria-expanded", "true", "false"}, to: button)
   end
 
   def show_dropdown(to) do
-    id = String.replace(to, "#", "")
-    button_id = "##{id}Link"
+    %{menu: menu, button: button, show_transition: show_in} =
+      dropdown_js_targets(to)
 
-    JS.show(
-      to: to,
-      transition:
-        {"transition ease-out duration-75", "transform opacity-0 scale-95",
-         "transform opacity-100 scale-100"}
-    )
-    |> JS.set_attribute({"aria-expanded", "true"}, to: button_id)
-    |> JS.add_class("dropdown-open", to: button_id)
+    JS.show(to: menu, transition: show_in)
+    |> JS.set_attribute({"aria-expanded", "true"}, to: button)
+    |> JS.add_class("dropdown-open", to: button)
   end
 
   def hide_dropdown(to) do
-    id = String.replace(to, "#", "")
-    button_id = "##{id}Link"
+    %{menu: menu, button: button, hide_transition: hide_out} =
+      dropdown_js_targets(to)
 
-    JS.hide(
-      to: to,
-      transition:
-        {"transition ease-in duration-75", "transform opacity-100 scale-100",
-         "transform opacity-0 scale-95"}
-    )
-    |> JS.remove_attribute("aria-expanded", to: button_id)
-    |> JS.remove_class("dropdown-open", to: button_id)
+    JS.hide(to: menu, transition: hide_out)
+    |> JS.set_attribute({"aria-expanded", "false"}, to: button)
+    |> JS.remove_class("dropdown-open", to: button)
+  end
+
+  defp dropdown_js_targets(to) do
+    id = String.replace(to, "#", "")
+
+    show_transition =
+      {"transition ease-out duration-75", "transform opacity-0 scale-95",
+       "transform opacity-100 scale-100"}
+
+    hide_transition =
+      {"transition ease-in duration-75", "transform opacity-100 scale-100",
+       "transform opacity-0 scale-95"}
+
+    %{
+      menu: to,
+      button: "##{id}Link",
+      show_transition: show_transition,
+      hide_transition: hide_transition
+    }
   end
 
   @doc """

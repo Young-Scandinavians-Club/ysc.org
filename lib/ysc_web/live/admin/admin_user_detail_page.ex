@@ -685,7 +685,10 @@ defmodule YscWeb.AdminUserDetailsLive do
                     />
                   </tbody>
                   <tbody
-                    :if={!@booking_entitlements_loading?}
+                    :if={
+                      !@booking_entitlements_loading? &&
+                        !@booking_entitlements_load_error?
+                    }
                     class="divide-y divide-zinc-100"
                   >
                     <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
@@ -733,7 +736,27 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </table>
                 <p
                   :if={
-                    !@booking_entitlements_loading? && @booking_entitlements == []
+                    @booking_entitlements_load_error? &&
+                      !@booking_entitlements_loading?
+                  }
+                  id="booking-entitlements-load-error"
+                  class="px-4 py-6 text-center text-sm"
+                >
+                  <span class="text-red-600">Could not load entitlements.</span>
+                  <button
+                    type="button"
+                    id="retry-booking-entitlements-load"
+                    phx-click="retry_load_booking_entitlements"
+                    class="mt-2 block mx-auto text-blue-600 hover:underline font-semibold"
+                  >
+                    Retry
+                  </button>
+                </p>
+                <p
+                  :if={
+                    @booking_entitlements_loaded? && !@booking_entitlements_loading? &&
+                      !@booking_entitlements_load_error? &&
+                      @booking_entitlements == []
                   }
                   class="px-4 py-6 text-center text-zinc-500 text-sm"
                 >
@@ -2332,6 +2355,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       )
       |> assign(:booking_entitlements, [])
       |> assign(:booking_entitlements_loaded?, false)
+      |> assign(:booking_entitlements_load_error?, false)
       |> assign(:booking_entitlements_loading?, false)
       |> assign(:show_booking_benefits?, false)
       |> assign(:entitlement_form, entitlement_form_defaults())
@@ -2556,6 +2580,7 @@ defmodule YscWeb.AdminUserDetailsLive do
      socket
      |> assign(:booking_entitlements, list)
      |> assign(:booking_entitlements_loaded?, true)
+     |> assign(:booking_entitlements_load_error?, false)
      |> assign(:booking_entitlements_loading?, false)}
   end
 
@@ -2564,7 +2589,10 @@ defmodule YscWeb.AdminUserDetailsLive do
       error: inspect(reason)
     )
 
-    {:noreply, assign(socket, :booking_entitlements_loading?, false)}
+    {:noreply,
+     socket
+     |> assign(:booking_entitlements_load_error?, true)
+     |> assign(:booking_entitlements_loading?, false)}
   end
 
   def handle_async(:load_notifications, {:ok, notifications}, socket) do
@@ -2644,19 +2672,18 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:show_booking_benefits?, show?)
 
     socket =
-      if show? && !socket.assigns.booking_entitlements_loaded? do
-        user_id = socket.assigns.user_id
-
-        socket
-        |> assign(:booking_entitlements_loading?, true)
-        |> start_async(:load_booking_entitlements, fn ->
-          Entitlements.list_all_for_user(user_id)
-        end)
+      if show? && !socket.assigns.booking_entitlements_loaded? &&
+           !socket.assigns.booking_entitlements_loading? do
+        start_booking_entitlements_load(socket)
       else
         socket
       end
 
     {:noreply, socket}
+  end
+
+  def handle_event("retry_load_booking_entitlements", _params, socket) do
+    {:noreply, start_booking_entitlements_load(socket)}
   end
 
   def handle_event("grant_booking_entitlement", %{"entitlement" => p}, socket) do
@@ -2674,10 +2701,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            title: "Bookings"
          )
          |> assign(:entitlement_form, entitlement_form_defaults())
-         |> assign(:booking_entitlements_loading?, true)
-         |> start_async(:load_booking_entitlements, fn ->
-           Entitlements.list_all_for_user(user_id)
-         end)}
+         |> start_booking_entitlements_load()}
 
       {:error, %Ecto.Changeset{} = cs} ->
         msg = format_changeset_errors(cs)
@@ -2702,10 +2726,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            title: "Bookings"
          )
          |> assign(:entitlement_form, entitlement_form_defaults())
-         |> assign(:booking_entitlements_loading?, true)
-         |> start_async(:load_booking_entitlements, fn ->
-           Entitlements.list_all_for_user(user_id)
-         end)}
+         |> start_booking_entitlements_load()}
     end
   end
 
@@ -2733,10 +2754,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                |> YscWeb.Flash.put_toast(:info, "Benefit revoked.",
                  title: "Bookings"
                )
-               |> assign(:booking_entitlements_loading?, true)
-               |> start_async(:load_booking_entitlements, fn ->
-                 Entitlements.list_all_for_user(user_id)
-               end)}
+               |> start_booking_entitlements_load()}
 
             {:error, _} ->
               {:noreply,
@@ -4359,6 +4377,17 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp format_changeset_errors(changeset) do
     YscWeb.FormHelpers.format_changeset_errors(changeset)
+  end
+
+  defp start_booking_entitlements_load(socket) do
+    user_id = socket.assigns.user_id
+
+    socket
+    |> assign(:booking_entitlements_load_error?, false)
+    |> assign(:booking_entitlements_loading?, true)
+    |> start_async(:load_booking_entitlements, fn ->
+      Entitlements.list_all_for_user(user_id)
+    end)
   end
 
   defp entitlement_form_defaults do
