@@ -142,4 +142,25 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "custom-stat"
     end
   end
+
+  describe "dropdown/1" do
+    test "uses JS.toggle on button and hide on wrapper click-away" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.dropdown id="test-dropdown">
+          <:button_block>Menu</:button_block>
+          <ul>
+            <li>Item</li>
+          </ul>
+        </.dropdown>
+        """)
+
+      assert Regex.match?(~r/<div class="relative"[^>]*phx-click-away/, html)
+      assert html =~ ~s(phx-click="[[&quot;toggle&quot;,{&quot;ins&quot;)
+      assert html =~ ~s(&quot;to&quot;:&quot;#test-dropdown&quot;)
+      refute Regex.match?(~r/<div id="test-dropdown"[^>]*phx-click-away/, html)
+    end
+  end
 end

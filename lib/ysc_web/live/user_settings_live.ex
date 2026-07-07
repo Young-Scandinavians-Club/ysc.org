@@ -2371,7 +2371,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div
                   :if={@filtered_payments_count > 0}
                   id="payments-cards"
-                  class="md:hidden space-y-4"
+                  class="md:hidden space-y-4 pt-4"
                 >
                   <%= for payment_info <- @filtered_payments_list do %>
                     <% card_id = "mobile-card-#{payment_dom_id(payment_info)}" %>

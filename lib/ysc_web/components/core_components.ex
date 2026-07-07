@@ -1793,7 +1793,7 @@ defmodule YscWeb.CoreComponents do
 
   def dropdown(assigns) do
     ~H"""
-    <div class="relative">
+    <div class="relative" phx-click-away={hide_dropdown("##{@id}")}>
       <button
         type="button"
         id={"#{@id}Link"}
@@ -1814,7 +1814,6 @@ defmodule YscWeb.CoreComponents do
           !@mobile && "absolute shadow",
           @wide && "wide"
         ]}
-        phx-click-away={close_dropdown("##{@id}")}
       >
         {render_slot(@inner_block)}
       </div>
@@ -3606,36 +3605,25 @@ defmodule YscWeb.CoreComponents do
   end
 
   def toggle_dropdown(to) do
-    # Extract the ID from the selector (e.g., "#about" -> "about")
     id = String.replace(to, "#", "")
     button_id = "##{id}Link"
 
-    # Toggle the dropdown: if it has aria-expanded="true", hide it; otherwise show it
-    # Use conditional operations based on the aria-expanded attribute
-    JS.toggle_class("hidden", to: to)
+    dropdown_in =
+      {"transition ease-out duration-75", "transform opacity-0 scale-95",
+       "transform opacity-100 scale-100"}
+
+    dropdown_out =
+      {"transition ease-in duration-75", "transform opacity-100 scale-100",
+       "transform opacity-0 scale-95"}
+
+    JS.toggle(to: to, in: dropdown_in, out: dropdown_out)
     |> JS.toggle_class("dropdown-open", to: button_id)
-    # If element will be visible (not hidden), set aria-expanded to true
-    |> JS.set_attribute({"aria-expanded", "true"}, to: "#{to}:not(.hidden)")
-    # If element will be hidden, remove aria-expanded
-    |> JS.remove_attribute("aria-expanded", to: "#{to}.hidden")
-    # Apply show/hide transitions conditionally
-    |> JS.show(
-      to: "#{to}:not(.hidden)",
-      transition:
-        {"transition ease-out duration-75", "transform opacity-0 scale-95",
-         "transform opacity-100 scale-100"}
-    )
-    |> JS.hide(
-      to: "#{to}.hidden",
-      transition:
-        {"transition ease-in duration-75", "transform opacity-100 scale-100",
-         "transform opacity-0 scale-95"}
-    )
+    |> JS.toggle_attribute({"aria-expanded", "true"}, to: button_id)
   end
 
   def show_dropdown(to) do
-    # Extract the ID from the selector (e.g., "#about" -> "about")
     id = String.replace(to, "#", "")
+    button_id = "##{id}Link"
 
     JS.show(
       to: to,
@@ -3643,13 +3631,13 @@ defmodule YscWeb.CoreComponents do
         {"transition ease-out duration-75", "transform opacity-0 scale-95",
          "transform opacity-100 scale-100"}
     )
-    |> JS.set_attribute({"aria-expanded", "true"}, to: to)
-    |> JS.add_class("dropdown-open", to: "##{id}Link")
+    |> JS.set_attribute({"aria-expanded", "true"}, to: button_id)
+    |> JS.add_class("dropdown-open", to: button_id)
   end
 
   def hide_dropdown(to) do
-    # Extract the ID from the selector (e.g., "#about" -> "about")
     id = String.replace(to, "#", "")
+    button_id = "##{id}Link"
 
     JS.hide(
       to: to,
@@ -3657,8 +3645,8 @@ defmodule YscWeb.CoreComponents do
         {"transition ease-in duration-75", "transform opacity-100 scale-100",
          "transform opacity-0 scale-95"}
     )
-    |> JS.remove_attribute("aria-expanded", to: to)
-    |> JS.remove_class("dropdown-open", to: "##{id}Link")
+    |> JS.remove_attribute("aria-expanded", to: button_id)
+    |> JS.remove_class("dropdown-open", to: button_id)
   end
 
   @doc """
@@ -3666,20 +3654,7 @@ defmodule YscWeb.CoreComponents do
 
   Idempotent: safe to call when the menu is already closed (e.g. click-away).
   """
-  def close_dropdown(to) do
-    id = String.replace(to, "#", "")
-    button_id = "##{id}Link"
-
-    JS.add_class("hidden", to: to)
-    |> JS.remove_class("dropdown-open", to: button_id)
-    |> JS.remove_attribute("aria-expanded", to: button_id)
-    |> JS.hide(
-      to: to,
-      transition:
-        {"transition ease-in duration-75", "transform opacity-100 scale-100",
-         "transform opacity-0 scale-95"}
-    )
-  end
+  def close_dropdown(to), do: hide_dropdown(to)
 
   @spec translate_error({binary(), keyword() | map()}) :: binary()
   @doc """
