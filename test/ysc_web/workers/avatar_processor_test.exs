@@ -35,58 +35,17 @@ defmodule Ysc.Test.AvatarProcessor.MockS3Plug do
     end
   end
 
-  # Initiate multipart upload: POST /{bucket}/{key}?uploads
-  defp dispatch(%{method: "POST", query_params: %{"uploads" => _}} = conn) do
-    {:ok, _body, conn} = read_body(conn)
-
-    conn
-    |> put_resp_content_type("application/xml")
-    |> send_resp(200, """
-    <?xml version="1.0" encoding="UTF-8"?>
-    <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Bucket>avatars</Bucket>
-      <Key>key</Key>
-      <UploadId>mock-upload-id-12345</UploadId>
-    </InitiateMultipartUploadResult>
-    """)
-  end
-
-  # Upload part: PUT /{bucket}/{key}?partNumber=N&uploadId=xxx
-  defp dispatch(%{method: "PUT", query_params: %{"partNumber" => _}} = conn) do
-    {:ok, _body, conn} = read_body(conn)
-
-    conn
-    |> put_resp_header("etag", ~s("mock-etag-abc123"))
-    |> send_resp(200, "")
-  end
-
-  # Complete multipart upload: POST /{bucket}/{key}?uploadId=xxx
-  defp dispatch(%{method: "POST", query_params: %{"uploadId" => _}} = conn) do
-    {:ok, _body, conn} = read_body(conn)
-    path = conn.request_path |> String.trim_leading("/")
-
-    conn
-    |> put_resp_content_type("application/xml")
-    |> send_resp(200, """
-    <?xml version="1.0" encoding="UTF-8"?>
-    <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
-      <Location>http://localhost/#{path}</Location>
-      <Bucket>avatars</Bucket>
-      <Key>key</Key>
-      <ETag>"mock-etag-final"</ETag>
-    </CompleteMultipartUploadResult>
-    """)
-  end
-
-  defp dispatch(conn), do: send_resp(conn, 200, "")
+  defp dispatch(conn), do: send_resp(conn, 404, "not found")
 end
 
 defmodule YscWeb.Workers.AvatarProcessorTest do
   @moduledoc """
   Tests for AvatarProcessor Oban worker.
 
-  Spins up a lightweight Cowboy HTTP server that mocks S3: `GET` for the raw
-  object (download), and multipart upload `POST`/`PUT` for `ExAws.S3.Upload`.
+  Spins up a lightweight Cowboy HTTP server that mocks S3 `GET` for the raw
+  object download. Uploads use `Ysc.Avatars.TestS3Uploader` in test (see
+  `:avatars_s3_uploader` in config/test.exs) because ExAws multipart PUT against
+  Cowboy mocks is unreliable after Mint/Cowboy upgrades.
 
   Because the S3 mock requires overriding the global `Application.put_env(:ex_aws, :s3, …)`
   config, this module runs with `async: false`.
