@@ -248,7 +248,8 @@ defmodule Ysc.MixProject do
       {:phoenix_live_view, "~> 1.2"},
       {:phoenix_test, "~> 0.11", only: :test, runtime: false},
       {:phoenix_turnstile, "~> 1.2"},
-      {:phoenix, "~> 1.8"},
+      # EEF-CVE-2026-56811/56812: channel join DoS + Presence JS prototype collision; fixed in 1.8.9+
+      {:phoenix, "~> 1.8.9"},
       # plug 1.20.0/1.20.1 retired on Hex (accidental Plug.Conn.upgrade break); pin 1.20.2+.
       {:plug, "~> 1.20.2", override: true},
       {:plug_cowboy, "~> 2.9"},
@@ -260,7 +261,8 @@ defmodule Ysc.MixProject do
       {:sentry, "~> 13.2"},
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
-      {:swoosh, "~> 1.26"},
+      # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+ (we use SES)
+      {:swoosh, "~> 1.26.3"},
       {:tailwind, "~> 0.5", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.1"},
       {:telemetry_poller, "~> 1.3"},
