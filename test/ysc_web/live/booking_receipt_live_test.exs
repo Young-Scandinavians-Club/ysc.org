@@ -73,6 +73,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert html =~ "Booking Confirmation"
       assert html =~ booking.reference_id
+      assert html =~ "Back to home"
       assert has_element?(view, "#booking-receipt")
     end
   end
@@ -2392,6 +2393,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
+      assert html =~ "Back to home"
       assert has_element?(view, "#booking-receipt")
       assert html =~ booking.reference_id
     end

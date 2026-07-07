@@ -889,7 +889,10 @@ defmodule YscWeb.UserSettingsLiveTest do
         live(conn, ~p"/users/membership?retry_invoice=in_test_missing")
 
       render(view)
-      assert render(view) =~ "Invoice"
+      html = render(view)
+      assert html =~ "Invoice"
+      assert html =~ "expired"
+      assert html =~ Ysc.EmailConfig.membership_email()
     end
   end
 
@@ -1728,10 +1731,10 @@ defmodule YscWeb.UserSettingsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/membership")
       render(view)
 
-      send(view.pid, {:retry_invoice_payment, nil})
+      send(view.pid, {:retry_invoice_payment, 123})
+      render(view)
 
-      assert render(view) =~ "Invalid invoice ID"
-      assert render(view) =~ "info@ysc.org"
+      assert render(view) =~ "memberships@ysc.org"
     end
 
     test "refresh_payment_methods handle_info ignores other user id", %{

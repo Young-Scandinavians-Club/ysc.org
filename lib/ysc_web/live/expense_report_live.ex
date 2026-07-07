@@ -1632,7 +1632,7 @@ defmodule YscWeb.ExpenseReportLive do
                 navigate={~p"/"}
                 class="px-3 py-2 text-zinc-600 hover:text-blue-600 transition-colors"
               >
-                Return to Dashboard
+                Back to home
               </.link>
               <span class="text-zinc-300">·</span>
               <.link

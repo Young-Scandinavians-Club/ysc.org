@@ -54,6 +54,7 @@ defmodule YscWeb.Emails.MembershipPaymentFailure do
 
     %{
       first_name: first_name,
+      email: user.email,
       membership_type: membership_type_name,
       is_renewal: is_renewal,
       invoice_id: invoice_id,
