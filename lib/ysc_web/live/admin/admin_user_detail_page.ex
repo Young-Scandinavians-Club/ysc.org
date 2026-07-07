@@ -23,7 +23,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Tickets
-  alias YscWeb.AdminBadgeHelpers
+  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers}
   alias YscWeb.Workers.MembershipRenewalReminderWorker
 
   require Ysc.Logging
@@ -357,7 +357,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                   </div>
                   <%= if order.event.start_date do %>
                     <div class="text-xs text-zinc-500 mt-0.5">
-                      {format_event_date(order.event.start_date)}
+                      {DateTimeDisplay.format_event_date(order.event.start_date)}
                     </div>
                   <% end %>
                 <% else %>
@@ -400,7 +400,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, order}} label="Order Date" field={:inserted_at}>
                 <span class="text-sm text-zinc-600">
-                  {format_utc_date(order.inserted_at)}
+                  {DateTimeDisplay.format_utc_date(order.inserted_at)}
                 </span>
               </:col>
             </Flop.Phoenix.table>
@@ -524,7 +524,7 @@ defmodule YscWeb.AdminUserDetailsLive do
               </:col>
               <:col :let={{_, booking}} label="Booked" field={:inserted_at}>
                 <span class="text-sm text-zinc-600">
-                  {format_utc_date(booking.inserted_at)}
+                  {DateTimeDisplay.format_utc_date(booking.inserted_at)}
                 </span>
               </:col>
             </Flop.Phoenix.table>
@@ -732,7 +732,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                       else: "N/A"}
                   <% else %>
                     <%= if @selected_user_application.reviewed_at do %>
-                      Reviewed {format_utc_date(
+                      Reviewed {DateTimeDisplay.format_utc_date(
                         @selected_user_application.reviewed_at
                       )} by {if @selected_user_application.reviewed_by,
                         do: @selected_user_application.reviewed_by.email,
@@ -1171,7 +1171,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                             to_string(@scheduled_downgrade_info.target_plan)
                           )}
                         </strong>
-                        on <strong><%= format_utc_date_long(@scheduled_downgrade_info.effective_date) %></strong>.
+                        on <strong><%= DateTimeDisplay.format_utc_date_long(@scheduled_downgrade_info.effective_date) %></strong>.
                       </p>
                     </div>
                   </div>
@@ -1221,7 +1221,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                     <span class="font-semibold">Scheduled Downgrade:</span>
                     Will change to {String.capitalize(
                       to_string(@scheduled_downgrade_info.target_plan)
-                    )} on {format_utc_date_long(
+                    )} on {DateTimeDisplay.format_utc_date_long(
                       @scheduled_downgrade_info.effective_date
                     )}
                   </p>
@@ -1461,7 +1461,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         Account ending in ••••{bank_account.account_number_last_4}
                       </h3>
                       <p class="text-sm text-zinc-600 mt-1">
-                        Added {format_utc_date_long(bank_account.inserted_at)}
+                        Added {DateTimeDisplay.format_utc_date_long(bank_account.inserted_at)}
                       </p>
                     </div>
                     <button
@@ -1865,7 +1865,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                           {FamilyDisplay.relationship_label(invite.relationship)}
                         </.badge>
                         <span class="text-xs text-zinc-500 ml-2">
-                          Expires {format_utc_date(invite.expires_at)}
+                          Expires {DateTimeDisplay.format_utc_date(invite.expires_at)}
                         </span>
                       </div>
                       <button
@@ -3824,30 +3824,6 @@ defmodule YscWeb.AdminUserDetailsLive do
       "Unknown Membership"
     end
   end
-
-  defp format_event_date(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")
-  end
-
-  defp format_event_date(_), do: "—"
-
-  defp format_utc_date(%DateTime{} = dt) do
-    dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_date()
-    |> Calendar.strftime("%b %d, %Y")
-  end
-
-  defp format_utc_date(_), do: "—"
-
-  defp format_utc_date_long(%DateTime{} = dt) do
-    dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_date()
-    |> Calendar.strftime("%B %d, %Y")
-  end
-
-  defp format_utc_date_long(_), do: "—"
 
   defp format_datetime_for_display(nil), do: "N/A"
 
