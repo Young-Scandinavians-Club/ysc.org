@@ -537,12 +537,40 @@ defmodule YscWeb.AdminUserDetailsLive do
             />
           </div>
 
-          <div class="mt-12 pt-10 border-t border-zinc-200 max-w-4xl space-y-8">
-            <div>
-              <h2 class="text-xl font-semibold text-zinc-800">
-                Cabin booking benefits
-              </h2>
-              <p class="text-sm text-zinc-500 mt-1">
+          <div class="mt-12 pt-10 border-t border-zinc-200 max-w-4xl">
+            <button
+              type="button"
+              id="toggle-booking-benefits"
+              phx-click="toggle_booking_benefits"
+              aria-expanded={if @show_booking_benefits?, do: "true", else: "false"}
+              class={[
+                "w-full flex items-center justify-between gap-4 text-left rounded-lg border px-4 py-3 transition-colors",
+                if(@show_booking_benefits?,
+                  do: "border-zinc-300 bg-white",
+                  else: "border-zinc-200 bg-zinc-50 hover:bg-zinc-100"
+                )
+              ]}
+            >
+              <div>
+                <span class="text-sm font-semibold text-zinc-800">
+                  Cabin booking benefits
+                </span>
+                <p class="text-xs text-zinc-500 mt-0.5">
+                  Grant or revoke member booking discounts
+                </p>
+              </div>
+              <.icon
+                name={
+                  if @show_booking_benefits?,
+                    do: "hero-chevron-up",
+                    else: "hero-chevron-down"
+                }
+                class="w-5 h-5 text-zinc-400 flex-shrink-0"
+              />
+            </button>
+
+            <div :if={@show_booking_benefits?} class="mt-6 space-y-8">
+              <p class="text-sm text-zinc-500">
                 Grants apply automatically when this member books an eligible stay (
                 <.link
                   navigate={~p"/admin/bookings/entitlements"}
@@ -552,164 +580,189 @@ defmodule YscWeb.AdminUserDetailsLive do
                 </.link>
                 ).
               </p>
-            </div>
 
-            <div class="rounded-lg border border-zinc-200 p-4 bg-white">
-              <h3 class="text-sm font-semibold text-zinc-800 mb-3">
-                Grant new benefit
-              </h3>
-              <.form
-                for={@entitlement_form}
-                id="grant-entitlement-form"
-                phx-submit="grant_booking_entitlement"
-              >
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <.input
-                    field={@entitlement_form[:benefit_kind]}
-                    type="select"
-                    label="Benefit type"
-                    options={[
-                      {"Percent off stay", "percent_off"},
-                      {"Free nights (proportional)", "free_nights"},
-                      {"Fixed amount off", "fixed_amount_off"}
-                    ]}
-                  />
-                  <.input
-                    field={@entitlement_form[:property]}
-                    type="select"
-                    label="Property"
-                    options={[
-                      {"Any property", ""},
-                      {"Lake Tahoe", "tahoe"},
-                      {"Clear Lake", "clear_lake"}
-                    ]}
-                  />
-                  <.input
-                    field={@entitlement_form[:max_guests]}
-                    type="number"
-                    label="Max guests (optional)"
-                  />
-                  <.input
-                    field={@entitlement_form[:free_nights]}
-                    type="number"
-                    label="Free nights count"
-                  />
-                  <.input
-                    field={@entitlement_form[:percent_off]}
-                    type="text"
-                    label="Percent off (e.g. 50)"
-                  />
-                  <.input
-                    field={@entitlement_form[:buyout_max_discount]}
-                    type="text"
-                    label="Buyout max discount (USD)"
-                  />
-                  <.input
-                    field={@entitlement_form[:amount_off]}
-                    type="text"
-                    label="Fixed amount off (USD)"
-                  />
-                  <.input
-                    field={@entitlement_form[:expires_on]}
-                    type="date"
-                    label="Expires (optional)"
-                  />
-                </div>
-                <.input
-                  field={@entitlement_form[:internal_note]}
-                  type="textarea"
-                  label="Internal note (optional)"
-                  class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
-                />
-                <button
-                  type="submit"
-                  id="grant-entitlement-submit"
-                  phx-disable-with="Granting..."
-                  class="mt-4 px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700"
+              <div class="rounded-lg border border-zinc-200 p-4 bg-white">
+                <h3 class="text-sm font-semibold text-zinc-800 mb-3">
+                  Grant new benefit
+                </h3>
+                <.form
+                  for={@entitlement_form}
+                  id="grant-entitlement-form"
+                  phx-submit="grant_booking_entitlement"
                 >
-                  Grant benefit & email member
-                </button>
-              </.form>
-            </div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <.input
+                      field={@entitlement_form[:benefit_kind]}
+                      type="select"
+                      label="Benefit type"
+                      options={[
+                        {"Percent off stay", "percent_off"},
+                        {"Free nights (proportional)", "free_nights"},
+                        {"Fixed amount off", "fixed_amount_off"}
+                      ]}
+                    />
+                    <.input
+                      field={@entitlement_form[:property]}
+                      type="select"
+                      label="Property"
+                      options={[
+                        {"Any property", ""},
+                        {"Lake Tahoe", "tahoe"},
+                        {"Clear Lake", "clear_lake"}
+                      ]}
+                    />
+                    <.input
+                      field={@entitlement_form[:max_guests]}
+                      type="number"
+                      label="Max guests (optional)"
+                    />
+                    <.input
+                      field={@entitlement_form[:free_nights]}
+                      type="number"
+                      label="Free nights count"
+                    />
+                    <.input
+                      field={@entitlement_form[:percent_off]}
+                      type="text"
+                      label="Percent off (e.g. 50)"
+                    />
+                    <.input
+                      field={@entitlement_form[:buyout_max_discount]}
+                      type="text"
+                      label="Buyout max discount (USD)"
+                    />
+                    <.input
+                      field={@entitlement_form[:amount_off]}
+                      type="text"
+                      label="Fixed amount off (USD)"
+                    />
+                    <.input
+                      field={@entitlement_form[:expires_on]}
+                      type="date"
+                      label="Expires (optional)"
+                    />
+                  </div>
+                  <.input
+                    field={@entitlement_form[:internal_note]}
+                    type="textarea"
+                    label="Internal note (optional)"
+                    class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    id="grant-entitlement-submit"
+                    phx-disable-with="Granting..."
+                    class="mt-4 px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700"
+                  >
+                    Grant benefit & email member
+                  </button>
+                </.form>
+              </div>
 
-            <div class="overflow-x-auto rounded-lg border border-zinc-200">
-              <table class="min-w-full text-sm">
-                <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
-                  <tr>
-                    <th class="px-4 py-3">Status</th>
-                    <th class="px-4 py-3">Benefit</th>
-                    <th class="px-4 py-3">Property</th>
-                    <th class="px-4 py-3">Created</th>
-                    <th class="px-4 py-3">Expires</th>
-                    <th class="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody
-                  :if={@booking_entitlements_loading?}
-                  id="booking-entitlements-loading"
-                  role="status"
-                  aria-live="polite"
+              <div class="overflow-x-auto rounded-lg border border-zinc-200">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-zinc-50 text-left text-xs font-semibold text-zinc-600 uppercase">
+                    <tr>
+                      <th class="px-4 py-3">Status</th>
+                      <th class="px-4 py-3">Benefit</th>
+                      <th class="px-4 py-3">Property</th>
+                      <th class="px-4 py-3">Created</th>
+                      <th class="px-4 py-3">Expires</th>
+                      <th class="px-4 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    :if={@booking_entitlements_loading?}
+                    id="booking-entitlements-loading"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <.table_rows_skeleton
+                      rows={3}
+                      colspan={6}
+                      label="Loading entitlements…"
+                      padding_class="px-4 py-3"
+                    />
+                  </tbody>
+                  <tbody
+                    :if={
+                      !@booking_entitlements_loading? &&
+                        !@booking_entitlements_load_error?
+                    }
+                    class="divide-y divide-zinc-100"
+                  >
+                    <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
+                      <td class="px-4 py-3">
+                        <span class="font-medium text-zinc-800">
+                          {format_entitlement_status(ent.status)}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-zinc-700">
+                        {admin_entitlement_summary(ent)}
+                      </td>
+                      <td class="px-4 py-3 text-zinc-600">
+                        <%= cond do %>
+                          <% is_nil(ent.property) -> %>
+                            Any
+                          <% ent.property == :tahoe -> %>
+                            Tahoe
+                          <% true -> %>
+                            Clear Lake
+                        <% end %>
+                      </td>
+                      <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                        {Calendar.strftime(ent.inserted_at, "%Y-%m-%d")}
+                      </td>
+                      <td class="px-4 py-3 text-zinc-600 tabular-nums">
+                        <%= if ent.expires_at do %>
+                          {Date.to_iso8601(DateTime.to_date(ent.expires_at))}
+                        <% else %>
+                          —
+                        <% end %>
+                      </td>
+                      <td class="px-4 py-3 text-right">
+                        <button
+                          :if={ent.status == :active}
+                          type="button"
+                          phx-click="revoke_booking_entitlement"
+                          phx-value-id={ent.id}
+                          class="text-red-600 hover:underline text-xs font-semibold"
+                        >
+                          Revoke
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p
+                  :if={
+                    @booking_entitlements_load_error? &&
+                      !@booking_entitlements_loading?
+                  }
+                  id="booking-entitlements-load-error"
+                  class="px-4 py-6 text-center text-sm"
                 >
-                  <.table_rows_skeleton
-                    rows={3}
-                    colspan={6}
-                    label="Loading entitlements…"
-                    padding_class="px-4 py-3"
-                  />
-                </tbody>
-                <tbody
-                  :if={!@booking_entitlements_loading?}
-                  class="divide-y divide-zinc-100"
+                  <span class="text-red-600">Could not load entitlements.</span>
+                  <button
+                    type="button"
+                    id="retry-booking-entitlements-load"
+                    phx-click="retry_load_booking_entitlements"
+                    class="mt-2 block mx-auto text-blue-600 hover:underline font-semibold"
+                  >
+                    Retry
+                  </button>
+                </p>
+                <p
+                  :if={
+                    @booking_entitlements_loaded? && !@booking_entitlements_loading? &&
+                      !@booking_entitlements_load_error? &&
+                      @booking_entitlements == []
+                  }
+                  class="px-4 py-6 text-center text-zinc-500 text-sm"
                 >
-                  <tr :for={ent <- @booking_entitlements} class="hover:bg-zinc-50">
-                    <td class="px-4 py-3">
-                      <span class="font-medium text-zinc-800">
-                        {format_entitlement_status(ent.status)}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3 text-zinc-700">
-                      {admin_entitlement_summary(ent)}
-                    </td>
-                    <td class="px-4 py-3 text-zinc-600">
-                      <%= cond do %>
-                        <% is_nil(ent.property) -> %>
-                          Any
-                        <% ent.property == :tahoe -> %>
-                          Tahoe
-                        <% true -> %>
-                          Clear Lake
-                      <% end %>
-                    </td>
-                    <td class="px-4 py-3 text-zinc-600 tabular-nums">
-                      {Calendar.strftime(ent.inserted_at, "%Y-%m-%d")}
-                    </td>
-                    <td class="px-4 py-3 text-zinc-600 tabular-nums">
-                      <%= if ent.expires_at do %>
-                        {Date.to_iso8601(DateTime.to_date(ent.expires_at))}
-                      <% else %>
-                        —
-                      <% end %>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                      <button
-                        :if={ent.status == :active}
-                        type="button"
-                        phx-click="revoke_booking_entitlement"
-                        phx-value-id={ent.id}
-                        class="text-red-600 hover:underline text-xs font-semibold"
-                      >
-                        Revoke
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <p
-                :if={!@booking_entitlements_loading? && @booking_entitlements == []}
-                class="px-4 py-6 text-center text-zinc-500 text-sm"
-              >
-                No entitlements yet for this member.
-              </p>
+                  No entitlements yet for this member.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -2301,7 +2354,10 @@ defmodule YscWeb.AdminUserDetailsLive do
         to_form(override_rejection_changeset(%{}), as: "override")
       )
       |> assign(:booking_entitlements, [])
-      |> assign(:booking_entitlements_loading?, true)
+      |> assign(:booking_entitlements_loaded?, false)
+      |> assign(:booking_entitlements_load_error?, false)
+      |> assign(:booking_entitlements_loading?, false)
+      |> assign(:show_booking_benefits?, false)
       |> assign(:entitlement_form, entitlement_form_defaults())
       |> assign(form: user_form)
 
@@ -2380,9 +2436,11 @@ defmodule YscWeb.AdminUserDetailsLive do
     socket = assign(socket, :list_params, list_params)
 
     if socket.assigns.live_action == :booking_benefits do
+      redirect_params = Map.put(list_params, "benefits", "open")
+
       {:noreply,
        push_navigate(socket,
-         to: ~p"/admin/users/#{user_id}/details/bookings?#{list_params}"
+         to: ~p"/admin/users/#{user_id}/details/bookings?#{redirect_params}"
        )}
     else
       socket =
@@ -2397,14 +2455,11 @@ defmodule YscWeb.AdminUserDetailsLive do
 
             :bookings ->
               socket
-              |> assign(:booking_entitlements_loading?, true)
               |> stream(:bookings, [], reset: true)
               |> start_async(:load_bookings, fn ->
                 Bookings.list_user_bookings_paginated(user_id, params)
               end)
-              |> start_async(:load_booking_entitlements, fn ->
-                Entitlements.list_all_for_user(user_id)
-              end)
+              |> maybe_open_booking_benefits(params)
 
             :notifications ->
               user_email = socket.assigns.selected_user.email
@@ -2527,6 +2582,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply,
      socket
      |> assign(:booking_entitlements, list)
+     |> assign(:booking_entitlements_loaded?, true)
+     |> assign(:booking_entitlements_load_error?, false)
      |> assign(:booking_entitlements_loading?, false)}
   end
 
@@ -2535,7 +2592,12 @@ defmodule YscWeb.AdminUserDetailsLive do
       error: inspect(reason)
     )
 
-    {:noreply, assign(socket, :booking_entitlements_loading?, false)}
+    {:noreply,
+     socket
+     |> assign(:booking_entitlements, [])
+     |> assign(:booking_entitlements_loaded?, false)
+     |> assign(:booking_entitlements_load_error?, true)
+     |> assign(:booking_entitlements_loading?, false)}
   end
 
   def handle_async(:load_notifications, {:ok, notifications}, socket) do
@@ -2607,6 +2669,28 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply, assign(socket, :panel_width, width)}
   end
 
+  def handle_event("toggle_booking_benefits", _params, socket) do
+    show? = !socket.assigns.show_booking_benefits?
+
+    socket =
+      socket
+      |> assign(:show_booking_benefits?, show?)
+
+    socket =
+      if show? && !socket.assigns.booking_entitlements_loaded? &&
+           !socket.assigns.booking_entitlements_loading? do
+        start_booking_entitlements_load(socket)
+      else
+        socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("retry_load_booking_entitlements", _params, socket) do
+    {:noreply, start_booking_entitlements_load(socket)}
+  end
+
   def handle_event("grant_booking_entitlement", %{"entitlement" => p}, socket) do
     user_id = socket.assigns.user_id
     admin_id = socket.assigns.current_user.id
@@ -2622,10 +2706,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            title: "Bookings"
          )
          |> assign(:entitlement_form, entitlement_form_defaults())
-         |> assign(:booking_entitlements_loading?, true)
-         |> start_async(:load_booking_entitlements, fn ->
-           Entitlements.list_all_for_user(user_id)
-         end)}
+         |> start_booking_entitlements_load()}
 
       {:error, %Ecto.Changeset{} = cs} ->
         msg = format_changeset_errors(cs)
@@ -2650,10 +2731,7 @@ defmodule YscWeb.AdminUserDetailsLive do
            title: "Bookings"
          )
          |> assign(:entitlement_form, entitlement_form_defaults())
-         |> assign(:booking_entitlements_loading?, true)
-         |> start_async(:load_booking_entitlements, fn ->
-           Entitlements.list_all_for_user(user_id)
-         end)}
+         |> start_booking_entitlements_load()}
     end
   end
 
@@ -2681,10 +2759,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                |> YscWeb.Flash.put_toast(:info, "Benefit revoked.",
                  title: "Bookings"
                )
-               |> assign(:booking_entitlements_loading?, true)
-               |> start_async(:load_booking_entitlements, fn ->
-                 Entitlements.list_all_for_user(user_id)
-               end)}
+               |> start_booking_entitlements_load()}
 
             {:error, _} ->
               {:noreply,
@@ -4307,6 +4382,35 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp format_changeset_errors(changeset) do
     YscWeb.FormHelpers.format_changeset_errors(changeset)
+  end
+
+  defp start_booking_entitlements_load(socket) do
+    user_id = socket.assigns.user_id
+
+    socket
+    |> assign(:booking_entitlements_load_error?, false)
+    |> assign(:booking_entitlements_loading?, true)
+    |> start_async(:load_booking_entitlements, fn ->
+      Entitlements.list_all_for_user(user_id)
+    end)
+  end
+
+  defp maybe_open_booking_benefits(socket, %{"benefits" => "open"}) do
+    socket
+    |> assign(:show_booking_benefits?, true)
+    |> maybe_start_booking_entitlements_load()
+  end
+
+  defp maybe_open_booking_benefits(socket, _params), do: socket
+
+  defp maybe_start_booking_entitlements_load(socket) do
+    if connected?(socket) &&
+         !socket.assigns.booking_entitlements_loaded? &&
+         !socket.assigns.booking_entitlements_loading? do
+      start_booking_entitlements_load(socket)
+    else
+      socket
+    end
   end
 
   defp entitlement_form_defaults do

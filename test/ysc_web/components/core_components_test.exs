@@ -142,4 +142,33 @@ defmodule YscWeb.CoreComponentsTest do
       assert html =~ "custom-stat"
     end
   end
+
+  describe "dropdown/1" do
+    test "uses JS.toggle on button and hide on wrapper click-away" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.dropdown id="test-dropdown">
+          <:button_block>Menu</:button_block>
+          <ul>
+            <li>Item</li>
+          </ul>
+        </.dropdown>
+        """)
+
+      document = LazyHTML.from_fragment(html)
+
+      assert [_wrapper] =
+               LazyHTML.filter(document, "div.relative[phx-click-away]")
+               |> Enum.to_list()
+
+      assert LazyHTML.filter(document, "div#test-dropdown[phx-click-away]")
+             |> Enum.empty?()
+
+      button = LazyHTML.query_by_id(document, "test-dropdownLink")
+      assert LazyHTML.attribute(button, "aria-expanded") == ["false"]
+      assert hd(LazyHTML.attribute(button, "phx-click")) =~ "toggle"
+    end
+  end
 end
