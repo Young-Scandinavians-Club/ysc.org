@@ -97,6 +97,16 @@ defmodule Ysc.Avatars do
   Returns `{:ok, location}` with the full object URL.
   """
   def upload_to_s3(file_path, key, opts \\ []) do
+    case Application.get_env(:ysc, :avatars_s3_uploader) do
+      mod when is_atom(mod) and not is_nil(mod) ->
+        mod.upload(file_path, key, opts)
+
+      _ ->
+        ex_aws_upload_to_s3(file_path, key, opts)
+    end
+  end
+
+  defp ex_aws_upload_to_s3(file_path, key, opts) do
     bucket = S3Config.avatars_bucket_name()
     key = String.trim_leading(key, "/")
 
