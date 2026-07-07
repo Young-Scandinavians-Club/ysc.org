@@ -1,5 +1,6 @@
 defmodule YscWeb.AdminDashboardLive do
   use YscWeb, :admin_live_view
+  require Ysc.Logging
 
   import YscWeb.CoreComponents
   import YscWeb.Live.AsyncHelpers
@@ -560,15 +561,31 @@ defmodule YscWeb.AdminDashboardLive do
               </.link>
             </div>
 
+            <div
+              :if={@loading_dashboard}
+              id="dashboard-events-timeline-loading"
+              class="space-y-4"
+              role="status"
+              aria-live="polite"
+            >
+              <span class="sr-only">Loading upcoming events…</span>
+              <.skeleton_list_row
+                :for={_ <- 1..3}
+                class="flex items-start gap-3"
+                leading_class="h-3 w-3 rounded-full mt-1.5 shrink-0"
+                lines={["h-4 w-2/3 rounded", "h-3 w-1/3 rounded"]}
+              />
+            </div>
+
             <.admin_icon_empty_state
-              :if={Enum.empty?(@events_with_tickets)}
+              :if={!@loading_dashboard && Enum.empty?(@events_with_tickets)}
               variant={:dashed}
               icon="hero-calendar"
               title="No upcoming events"
             />
 
             <ul
-              :if={not Enum.empty?(@events_with_tickets)}
+              :if={!@loading_dashboard && not Enum.empty?(@events_with_tickets)}
               class="relative border-l-2 border-zinc-200 ml-2.5 sm:ml-3 space-y-0"
             >
               <li
@@ -983,8 +1000,19 @@ defmodule YscWeb.AdminDashboardLive do
           </.link>
         </div>
 
+        <div
+          :if={@loading_dashboard}
+          id="dashboard-pending-applications-loading"
+          class="space-y-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading pending applications…</span>
+          <.skeleton_block :for={_ <- 1..2} class="h-16 w-full rounded-lg" />
+        </div>
+
         <.admin_icon_empty_state
-          :if={Enum.empty?(@pending_users)}
+          :if={!@loading_dashboard && Enum.empty?(@pending_users)}
           variant={:dashed}
           icon="hero-check-circle"
           title="No pending applications"
@@ -992,7 +1020,10 @@ defmodule YscWeb.AdminDashboardLive do
           icon_class="w-7 h-7 text-zinc-200 mx-auto mb-2"
         />
 
-        <div :if={not Enum.empty?(@pending_users)} class="space-y-3">
+        <div
+          :if={!@loading_dashboard && not Enum.empty?(@pending_users)}
+          class="space-y-3"
+        >
           <div
             :for={user <- Enum.take(@pending_users, 3)}
             class={[
@@ -1059,13 +1090,32 @@ defmodule YscWeb.AdminDashboardLive do
             View all posts
           </.link>
         </div>
+        <div
+          :if={@loading_dashboard}
+          id="dashboard-recent-discussions-loading"
+          class="space-y-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading recent discussions…</span>
+          <div
+            :for={_ <- 1..3}
+            class="space-y-2 border-b border-zinc-100 pb-3 last:border-0 last:pb-0"
+          >
+            <.skeleton_block class="h-3 w-1/3 rounded" />
+            <.skeleton_block class="h-4 w-full rounded" />
+          </div>
+        </div>
         <p
-          :if={Enum.empty?(@latest_comments)}
+          :if={!@loading_dashboard && Enum.empty?(@latest_comments)}
           class="text-xs text-zinc-400 italic py-1"
         >
           No new comments to moderate
         </p>
-        <ul :if={not Enum.empty?(@latest_comments)} class="space-y-3">
+        <ul
+          :if={!@loading_dashboard && not Enum.empty?(@latest_comments)}
+          class="space-y-3"
+        >
           <li
             :for={comment <- @latest_comments}
             class="border-b border-zinc-100 pb-3 last:border-0 last:pb-0"
@@ -1204,141 +1254,170 @@ defmodule YscWeb.AdminDashboardLive do
         :load_dashboard_data,
         %{assigns: %{admin_role: :volunteer}} = socket
       ) do
-    data =
-      [
-        {:latest_comments, fn -> Posts.get_latest_comments(5) end},
-        {:events_with_tickets,
-         fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
-        {:published_posts_count, fn -> get_published_posts_count() end},
-        {:newsletter_editions_count, fn -> get_newsletter_editions_count() end},
-        {:draft_posts_count, fn -> get_draft_posts_count() end},
-        {:draft_newsletter_count, fn -> get_draft_newsletter_count() end}
-      ]
-      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
-        timeout: :infinity,
-        max_concurrency: 6
-      )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
-        Map.put(acc, key, value)
-      end)
+    socket =
+      try do
+        data =
+          [
+            {:latest_comments, fn -> Posts.get_latest_comments(5) end},
+            {:events_with_tickets,
+             fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
+            {:published_posts_count, fn -> get_published_posts_count() end},
+            {:newsletter_editions_count,
+             fn -> get_newsletter_editions_count() end},
+            {:draft_posts_count, fn -> get_draft_posts_count() end},
+            {:draft_newsletter_count, fn -> get_draft_newsletter_count() end}
+          ]
+          |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+            timeout: :infinity,
+            max_concurrency: 6
+          )
+          |> Enum.reduce(%{}, fn
+            {:ok, {key, value}}, acc -> Map.put(acc, key, value)
+            {:exit, _reason}, acc -> acc
+          end)
 
-    events_with_tickets = Map.fetch!(data, :events_with_tickets)
+        events_with_tickets = Map.fetch!(data, :events_with_tickets)
 
-    {:noreply,
-     socket
-     |> assign(:loading_dashboard, false)
-     |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
-     |> assign(:events_with_tickets, events_with_tickets)
-     |> assign_dashboard_check_in_sessions(events_with_tickets)
-     |> assign(:upcoming_events_count, length(events_with_tickets))
-     |> assign(:published_posts_count, Map.fetch!(data, :published_posts_count))
-     |> assign(
-       :newsletter_editions_count,
-       Map.fetch!(data, :newsletter_editions_count)
-     )
-     |> assign(:draft_posts_count, Map.fetch!(data, :draft_posts_count))
-     |> assign(
-       :draft_newsletter_count,
-       Map.fetch!(data, :draft_newsletter_count)
-     )}
+        socket
+        |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
+        |> assign(:events_with_tickets, events_with_tickets)
+        |> assign_dashboard_check_in_sessions(events_with_tickets)
+        |> assign(:upcoming_events_count, length(events_with_tickets))
+        |> assign(
+          :published_posts_count,
+          Map.fetch!(data, :published_posts_count)
+        )
+        |> assign(
+          :newsletter_editions_count,
+          Map.fetch!(data, :newsletter_editions_count)
+        )
+        |> assign(:draft_posts_count, Map.fetch!(data, :draft_posts_count))
+        |> assign(
+          :draft_newsletter_count,
+          Map.fetch!(data, :draft_newsletter_count)
+        )
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load volunteer dashboard data",
+            error: Exception.message(error)
+          )
+
+          socket
+      end
+
+    {:noreply, assign(socket, :loading_dashboard, false)}
   end
 
   @impl true
   def handle_info(:load_dashboard_data, socket) do
-    data =
-      [
-        {:latest_comments, fn -> Posts.get_latest_comments(5) end},
-        {:events_with_tickets,
-         fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
-        {:pending_users, fn -> Accounts.get_pending_approval_users() end},
-        {:revenue, fn -> calculate_all_revenue_stats() end},
-        {:pending_refunds_summary,
-         fn -> Bookings.pending_refunds_dashboard_summary() end},
-        {:recent_newsletters,
-         fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
-        {:application_statistics, fn -> get_application_statistics() end},
-        {:property_stats, fn -> get_property_stats() end},
-        {:membership_stats, fn -> Accounts.get_membership_stats() end},
-        {:membership_joins_ytd,
-         fn -> Accounts.get_membership_joins_ytd_comparison() end},
-        {:memberships_renewing_30_days, fn -> get_renewals_in_30_days() end},
-        {:ytd_revenue_pair, fn -> calculate_ytd_revenue() end},
-        {:revenue_sparkline, fn -> get_last_7_days_revenue() end},
-        {:newsletter_subscriber_stats,
-         fn -> get_newsletter_subscriber_stats() end}
-      ]
-      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
-        timeout: :infinity,
-        max_concurrency: 10
-      )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
-        Map.put(acc, key, value)
-      end)
-
-    pending_users = Map.fetch!(data, :pending_users)
-
-    {applications_this_month, applications_this_year, applications_last_month,
-     applications_last_year, applications_month_change,
-     applications_year_change} = Map.fetch!(data, :application_statistics)
-
-    joins_ytd = Map.fetch!(data, :membership_joins_ytd)
-
-    {ytd_revenue, ytd_revenue_label} = Map.fetch!(data, :ytd_revenue_pair)
-
-    {newsletter_subscriber_count, newsletter_subscribers_this_month} =
-      Map.fetch!(data, :newsletter_subscriber_stats)
-
-    revenue = Map.fetch!(data, :revenue)
-    events_with_tickets = Map.fetch!(data, :events_with_tickets)
-
     socket =
-      socket
-      |> assign(:loading_dashboard, false)
-      |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
-      |> assign(:events_with_tickets, events_with_tickets)
-      |> assign_dashboard_check_in_sessions(events_with_tickets)
-      |> assign(:pending_users, pending_users)
-      |> assign(:pending_reviews_count, length(pending_users))
-      |> assign(:applications_this_month, applications_this_month)
-      |> assign(:applications_this_year, applications_this_year)
-      |> assign(:applications_last_month, applications_last_month)
-      |> assign(:applications_last_year, applications_last_year)
-      |> assign(:applications_month_change, applications_month_change)
-      |> assign(:applications_year_change, applications_year_change)
-      |> assign(:property_stats, Map.fetch!(data, :property_stats))
-      |> assign(:revenue_sparkline, Map.fetch!(data, :revenue_sparkline))
-      |> assign(:membership_stats, Map.fetch!(data, :membership_stats))
-      |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
-      |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
-      |> assign(:membership_joins_prior_year_label, joins_ytd.prior_year_label)
-      |> assign(
-        :membership_joins_ytd_change_percent,
-        joins_ytd.joins_ytd_change_percent
-      )
-      |> assign(
-        :memberships_renewing_30_days,
-        Map.fetch!(data, :memberships_renewing_30_days)
-      )
-      |> assign(:ytd_revenue, ytd_revenue)
-      |> assign(:ytd_revenue_label, ytd_revenue_label)
-      |> assign(:newsletter_subscriber_count, newsletter_subscriber_count)
-      |> assign(
-        :newsletter_subscribers_this_month,
-        newsletter_subscribers_this_month
-      )
-      |> assign(
-        :recent_newsletters_with_stats,
-        Map.fetch!(data, :recent_newsletters)
-      )
-      |> assign(
-        :pending_refunds_summary,
-        Map.fetch!(data, :pending_refunds_summary)
-      )
-      |> then(fn s ->
-        Enum.reduce(revenue, s, fn {k, v}, acc -> assign(acc, k, v) end)
-      end)
+      try do
+        data =
+          [
+            {:latest_comments, fn -> Posts.get_latest_comments(5) end},
+            {:events_with_tickets,
+             fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
+            {:pending_users, fn -> Accounts.get_pending_approval_users() end},
+            {:revenue, fn -> calculate_all_revenue_stats() end},
+            {:pending_refunds_summary,
+             fn -> Bookings.pending_refunds_dashboard_summary() end},
+            {:recent_newsletters,
+             fn -> Newsletter.list_recent_sent_editions_with_stats(5) end},
+            {:application_statistics, fn -> get_application_statistics() end},
+            {:property_stats, fn -> get_property_stats() end},
+            {:membership_stats, fn -> Accounts.get_membership_stats() end},
+            {:membership_joins_ytd,
+             fn -> Accounts.get_membership_joins_ytd_comparison() end},
+            {:memberships_renewing_30_days,
+             fn -> get_renewals_in_30_days() end},
+            {:ytd_revenue_pair, fn -> calculate_ytd_revenue() end},
+            {:revenue_sparkline, fn -> get_last_7_days_revenue() end},
+            {:newsletter_subscriber_stats,
+             fn -> get_newsletter_subscriber_stats() end}
+          ]
+          |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+            timeout: :infinity,
+            max_concurrency: 10
+          )
+          |> Enum.reduce(%{}, fn
+            {:ok, {key, value}}, acc -> Map.put(acc, key, value)
+            {:exit, _reason}, acc -> acc
+          end)
 
-    {:noreply, socket}
+        pending_users = Map.fetch!(data, :pending_users)
+
+        {applications_this_month, applications_this_year,
+         applications_last_month, applications_last_year,
+         applications_month_change, applications_year_change} =
+          Map.fetch!(data, :application_statistics)
+
+        joins_ytd = Map.fetch!(data, :membership_joins_ytd)
+
+        {ytd_revenue, ytd_revenue_label} = Map.fetch!(data, :ytd_revenue_pair)
+
+        {newsletter_subscriber_count, newsletter_subscribers_this_month} =
+          Map.fetch!(data, :newsletter_subscriber_stats)
+
+        revenue = Map.fetch!(data, :revenue)
+        events_with_tickets = Map.fetch!(data, :events_with_tickets)
+
+        socket
+        |> assign(:latest_comments, Map.fetch!(data, :latest_comments))
+        |> assign(:events_with_tickets, events_with_tickets)
+        |> assign_dashboard_check_in_sessions(events_with_tickets)
+        |> assign(:pending_users, pending_users)
+        |> assign(:pending_reviews_count, length(pending_users))
+        |> assign(:applications_this_month, applications_this_month)
+        |> assign(:applications_this_year, applications_this_year)
+        |> assign(:applications_last_month, applications_last_month)
+        |> assign(:applications_last_year, applications_last_year)
+        |> assign(:applications_month_change, applications_month_change)
+        |> assign(:applications_year_change, applications_year_change)
+        |> assign(:property_stats, Map.fetch!(data, :property_stats))
+        |> assign(:revenue_sparkline, Map.fetch!(data, :revenue_sparkline))
+        |> assign(:membership_stats, Map.fetch!(data, :membership_stats))
+        |> assign(:membership_joins_current_ytd, joins_ytd.current_ytd_joins)
+        |> assign(:membership_joins_prior_ytd, joins_ytd.prior_ytd_joins)
+        |> assign(
+          :membership_joins_prior_year_label,
+          joins_ytd.prior_year_label
+        )
+        |> assign(
+          :membership_joins_ytd_change_percent,
+          joins_ytd.joins_ytd_change_percent
+        )
+        |> assign(
+          :memberships_renewing_30_days,
+          Map.fetch!(data, :memberships_renewing_30_days)
+        )
+        |> assign(:ytd_revenue, ytd_revenue)
+        |> assign(:ytd_revenue_label, ytd_revenue_label)
+        |> assign(:newsletter_subscriber_count, newsletter_subscriber_count)
+        |> assign(
+          :newsletter_subscribers_this_month,
+          newsletter_subscribers_this_month
+        )
+        |> assign(
+          :recent_newsletters_with_stats,
+          Map.fetch!(data, :recent_newsletters)
+        )
+        |> assign(
+          :pending_refunds_summary,
+          Map.fetch!(data, :pending_refunds_summary)
+        )
+        |> then(fn s ->
+          Enum.reduce(revenue, s, fn {k, v}, acc -> assign(acc, k, v) end)
+        end)
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load admin dashboard data",
+            error: Exception.message(error)
+          )
+
+          socket
+      end
+
+    {:noreply, assign(socket, :loading_dashboard, false)}
   end
 
   defp assign_dashboard_check_in_sessions(socket, events_with_tickets) do

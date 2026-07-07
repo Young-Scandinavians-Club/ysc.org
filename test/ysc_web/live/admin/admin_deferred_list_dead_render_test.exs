@@ -51,7 +51,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       )
 
     assert query_count == 0
-    assert html =~ "Loading posts"
+    assert html =~ ~s|id="admin-posts-loading"|
     refute html =~ "Static Render Post"
   end
 
@@ -74,7 +74,7 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       )
 
     assert query_count == 0
-    assert html =~ "Loading events"
+    assert html =~ ~s|id="admin-events-loading"|
     refute html =~ "Static Render Event"
   end
 
@@ -96,11 +96,13 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       )
 
     assert query_count == 0
-    assert html =~ "Loading users"
+    assert html =~ ~s|id="admin-users-loading"|
     refute html =~ "Static User"
   end
 
-  test "dead render loads review route without list meta", %{conn: conn} do
+  test "dead render loads review route with deferred modal content", %{
+    conn: conn
+  } do
     pending_user =
       user_fixture(%{
         state: "pending_approval",
@@ -115,9 +117,10 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       |> get("/admin/users/#{pending_user.id}/review")
       |> html_response(200)
 
-    assert html =~ "Review Application"
-    assert html =~ "Review Render"
-    assert html =~ "Loading users"
+    assert html =~ ~s|id="admin-user-review-modal-loading"|
+    assert html =~ ~s|id="admin-users-loading"|
+    refute html =~ "Review Application"
+    refute html =~ "Review Render"
   end
 
   test "dead render skips scanner sessions query and shows loading state", %{
@@ -324,6 +327,28 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
       refute html =~ "Loading users…"
       assert html =~ "Deferred Loaduser"
       assert has_element?(view, "#admin_users_list")
+    end
+
+    test "review modal replaces loading placeholder after connect", %{
+      conn: conn
+    } do
+      pending_user =
+        user_fixture(%{
+          state: "pending_approval",
+          first_name: "Review",
+          last_name: "Connect"
+        })
+
+      signup_application_fixture(pending_user)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/users/#{pending_user.id}/review")
+
+      html = render_async(view)
+
+      refute html =~ ~s|id="admin-user-review-modal-loading"|
+      assert html =~ "Review Application"
+      assert html =~ "Review Connect"
     end
   end
 end

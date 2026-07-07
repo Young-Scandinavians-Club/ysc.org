@@ -104,7 +104,12 @@ defmodule YscWeb.AdminPostsLive do
             </.admin_filter_dropdown>
           </div>
 
-          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading posts…" />
+          <.admin_table_skeleton
+            :if={is_nil(@meta)}
+            id="admin-posts-loading"
+            rows={8}
+            columns={4}
+          />
 
           <div :if={@meta}>
             <%!-- Mobile Card View --%>

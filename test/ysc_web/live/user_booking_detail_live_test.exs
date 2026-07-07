@@ -76,7 +76,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       assert html =~ "children"
     end
 
-    test "static HTML shows payment loading before websocket connects", %{
+    test "static HTML shows loading shell before websocket connects", %{
       conn: conn
     } do
       %{conn: conn, user: user} = log_in_member(conn)
@@ -91,7 +91,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       conn = get(conn, ~p"/bookings/#{booking.id}")
       html = html_response(conn, 200)
 
-      assert html =~ "Loading payment details..."
+      assert html =~ ~s|id="booking-detail-loading"|
+      refute html =~ booking.reference_id
       refute html =~ "Payment Method"
       refute html =~ "Total Paid"
     end
@@ -162,11 +163,10 @@ defmodule YscWeb.UserBookingDetailLiveTest do
       %{conn: conn, user: _user} = log_in_member(conn)
       missing = Ecto.ULID.generate()
 
-      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+      assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/#{missing}")
 
       assert path == ~p"/"
-      assert flash["error"] =~ "couldn't find this reservation"
     end
 
     test "shows payment summary when a ledger payment exists", %{conn: conn} do

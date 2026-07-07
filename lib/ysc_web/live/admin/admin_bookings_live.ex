@@ -2339,13 +2339,12 @@ defmodule YscWeb.AdminBookingsLive do
                 clear_event="clear-reservation-search"
               />
             </div>
-            <div
+            <.admin_table_skeleton
               :if={is_nil(@reservation_meta)}
               id="reservations-loading"
-              class="py-16 text-center text-sm text-zinc-500"
-            >
-              Loading reservations…
-            </div>
+              rows={8}
+              columns={6}
+            />
             <div :if={@reservation_meta} class="py-6 w-full overflow-x-auto">
               <Flop.Phoenix.table
                 id="admin_reservations_list"
@@ -4075,10 +4074,7 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp apply_action(socket, :edit_booking, %{"id" => id}) do
-    booking = Bookings.get_booking!(id)
-
-    booking =
-      Ysc.Repo.preload(booking, user: :current_avatar, rooms: :room_category)
+    booking = Bookings.get_booking_for_admin_view!(id)
 
     # Determine booking type from existing booking
     has_rooms = Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
@@ -4267,15 +4263,7 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   defp apply_view_booking_action(socket, id) do
-    booking = Bookings.get_booking!(id)
-
-    booking =
-      Ysc.Repo.preload(booking,
-        user: :current_avatar,
-        booking_guests: [],
-        rooms: :room_category,
-        check_ins: :check_in_vehicles
-      )
+    booking = Bookings.get_booking_for_admin_view!(id)
 
     # Ensure selected_property matches the booking's property
     socket =
@@ -6811,7 +6799,7 @@ defmodule YscWeb.AdminBookingsLive do
           end),
           Task.async(fn ->
             Bookings.list_bookings(property, start_date, end_date,
-              preload: [:rooms, {:user, :current_avatar}]
+              preload: [rooms: :room_category, user: :current_avatar]
             )
           end)
         ],

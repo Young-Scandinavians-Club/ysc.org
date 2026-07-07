@@ -91,10 +91,24 @@ defmodule YscWeb.BookingCheckoutLive do
   defp validate_user_signed_in(_user), do: :ok
 
   defp load_checkout(socket, booking_id, user, timezone) do
-    with {:ok, booking} <- load_booking(booking_id, user),
+    with :ok <- Bookings.ensure_user_may_book(user),
+         {:ok, booking} <- load_booking(booking_id, user),
          :ok <- validate_booking_status(booking),
          :ok <- validate_booking_not_expired(booking) do
       initialize_checkout(socket, booking, user, timezone)
+    else
+      {:error, :application_pending_approval} ->
+        {:error,
+         {:redirect, ~p"/pending-review",
+          YscWeb.BookingUserMessages.application_pending_approval_message()}}
+
+      {:error, :membership_required} ->
+        {:error,
+         {:redirect, ~p"/users/membership",
+          YscWeb.BookingUserMessages.membership_required_plain_message()}}
+
+      {:error, {:redirect, _, _} = redirect} ->
+        {:error, redirect}
     end
   end
 
@@ -336,9 +350,36 @@ defmodule YscWeb.BookingCheckoutLive do
         <h1>Complete Your Booking</h1>
       </div>
 
-      <p :if={!@checkout_data_loaded?} class="text-zinc-600">
-        Loading checkout details…
-      </p>
+      <div
+        :if={!@checkout_data_loaded?}
+        id="checkout-loading"
+        class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="sr-only">Loading checkout details…</span>
+        <div class="lg:col-span-2 space-y-6">
+          <div class="flex items-center gap-6 p-6 bg-zinc-50 rounded-lg border border-zinc-200">
+            <.skeleton_block class="h-20 w-20 rounded-lg shrink-0" />
+            <div class="flex-1 space-y-2">
+              <.skeleton_block class="h-6 w-1/2 rounded" />
+              <.skeleton_block class="h-4 w-2/3 rounded" />
+              <.skeleton_block class="h-4 w-1/3 rounded" />
+            </div>
+          </div>
+          <div class="bg-white rounded-lg border border-zinc-200 p-8 space-y-4">
+            <.skeleton_block class="h-6 w-40 rounded" />
+            <.payment_element_loading />
+          </div>
+        </div>
+        <aside class="space-y-6">
+          <.skeleton_block class="h-20 w-full rounded-lg" />
+          <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+            <.skeleton_block class="h-4 w-1/3 rounded" />
+            <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded" />
+          </div>
+        </aside>
+      </div>
 
       <div
         :if={@checkout_data_loaded?}
@@ -1924,9 +1965,10 @@ defmodule YscWeb.BookingCheckoutLive do
         payment_intent_params
       end
 
-    # Use booking reference ID as idempotency key to prevent duplicate charges
-    # If the same reference is used again, Stripe will return the existing payment intent
-    idempotency_key = "booking_#{booking.reference_id}"
+    # Include amount in the idempotency key so repriced holds get a fresh PI.
+    # A reference-only key caused Stripe to return a stale PI after checkout
+    # recalculated entitlements or min-occupancy pricing.
+    idempotency_key = "booking_#{booking.reference_id}_#{amount_cents}"
 
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
@@ -1934,7 +1976,19 @@ defmodule YscWeb.BookingCheckoutLive do
            headers: %{"Idempotency-Key" => idempotency_key}
          ) do
       {:ok, payment_intent} ->
-        {:ok, payment_intent}
+        if payment_intent.amount == amount_cents do
+          {:ok, payment_intent}
+        else
+          Ysc.Logging.warning(
+            "[BookingCheckout] Stripe returned payment intent with stale amount",
+            booking_id: booking.id,
+            expected_amount_cents: amount_cents,
+            payment_intent_id: payment_intent.id,
+            payment_intent_amount_cents: payment_intent.amount
+          )
+
+          {:error, YscWeb.BookingUserMessages.checkout_payment_setup_failed()}
+        end
 
       {:error, %Stripe.Error{} = error} ->
         Ysc.Logging.error(

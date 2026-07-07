@@ -57,86 +57,14 @@ defmodule YscWeb.PaymentSuccessLive do
       redirect_status = Map.get(params, "redirect_status")
       payment_intent_id = extract_payment_intent_id(params)
 
+      socket =
+        socket
+        |> assign(:redirect_status, redirect_status)
+        |> assign(:payment_intent_id, payment_intent_id)
+        |> assign(:processing_payment?, true)
+
       cond do
-        redirect_status == "succeeded" ->
-          # Payment succeeded - redirect to success page
-          if payment_intent_id do
-            case redirect_to_success_page_with_retry(payment_intent_id, user) do
-              {:ok, redirect_path} ->
-                {:ok, redirect(socket, to: redirect_path)}
-
-              {:error, reason} ->
-                Ysc.Logging.error(
-                  "Failed to redirect from payment success after retries",
-                  payment_intent_id: payment_intent_id,
-                  user_id: user.id,
-                  error: reason
-                )
-
-                {:ok,
-                 socket
-                 |> YscWeb.Flash.put_toast(
-                   :error,
-                   "Your payment went through, but we couldn't load your confirmation. Please email #{Ysc.EmailConfig.contact_email()} with the date and amount charged, and we'll help right away.",
-                   title: "Payment"
-                 )
-                 |> redirect(to: ~p"/")}
-            end
-          else
-            {:ok,
-             socket
-             |> YscWeb.Flash.put_toast(
-               :error,
-               "We couldn't confirm your payment from this link. If you were charged, check your email for a receipt or contact us at #{Ysc.EmailConfig.contact_email()} with the date and amount. Otherwise, try checking out again.",
-               title: "Payment"
-             )
-             |> redirect(to: ~p"/")}
-          end
-
-        redirect_status in ["failed", "canceled"] ->
-          # Payment failed or was canceled - redirect to appropriate page with error
-          failure_message = get_failure_message(redirect_status)
-
-          if payment_intent_id do
-            case redirect_to_failure_page(
-                   payment_intent_id,
-                   user,
-                   redirect_status
-                 ) do
-              {:ok, redirect_path} ->
-                {:ok,
-                 socket
-                 |> YscWeb.Flash.put_toast(:error, failure_message,
-                   title: "Payment"
-                 )
-                 |> redirect(to: redirect_path)}
-
-              {:error, reason} ->
-                Ysc.Logging.error("Failed to redirect from payment failure",
-                  payment_intent_id: payment_intent_id,
-                  user_id: user.id,
-                  redirect_status: redirect_status,
-                  error: reason
-                )
-
-                {:ok,
-                 socket
-                 |> YscWeb.Flash.put_toast(:error, failure_message,
-                   title: "Payment"
-                 )
-                 |> redirect(to: ~p"/")}
-            end
-          else
-            {:ok,
-             socket
-             |> YscWeb.Flash.put_toast(:error, failure_message,
-               title: "Payment"
-             )
-             |> redirect(to: ~p"/")}
-          end
-
-        true ->
-          # Unknown or missing redirect status
+        is_nil(redirect_status) ->
           {:ok,
            socket
            |> YscWeb.Flash.put_toast(
@@ -145,13 +73,42 @@ defmodule YscWeb.PaymentSuccessLive do
              title: "Payment"
            )
            |> redirect(to: ~p"/")}
+
+        redirect_status == "succeeded" and is_nil(payment_intent_id) ->
+          {:ok,
+           socket
+           |> YscWeb.Flash.put_toast(
+             :error,
+             "We couldn't confirm your payment from this link. If you were charged, check your email for a receipt or contact us at #{Ysc.EmailConfig.contact_email()} with the date and amount. Otherwise, try checking out again.",
+             title: "Payment"
+           )
+           |> redirect(to: ~p"/")}
+
+        redirect_status in ["failed", "canceled"] and is_nil(payment_intent_id) ->
+          failure_message = get_failure_message(redirect_status)
+
+          {:ok,
+           socket
+           |> YscWeb.Flash.put_toast(:error, failure_message, title: "Payment")
+           |> redirect(to: ~p"/")}
+
+        true ->
+          if connected?(socket) do
+            process_payment_redirect(
+              socket,
+              user,
+              redirect_status,
+              payment_intent_id
+            )
+          else
+            {:ok, socket}
+          end
       end
     end
   end
 
   @impl true
   def render(assigns) do
-    # This should never render as we always redirect in mount
     ~H"""
     <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
       <div class="text-center">
@@ -162,6 +119,76 @@ defmodule YscWeb.PaymentSuccessLive do
   end
 
   ## Private Functions
+
+  defp process_payment_redirect(
+         socket,
+         user,
+         redirect_status,
+         payment_intent_id
+       ) do
+    cond do
+      redirect_status == "succeeded" ->
+        case redirect_to_success_page_with_retry(payment_intent_id, user) do
+          {:ok, redirect_path} ->
+            {:ok, redirect(socket, to: redirect_path)}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Failed to redirect from payment success after retries",
+              payment_intent_id: payment_intent_id,
+              user_id: user.id,
+              error: reason
+            )
+
+            {:ok,
+             socket
+             |> YscWeb.Flash.put_toast(
+               :error,
+               "Your payment went through, but we couldn't load your confirmation. Please email #{Ysc.EmailConfig.contact_email()} with the date and amount charged, and we'll help right away.",
+               title: "Payment"
+             )
+             |> redirect(to: ~p"/")}
+        end
+
+      redirect_status in ["failed", "canceled"] ->
+        failure_message = get_failure_message(redirect_status)
+
+        case redirect_to_failure_page(payment_intent_id, user, redirect_status) do
+          {:ok, redirect_path} ->
+            {:ok,
+             socket
+             |> YscWeb.Flash.put_toast(:error, failure_message,
+               title: "Payment"
+             )
+             |> redirect(to: redirect_path)}
+
+          {:error, reason} ->
+            Ysc.Logging.error("Failed to redirect from payment failure",
+              payment_intent_id: payment_intent_id,
+              user_id: user.id,
+              redirect_status: redirect_status,
+              error: reason
+            )
+
+            {:ok,
+             socket
+             |> YscWeb.Flash.put_toast(:error, failure_message,
+               title: "Payment"
+             )
+             |> redirect(to: ~p"/")}
+        end
+
+      true ->
+        {:ok,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Payment status is unclear. Please check your booking or order status.",
+           title: "Payment"
+         )
+         |> redirect(to: ~p"/")}
+    end
+  end
 
   defp extract_payment_intent_id(params) do
     # Payment intent can come in different formats:
@@ -320,7 +347,7 @@ defmodule YscWeb.PaymentSuccessLive do
     end
   end
 
-  defp redirect_to_failure_page(payment_intent_id, user, _redirect_status) do
+  defp redirect_to_failure_page(payment_intent_id, user, redirect_status) do
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
@@ -342,10 +369,19 @@ defmodule YscWeb.PaymentSuccessLive do
             end
 
           not is_nil(ticket_order_id) ->
-            # Redirect to event page with error
+            # Redirect to event page with error — open ticket selection
             case verify_ticket_order_access(ticket_order_id, user) do
               {:ok, event_id} ->
-                {:ok, ~p"/events/#{event_id}"}
+                case release_failed_ticket_order(
+                       payment_intent_id,
+                       redirect_status
+                     ) do
+                  :ok ->
+                    {:ok, ~p"/events/#{event_id}?payment_failed=1"}
+
+                  {:error, reason} ->
+                    {:error, {:ticket_order_release_failed, reason}}
+                end
 
               error ->
                 error
@@ -386,6 +422,31 @@ defmodule YscWeb.PaymentSuccessLive do
     case Tickets.get_user_ticket_order_event_id(user.id, ticket_order_id) do
       nil -> {:error, :ticket_order_not_found}
       event_id -> {:ok, event_id}
+    end
+  end
+
+  defp release_failed_ticket_order(payment_intent_id, redirect_status) do
+    cancellation_reason =
+      if redirect_status == "canceled",
+        do: "Payment canceled",
+        else: "Payment failed"
+
+    case StripeService.handle_failed_payment(
+           payment_intent_id,
+           cancellation_reason
+         ) do
+      {:ok, _ticket_order} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Failed to proactively release ticket order on payment failure redirect",
+          payment_intent_id: payment_intent_id,
+          redirect_status: redirect_status,
+          error: reason
+        )
+
+        {:error, reason}
     end
   end
 

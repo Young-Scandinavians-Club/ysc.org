@@ -105,6 +105,46 @@ defmodule Ysc.MessagesTest do
       assert count_records_for_key(key) == 1
     end
 
+    test "adds ses:no-track to html body for non-newsletter templates" do
+      key = "em_notrack_" <> Ecto.UUID.generate()
+      html = ~s(<p><a href="https://ysc.org/reset">Reset</a></p>)
+
+      email =
+        test_email()
+        |> Swoosh.Email.html_body(html)
+
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(
+                 email,
+                 email_attrs(key, "reset_password")
+               )
+
+      assert_email_sent(fn sent ->
+        assert sent.html_body =~ "ses:no-track"
+        assert sent.html_body =~ ~s(href="https://ysc.org/reset")
+      end)
+    end
+
+    test "does not add ses:no-track for newsletter templates" do
+      key = "em_track_" <> Ecto.UUID.generate()
+      html = ~s(<p><a href="https://ysc.org/news">Read</a></p>)
+
+      email =
+        test_email()
+        |> Swoosh.Email.html_body(html)
+
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(
+                 email,
+                 email_attrs(key, "newsletter_edition")
+               )
+
+      assert_email_sent(fn sent ->
+        refute sent.html_body =~ "ses:no-track"
+        assert sent.html_body =~ ~s(href="https://ysc.org/news")
+      end)
+    end
+
     test "succeeds when SES configuration set is configured (tracking metadata path)" do
       prev = Application.get_env(:ysc, :ses_configuration_set)
 

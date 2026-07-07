@@ -207,7 +207,7 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
         |> element("button", "Unsubscribe")
         |> render_click()
 
-      assert html =~ "Something went wrong"
+      assert html =~ "info@ysc.org"
     end
 
     test "logged-in user can subscribe from newsletters page when not subscribed",

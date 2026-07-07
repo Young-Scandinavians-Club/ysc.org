@@ -1805,12 +1805,33 @@ defmodule YscWeb.ExpenseReportLive do
     ~H"""
     <div class="py-8 lg:py-10">
       <div class="max-w-screen-xl mx-auto px-4">
-        <.async_section_loader
+        <div
           :if={@loading_expense_form_data}
           id="expense-form-loading"
-          label="Loading expense report form..."
-          class="py-16"
-        />
+          class="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading expense report form…</span>
+          <div class="lg:col-span-2 space-y-6">
+            <.skeleton_block class="h-9 w-64 rounded" />
+            <div class="border border-zinc-200 rounded-lg p-6 space-y-3">
+              <.skeleton_block class="h-5 w-40 rounded" />
+              <.skeleton_block class="h-11 w-full rounded-lg" />
+              <.skeleton_block class="h-11 w-full rounded-lg" />
+            </div>
+            <div class="border border-zinc-200 rounded-lg p-6 space-y-3">
+              <.skeleton_block class="h-5 w-32 rounded" />
+              <.skeleton_block class="h-24 w-full rounded-lg" />
+            </div>
+          </div>
+          <aside class="space-y-3">
+            <div class="border border-zinc-200 rounded-lg p-6 space-y-3">
+              <.skeleton_block class="h-5 w-28 rounded" />
+              <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded" />
+            </div>
+          </aside>
+        </div>
         <div :if={!@loading_expense_form_data}>
           <!-- Header -->
           <div class="mb-8">

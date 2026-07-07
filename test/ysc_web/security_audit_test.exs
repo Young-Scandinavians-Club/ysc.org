@@ -19,6 +19,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 19 (MEDIUM)   Suspended/rejected users retain session access after state change
   Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
   Finding 21 (HIGH)     Paid ticket checkout bypassed via checkout=free URL / confirm-free-tickets
+  Finding 22 (MEDIUM)   Kiosk check-in API accepted ineligible bookings (draft/canceled/future)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1503,6 +1504,177 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:error, :payment_metadata_mismatch} =
                Bookings.verify_booking_payment_intent(payment_intent, booking_b)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Cabin booking: server-side membership eligibility (UI can_book bypass)
+  # ---------------------------------------------------------------------------
+
+  describe "cabin booking requires active membership server-side" do
+    import Ysc.BookingsFixtures
+    import Ysc.TestDataFactory
+
+    alias Ysc.Bookings
+    alias Ysc.Bookings.Booking
+
+    test "ensure_user_may_book rejects users without membership" do
+      user = user_with_membership(:none)
+
+      assert {:error, :membership_required} =
+               Bookings.ensure_user_may_book(user)
+    end
+
+    test "ensure_user_may_book rejects pending_approval users" do
+      user = user_fixture(%{state: :pending_approval})
+
+      assert {:error, :application_pending_approval} =
+               Bookings.ensure_user_may_book(user)
+    end
+
+    test "create-booking LiveView event does not create a hold without membership",
+         %{conn: conn} do
+      user = user_with_membership(:none)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 60)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "4",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/clear-lake?#{URI.encode_query(params)}")
+
+      render_async(view, 5_000)
+
+      hold_count_before =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      render_click(view, "create-booking", %{})
+
+      hold_count_after =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      assert hold_count_before == hold_count_after
+      assert render(view) =~ "active YSC membership"
+    end
+
+    test "tahoe create-booking LiveView event does not create a hold without membership",
+         %{conn: conn} do
+      user = user_with_membership(:none)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 60)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "4",
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 5_000)
+
+      hold_count_before =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      render_click(view, "create-booking", %{})
+
+      hold_count_after =
+        Repo.aggregate(
+          from(b in Booking,
+            where: b.user_id == ^user.id and b.status == :hold
+          ),
+          :count
+        )
+
+      assert hold_count_before == hold_count_after
+      assert render(view) =~ "active YSC membership"
+    end
+
+    test "checkout redirects pending_approval users to pending-review", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :pending_approval})
+      booking = booking_fixture(%{user_id: user.id, status: :hold})
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/pending-review"}}} =
+               live(conn, ~p"/bookings/checkout/#{booking.id}")
+    end
+
+    test "checkout redirects ineligible users even when a hold already exists",
+         %{conn: conn} do
+      user = user_with_membership(:none)
+
+      booking =
+        booking_fixture(%{user_id: user.id, status: :hold})
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/users/membership"}}} =
+               live(conn, ~p"/bookings/checkout/#{booking.id}")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 22 (MEDIUM): Kiosk check-in API accepted ineligible bookings
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 22: kiosk check-in booking eligibility" do
+    import Ysc.BookingsFixtures
+
+    setup do
+      prev = Application.get_env(:ysc, :kiosk_api_key)
+      Application.put_env(:ysc, :kiosk_api_key, "security-audit-kiosk-key")
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :kiosk_api_key, prev)
+      end)
+
+      :ok
+    end
+
+    test "rejects draft bookings at the kiosk check-in API", %{conn: conn} do
+      booking = booking_fixture(%{status: :draft})
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
+        |> put_req_header("content-type", "application/json")
+        |> post(~p"/api/v1/mobile/check-in", %{
+          property: "tahoe",
+          booking_ids: [to_string(booking.id)],
+          rules_agreed: true
+        })
+
+      assert %{"error" => error} = json_response(conn, 422)
+      assert error =~ "not confirmed"
+      refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
     end
   end
 

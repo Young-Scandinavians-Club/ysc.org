@@ -5107,6 +5107,34 @@ defmodule YscWeb.TahoeBookingLive do
                show_confirm_modal: false
              )}
 
+          {:error, :membership_required} ->
+            message =
+              YscWeb.BookingUserMessages.membership_required_plain_message()
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, message, title: "Booking")
+             |> assign(
+               form_errors: %{general: message},
+               calculated_price: nil,
+               price_error: "Membership required",
+               show_confirm_modal: false
+             )}
+
+          {:error, :application_pending_approval} ->
+            message =
+              YscWeb.BookingUserMessages.application_pending_approval_message()
+
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, message, title: "Booking")
+             |> assign(
+               form_errors: %{general: message},
+               calculated_price: nil,
+               price_error: "Application under review",
+               show_confirm_modal: false
+             )}
+
           {:error, _reason} ->
             {:noreply,
              socket
@@ -5873,14 +5901,39 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp validate_and_create_booking(socket) do
+    user = socket.assigns.user
     property = socket.assigns.property
     checkin_date = socket.assigns.checkin_date
     checkout_date = socket.assigns.checkout_date
     booking_mode = socket.assigns.selected_booking_mode
     guests_count = socket.assigns.guests_count
     children_count = socket.assigns.children_count || 0
-    user_id = socket.assigns.user.id
+    user_id = user.id
 
+    with :ok <- Bookings.ensure_user_may_book(user) do
+      do_validate_and_create_booking(
+        property,
+        checkin_date,
+        checkout_date,
+        booking_mode,
+        guests_count,
+        children_count,
+        user_id,
+        socket
+      )
+    end
+  end
+
+  defp do_validate_and_create_booking(
+         property,
+         checkin_date,
+         checkout_date,
+         booking_mode,
+         guests_count,
+         children_count,
+         user_id,
+         socket
+       ) do
     # Validate required fields
     # For buyout, guests_count is not required (full house capacity)
     # For room bookings, guests_count is required

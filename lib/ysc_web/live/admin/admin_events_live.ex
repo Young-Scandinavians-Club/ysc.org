@@ -126,9 +126,11 @@ defmodule YscWeb.AdminEventsLive do
             </.admin_filter_dropdown>
           </div>
 
-          <.admin_flop_loading_state
+          <.admin_table_skeleton
             :if={is_nil(@meta)}
-            message="Loading events…"
+            id="admin-events-loading"
+            rows={8}
+            columns={5}
           />
 
           <div :if={@meta}>

@@ -83,11 +83,10 @@ defmodule YscWeb.BookingChangeLiveTest do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
 
-    assert {:error, {:redirect, %{to: path, flash: flash}}} =
+    assert {:error, {:redirect, %{to: path}}} =
              live(conn, ~p"/bookings/#{Ecto.ULID.generate()}/change")
 
     assert path == ~p"/"
-    assert flash["error"] =~ "couldn't find this reservation"
   end
 
   test "shows forfeiture notice and change form for eligible booking", %{
@@ -113,7 +112,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     refute html =~ "Number of guests"
   end
 
-  test "dead render serves change page shell without loading availability data",
+  test "dead render serves loading shell without booking or availability queries",
        %{
          conn: conn
        } do
@@ -124,11 +123,10 @@ defmodule YscWeb.BookingChangeLiveTest do
     conn = get(conn, ~p"/bookings/#{booking.id}/change")
     html = html_response(conn, 200)
 
-    assert html =~ "Change Reservation"
-    assert html =~ "Loading availability and price preview"
-    assert html =~ "will not get a refund if you change these dates"
-    assert html =~ "cannot get a refund later"
-    refute html =~ "Price preview"
+    assert html =~ ~s|id="booking-change-loading"|
+    refute html =~ booking.reference_id
+    refute html =~ "Loading availability and price preview"
+    refute html =~ "will not get a refund if you change these dates"
   end
 
   test "submit is blocked until acknowledgment is checked", %{conn: conn} do

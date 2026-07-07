@@ -5,6 +5,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
   import Mox
 
   alias Money
@@ -25,12 +26,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
     Application.put_env(:ysc, :stripe_client, StripeMock)
 
-    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
       {:ok,
        %Stripe.PaymentIntent{
          id: "pi_test_123",
          client_secret: "pi_test_123_secret_456",
-         status: "requires_payment_method"
+         status: "requires_payment_method",
+         amount: params.amount
        }}
     end)
 
@@ -68,7 +70,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "Booking Checkout page" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       booking = booking_fixture(user_id: user.id, status: :hold)
 
       %{conn: log_in_user(conn, user), user: user, booking: booking}
@@ -112,7 +114,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
     end
 
     test "redirects if not owner", %{conn: conn, booking: booking} do
-      other_user = user_fixture()
+      other_user = user_with_membership()
       conn = log_in_user(conn, other_user)
 
       assert {:error, {:redirect, %{to: path}}} =
@@ -641,6 +643,86 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
 
+    test "creates payment intent idempotency key from synced checkout price", %{
+      conn: conn,
+      user: user
+    } do
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      stale_total = Money.mult!(booking.total_price, 2)
+
+      booking =
+        booking
+        |> Ecto.Changeset.change(total_price: stale_total)
+        |> Repo.update!()
+
+      expect(StripeMock, :create_payment_intent, fn params, opts ->
+        synced_cents =
+          Repo.get!(Booking, booking.id).total_price
+          |> Ysc.MoneyHelper.money_to_cents()
+
+        assert params.amount == synced_cents
+
+        idempotency_key =
+          opts[:headers]["Idempotency-Key"] ||
+            opts[:headers][:"Idempotency-Key"]
+
+        assert idempotency_key ==
+                 "booking_#{booking.reference_id}_#{synced_cents}"
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_repriced_#{System.unique_integer([:positive])}",
+           client_secret: "pi_repriced_secret",
+           status: "requires_payment_method",
+           amount: synced_cents
+         }}
+      end)
+
+      {:ok, _view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      synced_booking = Repo.get!(Booking, booking.id)
+      refute Money.equal?(synced_booking.total_price, stale_total)
+      Mox.verify!(StripeMock)
+    end
+
+    test "rejects stale payment intent amount returned by Stripe", %{
+      conn: conn,
+      user: user
+    } do
+      booking = booking_fixture(user_id: user.id, status: :hold)
+
+      expect(StripeMock, :create_payment_intent, fn params, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_stale_amount_#{System.unique_integer([:positive])}",
+           client_secret: "pi_stale_secret",
+           status: "requires_payment_method",
+           amount: params.amount - 1
+         }}
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      assert has_element?(
+               view,
+               "#checkout-payment-error",
+               YscWeb.BookingUserMessages.checkout_payment_setup_failed()
+             )
+
+      Mox.verify!(StripeMock)
+    end
+
     test "handle_info :check_booking_expiration marks expired when hold was released in DB",
          %{
            conn: conn,
@@ -956,7 +1038,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "payment-success with shared booking entitlement" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       admin = user_fixture()
 
       {:ok, entitlement} =
@@ -1050,7 +1132,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "payment-success rejects foreign payment intent" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       %{conn: log_in_user(conn, user), user: user}
     end
 
@@ -1120,7 +1202,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
   describe "room booking guest step" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
 
       {:ok, category} =
         %RoomCategory{}

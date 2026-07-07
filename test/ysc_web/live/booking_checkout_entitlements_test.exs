@@ -20,6 +20,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
   import Mox
 
   alias Ysc.Bookings
@@ -39,12 +40,13 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
     Application.put_env(:ysc, :stripe_client, StripeMock)
 
-    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+    stub(StripeMock, :create_payment_intent, fn params, _opts ->
       {:ok,
        %Stripe.PaymentIntent{
          id: "pi_test_#{System.unique_integer([:positive])}",
          client_secret: "pi_test_secret",
-         status: "requires_payment_method"
+         status: "requires_payment_method",
+         amount: params.amount
        }}
     end)
 
@@ -69,7 +71,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "buyout checkout — Tahoe" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = buyout_stay_dates()
 
       %{
@@ -397,7 +399,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "buyout checkout — Clear Lake" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = buyout_stay_dates()
 
       %{
@@ -585,7 +587,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "room checkout — Tahoe" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = room_stay_dates()
 
       {:ok, category} =
@@ -831,7 +833,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   describe "room checkout — Clear Lake" do
     setup %{conn: conn} do
-      user = user_fixture()
+      user = user_with_membership()
       {checkin, checkout} = room_stay_dates()
 
       {:ok, category} =
@@ -1058,7 +1060,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
          %{
            conn: conn
          } do
-      user = user_fixture()
+      user = user_with_membership()
       conn = log_in_user(conn, user)
       {checkin, checkout} = room_stay_dates()
 
@@ -1135,7 +1137,7 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
          %{
            conn: conn
          } do
-      user = user_fixture()
+      user = user_with_membership()
       conn = log_in_user(conn, user)
       {checkin, checkout} = room_stay_dates()
 

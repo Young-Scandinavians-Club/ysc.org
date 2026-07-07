@@ -9,7 +9,7 @@ defmodule YscWeb.AdminUsersLive do
   require Ysc.Logging
 
   alias Ysc.Accounts
-  alias Ysc.Accounts.User
+  alias Ysc.Accounts.{User, UserDisplay}
   alias Ysc.Customers
   alias Ysc.Payments
   alias Ysc.Subscriptions
@@ -28,67 +28,81 @@ defmodule YscWeb.AdminUsersLive do
         on_cancel={JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
-        <.admin_page_title level={2} class="mb-4">
-          Edit User
-        </.admin_page_title>
-
-        <div>
-          <.user_avatar_image
-            user={@selected_user}
-            class="w-32 h-32 rounded-full"
-          />
+        <div
+          :if={@loading_user_modal?}
+          id="admin-user-edit-modal-loading"
+          class="space-y-4"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading user…</span>
+          <.skeleton_block class="w-32 h-32 rounded-full" />
+          <.skeleton_block :for={_ <- 1..5} class="h-10 w-full rounded" />
         </div>
 
-        <.simple_form
-          for={@user_edit_form}
-          id="user-edit-form"
-          phx-change="validate"
-          phx-submit="save"
-        >
-          <.input field={@user_edit_form[:email]} label="Email" />
-          <.input field={@user_edit_form[:first_name]} label="First Name" />
-          <.input field={@user_edit_form[:last_name]} label="Last Name" />
-          <.input
-            field={@user_edit_form[:most_connected_country]}
-            label="Most connected Nordic country:"
-            type="select"
-            options={["Sweden", "Norway", "Finland", "Denmark", "Iceland"]}
-          />
-          <.input
-            type="select"
-            field={@user_edit_form[:state]}
-            options={[
-              "active",
-              "pending_approval",
-              "rejected",
-              "suspended",
-              "deleted"
-            ]}
-            label="Account Status"
-          />
-          <.input
-            type="select"
-            field={@user_edit_form[:role]}
-            options={["member", "admin", "volunteer"]}
-            label="Role"
-          />
+        <div :if={!@loading_user_modal?}>
+          <.admin_page_title level={2} class="mb-4">
+            Edit User
+          </.admin_page_title>
 
-          <div class="flex flex-row justify-end w-full pt-8">
-            <.button
-              id="admin-users-edit-modal-cancel"
-              patch={~p"/admin/users?#{list_params_for_back(@params)}"}
-              variant="outline"
-              color="zinc"
-              class="mr-4"
-            >
-              Cancel
-            </.button>
-
-            <.button phx-disable-with="Saving..." type="submit">
-              <.icon name="hero-check" class="w-5 h-5 mb-0.5 me-1" /> Save changes
-            </.button>
+          <div>
+            <.user_avatar_image
+              user={@selected_user}
+              class="w-32 h-32 rounded-full"
+            />
           </div>
-        </.simple_form>
+
+          <.simple_form
+            for={@user_edit_form}
+            id="user-edit-form"
+            phx-change="validate"
+            phx-submit="save"
+          >
+            <.input field={@user_edit_form[:email]} label="Email" />
+            <.input field={@user_edit_form[:first_name]} label="First Name" />
+            <.input field={@user_edit_form[:last_name]} label="Last Name" />
+            <.input
+              field={@user_edit_form[:most_connected_country]}
+              label="Most connected Nordic country:"
+              type="select"
+              options={UserDisplay.nordic_country_options()}
+            />
+            <.input
+              type="select"
+              field={@user_edit_form[:state]}
+              options={[
+                "active",
+                "pending_approval",
+                "rejected",
+                "suspended",
+                "deleted"
+              ]}
+              label="Account Status"
+            />
+            <.input
+              type="select"
+              field={@user_edit_form[:role]}
+              options={["member", "admin", "volunteer"]}
+              label="Role"
+            />
+
+            <div class="flex flex-row justify-end w-full pt-8">
+              <.button
+                id="admin-users-edit-modal-cancel"
+                patch={~p"/admin/users?#{list_params_for_back(@params)}"}
+                variant="outline"
+                color="zinc"
+                class="mr-4"
+              >
+                Cancel
+              </.button>
+
+              <.button phx-disable-with="Saving..." type="submit">
+                <.icon name="hero-check" class="w-5 h-5 mb-0.5 me-1" /> Save changes
+              </.button>
+            </div>
+          </.simple_form>
+        </div>
       </.modal>
 
       <.modal
@@ -97,7 +111,19 @@ defmodule YscWeb.AdminUsersLive do
         on_cancel={JS.patch(~p"/admin/users?#{list_params_for_back(@params)}")}
         show
       >
-        <div class="max-w-2xl mx-auto">
+        <div
+          :if={@loading_user_modal?}
+          id="admin-user-review-modal-loading"
+          class="max-w-2xl mx-auto space-y-4"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading application…</span>
+          <.skeleton_block class="h-8 w-64 rounded" />
+          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded" />
+        </div>
+
+        <div :if={!@loading_user_modal?} class="max-w-2xl mx-auto">
           <div class="flex items-center justify-between border-b border-zinc-200 pb-4 mb-6 gap-4">
             <div class="min-w-0">
               <.admin_page_title level={2} variant={:emphasis}>
@@ -155,7 +181,9 @@ defmodule YscWeb.AdminUsersLive do
                 <div class="py-2">
                   <dt class="text-sm font-semibold text-zinc-600">Birth Date</dt>
                   <dd class="mt-0.5 text-sm text-zinc-900">
-                    {format_birth_date(@selected_user_application.birth_date)}
+                    {UserDisplay.birth_date_label(
+                      @selected_user_application.birth_date
+                    )}
                   </dd>
                 </div>
                 <div
@@ -171,7 +199,7 @@ defmodule YscWeb.AdminUsersLive do
                         <span class="text-xs font-medium me-2 px-2.5 py-1 rounded bg-blue-100 text-blue-800">
                           {String.capitalize("#{family_member.type}")}
                         </span>
-                        {"#{family_member.first_name} #{family_member.last_name} (#{format_birth_date(family_member.birth_date)})"}
+                        {"#{family_member.first_name} #{family_member.last_name} (#{UserDisplay.birth_date_label(family_member.birth_date)})"}
                       </li>
                     </ul>
                   </dd>
@@ -227,7 +255,7 @@ defmodule YscWeb.AdminUsersLive do
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
                       <span
                         :if={
-                          country_to_flag_class(
+                          UserDisplay.country_flag_class(
                             @selected_user_application.place_of_birth
                           )
                         }
@@ -235,14 +263,14 @@ defmodule YscWeb.AdminUsersLive do
                       >
                         <.flag
                           country={
-                            country_to_flag_class(
+                            UserDisplay.country_flag_class(
                               @selected_user_application.place_of_birth
                             )
                           }
                           class="h-4 w-6 rounded inline-block align-middle"
                         />
                       </span>
-                      {nordic_country_display_name(
+                      {UserDisplay.country_label(
                         @selected_user_application.place_of_birth
                       )}
                     </dd>
@@ -252,7 +280,7 @@ defmodule YscWeb.AdminUsersLive do
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
                       <span
                         :if={
-                          country_to_flag_class(
+                          UserDisplay.country_flag_class(
                             @selected_user_application.citizenship
                           )
                         }
@@ -260,14 +288,14 @@ defmodule YscWeb.AdminUsersLive do
                       >
                         <.flag
                           country={
-                            country_to_flag_class(
+                            UserDisplay.country_flag_class(
                               @selected_user_application.citizenship
                             )
                           }
                           class="h-4 w-6 rounded inline-block align-middle"
                         />
                       </span>
-                      {nordic_country_display_name(
+                      {UserDisplay.country_label(
                         @selected_user_application.citizenship
                       )}
                     </dd>
@@ -279,7 +307,7 @@ defmodule YscWeb.AdminUsersLive do
                     <dd class="mt-0.5 text-sm text-zinc-900 flex items-center gap-2">
                       <span
                         :if={
-                          country_to_flag_class(
+                          UserDisplay.country_flag_class(
                             @selected_user_application.most_connected_nordic_country
                           )
                         }
@@ -287,14 +315,14 @@ defmodule YscWeb.AdminUsersLive do
                       >
                         <.flag
                           country={
-                            country_to_flag_class(
+                            UserDisplay.country_flag_class(
                               @selected_user_application.most_connected_nordic_country
                             )
                           }
                           class="h-4 w-6 rounded inline-block align-middle"
                         />
                       </span>
-                      {nordic_country_display_name(
+                      {UserDisplay.country_label(
                         @selected_user_application.most_connected_nordic_country
                       )}
                     </dd>
@@ -555,7 +583,12 @@ defmodule YscWeb.AdminUsersLive do
             </.admin_filter_dropdown>
           </div>
 
-          <.admin_flop_loading_state :if={is_nil(@meta)} message="Loading users…" />
+          <.admin_table_skeleton
+            :if={is_nil(@meta)}
+            id="admin-users-loading"
+            rows={8}
+            columns={5}
+          />
 
           <div :if={@meta}>
             <!-- Mobile Card View -->
@@ -747,23 +780,13 @@ defmodule YscWeb.AdminUsersLive do
     """
   end
 
-  def mount(%{"id" => id} = params, _session, socket) do
-    current_user = socket.assigns[:current_user]
-
-    selected_user = Accounts.get_user!(id, [:family_members, :current_avatar])
-
-    application =
-      Accounts.get_signup_application_from_user_id!(id, current_user, [
-        :reviewed_by
-      ])
-
-    user_changeset = Accounts.User.update_user_changeset(selected_user, %{})
-
+  def mount(%{"id" => _id} = params, _session, socket) do
     {:ok,
      socket
      |> assign(:active_page, :members)
-     |> assign(:selected_user, selected_user)
-     |> assign(:selected_user_application, application)
+     |> assign(:selected_user, nil)
+     |> assign(:selected_user_application, nil)
+     |> assign(:loading_user_modal?, true)
      |> assign(:empty, false)
      |> assign(:page_title, "Users")
      |> assign(:params, params)
@@ -773,7 +796,7 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:file_export_path, "")
      |> assign(:export_error, "Something went wrong")
      |> assign(:form, to_form(%{}, as: "csv_export"))
-     |> assign(:user_edit_form, to_form(user_changeset, as: "user"))
+     |> assign(:user_edit_form, nil)
      |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
      |> assign(:show_reject_form, false)
      |> assign(:meta, nil)
@@ -785,6 +808,9 @@ defmodule YscWeb.AdminUsersLive do
     {:ok,
      socket
      |> assign(:active_page, :members)
+     |> assign(:selected_user, nil)
+     |> assign(:selected_user_application, nil)
+     |> assign(:loading_user_modal?, false)
      |> assign(:empty, false)
      |> assign(:page_title, "Users")
      |> assign(:params, params)
@@ -1242,7 +1268,7 @@ defmodule YscWeb.AdminUsersLive do
                 end
 
             if skip_assign? do
-              socket
+              assign(socket, :loading_user_modal?, false)
             else
               assign_user_modal_data(socket, id)
             end
@@ -1275,6 +1301,7 @@ defmodule YscWeb.AdminUsersLive do
     socket
     |> assign(:selected_user, selected_user)
     |> assign(:selected_user_application, application)
+    |> assign(:loading_user_modal?, false)
     |> assign(:rejection_form, to_form(%{"note" => ""}, as: "reject"))
     |> assign(:show_reject_form, false)
     |> assign_user_edit_form_for_action(user_changeset)
@@ -1309,43 +1336,6 @@ defmodule YscWeb.AdminUsersLive do
     inherited? = Accounts.sub_account?(user) && plan_type != nil
     {plan_type, inherited?}
   end
-
-  defp country_to_flag_class(nil), do: nil
-
-  defp country_to_flag_class(code) when is_binary(code) do
-    normalized = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
-
-    if normalized in ["SE", "NO", "FI", "DK", "IS"] do
-      "fi-#{String.downcase(normalized)}"
-    else
-      nil
-    end
-  end
-
-  defp nordic_country_display_name(nil), do: ""
-
-  defp nordic_country_display_name(code) when is_binary(code) do
-    key = code |> String.trim() |> String.upcase() |> String.slice(0, 2)
-
-    Map.get(
-      %{
-        "SE" => "Sweden",
-        "NO" => "Norway",
-        "FI" => "Finland",
-        "DK" => "Denmark",
-        "IS" => "Iceland"
-      },
-      key,
-      code
-    )
-  end
-
-  defp format_birth_date(nil), do: ""
-
-  defp format_birth_date(%Date{} = date),
-    do: Timex.format!(date, "%b %d, %Y", :strftime)
-
-  defp format_birth_date(other), do: to_string(other)
 
   defp list_params_for_back(params) when is_map(params) do
     Map.drop(params, ["id"])

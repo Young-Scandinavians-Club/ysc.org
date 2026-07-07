@@ -1,5 +1,6 @@
 defmodule YscWeb.UserSettingsLive do
   use YscWeb, :live_view
+  require Ysc.Logging
 
   import YscWeb.Live.AsyncHelpers
 
@@ -23,6 +24,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Repo
   alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias Ysc.Payments.PaymentDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
@@ -1216,16 +1218,10 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                     </div>
 
-                    <div
+                    <.payment_method_row_skeleton
                       :if={@loading_payment_methods}
-                      class="flex items-center gap-3 py-3"
-                    >
-                      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600">
-                      </div>
-                      <span class="text-sm text-zinc-500">
-                        Loading payment methods...
-                      </span>
-                    </div>
+                      id="membership-payment-method-loading"
+                    />
 
                     <%!-- No payment method: dashed "add" prompt --%>
                     <.link
@@ -1653,14 +1649,10 @@ defmodule YscWeb.UserSettingsLive do
                       </div>
                     </div>
 
-                    <div
+                    <.payment_method_row_skeleton
                       :if={@loading_payment_methods}
-                      class="flex items-center gap-3 py-3"
-                    >
-                      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600">
-                      </div>
-                      <span class="text-sm text-zinc-500">Loading...</span>
-                    </div>
+                      id="change-payment-method-loading"
+                    />
 
                     <.link
                       :if={
@@ -1855,11 +1847,23 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
               </div>
 
-              <.async_section_loader
+              <div
                 :if={@loading_notification_preferences}
                 id="notification-preferences-loading"
-                label="Loading notification preferences…"
-              />
+                class="overflow-x-auto rounded-lg border border-zinc-200 divide-y divide-zinc-100"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="sr-only">Loading notification preferences…</span>
+                <div :for={_ <- 1..4} class="flex items-center gap-4 px-6 py-4">
+                  <div class="flex-1 space-y-2">
+                    <.skeleton_block class="h-4 w-40 rounded" />
+                    <.skeleton_block class="h-3 w-64 rounded" />
+                  </div>
+                  <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                  <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                </div>
+              </div>
 
               <.simple_form
                 :if={!@loading_notification_preferences}
@@ -2179,11 +2183,20 @@ defmodule YscWeb.UserSettingsLive do
               <!-- Loading state for payments -->
               <div
                 :if={assigns[:loading_payments]}
-                class="flex items-center justify-center py-12"
+                id="payment-history-loading"
+                role="status"
+                aria-live="polite"
               >
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600">
+                <span class="sr-only">Loading payment history…</span>
+                <div class="flex flex-wrap gap-2 pb-4 border-b border-zinc-200">
+                  <.skeleton_block :for={_ <- 1..4} class="h-9 w-20 rounded-full" />
                 </div>
-                <span class="ml-3 text-zinc-600">Loading payment history...</span>
+                <.table_skeleton
+                  rows={5}
+                  columns={4}
+                  class="mt-4"
+                  announce?={false}
+                />
               </div>
               <!-- Filter Chips (hidden while loading) -->
               <div :if={!assigns[:loading_payments]}>
@@ -2720,133 +2733,164 @@ defmodule YscWeb.UserSettingsLive do
 
   @impl true
   def handle_info(:load_settings_data, socket) do
-    user = socket.assigns.current_user
-    live_action = socket.assigns[:live_action] || :edit
+    socket =
+      try do
+        user = socket.assigns.current_user
+        live_action = socket.assigns[:live_action] || :edit
 
-    # Ensure Stripe customer exists - create if missing or invalid
-    user = ensure_stripe_customer_exists(user)
-    # Reload user with billing_address after ensure_stripe_customer_exists
-    user = Repo.preload(user, :billing_address)
+        # Ensure Stripe customer exists - create if missing or invalid
+        user = ensure_stripe_customer_exists(user)
+        # Reload user with billing_address after ensure_stripe_customer_exists
+        user = Repo.preload(user, :billing_address)
 
-    # Load payment methods
-    all_payment_methods =
-      Ysc.Payments.list_payment_methods(user)
-      |> Enum.sort_by(fn pm -> {!pm.is_default, pm.inserted_at} end)
+        # Load payment methods
+        all_payment_methods =
+          Ysc.Payments.list_payment_methods(user)
+          |> Enum.sort_by(fn pm -> {!pm.is_default, pm.inserted_at} end)
 
-    default_payment_method = Enum.find(all_payment_methods, & &1.is_default)
+        default_payment_method = Enum.find(all_payment_methods, & &1.is_default)
 
-    # Get membership type from current or past subscriptions
-    membership_type_to_select = get_membership_type_for_selection(user)
+        # Get membership type from current or past subscriptions
+        membership_type_to_select = get_membership_type_for_selection(user)
 
-    # Get primary user if sub-account
-    primary_user =
-      if socket.assigns.is_sub_account,
-        do: Accounts.get_primary_user(user),
-        else: nil
+        # Get primary user if sub-account
+        primary_user =
+          if socket.assigns.is_sub_account,
+            do: Accounts.get_primary_user(user),
+            else: nil
 
-    # Rebuild address changeset with loaded billing_address
-    address_changeset = Accounts.change_billing_address(user)
+        # Rebuild address changeset with loaded billing_address
+        address_changeset = Accounts.change_billing_address(user)
 
-    # Fetch scheduled downgrade info from Stripe (if user has membership with schedule)
-    scheduled_downgrade_info =
-      case socket.assigns.current_membership do
-        nil -> nil
-        membership -> Subscriptions.get_scheduled_downgrade_info(membership)
+        # Fetch scheduled downgrade info from Stripe (if user has membership with schedule)
+        scheduled_downgrade_info =
+          case socket.assigns.current_membership do
+            nil -> nil
+            membership -> Subscriptions.get_scheduled_downgrade_info(membership)
+          end
+
+        payment_intent_secret = payment_secret(live_action, user)
+
+        # Auto-show the new payment form when the modal opens with no existing methods
+        show_new_payment_form =
+          live_action == :payment_method && all_payment_methods == [] &&
+            not is_nil(payment_intent_secret)
+
+        board_member = Accounts.household_board_member(user)
+
+        effective_newsletter =
+          case Newsletter.get_subscriber_by_email(user.email) do
+            nil -> false
+            subscriber -> subscriber.subscribed
+          end
+
+        notification_changeset =
+          Accounts.change_notification_preferences(user, %{
+            "newsletter_notifications" => effective_newsletter
+          })
+
+        pending_family_invites =
+          FamilyInvites.list_pending_invites_for_email(user.email)
+
+        socket
+        |> assign(:user, user)
+        |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
+        |> assign(:primary_user, primary_user)
+        |> assign(:membership_paused_by_board, board_member)
+        |> assign(:payment_intent_secret, payment_intent_secret)
+        |> assign(:default_payment_method, default_payment_method)
+        |> assign(:all_payment_methods, all_payment_methods)
+        |> assign(:show_new_payment_form, show_new_payment_form)
+        |> assign(:address_form, to_form(address_changeset))
+        |> assign(
+          :membership_form,
+          to_form(%{"membership_type" => membership_type_to_select})
+        )
+        |> assign(:notification_form, to_form(notification_changeset))
+        |> assign(:pending_family_invites, pending_family_invites)
+        |> assign(:user_avatars, load_user_avatars(user))
+        |> assign(:current_avatar_url, resolve_current_avatar_url(user))
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load user settings async data",
+            error: Exception.message(error)
+          )
+
+          socket
       end
-
-    payment_intent_secret = payment_secret(live_action, user)
-
-    # Auto-show the new payment form when the modal opens with no existing methods
-    show_new_payment_form =
-      live_action == :payment_method && all_payment_methods == [] &&
-        not is_nil(payment_intent_secret)
-
-    board_member = Accounts.household_board_member(user)
-
-    effective_newsletter =
-      case Newsletter.get_subscriber_by_email(user.email) do
-        nil -> false
-        subscriber -> subscriber.subscribed
-      end
-
-    notification_changeset =
-      Accounts.change_notification_preferences(user, %{
-        "newsletter_notifications" => effective_newsletter
-      })
-
-    pending_family_invites =
-      FamilyInvites.list_pending_invites_for_email(user.email)
 
     {:noreply,
      socket
-     |> assign(:user, user)
-     |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
-     |> assign(:primary_user, primary_user)
-     |> assign(:membership_paused_by_board, board_member)
-     |> assign(:payment_intent_secret, payment_intent_secret)
-     |> assign(:default_payment_method, default_payment_method)
-     |> assign(:all_payment_methods, all_payment_methods)
      |> assign(:loading_payment_methods, false)
-     |> assign(:show_new_payment_form, show_new_payment_form)
-     |> assign(:address_form, to_form(address_changeset))
-     |> assign(
-       :membership_form,
-       to_form(%{"membership_type" => membership_type_to_select})
-     )
-     |> assign(:notification_form, to_form(notification_changeset))
-     |> assign(:pending_family_invites, pending_family_invites)
      |> assign(:loading_notification_preferences, false)
-     |> assign(:user_avatars, load_user_avatars(user))
-     |> assign(:loading_avatars, false)
-     |> assign(:current_avatar_url, resolve_current_avatar_url(user))}
+     |> assign(:loading_avatars, false)}
   end
 
   # Handle async data loading for payments tab
   def handle_info(:load_payments_data, socket) do
-    user = socket.assigns.user
-    per_page = socket.assigns.payments_per_page
+    socket =
+      try do
+        user = socket.assigns.user
+        per_page = socket.assigns.payments_per_page
 
-    parallel =
-      [
-        {:payments,
-         fn -> Ledgers.list_user_payments_paginated(user.id, 1, per_page) end},
-        {:entitlements, fn -> Entitlements.list_usable_for_user(user.id) end},
-        {:reservations,
-         fn -> Events.list_active_ticket_holds_for_user(user.id) end}
-      ]
-      |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
-        max_concurrency: 3,
-        timeout: :infinity
-      )
-      |> Enum.reduce(%{}, fn {:ok, {key, value}}, acc ->
-        Map.put(acc, key, value)
-      end)
+        parallel =
+          [
+            {:payments,
+             fn ->
+               Ledgers.list_user_payments_paginated(user.id, 1, per_page)
+             end},
+            {:entitlements,
+             fn -> Entitlements.list_usable_for_user(user.id) end},
+            {:reservations,
+             fn -> Events.list_active_ticket_holds_for_user(user.id) end}
+          ]
+          |> async_stream_with_repo(fn {key, fun} -> {key, fun.()} end,
+            max_concurrency: 3,
+            timeout: :infinity
+          )
+          |> Enum.reduce(%{}, fn
+            {:ok, {key, value}}, acc -> Map.put(acc, key, value)
+            {:exit, _reason}, acc -> acc
+          end)
 
-    {all_payments, total_count} = Map.fetch!(parallel, :payments)
-    booking_entitlements = Map.fetch!(parallel, :entitlements)
-    ticket_reservations = Map.fetch!(parallel, :reservations)
+        {all_payments, total_count} =
+          Map.get(parallel, :payments, {[], 0})
 
-    total_pages = div(total_count + per_page - 1, per_page)
+        booking_entitlements = Map.get(parallel, :entitlements, [])
+        ticket_reservations = Map.get(parallel, :reservations, [])
 
-    {:noreply,
-     socket
-     |> assign(:payments_total, total_count)
-     |> assign(:payments_total_pages, total_pages)
-     |> assign(:all_payments, all_payments)
-     |> stream(:payments, all_payments, reset: true, dom_id: &payment_dom_id/1)
-     |> assign(:filtered_payments_count, length(all_payments))
-     |> assign(:filtered_payments_list, all_payments)
-     |> assign(:booking_entitlements_count, length(booking_entitlements))
-     |> assign(:ticket_reservations_count, length(ticket_reservations))
-     |> stream(:booking_entitlements, booking_entitlements,
-       reset: true,
-       dom_id: &booking_entitlement_dom_id/1
-     )
-     |> stream(:ticket_reservations, ticket_reservations,
-       reset: true,
-       dom_id: &ticket_reservation_dom_id/1
-     )
-     |> assign(:loading_payments, false)}
+        total_pages = div(total_count + per_page - 1, per_page)
+
+        socket
+        |> assign(:payments_total, total_count)
+        |> assign(:payments_total_pages, total_pages)
+        |> assign(:all_payments, all_payments)
+        |> stream(:payments, all_payments,
+          reset: true,
+          dom_id: &payment_dom_id/1
+        )
+        |> assign(:filtered_payments_count, length(all_payments))
+        |> assign(:filtered_payments_list, all_payments)
+        |> assign(:booking_entitlements_count, length(booking_entitlements))
+        |> assign(:ticket_reservations_count, length(ticket_reservations))
+        |> stream(:booking_entitlements, booking_entitlements,
+          reset: true,
+          dom_id: &booking_entitlement_dom_id/1
+        )
+        |> stream(:ticket_reservations, ticket_reservations,
+          reset: true,
+          dom_id: &ticket_reservation_dom_id/1
+        )
+      rescue
+        error ->
+          Ysc.Logging.warning("Failed to load payment history async data",
+            error: Exception.message(error)
+          )
+
+          socket
+      end
+
+    {:noreply, assign(socket, :loading_payments, false)}
   end
 
   def handle_info(
@@ -5510,20 +5554,20 @@ defmodule YscWeb.UserSettingsLive do
     <div class="flex items-center gap-4 mb-4">
       <div class={[
         "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
-        get_payment_icon_bg(@payment_info)
+        PaymentDisplay.get_payment_icon_bg(@payment_info)
       ]}>
         <.icon
-          name={get_payment_icon(@payment_info)}
+          name={PaymentDisplay.get_payment_icon(@payment_info)}
           class={[
             "w-6 h-6",
-            get_payment_icon_color(@payment_info)
+            PaymentDisplay.get_payment_icon_color(@payment_info)
           ]}
         />
       </div>
       <div class="flex-1">
         <div class="flex items-center gap-2">
           <h3 class="font-bold text-zinc-900 text-lg leading-tight">
-            {get_payment_title(@payment_info)}
+            {PaymentDisplay.get_payment_title(@payment_info)}
           </h3>
           <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
             <.badge type="red">Cancelled</.badge>
@@ -5533,7 +5577,7 @@ defmodule YscWeb.UserSettingsLive do
           <% end %>
         </div>
         <p class="text-xs font-mono text-zinc-400 mt-1">
-          {get_payment_reference(@payment_info)}
+          {PaymentDisplay.get_payment_reference(@payment_info)}
         </p>
       </div>
     </div>
@@ -5645,20 +5689,20 @@ defmodule YscWeb.UserSettingsLive do
         <div class="flex items-center gap-4">
           <div class={[
             "w-10 h-10 rounded-full flex items-center justify-center",
-            get_payment_icon_bg(@payment_info)
+            PaymentDisplay.get_payment_icon_bg(@payment_info)
           ]}>
             <.icon
-              name={get_payment_icon(@payment_info)}
+              name={PaymentDisplay.get_payment_icon(@payment_info)}
               class={[
                 "w-5 h-5",
-                get_payment_icon_color(@payment_info)
+                PaymentDisplay.get_payment_icon_color(@payment_info)
               ]}
             />
           </div>
           <div>
             <div class="flex items-center gap-2">
               <h3 class="font-bold text-zinc-900 text-sm">
-                {get_payment_title(@payment_info)}
+                {PaymentDisplay.get_payment_title(@payment_info)}
               </h3>
               <%= if @payment_info.type == :booking && @payment_info.booking && @payment_info.booking.status == :canceled do %>
                 <.badge type="red" class="text-xs">Cancelled</.badge>
@@ -5668,7 +5712,7 @@ defmodule YscWeb.UserSettingsLive do
               <% end %>
             </div>
             <p class="text-xs font-mono text-zinc-400 mt-0.5">
-              {get_payment_reference(@payment_info)}
+              {PaymentDisplay.get_payment_reference(@payment_info)}
             </p>
           </div>
         </div>
@@ -5704,95 +5748,6 @@ defmodule YscWeb.UserSettingsLive do
     </tr>
     """
   end
-
-  # Helper functions for payment rendering
-  defp get_payment_icon(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    "hero-home"
-  end
-
-  defp get_payment_icon(%{type: :ticket}), do: "hero-ticket"
-  defp get_payment_icon(%{type: :membership}), do: "hero-heart"
-  defp get_payment_icon(%{type: :donation}), do: "hero-gift"
-  defp get_payment_icon(_), do: "hero-credit-card"
-
-  defp get_payment_icon_bg(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    case booking.property do
-      :tahoe -> "bg-blue-50 group-hover:bg-blue-600"
-      :clear_lake -> "bg-emerald-50 group-hover:bg-emerald-600"
-      _ -> "bg-purple-50 group-hover:bg-purple-600"
-    end
-  end
-
-  defp get_payment_icon_bg(%{type: :ticket}),
-    do: "bg-purple-50 group-hover:bg-purple-600"
-
-  defp get_payment_icon_bg(%{type: :membership}),
-    do: "bg-teal-50 group-hover:bg-teal-600"
-
-  defp get_payment_icon_bg(%{type: :donation}),
-    do: "bg-yellow-50 group-hover:bg-yellow-600"
-
-  defp get_payment_icon_bg(_), do: "bg-zinc-50 group-hover:bg-zinc-600"
-
-  defp get_payment_icon_color(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    case booking.property do
-      :tahoe -> "text-blue-600 group-hover:text-white"
-      :clear_lake -> "text-emerald-600 group-hover:text-white"
-      _ -> "text-purple-600 group-hover:text-white"
-    end
-  end
-
-  defp get_payment_icon_color(%{type: :ticket}),
-    do: "text-purple-600 group-hover:text-white"
-
-  defp get_payment_icon_color(%{type: :membership}),
-    do: "text-teal-600 group-hover:text-white"
-
-  defp get_payment_icon_color(%{type: :donation}),
-    do: "text-yellow-600 group-hover:text-white"
-
-  defp get_payment_icon_color(_), do: "text-zinc-600 group-hover:text-white"
-
-  defp get_payment_title(%{type: :booking, booking: booking})
-       when not is_nil(booking) do
-    property_name =
-      case booking.property do
-        :tahoe -> "Tahoe"
-        :clear_lake -> "Clear Lake"
-        _ -> "Cabin"
-      end
-
-    "#{property_name} Booking"
-  end
-
-  defp get_payment_title(%{type: :ticket, event: event})
-       when not is_nil(event) do
-    event.title
-  end
-
-  defp get_payment_title(%{type: :ticket}), do: "Event Tickets"
-  defp get_payment_title(%{type: :membership}), do: "Membership Payment"
-  defp get_payment_title(%{type: :donation}), do: "Donation"
-  defp get_payment_title(%{description: description}), do: description
-  defp get_payment_title(_), do: "Payment"
-
-  defp get_payment_reference(%{booking: booking}) when not is_nil(booking) do
-    booking.reference_id || "—"
-  end
-
-  defp get_payment_reference(%{ticket_order: ticket_order})
-       when not is_nil(ticket_order) do
-    ticket_order.reference_id || "—"
-  end
-
-  defp get_payment_reference(%{payment: payment}) when not is_nil(payment) do
-    payment.reference_id || "—"
-  end
-
-  defp get_payment_reference(_), do: "—"
 
   defp render_payment_details(assigns) do
     payment_info = assigns.payment_info

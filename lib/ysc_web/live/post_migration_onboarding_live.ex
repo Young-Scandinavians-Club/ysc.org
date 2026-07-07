@@ -93,12 +93,22 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </.link>
         </div>
 
-        <.async_section_loader
+        <div
           :if={@loading_onboarding_data}
           id="onboarding-loading"
-          label="Loading your account..."
-          class="py-16"
-        />
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading your account…</span>
+          <div class="mb-8 flex items-center justify-center gap-2">
+            <.skeleton_block :for={_ <- 1..6} class="h-2 flex-1 rounded-full" />
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8 space-y-4">
+            <.skeleton_block class="h-6 w-1/2 rounded" />
+            <.skeleton_block :for={_ <- 1..3} class="h-11 w-full rounded-lg" />
+            <.skeleton_block class="h-11 w-1/3 rounded-lg" />
+          </div>
+        </div>
 
         <div :if={!@loading_onboarding_data}>
           <%!-- Stepper --%>
@@ -904,7 +914,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
           YscWeb.Flash.send_toast(
             :error,
-            "Could not save your membership selection. Please try again.",
+            "We couldn't save your membership selection. Please try again, or email info@ysc.org if this keeps happening.",
             title: "Error"
           )
 
@@ -955,7 +965,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:error, _} ->
             YscWeb.Flash.send_toast(
               :error,
-              "Failed to save verification. Please try again.",
+              "We couldn't save your phone verification. Please try again, or email info@ysc.org if this keeps happening.",
               title: "Error"
             )
 
@@ -983,7 +993,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "Could not verify the code. Please try again.",
+          "We couldn't verify your code. Please try again, or email info@ysc.org if this keeps happening.",
           title: "Error"
         )
 
@@ -1056,7 +1066,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
         YscWeb.Flash.send_toast(
           :error,
-          "Failed to initialize payment form. Please try again.",
+          "We couldn't load the payment form. Please try again in a few minutes, or email memberships@ysc.org and we'll help you add a card.",
           title: "Payment Error"
         )
 
@@ -1146,7 +1156,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           {:error, _} ->
             YscWeb.Flash.send_toast(
               :error,
-              "Failed to store payment method. Please try again.",
+              "We couldn't save your payment method. Please try again, or email memberships@ysc.org if this keeps happening.",
               title: "Payment"
             )
 
@@ -1156,7 +1166,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "Could not retrieve payment method. Please try again.",
+          "We couldn't confirm your payment method. Please try again, or email memberships@ysc.org if this keeps happening.",
           title: "Payment"
         )
 
@@ -1606,7 +1616,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       {:error, _} ->
         YscWeb.Flash.send_toast(
           :error,
-          "Could not complete setup. Please try again.",
+          "We couldn't finish setting up your account. Please try again, or email info@ysc.org and we'll help you complete this.",
           title: "Error"
         )
 

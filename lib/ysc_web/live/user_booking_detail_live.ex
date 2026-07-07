@@ -24,79 +24,14 @@ defmodule YscWeb.UserBookingDetailLive do
        )
        |> redirect(to: ~p"/")}
     else
-      # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-      # This ensures we only fetch bookings that belong to the current user
-      booking_query =
-        from(b in Booking,
-          where: b.id == ^booking_id and b.user_id == ^user.id,
-          preload: [:user, rooms: :room_category]
-        )
+      socket =
+        socket
+        |> assign_booking_detail_loading_shell(booking_id)
 
-      case Repo.one(booking_query) do
-        nil ->
-          {:ok,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             YscWeb.BookingUserMessages.reservation_not_found(),
-             title: "Booking"
-           )
-           |> redirect(to: ~p"/")}
-
-        booking ->
-          # Additional authorization check using LetMe policy
-          case Policy.authorize(:booking_read, user, booking) do
-            :ok ->
-              connect_params =
-                case get_connect_params(socket) do
-                  nil -> %{}
-                  v -> v
-                end
-
-              timezone =
-                Map.get(connect_params, "timezone", "America/Los_Angeles")
-
-              price_breakdown = calculate_price_breakdown(booking)
-              can_cancel = BookingActions.can_cancel_booking?(booking)
-              can_change = BookingActions.can_change_booking?(booking)
-
-              socket =
-                socket
-                |> assign(:booking, booking)
-                |> assign(:payment, nil)
-                |> assign(:timezone, timezone)
-                |> assign(:price_breakdown, price_breakdown)
-                |> assign(:can_cancel, can_cancel)
-                |> assign(:can_change, can_change)
-                |> assign(:refund_info, nil)
-                |> assign(:loading_booking_payment_details, !connected?(socket))
-                |> assign(:show_cancel_modal, false)
-                |> assign(:cancel_reason, "")
-                |> assign(:page_title, "Booking Details")
-                |> assign(
-                  :meta_description,
-                  "View the details of your cabin booking with Young Scandinavians Club."
-                )
-
-              socket =
-                if connected?(socket) do
-                  assign_booking_payment_details(socket, booking)
-                else
-                  socket
-                end
-
-              {:ok, socket}
-
-            {:error, _} ->
-              {:ok,
-               socket
-               |> YscWeb.Flash.put_toast(
-                 :error,
-                 "You don't have permission to view this booking.",
-                 title: "Booking"
-               )
-               |> redirect(to: ~p"/")}
-          end
+      if connected?(socket) do
+        {:ok, load_booking_detail(socket, user, booking_id)}
+      else
+        {:ok, socket}
       end
     end
   end
@@ -204,7 +139,33 @@ defmodule YscWeb.UserBookingDetailLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10 max-w-screen-lg mx-auto px-4">
+    <div
+      :if={@loading_booking?}
+      id="booking-detail-loading"
+      class="py-8 lg:py-10 max-w-screen-lg mx-auto px-4"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="sr-only">Loading booking details…</span>
+      <div class="max-w-xl mx-auto lg:mx-0 space-y-6">
+        <.skeleton_block class="h-9 w-56 rounded" />
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded" />
+        </div>
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+          <.skeleton_block class="h-5 w-40 rounded mb-2" />
+          <div :for={_ <- 1..3} class="flex justify-between">
+            <.skeleton_block class="h-4 w-28 rounded" />
+            <.skeleton_block class="h-4 w-20 rounded" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      :if={!@loading_booking?}
+      id="booking-detail"
+      class="py-8 lg:py-10 max-w-screen-lg mx-auto px-4"
+    >
       <div class="max-w-xl mx-auto lg:mx-0">
         <div class="prose prose-zinc mb-6">
           <div class="flex items-start justify-between">
@@ -424,11 +385,24 @@ defmodule YscWeb.UserBookingDetailLive do
               <% end %>
             </div>
           </div>
-          <.async_section_loader
+          <div
             :if={@loading_booking_payment_details}
             id="booking-payment-loading"
-            label="Loading payment details..."
-          />
+            class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="sr-only">Loading payment details…</span>
+            <.skeleton_block class="h-5 w-40 rounded mb-2" />
+            <div :for={_ <- 1..3} class="flex justify-between">
+              <.skeleton_block class="h-4 w-28 rounded" />
+              <.skeleton_block class="h-4 w-20 rounded" />
+            </div>
+            <div class="border-t border-zinc-200 pt-3 flex justify-between items-center">
+              <.skeleton_block class="h-5 w-24 rounded" />
+              <.skeleton_block class="h-7 w-28 rounded" />
+            </div>
+          </div>
           <!-- Payment Summary -->
           <%= if @payment do %>
             <div class="bg-white rounded-lg border border-zinc-200 p-6">
@@ -563,6 +537,107 @@ defmodule YscWeb.UserBookingDetailLive do
   end
 
   ## Helper Functions
+
+  defp assign_booking_detail_loading_shell(socket, booking_id) do
+    timezone = get_timezone_from_connect_params(socket)
+
+    assign(socket,
+      booking_id: booking_id,
+      loading_booking?: true,
+      booking: nil,
+      payment: nil,
+      timezone: timezone,
+      price_breakdown: nil,
+      can_cancel: false,
+      can_change: false,
+      refund_info: nil,
+      loading_booking_payment_details: true,
+      show_cancel_modal: false,
+      cancel_reason: "",
+      page_title: "Booking Details",
+      meta_description:
+        "View the details of your cabin booking with Young Scandinavians Club."
+    )
+  end
+
+  defp load_booking_detail(socket, user, booking_id) do
+    if loaded_booking_matches?(socket, booking_id) do
+      socket
+      |> assign(:loading_booking?, false)
+      |> maybe_assign_booking_payment_details()
+    else
+      # SECURITY: Filter by user_id in the database query to prevent unauthorized access
+      booking_query =
+        from(b in Booking,
+          where: b.id == ^booking_id and b.user_id == ^user.id,
+          preload: [:user, rooms: :room_category]
+        )
+
+      case Repo.one(booking_query) do
+        nil ->
+          socket
+          |> YscWeb.Flash.put_toast(
+            :error,
+            YscWeb.BookingUserMessages.reservation_not_found(),
+            title: "Booking"
+          )
+          |> redirect(to: ~p"/")
+
+        booking ->
+          case Policy.authorize(:booking_read, user, booking) do
+            :ok ->
+              socket
+              |> assign(:loading_booking?, false)
+              |> assign(:booking, booking)
+              |> assign(:price_breakdown, calculate_price_breakdown(booking))
+              |> assign(
+                :can_cancel,
+                BookingActions.can_cancel_booking?(booking)
+              )
+              |> assign(
+                :can_change,
+                BookingActions.can_change_booking?(booking)
+              )
+              |> assign(:loading_booking_payment_details, true)
+              |> assign_booking_payment_details(booking)
+
+            {:error, _} ->
+              socket
+              |> YscWeb.Flash.put_toast(
+                :error,
+                "You don't have permission to view this booking.",
+                title: "Booking"
+              )
+              |> redirect(to: ~p"/")
+          end
+      end
+    end
+  end
+
+  defp loaded_booking_matches?(socket, booking_id) do
+    case socket.assigns[:booking] do
+      %Booking{id: id} -> to_string(id) == to_string(booking_id)
+      _ -> false
+    end
+  end
+
+  defp maybe_assign_booking_payment_details(socket) do
+    if socket.assigns[:loading_booking_payment_details] do
+      assign_booking_payment_details(socket, socket.assigns.booking)
+    else
+      socket
+    end
+  end
+
+  defp get_timezone_from_connect_params(socket) do
+    connect_params =
+      case get_connect_params(socket) do
+        nil -> %{}
+        v -> v
+      end
+
+    Map.get(connect_params, "timezone", "America/Los_Angeles")
+  end
 
   defp assign_booking_payment_details(socket, booking) do
     payment = get_booking_payment_info(booking)

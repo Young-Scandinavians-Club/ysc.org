@@ -19,6 +19,7 @@ defmodule Ysc.Bookings do
   import Ecto.Query, warn: false
   require Ysc.Logging
 
+  alias Ysc.Accounts
   alias Ysc.Repo
   alias Stripe
   alias Ysc.Ledgers
@@ -47,6 +48,25 @@ defmodule Ysc.Bookings do
   # Check-in and check-out times
   @checkin_time ~T[15:00:00]
   @checkout_time ~T[11:00:00]
+
+  @doc """
+  Returns `:ok` when `user` may create or pay for a cabin booking.
+
+  Mirrors the booking LiveViews' UI eligibility checks: account must be
+  `:active` and the user (or their primary account) must have active membership.
+  """
+  def ensure_user_may_book(%Accounts.User{} = user) do
+    cond do
+      user.state != :active ->
+        {:error, :application_pending_approval}
+
+      not Accounts.has_active_membership?(user) ->
+        {:error, :membership_required}
+
+      true ->
+        :ok
+    end
+  end
 
   ## Seasons
 
@@ -251,6 +271,23 @@ defmodule Ysc.Bookings do
   def get_room!(id) do
     Repo.get!(Room, id)
     |> Repo.preload([:room_category, :image])
+  end
+
+  @doc """
+  Fetches rooms by ID in a single query.
+
+  Used for pricing helpers when selected room IDs are not yet in
+  `available_rooms` — avoids one `get_room!/1` call per room.
+  """
+  def list_rooms_by_ids(ids) when is_list(ids) do
+    ids = ids |> Enum.reject(&is_nil/1) |> Enum.uniq()
+
+    if ids == [] do
+      []
+    else
+      from(r in Room, where: r.id in ^ids)
+      |> Repo.all()
+    end
   end
 
   @doc """
@@ -581,6 +618,23 @@ defmodule Ysc.Bookings do
        from(bg in BookingGuest, order_by: [asc: bg.order_index])},
       :rooms,
       :user
+    ])
+  end
+
+  @doc """
+  Gets a booking with associations needed for admin view and edit modals.
+
+  Loads everything in one preload pass instead of `get_booking!/1` followed by
+  a second `Repo.preload/2`.
+  """
+  def get_booking_for_admin_view!(id) do
+    Repo.get!(Booking, id)
+    |> Repo.preload([
+      {:booking_guests,
+       from(bg in BookingGuest, order_by: [asc: bg.order_index])},
+      rooms: :room_category,
+      user: :current_avatar,
+      check_ins: :check_in_vehicles
     ])
   end
 
@@ -1667,6 +1721,51 @@ defmodule Ysc.Bookings do
   end
 
   ## Check-ins
+
+  @doc """
+  Validates that bookings are eligible for property check-in.
+
+  Requires confirmed (`:complete`) status, an active stay window in PST
+  (check-in date reached and checkout not yet passed), and that the booking
+  has not already been marked checked in.
+  """
+  def validate_bookings_for_check_in(bookings) when is_list(bookings) do
+    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+    Enum.reduce_while(bookings, :ok, fn booking, :ok ->
+      case check_in_eligibility_error(booking, today_pst) do
+        nil -> {:cont, :ok}
+        message -> {:halt, {:error, message}}
+      end
+    end)
+  end
+
+  defp check_in_eligibility_error(%Booking{} = booking, today_pst) do
+    label = booking_check_in_label(booking)
+
+    cond do
+      booking.status != :complete ->
+        "booking #{label} is not confirmed (status: #{booking.status})"
+
+      booking.checked_in ->
+        "booking #{label} is already checked in"
+
+      Date.compare(booking.checkin_date, today_pst) == :gt ->
+        "booking #{label} is not yet active (check-in: #{booking.checkin_date})"
+
+      Date.compare(booking.checkout_date, today_pst) != :gt ->
+        "booking #{label} has already ended (checkout: #{booking.checkout_date})"
+
+      true ->
+        nil
+    end
+  end
+
+  defp booking_check_in_label(%Booking{reference_id: ref})
+       when is_binary(ref) and ref != "",
+       do: ref
+
+  defp booking_check_in_label(%Booking{id: id}), do: to_string(id)
 
   @doc """
   Creates a check-in with associated bookings and vehicles.
