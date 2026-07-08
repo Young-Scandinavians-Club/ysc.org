@@ -94,7 +94,7 @@ defmodule Ysc.Tickets.TicketOrder do
   @doc """
   Creates a changeset for an admin-granted complimentary ticket order.
   """
-  def admin_grant_changeset(ticket_order, attrs) do
+  def admin_grant_changeset(ticket_order, attrs, granted_by_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     ticket_order
@@ -105,10 +105,16 @@ defmodule Ysc.Tickets.TicketOrder do
       :discount_amount,
       :expires_at,
       :completed_at,
-      :granted_by_id,
       :admin_grant_notes
     ])
-    |> validate_required([:user_id, :event_id, :total_amount, :expires_at])
+    |> put_change(:granted_by_id, granted_by_id)
+    |> validate_required([
+      :user_id,
+      :event_id,
+      :total_amount,
+      :expires_at,
+      :granted_by_id
+    ])
     |> validate_money(:total_amount)
     |> put_change(:status, :completed)
     |> put_change(:completed_at, Map.get(attrs, :completed_at, now))

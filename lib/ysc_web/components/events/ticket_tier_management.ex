@@ -400,7 +400,10 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
           <div :if={length(@ticket_purchases) > 0} class="space-y-3 sm:space-y-4">
             <%= for purchase <- @ticket_purchases do %>
-              <div class="border border-zinc-200 rounded p-3 sm:p-4">
+              <div
+                id={"ticket-purchase-#{purchase.user_id}"}
+                class="border border-zinc-200 rounded p-3 sm:p-4"
+              >
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0">
                   <div class="flex-1">
                     <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-2">
@@ -841,60 +844,57 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   @impl true
-  def handle_event("grant-tickets", params, socket) do
-    tier_id = tier_id_from_event_params(params)
-    ticket_tier = Events.get_ticket_tier!(tier_id)
-
-    is_donation =
-      ticket_tier.type == "donation" || ticket_tier.type == :donation
-
-    if is_donation do
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(
-         :error,
-         "Tickets cannot be granted for donation tiers",
-         title: "Grant Tickets"
-       )}
-    else
-      {:noreply,
-       socket
-       |> assign(:show_grant_modal, true)
-       |> assign(:granting_tier, ticket_tier)}
-    end
-  end
-
-  @impl true
-  def handle_event("reserve-tickets", params, socket) do
-    tier_id = tier_id_from_event_params(params)
-    ticket_tier = Events.get_ticket_tier!(tier_id)
-
-    # Don't allow reservations for donation tiers
-    is_donation =
-      ticket_tier.type == "donation" || ticket_tier.type == :donation
-
-    if is_donation do
-      {:noreply,
-       socket
-       |> YscWeb.Flash.put_toast(
-         :error,
-         "Reservations are not available for donation tiers",
-         title: "Reservation"
-       )}
-    else
-      {:noreply,
-       socket
-       |> assign(:show_reserve_modal, true)
-       |> assign(:reserving_tier, ticket_tier)}
-    end
-  end
-
-  @impl true
   def handle_event("close-reserve-tickets-modal", _params, socket) do
     {:noreply,
      socket
      |> assign(:show_reserve_modal, false)
      |> assign(:reserving_tier, nil)}
+  end
+
+  @impl true
+  def handle_event("grant-tickets", params, socket) do
+    case tier_id_from_event_params(params) do
+      nil ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Invalid ticket tier.",
+           title: "Grant Tickets"
+         )}
+
+      tier_id ->
+        case Events.get_ticket_tier(tier_id) do
+          nil ->
+            {:noreply,
+             YscWeb.Flash.put_toast(socket, :error, "Ticket tier not found.",
+               title: "Grant Tickets"
+             )}
+
+          ticket_tier ->
+            grant_tickets_for_tier(socket, ticket_tier)
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("reserve-tickets", params, socket) do
+    case tier_id_from_event_params(params) do
+      nil ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Invalid ticket tier.",
+           title: "Reservation"
+         )}
+
+      tier_id ->
+        case Events.get_ticket_tier(tier_id) do
+          nil ->
+            {:noreply,
+             YscWeb.Flash.put_toast(socket, :error, "Ticket tier not found.",
+               title: "Reservation"
+             )}
+
+          ticket_tier ->
+            reserve_tickets_for_tier(socket, ticket_tier)
+        end
+    end
   end
 
   @impl true
@@ -1142,4 +1142,45 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   defp tier_id_from_event_params(%{"id" => id}), do: id
   defp tier_id_from_event_params(%{"tier-id" => id}), do: id
+  defp tier_id_from_event_params(_), do: nil
+
+  defp grant_tickets_for_tier(socket, ticket_tier) do
+    is_donation =
+      ticket_tier.type == "donation" || ticket_tier.type == :donation
+
+    if is_donation do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Tickets cannot be granted for donation tiers",
+         title: "Grant Tickets"
+       )}
+    else
+      {:noreply,
+       socket
+       |> assign(:show_grant_modal, true)
+       |> assign(:granting_tier, ticket_tier)}
+    end
+  end
+
+  defp reserve_tickets_for_tier(socket, ticket_tier) do
+    is_donation =
+      ticket_tier.type == "donation" || ticket_tier.type == :donation
+
+    if is_donation do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Reservations are not available for donation tiers",
+         title: "Reservation"
+       )}
+    else
+      {:noreply,
+       socket
+       |> assign(:show_reserve_modal, true)
+       |> assign(:reserving_tier, ticket_tier)}
+    end
+  end
 end

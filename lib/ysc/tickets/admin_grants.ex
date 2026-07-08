@@ -7,6 +7,8 @@ defmodule Ysc.Tickets.AdminGrants do
 
   import Ecto.Query, warn: false
 
+  require Ysc.Logging
+
   alias Ysc.Accounts
   alias Ysc.Events
   alias Ysc.Events.Event
@@ -44,25 +46,69 @@ defmodule Ysc.Tickets.AdminGrants do
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
     admin_grant_notes = Keyword.get(opts, :admin_grant_notes)
 
-    with {:ok, user} <- fetch_user(user_id),
-         {:ok, event} <- fetch_grantable_event(event_id),
-         {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
-         :ok <-
-           maybe_validate_capacity(
-             user_id,
-             event_id,
-             ticket_selections,
-             skip_capacity?
-           ) do
-      insert_grant_transaction(
-        granted_by_id,
-        user,
-        event,
-        tiers,
-        ticket_selections,
-        admin_grant_notes
-      )
+    Ysc.Logging.info("Admin ticket grant started",
+      granted_by_id: granted_by_id,
+      user_id: user_id,
+      event_id: event_id,
+      ticket_selections: ticket_selections,
+      skip_capacity: skip_capacity?
+    )
+
+    result =
+      with {:ok, user} <- fetch_user(user_id),
+           {:ok, event} <- fetch_grantable_event(event_id),
+           {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
+           :ok <-
+             maybe_validate_capacity(
+               user_id,
+               event_id,
+               ticket_selections,
+               skip_capacity?
+             ) do
+        insert_grant_transaction(
+          granted_by_id,
+          user,
+          event,
+          tiers,
+          ticket_selections,
+          admin_grant_notes
+        )
+      end
+
+    case result do
+      {:ok, ticket_order} ->
+        Ysc.Logging.info("Admin ticket grant succeeded",
+          granted_by_id: granted_by_id,
+          user_id: user_id,
+          event_id: event_id,
+          ticket_order_id: ticket_order.id,
+          ticket_count: length(ticket_order.tickets || [])
+        )
+
+        {:ok, ticket_order}
+
+      {:error, reason} = error ->
+        Ysc.Logging.info("Admin ticket grant failed",
+          granted_by_id: granted_by_id,
+          user_id: user_id,
+          event_id: event_id,
+          reason: inspect(reason)
+        )
+
+        error
     end
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    event_id = Fixtures.ulid()
+    tier_ids = [Fixtures.ulid()]
+
+    from(tt in TicketTier,
+      where: tt.id in ^tier_ids and tt.event_id == ^event_id
+    )
   end
 
   defp fetch_user(user_id) do
@@ -182,9 +228,11 @@ defmodule Ysc.Tickets.AdminGrants do
     end
   end
 
-  defp insert_ticket_order(attrs) do
+  defp insert_ticket_order(%{granted_by_id: granted_by_id} = attrs) do
+    order_attrs = Map.delete(attrs, :granted_by_id)
+
     %TicketOrder{}
-    |> TicketOrder.admin_grant_changeset(attrs)
+    |> TicketOrder.admin_grant_changeset(order_attrs, granted_by_id)
     |> Repo.insert_with_reference_retry(TicketOrder)
   end
 
@@ -195,37 +243,36 @@ defmodule Ysc.Tickets.AdminGrants do
          ticket_selections,
          expires_at
        ) do
-    tickets =
-      ticket_selections
-      |> Enum.flat_map(fn {tier_id, quantity} ->
-        tier = Map.fetch!(tiers_by_id, tier_id)
+    ticket_selections
+    |> Enum.flat_map(fn {tier_id, quantity} ->
+      tier = Map.fetch!(tiers_by_id, tier_id)
 
-        Enum.map(1..quantity, fn _ ->
-          %Ticket{}
-          |> Ticket.admin_grant_changeset(%{
-            event_id: ticket_order.event_id,
-            ticket_tier_id: tier.id,
-            user_id: user.id,
-            ticket_order_id: ticket_order.id,
-            status: :confirmed,
-            expires_at: expires_at,
-            discount_amount: Money.new(0, :USD)
-          })
-        end)
+      Enum.map(1..quantity, fn _ ->
+        %Ticket{}
+        |> Ticket.admin_grant_changeset(%{
+          event_id: ticket_order.event_id,
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          ticket_order_id: ticket_order.id,
+          status: :confirmed,
+          expires_at: expires_at,
+          discount_amount: Money.new(0, :USD)
+        })
       end)
+    end)
+    |> Enum.reduce_while({:ok, []}, fn changeset, {:ok, acc} ->
+      case Repo.insert_with_reference_retry(changeset, Ticket) do
+        {:ok, ticket} ->
+          {:cont, {:ok, [ticket | acc]}}
 
-    inserted =
-      Enum.map(tickets, fn changeset ->
-        case Repo.insert_with_reference_retry(changeset, Ticket) do
-          {:ok, ticket} ->
-            ticket
-
-          {:error, changeset} ->
-            Repo.rollback(changeset)
-        end
-      end)
-
-    {:ok, inserted}
+        {:error, changeset} ->
+          {:halt, {:error, changeset}}
+      end
+    end)
+    |> case do
+      {:ok, inserted} -> {:ok, Enum.reverse(inserted)}
+      {:error, changeset} -> {:error, changeset}
+    end
   end
 
   defp maybe_insert_registration_details(tickets, tiers_by_id, user) do

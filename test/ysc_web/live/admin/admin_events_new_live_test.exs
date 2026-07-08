@@ -779,6 +779,8 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       refute has_element?(view, "#grant-tickets-modal")
 
+      refute has_element?(view, "#ticket-purchase-#{member.id}")
+
       view
       |> element("#ticket-tier-actions-#{tier.id}-grant")
       |> render_click()
@@ -808,9 +810,9 @@ defmodule YscWeb.AdminEventsNewLiveTest do
         }
       })
 
-      html = render(view)
-      assert html =~ member.email
-      assert html =~ "GA Migration"
+      assert has_element?(view, "#ticket-purchase-#{member.id}", member.email)
+      assert has_element?(view, "#ticket-purchase-#{member.id}", "GA Migration")
+      assert has_element?(view, "#ticket-purchase-#{member.id}", "2")
 
       summary = Events.get_ticket_purchase_summary(event.id)
       purchase = Enum.find(summary, &(&1.user_id == member.id))

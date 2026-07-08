@@ -125,25 +125,12 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   end
 
   @impl true
-  def update(%{ticket_tier: ticket_tier} = assigns, socket) do
-    {:ok,
-     socket
-     |> assign(assigns)
-     |> assign(:ticket_tier_id, ticket_tier.id)
-     |> assign(
-       :form,
-       to_form(default_form_params(ticket_tier.id), as: "ticket_grant")
-     )
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
-  end
-
-  @impl true
   def update(assigns, socket) do
     ticket_tier_id =
-      assigns[:ticket_tier_id] ||
-        (assigns[:ticket_tier] && assigns[:ticket_tier].id)
+      case assigns do
+        %{ticket_tier: %{id: id}} -> id
+        _ -> assigns[:ticket_tier_id]
+      end
 
     {:ok,
      socket
@@ -217,7 +204,9 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Select a member to grant tickets to.", title: "Grant Tickets")
+           "Select a member to grant tickets to.",
+           title: "Grant Tickets"
+         )
          |> assign(:form, to_form(merged, as: "ticket_grant"))}
 
       is_nil(quantity) or quantity < 1 ->

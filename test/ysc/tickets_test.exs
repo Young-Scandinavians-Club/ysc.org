@@ -1364,15 +1364,15 @@ defmodule Ysc.TicketsTest do
   describe "grant_admin_tickets/4" do
     setup do
       tickets_setup()
+      |> Map.put(:admin, user_fixture_unique())
     end
 
     test "creates a completed order with confirmed tickets", %{
+      admin: admin,
       user: user,
       event: event,
       tier1: tier1
     } do
-      admin = user_fixture_unique()
-
       assert {:ok, order} =
                Tickets.grant_admin_tickets(
                  admin.id,
@@ -1396,11 +1396,10 @@ defmodule Ysc.TicketsTest do
     end
 
     test "enforces capacity unless skip_capacity is true", %{
+      admin: admin,
       user: user,
       event: event
     } do
-      admin = user_fixture_unique()
-
       {:ok, tier} =
         Events.create_ticket_tier(%{
           name: "Limited",
@@ -1436,10 +1435,10 @@ defmodule Ysc.TicketsTest do
     end
 
     test "grants tickets without requiring active membership", %{
+      admin: admin,
       event: event,
       tier1: tier1
     } do
-      admin = user_fixture_unique()
       member = user_fixture_unique()
 
       assert {:ok, order} =
@@ -1455,11 +1454,10 @@ defmodule Ysc.TicketsTest do
     end
 
     test "auto-creates registration details when tier requires registration", %{
+      admin: admin,
       user: user,
       event: event
     } do
-      admin = user_fixture_unique()
-
       {:ok, tier} =
         Events.create_ticket_tier(%{
           name: "Registered GA",
@@ -1484,12 +1482,11 @@ defmodule Ysc.TicketsTest do
     end
 
     test "skip_email prevents confirmation email scheduling", %{
+      admin: admin,
       user: user,
       event: event,
       tier1: tier1
     } do
-      admin = user_fixture_unique()
-
       Oban.Testing.with_testing_mode(:manual, fn ->
         assert {:ok, _order} =
                  Tickets.grant_admin_tickets(
@@ -1505,11 +1502,10 @@ defmodule Ysc.TicketsTest do
     end
 
     test "rejects donation tiers and partiful events", %{
+      admin: admin,
       user: user,
       tier1: tier1
     } do
-      admin = user_fixture_unique()
-
       {:ok, donation_tier} =
         Events.create_ticket_tier(%{
           name: "Donation",
