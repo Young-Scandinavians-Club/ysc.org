@@ -442,6 +442,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     latitude={@form[:latitude].value}
                     longitude={@form[:longitude].value}
                     locked={false}
+                    cooperative_gestures={false}
                   />
                   <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
                     <.icon

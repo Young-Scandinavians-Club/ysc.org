@@ -64,6 +64,33 @@ defmodule YscWeb.Components.MapComponentTest do
 
       assert html =~ ~s(phx-update="ignore")
     end
+
+    test "enables cooperative gestures by default" do
+      assigns = %{
+        id: "test-map",
+        latitude: 38.9072,
+        longitude: -77.0369,
+        locked: true
+      }
+
+      html = render_component(MapComponent, assigns)
+
+      assert html =~ ~s(data-cooperative-gestures="true")
+    end
+
+    test "can disable cooperative gestures" do
+      assigns = %{
+        id: "test-map",
+        latitude: 38.9072,
+        longitude: -77.0369,
+        locked: false,
+        cooperative_gestures: false
+      }
+
+      html = render_component(MapComponent, assigns)
+
+      assert html =~ ~s(data-cooperative-gestures="false")
+    end
   end
 
   describe "update/2" do
