@@ -171,4 +171,24 @@ defmodule YscWeb.CoreComponentsTest do
       assert hd(LazyHTML.attribute(button, "phx-click")) =~ "toggle"
     end
   end
+
+  describe "dropdown JS helpers" do
+    test "toggle_dropdown/1 toggles visibility, aria-expanded, and dropdown-open class" do
+      js = toggle_dropdown("#test-dropdown")
+      ops = inspect(js.ops)
+
+      assert ops =~ "aria-expanded"
+      assert ops =~ "dropdown-open"
+      assert ops =~ "toggle"
+    end
+
+    test "hide_dropdown/1 hides menu and resets aria-expanded and dropdown-open" do
+      js = hide_dropdown("#test-dropdown")
+      ops = inspect(js.ops)
+
+      assert ops =~ "hide"
+      assert ops =~ ~s|"aria-expanded", "false"|
+      assert ops =~ "dropdown-open"
+    end
+  end
 end

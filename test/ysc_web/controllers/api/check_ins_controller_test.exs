@@ -352,6 +352,49 @@ defmodule YscWeb.Api.CheckInsControllerTest do
       assert error =~ "already ended"
     end
 
+    test "rejects bookings on checkout day (stay has ended)", %{conn: conn} do
+      today_pst =
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+      booking =
+        active_check_in_booking_fixture()
+        |> Ecto.Changeset.change(%{
+          checkin_date: Date.add(today_pst, -3),
+          checkout_date: today_pst
+        })
+        |> Ysc.Repo.update!()
+
+      payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(booking.id)],
+        rules_agreed: true
+      }
+
+      response = post(conn, ~p"/api/v1/mobile/check-in", payload)
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "already ended"
+    end
+
+    test "rejects multi-booking check-in when any booking is ineligible", %{
+      conn: conn
+    } do
+      valid = active_check_in_booking_fixture()
+      invalid = active_check_in_booking_fixture(%{status: :canceled})
+
+      payload = %{
+        property: "tahoe",
+        booking_ids: [to_string(valid.id), to_string(invalid.id)],
+        rules_agreed: true
+      }
+
+      response = post(conn, ~p"/api/v1/mobile/check-in", payload)
+
+      assert %{"error" => error} = json_response(response, 422)
+      assert error =~ "not confirmed"
+    end
+
     test "rejects bookings that are already checked in", %{conn: conn} do
       booking = active_check_in_booking_fixture()
 

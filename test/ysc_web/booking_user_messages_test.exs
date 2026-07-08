@@ -96,6 +96,17 @@ defmodule YscWeb.BookingUserMessagesTest do
              "/users/membership"
            ) =~
              "Membership page"
+
+    assert BookingUserMessages.membership_required_plain_message() =~
+             "active YSC membership"
+
+    refute BookingUserMessages.membership_required_plain_message() =~ "<a"
+
+    assert BookingUserMessages.application_pending_approval_message() =~
+             "still being reviewed"
+
+    assert BookingUserMessages.application_pending_approval_message() =~
+             "after your application is approved"
   end
 
   test "checkout error messages include contact email" do
