@@ -10,6 +10,8 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
 
+  alias Ysc.Bookings.AvailabilityCache
+
   describe "deferred availability and pricing" do
     test "dead render skips availability queries when dates are in the URL", %{
       conn: conn
@@ -61,6 +63,11 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
       html = render(view)
       assert html =~ "Clear Lake"
 
+      # Parallel tests invalidate shared caches in setup; process any broadcast
+      # before measuring info-tab navigation query counts.
+      AvailabilityCache.invalidate()
+      render(view)
+
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.active_tab == :information
       assert state.socket.assigns.info_tab == :general
@@ -76,6 +83,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
         )
 
       assert query_count == 0
+      assert :sys.get_state(view.pid).socket.assigns.info_tab == :rules
     end
   end
 end

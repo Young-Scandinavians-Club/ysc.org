@@ -362,8 +362,11 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         # Validate availability and price only after connect, and only when booking
         # inputs changed (skip tab-only navigation work on the dead render path).
+        switching_to_booking_tab = tab_changed && active_tab == :booking
+
         needs_booking_recalculation =
-          dates_changed || guests_changed || booking_mode_changed
+          dates_changed || guests_changed || booking_mode_changed ||
+            switching_to_booking_tab
 
         socket =
           socket
@@ -401,6 +404,17 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         socket =
           if connected?(socket) && needs_booking_recalculation do
+            socket =
+              if switching_to_booking_tab do
+                assign(
+                  socket,
+                  :availability_cache_version,
+                  System.unique_integer([:positive])
+                )
+              else
+                socket
+              end
+
             socket
             |> validate_all_conditions(
               checkin_date,
@@ -2996,9 +3010,16 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   def handle_info(:availability_cache_invalidated, socket) do
     socket =
-      socket
-      |> assign(:availability_cache_version, System.unique_integer([:positive]))
-      |> refresh_selection_after_availability_change()
+      if socket.assigns.active_tab == :booking do
+        socket
+        |> assign(
+          :availability_cache_version,
+          System.unique_integer([:positive])
+        )
+        |> refresh_selection_after_availability_change()
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
