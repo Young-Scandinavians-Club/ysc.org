@@ -78,6 +78,35 @@ defmodule Ysc.Events.Ticket do
   end
 
   @doc """
+  Changeset for admin-granted tickets.
+
+  Skips purchase-time validations (membership, event-in-past) while still requiring
+  core ticket fields.
+  """
+  def admin_grant_changeset(ticket, attrs) do
+    ticket
+    |> cast(attrs, [
+      :reference_id,
+      :event_id,
+      :ticket_tier_id,
+      :user_id,
+      :ticket_order_id,
+      :status,
+      :expires_at,
+      :discount_amount
+    ])
+    |> validate_required([
+      :event_id,
+      :ticket_tier_id,
+      :user_id,
+      :expires_at
+    ])
+    |> put_change(:status, Map.get(attrs, :status, :confirmed))
+    |> put_reference_id()
+    |> unique_constraint(:reference_id)
+  end
+
+  @doc """
   Changeset for updating ticket status only.
   Skips validations that shouldn't apply when changing status (e.g., expiring tickets).
   This is used for administrative status changes where business validations don't apply.

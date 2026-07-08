@@ -306,7 +306,7 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
               }
             >
               {@submit_label}
-              <.icon name="hero-arrow-right" class="w-5 h-5 -mt-0.5 ms-1" />
+              <.icon name="hero-arrow-right" class="w-5 h-5" />
             </.button>
             {render_slot(@actions)}
           </div>

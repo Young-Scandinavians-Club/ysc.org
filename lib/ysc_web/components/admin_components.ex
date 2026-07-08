@@ -1062,7 +1062,7 @@ defmodule YscWeb.AdminComponents do
       class="hidden sm:inline-flex"
       {@rest}
     >
-      <.icon name={@icon} class="w-5 h-5 me-1 mt-0.5" />
+      <.icon name={@icon} class="w-5 h-5" />
       {@label}
     </.button>
     <button
@@ -1132,7 +1132,7 @@ defmodule YscWeb.AdminComponents do
       data-copy-target={@copy_target}
       {@rest}
     >
-      <.icon name={@icon} class="w-5 h-5 me-1 mt-0.5" />
+      <.icon name={@icon} class="w-5 h-5" />
       {@label}
     </.button>
     <button
@@ -1468,8 +1468,7 @@ defmodule YscWeb.AdminComponents do
           color="zinc"
           class="mx-auto w-36 justify-center gap-2 py-2 px-3 text-sm font-semibold"
         >
-          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-          Clear filters
+          <.icon name="hero-x-circle" class="w-5 h-5 shrink-0" /> Clear filters
         </.button>
         <button
           :if={@clear_event}
@@ -1479,7 +1478,7 @@ defmodule YscWeb.AdminComponents do
           phx-click={@clear_event}
           phx-disable-with="Clearing..."
         >
-          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5" /> Clear filters
+          <.icon name="hero-x-circle" class="w-5 h-5 shrink-0" /> Clear filters
         </button>
       </div>
     </div>
@@ -2783,7 +2782,7 @@ defmodule YscWeb.AdminComponents do
 
   attr :rest, :global,
     include:
-      ~w(phx-click phx-value-id phx-value-email data-confirm disabled target rel aria-label)
+      ~w(phx-click phx-target phx-value-id phx-value-tier-id phx-value-email data-confirm disabled target rel aria-label)
 
   slot :inner_block, required: true
   slot :leading, doc: "Custom leading content instead of a hero icon"
@@ -2921,8 +2920,7 @@ defmodule YscWeb.AdminComponents do
           color="zinc"
           class="w-full justify-center gap-2 py-2 px-3 text-sm font-semibold"
         >
-          <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 shrink-0" />
-          Clear filters
+          <.icon name="hero-x-circle" class="w-5 h-5 shrink-0" /> Clear filters
         </.button>
       </div>
     </.dropdown>

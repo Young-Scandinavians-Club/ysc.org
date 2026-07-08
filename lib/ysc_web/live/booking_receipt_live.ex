@@ -1153,12 +1153,12 @@ defmodule YscWeb.BookingReceiptLive do
                 class="w-full py-3"
                 id="change-reservation-button"
               >
-                <.icon name="hero-pencil-square" class="w-5 h-5 -mt-0.5 me-2" />Change Reservation
+                <.icon name="hero-pencil-square" class="w-5 h-5" />Change Reservation
               </.button>
             <% end %>
             <%= if @booking.status != :canceled && @can_cancel do %>
               <.button phx-click="show-cancel-modal" class="w-full py-3" color="red">
-                <.icon name="hero-x-circle" class="w-5 h-5 -mt-0.5 me-2" />Cancel Reservation
+                <.icon name="hero-x-circle" class="w-5 h-5" />Cancel Reservation
               </.button>
             <% end %>
             <.button
@@ -1167,7 +1167,7 @@ defmodule YscWeb.BookingReceiptLive do
               color="zinc"
               variant="outline"
             >
-              <.icon name="hero-arrow-left" class="w-5 h-5 -mt-0.5 me-2" />Back to home
+              <.icon name="hero-arrow-left" class="w-5 h-5" />Back to home
             </.button>
           </div>
         </aside>

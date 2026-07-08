@@ -1004,12 +1004,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             color="zinc"
             phx-click="open-send-modal"
           >
-            <.icon name="hero-paper-airplane" class="w-4 h-4 -mt-0.5 mr-1" />
-            Send now
+            <.icon name="hero-paper-airplane" class="w-4 h-4" /> Send now
           </.button>
           <.button type="button" color="blue" phx-click="open-schedule-modal">
-            <.icon name="hero-clock" class="w-4 h-4 -mt-0.5 mr-1 opacity-80" />
-            Schedule
+            <.icon name="hero-clock" class="w-4 h-4 opacity-80" /> Schedule
           </.button>
         </div>
       </div>

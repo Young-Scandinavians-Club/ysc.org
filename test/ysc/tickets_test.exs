@@ -11,6 +11,7 @@ defmodule Ysc.TicketsTest do
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
 
   defp user_fixture_unique(attrs \\ %{}) do
@@ -1357,6 +1358,185 @@ defmodule Ysc.TicketsTest do
 
       assert {:error, :payment_required} =
                Tickets.process_free_ticket_order(order)
+    end
+  end
+
+  describe "grant_admin_tickets/4" do
+    setup do
+      tickets_setup()
+    end
+
+    test "creates a completed order with confirmed tickets", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      admin = user_fixture_unique()
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier1.id => 2},
+                 admin_grant_notes: "WP order #99"
+               )
+
+      order = Tickets.get_ticket_order(order.id)
+      assert order.status == :completed
+      assert order.granted_by_id == admin.id
+      assert order.admin_grant_notes == "WP order #99"
+      assert Money.zero?(order.total_amount)
+      assert length(order.tickets) == 2
+      assert Enum.all?(order.tickets, &(&1.status == :confirmed))
+
+      summary = Events.get_ticket_purchase_summary(event.id)
+      purchase = Enum.find(summary, &(&1.user_id == user.id))
+      assert purchase.ticket_count == 2
+    end
+
+    test "enforces capacity unless skip_capacity is true", %{
+      user: user,
+      event: event
+    } do
+      admin = user_fixture_unique()
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Limited",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 1,
+          event_id: event.id
+        })
+
+      assert {:ok, _order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      assert {:error, :tier_validation_failed} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier.id => 1}
+               )
+
+      other = user_fixture_unique()
+
+      assert {:ok, _order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 other.id,
+                 event.id,
+                 %{tier.id => 1},
+                 skip_capacity: true
+               )
+    end
+
+    test "grants tickets without requiring active membership", %{
+      event: event,
+      tier1: tier1
+    } do
+      admin = user_fixture_unique()
+      member = user_fixture_unique()
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 member.id,
+                 event.id,
+                 %{tier1.id => 1}
+               )
+
+      order = Tickets.get_ticket_order(order.id)
+      assert hd(order.tickets).user_id == member.id
+    end
+
+    test "auto-creates registration details when tier requires registration", %{
+      user: user,
+      event: event
+    } do
+      admin = user_fixture_unique()
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Registered GA",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 10,
+          requires_registration: true,
+          event_id: event.id
+        })
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      ticket = hd(order.tickets)
+      detail = Events.get_ticket_detail_for_ticket(ticket.id)
+
+      assert detail.first_name == user.first_name
+      assert detail.last_name == user.last_name
+      assert detail.email == user.email
+    end
+
+    test "skip_email prevents confirmation email scheduling", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      admin = user_fixture_unique()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _order} =
+                 Tickets.grant_admin_tickets(
+                   admin.id,
+                   user.id,
+                   event.id,
+                   %{tier1.id => 1},
+                   skip_email: true
+                 )
+
+        refute_enqueued(worker: YscWeb.Workers.EmailNotifier)
+      end)
+    end
+
+    test "rejects donation tiers and partiful events", %{
+      user: user,
+      tier1: tier1
+    } do
+      admin = user_fixture_unique()
+
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Donation",
+          type: :donation,
+          price: Money.new(0, :USD),
+          quantity: nil,
+          event_id: tier1.event_id
+        })
+
+      assert {:error, :donation_tier_not_grantable} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 tier1.event_id,
+                 %{donation_tier.id => 1}
+               )
+
+      partiful_event =
+        event_fixture(%{partiful_link: "https://partiful.com/e/test"})
+
+      assert {:error, :partiful_event} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 partiful_event.id,
+                 %{tier1.id => 1}
+               )
     end
   end
 end

@@ -16,6 +16,7 @@ defmodule Ysc.Tickets do
 
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Tickets.BookingLocker
+  alias Ysc.Tickets.AdminGrants
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketTier
   alias Ysc.Events.Event
@@ -102,6 +103,54 @@ defmodule Ysc.Tickets do
           error: error
         )
 
+        error
+    end
+  end
+
+  @doc """
+  Grants confirmed tickets to a member immediately (admin migration / complimentary).
+
+  Creates a completed $0 ticket order without checkout. See `Ysc.Tickets.AdminGrants` for details.
+
+  ## Options
+
+    * `:skip_capacity` - when true, bypass tier and event capacity checks
+    * `:skip_email` - when true, do not send the ticket confirmation email
+    * `:admin_grant_notes` - optional audit note (e.g. legacy order reference)
+
+  ## Returns
+
+    * `{:ok, %TicketOrder{}}` with tickets preloaded
+    * `{:error, reason}` or `{:error, %Ecto.Changeset{}}`
+  """
+  def grant_admin_tickets(
+        granted_by_id,
+        user_id,
+        event_id,
+        ticket_selections,
+        opts \\ []
+      ) do
+    skip_email? = Keyword.get(opts, :skip_email, false)
+
+    case AdminGrants.grant_admin_tickets(
+           granted_by_id,
+           user_id,
+           event_id,
+           ticket_selections,
+           opts
+         ) do
+      {:ok, ticket_order} ->
+        broadcast_ticket_availability_update(event_id)
+
+        unless skip_email? do
+          ticket_order.id
+          |> get_ticket_order()
+          |> send_ticket_confirmation_email()
+        end
+
+        {:ok, ticket_order}
+
+      error ->
         error
     end
   end

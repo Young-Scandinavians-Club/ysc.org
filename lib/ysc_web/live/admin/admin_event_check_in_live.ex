@@ -41,8 +41,7 @@ defmodule YscWeb.AdminEventCheckInLive do
             color="zinc"
             class="hidden sm:inline-flex"
           >
-            <.icon name="hero-identification" class="w-5 h-5 me-1 mt-0.5" />
-            Membership Check-in
+            <.icon name="hero-identification" class="w-5 h-5" /> Membership Check-in
           </.button>
           <.admin_check_in_qr_scanner />
         </div>

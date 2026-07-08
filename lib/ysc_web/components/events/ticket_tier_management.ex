@@ -1,6 +1,8 @@
 defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   use YscWeb, :live_component
 
+  import YscWeb.AdminComponents
+
   alias Ysc.Events
 
   @impl true
@@ -38,7 +40,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                 phx-target={@myself}
                 class="w-full sm:w-auto"
               >
-                <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Ticket Tier
+                <.icon name="hero-plus" class="w-5 h-5" /> Add Ticket Tier
               </.button>
             </div>
           </div>
@@ -202,45 +204,59 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                     </div>
                   </div>
 
-                  <div class="flex items-center gap-2 pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
-                    <%= if !is_donation do %>
-                      <button
-                        phx-click="reserve-tickets"
-                        phx-value-tier-id={ticket_tier.id}
+                  <div class="flex justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
+                    <.admin_row_actions_dropdown
+                      id={"ticket-tier-actions-#{ticket_tier.id}"}
+                      label={"Actions for #{ticket_tier.name}"}
+                    >
+                      <.admin_dropdown_menu_item
+                        :if={!is_donation}
+                        id={"ticket-tier-actions-#{ticket_tier.id}-grant"}
+                        icon="hero-gift"
+                        tone={:success}
+                        phx-click="grant-tickets"
+                        phx-value-id={ticket_tier.id}
                         phx-target={@myself}
-                        phx-disable-with="Loading..."
-                        class="p-2 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
                       >
-                        <.icon name="hero-ticket" class="w-5 h-5" />
-                      </button>
-                    <% end %>
-                    <button
-                      phx-click="edit-ticket-tier"
-                      phx-value-id={ticket_tier.id}
-                      phx-target={@myself}
-                      phx-disable-with="Loading..."
-                      class="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                    >
-                      <.icon name="hero-pencil" class="w-5 h-5" />
-                    </button>
-                    <button
-                      phx-click="delete-ticket-tier"
-                      phx-value-id={ticket_tier.id}
-                      phx-target={@myself}
-                      phx-disable-with="Deleting..."
-                      data-confirm="Are you sure you want to delete this ticket tier? This action cannot be undone."
-                      disabled={ticket_tier.sold_tickets_count > 0}
-                      class={[
-                        "p-2 rounded-md transition-colors",
-                        if ticket_tier.sold_tickets_count > 0 do
-                          "text-zinc-300 cursor-not-allowed"
-                        else
-                          "text-zinc-400 hover:text-red-600 hover:bg-red-50"
-                        end
-                      ]}
-                    >
-                      <.icon name="hero-trash" class="w-5 h-5" />
-                    </button>
+                        Grant tickets
+                      </.admin_dropdown_menu_item>
+                      <.admin_dropdown_menu_item
+                        :if={!is_donation}
+                        id={"ticket-tier-actions-#{ticket_tier.id}-reserve"}
+                        icon="hero-ticket"
+                        tone={:info}
+                        phx-click="reserve-tickets"
+                        phx-value-id={ticket_tier.id}
+                        phx-target={@myself}
+                      >
+                        Reserve tickets
+                      </.admin_dropdown_menu_item>
+                      <.admin_dropdown_menu_item
+                        id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
+                        icon="hero-pencil-square"
+                        phx-click="edit-ticket-tier"
+                        phx-value-id={ticket_tier.id}
+                        phx-target={@myself}
+                      >
+                        Edit tier
+                      </.admin_dropdown_menu_item>
+                      <.admin_dropdown_menu_item
+                        id={"ticket-tier-actions-#{ticket_tier.id}-delete"}
+                        icon="hero-trash"
+                        tone={:danger}
+                        phx-click="delete-ticket-tier"
+                        phx-value-id={ticket_tier.id}
+                        phx-target={@myself}
+                        data-confirm="Are you sure you want to delete this ticket tier? This action cannot be undone."
+                        disabled={ticket_tier.sold_tickets_count > 0}
+                        class={
+                          if ticket_tier.sold_tickets_count > 0,
+                            do: "opacity-50 cursor-not-allowed hover:bg-transparent"
+                        }
+                      >
+                        Delete tier
+                      </.admin_dropdown_menu_item>
+                    </.admin_row_actions_dropdown>
                   </div>
                 </div>
                 <!-- Reservations Section -->
@@ -367,8 +383,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                 color="blue"
                 class="w-full sm:w-auto"
               >
-                <.icon name="hero-arrow-down-tray" class="w-4 h-4 me-1" />
-                Export CSV
+                <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
               </.button>
             </div>
           </div>
@@ -468,16 +483,35 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
             current_user={@current_user}
           />
         </.modal>
+        <!-- Grant Tickets Modal -->
+        <.modal
+          :if={@show_grant_modal && @granting_tier}
+          id="grant-tickets-modal"
+          show
+          on_cancel={JS.push("close-grant-tickets-modal", target: @myself)}
+        >
+          <.live_component
+            id={"ticket-grant-form-#{@granting_tier.id}"}
+            module={YscWeb.AdminEventsLive.TicketGrantForm}
+            ticket_tier={@granting_tier}
+            ticket_tier_id={@granting_tier.id}
+            event_id={@event_id}
+            current_user={@current_user}
+          />
+        </.modal>
       <% end %>
     </div>
     """
   end
 
   @reservation_update_keys [:id, :reservation_epoch, :close_reserve_modal]
+  @grant_update_keys [:id, :grant_epoch, :close_grant_modal, :grant_success]
 
   @impl true
   def update(incoming_assigns, socket) do
-    close_modal = Map.get(incoming_assigns, :close_reserve_modal, false)
+    close_reserve_modal = Map.get(incoming_assigns, :close_reserve_modal, false)
+    close_grant_modal = Map.get(incoming_assigns, :close_grant_modal, false)
+    grant_success = Map.get(incoming_assigns, :grant_success)
 
     socket =
       if reservation_only_update?(incoming_assigns) and
@@ -503,6 +537,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
             :show_edit_modal,
             :show_reserve_modal,
             :reserving_tier,
+            :show_grant_modal,
+            :granting_tier,
             :editing_ticket_tier
           ])
           |> Map.merge(incoming_assigns)
@@ -526,54 +562,107 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       end
 
     socket =
-      if close_modal do
-        # Explicitly close the reserve modal
-        socket
-        |> assign(:show_reserve_modal, false)
-        |> assign(:reserving_tier, nil)
-        |> assign(:show_add_modal, false)
-        |> assign(:show_edit_modal, false)
-      else
-        # Normal update - preserve modal states unless explicitly set in assigns
-        socket
-        |> assign(
-          :show_add_modal,
-          Map.get(
-            incoming_assigns,
+      cond do
+        close_grant_modal ->
+          socket
+          |> refresh_ticket_data()
+          |> assign(:show_grant_modal, false)
+          |> assign(:granting_tier, nil)
+          |> maybe_toast_grant_success(grant_success)
+
+        close_reserve_modal ->
+          socket
+          |> assign(:show_reserve_modal, false)
+          |> assign(:reserving_tier, nil)
+          |> assign(:show_add_modal, false)
+          |> assign(:show_edit_modal, false)
+
+        Map.has_key?(incoming_assigns, :grant_epoch) ->
+          refresh_ticket_data(socket)
+
+        true ->
+          socket
+          |> assign(
             :show_add_modal,
-            socket.assigns[:show_add_modal] || false
+            Map.get(
+              incoming_assigns,
+              :show_add_modal,
+              socket.assigns[:show_add_modal] || false
+            )
           )
-        )
-        |> assign(
-          :show_edit_modal,
-          Map.get(
-            incoming_assigns,
+          |> assign(
             :show_edit_modal,
-            socket.assigns[:show_edit_modal] || false
+            Map.get(
+              incoming_assigns,
+              :show_edit_modal,
+              socket.assigns[:show_edit_modal] || false
+            )
           )
-        )
-        |> assign(
-          :show_reserve_modal,
-          Map.get(
-            incoming_assigns,
+          |> assign(
             :show_reserve_modal,
-            socket.assigns[:show_reserve_modal] || false
+            Map.get(
+              incoming_assigns,
+              :show_reserve_modal,
+              socket.assigns[:show_reserve_modal] || false
+            )
           )
-        )
+          |> assign(
+            :show_grant_modal,
+            Map.get(
+              incoming_assigns,
+              :show_grant_modal,
+              socket.assigns[:show_grant_modal] || false
+            )
+          )
       end
 
     {:ok, socket}
   end
 
+  defp refresh_ticket_data(socket) do
+    ticket_tiers = Events.list_ticket_tiers_for_event(socket.assigns.event_id)
+
+    ticket_purchases =
+      Events.get_ticket_purchase_summary(socket.assigns.event_id)
+
+    {reservations_by_tier, expired_reservations_by_tier} =
+      load_reservations_maps(ticket_tiers)
+
+    socket
+    |> assign(:ticket_tiers, ticket_tiers)
+    |> assign(:ticket_purchases, ticket_purchases)
+    |> assign(:reservations_by_tier, reservations_by_tier)
+    |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
+  end
+
+  defp maybe_toast_grant_success(socket, %{
+         user_name: user_name,
+         quantity: quantity
+       }) do
+    YscWeb.Flash.put_toast(
+      socket,
+      :info,
+      "Granted #{quantity} ticket(s) to #{user_name}.",
+      title: "Grant Tickets"
+    )
+  end
+
+  defp maybe_toast_grant_success(socket, _), do: socket
+
   defp reservation_only_update?(assigns) do
     extra_keys =
       assigns
       |> Map.keys()
-      |> Enum.reject(&(&1 in @reservation_update_keys or &1 == :__changed__))
+      |> Enum.reject(
+        &(&1 in @reservation_update_keys or &1 in @grant_update_keys or
+            &1 == :__changed__)
+      )
 
     extra_keys == [] and
       (Map.has_key?(assigns, :reservation_epoch) or
-         Map.get(assigns, :close_reserve_modal) == true)
+         Map.get(assigns, :close_reserve_modal) == true or
+         Map.has_key?(assigns, :grant_epoch) or
+         Map.get(assigns, :close_grant_modal) == true)
   end
 
   @impl true
@@ -744,7 +833,40 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   end
 
   @impl true
-  def handle_event("reserve-tickets", %{"tier-id" => tier_id}, socket) do
+  def handle_event("close-grant-tickets-modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_grant_modal, false)
+     |> assign(:granting_tier, nil)}
+  end
+
+  @impl true
+  def handle_event("grant-tickets", params, socket) do
+    tier_id = tier_id_from_event_params(params)
+    ticket_tier = Events.get_ticket_tier!(tier_id)
+
+    is_donation =
+      ticket_tier.type == "donation" || ticket_tier.type == :donation
+
+    if is_donation do
+      {:noreply,
+       socket
+       |> YscWeb.Flash.put_toast(
+         :error,
+         "Tickets cannot be granted for donation tiers",
+         title: "Grant Tickets"
+       )}
+    else
+      {:noreply,
+       socket
+       |> assign(:show_grant_modal, true)
+       |> assign(:granting_tier, ticket_tier)}
+    end
+  end
+
+  @impl true
+  def handle_event("reserve-tickets", params, socket) do
+    tier_id = tier_id_from_event_params(params)
     ticket_tier = Events.get_ticket_tier!(tier_id)
 
     # Don't allow reservations for donation tiers
@@ -1017,4 +1139,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
       true -> "bg-blue-600"
     end
   end
+
+  defp tier_id_from_event_params(%{"id" => id}), do: id
+  defp tier_id_from_event_params(%{"tier-id" => id}), do: id
 end
