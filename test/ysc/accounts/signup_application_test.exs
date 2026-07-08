@@ -332,7 +332,10 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
       refute changeset.valid?
-      assert "must be accepted" in errors_on(changeset).agreed_to_bylaws
+
+      assert "Please check the box to confirm you agree to the bylaws" in errors_on(
+               changeset
+             ).agreed_to_bylaws
     end
 
     test "rejects missing agreed_to_bylaws" do
@@ -342,7 +345,10 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
       refute changeset.valid?
-      assert "must be accepted" in errors_on(changeset).agreed_to_bylaws
+
+      assert "Please check the box to confirm you agree to the bylaws" in errors_on(
+               changeset
+             ).agreed_to_bylaws
     end
 
     test "rejects agreed_to_bylaws = nil" do
@@ -352,7 +358,10 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         SignupApplication.application_changeset(%SignupApplication{}, attrs)
 
       refute changeset.valid?
-      assert "must be accepted" in errors_on(changeset).agreed_to_bylaws
+
+      assert "Please check the box to confirm you agree to the bylaws" in errors_on(
+               changeset
+             ).agreed_to_bylaws
     end
   end
 

@@ -957,13 +957,21 @@ defmodule YscWeb.EventDetailsLive do
                           <.icon
                             name="hero-exclamation-circle"
                             class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
-                          /> Member tickets require an active YSC membership.
+                          />
+                          <%= cond do %>
+                            <% @current_user.state == :pending_approval -> %>
+                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                            <% @had_membership? -> %>
+                              Member tickets require an active paid membership. Your membership has expired — renew on your membership page.
+                            <% true -> %>
+                              Member tickets require an active paid membership. Visit your membership page to pay dues or activate your membership.
+                          <% end %>
                         </p>
                         <.link
                           navigate={~p"/users/membership"}
                           class="inline-flex items-center justify-center gap-1 text-sm font-semibold text-orange-900 underline underline-offset-2"
                         >
-                          View membership status
+                          View membership and payment options
                           <.icon name="hero-arrow-right" class="w-4 h-4" />
                         </.link>
                       </div>
@@ -1504,7 +1512,7 @@ defmodule YscWeb.EventDetailsLive do
                         class="text-zinc-600 w-5 h-5 me-1"
                       />
                       <p class="text-sm text-zinc-600">
-                        A donation is not a ticket to the event
+                        This is a voluntary donation, not event admission. Donating does not reserve a seat or ticket.
                       </p>
                     </div>
                   <% else %>
@@ -1883,22 +1891,27 @@ defmodule YscWeb.EventDetailsLive do
           <!-- Normal Payment Flow -->
         <!-- Sticky Timer Banner at Top -->
           <div class="sticky top-0 z-10 bg-blue-50 border-b border-blue-200 -mx-6 -mt-2 px-6 pt-3 pb-3 mb-6">
-            <div class="flex items-center justify-center space-x-2">
-              <.icon name="hero-clock" class="w-5 h-5 text-blue-600" />
-              <span class="text-sm font-medium text-blue-800">
-                Time remaining to complete purchase:
-              </span>
-              <div
-                id="checkout-timer"
-                class="font-bold text-blue-900"
-                phx-hook="Countdown"
-                phx-update="ignore"
-                data-expires-at={@ticket_order.expires_at}
-                data-expire-event="checkout-expired"
-                data-expire-text="Time expired"
-                data-color-self
-              >
+            <div class="flex flex-col items-center gap-1">
+              <div class="flex items-center justify-center space-x-2">
+                <.icon name="hero-clock" class="w-5 h-5 text-blue-600" />
+                <span class="text-sm font-medium text-blue-800">
+                  Time remaining to complete purchase:
+                </span>
+                <div
+                  id="checkout-timer"
+                  class="font-bold text-blue-900"
+                  phx-hook="Countdown"
+                  phx-update="ignore"
+                  data-expires-at={@ticket_order.expires_at}
+                  data-expire-event="checkout-expired"
+                  data-expire-text="Time expired"
+                  data-color-self
+                >
+                </div>
               </div>
+              <p class="text-xs text-blue-700 text-center max-w-md">
+                Complete payment before the timer expires. Unpaid reservations are released so others can buy tickets.
+              </p>
             </div>
           </div>
 

@@ -10,6 +10,7 @@ defmodule YscWeb.EventDetailsLiveTest do
   import EventDetailsLiveHelpers
 
   alias Ysc.Repo
+  alias Ysc.Subscriptions
 
   setup :verify_on_exit!
 
@@ -282,12 +283,13 @@ defmodule YscWeb.EventDetailsLiveTest do
       render_async(view)
 
       assert html =~ event.title
-      assert html =~ "Member tickets require an active YSC membership"
+      assert html =~ "Member tickets require an active paid membership"
+      assert html =~ "pay dues or activate your membership"
 
       assert has_element?(
                view,
                ~s(a[href="/users/membership"]),
-               "View membership status"
+               "View membership and payment options"
              )
 
       assert has_element?(
@@ -296,6 +298,46 @@ defmodule YscWeb.EventDetailsLiveTest do
                "View Membership"
              )
 
+      refute has_element?(view, "button", "Get Tickets")
+    end
+
+    test "shows board-review copy for pending approval users", %{conn: conn} do
+      user = user_with_membership(:none, %{state: :pending_approval})
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 2, state: :upcoming)
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert html =~ "Your application is under board review"
+      assert html =~ "dues may still be required"
+      refute html =~ "membership has expired"
+      refute has_element?(view, "button", "Get Tickets")
+    end
+
+    test "shows expired-membership copy for users with lapsed subscriptions", %{
+      conn: conn
+    } do
+      user = user_with_membership(:none, %{state: :active})
+
+      {:ok, _expired_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_expired_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Expired Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      conn = log_in_user(conn, user)
+      event = event_with_tickets(tier_count: 2, state: :upcoming)
+
+      {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+      render_async(view)
+
+      assert html =~ "Your membership has expired"
+      assert html =~ "renew on your membership page"
+      refute html =~ "pay dues or activate your membership"
       refute has_element?(view, "button", "Get Tickets")
     end
   end
