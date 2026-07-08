@@ -957,7 +957,8 @@ defmodule YscWeb.EventDetailsLive do
                           <.icon
                             name="hero-exclamation-circle"
                             class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
-                          /> Member tickets require an active paid membership. If your application is still under review, you can buy tickets after approval. If you're already approved, check your membership page to pay dues or renew.
+                          />
+                          Member tickets require an active paid membership. If your application is still under review, you can buy tickets after approval. If you're already approved, check your membership page to pay dues or renew.
                         </p>
                         <.link
                           navigate={~p"/users/membership"}

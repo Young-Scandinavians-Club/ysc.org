@@ -262,7 +262,9 @@ defmodule Ysc.Accounts.SignupApplication do
 
   defp validate_agreed_to_bylaws(changeset) do
     case get_change(changeset, :agreed_to_bylaws) do
-      true -> changeset
+      true ->
+        changeset
+
       _ ->
         add_error(
           changeset,

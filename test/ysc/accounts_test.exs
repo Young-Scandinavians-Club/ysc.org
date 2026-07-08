@@ -1511,7 +1511,12 @@ defmodule Ysc.AccountsTest do
         })
 
       refute changeset.valid?
-      assert %{agreed_to_bylaws: ["Please check the box to confirm you agree to the bylaws"]} =
+
+      assert %{
+               agreed_to_bylaws: [
+                 "Please check the box to confirm you agree to the bylaws"
+               ]
+             } =
                errors_on(changeset)
     end
 
