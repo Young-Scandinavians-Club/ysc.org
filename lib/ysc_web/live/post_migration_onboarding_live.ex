@@ -295,7 +295,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Choose Your Membership Type
         <:subtitle>
-          Please confirm whether you have a single or family membership so we can set up billing correctly.
+          We couldn't find a membership type on record. Please confirm whether you have a single or family membership so we can set up billing and family access correctly.
         </:subtitle>
       </.header>
 

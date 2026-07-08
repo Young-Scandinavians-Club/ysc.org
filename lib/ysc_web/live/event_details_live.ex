@@ -958,7 +958,14 @@ defmodule YscWeb.EventDetailsLive do
                             name="hero-exclamation-circle"
                             class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
                           />
-                          Member tickets require an active paid membership. If your application is still under review, you can buy tickets after approval. If you're already approved, check your membership page to pay dues or renew.
+                          <%= cond do %>
+                            <% @current_user.state == :pending_approval -> %>
+                              Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
+                            <% @current_membership != nil -> %>
+                              Member tickets require an active paid membership. Your membership has expired — renew on your membership page.
+                            <% true -> %>
+                              Member tickets require an active paid membership. Visit your membership page to pay dues or activate your membership.
+                          <% end %>
                         </p>
                         <.link
                           navigate={~p"/users/membership"}
@@ -1903,7 +1910,7 @@ defmodule YscWeb.EventDetailsLive do
                 </div>
               </div>
               <p class="text-xs text-blue-700 text-center max-w-md">
-                Complete payment within 30 minutes. After that, your reserved tickets are released so others can buy them.
+                Complete payment before the timer expires. Unpaid reservations are released so others can buy tickets.
               </p>
             </div>
           </div>
