@@ -173,9 +173,12 @@ export default RadarMap = {
             return;
         }
 
+        const cooperativeGestures = this.el.dataset.cooperativeGestures !== "false";
+
         map = window.Radar.ui.map({
             container: elementID,
             transformRequest: radarGlyphTransformRequest,
+            cooperativeGestures,
         });
 
         this._radarMap = map;
