@@ -87,7 +87,7 @@ defmodule Ysc.Accounts.UserNotifierTest do
 
       assert job
       assert job.args["recipient"] == user.email
-      assert job.args["subject"] == "New login to Young Scandinavians Club"
+      assert job.args["subject"] == "New Sign-In to Your YSC Account"
       assert job.args["template"] == "new_sign_in_detected"
       assert job.args["params"]["auth_event_id"] == auth_event.id
       assert job.args["text_body"] == ""

@@ -165,7 +165,7 @@ defmodule Ysc.Accounts.UserNotifier do
     Notifier.schedule_email(
       user.email,
       "new_sign_in_#{user.id}_#{auth_event.id}",
-      "New login to Young Scandinavians Club",
+      "New Sign-In to Your YSC Account",
       "new_sign_in_detected",
       %{auth_event_id: auth_event.id},
       "",

@@ -11,7 +11,6 @@ defmodule Ysc.Accounts.AuthService do
   @unfamiliar_sign_in_indicators ["new_device", "unusual_location"]
   # Match session token lifetime so returning users on the same device are not
   # flagged after a long-lived session expires (sessions last up to 60 days).
-  @login_history_window_days UserToken.session_validity_in_days()
 
   @doc """
   Logs a successful login attempt.
@@ -320,14 +319,18 @@ defmodule Ysc.Accounts.AuthService do
   defp ip_family_key(_auth_event), do: :unknown
 
   defp recent_successful_login_events_query(auth_event) do
+    window_days = login_history_window_days()
+
     from(ae in AuthEvent,
       where: ae.user_id == ^auth_event.user_id,
       where: ae.id != ^auth_event.id,
       where: ae.event_type == "login_success",
       where: ae.success == true,
-      where: ae.inserted_at > ago(^@login_history_window_days, "day")
+      where: ae.inserted_at > ago(^window_days, "day")
     )
   end
+
+  defp login_history_window_days, do: UserToken.session_validity_in_days()
 
   defp device_fingerprint(%{
          device_type: device_type,
@@ -743,12 +746,14 @@ defmodule Ysc.Accounts.AuthService do
     user_id = Fixtures.user().id
     excluded_auth_event_id = Fixtures.ulid()
 
+    window_days = login_history_window_days()
+
     from(ae in AuthEvent,
       where: ae.user_id == ^user_id,
       where: ae.id != ^excluded_auth_event_id,
       where: ae.event_type == "login_success",
       where: ae.success == true,
-      where: ae.inserted_at > ago(^@login_history_window_days, "day")
+      where: ae.inserted_at > ago(^window_days, "day")
     )
   end
 end

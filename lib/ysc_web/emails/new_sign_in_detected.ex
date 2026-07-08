@@ -1,8 +1,8 @@
 defmodule YscWeb.Emails.NewSignInDetected do
   @moduledoc """
-  Email template for unfamiliar login notification.
+  Email template for unfamiliar sign-in notification.
 
-  Alerts users when a login happens from a new device or browser.
+  Alerts users when a sign-in happens from a new device or browser.
   """
   use MjmlEEx,
     mjml_template: "templates/new_sign_in_detected.mjml.eex",
@@ -30,7 +30,7 @@ defmodule YscWeb.Emails.NewSignInDetected do
   end
 
   @doc """
-  Plain-text body for the unfamiliar login notification.
+  Plain-text body for the unfamiliar sign-in notification.
   """
   def text_body(%{
         first_name: first_name,
@@ -54,7 +54,7 @@ defmodule YscWeb.Emails.NewSignInDetected do
     Go to your security settings for a list of your recent sign-ins and active sessions:
     #{security_url}
 
-    If you didn't make this login or don't recognize this activity, sign out unfamiliar sessions from your security settings and contact us at info@ysc.org.
+    If you didn't sign in or don't recognize this activity, sign out unfamiliar sessions from your security settings and contact us at info@ysc.org.
 
     ==============================
     """
@@ -77,20 +77,20 @@ defmodule YscWeb.Emails.NewSignInDetected do
 
     cond do
       new_device? and unusual_location? ->
-        "We noticed a login to Young Scandinavians Club from a new device or location."
+        "We noticed a sign-in to Young Scandinavians Club from a new device or location."
 
       new_device? ->
-        "We noticed a login to Young Scandinavians Club from a new device or browser."
+        "We noticed a sign-in to Young Scandinavians Club from a new device or browser."
 
       unusual_location? ->
-        "We noticed a login to Young Scandinavians Club from a new location."
+        "We noticed a sign-in to Young Scandinavians Club from a new location."
 
       true ->
-        "We noticed a login to Young Scandinavians Club."
+        "We noticed a sign-in to Young Scandinavians Club."
     end
   end
 
   defp intro_text(_auth_event) do
-    "We noticed a login to Young Scandinavians Club."
+    "We noticed a sign-in to Young Scandinavians Club."
   end
 end

@@ -32,7 +32,7 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
       assert is_binary(assigns.signed_in_at)
 
       assert assigns.intro_text ==
-               "We noticed a login to Young Scandinavians Club from a new device or browser."
+               "We noticed a sign-in to Young Scandinavians Club from a new device or browser."
     end
 
     test "falls back to IP when geo has not been resolved yet" do
@@ -52,7 +52,7 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
       assert assigns.location == "203.0.113.1"
 
       assert assigns.intro_text ==
-               "We noticed a login to Young Scandinavians Club from a new location."
+               "We noticed a sign-in to Young Scandinavians Club from a new location."
     end
 
     test "returns error when auth event is missing" do
@@ -69,7 +69,7 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
         NewSignInDetected.text_body(%{
           first_name: "Ada",
           intro_text:
-            "We noticed a login to Young Scandinavians Club from a new location.",
+            "We noticed a sign-in to Young Scandinavians Club from a new location.",
           signed_in_at: "Jan 1, 2026 at 9:00 AM PST",
           device: "Chrome on macOS",
           location: "Stockholm, Stockholm, SE (24.206.103.29)",

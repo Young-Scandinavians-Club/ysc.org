@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>New login to Young Scandinavians Club</strong>
+      <strong>New sign-in to Young Scandinavians Club</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -23,7 +23,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-button href="<%= @security_url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px"> Security settings → </mj-button>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you didn't make this login or don't recognize this activity, sign out unfamiliar sessions from your security settings and contact us at <a href="mailto:info@ysc.org" style="color: #1447e6;">info@ysc.org</a>.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">If you didn't sign in or don't recognize this activity, sign out unfamiliar sessions from your security settings and contact us at <a href="mailto:info@ysc.org" style="color: #1447e6;">info@ysc.org</a>.</mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Skål! 🍻</mj-text>
     <mj-spacer height="24px"></mj-spacer>
