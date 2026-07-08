@@ -13,7 +13,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
         Grant Tickets
         <:subtitle>
           Immediately assign confirmed tickets to a member (e.g. migration from a legacy system).
-          To revoke a mistaken grant, cancel the ticket order from Admin → Money.
+          Double-check the member and quantity before granting; complimentary orders cannot be revoked from this screen.
         </:subtitle>
       </.header>
 
@@ -132,17 +132,25 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
         _ -> assigns[:ticket_tier_id]
       end
 
-    {:ok,
-     socket
-     |> assign(assigns)
-     |> assign(:ticket_tier_id, ticket_tier_id)
-     |> assign(
-       :form,
-       to_form(default_form_params(ticket_tier_id), as: "ticket_grant")
-     )
-     |> assign(:selected_user, nil)
-     |> assign(:user_search, "")
-     |> assign(:user_search_results, [])}
+    socket =
+      socket
+      |> assign(assigns)
+      |> assign(:ticket_tier_id, ticket_tier_id)
+
+    if socket.assigns[:initialized?] do
+      {:ok, socket}
+    else
+      {:ok,
+       socket
+       |> assign(:initialized?, true)
+       |> assign(
+         :form,
+         to_form(default_form_params(ticket_tier_id), as: "ticket_grant")
+       )
+       |> assign(:selected_user, nil)
+       |> assign(:user_search, "")
+       |> assign(:user_search_results, [])}
+    end
   end
 
   @impl true
@@ -194,8 +202,8 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     merged = merge_form_params(socket, params)
     user_id = merged["user_id"]
     quantity = parse_quantity(merged["quantity"])
-    skip_capacity? = merged["skip_capacity"] == "true"
-    skip_email? = merged["send_email"] != "true"
+    skip_capacity? = checkbox_enabled?(merged["skip_capacity"])
+    skip_email? = not checkbox_enabled?(merged["send_email"])
     notes = blank_to_nil(merged["admin_grant_notes"])
 
     cond do
@@ -300,6 +308,10 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
 
+  defp checkbox_enabled?(value) do
+    Phoenix.HTML.Form.normalize_value("checkbox", value) == "true"
+  end
+
   defp grant_error_message(:user_not_found), do: "Member not found."
   defp grant_error_message(:event_not_found), do: "Event not found."
 
@@ -318,6 +330,13 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   defp grant_error_message(:insufficient_capacity),
     do: "Not enough tickets available in this tier."
+
+  defp grant_error_message(:tier_validation_failed),
+    do: "Not enough tickets available in this tier."
+
+  defp grant_error_message(:incomplete_member_profile),
+    do:
+      "This member's profile is missing a name or email required for registration tiers. Update their profile first."
 
   defp grant_error_message(:event_capacity_exceeded),
     do: "Event capacity would be exceeded."

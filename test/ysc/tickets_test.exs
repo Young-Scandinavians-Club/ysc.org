@@ -1481,6 +1481,32 @@ defmodule Ysc.TicketsTest do
       assert detail.email == user.email
     end
 
+    test "rejects registration tiers when member profile is incomplete", %{
+      admin: admin,
+      event: event
+    } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Registered GA",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 10,
+          requires_registration: true,
+          event_id: event.id
+        })
+
+      member = user_fixture_unique()
+
+      member
+      |> Ecto.Changeset.change(%{first_name: nil, last_name: nil})
+      |> Ysc.Repo.update!()
+
+      assert {:error, :incomplete_member_profile} =
+               Tickets.grant_admin_tickets(admin.id, member.id, event.id, %{
+                 tier.id => 1
+               })
+    end
+
     test "skip_email prevents confirmation email scheduling", %{
       admin: admin,
       user: user,

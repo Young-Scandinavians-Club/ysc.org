@@ -86,19 +86,32 @@ defmodule Ysc.Tickets.BookingLocker do
   """
   def validate_fulfillment_capacity(user_id, event_id, ticket_selections) do
     Repo.transaction(fn ->
-      with {:ok, event} <- lock_and_validate_event(event_id),
-           {:ok, tiers} <-
-             lock_and_validate_tiers(event_id, ticket_selections, user_id),
-           :ok <-
-             validate_event_capacity(event, tiers, ticket_selections, user_id) do
-        :ok
-      else
+      case validate_fulfillment_capacity_locked(
+             user_id,
+             event_id,
+             ticket_selections
+           ) do
+        :ok -> :ok
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
     |> case do
       {:ok, :ok} -> :ok
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Validates fulfillment capacity with row locks.
+
+  Must be called inside an existing `Repo.transaction/1` so locks are held until
+  the caller commits (e.g. admin grants inserting confirmed tickets).
+  """
+  def validate_fulfillment_capacity_locked(user_id, event_id, ticket_selections) do
+    with {:ok, event} <- lock_and_validate_event(event_id),
+         {:ok, tiers} <-
+           lock_and_validate_tiers(event_id, ticket_selections, user_id) do
+      validate_event_capacity(event, tiers, ticket_selections, user_id)
     end
   end
 

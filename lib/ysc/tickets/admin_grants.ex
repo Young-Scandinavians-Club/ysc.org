@@ -58,6 +58,7 @@ defmodule Ysc.Tickets.AdminGrants do
       with {:ok, user} <- fetch_user(user_id),
            {:ok, event} <- fetch_grantable_event(event_id),
            {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
+           :ok <- validate_recipient_for_registration_tiers(user, tiers),
            :ok <-
              maybe_validate_capacity(
                user_id,
@@ -71,7 +72,8 @@ defmodule Ysc.Tickets.AdminGrants do
           event,
           tiers,
           ticket_selections,
-          admin_grant_notes
+          admin_grant_notes,
+          skip_capacity?
         )
       end
 
@@ -182,13 +184,57 @@ defmodule Ysc.Tickets.AdminGrants do
     end
   end
 
+  defp maybe_validate_capacity_in_transaction(
+         _user_id,
+         _event_id,
+         _ticket_selections,
+         true
+       ),
+       do: :ok
+
+  defp maybe_validate_capacity_in_transaction(
+         user_id,
+         event_id,
+         ticket_selections,
+         false
+       ) do
+    case BookingLocker.validate_fulfillment_capacity_locked(
+           user_id,
+           event_id,
+           ticket_selections
+         ) do
+      :ok -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp validate_recipient_for_registration_tiers(user, tiers) do
+    if Enum.any?(tiers, & &1.requires_registration) and
+         not registration_profile_complete?(user) do
+      {:error, :incomplete_member_profile}
+    else
+      :ok
+    end
+  end
+
+  defp registration_profile_complete?(user) do
+    present?(user.first_name) and present?(user.last_name) and
+      present?(user.email)
+  end
+
+  defp present?(nil), do: false
+  defp present?(""), do: false
+  defp present?(value) when is_binary(value), do: String.trim(value) != ""
+  defp present?(_), do: false
+
   defp insert_grant_transaction(
          granted_by_id,
          user,
          event,
          tiers,
          ticket_selections,
-         admin_grant_notes
+         admin_grant_notes,
+         skip_capacity?
        ) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     expires_at = grant_expires_at(event, now)
@@ -206,7 +252,14 @@ defmodule Ysc.Tickets.AdminGrants do
         admin_grant_notes: admin_grant_notes
       }
 
-      with {:ok, ticket_order} <- insert_ticket_order(order_attrs),
+      with :ok <-
+             maybe_validate_capacity_in_transaction(
+               user.id,
+               event.id,
+               ticket_selections,
+               skip_capacity?
+             ),
+           {:ok, ticket_order} <- insert_ticket_order(order_attrs),
            {:ok, tickets} <-
              insert_tickets_for_selections(
                ticket_order,
