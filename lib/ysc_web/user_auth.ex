@@ -484,9 +484,28 @@ defmodule YscWeb.UserAuth do
         end
       end)
 
+    socket =
+      Phoenix.Component.assign_new(socket, :had_membership?, fn ->
+        case socket.assigns.current_user do
+          nil -> false
+          user -> had_membership?(user)
+        end
+      end)
+
     Phoenix.Component.assign_new(socket, :active_membership?, fn ->
       socket.assigns.current_membership != nil
     end)
+  end
+
+  defp had_membership?(user) do
+    user_to_check =
+      if Accounts.sub_account?(user) do
+        Accounts.get_primary_user(user) || user
+      else
+        user
+      end
+
+    Subscriptions.list_subscriptions(user_to_check) != []
   end
 
   @doc """
