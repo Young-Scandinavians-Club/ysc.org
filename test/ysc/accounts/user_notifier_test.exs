@@ -68,4 +68,34 @@ defmodule Ysc.Accounts.UserNotifierTest do
       assert job.args["user_id"] == user.id
     end
   end
+
+  describe "deliver_new_sign_in_detected_notification/2" do
+    test "schedules email with correct parameters" do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        Ysc.Accounts.AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS",
+          metadata: %{"auth_method" => "passkey"}
+        })
+        |> Ysc.Repo.insert()
+
+      job =
+        UserNotifier.deliver_new_sign_in_detected_notification(user, auth_event)
+
+      assert job
+      assert job.args["recipient"] == user.email
+      assert job.args["subject"] == "New Sign-In to Your YSC Account"
+      assert job.args["template"] == "new_sign_in_detected"
+      assert job.args["params"]["auth_event_id"] == auth_event.id
+      assert job.args["text_body"] == ""
+
+      assert job.args["idempotency_key"] ==
+               "new_sign_in_#{user.id}_#{auth_event.id}"
+
+      assert job.args["user_id"] == user.id
+    end
+  end
 end

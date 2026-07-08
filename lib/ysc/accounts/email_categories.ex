@@ -31,6 +31,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "reset_password" => :account,
     "password_changed" => :account,
     "passkey_added" => :account,
+    "new_sign_in_detected" => :account,
     "change_email" => :account,
     "email_changed" => :account,
     "application_submitted" => :account,
