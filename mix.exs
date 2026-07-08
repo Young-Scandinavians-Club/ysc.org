@@ -18,6 +18,7 @@ defmodule Ysc.MixProject do
         list_unused_filters: true
       ],
       # cowlib 2.18.0 has open EEF advisories; no patched Hex release yet. Revisit by 2026-07-22.
+      # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
           "EEF-CVE-2026-43966",

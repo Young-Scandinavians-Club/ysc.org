@@ -376,8 +376,9 @@ Verify: `make query-explain-staged` or `mix ci.query_explain.suggest`. Full guid
 
 ### System dependencies (pre-installed in environment)
 
-- **Erlang/OTP 27–28** (see `.tool-versions`; CI uses OTP 27.3)
-- **Elixir 1.20.0** (see `.tool-versions`; use `asdf install` or the [official release](https://github.com/elixir-lang/elixir/releases/tag/v1.20.0))
+- **Erlang/OTP 27–28** (see `.tool-versions`; CI uses the same `.tool-versions` as local dev)
+- **Elixir 1.20.2** (see `.tool-versions`; use `asdf install` or the [official release](https://github.com/elixir-lang/elixir/releases/tag/v1.20.2))
+- **Hex 2.5.1-dev** (via `etc/scripts/install_hex.sh`; needed for `mix hex.audit` advisory ignores until Hex 2.5.1 ships on hex.pm)
 - **Docker** with `docker compose` (fuse-overlayfs storage driver, iptables-legacy)
 - **shellcheck** and **shfmt** (for shell script linting)
 - **inotify-tools** (for Phoenix live reload file watching)
@@ -394,7 +395,7 @@ Verify: `make query-explain-staged` or `mix ci.query_explain.suggest`. Full guid
 - The `make dev` target calls `etc/scripts/check_dev_prerequisites.sh` which uses `tput` for coloring; if this fails in a non-TTY context, run `mix phx.server` directly with `.env` sourced
 - Test suite runs with `MIX_ENV=test mix test` (7256 tests); no external services needed beyond PostgreSQL
 - Docker containers must be started with `sudo docker compose` since the daemon runs as root in this environment
-- `.tool-versions` specifies `elixir 1.20.0-otp-28` and `erlang 28.3`; CI pins Elixir `1.20.0` with OTP `27.3`
+- `.tool-versions` specifies `elixir 1.20.2-otp-28` and `erlang 28.3`; production Docker uses Elixir 1.20.2 on OTP 27.3
 - Custom Credo checks live in `dev/ysc/credo/` and are compiled via `elixirc_paths` in dev/test
 - Lint: `mix format --check-formatted && mix credo --all` plus `shellcheck` and `shfmt -d -i 2 -ci` on shell scripts (see Makefile `lint` target)
 - The seeded admin account is `admin@ysc.org` / `very_secure_password`

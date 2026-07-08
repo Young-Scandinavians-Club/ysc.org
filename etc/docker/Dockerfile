@@ -1,10 +1,10 @@
 # ===============================================
 # Stage 1: Build the Elixir/Phoenix application
 # ===============================================
-# Official library/elixir has no 1.20-alpine tag; pin hexpm image (Elixir 1.20.0, OTP 27.3.x, Alpine 3.22).
-# Use 1.20.0 (not the floating 1.20 tag): ~> 1.20 in mix.exs rejects 1.20.0-rc.*.
+# Official library/elixir has no 1.20-alpine tag; pin hexpm image (Elixir 1.20.2, OTP 27.3.x, Alpine 3.22).
+# Use 1.20.2 (not the floating 1.20 tag): ~> 1.20 in mix.exs rejects 1.20.0-rc.*.
 # Digest pins the multi-arch manifest (linux/amd64 + linux/arm64) for reproducible builds.
-FROM hexpm/elixir:1.20.0-erlang-27.3.4.12-alpine-3.22.4@sha256:0142389d05943ff609e4ec814a038c2a4368011805cf52596a235bee7dac35d5 AS builder
+FROM hexpm/elixir:1.20.2-erlang-27.3.4.14-alpine-3.22.5@sha256:6bb74368bbf64a2119c21583c8d5e48deb0fef6ee7a63d7bfc36d5bc9c69384a AS builder
 
 # Install build dependencies
 # ffmpeg is required during asset compilation (mix assets.deploy)
@@ -26,8 +26,10 @@ ARG BUILD_VERSION
 
 WORKDIR /app
 
-# Install hex + rebar
-RUN mix local.hex --force && \
+# Install hex + rebar (Hex 2.5.1-dev until ignore_advisories ships on hex.pm)
+COPY etc/scripts/install_hex.sh etc/scripts/install_hex.sh
+RUN chmod +x etc/scripts/install_hex.sh && \
+    sh etc/scripts/install_hex.sh && \
     mix local.rebar --force
 
 # Install mix dependencies
