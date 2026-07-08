@@ -746,7 +746,9 @@ defmodule Ysc.BookingsTest do
       results = Bookings.list_rooms_by_ids([room1.id, room2.id])
 
       assert length(results) == 2
-      assert MapSet.new(Enum.map(results, & &1.id)) == MapSet.new([room1.id, room2.id])
+
+      assert MapSet.new(Enum.map(results, & &1.id)) ==
+               MapSet.new([room1.id, room2.id])
     end
 
     test "list_rooms_by_ids/1 returns empty list for empty input" do
