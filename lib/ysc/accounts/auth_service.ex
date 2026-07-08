@@ -297,9 +297,17 @@ defmodule Ysc.Accounts.AuthService do
     case geo_location_key(auth_event) do
       geo when is_tuple(geo) ->
         Enum.any?(recent_events, fn event ->
-          geo_location_key(event) == geo or
-            same_ip?(auth_event, event) or
-            ip_family_key(event) == ip_family_key(auth_event)
+          case geo_location_key(event) do
+            ^geo ->
+              true
+
+            nil ->
+              same_ip?(auth_event, event) or
+                ip_family_key(event) == ip_family_key(auth_event)
+
+            _ ->
+              same_ip?(auth_event, event)
+          end
         end)
 
       nil ->
