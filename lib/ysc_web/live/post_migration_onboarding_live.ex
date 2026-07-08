@@ -511,7 +511,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set Up Renewal Payment
           <:subtitle>
-            Add a card or bank account so your membership can renew automatically each year. You won't be charged today — we'll only charge when your membership renews. You can skip for now and add a payment method later in account settings.
+            Add a card or bank account so your membership can renew automatically each year. You won't be charged today unless your renewal date has passed. You can skip for now and add a payment method later in account settings.
           </:subtitle>
         </.header>
 
