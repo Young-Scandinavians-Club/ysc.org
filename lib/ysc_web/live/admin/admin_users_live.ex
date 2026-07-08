@@ -13,7 +13,7 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Customers
   alias Ysc.Payments
   alias Ysc.Subscriptions
-  alias YscWeb.AdminBadgeHelpers
+  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers}
 
   def render(assigns) do
     ~H"""
@@ -135,7 +135,9 @@ defmodule YscWeb.AdminUsersLive do
                     Timex.from_now(@selected_user_application.completed)
                 else
                   "Reviewed " <>
-                    format_utc_date(@selected_user_application.reviewed_at) <>
+                    DateTimeDisplay.format_utc_date(
+                      @selected_user_application.reviewed_at
+                    ) <>
                     " by " <> @selected_user_application.reviewed_by.email
                 end}
               </p>
@@ -1342,15 +1344,6 @@ defmodule YscWeb.AdminUsersLive do
   end
 
   defp list_params_for_back(_), do: %{}
-
-  defp format_utc_date(%DateTime{} = dt) do
-    dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_date()
-    |> Calendar.strftime("%b %d, %Y")
-  end
-
-  defp format_utc_date(_), do: "—"
 
   # Attempts to auto-activate a membership by charging the user's saved payment method.
   # Returns true if the subscription was successfully created, false otherwise.
