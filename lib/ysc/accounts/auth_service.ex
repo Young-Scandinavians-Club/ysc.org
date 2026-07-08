@@ -5,11 +5,13 @@ defmodule Ysc.Accounts.AuthService do
 
   import Ecto.Query
   import Plug.Conn
-  alias Ysc.Accounts.{AuthEvent, User, UserNotifier}
+  alias Ysc.Accounts.{AuthEvent, User, UserNotifier, UserToken}
   alias Ysc.Repo
 
   @unfamiliar_sign_in_indicators ["new_device", "unusual_location"]
-  @login_history_window_days 30
+  # Match session token lifetime so returning users on the same device are not
+  # flagged after a long-lived session expires (sessions last up to 60 days).
+  @login_history_window_days UserToken.session_validity_in_days()
 
   @doc """
   Logs a successful login attempt.
@@ -206,9 +208,7 @@ defmodule Ysc.Accounts.AuthService do
 
     threat_indicators =
       if auth_event.user_id do
-        threat_indicators
-        |> maybe_add_new_device_indicator(auth_event)
-        |> maybe_add_unusual_location_indicator(auth_event)
+        add_unfamiliar_sign_in_indicators(threat_indicators, auth_event)
       else
         threat_indicators
       end
@@ -247,15 +247,28 @@ defmodule Ysc.Accounts.AuthService do
     :ok
   end
 
-  defp maybe_add_new_device_indicator(threat_indicators, auth_event) do
+  defp add_unfamiliar_sign_in_indicators(threat_indicators, auth_event) do
+    recent_events =
+      auth_event
+      |> recent_successful_login_events_query()
+      |> Repo.all()
+
+    threat_indicators
+    |> maybe_add_new_device_indicator(auth_event, recent_events)
+    |> maybe_add_unusual_location_indicator(auth_event, recent_events)
+  end
+
+  defp maybe_add_new_device_indicator(
+         threat_indicators,
+         auth_event,
+         recent_events
+       ) do
     fingerprint = device_fingerprint(auth_event)
 
     known_fingerprints =
-      recent_successful_login_events_query(auth_event)
-      |> select([ae], {ae.device_type, ae.browser, ae.operating_system})
-      |> distinct(true)
-      |> Repo.all()
+      recent_events
       |> Enum.map(&device_fingerprint/1)
+      |> Enum.uniq()
 
     if fingerprint in known_fingerprints do
       threat_indicators
@@ -264,12 +277,15 @@ defmodule Ysc.Accounts.AuthService do
     end
   end
 
-  defp maybe_add_unusual_location_indicator(threat_indicators, auth_event) do
+  defp maybe_add_unusual_location_indicator(
+         threat_indicators,
+         auth_event,
+         recent_events
+       ) do
     current_keys = location_keys(auth_event)
 
     known_keys =
-      recent_successful_login_events_query(auth_event)
-      |> Repo.all()
+      recent_events
       |> Enum.flat_map(&location_keys/1)
       |> Enum.uniq()
 
@@ -288,11 +304,6 @@ defmodule Ysc.Accounts.AuthService do
       where: ae.success == true,
       where: ae.inserted_at > ago(^@login_history_window_days, "day")
     )
-  end
-
-  defp device_fingerprint({device_type, browser, operating_system}) do
-    {device_type || "unknown", browser || "unknown",
-     operating_system || "unknown"}
   end
 
   defp device_fingerprint(%{
@@ -724,9 +735,7 @@ defmodule Ysc.Accounts.AuthService do
       where: ae.id != ^excluded_auth_event_id,
       where: ae.event_type == "login_success",
       where: ae.success == true,
-      where: ae.inserted_at > ago(30, "day"),
-      select: {ae.device_type, ae.browser, ae.operating_system},
-      distinct: true
+      where: ae.inserted_at > ago(^@login_history_window_days, "day")
     )
   end
 end
