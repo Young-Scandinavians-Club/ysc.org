@@ -215,7 +215,7 @@ defmodule Ysc.Accounts.AuthService do
       end
 
     threat_indicators =
-      if auth_event.user_id do
+      if auth_event.user_id && recent_events != [] do
         threat_indicators
         |> maybe_add_new_device_indicator(auth_event, recent_events)
         |> maybe_add_unusual_location_indicator(auth_event, recent_events)
@@ -296,13 +296,22 @@ defmodule Ysc.Accounts.AuthService do
   defp familiar_location?(auth_event, recent_events) do
     case geo_location_key(auth_event) do
       geo when is_tuple(geo) ->
-        Enum.any?(recent_events, &(geo_location_key(&1) == geo))
+        Enum.any?(recent_events, fn event ->
+          geo_location_key(event) == geo or
+            same_ip?(auth_event, event) or
+            ip_family_key(event) == ip_family_key(auth_event)
+        end)
 
       nil ->
         current_ip_family = ip_family_key(auth_event)
 
         Enum.any?(recent_events, &(ip_family_key(&1) == current_ip_family))
     end
+  end
+
+  defp same_ip?(left, right) do
+    is_binary(left.ip_address) and left.ip_address != "" and
+      left.ip_address == right.ip_address
   end
 
   defp geo_location_key(%{country: country} = auth_event)

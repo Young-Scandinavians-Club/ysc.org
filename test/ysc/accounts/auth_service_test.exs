@@ -417,6 +417,19 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert updated_event != nil
     end
 
+    test "does not flag new_device or unusual_location on first successful sign-in" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+
+      updated_event = Repo.get(AuthEvent, auth_event.id)
+      indicators = updated_event.threat_indicators || []
+
+      refute "new_device" in indicators
+      refute "unusual_location" in indicators
+    end
+
     test "flags new_device when browser fingerprint differs from recent history" do
       user = user_fixture()
       conn = mock_conn()
@@ -436,6 +449,34 @@ defmodule Ysc.Accounts.AuthServiceTest do
       updated_event = Repo.get(AuthEvent, auth_event.id)
       assert "new_device" in updated_event.threat_indicators
       refute "unusual_location" in updated_event.threat_indicators
+    end
+
+    test "does not flag unusual_location when prior login lacked geo but IP matches" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Unknown",
+        operating_system: "Windows",
+        ip_address: "203.0.113.1"
+      })
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Unknown",
+          operating_system: "Windows",
+          device_type: "desktop",
+          country: "US",
+          region: "California",
+          city: "San Francisco"
+        })
+        |> Repo.insert()
+
+      {updated_event, _recent_events} =
+        AuthService.check_suspicious_activity(auth_event)
+
+      refute "unusual_location" in (updated_event.threat_indicators || [])
     end
 
     test "flags unusual_location when geo differs from recent history" do
