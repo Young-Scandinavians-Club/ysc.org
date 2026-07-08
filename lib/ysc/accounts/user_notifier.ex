@@ -155,4 +155,21 @@ defmodule Ysc.Accounts.UserNotifier do
       user.id
     )
   end
+
+  @doc """
+  Deliver unfamiliar sign-in notification to a user.
+
+  Alerts the user when a successful sign-in is detected from a new device or location.
+  """
+  def deliver_new_sign_in_detected_notification(user, auth_event) do
+    Notifier.schedule_email(
+      user.email,
+      "new_sign_in_#{user.id}_#{auth_event.id}",
+      "New Sign-In to Your YSC Account",
+      "new_sign_in_detected",
+      %{auth_event_id: auth_event.id},
+      "",
+      user.id
+    )
+  end
 end

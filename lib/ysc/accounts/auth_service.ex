@@ -5,8 +5,12 @@ defmodule Ysc.Accounts.AuthService do
 
   import Ecto.Query
   import Plug.Conn
-  alias Ysc.Accounts.{AuthEvent, User}
+  alias Ysc.Accounts.{AuthEvent, User, UserNotifier, UserToken}
   alias Ysc.Repo
+
+  @unfamiliar_sign_in_indicators ["new_device", "unusual_location"]
+  # Match session token lifetime so returning users on the same device are not
+  # flagged after a long-lived session expires (sessions last up to 60 days).
 
   @doc """
   Logs a successful login attempt.
@@ -18,8 +22,8 @@ defmodule Ysc.Accounts.AuthService do
     |> Repo.insert()
     |> case do
       {:ok, auth_event} ->
-        # Check for suspicious activity after successful login
-        check_suspicious_activity(auth_event)
+        {auth_event, recent_events} = check_suspicious_activity(auth_event)
+        maybe_notify_unfamiliar_sign_in(user, auth_event, recent_events)
         {:ok, auth_event}
 
       {:error, changeset} ->
@@ -201,40 +205,226 @@ defmodule Ysc.Accounts.AuthService do
         threat_indicators
       end
 
-    # Check for new device (simplified - in production you'd want more sophisticated device fingerprinting)
-    threat_indicators =
+    recent_events =
       if auth_event.user_id do
-        recent_devices =
-          from(ae in AuthEvent,
-            where: ae.user_id == ^auth_event.user_id,
-            where: ae.success == true,
-            where: ae.inserted_at > ago(30, "day"),
-            select: ae.device_type,
-            distinct: true
-          )
-          |> Repo.all()
+        auth_event
+        |> recent_successful_login_events_query()
+        |> Repo.all()
+      else
+        []
+      end
 
-        if auth_event.device_type in recent_devices do
-          threat_indicators
-        else
-          ["new_device" | threat_indicators]
-        end
+    threat_indicators =
+      if auth_event.user_id && recent_events != [] do
+        threat_indicators
+        |> maybe_add_new_device_indicator(auth_event, recent_events)
+        |> maybe_add_unusual_location_indicator(auth_event, recent_events)
       else
         threat_indicators
       end
 
-    if threat_indicators != [] do
-      # Update the auth event with threat indicators
-      auth_event
-      |> Ecto.Changeset.change(%{
-        threat_indicators: threat_indicators,
-        is_suspicious: true,
-        risk_score:
-          AuthEvent.calculate_risk_score(%{
-            threat_indicators: threat_indicators
+    auth_event =
+      if threat_indicators != [] do
+        {:ok, updated_event} =
+          auth_event
+          |> Ecto.Changeset.change(%{
+            threat_indicators: threat_indicators,
+            is_suspicious: true,
+            risk_score:
+              AuthEvent.calculate_risk_score(%{
+                threat_indicators: threat_indicators
+              })
           })
-      })
-      |> Repo.update()
+          |> Repo.update()
+
+        updated_event
+      else
+        auth_event
+      end
+
+    {auth_event, recent_events}
+  end
+
+  @doc false
+  def unfamiliar_sign_in?(auth_event) do
+    indicators = auth_event.threat_indicators || []
+
+    Enum.any?(@unfamiliar_sign_in_indicators, &(&1 in indicators))
+  end
+
+  defp maybe_notify_unfamiliar_sign_in(user, auth_event, recent_events) do
+    # Skip the member's very first successful login — there is no prior activity
+    # to compare against, and registration already establishes the account.
+    if unfamiliar_sign_in?(auth_event) and recent_events != [] do
+      UserNotifier.deliver_new_sign_in_detected_notification(user, auth_event)
+    end
+
+    :ok
+  end
+
+  defp maybe_add_new_device_indicator(
+         threat_indicators,
+         auth_event,
+         recent_events
+       ) do
+    fingerprint = device_fingerprint(auth_event)
+
+    known_fingerprints =
+      recent_events
+      |> Enum.map(&device_fingerprint/1)
+      |> Enum.uniq()
+
+    if fingerprint in known_fingerprints do
+      threat_indicators
+    else
+      ["new_device" | threat_indicators]
+    end
+  end
+
+  defp maybe_add_unusual_location_indicator(
+         threat_indicators,
+         auth_event,
+         recent_events
+       ) do
+    if familiar_location?(auth_event, recent_events) do
+      threat_indicators
+    else
+      ["unusual_location" | threat_indicators]
+    end
+  end
+
+  defp familiar_location?(auth_event, recent_events) do
+    case geo_location_key(auth_event) do
+      geo when is_tuple(geo) ->
+        Enum.any?(recent_events, fn event ->
+          case geo_location_key(event) do
+            ^geo ->
+              true
+
+            nil ->
+              same_ip?(auth_event, event) or
+                ip_family_key(event) == ip_family_key(auth_event)
+
+            _ ->
+              same_ip?(auth_event, event)
+          end
+        end)
+
+      nil ->
+        current_ip_family = ip_family_key(auth_event)
+
+        Enum.any?(recent_events, &(ip_family_key(&1) == current_ip_family))
+    end
+  end
+
+  defp same_ip?(left, right) do
+    is_binary(left.ip_address) and left.ip_address != "" and
+      left.ip_address == right.ip_address
+  end
+
+  defp geo_location_key(%{country: country} = auth_event)
+       when is_binary(country) and country != "" do
+    {country, auth_event.region || "", auth_event.city || ""}
+  end
+
+  defp geo_location_key(_auth_event), do: nil
+
+  defp ip_family_key(%{ip_address: ip}) when is_binary(ip) and ip != "" do
+    {:ip_family, ip_family(ip)}
+  end
+
+  defp ip_family_key(_auth_event), do: :unknown
+
+  defp recent_successful_login_events_query(auth_event) do
+    window_days = login_history_window_days()
+
+    from(ae in AuthEvent,
+      where: ae.user_id == ^auth_event.user_id,
+      where: ae.id != ^auth_event.id,
+      where: ae.event_type == "login_success",
+      where: ae.success == true,
+      where: ae.inserted_at > ago(^window_days, "day")
+    )
+  end
+
+  defp login_history_window_days, do: UserToken.session_validity_in_days()
+
+  defp device_fingerprint(%{
+         device_type: device_type,
+         browser: browser,
+         operating_system: os
+       }) do
+    {device_type || "unknown", browser || "unknown", os || "unknown"}
+  end
+
+  defp ip_family(ip) do
+    parts = String.split(ip, ".")
+
+    if length(parts) == 4 do
+      parts
+      |> Enum.take(2)
+      |> Enum.join(".")
+    else
+      parts = String.split(ip, ":")
+
+      if length(parts) >= 2 do
+        parts
+        |> Enum.take(2)
+        |> Enum.join(":")
+      else
+        ip
+      end
+    end
+  end
+
+  @doc """
+  Loads a successful login auth event for deferred email rendering.
+  """
+  def fetch_auth_event_for_email(user_id, auth_event_id) do
+    from(ae in AuthEvent,
+      where: ae.id == ^auth_event_id,
+      where: ae.user_id == ^user_id,
+      where: ae.event_type == "login_success",
+      where: ae.success == true
+    )
+    |> Repo.one()
+    |> case do
+      %AuthEvent{} = auth_event -> {:ok, auth_event}
+      nil -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Enriches an auth event with geolocation data when it is not already present.
+
+  Safe to call when geo is resolved asynchronously after login: if another process
+  already persisted location fields, this is a no-op.
+  """
+  def enrich_auth_event_geo(%AuthEvent{country: country} = auth_event)
+      when is_binary(country) and country != "" do
+    auth_event
+  end
+
+  def enrich_auth_event_geo(%AuthEvent{ip_address: ip} = auth_event)
+      when is_binary(ip) and ip != "" do
+    case Ysc.GeoIP.lookup(ip) do
+      geo when geo == %{} ->
+        auth_event
+
+      geo ->
+        persist_auth_event_geo(auth_event, geo)
+    end
+  end
+
+  def enrich_auth_event_geo(auth_event), do: auth_event
+
+  defp persist_auth_event_geo(auth_event, geo) do
+    auth_event
+    |> Ecto.Changeset.change(geo)
+    |> Repo.update()
+    |> case do
+      {:ok, updated_event} -> updated_event
+      {:error, _changeset} -> struct(auth_event, geo)
     end
   end
 
@@ -571,13 +761,16 @@ defmodule Ysc.Accounts.AuthService do
     alias Ysc.Ci.QueryExplain.Fixtures
 
     user_id = Fixtures.user().id
+    excluded_auth_event_id = Fixtures.ulid()
+
+    window_days = login_history_window_days()
 
     from(ae in AuthEvent,
       where: ae.user_id == ^user_id,
+      where: ae.id != ^excluded_auth_event_id,
+      where: ae.event_type == "login_success",
       where: ae.success == true,
-      where: ae.inserted_at > ago(30, "day"),
-      select: ae.device_type,
-      distinct: true
+      where: ae.inserted_at > ago(^window_days, "day")
     )
   end
 end

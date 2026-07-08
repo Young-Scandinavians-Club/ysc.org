@@ -1056,8 +1056,18 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       Repo.update!(Ecto.Changeset.change(summer, advance_booking_days: 7))
       Ysc.Bookings.SeasonCache.invalidate_property(:tahoe)
 
+      today = Date.utc_today()
       advance_days = 7
-      checkin = Date.add(Date.utc_today(), advance_days + 3)
+
+      # Pick a Monday far enough out to exceed the advance booking window.
+      checkin =
+        today
+        |> Date.add(advance_days + 7)
+        |> then(fn base ->
+          days_to_monday = rem(8 - Date.day_of_week(base, :monday), 7)
+          Date.add(base, days_to_monday)
+        end)
+
       checkout = Date.add(checkin, 2)
 
       attrs = %{

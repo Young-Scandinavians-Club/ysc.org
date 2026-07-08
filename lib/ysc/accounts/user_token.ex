@@ -18,6 +18,8 @@ defmodule Ysc.Accounts.UserToken do
   @change_email_validity_in_days 7
   @session_validity_in_days 60
 
+  def session_validity_in_days, do: @session_validity_in_days
+
   @primary_key {:id, Ecto.ULID, autogenerate: true}
   @foreign_key_type Ecto.ULID
   @timestamps_opts [type: :utc_datetime]
