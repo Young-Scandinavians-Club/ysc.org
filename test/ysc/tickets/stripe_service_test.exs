@@ -84,7 +84,13 @@ defmodule Ysc.Tickets.StripeServiceTest do
         assert params.currency == "usd"
         # Metadata uses atom keys in the code
         assert params.metadata[:ticket_order_id] == ticket_order.id
-        {:ok, %{id: "pi_test_123", status: "requires_payment_method"}}
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_test_123",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
       end)
 
       assert {:ok, payment_intent} =
@@ -96,7 +102,13 @@ defmodule Ysc.Tickets.StripeServiceTest do
     test "includes customer_id when provided", %{ticket_order: ticket_order} do
       expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         assert params.customer == "cus_test_123"
-        {:ok, %{id: "pi_test_123", status: "requires_payment_method"}}
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_test_123",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
       end)
 
       assert {:ok, _} =
@@ -130,13 +142,69 @@ defmodule Ysc.Tickets.StripeServiceTest do
       expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         assert params.amount == 7500
         assert params.metadata[:ticket_order_id] == order.id
-        {:ok, %{id: "pi_synced_#{order.id}", status: "requires_payment_method"}}
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_synced_#{order.id}",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
       end)
 
       assert {:ok, payment_intent} =
                StripeService.create_payment_intent(order)
 
       assert payment_intent.id == "pi_synced_#{order.id}"
+    end
+
+    test "creates payment intent idempotency key from synced order total", %{
+      ticket_order: ticket_order
+    } do
+      order = Ysc.Tickets.get_ticket_order(ticket_order.id)
+      [%{ticket_tier: tier} | _] = order.tickets
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier, %{price: Money.new(75, :USD)})
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, opts ->
+        synced_cents =
+          Ysc.Tickets.get_ticket_order(order.id).total_amount
+          |> MoneyHelper.money_to_cents()
+
+        assert params.amount == synced_cents
+
+        idempotency_key =
+          opts[:headers]["Idempotency-Key"] ||
+            opts[:headers][:"Idempotency-Key"]
+
+        assert idempotency_key ==
+                 "ticket_order_#{order.reference_id}_#{synced_cents}"
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_repriced_#{order.id}",
+           status: "requires_payment_method",
+           amount: synced_cents
+         }}
+      end)
+
+      assert {:ok, _} = StripeService.create_payment_intent(order)
+    end
+
+    test "rejects stale payment intent amount returned by Stripe", %{
+      ticket_order: ticket_order
+    } do
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_stale_amount_#{System.unique_integer([:positive])}",
+           status: "requires_payment_method",
+           amount: params.amount - 1
+         }}
+      end)
+
+      assert {:error, "Payment initialization failed"} =
+               StripeService.create_payment_intent(ticket_order)
     end
   end
 
