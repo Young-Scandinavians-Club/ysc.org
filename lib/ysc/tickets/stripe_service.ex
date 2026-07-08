@@ -85,7 +85,8 @@ defmodule Ysc.Tickets.StripeService do
 
     # Include amount in the idempotency key so repriced orders get a fresh PI.
     # A reference-only key caused Stripe to return a stale PI after tier repricing.
-    idempotency_key = "ticket_order_#{ticket_order.reference_id}_#{amount_cents}"
+    idempotency_key =
+      "ticket_order_#{ticket_order.reference_id}_#{amount_cents}"
 
     case stripe_client().create_payment_intent(payment_intent_params,
            headers: %{"Idempotency-Key" => idempotency_key}
