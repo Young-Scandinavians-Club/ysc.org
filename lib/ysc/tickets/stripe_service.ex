@@ -83,21 +83,35 @@ defmodule Ysc.Tickets.StripeService do
         payment_intent_params
       end
 
-    # Use ticket order reference ID as idempotency key to prevent duplicate charges
-    # If the same reference is used again, Stripe will return the existing payment intent
-    idempotency_key = "ticket_order_#{ticket_order.reference_id}"
+    # Include amount in the idempotency key so repriced orders get a fresh PI.
+    # A reference-only key caused Stripe to return a stale PI after tier repricing.
+    idempotency_key = "ticket_order_#{ticket_order.reference_id}_#{amount_cents}"
 
     case stripe_client().create_payment_intent(payment_intent_params,
            headers: %{"Idempotency-Key" => idempotency_key}
          ) do
       {:ok, payment_intent} ->
-        # Update the ticket order with the payment intent ID
-        case Tickets.update_payment_intent(ticket_order, payment_intent.id) do
-          {:ok, _updated_order} ->
-            {:ok, payment_intent}
+        if payment_intent.amount == amount_cents do
+          # Update the ticket order with the payment intent ID
+          case Tickets.update_payment_intent(ticket_order, payment_intent.id) do
+            {:ok, _updated_order} ->
+              {:ok, payment_intent}
 
-          {:error, reason} ->
-            {:error, reason}
+            {:error, reason} ->
+              {:error, reason}
+          end
+        else
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Stripe returned payment intent with stale amount for ticket order",
+            ticket_order_id: ticket_order.id,
+            expected_amount_cents: amount_cents,
+            payment_intent_id: payment_intent.id,
+            payment_intent_amount_cents: payment_intent.amount
+          )
+
+          {:error, "Payment initialization failed"}
         end
 
       {:error, %Stripe.Error{} = error} ->
