@@ -894,6 +894,19 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert html =~ "expired"
       assert html =~ Ysc.EmailConfig.membership_email()
     end
+
+    test "dead render does not retry invoice before websocket connects", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+
+      conn = get(conn, ~p"/users/membership?retry_invoice=in_test_missing")
+      html = html_response(conn, 200)
+
+      refute html =~ "expired"
+      refute html =~ "Invoice not found"
+    end
   end
 
   describe "settings page — phone verification flow" do

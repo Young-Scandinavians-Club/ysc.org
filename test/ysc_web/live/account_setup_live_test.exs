@@ -351,6 +351,21 @@ defmodule YscWeb.AccountSetupLiveTest do
   # Regression: deferred payment lookup on mount (#351)
   # ---------------------------------------------------------------------------
 
+  describe "dead render performance" do
+    test "payment step static HTML skips Stripe setup intent creation", %{
+      conn: conn
+    } do
+      user = verified_pending_user()
+      conn = log_in_user(conn, user)
+
+      conn = get(conn, account_setup_path(user, %{"step" => "1"}))
+      html = html_response(conn, 200)
+
+      refute html =~ "data-clientSecret"
+      refute html =~ ~s|id="setup-payment-form"|
+    end
+  end
+
   describe "pending user with payment on file" do
     test "lands on password step when a default payment method already exists",
          %{

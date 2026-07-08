@@ -20,6 +20,20 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~ "Doe"
     end
 
+    test "static HTML shows loading shell before websocket connects", %{
+      conn: conn
+    } do
+      user = user_fixture(%{first_name: "Deferred", last_name: "LoadUser"})
+
+      conn = get(conn, ~p"/admin/users/#{user.id}/details")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s|id="admin-user-detail-loading"|
+      refute html =~ "Deferred"
+      refute html =~ "LoadUser"
+      refute html =~ "Sign in as User"
+    end
+
     test "displays user avatar", %{conn: conn} do
       user = user_fixture()
 

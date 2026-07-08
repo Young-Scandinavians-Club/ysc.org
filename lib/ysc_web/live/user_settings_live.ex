@@ -2432,7 +2432,7 @@ defmodule YscWeb.UserSettingsLive do
   def handle_params(params, _uri, socket) do
     # Handle retry invoice payment from email link
     socket =
-      if params["retry_invoice"] do
+      if params["retry_invoice"] && connected?(socket) do
         invoice_id = params["retry_invoice"]
         # Trigger the retry via an event to ensure proper error handling
         send(self(), {:retry_invoice_payment, invoice_id})

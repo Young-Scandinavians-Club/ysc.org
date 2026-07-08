@@ -723,8 +723,12 @@ defmodule YscWeb.AccountSetupLive do
       current_user = socket.assigns.current_user
       user = socket.assigns.user
 
-      # Re-fetch user to get latest data for access control (important after email verification)
-      fresh_user = Accounts.get_user!(user.id)
+      fresh_user =
+        if connected?(socket) do
+          Accounts.get_user!(user.id)
+        else
+          user
+        end
 
       # Steps after email verification require a real session whose user matches the
       # account in the URL. Never derive current_user from the path alone — that would
@@ -749,7 +753,12 @@ defmodule YscWeb.AccountSetupLive do
         user_needs = socket.assigns.user_needs
 
         # Update socket assigns with fresh user data
-        socket = assign(socket, user: fresh_user)
+        socket =
+          if connected?(socket) do
+            assign(socket, user: fresh_user)
+          else
+            socket
+          end
 
         # Calculate allowed step based on what user needs and their authentication
         # New order: 0=email, 1=payment, 2=password, 3=phone setup, 4=phone verify
@@ -786,7 +795,8 @@ defmodule YscWeb.AccountSetupLive do
 
         # Create setup intent when user reaches the payment step (step 1)
         socket =
-          if allowed_step == 1 and is_nil(socket.assigns.payment_intent_secret) do
+          if connected?(socket) && allowed_step == 1 &&
+               is_nil(socket.assigns.payment_intent_secret) do
             user = socket.assigns.user
 
             case Customers.create_setup_intent(user,
@@ -808,7 +818,8 @@ defmodule YscWeb.AccountSetupLive do
 
         # Automatically send phone verification code if user reaches step 4 with unverified phone
         socket =
-          if allowed_step == 4 and not is_nil(fresh_user.phone_number) and
+          if (connected?(socket) && allowed_step == 4 &&
+                not is_nil(fresh_user.phone_number)) and
                is_nil(fresh_user.phone_verified_at) do
             # Check if code already exists in cache
             case Ysc.VerificationCache.get_code(

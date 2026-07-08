@@ -35,7 +35,25 @@ defmodule YscWeb.AdminUserDetailsLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex flex-col justify-between py-6">
+      <div
+        :if={@loading_user_detail?}
+        id="admin-user-detail-loading"
+        class="flex flex-col py-6 space-y-6"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="sr-only">Loading user details…</span>
+        <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
+        <.skeleton_block class="h-9 w-56 rounded" />
+        <.skeleton_block class="h-24 w-24 rounded-full" />
+        <div class="flex flex-wrap gap-2">
+          <.skeleton_block :for={_ <- 1..8} class="h-9 w-24 rounded-full" />
+        </div>
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded" />
+        </div>
+      </div>
+      <div :if={!@loading_user_detail?} class="flex flex-col justify-between py-6">
         <.back navigate={~p"/admin/users?#{@list_params}"}>Back</.back>
 
         <div class="flex flex-row items-center justify-between pt-4">
@@ -2262,167 +2280,27 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> DateTime.to_date()
       |> Date.to_iso8601()
 
-    selected_user =
-      Accounts.get_user!(id, [
-        :family_members,
-        :billing_address,
-        {:primary_user, :current_avatar},
-        {:sub_accounts, :current_avatar},
-        :current_avatar
-      ])
-
-    user_changeset =
-      Accounts.User.update_user_with_address_changeset(selected_user, %{})
-
-    user_form = to_form(user_changeset, as: "user")
-    original_form_data = extract_form_data(user_form)
-
-    is_treasurer =
-      current_user.board_position == :treasurer && current_user.state == :active
+    connected_remount? =
+      connected?(socket) &&
+        socket.assigns[:user_id] == id &&
+        not is_nil(socket.assigns[:selected_user])
 
     socket =
-      socket
-      |> assign(:user_id, id)
-      |> assign(:first_name, selected_user.first_name)
-      |> assign(:last_name, selected_user.last_name)
-      |> assign(:role, selected_user.role)
-      |> assign(:page_title, "Users")
-      |> assign(:active_page, :members)
-      |> assign(:selected_user, selected_user)
-      |> assign(:selected_user_application, nil)
-      |> assign(:active_subscription, nil)
-      |> assign(:subscription_payments, [])
-      |> assign(:scheduled_downgrade_info, nil)
-      |> assign(:has_lifetime_membership, false)
-      |> assign(:membership_paused_by_board, nil)
-      |> assign(
-        :membership_form,
-        to_form(membership_changeset(%{period_end_date: nil}), as: "membership")
-      )
-      |> assign(
-        :membership_type_form,
-        to_form(membership_type_changeset(%{membership_type: nil}),
-          as: "membership_type"
+      if connected_remount? do
+        socket
+      else
+        assign_user_detail_loading_shell(
+          socket,
+          id,
+          current_user,
+          timezone,
+          today_max
         )
-      )
-      |> assign(
-        :lifetime_form,
-        to_form(
-          lifetime_membership_changeset(%{
-            has_lifetime: false,
-            awarded_at: DateTime.utc_now()
-          }),
-          as: "lifetime"
-        )
-      )
-      |> assign(
-        :create_paid_membership_form,
-        to_form(create_paid_membership_changeset(%{plan_id: "single"}),
-          as: "create_paid_membership"
-        )
-      )
-      |> assign(:ticket_orders_meta, nil)
-      |> assign(:bookings_meta, nil)
-      |> assign(:notifications, [])
-      |> assign(:notifications_loading?, true)
-      |> assign(:selected_notification, nil)
-      |> assign(:panel_width, nil)
-      |> assign(:is_treasurer, is_treasurer)
-      |> assign(:bank_accounts, [])
-      |> assign(:unsealed_account_id, nil)
-      |> assign(:unsealed_account, nil)
-      |> assign(:original_form_data, original_form_data)
-      |> assign(:timezone, timezone)
-      |> assign(:today_max, today_max)
-      |> assign(:primary_user, nil)
-      |> assign(:sub_accounts, [])
-      |> assign(:family_members, [])
-      |> assign(:pending_invites, [])
-      |> assign(:can_manage_family, false)
-      |> assign(:add_family_user_search, "")
-      |> assign(:add_family_user_results, [])
-      |> assign(:add_family_user_relationship, "child")
-      |> assign(:user_notes, [])
-      |> assign(:rejection_notes, [])
-      |> assign(
-        :note_form,
-        to_form(note_changeset(%{category: "general"}), as: "note")
-      )
-      |> assign(:pending_activation_params, nil)
-      |> assign(
-        :override_rejection_form,
-        to_form(override_rejection_changeset(%{}), as: "override")
-      )
-      |> assign(:booking_entitlements, [])
-      |> assign(:booking_entitlements_loaded?, false)
-      |> assign(:booking_entitlements_load_error?, false)
-      |> assign(:booking_entitlements_loading?, false)
-      |> assign(:show_booking_benefits?, false)
-      |> assign(:entitlement_form, entitlement_form_defaults())
-      |> assign(form: user_form)
+      end
 
     socket =
-      if connected?(socket) do
-        [sub_result, has_lifetime, application, board_member] =
-          Task.await_many(
-            [
-              Task.async(fn -> fetch_subscription_data(selected_user) end),
-              Task.async(fn ->
-                Accounts.has_lifetime_membership?(selected_user)
-              end),
-              Task.async(fn -> fetch_application(id, current_user) end),
-              Task.async(fn ->
-                Accounts.household_board_member(selected_user)
-              end)
-            ],
-            :infinity
-          )
-
-        {active_subscription, subscription_payments} = sub_result
-
-        membership_cs =
-          %{
-            period_end_date:
-              active_subscription && active_subscription.current_period_end
-          }
-          |> membership_changeset()
-
-        lifetime_cs =
-          %{
-            has_lifetime: has_lifetime,
-            awarded_at:
-              selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
-          }
-          |> lifetime_membership_changeset()
-
-        membership_type_cs =
-          %{
-            membership_type:
-              get_current_membership_type_from_subscription(active_subscription)
-          }
-          |> membership_type_changeset()
-
-        socket =
-          socket
-          |> assign(:selected_user_application, application)
-          |> assign(:active_subscription, active_subscription)
-          |> assign(:subscription_payments, subscription_payments)
-          |> assign(:has_lifetime_membership, has_lifetime)
-          |> assign(:membership_paused_by_board, board_member)
-          |> assign(:membership_form, to_form(membership_cs, as: "membership"))
-          |> assign(
-            :membership_type_form,
-            to_form(membership_type_cs, as: "membership_type")
-          )
-          |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
-
-        if active_subscription do
-          start_async(socket, :load_downgrade_info, fn ->
-            Subscriptions.get_scheduled_downgrade_info(active_subscription)
-          end)
-        else
-          socket
-        end
+      if connected?(socket) && !connected_remount? do
+        load_user_detail(socket, id, current_user)
       else
         socket
       end
@@ -4441,4 +4319,188 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp format_admin_money(nil), do: "—"
   defp format_admin_money(m), do: Ysc.MoneyHelper.format_money!(m)
+
+  defp assign_user_detail_loading_shell(
+         socket,
+         id,
+         current_user,
+         timezone,
+         today_max
+       ) do
+    is_treasurer =
+      current_user.board_position == :treasurer && current_user.state == :active
+
+    socket
+    |> assign(:loading_user_detail?, true)
+    |> assign(:user_id, id)
+    |> assign(:list_params, %{})
+    |> assign(:first_name, "")
+    |> assign(:last_name, "")
+    |> assign(:role, nil)
+    |> assign(:page_title, "Users")
+    |> assign(:active_page, :members)
+    |> assign(:selected_user, nil)
+    |> assign(:selected_user_application, nil)
+    |> assign(:active_subscription, nil)
+    |> assign(:subscription_payments, [])
+    |> assign(:scheduled_downgrade_info, nil)
+    |> assign(:has_lifetime_membership, false)
+    |> assign(:membership_paused_by_board, nil)
+    |> assign(
+      :membership_form,
+      to_form(membership_changeset(%{period_end_date: nil}), as: "membership")
+    )
+    |> assign(
+      :membership_type_form,
+      to_form(membership_type_changeset(%{membership_type: nil}),
+        as: "membership_type"
+      )
+    )
+    |> assign(
+      :lifetime_form,
+      to_form(
+        lifetime_membership_changeset(%{
+          has_lifetime: false,
+          awarded_at: DateTime.utc_now()
+        }),
+        as: "lifetime"
+      )
+    )
+    |> assign(
+      :create_paid_membership_form,
+      to_form(create_paid_membership_changeset(%{plan_id: "single"}),
+        as: "create_paid_membership"
+      )
+    )
+    |> assign(:ticket_orders_meta, nil)
+    |> assign(:bookings_meta, nil)
+    |> assign(:notifications, [])
+    |> assign(:notifications_loading?, true)
+    |> assign(:selected_notification, nil)
+    |> assign(:panel_width, nil)
+    |> assign(:is_treasurer, is_treasurer)
+    |> assign(:bank_accounts, [])
+    |> assign(:unsealed_account_id, nil)
+    |> assign(:unsealed_account, nil)
+    |> assign(:original_form_data, %{})
+    |> assign(:timezone, timezone)
+    |> assign(:today_max, today_max)
+    |> assign(:primary_user, nil)
+    |> assign(:sub_accounts, [])
+    |> assign(:family_members, [])
+    |> assign(:pending_invites, [])
+    |> assign(:can_manage_family, false)
+    |> assign(:add_family_user_search, "")
+    |> assign(:add_family_user_results, [])
+    |> assign(:add_family_user_relationship, "child")
+    |> assign(:user_notes, [])
+    |> assign(:rejection_notes, [])
+    |> assign(
+      :note_form,
+      to_form(note_changeset(%{category: "general"}), as: "note")
+    )
+    |> assign(:pending_activation_params, nil)
+    |> assign(
+      :override_rejection_form,
+      to_form(override_rejection_changeset(%{}), as: "override")
+    )
+    |> assign(:booking_entitlements, [])
+    |> assign(:booking_entitlements_loaded?, false)
+    |> assign(:booking_entitlements_load_error?, false)
+    |> assign(:booking_entitlements_loading?, false)
+    |> assign(:show_booking_benefits?, false)
+    |> assign(:entitlement_form, entitlement_form_defaults())
+    |> assign(:form, to_form(%{}, as: "user"))
+  end
+
+  defp load_user_detail(socket, id, current_user) do
+    selected_user =
+      Accounts.get_user!(id, [
+        :family_members,
+        :billing_address,
+        {:primary_user, :current_avatar},
+        {:sub_accounts, :current_avatar},
+        :current_avatar
+      ])
+
+    user_changeset =
+      Accounts.User.update_user_with_address_changeset(selected_user, %{})
+
+    user_form = to_form(user_changeset, as: "user")
+    original_form_data = extract_form_data(user_form)
+
+    socket =
+      socket
+      |> assign(:loading_user_detail?, false)
+      |> assign(:first_name, selected_user.first_name)
+      |> assign(:last_name, selected_user.last_name)
+      |> assign(:role, selected_user.role)
+      |> assign(:selected_user, selected_user)
+      |> assign(:original_form_data, original_form_data)
+      |> assign(:form, user_form)
+
+    [sub_result, has_lifetime, application, board_member] =
+      Task.await_many(
+        [
+          Task.async(fn -> fetch_subscription_data(selected_user) end),
+          Task.async(fn ->
+            Accounts.has_lifetime_membership?(selected_user)
+          end),
+          Task.async(fn -> fetch_application(id, current_user) end),
+          Task.async(fn -> Accounts.household_board_member(selected_user) end)
+        ],
+        :infinity
+      )
+
+    {active_subscription, subscription_payments} = sub_result
+
+    membership_cs =
+      %{
+        period_end_date:
+          active_subscription && active_subscription.current_period_end
+      }
+      |> membership_changeset()
+
+    lifetime_cs =
+      %{
+        has_lifetime: has_lifetime,
+        awarded_at:
+          selected_user.lifetime_membership_awarded_at || DateTime.utc_now()
+      }
+      |> lifetime_membership_changeset()
+
+    membership_type_cs =
+      %{
+        membership_type:
+          get_current_membership_type_from_subscription(active_subscription)
+      }
+      |> membership_type_changeset()
+
+    socket =
+      socket
+      |> assign(:selected_user_application, application)
+      |> assign(:active_subscription, active_subscription)
+      |> assign(:subscription_payments, subscription_payments)
+      |> assign(:has_lifetime_membership, has_lifetime)
+      |> assign(:membership_paused_by_board, board_member)
+      |> assign(:membership_form, to_form(membership_cs, as: "membership"))
+      |> assign(
+        :membership_type_form,
+        to_form(membership_type_cs, as: "membership_type")
+      )
+      |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
+
+    if active_subscription do
+      start_async(socket, :load_downgrade_info, fn ->
+        Subscriptions.get_scheduled_downgrade_info(active_subscription)
+      end)
+    else
+      socket
+    end
+  rescue
+    Ecto.NoResultsError ->
+      socket
+      |> YscWeb.Flash.put_toast(:error, "User not found", title: "Users")
+      |> redirect(to: ~p"/admin/users")
+  end
 end
