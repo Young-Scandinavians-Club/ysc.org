@@ -22,6 +22,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ResetPassword,
     PasswordChanged,
     PasskeyAdded,
+    NewSignInDetected,
     EmailChanged,
     ConductViolationConfirmation,
     ConductViolationBoardNotification,
@@ -156,6 +157,25 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert is_binary(html)
       assert String.length(html) > 0
       assert PasskeyAdded.get_template_name() == "passkey_added"
+    end
+
+    test "NewSignInDetected renders", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        intro_text:
+          "We noticed a sign-in to Young Scandinavians Club from a new device or browser.",
+        signed_in_at: "July 8, 2026 at 10:30 AM PDT",
+        device: "Chrome on macOS",
+        location: "Stockholm, Stockholm, SE (24.206.103.29)",
+        security_url: "https://example.com/users/settings/security"
+      }
+
+      html = NewSignInDetected.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+      assert html =~ "New sign-in to Young Scandinavians Club"
+      assert html =~ "Security settings"
+      assert NewSignInDetected.get_template_name() == "new_sign_in_detected"
     end
 
     test "EmailChanged renders", %{user: user} do
@@ -971,6 +991,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
         "reset_password" => ResetPassword,
         "password_changed" => PasswordChanged,
         "passkey_added" => PasskeyAdded,
+        "new_sign_in_detected" => NewSignInDetected,
         "change_email" => ChangeEmail,
         "email_changed" => EmailChanged,
         "admin_application_submitted" => AdminApplicationSubmitted,

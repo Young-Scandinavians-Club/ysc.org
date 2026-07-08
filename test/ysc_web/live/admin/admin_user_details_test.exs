@@ -117,6 +117,28 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert bookings_html =~ "Bookings"
     end
 
+    test "legacy booking-benefits route redirects and expands benefits on bookings tab",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+
+      assert {:error, {:live_redirect, %{to: redirect_to}}} =
+               live(conn, ~p"/admin/users/#{user.id}/details/booking-benefits")
+
+      assert redirect_to =~ "/details/bookings"
+      assert redirect_to =~ "benefits=open"
+
+      {:ok, view, _html} = live(conn, redirect_to)
+
+      assert has_element?(view, "#grant-entitlement-form")
+
+      assert has_element?(
+               view,
+               "button#toggle-booking-benefits[aria-expanded=\"true\"]"
+             )
+    end
+
     test "can navigate to application tab", %{conn: conn} do
       user = user_fixture()
 

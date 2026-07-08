@@ -18,7 +18,6 @@ defmodule YscWeb.BookingCheckoutEntitlementsTest do
 
   import Ecto.Changeset
   import Phoenix.LiveViewTest
-  import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
   import Mox

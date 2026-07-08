@@ -502,7 +502,7 @@ defmodule YscWeb.AdminUsersLive do
                 :if={@export_status == :complete}
                 id="download-user-export-button"
                 href={@file_export_path}
-                phx-click={close_dropdown("#export-users-button")}
+                phx-click={hide_dropdown("#export-users-button")}
                 class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
               >
                 <.icon

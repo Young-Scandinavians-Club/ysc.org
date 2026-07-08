@@ -370,7 +370,7 @@ html {
 #site-header.hero-mode button.nav-link,
 #site-header.hero-mode .menu-label,
 #site-header.hero-mode .hamburger-btn,
-#site-header.hero-mode #avatar-menu-link {
+#site-header.hero-mode #avatar-menuLink {
     color: color-mix(in srgb, #18181b calc(var(--hero-nav-chrome-progress) * 100%), white);
     text-shadow: 0 1px 2px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.4)), 0 0 1px rgba(0, 0, 0, calc((1 - var(--hero-nav-chrome-progress)) * 0.5));
     transition: none !important;
@@ -391,16 +391,16 @@ html {
     background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2));
 }
 
-#site-header.hero-mode #avatar-menu-link:hover {
+#site-header.hero-mode #avatar-menuLink:hover {
     background-color: color-mix(in srgb, #f4f4f5 calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.2)) !important;
 }
 
-#site-header.hero-mode #avatar-menu-link .text-zinc-800 {
+#site-header.hero-mode #avatar-menuLink .text-zinc-800 {
     color: color-mix(in srgb, #27272a calc(var(--hero-nav-chrome-progress) * 100%), white) !important;
     transition: none !important;
 }
 
-#site-header.hero-mode #avatar-menu-link .text-zinc-500 {
+#site-header.hero-mode #avatar-menuLink .text-zinc-500 {
     color: color-mix(in srgb, #71717a calc(var(--hero-nav-chrome-progress) * 100%), rgba(255, 255, 255, 0.8)) !important;
     transition: none !important;
 }
@@ -497,7 +497,7 @@ body.overflow-hidden {
 #site-header.hero-mode .mobile-menu-panel .nav-link,
 #site-header.hero-mode .mobile-menu-panel button.nav-link,
 #site-header.hero-mode .mobile-menu-panel .menu-label,
-#site-header.hero-mode .mobile-menu-panel #avatar-menu-link {
+#site-header.hero-mode .mobile-menu-panel #avatar-menuLink {
     text-shadow: none;
 }
 

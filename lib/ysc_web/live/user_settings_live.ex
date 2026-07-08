@@ -2371,7 +2371,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div
                   :if={@filtered_payments_count > 0}
                   id="payments-cards"
-                  class="md:hidden space-y-4"
+                  class="md:hidden space-y-4 pt-4"
                 >
                   <%= for payment_info <- @filtered_payments_list do %>
                     <% card_id = "mobile-card-#{payment_dom_id(payment_info)}" %>
@@ -6018,7 +6018,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "Invoice not found. Please use the link from your email, or contact info@ysc.org if this persists.",
+             retry_invoice_link_help_message(),
              title: "Invoice"
            )}
 
@@ -6045,7 +6045,7 @@ defmodule YscWeb.UserSettingsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This invoice cannot be paid in its current state. Please update your payment method and try again.",
+             retry_invoice_link_help_message(),
              title: "Invoice"
            )}
 
@@ -6082,9 +6082,13 @@ defmodule YscWeb.UserSettingsLive do
      YscWeb.Flash.put_toast(
        socket,
        :error,
-       "Invalid invoice ID. Please use the link from your email or contact info@ysc.org for help.",
+       retry_invoice_link_help_message(),
        title: "Invoice"
      )}
+  end
+
+  defp retry_invoice_link_help_message do
+    "This payment link didn't work — it may have expired. Go to Membership in your account settings to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
   end
 
   defp subscription_items_contain_price?(subscription, price_id) do

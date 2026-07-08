@@ -170,19 +170,19 @@ defmodule YscWeb.BookingReceiptLive do
           error_message =
             case reason do
               {:payment_not_found, _} ->
-                "Unable to process cancellation: payment not found."
+                "We cancelled your reservation, but we couldn't find your payment record to process a refund. Email info@ysc.org with your booking confirmation number and we'll help."
 
               {:calculation_failed, _} ->
-                "Unable to calculate refund amount."
+                "We cancelled your reservation, but we couldn't calculate your refund right now. Email info@ysc.org with your booking confirmation number and we'll follow up."
 
               {:refund_failed, _} ->
-                "Booking cancelled but refund processing failed. Please contact support."
+                "We cancelled your reservation, but your refund couldn't be processed automatically. Email info@ysc.org with your booking confirmation number and we'll help."
 
               {:pending_refund_failed, _} ->
-                "Booking cancelled but could not create pending refund. Please contact support."
+                "We cancelled your reservation, but we couldn't submit your refund for review. Email info@ysc.org with your booking confirmation number and we'll follow up."
 
               {:cancellation_failed, _} ->
-                "Failed to cancel booking. Please try again or contact support."
+                "We couldn't cancel your reservation. Please try again, or email info@ysc.org if the problem continues."
             end
 
           {:noreply,
@@ -1167,7 +1167,7 @@ defmodule YscWeb.BookingReceiptLive do
               color="zinc"
               variant="outline"
             >
-              <.icon name="hero-arrow-left" class="w-5 h-5 -mt-0.5 me-2" />Return to Dashboard
+              <.icon name="hero-arrow-left" class="w-5 h-5 -mt-0.5 me-2" />Back to home
             </.button>
           </div>
         </aside>
