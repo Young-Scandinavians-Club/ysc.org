@@ -100,7 +100,16 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
           label="Override capacity limits"
         />
         <p class="text-sm text-zinc-500 -mt-2">
-          Allow granting even when the tier or event is sold out (useful for migration).
+          Allow granting when the tier or event is sold out. Publish status, sale windows, and event dates are still enforced.
+        </p>
+
+        <.input
+          type="checkbox"
+          field={@form[:skip_sale_guards]}
+          label="Migration override"
+        />
+        <p class="text-sm text-zinc-500 -mt-2">
+          Also bypass publish status, tier sale windows, and event date checks. Use only when importing tickets from a legacy system.
         </p>
 
         <.input
@@ -203,6 +212,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
     user_id = merged["user_id"]
     quantity = parse_quantity(merged["quantity"])
     skip_capacity? = checkbox_enabled?(merged["skip_capacity"])
+    skip_sale_guards? = checkbox_enabled?(merged["skip_sale_guards"])
     skip_email? = not checkbox_enabled?(merged["send_email"])
     notes = blank_to_nil(merged["admin_grant_notes"])
 
@@ -234,6 +244,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
                socket.assigns.event_id,
                ticket_selections,
                skip_capacity: skip_capacity?,
+               skip_sale_guards: skip_sale_guards?,
                skip_email: skip_email?,
                admin_grant_notes: notes
              ) do
@@ -272,6 +283,7 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
       "ticket_tier_id" => ticket_tier_id,
       "quantity" => 1,
       "skip_capacity" => false,
+      "skip_sale_guards" => false,
       "send_email" => true,
       "admin_grant_notes" => ""
     }
@@ -343,10 +355,15 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
 
   defp grant_error_message(:event_not_available),
     do:
-      "Event must be published to grant tickets (or enable override capacity)."
+      "Event must be published to grant tickets (enable migration override for legacy imports)."
 
   defp grant_error_message(:event_in_past),
-    do: "Cannot grant tickets for events that have already started."
+    do:
+      "Cannot grant tickets for events that have already started (enable migration override for legacy imports)."
+
+  defp grant_error_message(:tier_not_on_sale),
+    do:
+      "This tier is not currently on sale (enable migration override for legacy imports)."
 
   defp grant_error_message(:event_cancelled),
     do: "This event has been cancelled."

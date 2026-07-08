@@ -805,6 +805,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
           "ticket_tier_id" => tier.id,
           "quantity" => "2",
           "skip_capacity" => "false",
+          "skip_sale_guards" => "false",
           "send_email" => "false",
           "admin_grant_notes" => "Legacy purchase"
         }

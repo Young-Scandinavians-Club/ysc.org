@@ -267,7 +267,7 @@ jobs:
       - name: Dependency audit
         run: mix deps.audit --ignore-file config/mix_audit.ignore
 
-      - name: Hex audit (retired packages)
+      - name: Hex audit (retired packages and advisories)
         run: mix hex.audit
 
       - name: Check unused deps

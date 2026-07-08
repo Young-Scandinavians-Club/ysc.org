@@ -28,7 +28,7 @@ defmodule Ysc.Tickets.AdminGrants do
     * `user_id` - member receiving tickets
     * `event_id` - event id
     * `ticket_selections` - map of `ticket_tier_id => quantity`
-    * `opts` - `:skip_capacity`, `:skip_email`, `:admin_grant_notes`
+    * `opts` - `:skip_capacity`, `:skip_sale_guards`, `:skip_email`, `:admin_grant_notes`
 
   ## Returns
 
@@ -44,6 +44,7 @@ defmodule Ysc.Tickets.AdminGrants do
       )
       when is_map(ticket_selections) do
     skip_capacity? = Keyword.get(opts, :skip_capacity, false)
+    skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
     admin_grant_notes = Keyword.get(opts, :admin_grant_notes)
 
     Ysc.Logging.info("Admin ticket grant started",
@@ -51,7 +52,8 @@ defmodule Ysc.Tickets.AdminGrants do
       user_id: user_id,
       event_id: event_id,
       ticket_selections: ticket_selections,
-      skip_capacity: skip_capacity?
+      skip_capacity: skip_capacity?,
+      skip_sale_guards: skip_sale_guards?
     )
 
     result =
@@ -60,11 +62,12 @@ defmodule Ysc.Tickets.AdminGrants do
            {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
            :ok <- validate_recipient_for_registration_tiers(user, tiers),
            :ok <-
-             maybe_validate_capacity(
+             maybe_validate_fulfillment(
                user_id,
                event_id,
                ticket_selections,
-               skip_capacity?
+               skip_capacity: skip_capacity?,
+               skip_sale_guards: skip_sale_guards?
              ) do
         insert_grant_transaction(
           granted_by_id,
@@ -73,7 +76,8 @@ defmodule Ysc.Tickets.AdminGrants do
           tiers,
           ticket_selections,
           admin_grant_notes,
-          skip_capacity?
+          skip_capacity: skip_capacity?,
+          skip_sale_guards: skip_sale_guards?
         )
       end
 
@@ -170,38 +174,29 @@ defmodule Ysc.Tickets.AdminGrants do
     end)
   end
 
-  defp maybe_validate_capacity(_user_id, _event_id, _ticket_selections, true),
-    do: :ok
-
-  defp maybe_validate_capacity(user_id, event_id, ticket_selections, false) do
+  defp maybe_validate_fulfillment(user_id, event_id, ticket_selections, opts) do
     case BookingLocker.validate_fulfillment_capacity(
            user_id,
            event_id,
-           ticket_selections
+           ticket_selections,
+           opts
          ) do
       :ok -> :ok
       {:error, reason} -> {:error, reason}
     end
   end
 
-  defp maybe_validate_capacity_in_transaction(
-         _user_id,
-         _event_id,
-         _ticket_selections,
-         true
-       ),
-       do: :ok
-
-  defp maybe_validate_capacity_in_transaction(
+  defp maybe_validate_fulfillment_in_transaction(
          user_id,
          event_id,
          ticket_selections,
-         false
+         opts
        ) do
-    case BookingLocker.validate_fulfillment_capacity_locked(
+    case BookingLocker.validate_fulfillment_capacity_in_transaction(
            user_id,
            event_id,
-           ticket_selections
+           ticket_selections,
+           opts
          ) do
       :ok -> :ok
       {:error, reason} -> {:error, reason}
@@ -234,7 +229,7 @@ defmodule Ysc.Tickets.AdminGrants do
          tiers,
          ticket_selections,
          admin_grant_notes,
-         skip_capacity?
+         grant_opts
        ) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     expires_at = grant_expires_at(event, now)
@@ -253,13 +248,26 @@ defmodule Ysc.Tickets.AdminGrants do
       }
 
       with :ok <-
-             maybe_validate_capacity_in_transaction(
+             maybe_validate_fulfillment_in_transaction(
                user.id,
                event.id,
                ticket_selections,
-               skip_capacity?
+               grant_opts
              ),
            {:ok, ticket_order} <- insert_ticket_order(order_attrs),
+           {:ok, _fulfilled_reservations} <-
+             BookingLocker.fulfill_reservations_for_selections(
+               user.id,
+               event.id,
+               ticket_order.id,
+               ticket_selections
+             ),
+           :ok <-
+             cancel_pending_ticket_orders_for_grant(
+               user.id,
+               event.id,
+               ticket_order.id
+             ),
            {:ok, tickets} <-
              insert_tickets_for_selections(
                ticket_order,
@@ -354,6 +362,54 @@ defmodule Ysc.Tickets.AdminGrants do
         {:ok, _} -> :ok
         {:error, reason} -> {:error, reason}
       end
+    end
+  end
+
+  defp cancel_pending_ticket_orders_for_grant(user_id, event_id, grant_order_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    pending_order_ids =
+      TicketOrder
+      |> where(
+        [to],
+        to.user_id == ^user_id and to.event_id == ^event_id and
+          to.status == :pending and
+          to.id != ^grant_order_id
+      )
+      |> select([to], to.id)
+      |> Repo.all()
+
+    if pending_order_ids == [] do
+      :ok
+    else
+      {order_count, _} =
+        from(to in TicketOrder, where: to.id in ^pending_order_ids)
+        |> Repo.update_all(
+          set: [
+            status: :cancelled,
+            cancelled_at: now,
+            cancellation_reason: "Superseded by admin ticket grant",
+            updated_at: now
+          ]
+        )
+
+      {ticket_count, _} =
+        from(t in Ticket,
+          where:
+            t.ticket_order_id in ^pending_order_ids and t.status == :pending
+        )
+        |> Repo.update_all(set: [status: :cancelled, updated_at: now])
+
+      Ysc.Logging.info(
+        "Cancelled pending ticket orders superseded by admin grant",
+        user_id: user_id,
+        event_id: event_id,
+        grant_order_id: grant_order_id,
+        cancelled_order_count: order_count,
+        cancelled_ticket_count: ticket_count
+      )
+
+      :ok
     end
   end
 

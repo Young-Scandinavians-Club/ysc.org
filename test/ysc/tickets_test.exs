@@ -1434,6 +1434,77 @@ defmodule Ysc.TicketsTest do
                )
     end
 
+    test "skip_capacity alone does not bypass publish or past-event checks", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+
+      {:ok, event} =
+        Events.update_event(event, %{
+          start_date: past
+        })
+
+      assert {:error, :event_in_past} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier1.id => 1},
+                 skip_capacity: true
+               )
+
+      {:ok, future_event} =
+        Events.update_event(event, %{
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          state: :draft
+        })
+
+      assert {:error, :event_not_available} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 future_event.id,
+                 %{tier1.id => 1},
+                 skip_capacity: true
+               )
+    end
+
+    test "skip_sale_guards allows legacy migration grants on past events", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+
+      {:ok, event} =
+        Events.update_event(event, %{
+          start_date: past
+        })
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier1.id => 1},
+                 skip_capacity: true,
+                 skip_sale_guards: true
+               )
+
+      order = Tickets.get_ticket_order(order.id)
+      assert order.status == :completed
+      assert length(order.tickets) == 1
+    end
+
     test "grants tickets without requiring active membership", %{
       admin: admin,
       event: event,
@@ -1505,6 +1576,77 @@ defmodule Ysc.TicketsTest do
                Tickets.grant_admin_tickets(admin.id, member.id, event.id, %{
                  tier.id => 1
                })
+    end
+
+    test "fulfills active reservations on granted tiers so checkout cannot double-book",
+         %{
+           admin: admin,
+           user: user,
+           event: event
+         } do
+      organizer = user_fixture_unique()
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Single Seat",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 1,
+          event_id: event.id
+        })
+
+      {:ok, reservation} =
+        Events.create_ticket_reservation(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          quantity: 1,
+          created_by_id: organizer.id,
+          status: "active"
+        })
+
+      assert {:ok, grant_order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      reservation = Ysc.Repo.reload!(reservation)
+      assert reservation.status == "fulfilled"
+      assert reservation.ticket_order_id == grant_order.id
+
+      grant_order = Tickets.get_ticket_order(grant_order.id)
+      assert length(grant_order.tickets) == 1
+      assert hd(grant_order.tickets).status == :confirmed
+
+      assert {:error, :tier_validation_failed} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+    end
+
+    test "cancels pending checkout orders for the recipient before granting", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:ok, pending_order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, grant_order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier1.id => 1
+               })
+
+      pending_order = Tickets.get_ticket_order(pending_order.id)
+      assert pending_order.status == :cancelled
+
+      assert pending_order.cancellation_reason ==
+               "Superseded by admin ticket grant"
+
+      assert Enum.all?(pending_order.tickets, &(&1.status == :cancelled))
+
+      grant_order = Tickets.get_ticket_order(grant_order.id)
+      assert grant_order.status == :completed
+      assert length(grant_order.tickets) == 1
+      assert hd(grant_order.tickets).status == :confirmed
     end
 
     test "skip_email prevents confirmation email scheduling", %{

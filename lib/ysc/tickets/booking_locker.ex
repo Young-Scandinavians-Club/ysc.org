@@ -1,9 +1,11 @@
 defmodule Ysc.Tickets.BookingLocker do
   @moduledoc """
-  Provides atomic booking operations with proper locking to prevent race conditions.
+  Provides atomic booking operations within a single database transaction.
 
-  This module ensures that ticket availability checks and ticket creation happen
-  atomically within a single database transaction with proper row-level locking.
+  Capacity checks and ticket creation run in the same transaction so validation
+  and inserts share one snapshot. Event/tier rows are loaded without
+  `FOR UPDATE` today (see `lock_event/1` and `lock_ticket_tiers/1`), so
+  concurrent transactions can still race on inventory counts under heavy load.
   """
 
   import Ecto.Query, warn: false
@@ -13,10 +15,10 @@ defmodule Ysc.Tickets.BookingLocker do
   alias Ysc.Tickets.TicketOrder
 
   @doc """
-  Atomically reserves tickets for a booking with proper locking.
+  Atomically reserves tickets for a booking.
 
   This function:
-  1. Locks the event and ticket tiers
+  1. Loads the event and ticket tiers (no `FOR UPDATE` row locks yet)
   2. Validates availability
   3. Creates the ticket order and tickets
   4. All within a single transaction
@@ -84,12 +86,18 @@ defmodule Ysc.Tickets.BookingLocker do
   Used when completing an expired order after a late Stripe success so we do not
   confirm tickets that would exceed tier or event capacity.
   """
-  def validate_fulfillment_capacity(user_id, event_id, ticket_selections) do
+  def validate_fulfillment_capacity(
+        user_id,
+        event_id,
+        ticket_selections,
+        opts \\ []
+      ) do
     Repo.transaction(fn ->
-      case validate_fulfillment_capacity_locked(
+      case validate_fulfillment_capacity_in_transaction(
              user_id,
              event_id,
-             ticket_selections
+             ticket_selections,
+             opts
            ) do
         :ok -> :ok
         {:error, reason} -> Repo.rollback(reason)
@@ -102,17 +110,57 @@ defmodule Ysc.Tickets.BookingLocker do
   end
 
   @doc """
-  Validates fulfillment capacity with row locks.
+  Validates fulfillment capacity inside an existing transaction.
 
-  Must be called inside an existing `Repo.transaction/1` so locks are held until
-  the caller commits (e.g. admin grants inserting confirmed tickets).
+  Keeps validation and subsequent inserts on the same snapshot, but does **not**
+  acquire `FOR UPDATE` locks on event or tier rows. Callers that need to prevent
+  concurrent overbooking under load should add row locks or use stricter isolation.
   """
-  def validate_fulfillment_capacity_locked(user_id, event_id, ticket_selections) do
-    with {:ok, event} <- lock_and_validate_event(event_id),
+  def validate_fulfillment_capacity_in_transaction(
+        user_id,
+        event_id,
+        ticket_selections,
+        opts \\ []
+      ) do
+    skip_capacity? = Keyword.get(opts, :skip_capacity, false)
+    skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
+
+    with {:ok, event} <-
+           validate_event_for_fulfillment(event_id, skip_sale_guards?),
          {:ok, tiers} <-
-           lock_and_validate_tiers(event_id, ticket_selections, user_id) do
-      validate_event_capacity(event, tiers, ticket_selections, user_id)
+           validate_tiers_for_fulfillment(
+             event_id,
+             ticket_selections,
+             user_id,
+             skip_sale_guards: skip_sale_guards?,
+             skip_capacity: skip_capacity?
+           ) do
+      if skip_capacity? do
+        :ok
+      else
+        validate_event_capacity(event, tiers, ticket_selections, user_id)
+      end
     end
+  end
+
+  @doc """
+  Fulfills active ticket reservations for the given selections inside a transaction.
+
+  Links holds to `ticket_order_id` FIFO per tier, matching `atomic_booking/3`.
+  Must be called within the same `Repo.transaction/1` that creates the order/tickets.
+  """
+  def fulfill_reservations_for_selections(
+        user_id,
+        event_id,
+        ticket_order_id,
+        ticket_selections
+      ) do
+    fulfill_reservations_atomic(
+      user_id,
+      event_id,
+      ticket_order_id,
+      ticket_selections
+    )
   end
 
   @doc """
@@ -158,16 +206,48 @@ defmodule Ysc.Tickets.BookingLocker do
   end
 
   defp lock_and_validate_tiers(event_id, ticket_selections, user_id) do
-    _tier_ids = Map.keys(ticket_selections)
+    validate_tiers_for_fulfillment(
+      event_id,
+      ticket_selections,
+      user_id,
+      skip_sale_guards: false,
+      skip_capacity: false
+    )
+  end
 
-    # Lock all ticket tiers for this event
+  defp validate_event_for_fulfillment(event_id, true) do
+    case lock_event(event_id) do
+      nil -> {:error, :event_not_found}
+      event -> {:ok, event}
+    end
+  end
+
+  defp validate_event_for_fulfillment(event_id, false) do
+    lock_and_validate_event(event_id)
+  end
+
+  defp validate_tiers_for_fulfillment(
+         event_id,
+         ticket_selections,
+         user_id,
+         opts
+       ) do
+    skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
+    skip_capacity? = Keyword.get(opts, :skip_capacity, false)
     tiers = lock_ticket_tiers(event_id)
 
-    # Validate each requested tier
     validations =
       ticket_selections
       |> Enum.map(fn {tier_id, quantity} ->
-        validate_tier_availability(tiers, tier_id, quantity, event_id, user_id)
+        validate_tier_availability(
+          tiers,
+          tier_id,
+          quantity,
+          event_id,
+          user_id,
+          skip_sale_guards: skip_sale_guards?,
+          skip_capacity: skip_capacity?
+        )
       end)
 
     if Enum.any?(validations, &(&1 != :ok)) do
@@ -177,19 +257,40 @@ defmodule Ysc.Tickets.BookingLocker do
     end
   end
 
-  defp validate_tier_availability(tiers, tier_id, quantity, event_id, user_id) do
+  defp validate_tier_availability(
+         tiers,
+         tier_id,
+         quantity,
+         event_id,
+         user_id,
+         opts
+       ) do
+    skip_sale_guards? = Keyword.get(opts, :skip_sale_guards, false)
+    skip_capacity? = Keyword.get(opts, :skip_capacity, false)
+
     case Enum.find(tiers, &(&1.id == tier_id)) do
       nil ->
         {:error, :tier_not_found}
 
       tier ->
         cond do
-          tier.event_id != event_id -> {:error, :tier_not_for_event}
-          not tier_on_sale?(tier) -> {:error, :tier_not_on_sale}
-          quantity <= 0 -> {:error, :invalid_quantity}
-          # Donations don't count towards capacity - skip capacity check
-          tier.type == :donation or tier.type == "donation" -> :ok
-          true -> validate_tier_capacity(tier, quantity, user_id)
+          tier.event_id != event_id ->
+            {:error, :tier_not_for_event}
+
+          not skip_sale_guards? and not tier_on_sale?(tier) ->
+            {:error, :tier_not_on_sale}
+
+          quantity <= 0 ->
+            {:error, :invalid_quantity}
+
+          tier.type == :donation or tier.type == "donation" ->
+            :ok
+
+          skip_capacity? ->
+            :ok
+
+          true ->
+            validate_tier_capacity(tier, quantity, user_id)
         end
     end
   end
@@ -293,14 +394,12 @@ defmodule Ysc.Tickets.BookingLocker do
   end
 
   defp lock_event(event_id) do
-    # Fetch event (optimistic locking - no FOR UPDATE)
-    # The optimistic lock will be checked when we update the event if needed
+    # Plain read — no FOR UPDATE. Concurrent transactions can observe the same counts.
     Repo.get(Event, event_id)
   end
 
   defp lock_ticket_tiers(event_id) do
-    # Fetch ticket tiers (optimistic locking - no FOR UPDATE)
-    # The optimistic lock will be checked when we update tiers if needed
+    # Plain read — no FOR UPDATE. See module doc for concurrency caveats.
     Repo.all(
       from tt in TicketTier,
         where: tt.event_id == ^event_id

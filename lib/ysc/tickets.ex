@@ -114,7 +114,8 @@ defmodule Ysc.Tickets do
 
   ## Options
 
-    * `:skip_capacity` - when true, bypass tier and event capacity checks
+    * `:skip_capacity` - when true, bypass tier and event capacity checks only
+    * `:skip_sale_guards` - when true, bypass publish state, event date, and tier sale window checks (for legacy migration)
     * `:skip_email` - when true, do not send the ticket confirmation email
     * `:admin_grant_notes` - optional audit note (e.g. legacy order reference)
 
