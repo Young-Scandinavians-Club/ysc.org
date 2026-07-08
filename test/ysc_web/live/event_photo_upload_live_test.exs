@@ -78,8 +78,9 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
 
   test "shows friendly message for unexpected upload validation errors" do
     message =
-      YscWeb.EventPhotoUploadLive.test_upload_error_to_string(
-        {:writer_failure, :timeout}
+      YscWeb.UploadErrors.error_to_string(
+        {:writer_failure, :timeout},
+        :event_photo
       )
 
     assert message =~ "Something went wrong uploading that file"

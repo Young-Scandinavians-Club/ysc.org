@@ -68,6 +68,45 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "upload_error/1" do
+    test "renders default upload error with icon" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.upload_error error={:too_large} />
+        """)
+
+      assert html =~ "hero-exclamation-circle"
+      assert html =~ "Too large"
+      assert html =~ "text-red-600"
+      refute html =~ "alert-danger"
+    end
+
+    test "alert? adds admin alert classes" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.upload_error error={:not_accepted} variant={:admin} alert? />
+        """)
+
+      assert html =~ "alert-danger"
+      assert html =~ "unacceptable file type"
+    end
+
+    test "variant selects context-specific copy" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.upload_error error={:too_large} variant={:avatar} />
+        """)
+
+      assert html =~ "Image must be under 10 MB"
+    end
+  end
+
   describe "at_glance_grid/1 and at_glance_stat/1" do
     test "renders responsive grid with blue accent stat tiles" do
       assigns = %{}

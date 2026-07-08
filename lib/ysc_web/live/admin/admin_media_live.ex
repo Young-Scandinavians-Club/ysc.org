@@ -277,26 +277,15 @@ defmodule YscWeb.AdminMediaLive do
                       </button>
                     </figure>
 
-                    <%!-- Phoenix.Component.upload_errors/2 returns a list of error atoms --%>
                     <%= for err <- upload_errors(@uploads.media_uploads, entry) do %>
-                      <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="-mt-0.5 h-5 w-5"
-                        /> {error_to_string(err)}
-                      </p>
+                      <.upload_error error={err} variant={:admin} alert? />
                     <% end %>
                   </article>
                 <% end %>
               </div>
 
-              <%!-- Phoenix.Component.upload_errors/1 returns a list of error atoms --%>
               <%= for err <- upload_errors(@uploads.media_uploads) do %>
-                <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
-                    err
-                  )}
-                </p>
+                <.upload_error error={err} variant={:admin} alert? />
               <% end %>
 
               <div :if={length(@uploads.media_uploads.entries) == 0}>
@@ -1261,21 +1250,6 @@ defmodule YscWeb.AdminMediaLive do
 
     {:ok, meta, socket}
   end
-
-  defp error_to_string(:too_large), do: "Too large"
-
-  defp error_to_string(:not_accepted),
-    do: "You have selected an unacceptable file type"
-
-  defp error_to_string(:too_many_files), do: "You have selected too many files"
-
-  defp error_to_string(:external_client_failure) do
-    "Upload failed: The file could not be uploaded to storage. " <>
-      "This may be due to network issues, CORS configuration, or invalid credentials. " <>
-      "Please check the browser console for more details."
-  end
-
-  defp error_to_string(_), do: "An error occurred"
 
   defp upload_entries_in_progress?(socket, upload_name) do
     socket.assigns.uploads[upload_name].entries
