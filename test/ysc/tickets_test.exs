@@ -11,6 +11,7 @@ defmodule Ysc.TicketsTest do
   alias Ysc.Tickets
   alias Ysc.Tickets.TicketOrder
   import Ysc.AccountsFixtures
+  import Ysc.EventsFixtures
   import Ysc.TicketsFixtures
 
   defp user_fixture_unique(attrs \\ %{}) do
@@ -1357,6 +1358,349 @@ defmodule Ysc.TicketsTest do
 
       assert {:error, :payment_required} =
                Tickets.process_free_ticket_order(order)
+    end
+  end
+
+  describe "grant_admin_tickets/4" do
+    setup do
+      tickets_setup()
+      |> Map.put(:admin, user_fixture_unique())
+    end
+
+    test "creates a completed order with confirmed tickets", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier1.id => 2},
+                 admin_grant_notes: "WP order #99"
+               )
+
+      order = Tickets.get_ticket_order(order.id)
+      assert order.status == :completed
+      assert order.granted_by_id == admin.id
+      assert order.admin_grant_notes == "WP order #99"
+      assert Money.zero?(order.total_amount)
+      assert length(order.tickets) == 2
+      assert Enum.all?(order.tickets, &(&1.status == :confirmed))
+
+      summary = Events.get_ticket_purchase_summary(event.id)
+      purchase = Enum.find(summary, &(&1.user_id == user.id))
+      assert purchase.ticket_count == 2
+    end
+
+    test "enforces capacity unless skip_capacity is true", %{
+      admin: admin,
+      user: user,
+      event: event
+    } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Limited",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 1,
+          event_id: event.id
+        })
+
+      assert {:ok, _order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      assert {:error, :tier_validation_failed} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier.id => 1}
+               )
+
+      other = user_fixture_unique()
+
+      assert {:ok, _order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 other.id,
+                 event.id,
+                 %{tier.id => 1},
+                 skip_capacity: true
+               )
+    end
+
+    test "skip_capacity alone does not bypass publish or past-event checks", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+
+      {:ok, event} =
+        Events.update_event(event, %{
+          start_date: past
+        })
+
+      assert {:error, :event_in_past} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier1.id => 1},
+                 skip_capacity: true
+               )
+
+      {:ok, future_event} =
+        Events.update_event(event, %{
+          start_date:
+            DateTime.add(
+              DateTime.truncate(DateTime.utc_now(), :second),
+              30,
+              :day
+            ),
+          state: :draft
+        })
+
+      assert {:error, :event_not_available} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 future_event.id,
+                 %{tier1.id => 1},
+                 skip_capacity: true
+               )
+    end
+
+    test "skip_sale_guards allows legacy migration grants on past events", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+
+      {:ok, event} =
+        Events.update_event(event, %{
+          start_date: past
+        })
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 event.id,
+                 %{tier1.id => 1},
+                 skip_capacity: true,
+                 skip_sale_guards: true
+               )
+
+      order = Tickets.get_ticket_order(order.id)
+      assert order.status == :completed
+      assert length(order.tickets) == 1
+    end
+
+    test "grants tickets without requiring active membership", %{
+      admin: admin,
+      event: event,
+      tier1: tier1
+    } do
+      member = user_fixture_unique()
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 member.id,
+                 event.id,
+                 %{tier1.id => 1}
+               )
+
+      order = Tickets.get_ticket_order(order.id)
+      assert hd(order.tickets).user_id == member.id
+    end
+
+    test "auto-creates registration details when tier requires registration", %{
+      admin: admin,
+      user: user,
+      event: event
+    } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Registered GA",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 10,
+          requires_registration: true,
+          event_id: event.id
+        })
+
+      assert {:ok, order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      ticket = hd(order.tickets)
+      detail = Events.get_ticket_detail_for_ticket(ticket.id)
+
+      assert detail.first_name == user.first_name
+      assert detail.last_name == user.last_name
+      assert detail.email == user.email
+    end
+
+    test "rejects registration tiers when member profile is incomplete", %{
+      admin: admin,
+      event: event
+    } do
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Registered GA",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 10,
+          requires_registration: true,
+          event_id: event.id
+        })
+
+      member = user_fixture_unique()
+
+      member
+      |> Ecto.Changeset.change(%{first_name: nil, last_name: nil})
+      |> Ysc.Repo.update!()
+
+      assert {:error, :incomplete_member_profile} =
+               Tickets.grant_admin_tickets(admin.id, member.id, event.id, %{
+                 tier.id => 1
+               })
+    end
+
+    test "fulfills active reservations on granted tiers so checkout cannot double-book",
+         %{
+           admin: admin,
+           user: user,
+           event: event
+         } do
+      organizer = user_fixture_unique()
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "Single Seat",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 1,
+          event_id: event.id
+        })
+
+      {:ok, reservation} =
+        Events.create_ticket_reservation(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          quantity: 1,
+          created_by_id: organizer.id,
+          status: "active"
+        })
+
+      assert {:ok, grant_order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier.id => 1
+               })
+
+      reservation = Ysc.Repo.reload!(reservation)
+      assert reservation.status == "fulfilled"
+      assert reservation.ticket_order_id == grant_order.id
+
+      grant_order = Tickets.get_ticket_order(grant_order.id)
+      assert length(grant_order.tickets) == 1
+      assert hd(grant_order.tickets).status == :confirmed
+
+      assert {:error, :tier_validation_failed} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+    end
+
+    test "cancels pending checkout orders for the recipient before granting", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:ok, pending_order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, grant_order} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier1.id => 1
+               })
+
+      pending_order = Tickets.get_ticket_order(pending_order.id)
+      assert pending_order.status == :cancelled
+
+      assert pending_order.cancellation_reason ==
+               "Superseded by admin ticket grant"
+
+      assert Enum.all?(pending_order.tickets, &(&1.status == :cancelled))
+
+      grant_order = Tickets.get_ticket_order(grant_order.id)
+      assert grant_order.status == :completed
+      assert length(grant_order.tickets) == 1
+      assert hd(grant_order.tickets).status == :confirmed
+    end
+
+    test "skip_email prevents confirmation email scheduling", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _order} =
+                 Tickets.grant_admin_tickets(
+                   admin.id,
+                   user.id,
+                   event.id,
+                   %{tier1.id => 1},
+                   skip_email: true
+                 )
+
+        refute_enqueued(worker: YscWeb.Workers.EmailNotifier)
+      end)
+    end
+
+    test "rejects donation tiers and partiful events", %{
+      admin: admin,
+      user: user,
+      tier1: tier1
+    } do
+      {:ok, donation_tier} =
+        Events.create_ticket_tier(%{
+          name: "Donation",
+          type: :donation,
+          price: Money.new(0, :USD),
+          quantity: nil,
+          event_id: tier1.event_id
+        })
+
+      assert {:error, :donation_tier_not_grantable} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 tier1.event_id,
+                 %{donation_tier.id => 1}
+               )
+
+      partiful_event =
+        event_fixture(%{partiful_link: "https://partiful.com/e/test"})
+
+      assert {:error, :partiful_event} =
+               Tickets.grant_admin_tickets(
+                 admin.id,
+                 user.id,
+                 partiful_event.id,
+                 %{tier1.id => 1}
+               )
     end
   end
 end

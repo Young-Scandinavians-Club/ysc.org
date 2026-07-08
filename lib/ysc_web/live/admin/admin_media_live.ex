@@ -401,10 +401,7 @@ defmodule YscWeb.AdminMediaLive do
             </div>
 
             <.button phx-click={JS.patch(~p"/admin/media/upload")}>
-              <.icon name="hero-photo" class="w-5 h-5 -mt-0.5" />
-              <span class="ms-1">
-                New Image
-              </span>
+              <.icon name="hero-photo" class="w-5 h-5" /> New Image
             </.button>
           </div>
         </div>
@@ -548,10 +545,7 @@ defmodule YscWeb.AdminMediaLive do
                 Upload your first image to get started
               </p>
               <.button phx-click={JS.patch(~p"/admin/media/upload")}>
-                <.icon name="hero-cloud-arrow-up" class="w-5 h-5 -mt-0.5" />
-                <span class="ms-1">
-                  Upload Image
-                </span>
+                <.icon name="hero-cloud-arrow-up" class="w-5 h-5" /> Upload Image
               </.button>
             </div>
           </div>

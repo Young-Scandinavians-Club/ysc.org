@@ -27,17 +27,11 @@ defmodule YscWeb.AdminEventsLive do
 
         <div class="flex items-center gap-3">
           <.button navigate={~p"/admin/scanner"}>
-            <.icon name="hero-qr-code" class="w-5 h-5 -mt-0.5" />
-            <span class="ms-1">
-              Check-in &amp; Scan
-            </span>
+            <.icon name="hero-qr-code" class="w-5 h-5" /> Check-in &amp; Scan
           </.button>
 
           <.button navigate={~p"/admin/events/new"}>
-            <.icon name="hero-calendar" class="w-5 h-5 -mt-0.5" />
-            <span class="ms-1">
-              New Event
-            </span>
+            <.icon name="hero-calendar" class="w-5 h-5" /> New Event
           </.button>
         </div>
       </div>

@@ -738,11 +738,10 @@ defmodule YscWeb.AdminGhostComponents do
             color="zinc"
             class="hidden sm:inline-flex text-sm"
           >
-            <.icon name="hero-identification" class="w-5 h-5 me-1 mt-0.5" />
-            Membership Check-in
+            <.icon name="hero-identification" class="w-5 h-5" /> Membership Check-in
           </.button>
           <.button class="hidden sm:inline-flex text-sm">
-            <.icon name="hero-qr-code" class="w-5 h-5 me-1 mt-0.5" /> QR Scanner
+            <.icon name="hero-qr-code" class="w-5 h-5" /> QR Scanner
           </.button>
         </div>
       </.admin_check_in_sticky_bar>
@@ -1501,7 +1500,7 @@ defmodule YscWeb.AdminGhostComponents do
           id="ghost-public-get-tickets"
           class="w-full py-3.5 uppercase tracking-widest text-sm"
         >
-          <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" /> Get Tickets
+          <.icon name="hero-ticket" class="w-5 h-5" /> Get Tickets
         </.button>
       </div>
     </aside>

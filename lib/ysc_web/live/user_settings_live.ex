@@ -123,7 +123,7 @@ defmodule YscWeb.UserSettingsLive do
                       else: ""
                   }
                 >
-                  <.icon name="hero-check-circle" class="w-5 h-5 me-1 -mt-0.5" />Verify Phone Number
+                  <.icon name="hero-check-circle" class="w-5 h-5" />Verify Phone Number
                 </.button>
               </div>
             </:actions>
@@ -207,7 +207,7 @@ defmodule YscWeb.UserSettingsLive do
                       else: ""
                   }
                 >
-                  <.icon name="hero-check-circle" class="w-5 h-5 me-1 -mt-0.5" />Verify Email Address
+                  <.icon name="hero-check-circle" class="w-5 h-5" />Verify Email Address
                 </.button>
               </div>
             </:actions>
@@ -948,8 +948,7 @@ defmodule YscWeb.UserSettingsLive do
                 :if={@current_membership != nil}
                 phx-click="show_membership_qr"
               >
-                <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
-                My Membership QR
+                <.icon name="hero-qr-code" class="w-5 h-5" /> My Membership QR
               </.button>
               <div
                 :if={@pending_family_invites != []}
@@ -1038,8 +1037,7 @@ defmodule YscWeb.UserSettingsLive do
                 </div>
               </div>
               <.button phx-click="show_membership_qr">
-                <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
-                My Membership QR
+                <.icon name="hero-qr-code" class="w-5 h-5" /> My Membership QR
               </.button>
               <.link
                 navigate={~p"/users/settings/family"}
@@ -1310,7 +1308,7 @@ defmodule YscWeb.UserSettingsLive do
                           }
                           phx-disable-with="Processing..."
                         >
-                          <.icon name="hero-shield-check" class="w-5 h-5 me-1.5" />
+                          <.icon name="hero-shield-check" class="w-5 h-5" />
                           Complete Membership Purchase
                         </.button>
                         <p class="text-xs text-zinc-400 flex items-center gap-1">
@@ -1436,15 +1434,14 @@ defmodule YscWeb.UserSettingsLive do
                     phx-click="show_membership_qr"
                     class="w-full sm:w-auto justify-center"
                   >
-                    <.icon name="hero-qr-code" class="w-5 h-5 me-1.5 -mt-0.5" />
-                    My Membership QR
+                    <.icon name="hero-qr-code" class="w-5 h-5" /> My Membership QR
                   </.button>
                   <.button
                     patch={~p"/users/membership/payment-method"}
                     variant="outline"
                     class="w-full sm:w-auto justify-center"
                   >
-                    <.icon name="hero-credit-card" class="w-5 h-5 me-1.5 -mt-0.5" />
+                    <.icon name="hero-credit-card" class="w-5 h-5" />
                     Change Payment Method
                   </.button>
                   <.button
@@ -1716,8 +1713,7 @@ defmodule YscWeb.UserSettingsLive do
                       phx-disable-with="Changing..."
                       type="button"
                     >
-                      <.icon name="hero-arrows-right-left" class="me-2 -mt-0.5" />
-                      Change Membership Plan
+                      <.icon name="hero-arrows-right-left" /> Change Membership Plan
                     </.button>
                   </div>
                 </.form>

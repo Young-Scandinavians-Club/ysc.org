@@ -1,0 +1,26 @@
+name: Setup Elixir
+description: Install Erlang/Elixir from .tool-versions and pin Hex (2.5.1-dev until released)
+inputs:
+  version-file:
+    description: Path to .tool-versions or mise.toml
+    required: false
+    default: .tool-versions
+outputs:
+  otp-version:
+    description: Installed OTP version
+    value: ${{ steps.setup-beam.outputs.otp-version }}
+  elixir-version:
+    description: Installed Elixir version
+    value: ${{ steps.setup-beam.outputs.elixir-version }}
+runs:
+  using: composite
+  steps:
+    - id: setup-beam
+      uses: erlef/setup-beam@fc68ffb90438ef2936bbb3251622353b3dcb2f93 # v1.24.0
+      with:
+        version-file: ${{ inputs.version-file }}
+        version-type: strict
+
+    - name: Install Hex
+      shell: bash
+      run: ./etc/scripts/install_hex.sh

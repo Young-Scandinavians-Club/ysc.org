@@ -223,8 +223,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <:actions>
           <div class="flex justify-end w-full">
             <.button type="submit" phx-disable-with="Saving...">
-              Confirm & Continue
-              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+              Confirm & Continue <.icon name="hero-arrow-right" class="w-4 h-4" />
             </.button>
           </div>
         </:actions>
@@ -275,8 +274,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <:actions>
           <div class="flex justify-end w-full">
             <.button type="submit" phx-disable-with="Saving...">
-              Confirm & Continue
-              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+              Confirm & Continue <.icon name="hero-arrow-right" class="w-4 h-4" />
             </.button>
           </div>
         </:actions>
@@ -337,8 +335,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               id="confirm-membership-selection"
               disabled={@membership_plan == :unknown}
             >
-              Confirm & Continue
-              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1 -mt-0.5" />
+              Confirm & Continue <.icon name="hero-arrow-right" class="w-4 h-4" />
             </.button>
           </div>
         </:actions>

@@ -240,8 +240,7 @@ defmodule YscWeb.AdminScannerLive do
               color="blue"
               class="shrink-0"
             >
-              <.icon name="hero-arrow-down-tray" class="w-4 h-4 -mt-0.5 me-1" />
-              Export CSV
+              <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> Export CSV
             </.button>
           </div>
 

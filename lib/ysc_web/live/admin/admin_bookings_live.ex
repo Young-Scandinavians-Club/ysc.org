@@ -96,7 +96,7 @@ defmodule YscWeb.AdminBookingsLive do
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this blackout?"
                 >
-                  <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
+                  <.icon name="hero-trash" class="w-4 h-4" /> Delete
                 </.button>
               </div>
               <div class="flex gap-2">
@@ -250,7 +250,7 @@ defmodule YscWeb.AdminBookingsLive do
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this pricing rule?"
                 >
-                  <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
+                  <.icon name="hero-trash" class="w-4 h-4" /> Delete
                 </.button>
               </div>
               <div class="flex gap-2">
@@ -959,8 +959,7 @@ defmodule YscWeb.AdminBookingsLive do
               data-confirm="Are you sure you want to process a refund for this booking? This action will initiate a refund through Stripe."
               class="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto"
             >
-              <.icon name="hero-arrow-uturn-left" class="w-4 h-4 -mt-0.5" />
-              <span class="ms-1">Process Refund</span>
+              <.icon name="hero-arrow-uturn-left" class="w-4 h-4" /> Process Refund
             </.button>
           </div>
           <div class="flex flex-col gap-2 sm:flex-row sm:gap-2 w-full sm:w-auto">
@@ -981,8 +980,7 @@ defmodule YscWeb.AdminBookingsLive do
               phx-disable-with="Loading..."
               class="w-full sm:w-auto"
             >
-              <.icon name="hero-pencil" class="w-4 h-4 -mt-0.5" />
-              <span>Edit</span>
+              <.icon name="hero-pencil" class="w-4 h-4" /> Edit
             </.button>
             <.button
               variant="outline"
@@ -1617,7 +1615,7 @@ defmodule YscWeb.AdminBookingsLive do
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this booking? This action cannot be undone."
                 >
-                  <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
+                  <.icon name="hero-trash" class="w-4 h-4" /> Delete
                 </.button>
               </div>
               <div class="flex gap-2">
@@ -1806,7 +1804,7 @@ defmodule YscWeb.AdminBookingsLive do
                   phx-disable-with="Deleting..."
                   data-confirm="Are you sure you want to delete this room?"
                 >
-                  <.icon name="hero-trash" class="w-4 h-4 -mt-0.5" /> Delete
+                  <.icon name="hero-trash" class="w-4 h-4" /> Delete
                 </.button>
               </div>
               <div class="flex gap-2">
@@ -2930,10 +2928,7 @@ defmodule YscWeb.AdminBookingsLive do
               }
               phx-disable-with="Loading..."
             >
-              <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
-              <span class="ms-1">
-                New Pricing Rule
-              </span>
+              <.icon name="hero-plus" class="w-5 h-5" />New Pricing Rule
             </.button>
           </div>
 
@@ -3034,10 +3029,7 @@ defmodule YscWeb.AdminBookingsLive do
               }
               phx-disable-with="Loading..."
             >
-              <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
-              <span class="ms-1">
-                New Refund Policy
-              </span>
+              <.icon name="hero-plus" class="w-5 h-5" /> New Refund Policy
             </.button>
           </div>
 
@@ -3142,10 +3134,7 @@ defmodule YscWeb.AdminBookingsLive do
               }
               phx-disable-with="Loading..."
             >
-              <.icon name="hero-plus" class="w-5 h-5 -mt-0.5" />
-              <span class="ms-1">
-                New Room
-              </span>
+              <.icon name="hero-plus" class="w-5 h-5" /> New Room
             </.button>
           </div>
 

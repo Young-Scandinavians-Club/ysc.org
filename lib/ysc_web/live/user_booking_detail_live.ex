@@ -178,7 +178,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 color="zinc"
                 id="change-reservation-button"
               >
-                <.icon name="hero-pencil-square" class="w-5 h-5 me-1 -mt-0.5" />
+                <.icon name="hero-pencil-square" class="w-5 h-5" />
                 Change Reservation
               </.button>
               <.button
@@ -186,8 +186,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 phx-click="show-cancel-modal"
                 color="red"
               >
-                <.icon name="hero-x-circle" class="w-5 h-5 me-1 -mt-0.5" />
-                Cancel Booking
+                <.icon name="hero-x-circle" class="w-5 h-5" /> Cancel Booking
               </.button>
             </div>
           </div>

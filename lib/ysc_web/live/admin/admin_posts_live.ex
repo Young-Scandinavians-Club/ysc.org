@@ -26,10 +26,7 @@ defmodule YscWeb.AdminPostsLive do
         </div>
 
         <.button id="admin-posts-new-post" navigate={~p"/admin/posts/new"}>
-          <.icon name="hero-document-plus" class="w-5 h-5 -mt-0.5" />
-          <span class="ms-1">
-            New Post
-          </span>
+          <.icon name="hero-document-plus" class="w-5 h-5" /> New Post
         </.button>
       </div>
 
