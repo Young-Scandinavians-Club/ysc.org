@@ -11,7 +11,7 @@
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hello <%= @first_name %>!</mj-text>
     <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We noticed a login to Young Scandinavians Club from a new device or browser.</mj-text>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><%= @intro_text %></mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px"><strong>Platform:</strong> <%= @device %></mj-text>
     <mj-spacer height="12px"></mj-spacer>

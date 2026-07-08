@@ -487,12 +487,48 @@ defmodule Ysc.Accounts.AuthServiceTest do
   end
 
   describe "unfamiliar sign-in notifications" do
-    test "schedules email on unfamiliar first sign-in" do
+    test "does not schedule email on first-ever sign-in" do
       user = user_fixture()
       conn = mock_conn()
 
       Oban.Testing.with_testing_mode(:manual, fn ->
         {:ok, _auth_event} = AuthService.log_login_success(user, conn)
+
+        refute_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template" => "new_sign_in_detected"}
+        )
+      end)
+    end
+
+    test "schedules email on unfamiliar sign-in with prior history" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        country: "US",
+        region: "California",
+        city: "San Francisco",
+        ip_address: "203.0.113.1"
+      })
+
+      unfamiliar_conn =
+        mock_conn(%{
+          req_headers: [
+            {"user-agent",
+             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+            {"x-forwarded-for", "198.51.100.1"},
+            {"x-real-ip", "198.51.100.1"},
+            {"origin", "https://example.com"},
+            {"referer", "https://example.com/login"}
+          ]
+        })
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _auth_event} =
+          AuthService.log_login_success(user, unfamiliar_conn)
 
         assert_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
@@ -505,8 +541,12 @@ defmodule Ysc.Accounts.AuthServiceTest do
       user = user_fixture()
       conn = mock_conn()
 
-      {:ok, first_event} = AuthService.log_login_success(user, conn)
-      insert_prior_login_from_event!(user, first_event)
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Unknown",
+        operating_system: "Windows",
+        ip_address: "203.0.113.1"
+      })
 
       Oban.Testing.with_testing_mode(:manual, fn ->
         {:ok, _second_event} = AuthService.log_login_success(user, conn)

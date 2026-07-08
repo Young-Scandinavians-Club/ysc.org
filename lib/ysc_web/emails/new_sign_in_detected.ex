@@ -19,16 +19,14 @@ defmodule YscWeb.Emails.NewSignInDetected do
   Builds render assigns at send time so location can include async geo enrichment.
   """
   def prepare_email_data(user, auth_event_id) do
-    {:ok, auth_event} = AuthService.fetch_auth_event_for_email(auth_event_id)
-    auth_event = AuthService.enrich_auth_event_geo(auth_event)
+    case AuthService.fetch_auth_event_for_email(user.id, auth_event_id) do
+      {:ok, auth_event} ->
+        auth_event = AuthService.enrich_auth_event_geo(auth_event)
+        {:ok, build_assigns(user, auth_event)}
 
-    %{
-      first_name: Ysc.title_case(user.first_name),
-      signed_in_at: EmailHelpers.format_datetime(auth_event.inserted_at),
-      device: EmailHelpers.sign_in_device_description(auth_event),
-      location: EmailHelpers.sign_in_location(auth_event),
-      security_url: EmailHelpers.security_settings_url()
-    }
+      {:error, :not_found} ->
+        {:error, :auth_event_not_found}
+    end
   end
 
   @doc """
@@ -36,6 +34,7 @@ defmodule YscWeb.Emails.NewSignInDetected do
   """
   def text_body(%{
         first_name: first_name,
+        intro_text: intro_text,
         signed_in_at: signed_in_at,
         device: device,
         location: location,
@@ -46,7 +45,7 @@ defmodule YscWeb.Emails.NewSignInDetected do
 
     Hi #{first_name},
 
-    We noticed a login to Young Scandinavians Club from a new device or browser.
+    #{intro_text}
 
     Platform: #{device}
     Location: #{location}
@@ -59,5 +58,39 @@ defmodule YscWeb.Emails.NewSignInDetected do
 
     ==============================
     """
+  end
+
+  defp build_assigns(user, auth_event) do
+    %{
+      first_name: Ysc.title_case(user.first_name),
+      intro_text: intro_text(auth_event),
+      signed_in_at: EmailHelpers.format_datetime(auth_event.inserted_at),
+      device: EmailHelpers.sign_in_device_description(auth_event),
+      location: EmailHelpers.sign_in_location(auth_event),
+      security_url: EmailHelpers.security_settings_url()
+    }
+  end
+
+  defp intro_text(%{threat_indicators: indicators}) when is_list(indicators) do
+    new_device? = "new_device" in indicators
+    unusual_location? = "unusual_location" in indicators
+
+    cond do
+      new_device? and unusual_location? ->
+        "We noticed a login to Young Scandinavians Club from a new device or location."
+
+      new_device? ->
+        "We noticed a login to Young Scandinavians Club from a new device or browser."
+
+      unusual_location? ->
+        "We noticed a login to Young Scandinavians Club from a new location."
+
+      true ->
+        "We noticed a login to Young Scandinavians Club."
+    end
+  end
+
+  defp intro_text(_auth_event) do
+    "We noticed a login to Young Scandinavians Club."
   end
 end

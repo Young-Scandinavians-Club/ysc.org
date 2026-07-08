@@ -162,6 +162,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     test "NewSignInDetected renders", %{user: user} do
       assigns = %{
         first_name: user.first_name,
+        intro_text:
+          "We noticed a login to Young Scandinavians Club from a new device or browser.",
         signed_in_at: "July 8, 2026 at 10:30 AM PDT",
         device: "Chrome on macOS",
         location: "Stockholm, Stockholm, SE (24.206.103.29)",
