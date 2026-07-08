@@ -59,6 +59,65 @@ defmodule YscWeb.Emails.Helpers do
   def payment_methods_url, do: absolute_url("/users/payment-methods")
 
   @doc """
+  Absolute URL for the member security settings page.
+  """
+  def security_settings_url, do: absolute_url("/users/settings/security")
+
+  @doc """
+  Formats sign-in method from an auth event for email copy.
+  """
+  def sign_in_method_label(%{metadata: metadata}) when is_map(metadata) do
+    method = Map.get(metadata, "auth_method") || Map.get(metadata, :auth_method)
+
+    case method do
+      "email_password" -> "Password"
+      "passkey" -> "Passkey"
+      "google" -> "Google"
+      "facebook" -> "Facebook"
+      "oauth" -> "Google or Facebook"
+      other when is_binary(other) and other != "" -> String.capitalize(other)
+      _ -> "Sign-in"
+    end
+  end
+
+  def sign_in_method_label(_), do: "Sign-in"
+
+  @doc """
+  Formats device/browser details from an auth event for email copy.
+  """
+  def sign_in_device_description(%{browser: browser, operating_system: os}) do
+    browser_label = browser || "Unknown browser"
+    os_label = os || "Unknown OS"
+    "#{browser_label} on #{os_label}"
+  end
+
+  @doc """
+  Formats location from an auth event for email copy.
+  """
+  def sign_in_location(event) do
+    geo =
+      [event.city, event.region, event.country]
+      |> Enum.reject(&(is_nil(&1) || &1 == ""))
+      |> case do
+        [] -> nil
+        parts -> Enum.join(parts, ", ")
+      end
+
+    ip =
+      case event.ip_address do
+        ip when is_binary(ip) and ip != "" -> ip
+        _ -> nil
+      end
+
+    case {geo, ip} do
+      {geo, ip} when is_binary(geo) and is_binary(ip) -> "#{geo} (#{ip})"
+      {geo, _} when is_binary(geo) -> geo
+      {_, ip} when is_binary(ip) -> ip
+      _ -> "Unknown location"
+    end
+  end
+
+  @doc """
   Absolute URL for the public news listing.
   """
   def news_url, do: absolute_url("/news")

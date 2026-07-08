@@ -151,43 +151,61 @@ defmodule YscWeb.Workers.EmailNotifier do
           raise error_message
         end
 
-        atomized_params = atomize_keys(params.params)
-        Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
+        case resolve_render_content(
+               template_module,
+               params.params,
+               params.text_body,
+               final_user_id
+             ) do
+          {:ok, {atomized_params, text_body}} ->
+            Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
 
-        # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
-        normalized_recipient = normalize_recipient(params.recipient)
+            # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
+            normalized_recipient = normalize_recipient(params.recipient)
 
-        result =
-          YscWeb.Emails.Notifier.send_email_idempotent(
-            normalized_recipient,
-            params.idempotency_key,
-            params.subject,
-            template_module,
-            atomized_params,
-            params.text_body,
-            final_user_id,
-            email_send_opts(params)
-          )
+            result =
+              YscWeb.Emails.Notifier.send_email_idempotent(
+                normalized_recipient,
+                params.idempotency_key,
+                params.subject,
+                template_module,
+                atomized_params,
+                text_body,
+                final_user_id,
+                email_send_opts(params)
+              )
 
-        case result do
-          {:ok, _email} ->
-            Ysc.Logging.info("Email sent successfully",
-              job_id: params.job.id,
-              recipient: params.recipient,
-              idempotency_key: params.idempotency_key
-            )
+            case result do
+              {:ok, _email} ->
+                Ysc.Logging.info("Email sent successfully",
+                  job_id: params.job.id,
+                  recipient: params.recipient,
+                  idempotency_key: params.idempotency_key
+                )
 
-            :ok
+                :ok
+
+              {:error, reason} ->
+                Ysc.Logging.warning("Failed to send email",
+                  job_id: params.job.id,
+                  recipient: params.recipient,
+                  idempotency_key: params.idempotency_key,
+                  error: reason
+                )
+
+                {:error, reason}
+            end
 
           {:error, reason} ->
-            Ysc.Logging.warning("Failed to send email",
+            Ysc.Logging.warning("Email render skipped",
               job_id: params.job.id,
               recipient: params.recipient,
               idempotency_key: params.idempotency_key,
-              error: reason
+              template: params.template,
+              reason: reason
             )
 
-            {:error, reason}
+            :ok
         end
       rescue
         error ->
@@ -215,6 +233,42 @@ defmodule YscWeb.Workers.EmailNotifier do
       :ok
     end
   end
+
+  defp resolve_render_content(template_module, job_params, text_body, user_id) do
+    if deferred_email_params?(template_module, job_params) do
+      if is_nil(user_id) do
+        {:error, :missing_user_id}
+      else
+        user = Ysc.Accounts.get_user!(user_id)
+        auth_event_id = Map.get(job_params, "auth_event_id")
+
+        case template_module.prepare_email_data(user, auth_event_id) do
+          {:ok, assigns} ->
+            body =
+              if function_exported?(template_module, :text_body, 1) do
+                template_module.text_body(assigns)
+              else
+                text_body
+              end
+
+            {:ok, {assigns, body}}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+      end
+    else
+      {:ok, {atomize_keys(job_params), text_body}}
+    end
+  end
+
+  defp deferred_email_params?(YscWeb.Emails.NewSignInDetected, %{
+         "auth_event_id" => auth_event_id
+       })
+       when is_binary(auth_event_id),
+       do: true
+
+  defp deferred_email_params?(_template_module, _job_params), do: false
 
   def atomize_keys(map) when is_map(map) do
     Map.new(map, fn {key, value} ->
