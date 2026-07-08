@@ -534,7 +534,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </span>
           </div>
           <p class="mt-2 text-sm text-zinc-600">
-            You won't be charged today — we'll only charge when your membership renews.
+            You won't be charged today unless your renewal date has already passed.
           </p>
           <div class="mt-6 flex items-center justify-between">
             <.button
