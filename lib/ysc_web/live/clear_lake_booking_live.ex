@@ -268,7 +268,11 @@ defmodule YscWeb.ClearLakeBookingLive do
         end
 
     guests_changed = guests_count != socket.assigns.guests_count
-    booking_mode_changed = booking_mode != socket.assigns.selected_booking_mode
+
+    # Treat omitted booking_mode as :day (the default) so info-tab-only URL patches
+    # do not trigger availability re-queries when the resolved mode is unchanged.
+    booking_mode_changed =
+      (booking_mode || :day) != socket.assigns.selected_booking_mode
 
     # Also check if can_book, booking_error_title, or booking_disabled_reason changed
     can_book_changed =

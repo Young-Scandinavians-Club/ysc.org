@@ -76,6 +76,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
         )
 
       assert query_count == 0
+      assert :sys.get_state(view.pid).socket.assigns.info_tab == :rules
     end
   end
 end
