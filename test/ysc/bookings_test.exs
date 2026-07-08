@@ -758,7 +758,9 @@ defmodule Ysc.BookingsTest do
     test "list_rooms_by_ids/1 filters nil ids and deduplicates" do
       room = create_room_fixture()
 
-      assert [%Room{id: id}] = Bookings.list_rooms_by_ids([room.id, nil, room.id])
+      assert [%Room{id: id}] =
+               Bookings.list_rooms_by_ids([room.id, nil, room.id])
+
       assert id == room.id
     end
 
