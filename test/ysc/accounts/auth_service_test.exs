@@ -416,6 +416,107 @@ defmodule Ysc.Accounts.AuthServiceTest do
       # We can't reliably test time-based detection without mocking time
       assert updated_event != nil
     end
+
+    test "flags new_device when browser fingerprint differs from recent history" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        country: "US",
+        region: "California",
+        city: "San Francisco",
+        ip_address: "203.0.113.1"
+      })
+
+      {:ok, auth_event} = AuthService.log_login_success(user, conn)
+
+      updated_event = Repo.get(AuthEvent, auth_event.id)
+      assert "new_device" in updated_event.threat_indicators
+      refute "unusual_location" in updated_event.threat_indicators
+    end
+
+    test "flags unusual_location when geo differs from recent history" do
+      user = user_fixture()
+
+      insert_prior_login!(user, %{
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "Windows",
+        country: "US",
+        region: "California",
+        city: "San Francisco",
+        ip_address: "203.0.113.1"
+      })
+
+      unfamiliar_conn =
+        mock_conn(%{
+          req_headers: [
+            {"user-agent",
+             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
+            {"x-forwarded-for", "198.51.100.1"},
+            {"x-real-ip", "198.51.100.1"},
+            {"origin", "https://example.com"},
+            {"referer", "https://example.com/login"}
+          ]
+        })
+
+      {:ok, auth_event} = AuthService.log_login_success(user, unfamiliar_conn)
+
+      updated_event = Repo.get(AuthEvent, auth_event.id)
+      assert "unusual_location" in updated_event.threat_indicators
+      refute "new_device" in updated_event.threat_indicators
+    end
+
+    test "does not flag familiar device and location on repeat login" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, first_event} = AuthService.log_login_success(user, conn)
+
+      insert_prior_login_from_event!(user, first_event)
+
+      {:ok, second_event} = AuthService.log_login_success(user, conn)
+      updated_event = Repo.get(AuthEvent, second_event.id)
+
+      refute "new_device" in updated_event.threat_indicators
+      refute "unusual_location" in updated_event.threat_indicators
+    end
+  end
+
+  describe "unfamiliar sign-in notifications" do
+    test "schedules email on unfamiliar first sign-in" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _auth_event} = AuthService.log_login_success(user, conn)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template" => "new_sign_in_detected", "user_id" => user.id}
+        )
+      end)
+    end
+
+    test "does not schedule email on familiar repeat sign-in" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, first_event} = AuthService.log_login_success(user, conn)
+      insert_prior_login_from_event!(user, first_event)
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _second_event} = AuthService.log_login_success(user, conn)
+
+        refute_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{"template" => "new_sign_in_detected"}
+        )
+      end)
+    end
   end
 
   describe "check_account_lockout/2" do
@@ -1005,5 +1106,32 @@ defmodule Ysc.Accounts.AuthServiceTest do
       assert auth_event.latitude == 42.16
       assert auth_event.longitude == -70.81
     end
+  end
+
+  defp insert_prior_login!(user, attrs) do
+    base = %{
+      ip_address: "203.0.113.1",
+      user_agent: "Mozilla/5.0",
+      metadata: %{"auth_method" => "email_password"}
+    }
+
+    attrs = Map.merge(base, attrs)
+
+    user
+    |> AuthEvent.login_success_changeset(attrs)
+    |> Repo.insert!()
+  end
+
+  defp insert_prior_login_from_event!(user, event) do
+    insert_prior_login!(user, %{
+      device_type: event.device_type,
+      browser: event.browser,
+      operating_system: event.operating_system,
+      country: event.country,
+      region: event.region,
+      city: event.city,
+      ip_address: event.ip_address,
+      metadata: event.metadata
+    })
   end
 end

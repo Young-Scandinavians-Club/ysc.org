@@ -151,7 +151,14 @@ defmodule YscWeb.Workers.EmailNotifier do
           raise error_message
         end
 
-        atomized_params = atomize_keys(params.params)
+        {atomized_params, text_body} =
+          resolve_render_content(
+            template_module,
+            params.params,
+            params.text_body,
+            final_user_id
+          )
+
         Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
 
         # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
@@ -164,7 +171,7 @@ defmodule YscWeb.Workers.EmailNotifier do
             params.subject,
             template_module,
             atomized_params,
-            params.text_body,
+            text_body,
             final_user_id,
             email_send_opts(params)
           )
@@ -215,6 +222,34 @@ defmodule YscWeb.Workers.EmailNotifier do
       :ok
     end
   end
+
+  defp resolve_render_content(template_module, job_params, text_body, user_id) do
+    if deferred_email_params?(template_module, job_params) do
+      user = Ysc.Accounts.get_user!(user_id)
+      auth_event_id = Map.get(job_params, "auth_event_id")
+      assigns = template_module.prepare_email_data(user, auth_event_id)
+
+      body =
+        if function_exported?(template_module, :text_body, 1) do
+          template_module.text_body(assigns)
+        else
+          text_body
+        end
+
+      {assigns, body}
+    else
+      {atomize_keys(job_params), text_body}
+    end
+  end
+
+  defp deferred_email_params?(template_module, %{
+         "auth_event_id" => auth_event_id
+       })
+       when is_binary(auth_event_id) do
+    function_exported?(template_module, :prepare_email_data, 2)
+  end
+
+  defp deferred_email_params?(_template_module, _job_params), do: false
 
   def atomize_keys(map) when is_map(map) do
     Map.new(map, fn {key, value} ->
