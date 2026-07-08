@@ -22,6 +22,7 @@ defmodule Ysc.BookingsTest do
   import Ecto.Query
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -737,6 +738,39 @@ defmodule Ysc.BookingsTest do
       assert {:ok, %Room{}} = Bookings.delete_room(room)
       assert_raise Ecto.NoResultsError, fn -> Bookings.get_room!(room.id) end
     end
+
+    test "list_rooms_by_ids/1 returns rooms matching the given ids" do
+      room1 = create_room_fixture(%{property: :tahoe})
+      room2 = create_room_fixture(%{property: :tahoe})
+
+      results = Bookings.list_rooms_by_ids([room1.id, room2.id])
+
+      assert length(results) == 2
+
+      assert MapSet.new(Enum.map(results, & &1.id)) ==
+               MapSet.new([room1.id, room2.id])
+    end
+
+    test "list_rooms_by_ids/1 returns empty list for empty input" do
+      assert Bookings.list_rooms_by_ids([]) == []
+    end
+
+    test "list_rooms_by_ids/1 filters nil ids and deduplicates" do
+      room = create_room_fixture()
+
+      assert [%Room{id: id}] =
+               Bookings.list_rooms_by_ids([room.id, nil, room.id])
+
+      assert id == room.id
+    end
+
+    test "list_rooms_by_ids/1 ignores unknown ids" do
+      room = create_room_fixture()
+      missing = Ecto.ULID.generate()
+
+      assert [%Room{id: id}] = Bookings.list_rooms_by_ids([room.id, missing])
+      assert id == room.id
+    end
   end
 
   describe "room categories" do
@@ -1029,6 +1063,35 @@ defmodule Ysc.BookingsTest do
                Bookings.validate_bookings_for_check_in([booking])
 
       assert message =~ ref
+    end
+  end
+
+  describe "ensure_user_may_book/1" do
+    test "returns :ok for active users with lifetime membership" do
+      user = user_with_membership(:lifetime, %{state: :active})
+
+      assert :ok = Bookings.ensure_user_may_book(user)
+    end
+
+    test "rejects users without active membership" do
+      user = user_with_membership(:none, %{state: :active})
+
+      assert {:error, :membership_required} =
+               Bookings.ensure_user_may_book(user)
+    end
+
+    test "rejects non-active users before checking membership" do
+      user = user_with_membership(:lifetime, %{state: :suspended})
+
+      assert {:error, :application_pending_approval} =
+               Bookings.ensure_user_may_book(user)
+    end
+
+    test "rejects pending approval users" do
+      user = user_fixture(%{state: :pending_approval})
+
+      assert {:error, :application_pending_approval} =
+               Bookings.ensure_user_may_book(user)
     end
   end
 
