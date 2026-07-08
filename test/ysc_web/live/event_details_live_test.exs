@@ -282,12 +282,12 @@ defmodule YscWeb.EventDetailsLiveTest do
       render_async(view)
 
       assert html =~ event.title
-      assert html =~ "Member tickets require an active YSC membership"
+      assert html =~ "Member tickets require an active paid membership"
 
       assert has_element?(
                view,
                ~s(a[href="/users/membership"]),
-               "View membership status"
+               "View membership and payment options"
              )
 
       assert has_element?(

@@ -92,7 +92,7 @@ defmodule YscWeb.UserRegistrationLive do
 
                   <.checkgroup
                     field={rf[:membership_eligibility]}
-                    label="How do you qualify for membership? Check all that apply — you only need one to apply.*"
+                    label="How do you qualify for membership? Select every option that applies to you. You only need to meet one to qualify.*"
                     options={SignupApplication.eligibility_options()}
                   />
                   <p class="text-sm leading-6 text-zinc-600 mt-4">
@@ -377,7 +377,7 @@ defmodule YscWeb.UserRegistrationLive do
                       for={field.id}
                       class="flex flex-nowrap items-center gap-1.5 text-sm leading-6 text-zinc-600 cursor-pointer py-1"
                     >
-                      <span>I have read and agreed to the</span>
+                      <span>I have read and agree to the</span>
                       <.link
                         navigate={~p"/bylaws"}
                         target="_blank"

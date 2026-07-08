@@ -295,7 +295,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Choose Your Membership Type
         <:subtitle>
-          We couldn't find a membership type on record for your account. Please select the plan that best fits you.
+          Please confirm whether you have a single or family membership so we can set up billing correctly.
         </:subtitle>
       </.header>
 
@@ -511,7 +511,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         <.header class="text-left">
           Set Up Renewal Payment
           <:subtitle>
-            Add a card or bank account so your membership can renew automatically each year. You won't be charged today unless your renewal date has passed. You can skip for now and add a payment method later in account settings.
+            Add a card or bank account so your membership can renew automatically each year. You won't be charged today — we'll only charge when your membership renews. You can skip for now and add a payment method later in account settings.
           </:subtitle>
         </.header>
 
@@ -534,7 +534,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </span>
           </div>
           <p class="mt-2 text-sm text-zinc-600">
-            You won't be charged today unless your renewal date has already passed.
+            You won't be charged today — we'll only charge when your membership renews.
           </p>
           <div class="mt-6 flex items-center justify-between">
             <.button

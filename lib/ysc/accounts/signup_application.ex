@@ -263,7 +263,12 @@ defmodule Ysc.Accounts.SignupApplication do
   defp validate_agreed_to_bylaws(changeset) do
     case get_change(changeset, :agreed_to_bylaws) do
       true -> changeset
-      _ -> add_error(changeset, :agreed_to_bylaws, "must be accepted")
+      _ ->
+        add_error(
+          changeset,
+          :agreed_to_bylaws,
+          "Please check the box to confirm you agree to the bylaws"
+        )
     end
   end
 
