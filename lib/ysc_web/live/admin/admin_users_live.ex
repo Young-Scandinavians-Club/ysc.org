@@ -135,7 +135,9 @@ defmodule YscWeb.AdminUsersLive do
                     Timex.from_now(@selected_user_application.completed)
                 else
                   "Reviewed " <>
-                    DateTimeDisplay.format_utc_date(@selected_user_application.reviewed_at) <>
+                    DateTimeDisplay.format_utc_date(
+                      @selected_user_application.reviewed_at
+                    ) <>
                     " by " <> @selected_user_application.reviewed_by.email
                 end}
               </p>

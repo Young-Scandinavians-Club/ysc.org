@@ -1461,7 +1461,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                         Account ending in ••••{bank_account.account_number_last_4}
                       </h3>
                       <p class="text-sm text-zinc-600 mt-1">
-                        Added {DateTimeDisplay.format_utc_date_long(bank_account.inserted_at)}
+                        Added {DateTimeDisplay.format_utc_date_long(
+                          bank_account.inserted_at
+                        )}
                       </p>
                     </div>
                     <button
@@ -1865,7 +1867,9 @@ defmodule YscWeb.AdminUserDetailsLive do
                           {FamilyDisplay.relationship_label(invite.relationship)}
                         </.badge>
                         <span class="text-xs text-zinc-500 ml-2">
-                          Expires {DateTimeDisplay.format_utc_date(invite.expires_at)}
+                          Expires {DateTimeDisplay.format_utc_date(
+                            invite.expires_at
+                          )}
                         </span>
                       </div>
                       <button
