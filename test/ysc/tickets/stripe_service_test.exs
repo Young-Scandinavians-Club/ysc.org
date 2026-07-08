@@ -84,6 +84,7 @@ defmodule Ysc.Tickets.StripeServiceTest do
         assert params.currency == "usd"
         # Metadata uses atom keys in the code
         assert params.metadata[:ticket_order_id] == ticket_order.id
+
         {:ok,
          %Stripe.PaymentIntent{
            id: "pi_test_123",
@@ -101,6 +102,7 @@ defmodule Ysc.Tickets.StripeServiceTest do
     test "includes customer_id when provided", %{ticket_order: ticket_order} do
       expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         assert params.customer == "cus_test_123"
+
         {:ok,
          %Stripe.PaymentIntent{
            id: "pi_test_123",
@@ -140,6 +142,7 @@ defmodule Ysc.Tickets.StripeServiceTest do
       expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         assert params.amount == 7500
         assert params.metadata[:ticket_order_id] == order.id
+
         {:ok,
          %Stripe.PaymentIntent{
            id: "pi_synced_#{order.id}",

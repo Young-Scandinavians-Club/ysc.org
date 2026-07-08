@@ -353,11 +353,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       payment_intent_id =
         "pi_processing_close_#{System.unique_integer([:positive])}"
 
-      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         {:ok,
          build_payment_intent(%{
            id: payment_intent_id,
-           status: "requires_payment_method"
+           status: "requires_payment_method",
+           amount: params.amount
          })}
       end)
 
@@ -396,11 +397,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       payment_intent_id =
         "pi_requires_action_close_#{System.unique_integer([:positive])}"
 
-      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         {:ok,
          build_payment_intent(%{
            id: payment_intent_id,
-           status: "requires_payment_method"
+           status: "requires_payment_method",
+           amount: params.amount
          })}
       end)
 
@@ -439,11 +441,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       payment_intent_id =
         "pi_requires_confirm_close_#{System.unique_integer([:positive])}"
 
-      expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
         {:ok,
          build_payment_intent(%{
            id: payment_intent_id,
-           status: "requires_payment_method"
+           status: "requires_payment_method",
+           amount: params.amount
          })}
       end)
 
