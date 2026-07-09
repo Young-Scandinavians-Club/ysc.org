@@ -264,7 +264,13 @@ defmodule YscWeb.ClearLakeBookingLive do
         booking_error_title != socket.assigns.booking_error_title ||
         booking_disabled_reason != socket.assigns.booking_disabled_reason
 
-    info_tab = resolve_info_tab(requested_info_tab, active_tab, socket.assigns[:info_tab])
+    info_tab =
+      resolve_info_tab(
+        requested_info_tab,
+        active_tab,
+        socket.assigns[:info_tab]
+      )
+
     info_tab_changed = info_tab != socket.assigns[:info_tab]
 
     if info_tab_changed && !dates_changed && !guests_changed && !tab_changed &&
@@ -452,7 +458,8 @@ defmodule YscWeb.ClearLakeBookingLive do
           to_form(
             %{
               "checkin_date" => date_to_datetime_string(s.assigns.checkin_date),
-              "checkout_date" => date_to_datetime_string(s.assigns.checkout_date)
+              "checkout_date" =>
+                date_to_datetime_string(s.assigns.checkout_date)
             },
             as: "booking_dates"
           )
