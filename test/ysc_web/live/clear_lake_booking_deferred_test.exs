@@ -88,9 +88,10 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
       assert :sys.get_state(view.pid).socket.assigns.info_tab == :rules
     end
 
-    test "switching to booking tab recalculates availability when dates are present", %{
-      conn: conn
-    } do
+    test "switching to booking tab recalculates availability when dates are present",
+         %{
+           conn: conn
+         } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
