@@ -31,7 +31,9 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
     admin = user_fixture(%{role: "admin"})
     organizer = user_fixture()
     event = event_fixture(%{organizer_id: organizer.id})
-    tier1 = ticket_tier_fixture(%{event_id: event.id, name: "General Admission"})
+
+    tier1 =
+      ticket_tier_fixture(%{event_id: event.id, name: "General Admission"})
 
     Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
 
@@ -56,7 +58,8 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
     assert {:ok, pending_order} =
              Tickets.update_payment_intent(pending_order, payment_intent_id)
 
-    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+    expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
       {:ok,
        %Stripe.PaymentIntent{
          id: payment_intent_id,
