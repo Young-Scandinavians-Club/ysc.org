@@ -151,5 +151,37 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
 
       assert version_after > version_before
     end
+
+    test "availability cache invalidation on information tab is a no-op", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      checkin = Date.add(Date.utc_today(), 45)
+      checkout = Date.add(checkin, 3)
+
+      path =
+        "/bookings/clear-lake?" <>
+          URI.encode_query(%{
+            "checkin_date" => Date.to_string(checkin),
+            "checkout_date" => Date.to_string(checkout),
+            "tab" => "information"
+          })
+
+      {:ok, view, _html} = live(conn, path)
+      render(view)
+
+      version_before =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      send(view.pid, :availability_cache_invalidated)
+      render(view)
+
+      version_after =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      assert version_after == version_before
+    end
   end
 end
