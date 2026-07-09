@@ -251,22 +251,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     # Check if tab changed (but nothing else)
     tab_changed = active_tab != socket.assigns.active_tab
 
-    # Update if dates, guest counts, or tab have changed
-    # Use Date.compare for proper date comparison
-    dates_changed =
-      case {checkin_date, socket.assigns.checkin_date} do
-        {nil, nil} -> false
-        {nil, _} -> true
-        {_, nil} -> true
-        {c1, c2} -> Date.compare(c1, c2) != :eq
-      end ||
-        case {checkout_date, socket.assigns.checkout_date} do
-          {nil, nil} -> false
-          {nil, _} -> true
-          {_, nil} -> true
-          {c1, c2} -> Date.compare(c1, c2) != :eq
-        end
-
+    dates_changed = dates_changed?(checkin_date, checkout_date, socket)
     guests_changed = guests_count != socket.assigns.guests_count
 
     # Treat omitted booking_mode as :day (the default) so info-tab-only URL patches
@@ -280,18 +265,12 @@ defmodule YscWeb.ClearLakeBookingLive do
         booking_error_title != socket.assigns.booking_error_title ||
         booking_disabled_reason != socket.assigns.booking_disabled_reason
 
-    # Update info_tab from URL when present; omitting it on the information tab means :general
     info_tab =
-      cond do
-        requested_info_tab != nil ->
-          requested_info_tab
-
-        active_tab == :information ->
-          :general
-
-        true ->
-          socket.assigns[:info_tab] || :general
-      end
+      resolve_info_tab(
+        requested_info_tab,
+        active_tab,
+        socket.assigns[:info_tab]
+      )
 
     info_tab_changed = info_tab != socket.assigns[:info_tab]
 
@@ -366,8 +345,11 @@ defmodule YscWeb.ClearLakeBookingLive do
 
         # Validate availability and price only after connect, and only when booking
         # inputs changed (skip tab-only navigation work on the dead render path).
+        switching_to_booking_tab = tab_changed && active_tab == :booking
+
         needs_booking_recalculation =
-          dates_changed || guests_changed || booking_mode_changed
+          dates_changed || guests_changed || booking_mode_changed ||
+            switching_to_booking_tab
 
         socket =
           socket
@@ -404,35 +386,16 @@ defmodule YscWeb.ClearLakeBookingLive do
           )
 
         socket =
-          if connected?(socket) && needs_booking_recalculation do
-            socket
-            |> validate_all_conditions(
-              checkin_date,
-              checkout_date,
-              resolved_booking_mode,
-              guests_count,
-              current_season
-            )
-            |> then(fn s ->
-              # Update date form with validated/corrected dates
-              validated_date_form =
-                to_form(
-                  %{
-                    "checkin_date" =>
-                      date_to_datetime_string(s.assigns.checkin_date),
-                    "checkout_date" =>
-                      date_to_datetime_string(s.assigns.checkout_date)
-                  },
-                  as: "booking_dates"
-                )
-
-              s
-              |> assign(:date_form, validated_date_form)
-              |> calculate_price_if_ready()
-            end)
-          else
-            socket
-          end
+          maybe_validate_and_price(
+            socket,
+            needs_booking_recalculation,
+            switching_to_booking_tab,
+            checkin_date,
+            checkout_date,
+            resolved_booking_mode,
+            guests_count,
+            current_season
+          )
 
         {:noreply, socket}
       else
@@ -440,6 +403,74 @@ defmodule YscWeb.ClearLakeBookingLive do
         socket = update_scroll_section(socket, uri)
         {:noreply, socket}
       end
+    end
+  end
+
+  defp dates_changed?(checkin_date, checkout_date, socket) do
+    date_assign_changed?(checkin_date, socket.assigns.checkin_date) or
+      date_assign_changed?(checkout_date, socket.assigns.checkout_date)
+  end
+
+  defp date_assign_changed?(nil, nil), do: false
+  defp date_assign_changed?(nil, _), do: true
+  defp date_assign_changed?(_, nil), do: true
+  defp date_assign_changed?(date1, date2), do: Date.compare(date1, date2) != :eq
+
+  defp resolve_info_tab(requested_info_tab, active_tab, current_info_tab) do
+    cond do
+      requested_info_tab != nil -> requested_info_tab
+      active_tab == :information -> :general
+      true -> current_info_tab || :general
+    end
+  end
+
+  defp maybe_validate_and_price(
+         socket,
+         needs_booking_recalculation,
+         switching_to_booking_tab,
+         checkin_date,
+         checkout_date,
+         resolved_booking_mode,
+         guests_count,
+         current_season
+       ) do
+    if connected?(socket) && needs_booking_recalculation do
+      socket =
+        if switching_to_booking_tab do
+          assign(
+            socket,
+            :availability_cache_version,
+            System.unique_integer([:positive])
+          )
+        else
+          socket
+        end
+
+      socket
+      |> validate_all_conditions(
+        checkin_date,
+        checkout_date,
+        resolved_booking_mode,
+        guests_count,
+        current_season
+      )
+      |> then(fn s ->
+        validated_date_form =
+          to_form(
+            %{
+              "checkin_date" => date_to_datetime_string(s.assigns.checkin_date),
+              "checkout_date" =>
+                date_to_datetime_string(s.assigns.checkout_date)
+            },
+            as: "booking_dates"
+          )
+
+        s
+        |> assign(:date_form, validated_date_form)
+        |> calculate_price_if_ready()
+      end)
+    else
+      socket
     end
   end
 
@@ -3000,9 +3031,16 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   def handle_info(:availability_cache_invalidated, socket) do
     socket =
-      socket
-      |> assign(:availability_cache_version, System.unique_integer([:positive]))
-      |> refresh_selection_after_availability_change()
+      if socket.assigns.active_tab == :booking do
+        socket
+        |> assign(
+          :availability_cache_version,
+          System.unique_integer([:positive])
+        )
+        |> refresh_selection_after_availability_change()
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
