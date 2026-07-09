@@ -16,6 +16,25 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     %{conn: log_in_user(conn, user), admin: user}
   end
 
+  describe "mount" do
+    setup [:create_admin]
+
+    test "static HTML shows loading shell before websocket connects", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{organizer_id: admin.id, title: "Deferred Load Event"})
+
+      conn = get(conn, ~p"/admin/events/#{event.id}/edit")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s|id="admin-event-loading"|
+      refute html =~ "Deferred Load Event"
+      refute html =~ ~s|id="event-header-bar"|
+    end
+  end
+
   describe "check-in navigation" do
     setup [:create_admin]
 
