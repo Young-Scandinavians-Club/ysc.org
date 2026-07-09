@@ -8,6 +8,7 @@ defmodule Ysc.QueryCounter do
     # so parallel async tests can otherwise pollute counts.
     :global.trans({:ysc, :query_counter}, fn ->
       pattern = Keyword.get(opts, :pattern, ~r/SELECT/)
+      caller_pids = Keyword.get(opts, :caller_pids)
       ref = :atomics.new(1, [])
 
       handler_id = {:ysc_query_counter, make_ref()}
@@ -15,14 +16,16 @@ defmodule Ysc.QueryCounter do
       :telemetry.attach(
         handler_id,
         [:ysc, :repo, :query],
-        fn _event, _measurements, metadata, _config ->
-          query = metadata |> Map.get(:query, "") |> IO.iodata_to_binary()
+        fn _event, _measurements, metadata, config ->
+          if caller_pids == nil or self() in config.caller_pids do
+            query = metadata |> Map.get(:query, "") |> IO.iodata_to_binary()
 
-          if Regex.match?(pattern, query) do
-            :atomics.add(ref, 1, 1)
+            if Regex.match?(pattern, query) do
+              :atomics.add(ref, 1, 1)
+            end
           end
         end,
-        nil
+        %{caller_pids: caller_pids}
       )
 
       try do
