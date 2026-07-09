@@ -932,6 +932,196 @@ defmodule Ysc.Tickets.BookingLockerTest do
                  %{limited_tier.id => 1}
                )
     end
+
+    test "skip_capacity allows validation when tier is sold out", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, limited_tier} = Events.update_ticket_tier(tier, %{quantity: 1})
+      other = user_fixture() |> with_lifetime_membership()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(other.id, event.id, %{
+                 limited_tier.id => 1
+               })
+
+      assert {:error, :tier_validation_failed} =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 event.id,
+                 %{limited_tier.id => 1}
+               )
+
+      assert :ok =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 event.id,
+                 %{limited_tier.id => 1},
+                 skip_capacity: true
+               )
+    end
+
+    test "skip_capacity allows validation when event capacity is full", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, limited_event} = Events.update_event(event, %{max_attendees: 1})
+      other = user_fixture() |> with_lifetime_membership()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(other.id, limited_event.id, %{
+                 tier.id => 1
+               })
+
+      assert {:error, :event_capacity_exceeded} =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 limited_event.id,
+                 %{tier.id => 1}
+               )
+
+      assert :ok =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 limited_event.id,
+                 %{tier.id => 1},
+                 skip_capacity: true
+               )
+    end
+
+    test "skip_sale_guards allows validation for past events", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+
+      {:ok, past_event} =
+        Events.update_event(event, %{
+          start_date: past
+        })
+
+      assert {:error, :event_in_past} =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 past_event.id,
+                 %{tier.id => 1}
+               )
+
+      assert :ok =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 past_event.id,
+                 %{tier.id => 1},
+                 skip_sale_guards: true,
+                 skip_capacity: true
+               )
+    end
+
+    test "skip_capacity alone does not bypass past-event checks", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      past = DateTime.add(DateTime.utc_now(), -2, :day)
+
+      {:ok, past_event} =
+        Events.update_event(event, %{
+          start_date: past
+        })
+
+      assert {:error, :event_in_past} =
+               BookingLocker.validate_fulfillment_capacity(
+                 user.id,
+                 past_event.id,
+                 %{tier.id => 1},
+                 skip_capacity: true
+               )
+    end
+  end
+
+  describe "validate_fulfillment_capacity_in_transaction/4" do
+    test "skip_capacity bypasses tier limits inside an existing transaction", %{
+      user: user,
+      event: event,
+      tier: tier
+    } do
+      {:ok, limited_tier} = Events.update_ticket_tier(tier, %{quantity: 1})
+      other = user_fixture() |> with_lifetime_membership()
+
+      assert {:ok, _} =
+               BookingLocker.atomic_booking(other.id, event.id, %{
+                 limited_tier.id => 1
+               })
+
+      assert {:ok, :ok} =
+               Repo.transaction(fn ->
+                 assert :ok =
+                          BookingLocker.validate_fulfillment_capacity_in_transaction(
+                            user.id,
+                            event.id,
+                            %{limited_tier.id => 1},
+                            skip_capacity: true
+                          )
+
+                 :ok
+               end)
+    end
+  end
+
+  describe "fulfill_reservations_for_selections/4" do
+    test "links active reservations to the ticket order FIFO per tier", %{
+      user: user,
+      event: event,
+      tier: tier,
+      organizer: organizer
+    } do
+      expires_at =
+        DateTime.utc_now()
+        |> DateTime.add(3600, :second)
+        |> DateTime.truncate(:second)
+
+      {:ok, reservation} =
+        %TicketReservation{}
+        |> TicketReservation.changeset(%{
+          ticket_tier_id: tier.id,
+          user_id: user.id,
+          quantity: 1,
+          created_by_id: organizer.id,
+          status: "active",
+          expires_at: expires_at
+        })
+        |> Repo.insert()
+
+      assert {:ok, order} =
+               Repo.transaction(fn ->
+                 {:ok, order} =
+                   %Ysc.Tickets.TicketOrder{}
+                   |> Ysc.Tickets.TicketOrder.create_changeset(%{
+                     user_id: user.id,
+                     event_id: event.id,
+                     total_amount: Money.new(25, :USD),
+                     expires_at: expires_at
+                   })
+                   |> Repo.insert()
+
+                 assert {:ok, _fulfilled_by_tier} =
+                          BookingLocker.fulfill_reservations_for_selections(
+                            user.id,
+                            event.id,
+                            order.id,
+                            %{tier.id => 1}
+                          )
+
+                 order
+               end)
+
+      reservation = Repo.reload!(reservation)
+      assert reservation.status == "fulfilled"
+      assert reservation.ticket_order_id == order.id
+    end
   end
 
   describe "estimate_order_total/3" do
