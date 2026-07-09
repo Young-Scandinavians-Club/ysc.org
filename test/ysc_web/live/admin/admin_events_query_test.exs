@@ -71,7 +71,8 @@ defmodule YscWeb.AdminEventsQueryTest do
         )
 
       assert query_count == 0
-      assert html =~ event.title
+      assert html =~ ~s|id="admin-event-loading"|
+      refute html =~ event.title
     end
   end
 end
