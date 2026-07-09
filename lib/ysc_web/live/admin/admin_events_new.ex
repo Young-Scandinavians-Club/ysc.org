@@ -90,7 +90,7 @@ defmodule YscWeb.AdminEventsNewLive do
                   >
                     <.icon
                       name="hero-document-arrow-up"
-                      class="w-5 h-5 -mt-0.5 me-1"
+                      class="w-5 h-5"
                     />Publish
                   </.button>
                 </.tooltip>
@@ -101,11 +101,11 @@ defmodule YscWeb.AdminEventsNewLive do
                   phx-click="publish-event"
                   phx-disable-with="Publishing..."
                 >
-                  <.icon name="hero-document-arrow-up" class="w-5 h-5 -mt-0.5 me-1" />Publish
+                  <.icon name="hero-document-arrow-up" class="w-5 h-5" />Publish
                 </.button>
               </div>
 
-              <div :if={@event.state in [:published]}>
+              <div :if={@event.state in [:published]} class="hidden sm:block">
                 <.button
                   class="whitespace-nowrap"
                   color="red"
@@ -114,7 +114,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 >
                   <.icon
                     name="hero-document-arrow-down"
-                    class="w-5 h-5 -mt-0.5 me-1"
+                    class="w-5 h-5"
                   />Unpublish
                 </.button>
               </div>
@@ -127,7 +127,7 @@ defmodule YscWeb.AdminEventsNewLive do
                 >
                   <.icon
                     name="hero-clipboard-document-check"
-                    class="w-4 h-4 -mt-0.5 me-1"
+                    class="w-5 h-5"
                   />Check In
                 </.button>
               </div>
@@ -192,6 +192,22 @@ defmodule YscWeb.AdminEventsNewLive do
 
                     <li
                       :if={@event.state == :published}
+                      class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100 sm:hidden"
+                    >
+                      <button
+                        type="button"
+                        class="w-full text-left px-1"
+                        phx-click="unpublish-event"
+                      >
+                        <.icon
+                          name="hero-document-arrow-down"
+                          class="me-1 -mt-1 w-5 h-5"
+                        />Unpublish
+                      </button>
+                    </li>
+
+                    <li
+                      :if={@event.state == :published}
                       class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
                     >
                       <button
@@ -209,8 +225,7 @@ defmodule YscWeb.AdminEventsNewLive do
                         class="w-full text-left px-1"
                         phx-click="delete-event"
                       >
-                        <.icon name="hero-trash" class="w-5 h-5 -mt-0.5" />
-                        <span>Delete Event</span>
+                        <.icon name="hero-trash" class="w-5 h-5" /> Delete Event
                       </button>
                     </li>
                   </ul>
@@ -427,6 +442,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     latitude={@form[:latitude].value}
                     longitude={@form[:longitude].value}
                     locked={false}
+                    cooperative_gestures={false}
                   />
                   <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
                     <.icon
@@ -878,7 +894,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     >
                       <.icon
                         name="hero-paper-airplane"
-                        class="w-5 h-5 -mt-0.5 mr-1"
+                        class="w-5 h-5"
                       /> Send Update
                     </.button>
                     <.button
@@ -887,7 +903,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       variant="outline"
                       phx-click="open-update-preview"
                     >
-                      <.icon name="hero-eye" class="w-5 h-5 -mt-0.5 mr-1" /> Preview
+                      <.icon name="hero-eye" class="w-5 h-5" /> Preview
                     </.button>
                   </div>
                 </.form>

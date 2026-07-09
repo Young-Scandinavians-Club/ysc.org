@@ -34,7 +34,8 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
             |> get(~p"/bookings/clear-lake?#{URI.encode_query(params)}")
             |> html_response(200)
           end,
-          pattern: bookings_pattern
+          pattern: bookings_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 0
@@ -79,7 +80,8 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
           fn ->
             render_click(view, "switch-info-tab", %{"tab" => "rules"})
           end,
-          pattern: bookings_pattern
+          pattern: bookings_pattern,
+          caller_pids: [view.pid]
         )
 
       assert query_count == 0

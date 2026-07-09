@@ -751,4 +751,77 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert reloaded.place_id == "radar-place-123"
     end
   end
+
+  describe "tickets tab - grant tickets" do
+    setup [:create_admin]
+
+    test "admin can grant tickets to a member from the tickets tab", %{
+      conn: conn,
+      admin: admin
+    } do
+      member =
+        user_fixture(%{
+          first_name: "Migrated",
+          last_name: "Member",
+          email: "migrated-#{System.unique_integer()}@example.com"
+        })
+
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+
+      tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "GA Migration",
+          quantity: 50
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/tickets")
+
+      refute has_element?(view, "#grant-tickets-modal")
+
+      refute has_element?(view, "#ticket-purchase-#{member.id}")
+
+      view
+      |> element("#ticket-tier-actions-#{tier.id}-grant")
+      |> render_click()
+
+      assert has_element?(view, "#grant-tickets-modal")
+      assert has_element?(view, "#ticket-grant-form")
+
+      view
+      |> element("#ticket-grant-form input[name='user_search']")
+      |> render_change(%{"user_search" => "Migrated"})
+
+      view
+      |> element(
+        "#ticket-grant-form div[phx-click='select-user'][phx-value-id='#{member.id}']"
+      )
+      |> render_click()
+
+      view
+      |> element("#ticket-grant-form")
+      |> render_submit(%{
+        "ticket_grant" => %{
+          "ticket_tier_id" => tier.id,
+          "quantity" => "2",
+          "skip_capacity" => "false",
+          "skip_sale_guards" => "false",
+          "send_email" => "false",
+          "admin_grant_notes" => "Legacy purchase"
+        }
+      })
+
+      assert has_element?(view, "#ticket-purchase-#{member.id}", member.email)
+      assert has_element?(view, "#ticket-purchase-#{member.id}", "GA Migration")
+      assert has_element?(view, "#ticket-purchase-#{member.id}", "2")
+
+      summary = Events.get_ticket_purchase_summary(event.id)
+      purchase = Enum.find(summary, &(&1.user_id == member.id))
+      assert purchase.ticket_count == 2
+
+      tickets = Events.list_tickets_for_user(member.id)
+      assert length(tickets) == 2
+      assert Enum.all?(tickets, &(&1.status == :confirmed))
+    end
+  end
 end

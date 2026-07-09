@@ -617,7 +617,7 @@ defmodule YscWeb.AdminDashboardLive do
                         color="zinc"
                         navigate={~p"/events/#{event.id}"}
                       >
-                        <.icon name="hero-globe-alt" class="w-4 h-4 -mt-0.5" /> View
+                        <.icon name="hero-globe-alt" class="w-4 h-4" /> View
                       </.button>
                       <.button
                         id={"dashboard-event-#{event.id}-edit"}
@@ -625,8 +625,7 @@ defmodule YscWeb.AdminDashboardLive do
                         color="zinc"
                         navigate={~p"/admin/events/#{event.id}/edit"}
                       >
-                        <.icon name="hero-pencil-square" class="w-4 h-4 -mt-0.5" />
-                        Edit
+                        <.icon name="hero-pencil-square" class="w-4 h-4" /> Edit
                       </.button>
                       <.button
                         id={"dashboard-event-#{event.id}-check-in"}
@@ -638,8 +637,7 @@ defmodule YscWeb.AdminDashboardLive do
                           )
                         }
                       >
-                        <.icon name="hero-qr-code" class="w-4 h-4 -mt-0.5" />
-                        Check-in
+                        <.icon name="hero-qr-code" class="w-4 h-4" /> Check-in
                       </.button>
                     </div>
                   </div>

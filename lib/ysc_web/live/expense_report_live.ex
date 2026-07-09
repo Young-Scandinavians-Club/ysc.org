@@ -2380,7 +2380,7 @@ defmodule YscWeb.ExpenseReportLive do
                           variant="outline"
                           color="red"
                         >
-                          <.icon name="hero-x-mark" class="w-5 h-5 -mt-0.5 me-1" />Remove
+                          <.icon name="hero-x-mark" class="w-5 h-5" />Remove
                         </.button>
                       </div>
 

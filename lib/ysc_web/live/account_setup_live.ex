@@ -116,7 +116,7 @@ defmodule YscWeb.AccountSetupLive do
                     if !@code_valid, do: "opacity-50 cursor-not-allowed", else: ""
                   }
                 >
-                  <.icon name="hero-check-circle" class="w-5 h-5 me-1 -mt-0.5" />Verify Code
+                  <.icon name="hero-check-circle" class="w-5 h-5" />Verify Code
                 </.button>
               </div>
             </:actions>
@@ -233,7 +233,7 @@ defmodule YscWeb.AccountSetupLive do
             <:actions>
               <div class="flex justify-end w-full">
                 <.button phx-disable-with="Setting password...">
-                  <.icon name="hero-check-circle" class="w-5 h-5 me-1 -mt-0.5" />Set Password
+                  <.icon name="hero-check-circle" class="w-5 h-5" />Set Password
                 </.button>
               </div>
             </:actions>
@@ -283,7 +283,7 @@ defmodule YscWeb.AccountSetupLive do
                 Skip for now
               </.button>
               <.button phx-disable-with="Saving...">
-                <.icon name="hero-check-circle" class="w-5 h-5 me-1 -mt-0.5" />Save Phone Number
+                <.icon name="hero-check-circle" class="w-5 h-5" />Save Phone Number
               </.button>
             </:actions>
           </.simple_form>
@@ -369,7 +369,7 @@ defmodule YscWeb.AccountSetupLive do
                       else: ""
                   }
                 >
-                  <.icon name="hero-check-circle" class="w-5 h-5 me-1 -mt-0.5" />Verify Phone Number
+                  <.icon name="hero-check-circle" class="w-5 h-5" />Verify Phone Number
                 </.button>
               </div>
             </:actions>
