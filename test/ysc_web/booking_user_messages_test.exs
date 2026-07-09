@@ -49,10 +49,10 @@ defmodule YscWeb.BookingUserMessagesTest do
              "already counted as a guest"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_payment() =~
-             "temporarily reserved these dates"
+             "held temporarily"
 
     assert BookingUserMessages.checkout_guest_info_step_continue_complimentary() =~
-             "temporarily reserved these dates"
+             "held temporarily"
 
     refute BookingUserMessages.checkout_guest_info_step_continue_payment() =~
              "reservation timer"

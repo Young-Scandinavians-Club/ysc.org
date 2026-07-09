@@ -46,11 +46,11 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_continue_payment do
-    "Continue to payment — we've temporarily reserved these dates for you, but they will be released if you don't finish checkout soon"
+    "Continue to payment — these dates are held temporarily, not confirmed yet. Finish checkout soon or they'll go back on the calendar."
   end
 
   def checkout_guest_info_step_continue_complimentary do
-    "Continue to confirm your booking — we've temporarily reserved these dates for you, but they will be released if you don't finish checkout soon"
+    "Continue to confirm your booking — these dates are held temporarily, not confirmed yet. Finish checkout soon or they'll go back on the calendar."
   end
 
   def insufficient_capacity_error(opts \\ []) do

@@ -430,8 +430,8 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       html = render(view)
 
-      assert html =~ "authorize"
-      assert html =~ "automatically renew"
+      assert html =~ "charge this card for your first year of membership"
+      assert html =~ "renews automatically each year"
     end
 
     test "stepper is visible on step 1", %{conn: conn, user: user} do

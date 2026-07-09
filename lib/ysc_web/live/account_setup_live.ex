@@ -155,7 +155,7 @@ defmodule YscWeb.AccountSetupLive do
               </strong>
             </p>
             <p>
-              By saving your payment details you authorize the Young Scandinavians Club to charge this payment method for your annual membership dues if your application is approved, and to automatically renew your membership each year until you cancel.
+              If your application is approved, we'll charge this card for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
             </p>
           </div>
 
