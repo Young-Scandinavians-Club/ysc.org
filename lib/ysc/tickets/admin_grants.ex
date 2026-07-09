@@ -395,7 +395,9 @@ defmodule Ysc.Tickets.AdminGrants do
       )
       |> Repo.all()
       |> Enum.filter(
-        &CheckoutCancel.pending_order_safe_to_cancel?(&1, context: "admin_grant")
+        &CheckoutCancel.pending_order_safe_to_cancel?(&1,
+          context: "admin_grant"
+        )
       )
       |> Enum.map(& &1.id)
 

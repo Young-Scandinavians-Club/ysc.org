@@ -24,7 +24,9 @@ defmodule Ysc.Tickets.CheckoutCancel do
   def blocking_pending_orders(user_id, event_id) do
     pending_orders_query(user_id, event_id)
     |> Repo.all()
-    |> Enum.reject(&pending_order_safe_to_cancel?(&1, context: "admin_grant_precheck"))
+    |> Enum.reject(
+      &pending_order_safe_to_cancel?(&1, context: "admin_grant_precheck")
+    )
   end
 
   @doc """
@@ -47,8 +49,6 @@ defmodule Ysc.Tickets.CheckoutCancel do
       end
     end
   end
-
-  def pending_order_safe_to_cancel?(_order, _opts), do: true
 
   @doc false
   def ci_query_explain_query do
