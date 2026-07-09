@@ -5,6 +5,7 @@ test/
 .git/
 .gitignore
 etc/
+!etc/scripts/install_hex.sh
 .dockerignore
 .elixir_ls/
 docs/

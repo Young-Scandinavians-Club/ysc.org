@@ -709,7 +709,7 @@ defmodule YscWeb.BookingChangeLive do
               class="w-full py-3"
               disabled={!@stripe_payment_element_ready || @submitting}
             >
-              <.icon name="hero-lock-closed" class="w-5 h-5 -mt-0.5 me-1" />
+              <.icon name="hero-lock-closed" class="w-5 h-5" />
               Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
             </.button>
           <% end %>

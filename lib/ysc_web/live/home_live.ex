@@ -1228,7 +1228,7 @@ defmodule YscWeb.HomeLive do
                 class="p-2 -mr-2 text-blue-400 hover:text-blue-600 transition-colors"
                 aria-label="Dismiss"
               >
-                <.icon name="hero-x-mark" class="w-5 h-5 -mt-0.5" />
+                <.icon name="hero-x-mark" class="w-5 h-5" />
               </button>
             </div>
           </div>

@@ -44,9 +44,14 @@ defmodule Ysc.Tickets.TicketOrder do
     field :completed_at, :utc_datetime
     field :cancelled_at, :utc_datetime
     field :cancellation_reason, :string
+    field :admin_grant_notes, :string
 
     belongs_to :user, Ysc.Accounts.User, foreign_key: :user_id, references: :id
     belongs_to :event, Ysc.Events.Event, foreign_key: :event_id, references: :id
+
+    belongs_to :granted_by, Ysc.Accounts.User,
+      foreign_key: :granted_by_id,
+      references: :id
 
     belongs_to :payment, Ysc.Ledgers.Payment,
       foreign_key: :payment_id,
@@ -84,6 +89,40 @@ defmodule Ysc.Tickets.TicketOrder do
     |> unique_constraint(:reference_id)
     |> foreign_key_constraint(:user_id)
     |> foreign_key_constraint(:event_id)
+  end
+
+  @doc """
+  Creates a changeset for an admin-granted complimentary ticket order.
+  """
+  def admin_grant_changeset(ticket_order, attrs, granted_by_id) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    ticket_order
+    |> cast(attrs, [
+      :user_id,
+      :event_id,
+      :total_amount,
+      :discount_amount,
+      :expires_at,
+      :completed_at,
+      :admin_grant_notes
+    ])
+    |> put_change(:granted_by_id, granted_by_id)
+    |> validate_required([
+      :user_id,
+      :event_id,
+      :total_amount,
+      :expires_at,
+      :granted_by_id
+    ])
+    |> validate_money(:total_amount)
+    |> put_change(:status, :completed)
+    |> put_change(:completed_at, Map.get(attrs, :completed_at, now))
+    |> put_reference_id()
+    |> unique_constraint(:reference_id)
+    |> foreign_key_constraint(:user_id)
+    |> foreign_key_constraint(:event_id)
+    |> foreign_key_constraint(:granted_by_id)
   end
 
   @doc """

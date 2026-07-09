@@ -411,21 +411,15 @@ defmodule YscWeb.UserSecurityLive do
                 <p class="text-zinc-600 text-sm mb-4">
                   You don't have any passkeys yet.
                 </p>
-                <.link
-                  navigate={~p"/users/settings/passkeys/new"}
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <.icon name="hero-plus" class="w-5 h-5 me-2" /> Add Passkey
-                </.link>
+                <.button navigate={~p"/users/settings/passkeys/new"}>
+                  <.icon name="hero-plus" class="w-5 h-5" /> Add Passkey
+                </.button>
               </div>
 
               <div :if={@passkeys_loaded && @passkeys != []} class="space-y-4">
-                <.link
-                  navigate={~p"/users/settings/passkeys/new"}
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 mb-4"
-                >
-                  <.icon name="hero-plus" class="w-5 h-5 me-2" /> Add Passkey
-                </.link>
+                <.button navigate={~p"/users/settings/passkeys/new"} class="mb-4">
+                  <.icon name="hero-plus" class="w-5 h-5" /> Add Passkey
+                </.button>
 
                 <div class="space-y-3">
                   <div

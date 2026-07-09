@@ -339,8 +339,7 @@ defmodule YscWeb.AdminNewslettersLive do
               </div>
               <.link navigate={~p"/admin/newsletters/new"} class="inline-flex">
                 <.button>
-                  <.icon name="hero-document-plus" class="w-5 h-5 -mt-0.5" />
-                  <span class="ms-1.5">New Newsletter</span>
+                  <.icon name="hero-document-plus" class="w-5 h-5" /> New Newsletter
                 </.button>
               </.link>
             </div>
@@ -587,8 +586,7 @@ defmodule YscWeb.AdminNewslettersLive do
                 phx-click="open-add-subscriber-modal"
                 class="ms-0 sm:ms-2"
               >
-                <.icon name="hero-user-plus" class="w-5 h-5 -mt-0.5" />
-                <span class="ms-1.5">Add subscriber</span>
+                <.icon name="hero-user-plus" class="w-5 h-5" /> Add subscriber
               </.button>
             </div>
           </div>

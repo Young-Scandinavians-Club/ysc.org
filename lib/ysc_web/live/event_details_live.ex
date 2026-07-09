@@ -931,7 +931,7 @@ defmodule YscWeb.EventDetailsLive do
                       <div class="text-sm text-orange-700 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-center">
                         <.icon
                           name="hero-exclamation-circle"
-                          class="text-orange-500 w-6 h-6 me-1 -mt-0.5"
+                          class="text-orange-500 w-6 h-6"
                         />
                         Sign in to buy tickets. An active YSC membership is required.
                       </div>
@@ -941,7 +941,7 @@ defmodule YscWeb.EventDetailsLive do
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6 me-2 -mt-0.5" />Sign In to Continue
+                        <.icon name="hero-ticket" class="w-6 h-6" />Sign In to Continue
                       </.button>
                     </div>
 
@@ -956,7 +956,7 @@ defmodule YscWeb.EventDetailsLive do
                         <p>
                           <.icon
                             name="hero-exclamation-circle"
-                            class="text-orange-500 w-5 h-5 me-1 -mt-0.5 inline"
+                            class="text-orange-500 w-5 h-5 inline"
                           />
                           <%= cond do %>
                             <% @current_user.state == :pending_approval -> %>
@@ -999,7 +999,7 @@ defmodule YscWeb.EventDetailsLive do
                           </svg>
                           <.icon
                             name="hero-arrow-top-right-on-square"
-                            class="w-5 h-5 -mt-0.5"
+                            class="w-5 h-5"
                           />
                         </.button>
                       </a>
@@ -1015,7 +1015,7 @@ defmodule YscWeb.EventDetailsLive do
                               >
                                 <.icon
                                   name="hero-ticket"
-                                  class="me-1 w-6 h-6 -mt-0.5"
+                                  class="me-1 w-6 h-6"
                                 />Sold Out
                               </.button>
                             </.tooltip>
@@ -1026,7 +1026,7 @@ defmodule YscWeb.EventDetailsLive do
                             class="w-full py-4 uppercase tracking-widest"
                             phx-click="open-ticket-modal"
                           >
-                            <.icon name="hero-ticket" class="me-1 w-6 h-6 -mt-0.5" />Get Tickets
+                            <.icon name="hero-ticket" class="w-6 h-6" />Get Tickets
                           </.button>
                         <% end %>
                       <% else %>
@@ -1051,7 +1051,7 @@ defmodule YscWeb.EventDetailsLive do
                 :if={!event_in_past?(@event)}
                 class="p-6 rounded-xl border border-zinc-100 flex items-center justify-between"
               >
-                <span class="text-sm font-bold text-zinc-900">Add to your calendar</span>
+                <span class="text-sm font-bold text-zinc-900">Don't forget</span>
                 <add-to-calendar-button
                   name={@event.title}
                   startDate={date_for_add_to_cal(@event.start_date)}
@@ -1166,7 +1166,7 @@ defmodule YscWeb.EventDetailsLive do
                           </svg>
                           <.icon
                             name="hero-arrow-top-right-on-square"
-                            class="w-4 h-4 -mt-0.5"
+                            class="w-4 h-4"
                           />
                         </.button>
                       </a>
@@ -1178,7 +1178,7 @@ defmodule YscWeb.EventDetailsLive do
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
-                          <.icon name="hero-ticket" class="w-5 h-5 me-2 -mt-0.5" />Sign In to Continue
+                          <.icon name="hero-ticket" class="w-5 h-5" />Sign In to Continue
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
@@ -1194,7 +1194,7 @@ defmodule YscWeb.EventDetailsLive do
                               >
                                 <.icon
                                   name="hero-ticket"
-                                  class="w-5 h-5 me-2 -mt-0.5"
+                                  class="w-5 h-5"
                                 />Get Tickets
                               </.button>
                             <% else %>
@@ -1204,7 +1204,7 @@ defmodule YscWeb.EventDetailsLive do
                               >
                                 <.icon
                                   name="hero-identification"
-                                  class="w-5 h-5 me-2 -mt-0.5"
+                                  class="w-5 h-5"
                                 />View Membership
                               </.button>
                             <% end %>
@@ -1806,7 +1806,7 @@ defmodule YscWeb.EventDetailsLive do
               phx-click="proceed-to-checkout"
               disabled={!has_any_tickets_selected?(@selected_tickets)}
             >
-              <.icon name="hero-shopping-cart" class="me-2 -mt-0.5" />Proceed to Checkout
+              <.icon name="hero-shopping-cart" class="w-5 h-5" />Proceed to Checkout
             </.button>
           </div>
         </div>
@@ -1841,8 +1841,7 @@ defmodule YscWeb.EventDetailsLive do
               class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
               phx-click="retry-checkout"
             >
-              <.icon name="hero-arrow-path" class="w-5 h-5 me-2" />
-              Select tickets again
+              <.icon name="hero-arrow-path" class="w-5 h-5" /> Select tickets again
             </.button>
             <.button
               class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
@@ -1876,7 +1875,7 @@ defmodule YscWeb.EventDetailsLive do
                 class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
                 phx-click="retry-checkout"
               >
-                <.icon name="hero-arrow-path" class="w-5 h-5 me-2" />
+                <.icon name="hero-arrow-path" class="w-5 h-5" />
                 Select tickets again
               </.button>
               <.button

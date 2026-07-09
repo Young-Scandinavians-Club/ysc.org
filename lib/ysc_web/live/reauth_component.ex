@@ -308,7 +308,7 @@ defmodule YscWeb.ReauthComponent do
               phx-disable-with="Verifying..."
               class="w-full"
             >
-              <.icon name="hero-finger-print" class="w-5 h-5 me-2" />
+              <.icon name="hero-finger-print" class="w-5 h-5" />
               Continue with Passkey
             </.button>
 

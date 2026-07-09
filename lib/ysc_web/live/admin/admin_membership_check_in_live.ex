@@ -49,8 +49,7 @@ defmodule YscWeb.AdminMembershipCheckInLive do
               variant="outline"
               color="zinc"
             >
-              <.icon name="hero-arrow-down-tray" class="w-5 h-5 me-1 mt-0.5" />
-              Export CSV
+              <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
             </.button>
           <% else %>
             <.admin_check_in_qr_scanner id="launch-scanner-btn" />

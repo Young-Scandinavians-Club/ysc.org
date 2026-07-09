@@ -43,6 +43,7 @@ dev: ## Start the local dev server
 .PHONY: dev-setup
 dev-setup:  ## Set up local dev environment
 	@echo "$(BOLD)Setting up development environment...$(RESET)"
+	@./etc/scripts/install_hex.sh
 	@mix deps.get
 	@docker compose -f $(DOCKER_COMPOSE_FILE) up -d
 	@./etc/scripts/_wait_db_connection.sh

@@ -14,7 +14,13 @@ defmodule YscWeb.Components.MapComponent do
       phx-update="ignore"
       id={"#{@id}-container"}
     >
-      <div class="w-full h-80" id={@id} phx-hook="RadarMap"></div>
+      <div
+        class="w-full h-80"
+        id={@id}
+        phx-hook="RadarMap"
+        data-cooperative-gestures={to_string(@cooperative_gestures)}
+      >
+      </div>
     </div>
     """
   end
@@ -25,6 +31,10 @@ defmodule YscWeb.Components.MapComponent do
      |> assign(:id, assigns.id)
      |> assign(:latitude, assigns[:latitude])
      |> assign(:longitude, assigns[:longitude])
+     |> assign(
+       :cooperative_gestures,
+       Map.get(assigns, :cooperative_gestures, true)
+     )
      |> Phoenix.LiveView.push_event("add-marker", %{
        lat: assigns[:latitude],
        lon: assigns[:longitude],
