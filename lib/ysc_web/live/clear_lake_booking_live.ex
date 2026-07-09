@@ -268,7 +268,10 @@ defmodule YscWeb.ClearLakeBookingLive do
         end
 
     guests_changed = guests_count != socket.assigns.guests_count
-    booking_mode_changed = booking_mode != socket.assigns.selected_booking_mode
+
+    booking_mode_changed =
+      not is_nil(booking_mode) &&
+        booking_mode != socket.assigns.selected_booking_mode
 
     # Also check if can_book, booking_error_title, or booking_disabled_reason changed
     can_book_changed =
