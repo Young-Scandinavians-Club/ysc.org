@@ -368,6 +368,10 @@ defmodule YscWeb.AdminEventsLive.TicketGrantForm do
   defp grant_error_message(:event_cancelled),
     do: "This event has been cancelled."
 
+  defp grant_error_message(:checkout_payment_in_progress),
+    do:
+      "This member has a payment in progress for this event. Wait for checkout to finish or fail before granting tickets."
+
   defp grant_error_message(other),
     do: "Could not grant tickets: #{inspect(other)}"
 end

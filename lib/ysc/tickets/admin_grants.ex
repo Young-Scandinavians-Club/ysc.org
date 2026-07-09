@@ -17,6 +17,7 @@ defmodule Ysc.Tickets.AdminGrants do
   alias Ysc.Events.TicketTier
   alias Ysc.Repo
   alias Ysc.Tickets.BookingLocker
+  alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.TicketOrder
 
   @doc """
@@ -61,6 +62,7 @@ defmodule Ysc.Tickets.AdminGrants do
            {:ok, event} <- fetch_grantable_event(event_id),
            {:ok, tiers} <- load_and_validate_tiers(event_id, ticket_selections),
            :ok <- validate_recipient_for_registration_tiers(user, tiers),
+           :ok <- ensure_no_blocking_pending_checkout(user_id, event_id),
            :ok <-
              maybe_validate_fulfillment(
                user_id,
@@ -172,6 +174,23 @@ defmodule Ysc.Tickets.AdminGrants do
     Enum.any?(ticket_selections, fn {_tier_id, quantity} ->
       not is_integer(quantity) or quantity < 1
     end)
+  end
+
+  defp ensure_no_blocking_pending_checkout(user_id, event_id) do
+    case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
+      [] ->
+        :ok
+
+      orders ->
+        Ysc.Logging.info(
+          "Admin ticket grant blocked by in-flight checkout payment",
+          user_id: user_id,
+          event_id: event_id,
+          pending_order_ids: Enum.map(orders, & &1.id)
+        )
+
+        {:error, :checkout_payment_in_progress}
+    end
   end
 
   defp maybe_validate_fulfillment(user_id, event_id, ticket_selections, opts) do
@@ -369,15 +388,18 @@ defmodule Ysc.Tickets.AdminGrants do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     pending_order_ids =
-      TicketOrder
-      |> where(
-        [to],
-        to.user_id == ^user_id and to.event_id == ^event_id and
-          to.status == :pending and
-          to.id != ^grant_order_id
+      from(to in TicketOrder,
+        where:
+          to.user_id == ^user_id and to.event_id == ^event_id and
+            to.status == :pending and to.id != ^grant_order_id
       )
-      |> select([to], to.id)
       |> Repo.all()
+      |> Enum.filter(
+        &CheckoutCancel.pending_order_safe_to_cancel?(&1,
+          context: "admin_grant"
+        )
+      )
+      |> Enum.map(& &1.id)
 
     if pending_order_ids == [] do
       :ok
