@@ -31,911 +31,940 @@ defmodule YscWeb.AdminEventsNewLive do
     >
       <div class="flex py-6 flex-col">
         <.back navigate={~p"/admin/events?#{@list_params}"}>Back</.back>
-        <div id="event-header-bar" class="pt-4 pb-2">
-          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0 flex flex-1 flex-col space-y-1">
-              <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <h1 class="event-header-title break-words text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl">
-                  {@event_title}
-                </h1>
 
-                <.badge type={event_state_to_badge_style(@state)}>
-                  {String.capitalize("#{@state}")}
-                </.badge>
-
-                <.admin_help_link
-                  topic={event_help_topic(@live_action)}
-                  label="Guide for this tab"
-                  role={@admin_role}
-                />
-
-                <.link
-                  :if={@event.state == :published}
-                  href={~p"/events/#{@event.id}"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex shrink-0 items-center gap-1 text-sm text-zinc-500 transition hover:text-blue-700"
-                >
-                  <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
-                  <span class="sr-only">View Event</span>
-                </.link>
-              </div>
-
-              <div
-                :if={@start_date != nil && @start_date != ""}
-                class="event-header-date flex flex-row items-center gap-1"
-              >
-                <.icon name="hero-calendar-days" class="shrink-0 text-zinc-600" />
-                <p class="text-sm text-zinc-600">
-                  {Ysc.Events.DateTimeFormatter.format_datetime(%{
-                    start_date: format_date(@start_date),
-                    start_time: format_time(@start_time),
-                    end_date: format_date(@end_date),
-                    end_time: format_time(@end_time)
-                  })}
-                </p>
-              </div>
-            </div>
-
-            <div class="flex flex-shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
-              <div :if={@event.state in [:draft, :scheduled]}>
-                <.tooltip
-                  :if={!@can_publish}
-                  tooltip_text="A title and event date must be set before publishing"
-                >
-                  <.button
-                    class="whitespace-nowrap opacity-50 cursor-not-allowed"
-                    color="blue"
-                    disabled
-                  >
-                    <.icon
-                      name="hero-document-arrow-up"
-                      class="w-5 h-5"
-                    />Publish
-                  </.button>
-                </.tooltip>
-                <.button
-                  :if={@can_publish}
-                  class="whitespace-nowrap"
-                  color="blue"
-                  phx-click="publish-event"
-                  phx-disable-with="Publishing..."
-                >
-                  <.icon name="hero-document-arrow-up" class="w-5 h-5" />Publish
-                </.button>
-              </div>
-
-              <div :if={@event.state in [:published]} class="hidden sm:block">
-                <.button
-                  class="whitespace-nowrap"
-                  color="red"
-                  phx-click="unpublish-event"
-                  phx-disable-with="Unpublishing..."
-                >
-                  <.icon
-                    name="hero-document-arrow-down"
-                    class="w-5 h-5"
-                  />Unpublish
-                </.button>
-              </div>
-
-              <div :if={@event.state in [:published, :scheduled]}>
-                <.button
-                  class="whitespace-nowrap"
-                  color="green"
-                  navigate={@check_in_path}
-                >
-                  <.icon
-                    name="hero-clipboard-document-check"
-                    class="w-5 h-5"
-                  />Check In
-                </.button>
-              </div>
-
-              <.dropdown
-                :if={@event.state in [:draft, :scheduled] && @can_publish}
-                id="edit-post-more"
-                right={true}
-                class={
-                  Enum.join(
-                    [
-                      "text-zinc-100 px-3 leading-6 py-2 text-sm font-semibold transition duration-300",
-                      @event.state == :scheduled &&
-                        "bg-green-700 hover:bg-green-800",
-                      @event.state != :scheduled && "bg-blue-700 hover:bg-blue-800"
-                    ],
-                    " "
-                  )
-                }
-              >
-                <:button_block>
-                  <.icon name="hero-clock" class="w-5 h-5 me-1" />{schedule_button_text(
-                    @event.state
-                  )}
-                  <.icon name="hero-chevron-down" class="ms-2" />
-                </:button_block>
-
-                <div class="w-full px-2 py-4">
-                  <.live_component
-                    id={@event.id}
-                    event={@event}
-                    module={YscWeb.AdminEventsLive.ScheduleEventForm}
-                    event_id={@event.id}
-                  />
-                </div>
-              </.dropdown>
-
-              <.dropdown
-                id="edit-event-more"
-                right={true}
-                class="text-zinc-800 hover:bg-zinc-100 hover:text-black"
-              >
-                <:button_block>
-                  <.icon name="hero-ellipsis-vertical" class="w-6 h-6" />
-                </:button_block>
-
-                <div class="w-full divide-y divide-zinc-100 text-sm text-zinc-700">
-                  <ul class="py-2 text-sm font-medium text-zinc-800 px-2">
-                    <li class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100">
-                      <button
-                        type="button"
-                        class="w-full text-left px-1"
-                        phx-click="copy-event"
-                        data-confirm="Copy this event?"
-                      >
-                        <.icon
-                          name="hero-document-duplicate"
-                          class="me-1 -mt-1 w-5 h-5"
-                        />Copy Event
-                      </button>
-                    </li>
-
-                    <li
-                      :if={@event.state == :published}
-                      class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100 sm:hidden"
-                    >
-                      <button
-                        type="button"
-                        class="w-full text-left px-1"
-                        phx-click="unpublish-event"
-                      >
-                        <.icon
-                          name="hero-document-arrow-down"
-                          class="me-1 -mt-1 w-5 h-5"
-                        />Unpublish
-                      </button>
-                    </li>
-
-                    <li
-                      :if={@event.state == :published}
-                      class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
-                    >
-                      <button
-                        type="button"
-                        class="w-full text-left px-1"
-                        phx-click="cancel-event"
-                      >
-                        <.icon name="hero-minus-circle" class="me-1 -mt-1 w-5 h-5" />Cancel Event
-                      </button>
-                    </li>
-
-                    <li class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100">
-                      <button
-                        type="button"
-                        class="w-full text-left px-1"
-                        phx-click="delete-event"
-                      >
-                        <.icon name="hero-trash" class="w-5 h-5" /> Delete Event
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </.dropdown>
-            </div>
+        <div
+          :if={@loading_event?}
+          id="admin-event-loading"
+          class="flex flex-col pt-4 space-y-6"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading event…</span>
+          <.skeleton_block class="h-9 w-64 rounded" />
+          <.skeleton_block class="h-5 w-40 rounded" />
+          <div class="flex flex-wrap gap-2">
+            <.skeleton_block :for={_ <- 1..5} class="h-9 w-24 rounded-full" />
           </div>
-
-          <.admin_tabs
-            id="event-detail-tabs"
-            aria_label="Event sections"
-            class="event-header-tabs pt-3 text-sm font-medium text-zinc-500 !mb-0"
-          >
-            <.admin_tab
-              active={@live_action == :edit}
-              patch={~p"/admin/events/#{@event.id}/edit"}
-            >
-              Event Details
-            </.admin_tab>
-            <.admin_tab
-              active={!@partiful_link_present && @live_action == :tickets}
-              patch={
-                if @partiful_link_present,
-                  do: "#",
-                  else: ~p"/admin/events/#{@event.id}/tickets"
-              }
-              class={
-                if @partiful_link_present,
-                  do: "opacity-50 cursor-not-allowed pointer-events-none",
-                  else: nil
-              }
-            >
-              Tickets {if @partiful_link_present, do: "(Disabled - Using Partiful)"}
-            </.admin_tab>
-            <.admin_tab
-              active={@live_action == :updates}
-              patch={~p"/admin/events/#{@event.id}/updates"}
-            >
-              Updates
-            </.admin_tab>
-          </.admin_tabs>
+          <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+            <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded" />
+          </div>
         </div>
 
-        <div :if={@live_action == :edit} class="relative py-8">
-          <div class="border max-w-3xl rounded border-zinc-200 py-6 px-4 space-y-4">
-            <h2 class="text-xl font-bold">Cover Image</h2>
+        <div :if={!@loading_event?}>
+          <div id="event-header-bar" class="pt-4 pb-2">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="min-w-0 flex flex-1 flex-col space-y-1">
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <h1 class="event-header-title break-words text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl">
+                    {@event_title}
+                  </h1>
 
-            <.live_component
-              module={YscWeb.MediaPickerComponent}
-              id={:event_cover}
-              user_id={@current_user.id}
-              image_id={@form[:image_id].value}
-            />
-          </div>
+                  <.badge type={event_state_to_badge_style(@state)}>
+                    {String.capitalize("#{@state}")}
+                  </.badge>
 
-          <.form
-            for={@form}
-            id="new_event_form"
-            phx-submit="save"
-            phx-change="validate"
-            phx-trigger-action={@trigger_submit}
-            method="post"
-            class="space-y-6 max-w-3xl"
-          >
-            <.input
-              type="hidden"
-              field={@form[:organizer_id]}
-              value={@current_user.id}
-            />
-            <.input type="hidden" field={@form[:image_id]} />
-
-            <div class="border rounded border-zinc-200 py-6 px-4 space-y-4">
-              <div>
-                <h2 class="text-xl font-bold">Basics</h2>
-                <p class="text-zinc-600 text-sm">
-                  Give your event a nice title and summary to attract attendees.
-                </p>
-              </div>
-              <.input
-                type="text"
-                field={@form[:title]}
-                label="Event Title*"
-                phx-debounce="300"
-                required
-              />
-              <.input
-                type="text"
-                field={@form[:description]}
-                label={"Summary (#{@description_length}/200)*"}
-                phx-debounce="300"
-                required
-              />
-              <.input
-                type="text"
-                field={@form[:partiful_link]}
-                label="Partiful Link (Optional)"
-                placeholder="https://partiful.com/e/..."
-                phx-debounce="300"
-                disabled={@ticket_tier_count > 0}
-              />
-              <p
-                :if={@ticket_tier_count > 0}
-                class="text-xs text-amber-700 -mt-2 flex items-start gap-1.5"
-              >
-                <.icon name="hero-information-circle" class="w-4 h-4 flex-shrink-0" />
-                Partiful cannot be used when this event has ticket tiers. Remove all ticket tiers on the Tickets tab to add a Partiful link.
-              </p>
-              <p
-                :if={@ticket_tier_count == 0 && @partiful_link_present}
-                class="text-xs text-zinc-500 -mt-2"
-              >
-                Using Partiful for registration. When a Partiful link is set, ticket tiers cannot be added.
-              </p>
-            </div>
-
-            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
-              <h2 class="text-xl font-bold mb-2">Date and Location</h2>
-
-              <h3 class="text-lg font-medium">Date and Time</h3>
-              <div class="flex flex-row w-full space-x-4">
-                <div class="flex">
-                  <.date_range_picker
-                    label="Date*"
-                    id="event_date"
-                    form={@form}
-                    start_date_field={@form[:start_date]}
-                    end_date_field={@form[:end_date]}
-                    min={Date.utc_today()}
-                    allow_saturdays={true}
+                  <.admin_help_link
+                    topic={event_help_topic(@live_action)}
+                    label="Guide for this tab"
+                    role={@admin_role}
                   />
-                </div>
 
-                <.input
-                  type="time"
-                  id="start_time"
-                  step="60"
-                  field={@form[:start_time]}
-                  label="Start Time*"
-                />
-                <.input
-                  type="time"
-                  id="end_time"
-                  step="60"
-                  field={@form[:end_time]}
-                  label="End Time"
-                />
-              </div>
-
-              <h3 class="text-lg pt-4 font-medium">Location</h3>
-              <div class="space-y-4">
-                <div class="space-y-2">
-                  <span class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                    Frequent Venues
-                  </span>
-                  <div class="flex flex-wrap gap-2" id="location-presets">
-                    <button
-                      :for={preset <- @location_presets}
-                      type="button"
-                      id={"location-preset-#{preset.id}"}
-                      phx-click="apply-location-preset"
-                      phx-value-id={preset.id}
-                      class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition"
-                    >
-                      <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
-                      {preset.label}
-                    </button>
-                  </div>
+                  <.link
+                    :if={@event.state == :published}
+                    href={~p"/events/#{@event.id}"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex shrink-0 items-center gap-1 text-sm text-zinc-500 transition hover:text-blue-700"
+                  >
+                    <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4" />
+                    <span class="sr-only">View Event</span>
+                  </.link>
                 </div>
 
                 <div
-                  id="event-location-search"
-                  phx-update="ignore"
-                  phx-hook="RadarLocationAutocomplete"
-                  data-presets={
-                    Jason.encode!(EventLocationConfig.presets_for_search())
-                  }
-                  class="w-full"
-                />
-
-                <div
-                  :if={location_set?(@form)}
-                  class="bg-zinc-50 border border-zinc-200 rounded-lg p-4 space-y-4"
-                  id="location-display-details"
+                  :if={@start_date != nil && @start_date != ""}
+                  class="event-header-date flex flex-row items-center gap-1"
                 >
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-medium text-zinc-700">
-                      Display Details
-                    </h4>
-                    <p class="text-xs text-zinc-500">Publicly visible</p>
-                  </div>
-
-                  <.input
-                    type="text"
-                    field={@form[:location_name]}
-                    label="Location Name"
-                    phx-debounce="300"
-                  />
-                  <.input
-                    type="text"
-                    field={@form[:address]}
-                    label="Address"
-                    phx-debounce="300"
-                  />
-                </div>
-
-                <.input type="hidden" field={@form[:latitude]} />
-                <.input type="hidden" field={@form[:longitude]} />
-
-                <div class="space-y-2">
-                  <.live_component
-                    id={"#{@event.id}-map"}
-                    module={YscWeb.Components.MapComponent}
-                    event_id={@event.id}
-                    latitude={@form[:latitude].value}
-                    longitude={@form[:longitude].value}
-                    locked={false}
-                    cooperative_gestures={false}
-                  />
-                  <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
-                    <.icon
-                      name="hero-information-circle"
-                      class="w-4 h-4 flex-shrink-0"
-                    />
-                    Double-check the pin on the map. You can click anywhere on the map to manually adjust it.
+                  <.icon name="hero-calendar-days" class="shrink-0 text-zinc-600" />
+                  <p class="text-sm text-zinc-600">
+                    {Ysc.Events.DateTimeFormatter.format_datetime(%{
+                      start_date: format_date(@start_date),
+                      start_time: format_time(@start_time),
+                      end_date: format_date(@end_date),
+                      end_time: format_time(@end_time)
+                    })}
                   </p>
                 </div>
               </div>
-            </div>
 
-            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
-              <div>
-                <h2 class="text-xl font-bold">Overview</h2>
-                <p class="text-zinc-600 text-sm">
-                  Add more details about the event to help attendees understand what to expect.
-                </p>
-              </div>
-
-              <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
-                <.input
-                  type="hidden"
-                  id="post[raw_body]"
-                  field={@form[:raw_details]}
-                  data-post-id={@event.id}
-                  phx-hook="TrixHook"
-                  phx-debounce={200}
-                />
-                <.live_component
-                  module={YscWeb.TrixImagePickerComponent}
-                  id={:event_body_image_picker}
-                  target_input_id="post[raw_body]"
-                />
-                <div id="richtext" phx-update="ignore">
-                  <trix-editor
-                    input="post[raw_body]"
-                    class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
-                    placeholder="Write something delightful and nice..."
+              <div class="flex flex-shrink-0 flex-row flex-wrap items-center gap-2 sm:justify-end">
+                <div :if={@event.state in [:draft, :scheduled]}>
+                  <.tooltip
+                    :if={!@can_publish}
+                    tooltip_text="A title and event date must be set before publishing"
                   >
-                  </trix-editor>
-                </div>
-              </div>
-            </div>
-          </.form>
-
-          <div id="hosts-section" class="max-w-3xl mt-6">
-            <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
-              <div>
-                <h2 class="text-xl font-bold">Hosts</h2>
-                <p class="text-zinc-600 text-sm">
-                  Search and add members who will be listed as hosts of this event.
-                </p>
-              </div>
-
-              <div id="event-hosts-manager" class="space-y-3">
-                <%!-- Current hosts list --%>
-                <div
-                  :if={@hosts != []}
-                  class="flex flex-wrap gap-2"
-                  id="hosts-list"
-                >
-                  <div
-                    :for={host <- @hosts}
-                    id={"host-#{host.id}"}
-                    class="flex items-center gap-2 bg-zinc-100 rounded-full pl-1 pr-3 py-1"
-                  >
-                    <.user_avatar_image
-                      user={host}
-                      class="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                    />
-                    <span class="text-sm font-medium text-zinc-800">
-                      {host.first_name} {host.last_name}
-                    </span>
-                    <button
-                      type="button"
-                      phx-click="remove-host"
-                      phx-value-user-id={host.id}
-                      class="text-zinc-400 hover:text-red-500 transition ml-0.5"
-                      aria-label={"Remove #{host.first_name} as host"}
+                    <.button
+                      class="whitespace-nowrap opacity-50 cursor-not-allowed"
+                      color="blue"
+                      disabled
                     >
-                      <.icon name="hero-x-mark" class="w-4 h-4 -mt-1" />
-                    </button>
-                  </div>
+                      <.icon
+                        name="hero-document-arrow-up"
+                        class="w-5 h-5"
+                      />Publish
+                    </.button>
+                  </.tooltip>
+                  <.button
+                    :if={@can_publish}
+                    class="whitespace-nowrap"
+                    color="blue"
+                    phx-click="publish-event"
+                    phx-disable-with="Publishing..."
+                  >
+                    <.icon name="hero-document-arrow-up" class="w-5 h-5" />Publish
+                  </.button>
                 </div>
 
-                <%!-- Search input --%>
-                <div class="relative">
-                  <div class="relative">
-                    <label for="host-search-input" class="sr-only">
-                      Search hosts by name or email
-                    </label>
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                      <.icon
-                        name="hero-magnifying-glass"
-                        class="w-4 h-4 text-zinc-400"
-                      />
-                    </div>
-                    <input
-                      id="host-search-input"
-                      type="text"
-                      value={@host_search_query}
-                      placeholder="Search members by name or email..."
-                      phx-keyup="search-hosts"
-                      phx-debounce="250"
-                      name="host_search"
-                      autocomplete="off"
-                      class="block w-full h-10 rounded border border-zinc-300 bg-white shadow-sm pl-9 pr-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-0"
+                <div :if={@event.state in [:published]} class="hidden sm:block">
+                  <.button
+                    class="whitespace-nowrap"
+                    color="red"
+                    phx-click="unpublish-event"
+                    phx-disable-with="Unpublishing..."
+                  >
+                    <.icon
+                      name="hero-document-arrow-down"
+                      class="w-5 h-5"
+                    />Unpublish
+                  </.button>
+                </div>
+
+                <div :if={@event.state in [:published, :scheduled]}>
+                  <.button
+                    class="whitespace-nowrap"
+                    color="green"
+                    navigate={@check_in_path}
+                  >
+                    <.icon
+                      name="hero-clipboard-document-check"
+                      class="w-5 h-5"
+                    />Check In
+                  </.button>
+                </div>
+
+                <.dropdown
+                  :if={@event.state in [:draft, :scheduled] && @can_publish}
+                  id="edit-post-more"
+                  right={true}
+                  class={
+                    Enum.join(
+                      [
+                        "text-zinc-100 px-3 leading-6 py-2 text-sm font-semibold transition duration-300",
+                        @event.state == :scheduled &&
+                          "bg-green-700 hover:bg-green-800",
+                        @event.state != :scheduled &&
+                          "bg-blue-700 hover:bg-blue-800"
+                      ],
+                      " "
+                    )
+                  }
+                >
+                  <:button_block>
+                    <.icon name="hero-clock" class="w-5 h-5 me-1" />{schedule_button_text(
+                      @event.state
+                    )}
+                    <.icon name="hero-chevron-down" class="ms-2" />
+                  </:button_block>
+
+                  <div class="w-full px-2 py-4">
+                    <.live_component
+                      id={@event.id}
+                      event={@event}
+                      module={YscWeb.AdminEventsLive.ScheduleEventForm}
+                      event_id={@event.id}
                     />
                   </div>
+                </.dropdown>
 
-                  <%!-- Search results dropdown --%>
-                  <div
-                    :if={@host_search_results != [] && @host_search_query != ""}
-                    id="host-search-results"
-                    class="absolute z-10 mt-1 w-full rounded border border-zinc-200 bg-white shadow-lg overflow-hidden"
-                  >
-                    <ul class="max-h-56 overflow-y-auto py-1 divide-y divide-zinc-50">
+                <.dropdown
+                  id="edit-event-more"
+                  right={true}
+                  class="text-zinc-800 hover:bg-zinc-100 hover:text-black"
+                >
+                  <:button_block>
+                    <.icon name="hero-ellipsis-vertical" class="w-6 h-6" />
+                  </:button_block>
+
+                  <div class="w-full divide-y divide-zinc-100 text-sm text-zinc-700">
+                    <ul class="py-2 text-sm font-medium text-zinc-800 px-2">
+                      <li class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100">
+                        <button
+                          type="button"
+                          class="w-full text-left px-1"
+                          phx-click="copy-event"
+                          data-confirm="Copy this event?"
+                        >
+                          <.icon
+                            name="hero-document-duplicate"
+                            class="me-1 -mt-1 w-5 h-5"
+                          />Copy Event
+                        </button>
+                      </li>
+
                       <li
-                        :for={user <- @host_search_results}
-                        id={"host-result-#{user.id}"}
+                        :if={@event.state == :published}
+                        class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100 sm:hidden"
                       >
                         <button
                           type="button"
-                          class="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 transition w-full text-left"
-                          phx-click="add-host"
-                          phx-value-user-id={user.id}
-                          aria-label={"Add #{user.first_name} #{user.last_name} (#{user.email}) as host"}
+                          class="w-full text-left px-1"
+                          phx-click="unpublish-event"
                         >
-                          <.user_avatar_image
-                            user={user}
-                            class="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                          />
-                          <div class="min-w-0 flex-1">
-                            <p class="text-sm font-medium text-zinc-900 truncate">
-                              {user.first_name} {user.last_name}
-                            </p>
-                            <p class="text-xs text-zinc-500 truncate">
-                              {user.email}
-                            </p>
-                          </div>
                           <.icon
-                            :if={MapSet.member?(@host_ids, user.id)}
-                            name="hero-check-circle"
-                            class="host-status-icon w-4 h-4 text-green-500 flex-shrink-0"
-                          />
+                            name="hero-document-arrow-down"
+                            class="me-1 -mt-1 w-5 h-5"
+                          />Unpublish
+                        </button>
+                      </li>
+
+                      <li
+                        :if={@event.state == :published}
+                        class="block py-2 px-3 transition ease-in-out duration-200 hover:bg-zinc-100"
+                      >
+                        <button
+                          type="button"
+                          class="w-full text-left px-1"
+                          phx-click="cancel-event"
+                        >
                           <.icon
-                            :if={!MapSet.member?(@host_ids, user.id)}
-                            name="hero-plus-circle"
-                            class="host-status-icon w-4 h-4 text-blue-400 flex-shrink-0"
-                          />
+                            name="hero-minus-circle"
+                            class="me-1 -mt-1 w-5 h-5"
+                          />Cancel Event
+                        </button>
+                      </li>
+
+                      <li class="block py-2 px-3 transition text-red-600 ease-in-out duration-200 hover:bg-zinc-100">
+                        <button
+                          type="button"
+                          class="w-full text-left px-1"
+                          phx-click="delete-event"
+                        >
+                          <.icon name="hero-trash" class="w-5 h-5" /> Delete Event
                         </button>
                       </li>
                     </ul>
                   </div>
-
-                  <p
-                    :if={@host_search_query != "" && @host_search_results == []}
-                    class="mt-2 text-sm text-zinc-500"
-                  >
-                    No members found for "{@host_search_query}".
-                  </p>
-                </div>
+                </.dropdown>
               </div>
             </div>
+
+            <.admin_tabs
+              id="event-detail-tabs"
+              aria_label="Event sections"
+              class="event-header-tabs pt-3 text-sm font-medium text-zinc-500 !mb-0"
+            >
+              <.admin_tab
+                active={@live_action == :edit}
+                patch={~p"/admin/events/#{@event.id}/edit"}
+              >
+                Event Details
+              </.admin_tab>
+              <.admin_tab
+                active={!@partiful_link_present && @live_action == :tickets}
+                patch={
+                  if @partiful_link_present,
+                    do: "#",
+                    else: ~p"/admin/events/#{@event.id}/tickets"
+                }
+                class={
+                  if @partiful_link_present,
+                    do: "opacity-50 cursor-not-allowed pointer-events-none",
+                    else: nil
+                }
+              >
+                Tickets {if @partiful_link_present,
+                  do: "(Disabled - Using Partiful)"}
+              </.admin_tab>
+              <.admin_tab
+                active={@live_action == :updates}
+                patch={~p"/admin/events/#{@event.id}/updates"}
+              >
+                Updates
+              </.admin_tab>
+            </.admin_tabs>
           </div>
 
-          <div class="max-w-3xl mt-6">
-            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded p-6 bg-white">
-              <div>
-                <h2 class="text-xl font-bold">Agenda</h2>
-                <p class="text-zinc-600 text-sm mt-1">
-                  Design your event schedule exactly as attendees will see it.
+          <div :if={@live_action == :edit} class="relative py-8">
+            <div class="border max-w-3xl rounded border-zinc-200 py-6 px-4 space-y-4">
+              <h2 class="text-xl font-bold">Cover Image</h2>
+
+              <.live_component
+                module={YscWeb.MediaPickerComponent}
+                id={:event_cover}
+                user_id={@current_user.id}
+                image_id={@form[:image_id].value}
+              />
+            </div>
+
+            <.form
+              for={@form}
+              id="new_event_form"
+              phx-submit="save"
+              phx-change="validate"
+              phx-trigger-action={@trigger_submit}
+              method="post"
+              class="space-y-6 max-w-3xl"
+            >
+              <.input
+                type="hidden"
+                field={@form[:organizer_id]}
+                value={@current_user.id}
+              />
+              <.input type="hidden" field={@form[:image_id]} />
+
+              <div class="border rounded border-zinc-200 py-6 px-4 space-y-4">
+                <div>
+                  <h2 class="text-xl font-bold">Basics</h2>
+                  <p class="text-zinc-600 text-sm">
+                    Give your event a nice title and summary to attract attendees.
+                  </p>
+                </div>
+                <.input
+                  type="text"
+                  field={@form[:title]}
+                  label="Event Title*"
+                  phx-debounce="300"
+                  required
+                />
+                <.input
+                  type="text"
+                  field={@form[:description]}
+                  label={"Summary (#{@description_length}/200)*"}
+                  phx-debounce="300"
+                  required
+                />
+                <.input
+                  type="text"
+                  field={@form[:partiful_link]}
+                  label="Partiful Link (Optional)"
+                  placeholder="https://partiful.com/e/..."
+                  phx-debounce="300"
+                  disabled={@ticket_tier_count > 0}
+                />
+                <p
+                  :if={@ticket_tier_count > 0}
+                  class="text-xs text-amber-700 -mt-2 flex items-start gap-1.5"
+                >
+                  <.icon
+                    name="hero-information-circle"
+                    class="w-4 h-4 flex-shrink-0"
+                  />
+                  Partiful cannot be used when this event has ticket tiers. Remove all ticket tiers on the Tickets tab to add a Partiful link.
+                </p>
+                <p
+                  :if={@ticket_tier_count == 0 && @partiful_link_present}
+                  class="text-xs text-zinc-500 -mt-2"
+                >
+                  Using Partiful for registration. When a Partiful link is set, ticket tiers cannot be added.
                 </p>
               </div>
 
-              <.button
-                id="add-agenda-button"
-                type="button"
-                phx-click="add-agenda"
-                phx-disable-with="Adding..."
-                class="shrink-0"
-              >
-                <.icon name="hero-plus" /> Add Agenda Track
-              </.button>
-            </div>
-
-            <div class="relative mt-6">
-              <button
-                type="button"
-                data-scroll-left
-                aria-label="Scroll to previous agenda track"
-                class="absolute left-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
-              >
-                <.icon name="hero-chevron-left" class="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                data-scroll-right
-                aria-label="Scroll to next agenda track"
-                class="absolute right-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
-              >
-                <.icon name="hero-chevron-right" class="h-5 w-5" />
-              </button>
-
-              <div
-                id="agendas-scroll"
-                phx-hook="AgendaTracksScroller"
-                class="agenda-tracks-scroll overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth"
-              >
-                <ul
-                  id="agendas"
-                  phx-update="stream"
-                  phx-hook="Sortable"
-                  class="flex gap-6 w-max min-w-full"
-                >
-                  <li
-                    :for={{id, agenda} <- @streams.agendas}
-                    id={id}
-                    data-id={agenda.id}
-                    class="group/agenda flex-shrink-0 w-[450px] sm:w-[500px] snap-start flex flex-col bg-white border border-zinc-200 shadow-sm rounded overflow-hidden drag-item:scale-[1.02] drag-item:shadow-xl drag-item:z-10 drag-ghost:opacity-100 drag-ghost:bg-blue-50 drag-ghost:border-2 drag-ghost:border-dashed drag-ghost:border-blue-400"
-                  >
-                    <div class="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 drag-ghost:opacity-0">
-                      <div class="flex items-center gap-2 flex-1">
-                        <div
-                          class="drag-handle cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 p-1"
-                          title="Drag to reorder tracks"
-                        >
-                          <.icon
-                            name="hero-arrows-right-left"
-                            class="w-5 h-5 block"
-                          />
-                        </div>
-
-                        <div class="flex-1">
-                          <.live_component
-                            id={"edit-agenda-title-#{agenda.id}"}
-                            module={YscWeb.AgendasLive.FormComponent}
-                            agenda_id={agenda.id}
-                            event_id={@event.id}
-                            agenda={agenda}
-                          />
-                        </div>
-                      </div>
-
-                      <.link
-                        phx-click="delete-agenda"
-                        phx-value-id={agenda.id}
-                        aria-label="delete agenda"
-                        class="text-zinc-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-md transition ml-2"
-                        data-confirm="Are you sure you want to delete this agenda?"
-                      >
-                        <.icon name="hero-trash" class="w-4 h-4 block" />
-                      </.link>
-                    </div>
-
-                    <div class="p-6 bg-white relative drag-ghost:opacity-0">
-                      <.live_component
-                        id={agenda.id}
-                        module={YscWeb.AgendaEditComponent}
-                        agenda={agenda}
-                        event_id={@event.id}
-                      />
-                    </div>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div :if={@live_action == :tickets} class="relative py-8">
-          <div class="max-w-3xl">
-            <div class="mb-6">
               <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
-                <div>
-                  <h2 class="text-xl font-bold">Event Capacity</h2>
-                  <p class="text-zinc-600 text-sm">
-                    Set the maximum number of attendees for this event. This limit applies across all ticket tiers.
-                  </p>
-                </div>
+                <h2 class="text-xl font-bold mb-2">Date and Location</h2>
 
-                <.form
-                  for={@capacity_form}
-                  id="capacity_form"
-                  phx-submit="save-capacity"
-                  phx-change="validate-capacity"
-                  class="space-y-4"
-                >
-                  <div class="space-y-4">
-                    <div class="flex items-center space-x-3">
-                      <.input
-                        type="checkbox"
-                        field={@capacity_form[:unlimited_capacity]}
-                        label="Unlimited capacity"
-                        checked={
-                          is_nil(@capacity_form[:max_attendees].value) ||
-                            @capacity_form[:max_attendees].value == ""
-                        }
-                        phx-click="toggle-unlimited-capacity"
-                      />
-                    </div>
-
-                    <div
-                      :if={
-                        !is_nil(@capacity_form[:max_attendees].value) &&
-                          @capacity_form[:max_attendees].value != ""
-                      }
-                      class="space-y-2"
-                    >
-                      <.input
-                        type="number"
-                        field={@capacity_form[:max_attendees]}
-                        label="Maximum Attendees"
-                        min="1"
-                      />
-                    </div>
+                <h3 class="text-lg font-medium">Date and Time</h3>
+                <div class="flex flex-row w-full space-x-4">
+                  <div class="flex">
+                    <.date_range_picker
+                      label="Date*"
+                      id="event_date"
+                      form={@form}
+                      start_date_field={@form[:start_date]}
+                      end_date_field={@form[:end_date]}
+                      min={Date.utc_today()}
+                      allow_saturdays={true}
+                    />
                   </div>
-                </.form>
-              </div>
-            </div>
 
-            <.live_component
-              id={"ticket-tier-management-#{@event.id}"}
-              module={YscWeb.AdminEventsLive.TicketTierManagement}
-              event_id={@event.id}
-              event={@event}
-              current_user={@current_user}
-            />
-          </div>
-        </div>
-
-        <div :if={@live_action == :updates} class="relative py-8">
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div class="lg:col-span-7 space-y-8">
-              <div
-                :if={
-                  @event.state in [:published, "published"] and @photo_upload_url
-                }
-                class="border border-zinc-200 rounded py-6 px-4 space-y-4"
-                id="event-photo-upload-link-card"
-              >
-                <div>
-                  <h2 class="text-xl font-bold">Event photo uploads</h2>
-                  <p class="text-zinc-600 text-sm mt-1">
-                    Share this link with attendees so they can contribute photos after the event.
-                    Reminder emails are sent automatically the morning after the event ends.
-                  </p>
-                </div>
-                <.admin_readonly_copy_field
-                  id="event-photo-upload-url"
-                  copy_button_id="copy-photo-upload-url-btn"
-                  value={@photo_upload_url}
-                />
-                <div
-                  :if={@dev_routes?}
-                  class="pt-2 border-t border-zinc-100 space-y-2"
-                >
-                  <p class="text-sm text-zinc-600">
-                    Development: send reminder emails now or preview in the mailbox.
-                  </p>
-                  <div class="flex flex-wrap gap-2">
-                    <.button
-                      type="button"
-                      id="send-photo-reminder-btn"
-                      phx-click="send-photo-reminder"
-                      variant="outline"
-                      data-confirm={"Send photo reminder emails to #{@recipient_count} recipient(s) now?"}
-                    >
-                      Send photo reminder emails now
-                    </.button>
-                    <.link
-                      href="/dev/mailbox"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      Open dev mailbox
-                      <.icon
-                        name="hero-arrow-top-right-on-square"
-                        class="w-4 h-4 ml-1"
-                      />
-                    </.link>
-                  </div>
-                </div>
-              </div>
-
-              <div class="bg-white border border-zinc-200 rounded py-6 px-4 space-y-4">
-                <div>
-                  <h2 class="text-xl font-bold">Send Update to Attendees</h2>
-                  <p class="text-zinc-600 text-sm">
-                    Send a branded email notification to everyone who has a ticket for this event.
-                    This includes both ticket purchasers and registered attendees.
-                  </p>
-                  <p class="mt-2 text-sm font-medium text-blue-600">
-                    {@recipient_count} recipient(s) will receive this update
-                  </p>
-                </div>
-
-                <.form
-                  for={@update_form}
-                  id="event-update-form"
-                  phx-submit="send-event-update"
-                  phx-change="validate-event-update"
-                  class="space-y-4"
-                >
                   <.input
-                    field={@update_form[:title]}
-                    type="text"
-                    label="Title (optional)"
-                    placeholder="e.g. Venue Change, Schedule Update..."
+                    type="time"
+                    id="start_time"
+                    step="60"
+                    field={@form[:start_time]}
+                    label="Start Time*"
+                  />
+                  <.input
+                    type="time"
+                    id="end_time"
+                    step="60"
+                    field={@form[:end_time]}
+                    label="End Time"
+                  />
+                </div>
+
+                <h3 class="text-lg pt-4 font-medium">Location</h3>
+                <div class="space-y-4">
+                  <div class="space-y-2">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      Frequent Venues
+                    </span>
+                    <div class="flex flex-wrap gap-2" id="location-presets">
+                      <button
+                        :for={preset <- @location_presets}
+                        type="button"
+                        id={"location-preset-#{preset.id}"}
+                        phx-click="apply-location-preset"
+                        phx-value-id={preset.id}
+                        class="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 hover:border-zinc-300 transition"
+                      >
+                        <.icon name="hero-map-pin" class="w-4 h-4 flex-shrink-0" />
+                        {preset.label}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div
+                    id="event-location-search"
+                    phx-update="ignore"
+                    phx-hook="RadarLocationAutocomplete"
+                    data-presets={
+                      Jason.encode!(EventLocationConfig.presets_for_search())
+                    }
+                    class="w-full"
                   />
 
-                  <div>
-                    <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
-                      Message
-                    </label>
+                  <div
+                    :if={location_set?(@form)}
+                    class="bg-zinc-50 border border-zinc-200 rounded-lg p-4 space-y-4"
+                    id="location-display-details"
+                  >
+                    <div class="flex items-center justify-between">
+                      <h4 class="text-sm font-medium text-zinc-700">
+                        Display Details
+                      </h4>
+                      <p class="text-xs text-zinc-500">Publicly visible</p>
+                    </div>
+
                     <.input
-                      type="hidden"
-                      id="update[raw_body]"
-                      field={@update_form[:raw_body]}
-                      phx-hook="TrixHook"
-                      phx-debounce={200}
+                      type="text"
+                      field={@form[:location_name]}
+                      label="Location Name"
+                      phx-debounce="300"
                     />
-                    <div id="update-richtext" phx-update="ignore">
-                      <trix-editor
-                        input="update[raw_body]"
-                        class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
-                        placeholder="Write the update message to send to all attendees..."
+                    <.input
+                      type="text"
+                      field={@form[:address]}
+                      label="Address"
+                      phx-debounce="300"
+                    />
+                  </div>
+
+                  <.input type="hidden" field={@form[:latitude]} />
+                  <.input type="hidden" field={@form[:longitude]} />
+
+                  <div class="space-y-2">
+                    <.live_component
+                      id={"#{@event.id}-map"}
+                      module={YscWeb.Components.MapComponent}
+                      event_id={@event.id}
+                      latitude={@form[:latitude].value}
+                      longitude={@form[:longitude].value}
+                      locked={false}
+                      cooperative_gestures={false}
+                    />
+                    <p class="text-zinc-500 text-xs flex items-center gap-1.5 mt-2">
+                      <.icon
+                        name="hero-information-circle"
+                        class="w-4 h-4 flex-shrink-0"
+                      />
+                      Double-check the pin on the map. You can click anywhere on the map to manually adjust it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+                <div>
+                  <h2 class="text-xl font-bold">Overview</h2>
+                  <p class="text-zinc-600 text-sm">
+                    Add more details about the event to help attendees understand what to expect.
+                  </p>
+                </div>
+
+                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
+                  <.input
+                    type="hidden"
+                    id="post[raw_body]"
+                    field={@form[:raw_details]}
+                    data-post-id={@event.id}
+                    phx-hook="TrixHook"
+                    phx-debounce={200}
+                  />
+                  <.live_component
+                    module={YscWeb.TrixImagePickerComponent}
+                    id={:event_body_image_picker}
+                    target_input_id="post[raw_body]"
+                  />
+                  <div id="richtext" phx-update="ignore">
+                    <trix-editor
+                      input="post[raw_body]"
+                      class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border-l border-b border-r text-wrap"
+                      placeholder="Write something delightful and nice..."
+                    >
+                    </trix-editor>
+                  </div>
+                </div>
+              </div>
+            </.form>
+
+            <div id="hosts-section" class="max-w-3xl mt-6">
+              <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+                <div>
+                  <h2 class="text-xl font-bold">Hosts</h2>
+                  <p class="text-zinc-600 text-sm">
+                    Search and add members who will be listed as hosts of this event.
+                  </p>
+                </div>
+
+                <div id="event-hosts-manager" class="space-y-3">
+                  <%!-- Current hosts list --%>
+                  <div
+                    :if={@hosts != []}
+                    class="flex flex-wrap gap-2"
+                    id="hosts-list"
+                  >
+                    <div
+                      :for={host <- @hosts}
+                      id={"host-#{host.id}"}
+                      class="flex items-center gap-2 bg-zinc-100 rounded-full pl-1 pr-3 py-1"
+                    >
+                      <.user_avatar_image
+                        user={host}
+                        class="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                      />
+                      <span class="text-sm font-medium text-zinc-800">
+                        {host.first_name} {host.last_name}
+                      </span>
+                      <button
+                        type="button"
+                        phx-click="remove-host"
+                        phx-value-user-id={host.id}
+                        class="text-zinc-400 hover:text-red-500 transition ml-0.5"
+                        aria-label={"Remove #{host.first_name} as host"}
                       >
-                      </trix-editor>
+                        <.icon name="hero-x-mark" class="w-4 h-4 -mt-1" />
+                      </button>
                     </div>
                   </div>
 
-                  <div class="flex items-center gap-2">
-                    <.input
-                      field={@update_form[:show_on_event_page]}
-                      type="checkbox"
-                      label="Also show this update on the public event page"
-                    />
-                  </div>
+                  <%!-- Search input --%>
+                  <div class="relative">
+                    <div class="relative">
+                      <label for="host-search-input" class="sr-only">
+                        Search hosts by name or email
+                      </label>
+                      <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <.icon
+                          name="hero-magnifying-glass"
+                          class="w-4 h-4 text-zinc-400"
+                        />
+                      </div>
+                      <input
+                        id="host-search-input"
+                        type="text"
+                        value={@host_search_query}
+                        placeholder="Search members by name or email..."
+                        phx-keyup="search-hosts"
+                        phx-debounce="250"
+                        name="host_search"
+                        autocomplete="off"
+                        class="block w-full h-10 rounded border border-zinc-300 bg-white shadow-sm pl-9 pr-4 text-sm text-zinc-900 placeholder-zinc-400 focus:border-zinc-400 focus:outline-none focus:ring-0"
+                      />
+                    </div>
 
-                  <div class="flex flex-wrap items-center gap-4 pt-2">
-                    <.button
-                      type="submit"
-                      phx-disable-with="Sending..."
-                      class="bg-blue-600 hover:bg-blue-700"
-                      data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                    <%!-- Search results dropdown --%>
+                    <div
+                      :if={@host_search_results != [] && @host_search_query != ""}
+                      id="host-search-results"
+                      class="absolute z-10 mt-1 w-full rounded border border-zinc-200 bg-white shadow-lg overflow-hidden"
                     >
-                      <.icon
-                        name="hero-paper-airplane"
-                        class="w-5 h-5"
-                      /> Send Update
-                    </.button>
-                    <.button
-                      type="button"
-                      id="preview-event-update-btn"
-                      variant="outline"
-                      phx-click="open-update-preview"
+                      <ul class="max-h-56 overflow-y-auto py-1 divide-y divide-zinc-50">
+                        <li
+                          :for={user <- @host_search_results}
+                          id={"host-result-#{user.id}"}
+                        >
+                          <button
+                            type="button"
+                            class="flex items-center gap-3 px-3 py-2.5 hover:bg-zinc-50 transition w-full text-left"
+                            phx-click="add-host"
+                            phx-value-user-id={user.id}
+                            aria-label={"Add #{user.first_name} #{user.last_name} (#{user.email}) as host"}
+                          >
+                            <.user_avatar_image
+                              user={user}
+                              class="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                            />
+                            <div class="min-w-0 flex-1">
+                              <p class="text-sm font-medium text-zinc-900 truncate">
+                                {user.first_name} {user.last_name}
+                              </p>
+                              <p class="text-xs text-zinc-500 truncate">
+                                {user.email}
+                              </p>
+                            </div>
+                            <.icon
+                              :if={MapSet.member?(@host_ids, user.id)}
+                              name="hero-check-circle"
+                              class="host-status-icon w-4 h-4 text-green-500 flex-shrink-0"
+                            />
+                            <.icon
+                              :if={!MapSet.member?(@host_ids, user.id)}
+                              name="hero-plus-circle"
+                              class="host-status-icon w-4 h-4 text-blue-400 flex-shrink-0"
+                            />
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <p
+                      :if={@host_search_query != "" && @host_search_results == []}
+                      class="mt-2 text-sm text-zinc-500"
                     >
-                      <.icon name="hero-eye" class="w-5 h-5" /> Preview
-                    </.button>
+                      No members found for "{@host_search_query}".
+                    </p>
                   </div>
-                </.form>
+                </div>
               </div>
             </div>
 
-            <div class="lg:col-span-5 lg:sticky lg:top-8 self-start">
-              <CommunicationTimeline.communication_timeline entries={
-                @communication_timeline
-              } />
+            <div class="max-w-3xl mt-6">
+              <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-zinc-200 rounded p-6 bg-white">
+                <div>
+                  <h2 class="text-xl font-bold">Agenda</h2>
+                  <p class="text-zinc-600 text-sm mt-1">
+                    Design your event schedule exactly as attendees will see it.
+                  </p>
+                </div>
+
+                <.button
+                  id="add-agenda-button"
+                  type="button"
+                  phx-click="add-agenda"
+                  phx-disable-with="Adding..."
+                  class="shrink-0"
+                >
+                  <.icon name="hero-plus" /> Add Agenda Track
+                </.button>
+              </div>
+
+              <div class="relative mt-6">
+                <button
+                  type="button"
+                  data-scroll-left
+                  aria-label="Scroll to previous agenda track"
+                  class="absolute left-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
+                >
+                  <.icon name="hero-chevron-left" class="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  data-scroll-right
+                  aria-label="Scroll to next agenda track"
+                  class="absolute right-2 top-1/2 z-20 flex h-9 w-9 shrink-0 -translate-y-1/2 items-center justify-center rounded-full border border-zinc-200 bg-white p-0 text-zinc-600 shadow-md transition hover:bg-zinc-50 hover:text-zinc-900 opacity-0 pointer-events-none"
+                >
+                  <.icon name="hero-chevron-right" class="h-5 w-5" />
+                </button>
+
+                <div
+                  id="agendas-scroll"
+                  phx-hook="AgendaTracksScroller"
+                  class="agenda-tracks-scroll overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth"
+                >
+                  <ul
+                    id="agendas"
+                    phx-update="stream"
+                    phx-hook="Sortable"
+                    class="flex gap-6 w-max min-w-full"
+                  >
+                    <li
+                      :for={{id, agenda} <- @streams.agendas}
+                      id={id}
+                      data-id={agenda.id}
+                      class="group/agenda flex-shrink-0 w-[450px] sm:w-[500px] snap-start flex flex-col bg-white border border-zinc-200 shadow-sm rounded overflow-hidden drag-item:scale-[1.02] drag-item:shadow-xl drag-item:z-10 drag-ghost:opacity-100 drag-ghost:bg-blue-50 drag-ghost:border-2 drag-ghost:border-dashed drag-ghost:border-blue-400"
+                    >
+                      <div class="flex items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-4 py-3 drag-ghost:opacity-0">
+                        <div class="flex items-center gap-2 flex-1">
+                          <div
+                            class="drag-handle cursor-grab active:cursor-grabbing text-zinc-400 hover:text-zinc-600 p-1"
+                            title="Drag to reorder tracks"
+                          >
+                            <.icon
+                              name="hero-arrows-right-left"
+                              class="w-5 h-5 block"
+                            />
+                          </div>
+
+                          <div class="flex-1">
+                            <.live_component
+                              id={"edit-agenda-title-#{agenda.id}"}
+                              module={YscWeb.AgendasLive.FormComponent}
+                              agenda_id={agenda.id}
+                              event_id={@event.id}
+                              agenda={agenda}
+                            />
+                          </div>
+                        </div>
+
+                        <.link
+                          phx-click="delete-agenda"
+                          phx-value-id={agenda.id}
+                          aria-label="delete agenda"
+                          class="text-zinc-400 hover:text-red-600 p-2 hover:bg-red-50 rounded-md transition ml-2"
+                          data-confirm="Are you sure you want to delete this agenda?"
+                        >
+                          <.icon name="hero-trash" class="w-4 h-4 block" />
+                        </.link>
+                      </div>
+
+                      <div class="p-6 bg-white relative drag-ghost:opacity-0">
+                        <.live_component
+                          id={agenda.id}
+                          module={YscWeb.AgendaEditComponent}
+                          agenda={agenda}
+                          event_id={@event.id}
+                        />
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 
-          <.modal
-            :if={@show_update_preview_modal}
-            id="event-update-preview-modal"
-            show
-            on_cancel={JS.push("close-update-preview")}
-            max_width="max-w-4xl"
-          >
-            <.header>
-              Email preview
-              <:subtitle :if={@update_preview_subject}>
-                Subject: {@update_preview_subject}
-              </:subtitle>
-            </.header>
-            <iframe
-              id="event-update-preview-iframe"
-              phx-hook="EmailPreview"
-              class="w-full border border-zinc-200 rounded min-h-[400px]"
-            />
-          </.modal>
+          <div :if={@live_action == :tickets} class="relative py-8">
+            <div class="max-w-3xl">
+              <div class="mb-6">
+                <div class="border border-zinc-200 rounded py-6 px-4 space-y-4">
+                  <div>
+                    <h2 class="text-xl font-bold">Event Capacity</h2>
+                    <p class="text-zinc-600 text-sm">
+                      Set the maximum number of attendees for this event. This limit applies across all ticket tiers.
+                    </p>
+                  </div>
+
+                  <.form
+                    for={@capacity_form}
+                    id="capacity_form"
+                    phx-submit="save-capacity"
+                    phx-change="validate-capacity"
+                    class="space-y-4"
+                  >
+                    <div class="space-y-4">
+                      <div class="flex items-center space-x-3">
+                        <.input
+                          type="checkbox"
+                          field={@capacity_form[:unlimited_capacity]}
+                          label="Unlimited capacity"
+                          checked={
+                            is_nil(@capacity_form[:max_attendees].value) ||
+                              @capacity_form[:max_attendees].value == ""
+                          }
+                          phx-click="toggle-unlimited-capacity"
+                        />
+                      </div>
+
+                      <div
+                        :if={
+                          !is_nil(@capacity_form[:max_attendees].value) &&
+                            @capacity_form[:max_attendees].value != ""
+                        }
+                        class="space-y-2"
+                      >
+                        <.input
+                          type="number"
+                          field={@capacity_form[:max_attendees]}
+                          label="Maximum Attendees"
+                          min="1"
+                        />
+                      </div>
+                    </div>
+                  </.form>
+                </div>
+              </div>
+
+              <.live_component
+                id={"ticket-tier-management-#{@event.id}"}
+                module={YscWeb.AdminEventsLive.TicketTierManagement}
+                event_id={@event.id}
+                event={@event}
+                current_user={@current_user}
+              />
+            </div>
+          </div>
+
+          <div :if={@live_action == :updates} class="relative py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div class="lg:col-span-7 space-y-8">
+                <div
+                  :if={
+                    @event.state in [:published, "published"] and @photo_upload_url
+                  }
+                  class="border border-zinc-200 rounded py-6 px-4 space-y-4"
+                  id="event-photo-upload-link-card"
+                >
+                  <div>
+                    <h2 class="text-xl font-bold">Event photo uploads</h2>
+                    <p class="text-zinc-600 text-sm mt-1">
+                      Share this link with attendees so they can contribute photos after the event.
+                      Reminder emails are sent automatically the morning after the event ends.
+                    </p>
+                  </div>
+                  <.admin_readonly_copy_field
+                    id="event-photo-upload-url"
+                    copy_button_id="copy-photo-upload-url-btn"
+                    value={@photo_upload_url}
+                  />
+                  <div
+                    :if={@dev_routes?}
+                    class="pt-2 border-t border-zinc-100 space-y-2"
+                  >
+                    <p class="text-sm text-zinc-600">
+                      Development: send reminder emails now or preview in the mailbox.
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                      <.button
+                        type="button"
+                        id="send-photo-reminder-btn"
+                        phx-click="send-photo-reminder"
+                        variant="outline"
+                        data-confirm={"Send photo reminder emails to #{@recipient_count} recipient(s) now?"}
+                      >
+                        Send photo reminder emails now
+                      </.button>
+                      <.link
+                        href="/dev/mailbox"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        Open dev mailbox
+                        <.icon
+                          name="hero-arrow-top-right-on-square"
+                          class="w-4 h-4 ml-1"
+                        />
+                      </.link>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="bg-white border border-zinc-200 rounded py-6 px-4 space-y-4">
+                  <div>
+                    <h2 class="text-xl font-bold">Send Update to Attendees</h2>
+                    <p class="text-zinc-600 text-sm">
+                      Send a branded email notification to everyone who has a ticket for this event.
+                      This includes both ticket purchasers and registered attendees.
+                    </p>
+                    <p class="mt-2 text-sm font-medium text-blue-600">
+                      {@recipient_count} recipient(s) will receive this update
+                    </p>
+                  </div>
+
+                  <.form
+                    for={@update_form}
+                    id="event-update-form"
+                    phx-submit="send-event-update"
+                    phx-change="validate-event-update"
+                    class="space-y-4"
+                  >
+                    <.input
+                      field={@update_form[:title]}
+                      type="text"
+                      label="Title (optional)"
+                      placeholder="e.g. Venue Change, Schedule Update..."
+                    />
+
+                    <div>
+                      <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
+                        Message
+                      </label>
+                      <.input
+                        type="hidden"
+                        id="update[raw_body]"
+                        field={@update_form[:raw_body]}
+                        phx-hook="TrixHook"
+                        phx-debounce={200}
+                      />
+                      <div id="update-richtext" phx-update="ignore">
+                        <trix-editor
+                          input="update[raw_body]"
+                          class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                          placeholder="Write the update message to send to all attendees..."
+                        >
+                        </trix-editor>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <.input
+                        field={@update_form[:show_on_event_page]}
+                        type="checkbox"
+                        label="Also show this update on the public event page"
+                      />
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-4 pt-2">
+                      <.button
+                        type="submit"
+                        phx-disable-with="Sending..."
+                        class="bg-blue-600 hover:bg-blue-700"
+                        data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                      >
+                        <.icon
+                          name="hero-paper-airplane"
+                          class="w-5 h-5"
+                        /> Send Update
+                      </.button>
+                      <.button
+                        type="button"
+                        id="preview-event-update-btn"
+                        variant="outline"
+                        phx-click="open-update-preview"
+                      >
+                        <.icon name="hero-eye" class="w-5 h-5" /> Preview
+                      </.button>
+                    </div>
+                  </.form>
+                </div>
+              </div>
+
+              <div class="lg:col-span-5 lg:sticky lg:top-8 self-start">
+                <CommunicationTimeline.communication_timeline entries={
+                  @communication_timeline
+                } />
+              </div>
+            </div>
+
+            <.modal
+              :if={@show_update_preview_modal}
+              id="event-update-preview-modal"
+              show
+              on_cancel={JS.push("close-update-preview")}
+              max_width="max-w-4xl"
+            >
+              <.header>
+                Email preview
+                <:subtitle :if={@update_preview_subject}>
+                  Subject: {@update_preview_subject}
+                </:subtitle>
+              </.header>
+              <iframe
+                id="event-update-preview-iframe"
+                phx-hook="EmailPreview"
+                class="w-full border border-zinc-200 rounded min-h-[400px]"
+              />
+            </.modal>
+          </div>
         </div>
       </div>
     </.side_menu>
@@ -952,57 +981,19 @@ defmodule YscWeb.AdminEventsNewLive do
       Events.subscribe()
     end
 
-    event = Events.get_event!(id)
-    event_changeset = Event.changeset(event, %{})
+    connected_remount? =
+      connected?(socket) &&
+        socket.assigns[:loading_event?] == false &&
+        match?(%{id: ^id}, socket.assigns[:event])
 
-    # Initialize capacity form with unlimited_capacity virtual field
-    capacity_attrs = %{
-      "unlimited_capacity" => is_nil(event.max_attendees)
-    }
+    socket =
+      if connected_remount? do
+        assign(socket, :list_params, Map.drop(params, ["id"]))
+      else
+        assign_event_loading_shell(socket, params, id)
+      end
 
-    capacity_changeset = Event.changeset(event, capacity_attrs)
-
-    {:ok,
-     socket
-     |> assign(:event, event)
-     |> assign(:active_page, :events)
-     |> assign(:capacity_form, to_form(capacity_changeset))
-     |> assign(:page_title, event.title)
-     |> assign(:description_length, description_length(event.description))
-     |> assign(:event_title, event.title)
-     |> assign(:state, event.state)
-     |> assign(:start_date, event.start_date)
-     |> assign(:end_date, event.end_date)
-     |> assign(:start_time, event.start_time)
-     |> assign(:end_time, event.end_time)
-     |> assign(:can_publish, can_publish?(event.start_date, event.title))
-     |> assign(:ticket_tier_count, 0)
-     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
-     |> assign(trigger_submit: false, check_errors: false)
-     |> assign(:hosts, [])
-     |> assign(:host_ids, MapSet.new())
-     |> assign(:host_search_query, "")
-     |> assign(:host_search_results, [])
-     |> stream(:agendas, [])
-     |> assign(:list_params, Map.drop(params, ["id"]))
-     |> assign(form: to_form(event_changeset, as: "event"))
-     |> assign(
-       :update_form,
-       to_form(
-         %{
-           "title" => "",
-           "raw_body" => "",
-           "rendered_body" => "",
-           "show_on_event_page" => false
-         },
-         as: "update"
-       )
-     )
-     |> assign_updates_tab_defaults()
-     |> assign(:show_update_preview_modal, false)
-     |> assign(:update_preview_subject, nil)
-     |> assign(:location_presets, EventLocationConfig.presets())
-     |> assign_check_in_path(event)}
+    {:ok, socket}
   end
 
   @impl true
@@ -1023,14 +1014,24 @@ defmodule YscWeb.AdminEventsNewLive do
     current_id = socket.assigns[:event] && socket.assigns.event.id
 
     socket =
-      if incoming_id != current_id do
-        load_event(socket, incoming_id)
-      else
-        socket
-      end
+      socket
       |> assign(:list_params, Map.drop(params, ["id"]))
-      |> maybe_refresh_tab_data()
-      |> maybe_assign_ticket_tier_count()
+      |> then(fn socket ->
+        if connected?(socket) do
+          socket
+          |> then(fn socket ->
+            if incoming_id != current_id or socket.assigns[:loading_event?] do
+              load_event(socket, incoming_id)
+            else
+              socket
+            end
+          end)
+          |> maybe_refresh_tab_data()
+          |> maybe_assign_ticket_tier_count()
+        else
+          socket
+        end
+      end)
 
     {:noreply, socket}
   end
@@ -1101,6 +1102,35 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:update_preview_subject, nil)
     |> assign(:location_presets, EventLocationConfig.presets())
     |> assign_check_in_path(event)
+    |> assign(:loading_event?, false)
+  end
+
+  defp assign_event_loading_shell(socket, params, id) do
+    socket
+    |> assign(:loading_event?, true)
+    |> assign(:event, %Event{id: id, state: :draft, title: ""})
+    |> assign(:active_page, :events)
+    |> assign(:page_title, "Event")
+    |> assign(:list_params, Map.drop(params, ["id"]))
+    |> assign(:event_title, "")
+    |> assign(:state, :draft)
+    |> assign(:start_date, nil)
+    |> assign(:end_date, nil)
+    |> assign(:start_time, nil)
+    |> assign(:end_time, nil)
+    |> assign(:can_publish, false)
+    |> assign(:ticket_tier_count, 0)
+    |> assign(:partiful_link_present, false)
+    |> assign(trigger_submit: false, check_errors: false)
+    |> assign(:hosts, [])
+    |> assign(:host_ids, MapSet.new())
+    |> assign(:host_search_query, "")
+    |> assign(:host_search_results, [])
+    |> stream(:agendas, [], reset: true)
+    |> assign_updates_tab_defaults()
+    |> assign(:show_update_preview_modal, false)
+    |> assign(:update_preview_subject, nil)
+    |> assign(:check_in_path, nil)
   end
 
   defp assign_updates_tab_defaults(socket) do
