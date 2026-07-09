@@ -1649,6 +1649,53 @@ defmodule Ysc.TicketsTest do
       assert hd(grant_order.tickets).status == :confirmed
     end
 
+    test "rejects grant when recipient checkout payment is in flight", %{
+      admin: admin,
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
+      end)
+
+      assert {:ok, pending_order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      payment_intent_id = "pi_grant_block_#{pending_order.id}"
+
+      assert {:ok, pending_order} =
+               Tickets.update_payment_intent(pending_order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "processing",
+           amount: Ysc.MoneyHelper.money_to_cents(pending_order.total_amount)
+         }}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+                 tier1.id => 1
+               })
+
+      pending_order = Tickets.get_ticket_order(pending_order.id)
+      assert pending_order.status == :pending
+
+      assert [] ==
+               Ysc.Repo.all(
+                 from to in TicketOrder,
+                   where:
+                     to.user_id == ^user.id and to.event_id == ^event.id and
+                       to.status == :completed and to.granted_by_id == ^admin.id
+               )
+    end
+
     test "skip_email prevents confirmation email scheduling", %{
       admin: admin,
       user: user,

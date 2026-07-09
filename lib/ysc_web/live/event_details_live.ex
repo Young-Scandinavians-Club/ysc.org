@@ -5190,72 +5190,10 @@ defmodule YscWeb.EventDetailsLive do
          %Ysc.Tickets.TicketOrder{} = ticket_order,
          opts
        ) do
-    if Keyword.get(opts, :payment_redirect_in_progress, false) do
-      false
-    else
-      case ticket_order.payment_intent_id do
-        nil ->
-          true
-
-        payment_intent_id ->
-          payment_intent_allows_checkout_cancel?(
-            payment_intent_id,
-            ticket_order.id,
-            Keyword.get(opts, :context, "checkout")
-          )
-      end
-    end
+    Ysc.Tickets.CheckoutCancel.pending_order_safe_to_cancel?(ticket_order, opts)
   end
 
   defp pending_checkout_safe_to_cancel?(_ticket_order, _opts), do: true
-
-  defp payment_intent_allows_checkout_cancel?(
-         payment_intent_id,
-         ticket_order_id,
-         context
-       ) do
-    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
-
-    case stripe_client.retrieve_payment_intent(payment_intent_id, %{}) do
-      {:ok, payment_intent} ->
-        case payment_intent.status do
-          status
-          when status in [
-                 "requires_action",
-                 "processing",
-                 "requires_confirmation"
-               ] ->
-            false
-
-          "succeeded" ->
-            require Ysc.Logging
-
-            Ysc.Logging.warning(
-              "Payment intent already succeeded, not cancelling order",
-              context: context,
-              payment_intent_id: payment_intent_id,
-              ticket_order_id: ticket_order_id
-            )
-
-            false
-
-          _ ->
-            true
-        end
-
-      {:error, _} ->
-        require Ysc.Logging
-
-        Ysc.Logging.warning(
-          "Could not retrieve payment intent status, not cancelling order",
-          context: context,
-          payment_intent_id: payment_intent_id,
-          ticket_order_id: ticket_order_id
-        )
-
-        false
-    end
-  end
 
   defp maybe_cancel_pending_ticket_order(ticket_order, reason, opts) do
     if pending_checkout_safe_to_cancel?(ticket_order, opts) do
