@@ -1100,8 +1100,7 @@ defmodule YscWeb.UserSettingsLive do
                   Pending Family Invitations
                 </h3>
                 <p class="text-xs text-zinc-500 mt-1">
-                  You have been invited to join a family membership. Accepting an invitation will
-                  link your account to the inviter's membership.
+                  You've been invited to join a family membership. If you accept, you'll share the same membership benefits as the person who invited you — including cabin bookings and member event tickets.
                 </p>
                 <div class="mt-3 space-y-2">
                   <%= for invite <- @pending_family_invites do %>
@@ -1141,7 +1140,7 @@ defmodule YscWeb.UserSettingsLive do
                       Account Pending Approval
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
-                      Your account must be approved by the board before you can purchase a membership. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
+                      Your application is being reviewed by the board. You'll be able to activate your membership and pay annual dues after approval. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
                       <.link
                         navigate={~p"/pending-review"}
                         class="font-semibold text-yellow-900 underline underline-offset-2"

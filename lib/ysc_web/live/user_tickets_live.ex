@@ -132,8 +132,9 @@ defmodule YscWeb.UserTicketsLive do
                         phx-value-order-id={ticket_order.id}
                         color="red"
                         class="flex-1"
+                        data-confirm="Cancel this reservation? You'll lose your held tickets and member price. You can buy tickets again if they're still available."
                       >
-                        Cancel
+                        Cancel reservation
                       </.button>
                     </div>
                   </div>
@@ -357,7 +358,9 @@ defmodule YscWeb.UserTicketsLive do
             {:noreply,
              socket
              |> stream(:ticket_orders, ticket_orders, reset: true, limit: -50)
-             |> YscWeb.Flash.put_toast(:info, "Order cancelled.",
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Reservation cancelled. Your tickets were released.",
                title: "Order"
              )}
 
@@ -424,10 +427,16 @@ defmodule YscWeb.UserTicketsLive do
         _ -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
       end
     ]}>
-      {String.capitalize(to_string(@status))}
+      {status_label(@status)}
     </span>
     """
   end
+
+  defp status_label(:pending), do: "Payment needed"
+  defp status_label(:completed), do: "Paid"
+  defp status_label(:expired), do: "Reservation expired"
+  defp status_label(:cancelled), do: "Cancelled"
+  defp status_label(status), do: String.capitalize(to_string(status))
 
   defp format_date(datetime) do
     Timex.format!(datetime, "{Mshort} {D}, {YYYY}")

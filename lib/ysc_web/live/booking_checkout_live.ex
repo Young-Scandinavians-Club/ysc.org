@@ -614,14 +614,14 @@ defmodule YscWeb.BookingCheckoutLive do
                 else: "text-blue-700"
               )
             ]}>
-              We've saved these dates for you for
+              These dates are held for
               <span
                 class="font-bold tabular-nums"
                 id="hold-countdown"
               >
                 {calculate_remaining_time(@booking.hold_expires_at)}
               </span>
-              . Pay now to confirm your reservation. If time runs out, your dates will be released and you may need to start a new booking.
+              — not confirmed yet. Pay now to complete your booking. If the timer runs out, the dates go back on the calendar and you'll need to book again.
             </p>
           </div>
           <!-- Price Details -->
