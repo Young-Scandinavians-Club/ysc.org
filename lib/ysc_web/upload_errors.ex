@@ -21,7 +21,7 @@ defmodule YscWeb.UploadErrors do
   - `:expense` — expense report receipt and proof uploads
   - `:event_photo` — event photo and video batch upload
   """
-  @spec error_to_string(term(), keyword()) :: String.t()
+  @spec error_to_string(term(), keyword() | variant()) :: String.t()
   def error_to_string(error, opts \\ [])
 
   def error_to_string(error, variant) when variant in @variants do
