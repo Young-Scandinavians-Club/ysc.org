@@ -124,23 +124,14 @@ defmodule YscWeb.MediaPickerComponent do
                     </figure>
 
                     <%= for err <- upload_errors(@uploads.media_picker_file, entry) do %>
-                      <p class="text-sm text-red-600 font-semibold mt-1">
-                        <.icon
-                          name="hero-exclamation-circle"
-                          class="-mt-0.5 h-5 w-5"
-                        /> {error_to_string(err)}
-                      </p>
+                      <.upload_error error={err} />
                     <% end %>
                   </article>
                 <% end %>
               </div>
 
               <%= for err <- upload_errors(@uploads.media_picker_file) do %>
-                <p class="text-sm text-red-600 font-semibold mt-1">
-                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
-                    err
-                  )}
-                </p>
+                <.upload_error error={err} />
               <% end %>
 
               <div :if={length(@uploads.media_picker_file.entries) == 0}>
@@ -383,11 +374,4 @@ defmodule YscWeb.MediaPickerComponent do
     |> Keyword.put(:before_date, date)
     |> Keyword.put(:start_at_year, year)
   end
-
-  defp error_to_string(:too_large), do: "Too large"
-
-  defp error_to_string(:not_accepted),
-    do: "You have selected an unacceptable file type"
-
-  defp error_to_string(:too_many_files), do: "You have selected too many files"
 end

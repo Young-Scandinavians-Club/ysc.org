@@ -2220,7 +2220,7 @@ defmodule YscWeb.ExpenseReportLive do
                           </label>
                           <%= for err <- upload_errors(@uploads.receipt) do %>
                             <p class="mt-2 text-sm text-red-600">
-                              {upload_error_to_string(err)}
+                              {YscWeb.UploadErrors.error_to_string(err, :expense)}
                             </p>
                           <% end %>
                           <!-- Upload progress for entries - only show if entry matches this expense item index -->
@@ -2257,7 +2257,10 @@ defmodule YscWeb.ExpenseReportLive do
                                     </div>
                                     <%= for err <- upload_errors(@uploads.receipt, entry) do %>
                                       <p class="mb-2 text-sm text-red-600">
-                                        {upload_error_to_string(err)}
+                                        {YscWeb.UploadErrors.error_to_string(
+                                          err,
+                                          :expense
+                                        )}
                                       </p>
                                     <% end %>
                                     <progress
@@ -2573,7 +2576,7 @@ defmodule YscWeb.ExpenseReportLive do
                           </label>
                           <%= for err <- upload_errors(@uploads.proof) do %>
                             <p class="mt-2 text-sm text-red-600">
-                              {upload_error_to_string(err)}
+                              {YscWeb.UploadErrors.error_to_string(err, :expense)}
                             </p>
                           <% end %>
                           <!-- Upload progress for entries - only show if entry matches this income item index -->
@@ -2610,7 +2613,10 @@ defmodule YscWeb.ExpenseReportLive do
                                     </div>
                                     <%= for err <- upload_errors(@uploads.proof, entry) do %>
                                       <p class="mb-2 text-sm text-red-600">
-                                        {upload_error_to_string(err)}
+                                        {YscWeb.UploadErrors.error_to_string(
+                                          err,
+                                          :expense
+                                        )}
                                       </p>
                                     <% end %>
                                     <progress
@@ -3522,17 +3528,6 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp error_to_string({msg, _opts}), do: msg
-
-  defp upload_error_to_string(:too_large), do: "File is too large (max 10MB)"
-
-  defp upload_error_to_string(:not_accepted),
-    do: "Invalid file type. Use PDF, JPG, JPEG, PNG, or WEBP"
-
-  defp upload_error_to_string(:too_many_files), do: "Too many files selected"
-
-  defp upload_error_to_string(_err),
-    do:
-      "Something went wrong uploading that file. Please try again, or use a different file format."
 
   # Timeline component for expense report status
   defp timeline_section(assigns) do

@@ -207,7 +207,7 @@ defmodule YscWeb.EventPhotoUploadLive do
                 :for={err <- collect_upload_errors(@uploads.photos)}
                 class="text-sm text-red-600"
               >
-                {error_to_string(err)}
+                {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
               </p>
             </div>
           </form>
@@ -351,23 +351,6 @@ defmodule YscWeb.EventPhotoUploadLive do
     String.starts_with?(client_type, "video") or
       Limits.video?(entry.client_name)
   end
-
-  defp error_to_string(:too_large),
-    do: "File is too large (photos max 200 MB, videos max 20 GB)"
-
-  defp error_to_string(:too_many_files),
-    do:
-      "You can upload up to 30 files per batch. Submit these first, then use Upload more to add another batch."
-
-  defp error_to_string(:not_accepted),
-    do: "File type not accepted — use a photo or video format we support"
-
-  defp error_to_string(_err),
-    do:
-      "Something went wrong uploading that file. Please try again, or use a different photo or video format."
-
-  @doc false
-  def test_upload_error_to_string(err), do: error_to_string(err)
 
   attr :event, Event, required: true
   attr :greeting_name, :string, required: true

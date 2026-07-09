@@ -22,6 +22,7 @@ defmodule YscWeb.CoreComponents do
 
   alias Phoenix.LiveView.JS
   alias YscWeb.FormHelpers
+  alias YscWeb.UploadErrors
 
   @doc """
   Renders a modal.
@@ -1611,6 +1612,50 @@ defmodule YscWeb.CoreComponents do
 
   defp upload_dropzone_empty_state_primary_text_class(:compact),
     do: "mb-1 text-sm text-zinc-500"
+
+  @doc """
+  Renders a single LiveView upload validation error with an icon.
+
+  Pair with `upload_errors/1` or `upload_errors/2` from `Phoenix.Component`.
+
+  ## Examples
+
+      <%= for err <- upload_errors(@uploads.avatar, entry) do %>
+        <.upload_error error={err} variant={:avatar} />
+      <% end %>
+
+      <.upload_error error={:too_large} alert? />
+  """
+  attr :error, :any, required: true
+
+  attr :variant, :atom,
+    default: :default,
+    values: [:default, :admin, :avatar, :expense, :event_photo],
+    doc: "Copy preset; see `YscWeb.UploadErrors.error_to_string/2`"
+
+  attr :alert?, :boolean,
+    default: false,
+    doc:
+      "When true, adds the `alert alert-danger` classes used on admin upload forms"
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the paragraph"
+
+  def upload_error(assigns) do
+    ~H"""
+    <p class={upload_error_class(@alert?, @class)}>
+      <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" />
+      {UploadErrors.error_to_string(@error, variant: @variant)}
+    </p>
+    """
+  end
+
+  defp upload_error_class(true, extra),
+    do: ["alert alert-danger text-sm text-red-600 font-semibold mt-1", extra]
+
+  defp upload_error_class(false, extra),
+    do: ["text-sm text-red-600 font-semibold mt-1", extra]
 
   @doc """
   Renders a back navigation link.

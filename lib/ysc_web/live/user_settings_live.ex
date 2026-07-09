@@ -532,7 +532,7 @@ defmodule YscWeb.UserSettingsLive do
                           name="hero-exclamation-circle"
                           class="w-4 h-4 -mt-0.5 inline"
                         />
-                        {avatar_upload_error_to_string(err)}
+                        {YscWeb.UploadErrors.error_to_string(err, :avatar)}
                       </p>
                     <% end %>
                   <% end %>
@@ -6214,17 +6214,6 @@ defmodule YscWeb.UserSettingsLive do
       avatar -> Avatars.avatar_url(avatar, :profile)
     end
   end
-
-  defp avatar_upload_error_to_string(:too_large),
-    do: "Image must be under 10 MB"
-
-  defp avatar_upload_error_to_string(:not_accepted),
-    do: "Only JPG, PNG, WebP, and GIF files are accepted"
-
-  defp avatar_upload_error_to_string(:too_many_files),
-    do: "Only one photo at a time"
-
-  defp avatar_upload_error_to_string(_), do: "Upload failed"
 
   defp format_utc_date(%DateTime{} = dt, format) do
     dt

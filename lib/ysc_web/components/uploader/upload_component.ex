@@ -66,24 +66,15 @@ defmodule YscWeb.UploadComponent do
                 </button>
               </figure>
 
-              <%!-- Phoenix.Component.upload_errors/2 returns a list of error atoms --%>
               <%= for err <- upload_errors(@uploads.upload_component_file, entry) do %>
-                <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-                  <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
-                    err
-                  )}
-                </p>
+                <.upload_error error={err} alert? />
               <% end %>
             </article>
           <% end %>
         </div>
 
         <%= for err <- upload_errors(@uploads.upload_component_file) do %>
-          <p class="alert alert-danger text-sm text-red-600 font-semibold mt-1">
-            <.icon name="hero-exclamation-circle" class="-mt-0.5 h-5 w-5" /> {error_to_string(
-              err
-            )}
-          </p>
+          <.upload_error error={err} alert? />
         <% end %>
 
         <div :if={length(@uploads.upload_component_file.entries) == 0}>
@@ -119,11 +110,4 @@ defmodule YscWeb.UploadComponent do
     send(self(), {__MODULE__, socket.assigns.id, upload_path})
     :ok
   end
-
-  defp error_to_string(:too_large), do: "Too large"
-
-  defp error_to_string(:not_accepted),
-    do: "You have selected an unacceptable file type"
-
-  defp error_to_string(:too_many_files), do: "You have selected too many files"
 end
