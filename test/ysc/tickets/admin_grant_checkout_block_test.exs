@@ -85,12 +85,13 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
              )
   end
 
-  test "rejects grant when checkout payment starts after precheck but before commit", %{
-    admin: admin,
-    user: user,
-    event: event,
-    tier1: tier1
-  } do
+  test "rejects grant when checkout payment starts after precheck but before commit",
+       %{
+         admin: admin,
+         user: user,
+         event: event,
+         tier1: tier1
+       } do
     assert {:ok, pending_order} =
              Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
 
@@ -101,7 +102,8 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
 
     retrieve_calls = :counters.new(1, [])
 
-    stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                      _opts ->
       call = :counters.add(retrieve_calls, 1, 1)
 
       status =
