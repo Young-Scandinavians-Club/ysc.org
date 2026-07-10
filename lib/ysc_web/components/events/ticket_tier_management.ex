@@ -509,6 +509,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
 
   @reservation_update_keys [:id, :reservation_epoch, :close_reserve_modal]
   @grant_update_keys [:id, :grant_epoch, :close_grant_modal, :grant_success]
+  @parent_passthrough_keys [:id, :event_id, :event, :current_user]
 
   @impl true
   def update(incoming_assigns, socket) do
@@ -517,51 +518,62 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
     grant_success = Map.get(incoming_assigns, :grant_success)
 
     socket =
-      if reservation_only_update?(incoming_assigns) and
-           socket.assigns[:ticket_tiers] != nil do
-        ticket_tiers = socket.assigns.ticket_tiers
+      cond do
+        reservation_only_update?(incoming_assigns) and
+            socket.assigns[:ticket_tiers] != nil ->
+          ticket_tiers = socket.assigns.ticket_tiers
 
-        {reservations_by_tier, expired_reservations_by_tier} =
-          load_reservations_maps(ticket_tiers)
+          {reservations_by_tier, expired_reservations_by_tier} =
+            load_reservations_maps(ticket_tiers)
 
-        socket
-        |> assign(:reservations_by_tier, reservations_by_tier)
-        |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
-      else
-        # Parent send_update/2 only passes a few keys; merge with prior component assigns
-        # so required fields (e.g. event_id) are always present.
-        assigns =
-          socket.assigns
-          |> Map.take([
-            :event_id,
-            :event,
-            :current_user,
-            :show_add_modal,
-            :show_edit_modal,
-            :show_reserve_modal,
-            :reserving_tier,
-            :show_grant_modal,
-            :granting_tier,
-            :editing_ticket_tier
-          ])
-          |> Map.merge(incoming_assigns)
+          socket
+          |> assign(:reservations_by_tier, reservations_by_tier)
+          |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
 
-        event = Map.get(assigns, :event) || Events.get_event!(assigns.event_id)
-        ticket_tiers = Events.list_ticket_tiers_for_event(assigns.event_id)
-        ticket_purchases = Events.get_ticket_purchase_summary(assigns.event_id)
+        parent_passthrough_only_update?(incoming_assigns) and
+            socket.assigns[:ticket_tiers] != nil ->
+          socket
+          |> maybe_assign_parent_passthrough(incoming_assigns)
 
-        {reservations_by_tier, expired_reservations_by_tier} =
-          load_reservations_maps(ticket_tiers)
+        true ->
+          # Parent send_update/2 only passes a few keys; merge with prior component assigns
+          # so required fields (e.g. event_id) are always present.
+          assigns =
+            socket.assigns
+            |> Map.take([
+              :event_id,
+              :event,
+              :current_user,
+              :show_add_modal,
+              :show_edit_modal,
+              :show_reserve_modal,
+              :reserving_tier,
+              :show_grant_modal,
+              :granting_tier,
+              :editing_ticket_tier
+            ])
+            |> Map.merge(incoming_assigns)
 
-        socket
-        |> assign(assigns)
-        |> assign(:event, event)
-        |> assign(:ticket_tiers, ticket_tiers)
-        |> assign(:ticket_purchases, ticket_purchases)
-        |> assign(:reservations_by_tier, reservations_by_tier)
-        |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
-        |> assign(:editing_ticket_tier, nil)
-        |> assign(:current_user, assigns[:current_user])
+          event =
+            Map.get(assigns, :event) || Events.get_event!(assigns.event_id)
+
+          ticket_tiers = Events.list_ticket_tiers_for_event(assigns.event_id)
+
+          ticket_purchases =
+            Events.get_ticket_purchase_summary(assigns.event_id)
+
+          {reservations_by_tier, expired_reservations_by_tier} =
+            load_reservations_maps(ticket_tiers)
+
+          socket
+          |> assign(assigns)
+          |> assign(:event, event)
+          |> assign(:ticket_tiers, ticket_tiers)
+          |> assign(:ticket_purchases, ticket_purchases)
+          |> assign(:reservations_by_tier, reservations_by_tier)
+          |> assign(:expired_reservations_by_tier, expired_reservations_by_tier)
+          |> assign(:editing_ticket_tier, nil)
+          |> assign(:current_user, assigns[:current_user])
       end
 
     socket =
@@ -666,6 +678,31 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
          Map.get(assigns, :close_reserve_modal) == true or
          Map.has_key?(assigns, :grant_epoch) or
          Map.get(assigns, :close_grant_modal) == true)
+  end
+
+  defp parent_passthrough_only_update?(assigns) do
+    extra_keys =
+      assigns
+      |> Map.keys()
+      |> Enum.reject(
+        &(&1 in @parent_passthrough_keys or &1 in @reservation_update_keys or
+            &1 in @grant_update_keys or &1 == :__changed__)
+      )
+
+    extra_keys == []
+  end
+
+  defp maybe_assign_parent_passthrough(socket, incoming_assigns) do
+    socket =
+      case Map.get(incoming_assigns, :event) do
+        nil -> socket
+        event -> assign(socket, :event, event)
+      end
+
+    case Map.get(incoming_assigns, :current_user) do
+      nil -> socket
+      current_user -> assign(socket, :current_user, current_user)
+    end
   end
 
   @impl true

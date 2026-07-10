@@ -758,6 +758,7 @@ defmodule YscWeb.AdminEventsNewLive do
                     id="capacity_form"
                     phx-submit="save-capacity"
                     phx-change="validate-capacity"
+                    phx-debounce="300"
                     class="space-y-4"
                   >
                     <div class="space-y-4">
