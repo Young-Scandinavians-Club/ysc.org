@@ -12,7 +12,7 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/users/reset-password")
 
       assert html =~ "Forgot your password?"
-      assert html =~ "We'll email you a link to reset your password"
+      assert html =~ "email you a link to reset your password"
       assert html =~ "Email me a reset link"
     end
 
