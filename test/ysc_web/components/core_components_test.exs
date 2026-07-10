@@ -182,6 +182,45 @@ defmodule YscWeb.CoreComponentsTest do
     end
   end
 
+  describe "oauth_button/1" do
+    test "renders Google sign-in button with brand icon and phx-click" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.oauth_button
+          provider={:google}
+          label="Sign in with Google"
+          phx-click="sign_in_with_google"
+        />
+        """)
+
+      assert html =~ "Sign in with Google"
+      assert html =~ ~s(phx-click="sign_in_with_google")
+      assert html =~ ~s(fill="#4285F4")
+      assert html =~ "border-zinc-300"
+    end
+
+    test "renders Facebook continue button with phx-target" do
+      assigns = %{myself: "reauth-1"}
+
+      html =
+        rendered_to_string(~H"""
+        <.oauth_button
+          provider={:facebook}
+          label="Continue with Facebook"
+          phx-click="reauth_with_facebook"
+          phx-target={@myself}
+        />
+        """)
+
+      assert html =~ "Continue with Facebook"
+      assert html =~ ~s(phx-click="reauth_with_facebook")
+      assert html =~ ~s(phx-target="reauth-1")
+      assert html =~ ~s(fill="#1877F2")
+    end
+  end
+
   describe "dropdown/1" do
     test "uses JS.toggle on button and hide on wrapper click-away" do
       assigns = %{}

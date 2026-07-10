@@ -44,8 +44,10 @@ defmodule Ysc.AuthRateLimitTest do
     end
 
     test "accepts tuple IP (e.g. from conn.remote_ip)" do
-      [_, b, c, _] =
-        String.split(unique_test_ip(), ".") |> Enum.map(&String.to_integer/1)
+      ip_string = unique_test_ip()
+
+      [127, 0, b, c] =
+        String.split(ip_string, ".") |> Enum.map(&String.to_integer/1)
 
       ip = {127, 0, b, c}
       assert :ok = AuthRateLimit.check_ip(ip)
