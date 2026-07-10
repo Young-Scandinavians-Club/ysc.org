@@ -84,4 +84,55 @@ defmodule Ysc.Tickets.AdminGrantCheckoutBlockTest do
                      to.status == :completed and to.granted_by_id == ^admin.id
              )
   end
+
+  test "rejects grant when checkout payment starts after precheck but before commit", %{
+    admin: admin,
+    user: user,
+    event: event,
+    tier1: tier1
+  } do
+    assert {:ok, pending_order} =
+             Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+    payment_intent_id = "pi_grant_toctou_#{pending_order.id}"
+
+    assert {:ok, pending_order} =
+             Tickets.update_payment_intent(pending_order, payment_intent_id)
+
+    retrieve_calls = :counters.new(1, [])
+
+    stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+      call = :counters.add(retrieve_calls, 1, 1)
+
+      status =
+        if call == 1 do
+          "requires_payment_method"
+        else
+          "processing"
+        end
+
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: payment_intent_id,
+         status: status,
+         amount: Ysc.MoneyHelper.money_to_cents(pending_order.total_amount)
+       }}
+    end)
+
+    assert {:error, :checkout_payment_in_progress} =
+             Tickets.grant_admin_tickets(admin.id, user.id, event.id, %{
+               tier1.id => 1
+             })
+
+    pending_order = Tickets.get_ticket_order(pending_order.id)
+    assert pending_order.status == :pending
+
+    assert [] ==
+             Ysc.Repo.all(
+               from to in TicketOrder,
+                 where:
+                   to.user_id == ^user.id and to.event_id == ^event.id and
+                     to.status == :completed and to.granted_by_id == ^admin.id
+             )
+  end
 end
