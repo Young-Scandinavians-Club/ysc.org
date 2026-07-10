@@ -5136,17 +5136,18 @@ defmodule YscWeb.TahoeBookingLive do
              )}
 
           {:error, _reason} ->
+            error_message = YscWeb.BookingUserMessages.booking_creation_failed()
+
             {:noreply,
              socket
              |> YscWeb.Flash.put_toast(
                :error,
-               "An error occurred while creating your booking. Please try again.",
+               error_message,
                title: "Booking"
              )
              |> assign(
                form_errors: %{
-                 general:
-                   "An error occurred while creating your booking. Please try again."
+                 general: error_message
                },
                calculated_price: nil,
                price_error: "Booking failed",

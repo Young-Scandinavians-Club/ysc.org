@@ -22,7 +22,16 @@ defmodule YscWeb.UploadErrorsTest do
       message = UploadErrors.error_to_string(:external_client_failure, :admin)
 
       assert message =~ "Upload failed"
-      assert message =~ "browser console"
+      refute message =~ "browser console"
+      refute message =~ "CORS"
+    end
+
+    test "uses member-friendly external client failure copy" do
+      message = UploadErrors.error_to_string(:external_client_failure, :avatar)
+
+      assert message =~ "We couldn't upload that file"
+      assert message =~ "info@ysc.org"
+      refute message =~ "browser console"
     end
 
     test "falls back to generic admin message" do

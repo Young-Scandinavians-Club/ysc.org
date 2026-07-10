@@ -140,4 +140,12 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.modification_redirect_update_failed() =~
              "couldn't update your reservation"
   end
+
+  test "booking creation failed message" do
+    message = BookingUserMessages.booking_creation_failed()
+
+    assert message =~ "couldn't complete your booking"
+    assert message =~ "not been charged"
+    assert message =~ "info@ysc.org"
+  end
 end

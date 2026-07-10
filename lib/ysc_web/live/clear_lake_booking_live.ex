@@ -3153,7 +3153,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     do: YscWeb.BookingUserMessages.application_pending_approval_message()
 
   defp format_booking_error(_),
-    do: "An error occurred while creating your booking. Please try again."
+    do: YscWeb.BookingUserMessages.booking_creation_failed()
 
   defp format_errors(changeset),
     do: YscWeb.FormHelpers.changeset_errors(changeset)
