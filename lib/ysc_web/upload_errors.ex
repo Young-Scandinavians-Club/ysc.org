@@ -69,10 +69,16 @@ defmodule YscWeb.UploadErrors do
     end
   end
 
-  def error_to_string(:external_client_failure, _opts) do
-    "Upload failed: The file could not be uploaded to storage. " <>
-      "This may be due to network issues, CORS configuration, or invalid credentials. " <>
-      "Please check the browser console for more details."
+  def error_to_string(:external_client_failure, opts) do
+    case Keyword.get(opts, :variant, :default) do
+      :admin ->
+        "Upload failed: The file could not be uploaded to storage. " <>
+          "This may be due to network issues or a temporary storage problem. Please try again."
+
+      _ ->
+        "We couldn't upload that file. Check your internet connection and try again. " <>
+          "If it still fails, try a smaller file or a different browser, or email info@ysc.org for help."
+    end
   end
 
   def error_to_string(_error, opts) do

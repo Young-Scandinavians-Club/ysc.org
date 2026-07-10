@@ -12,6 +12,8 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/users/reset-password")
 
       assert html =~ "Forgot your password?"
+      assert html =~ "We'll email you a link to reset your password"
+      assert html =~ "Email me a reset link"
     end
 
     test "redirects if already logged in", %{conn: conn} do
@@ -40,7 +42,7 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
         |> follow_redirect(conn, "/")
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "If your email is in our system"
+               "password reset link"
 
       assert Repo.get_by!(Accounts.UserToken, user_id: user.id).context ==
                "reset_password"
@@ -58,7 +60,7 @@ defmodule YscWeb.UserForgotPasswordLiveTest do
         |> follow_redirect(conn, "/")
 
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~
-               "If your email is in our system"
+               "password reset link"
 
       assert Repo.all(Accounts.UserToken) == []
     end

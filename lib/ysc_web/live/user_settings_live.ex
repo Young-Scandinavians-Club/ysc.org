@@ -1325,6 +1325,22 @@ defmodule YscWeb.UserSettingsLive do
                     >
                       Add a payment method in step 2 to complete your purchase.
                     </p>
+
+                    <p
+                      :if={
+                        !@user_is_active && !@loading_payment_methods &&
+                          @default_payment_method != nil
+                      }
+                      class="mt-3 text-sm text-zinc-500"
+                    >
+                      Membership purchase unlocks after the board approves your application.{" "}
+                      <.link
+                        navigate={~p"/pending-review"}
+                        class="font-medium text-blue-600 hover:underline"
+                      >
+                        View application status
+                      </.link>
+                    </p>
                   </div>
                 </div>
               </.form>
@@ -1603,12 +1619,12 @@ defmodule YscWeb.UserSettingsLive do
                         ]}>
                           <%= if @membership_change_info.direction == :upgrade do %>
                             <p>
-                              To upgrade today, you'll pay the difference for the rest of your
+                              To upgrade today, you'll pay the prorated difference for the rest of your
                               membership year when you switch from {String.capitalize(
                                 "#{@membership_change_info.current_plan.id}"
                               )} to {String.capitalize(
                                 "#{@membership_change_info.new_plan.id}"
-                              )} membership. The charge will be up to <strong>
+                              )} membership. Today's charge won't exceed <strong>
                                 {Ysc.MoneyHelper.format_money!(
                                   Money.new(
                                     :USD,

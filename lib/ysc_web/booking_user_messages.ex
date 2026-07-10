@@ -138,6 +138,12 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def booking_creation_failed do
+    trim("""
+    We couldn't complete your booking. Your card has not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.
+    """)
+  end
+
   def modification_redirect_hold_expired do
     trim("""
     Your payment went through, but we couldn't save your new dates in time. Your original reservation is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with your confirmation number.
