@@ -16,6 +16,7 @@ defmodule YscWeb.EventDetailsLive do
   alias Ysc.Tickets.Display, as: TicketDisplay
 
   alias Ysc.Agendas
+  alias YscWeb.DateDisplay
 
   @impl true
   def render(assigns) do
@@ -225,10 +226,14 @@ defmodule YscWeb.EventDetailsLive do
                       end %>
                     <% purchase_date =
                       if ticket_order && ticket_order.completed_at do
-                        format_datetime_display(ticket_order.completed_at)
+                        DateDisplay.format_datetime_display(
+                          ticket_order.completed_at
+                        )
                       else
                         if first_ticket.inserted_at do
-                          format_datetime_display(first_ticket.inserted_at)
+                          DateDisplay.format_datetime_display(
+                            first_ticket.inserted_at
+                          )
                         else
                           nil
                         end
@@ -369,7 +374,7 @@ defmodule YscWeb.EventDetailsLive do
                 </p>
                 <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
                   <%= if @event.start_date != nil do %>
-                    {format_date_short(@event.start_date)}
+                    {DateDisplay.format_date_short(@event.start_date)}
                   <% else %>
                     TBD
                   <% end %>
@@ -1609,14 +1614,18 @@ defmodule YscWeb.EventDetailsLive do
                   <div :if={!is_donation && is_pre_sale} class="mt-2">
                     <p class="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
                       <.icon name="hero-clock" class="w-4 h-4 inline me-1" />
-                      Sale starts {format_datetime_display(ticket_tier.start_date)}
+                      Sale starts {DateDisplay.format_datetime_display(
+                        ticket_tier.start_date
+                      )}
                     </p>
                   </div>
 
                   <div :if={!is_donation && is_sale_ended} class="mt-2">
                     <p class="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md border border-red-200">
                       <.icon name="hero-x-circle" class="w-4 h-4 inline me-1" />
-                      Sale ended on {format_datetime_display(ticket_tier.end_date)}
+                      Sale ended on {DateDisplay.format_datetime_display(
+                        ticket_tier.end_date
+                      )}
                     </p>
                   </div>
 
@@ -3123,7 +3132,7 @@ defmodule YscWeb.EventDetailsLive do
             <div class="flex justify-between">
               <span class="text-zinc-600">Date:</span>
               <span class="font-medium">
-                {format_date_long(@event.start_date)}
+                {DateDisplay.format_date_long(@event.start_date)}
               </span>
             </div>
             <div class="flex justify-between">
@@ -6208,33 +6217,6 @@ defmodule YscWeb.EventDetailsLive do
     do: Calendar.strftime(date, "%a, %b %-d")
 
   def format_start_date_short(_), do: ""
-
-  defp format_date_short(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Calendar.strftime("%b %-d")
-  end
-
-  defp format_date_short(%Date{} = date),
-    do: Calendar.strftime(date, "%b %-d")
-
-  defp format_date_short(_), do: ""
-
-  defp format_date_long(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
-  end
-
-  defp format_date_long(%Date{} = date),
-    do: Calendar.strftime(date, "%B %d, %Y")
-
-  defp format_date_long(_), do: ""
-
-  defp format_datetime_display(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Calendar.strftime("%b %-d, %Y")
-  end
-
-  defp format_datetime_display(%Date{} = date),
-    do: Calendar.strftime(date, "%b %-d, %Y")
-
-  defp format_datetime_display(_), do: ""
 
   defp event_body(%Event{rendered_details: nil} = event),
     do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)

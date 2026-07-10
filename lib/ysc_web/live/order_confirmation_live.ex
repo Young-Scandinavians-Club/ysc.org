@@ -3,6 +3,7 @@ defmodule YscWeb.OrderConfirmationLive do
 
   require Ysc.Logging
 
+  alias YscWeb.DateDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias Ysc.Tickets
@@ -268,7 +269,7 @@ defmodule YscWeb.OrderConfirmationLive do
                 </p>
                 <p class="text-xl font-bold text-zinc-900">
                   <%= if @event.start_date do %>
-                    {format_event_date(@event.start_date)}
+                    {DateDisplay.format_date_long(@event.start_date, "TBD")}
                   <% else %>
                     TBD
                   <% end %>
@@ -1084,13 +1085,4 @@ defmodule YscWeb.OrderConfirmationLive do
       _ -> false
     end
   end
-
-  defp format_event_date(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
-  end
-
-  defp format_event_date(%Date{} = date),
-    do: Calendar.strftime(date, "%B %d, %Y")
-
-  defp format_event_date(_), do: "TBD"
 end

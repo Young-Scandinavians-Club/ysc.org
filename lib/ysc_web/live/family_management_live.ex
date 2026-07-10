@@ -6,6 +6,7 @@ defmodule YscWeb.FamilyManagementLive do
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.FamilyMembers
+  alias YscWeb.DateDisplay
   alias Ysc.Repo
 
   @impl true
@@ -579,7 +580,7 @@ defmodule YscWeb.FamilyManagementLive do
                   {FamilyDisplay.relationship_label(member.type)}
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                  {format_birth_date(member.birth_date)}
+                  {DateDisplay.format_date_long(member.birth_date, "—")}
                 </td>
                 <td class="px-4 py-4 text-sm">
                   <form
@@ -744,7 +745,7 @@ defmodule YscWeb.FamilyManagementLive do
                     {FamilyDisplay.relationship_label(invite.relationship)}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {Calendar.strftime(invite.expires_at, "%B %d, %Y")}
+                    {DateDisplay.format_date_long(invite.expires_at)}
                   </td>
                   <td class="px-4 py-4 whitespace-nowrap text-sm">
                     <button
@@ -1061,11 +1062,4 @@ defmodule YscWeb.FamilyManagementLive do
       "relationship" => relationship
     }
   end
-
-  defp format_birth_date(nil), do: "—"
-
-  defp format_birth_date(%Date{} = date),
-    do: Calendar.strftime(date, "%B %d, %Y")
-
-  defp format_birth_date(_), do: "—"
 end
