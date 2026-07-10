@@ -176,7 +176,9 @@ defmodule Ysc.Tickets.AdminGrants do
     end)
   end
 
-  defp ensure_no_blocking_pending_checkout(user_id, event_id) do
+  defp ensure_no_blocking_pending_checkout(user_id, event_id, opts \\ []) do
+    context = Keyword.get(opts, :context, "admin_grant_precheck")
+
     case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
       [] ->
         :ok
@@ -184,6 +186,7 @@ defmodule Ysc.Tickets.AdminGrants do
       orders ->
         Ysc.Logging.info(
           "Admin ticket grant blocked by in-flight checkout payment",
+          context: context,
           user_id: user_id,
           event_id: event_id,
           pending_order_ids: Enum.map(orders, & &1.id)
@@ -295,7 +298,13 @@ defmodule Ysc.Tickets.AdminGrants do
                ticket_selections,
                expires_at
              ),
-           :ok <- maybe_insert_registration_details(tickets, tiers_by_id, user) do
+           :ok <- maybe_insert_registration_details(tickets, tiers_by_id, user),
+           :ok <-
+             ensure_no_blocking_pending_checkout(
+               user.id,
+               event.id,
+               context: "admin_grant_transaction"
+             ) do
         ticket_order
         |> Repo.preload(tickets: :ticket_tier)
       else
