@@ -354,4 +354,59 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
       assert is_map(updated_socket.assigns.reservations_by_tier)
     end
   end
+
+  describe "parent passthrough updates" do
+    test "parent event assign refresh skips ticket tier reload queries" do
+      event = event_fixture(%{max_attendees: 100})
+      user = user_fixture()
+      _tier = ticket_tier_fixture(%{event_id: event.id, name: "General"})
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{__changed__: %{}, flash: %{}}
+      }
+
+      {:ok, socket} =
+        TicketTierManagement.update(
+          %{
+            id: "tier-management",
+            event_id: event.id,
+            event: event,
+            current_user: user
+          },
+          socket
+        )
+
+      initial_tiers = socket.assigns.ticket_tiers
+      updated_event = %{event | max_attendees: 150}
+
+      {_updated_socket, query_count} =
+        Ysc.QueryCounter.with_query_counter(fn ->
+          TicketTierManagement.update(
+            %{
+              id: "tier-management",
+              event_id: event.id,
+              event: updated_event,
+              current_user: user
+            },
+            socket
+          )
+        end)
+
+      assert query_count == 0
+
+      {:ok, updated_socket} =
+        TicketTierManagement.update(
+          %{
+            id: "tier-management",
+            event_id: event.id,
+            event: updated_event,
+            current_user: user
+          },
+          socket
+        )
+
+      assert updated_socket.assigns.ticket_tiers == initial_tiers
+      assert updated_socket.assigns.event.max_attendees == 150
+    end
+  end
 end
