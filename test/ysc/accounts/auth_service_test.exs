@@ -1221,6 +1221,124 @@ defmodule Ysc.Accounts.AuthServiceTest do
     end
   end
 
+  describe "unfamiliar_sign_in?/1" do
+    test "returns true when new_device or unusual_location is present" do
+      assert AuthService.unfamiliar_sign_in?(%AuthEvent{
+               threat_indicators: ["new_device"]
+             })
+
+      assert AuthService.unfamiliar_sign_in?(%AuthEvent{
+               threat_indicators: ["unusual_location"]
+             })
+
+      assert AuthService.unfamiliar_sign_in?(%AuthEvent{
+               threat_indicators: ["rapid_attempts", "new_device"]
+             })
+    end
+
+    test "returns false for other threat indicators or empty lists" do
+      refute AuthService.unfamiliar_sign_in?(%AuthEvent{
+               threat_indicators: ["rapid_attempts", "unusual_time"]
+             })
+
+      refute AuthService.unfamiliar_sign_in?(%AuthEvent{threat_indicators: []})
+      refute AuthService.unfamiliar_sign_in?(%AuthEvent{threat_indicators: nil})
+    end
+  end
+
+  describe "fetch_auth_event_for_email/2" do
+    test "returns login_success events for the matching user" do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Repo.insert()
+
+      assert {:ok, fetched} =
+               AuthService.fetch_auth_event_for_email(user.id, auth_event.id)
+
+      assert fetched.id == auth_event.id
+      assert fetched.user_id == user.id
+    end
+
+    test "rejects events belonging to another user" do
+      user = user_fixture()
+      other = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(other, %{
+          ip_address: "203.0.113.1"
+        })
+        |> Repo.insert()
+
+      assert {:error, :not_found} =
+               AuthService.fetch_auth_event_for_email(user.id, auth_event.id)
+    end
+
+    test "rejects failed logins and non-login events" do
+      user = user_fixture()
+
+      {:ok, failed_event} =
+        AuthEvent.login_failure_changeset(%{
+          email: user.email,
+          ip_address: "203.0.113.1",
+          failure_reason: "invalid_credentials"
+        })
+        |> Repo.insert()
+
+      assert {:error, :not_found} =
+               AuthService.fetch_auth_event_for_email(user.id, failed_event.id)
+
+      {:ok, logout_event} =
+        AuthEvent.logout_changeset(user, %{ip_address: "203.0.113.1"})
+        |> Repo.insert()
+
+      assert {:error, :not_found} =
+               AuthService.fetch_auth_event_for_email(user.id, logout_event.id)
+    end
+  end
+
+  describe "enrich_auth_event_geo/1" do
+    test "returns the event unchanged when geo is already present" do
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user_fixture(), %{
+          ip_address: "203.0.113.1",
+          country: "SE",
+          region: "Stockholm",
+          city: "Stockholm"
+        })
+        |> Repo.insert()
+
+      assert AuthService.enrich_auth_event_geo(auth_event) == auth_event
+      reloaded = Repo.get!(AuthEvent, auth_event.id)
+      assert reloaded.country == "SE"
+    end
+
+    test "leaves events without geo unchanged when GeoIP is not configured" do
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user_fixture(), %{
+          ip_address: "203.0.113.1"
+        })
+        |> Repo.insert()
+
+      enriched = AuthService.enrich_auth_event_geo(auth_event)
+
+      assert enriched.country == nil
+      assert enriched.region == nil
+      assert enriched.city == nil
+    end
+
+    test "returns events without an IP address unchanged" do
+      auth_event = %AuthEvent{ip_address: nil, country: nil}
+
+      assert AuthService.enrich_auth_event_geo(auth_event) == auth_event
+    end
+  end
+
   defp insert_prior_login!(user, attrs) do
     base = %{
       ip_address: "203.0.113.1",

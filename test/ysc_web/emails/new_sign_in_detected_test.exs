@@ -55,6 +55,27 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
                "We noticed a sign-in to Young Scandinavians Club from a new location."
     end
 
+    test "uses combined intro copy when both device and location are unfamiliar" do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS",
+          country: "SE",
+          region: "Stockholm",
+          city: "Stockholm",
+          threat_indicators: ["new_device", "unusual_location"]
+        })
+        |> Repo.insert()
+
+      {:ok, assigns} = NewSignInDetected.prepare_email_data(user, auth_event.id)
+
+      assert assigns.intro_text ==
+               "We noticed a sign-in to Young Scandinavians Club from a new device or location."
+    end
+
     test "returns error when auth event is missing" do
       user = user_fixture()
 
