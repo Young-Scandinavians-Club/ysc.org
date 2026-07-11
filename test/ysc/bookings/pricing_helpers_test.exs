@@ -5,9 +5,11 @@ defmodule Ysc.Bookings.PricingHelpersTest do
   use Ysc.DataCase, async: false
 
   import Phoenix.Component, only: [assign: 2]
+  import Ysc.AccountsFixtures
 
+  alias Money
   alias Ysc.Bookings
-  alias Ysc.Bookings.PricingHelpers
+  alias Ysc.Bookings.{Entitlements, PricingHelpers}
 
   @checkin ~D[2026-07-01]
   @checkout ~D[2026-07-03]
@@ -337,6 +339,103 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       updated = PricingHelpers.calculate_price_if_ready(socket, :clear_lake)
 
       assert updated.assigns.price_error =~ "Unable to calculate price"
+    end
+
+    test "caches entitlement pricing context across repeated previews", %{
+      room: room
+    } do
+      user = user_fixture()
+      admin = user_fixture()
+
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      socket =
+        lv_socket(%{
+          current_user: user,
+          checkin_date: @checkin,
+          checkout_date: @checkout,
+          selected_booking_mode: :room,
+          selected_room_id: room.id,
+          guests_count: 2,
+          children_count: 0,
+          available_rooms: [%{id: room.id, min_billable_occupancy: 1}]
+        })
+
+      entitlement_query? =
+        ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
+
+      {socket_after_first, first_entitlement_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> PricingHelpers.calculate_price_if_ready(socket, :tahoe) end,
+          pattern: entitlement_query?
+        )
+
+      assert first_entitlement_queries == 2
+
+      assert socket_after_first.assigns.entitlement_pricing_context.user_id ==
+               user.id
+
+      {_socket_after_second, second_entitlement_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            PricingHelpers.calculate_price_if_ready(socket_after_first, :tahoe)
+          end,
+          pattern: entitlement_query?
+        )
+
+      assert second_entitlement_queries == 0
+    end
+
+    test "invalidate_entitlement_pricing_cache forces a refetch", %{room: room} do
+      user = user_fixture()
+      admin = user_fixture()
+
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      socket =
+        lv_socket(%{
+          current_user: user,
+          checkin_date: @checkin,
+          checkout_date: @checkout,
+          selected_booking_mode: :room,
+          selected_room_id: room.id,
+          guests_count: 2,
+          children_count: 0,
+          available_rooms: [%{id: room.id, min_billable_occupancy: 1}]
+        })
+
+      socket = PricingHelpers.calculate_price_if_ready(socket, :tahoe)
+      socket = PricingHelpers.invalidate_entitlement_pricing_cache(socket)
+      assert socket.assigns.entitlement_pricing_context == nil
+
+      entitlement_query? =
+        ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
+
+      {_socket, entitlement_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> PricingHelpers.calculate_price_if_ready(socket, :tahoe) end,
+          pattern: entitlement_query?
+        )
+
+      assert entitlement_queries == 2
     end
   end
 end

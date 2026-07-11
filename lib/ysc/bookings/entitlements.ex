@@ -208,8 +208,37 @@ defmodule Ysc.Bookings.Entitlements do
   end
 
   @doc """
+  Loads reserved-hold ids and eligible active entitlements for booking price previews.
+
+  Pass `exclude_booking_id` when repricing an existing hold so its entitlement stays
+  available. Results are safe to cache per LiveView session until holds change.
+  """
+  def pricing_context(user_id, opts \\ []) do
+    exclude_booking_id = Keyword.get(opts, :exclude_booking_id)
+
+    reserved_entitlement_ids =
+      entitlement_ids_reserved_on_active_holds(exclude_booking_id)
+      |> MapSet.new()
+
+    active_entitlements =
+      user_id
+      |> list_active_for_user()
+      |> Enum.reject(&MapSet.member?(reserved_entitlement_ids, &1.id))
+
+    %{
+      user_id: user_id,
+      exclude_booking_id: exclude_booking_id,
+      reserved_entitlement_ids: reserved_entitlement_ids,
+      active_entitlements: active_entitlements
+    }
+  end
+
+  @doc """
   Applies the best eligible entitlement to a computed subtotal and enriches pricing_items.
   Returns `{final_total, pricing_items, subtotal, discount, entitlement_id}`.
+
+  Pass `:pricing_context` from `pricing_context/2` to avoid repeated hold/user queries
+  during interactive price previews.
   """
   def apply_best_entitlement(
         user_id,
@@ -227,14 +256,7 @@ defmodule Ysc.Bookings.Entitlements do
     room_ids = Keyword.get(opts, :room_ids, [])
     headcount = guests + children
 
-    reserved_entitlement_ids =
-      entitlement_ids_reserved_on_active_holds()
-      |> MapSet.new()
-
-    entitlements =
-      user_id
-      |> list_active_for_user()
-      |> Enum.reject(&MapSet.member?(reserved_entitlement_ids, &1.id))
+    entitlements = entitlement_inputs_for_preview(user_id, opts)
 
     {ent, discount, final_total} =
       EntitlementDiscount.pick_best(
@@ -257,6 +279,22 @@ defmodule Ysc.Bookings.Entitlements do
 
     ent_id = if ent, do: ent.id, else: nil
     {final_total, items, subtotal, discount, ent_id}
+  end
+
+  defp entitlement_inputs_for_preview(user_id, opts) do
+    case Keyword.get(opts, :pricing_context) do
+      %{
+        user_id: ^user_id,
+        active_entitlements: active_entitlements
+      } ->
+        active_entitlements
+
+      _ ->
+        pricing_context(user_id,
+          exclude_booking_id: Keyword.get(opts, :exclude_booking_id)
+        )
+        |> Map.fetch!(:active_entitlements)
+    end
   end
 
   defp merge_discount_into_pricing_items(items, subtotal, discount, ent) do

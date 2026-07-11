@@ -729,6 +729,96 @@ defmodule Ysc.Bookings.EntitlementsTest do
     end
   end
 
+  describe "pricing_context/2" do
+    test "builds reserved ids and eligible entitlements for preview", %{
+      user: user,
+      admin: admin
+    } do
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      context = Entitlements.pricing_context(user.id)
+
+      assert context.user_id == user.id
+      assert context.exclude_booking_id == nil
+      assert entitlement.id in Enum.map(context.active_entitlements, & &1.id)
+
+      assert MapSet.member?(context.reserved_entitlement_ids, entitlement.id) ==
+               false
+    end
+
+    test "apply_best_entitlement/7 accepts pricing_context without extra queries",
+         %{
+           user: user,
+           admin: admin
+         } do
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      context = Entitlements.pricing_context(user.id)
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+      subtotal = Money.new(:USD, 200)
+
+      entitlement_query? =
+        ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
+
+      {uncached, uncached_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Entitlements.apply_best_entitlement(
+              user.id,
+              :tahoe,
+              :buyout,
+              checkin,
+              checkout,
+              subtotal,
+              %{},
+              []
+            )
+          end,
+          pattern: entitlement_query?
+        )
+
+      {cached, cached_queries} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Entitlements.apply_best_entitlement(
+              user.id,
+              :tahoe,
+              :buyout,
+              checkin,
+              checkout,
+              subtotal,
+              %{},
+              pricing_context: context
+            )
+          end,
+          pattern: entitlement_query?
+        )
+
+      assert uncached_queries == 2
+      assert cached_queries == 0
+      assert elem(uncached, 3) == elem(cached, 3)
+    end
+  end
+
   defp duplicate_pricing_rule?(%Ecto.Changeset{} = cs) do
     Enum.any?(cs.errors, fn {_field, {_msg, meta}} ->
       meta[:constraint] == :unique
