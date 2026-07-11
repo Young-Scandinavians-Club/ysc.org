@@ -341,7 +341,9 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       assert updated.assigns.price_error =~ "Unable to calculate price"
     end
 
-    test "caches entitlement pricing context across repeated previews", %{room: room} do
+    test "caches entitlement pricing context across repeated previews", %{
+      room: room
+    } do
       user = user_fixture()
       admin = user_fixture()
 
@@ -368,7 +370,8 @@ defmodule Ysc.Bookings.PricingHelpersTest do
           available_rooms: [%{id: room.id, min_billable_occupancy: 1}]
         })
 
-      entitlement_query? = ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
+      entitlement_query? =
+        ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
 
       {socket_after_first, first_entitlement_queries} =
         Ysc.QueryCounter.with_query_counter(
@@ -377,7 +380,9 @@ defmodule Ysc.Bookings.PricingHelpersTest do
         )
 
       assert first_entitlement_queries == 2
-      assert socket_after_first.assigns.entitlement_pricing_context.user_id == user.id
+
+      assert socket_after_first.assigns.entitlement_pricing_context.user_id ==
+               user.id
 
       {_socket_after_second, second_entitlement_queries} =
         Ysc.QueryCounter.with_query_counter(
@@ -421,7 +426,8 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       socket = PricingHelpers.invalidate_entitlement_pricing_cache(socket)
       assert socket.assigns.entitlement_pricing_context == nil
 
-      entitlement_query? = ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
+      entitlement_query? =
+        ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
 
       {_socket, entitlement_queries} =
         Ysc.QueryCounter.with_query_counter(

@@ -300,7 +300,8 @@ defmodule Ysc.Bookings.PricingHelpers do
     user = socket.assigns[:current_user]
 
     if user do
-      {socket, pricing_context} = ensure_entitlement_pricing_context(socket, user.id)
+      {socket, pricing_context} =
+        ensure_entitlement_pricing_context(socket, user.id)
 
       {final_total, _items, subtotal, discount, ent_id} =
         Entitlements.apply_best_entitlement(
@@ -345,7 +346,8 @@ defmodule Ysc.Bookings.PricingHelpers do
             exclude_booking_id: exclude_booking_id
           )
 
-        {assign(socket, entitlement_pricing_context: pricing_context), pricing_context}
+        {assign(socket, entitlement_pricing_context: pricing_context),
+         pricing_context}
     end
   end
 

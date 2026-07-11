@@ -290,7 +290,9 @@ defmodule Ysc.Bookings.Entitlements do
         active_entitlements
 
       _ ->
-        pricing_context(user_id, exclude_booking_id: Keyword.get(opts, :exclude_booking_id))
+        pricing_context(user_id,
+          exclude_booking_id: Keyword.get(opts, :exclude_booking_id)
+        )
         |> Map.fetch!(:active_entitlements)
     end
   end

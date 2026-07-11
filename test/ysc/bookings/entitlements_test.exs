@@ -730,7 +730,10 @@ defmodule Ysc.Bookings.EntitlementsTest do
   end
 
   describe "pricing_context/2" do
-    test "builds reserved ids and eligible entitlements for preview", %{user: user, admin: admin} do
+    test "builds reserved ids and eligible entitlements for preview", %{
+      user: user,
+      admin: admin
+    } do
       assert {:ok, entitlement} =
                Entitlements.create_entitlement(
                  %{
@@ -747,13 +750,16 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert context.user_id == user.id
       assert context.exclude_booking_id == nil
       assert entitlement.id in Enum.map(context.active_entitlements, & &1.id)
-      assert MapSet.member?(context.reserved_entitlement_ids, entitlement.id) == false
+
+      assert MapSet.member?(context.reserved_entitlement_ids, entitlement.id) ==
+               false
     end
 
-    test "apply_best_entitlement/7 accepts pricing_context without extra queries", %{
-      user: user,
-      admin: admin
-    } do
+    test "apply_best_entitlement/7 accepts pricing_context without extra queries",
+         %{
+           user: user,
+           admin: admin
+         } do
       assert {:ok, _} =
                Entitlements.create_entitlement(
                  %{
@@ -770,7 +776,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
       checkout = Date.add(checkin, 2)
       subtotal = Money.new(:USD, 200)
 
-      entitlement_query? = ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
+      entitlement_query? =
+        ~r/(FROM "booking_entitlements"|applied_booking_entitlement_id)/
 
       {uncached, uncached_queries} =
         Ysc.QueryCounter.with_query_counter(
