@@ -9,6 +9,7 @@ defmodule YscWeb.Emails.OutageNotification do
     layout: YscWeb.Emails.BaseLayout
 
   alias Ysc.Accounts.User
+  alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Repo
   import Ecto.Query
 
@@ -20,28 +21,7 @@ defmodule YscWeb.Emails.OutageNotification do
     "Property Outage Alert - Young Scandinavians Club"
   end
 
-  def property_name(property) when is_atom(property) do
-    case property do
-      :tahoe -> "Tahoe Property"
-      :clear_lake -> "Clear Lake Property"
-      _ -> "Property"
-    end
-  end
-
-  def property_name(property) when is_binary(property) do
-    property
-    |> String.to_existing_atom()
-    |> property_name()
-  rescue
-    ArgumentError ->
-      case property do
-        "tahoe" -> "Tahoe Property"
-        "clear_lake" -> "Clear Lake Property"
-        _ -> "Property"
-      end
-  end
-
-  def property_name(_), do: "Property"
+  def property_name(property), do: PropertyDisplay.outage_name(property)
 
   def incident_type_name(incident_type) when is_atom(incident_type) do
     case incident_type do

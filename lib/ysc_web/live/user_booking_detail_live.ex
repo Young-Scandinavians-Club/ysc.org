@@ -2,7 +2,7 @@ defmodule YscWeb.UserBookingDetailLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.Booking
+  alias Ysc.Bookings.{Booking, PropertyDisplay}
   alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -322,7 +322,7 @@ defmodule YscWeb.UserBookingDetailLive do
               <div>
                 <div class="text-sm text-zinc-600">Property</div>
                 <div class="font-medium text-zinc-900">
-                  {format_property_name(@booking.property)}
+                  {PropertyDisplay.full_name(@booking.property, "Cabin")}
                 </div>
               </div>
 
@@ -724,10 +724,6 @@ defmodule YscWeb.UserBookingDetailLive do
       nil
     end
   end
-
-  defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
-  defp format_property_name(:clear_lake), do: "Clear Lake Cabin"
-  defp format_property_name(_), do: "Cabin"
 
   defp get_cabin_master_email(:tahoe), do: EmailConfig.tahoe_email()
   defp get_cabin_master_email(:clear_lake), do: EmailConfig.clear_lake_email()

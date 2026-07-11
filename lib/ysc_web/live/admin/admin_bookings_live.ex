@@ -10,6 +10,7 @@ defmodule YscWeb.AdminBookingsLive do
 
   alias Ysc.Avatars
   alias Ysc.Bookings
+  alias Ysc.Bookings.PropertyDisplay
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Ledgers.{Payment, Refund}
@@ -2584,7 +2585,7 @@ defmodule YscWeb.AdminBookingsLive do
                           Booking: {pending_refund.booking.reference_id}
                         </.link>
                         <span class="text-sm text-zinc-600">
-                          {format_property_name(pending_refund.booking.property)}
+                          {PropertyDisplay.full_name(pending_refund.booking.property, "Cabin")}
                         </span>
                       </div>
                       <div class="text-sm text-zinc-600 space-y-1">
@@ -7002,10 +7003,6 @@ defmodule YscWeb.AdminBookingsLive do
   end
 
   # Helper to format property name
-  defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
-  defp format_property_name(:clear_lake), do: "Clear Lake Cabin"
-  defp format_property_name(_), do: "Cabin"
-
   # Build query params for reservations while preserving calendar params
   defp build_reservation_query_params(socket, reservation_params) do
     base_params = %{

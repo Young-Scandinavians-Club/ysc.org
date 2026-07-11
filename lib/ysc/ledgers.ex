@@ -13,6 +13,7 @@ defmodule Ysc.Ledgers do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
 
   alias Ysc.Ledgers.{
@@ -2689,14 +2690,7 @@ defmodule Ysc.Ledgers do
 
   defp build_payment_description(%{entity_type: :booking, booking: booking})
        when not is_nil(booking) do
-    property_name =
-      case booking.property do
-        :tahoe -> "Tahoe"
-        :clear_lake -> "Clear Lake"
-        _ -> "Cabin"
-      end
-
-    "#{property_name} Booking"
+    "#{PropertyDisplay.short_name(booking.property)} Booking"
   end
 
   defp build_payment_description(%{entity_type: :booking}), do: "Cabin Booking"

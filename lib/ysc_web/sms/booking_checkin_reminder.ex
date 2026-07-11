@@ -6,6 +6,7 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
   """
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Repo
   alias YscWeb.Sms.Template
 
@@ -80,7 +81,7 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
     door_code = Bookings.get_active_door_code(booking.property)
 
     # Get property name
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     # Format dates
     checkin_date = format_date(booking.checkin_date)
@@ -93,14 +94,6 @@ defmodule YscWeb.Sms.BookingCheckinReminder do
       checkin_time: "3:00 PM"
     }
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 
   defp format_date(date) do
     Calendar.strftime(date, "%b %d, %Y")

@@ -17,6 +17,8 @@ defmodule YscWeb.Emails.BookingRefundPending do
       format_money: 1
     ]
 
+  alias Ysc.Bookings.PropertyDisplay
+
   def get_template_name() do
     "booking_refund_pending"
   end
@@ -81,7 +83,7 @@ defmodule YscWeb.Emails.BookingRefundPending do
     original_amount = if payment, do: format_money(payment.amount), else: "N/A"
 
     # Get property name
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     # Calculate refund percentage
     refund_percentage =
@@ -125,11 +127,4 @@ defmodule YscWeb.Emails.BookingRefundPending do
     }
   end
 
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 end

@@ -7,7 +7,7 @@ defmodule YscWeb.HomeLive do
 
   alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
-  alias Ysc.Bookings.{Booking, Season}
+  alias Ysc.Bookings.{Booking, PropertyDisplay, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
   alias Ysc.GoogleWallet
@@ -1407,7 +1407,7 @@ defmodule YscWeb.HomeLive do
                             Destination
                           </p>
                           <p class="font-black text-2xl text-zinc-900 tracking-tight">
-                            {format_property_name(booking.property)}
+                            {PropertyDisplay.medium_name(booking.property)}
                           </p>
                           <p class="text-xs font-mono text-zinc-400">
                             {booking.reference_id}
@@ -2268,10 +2268,6 @@ defmodule YscWeb.HomeLive do
     end)
     |> Enum.take(limit)
   end
-
-  defp format_property_name(:tahoe), do: "Lake Tahoe"
-  defp format_property_name(:clear_lake), do: "Clear Lake"
-  defp format_property_name(_), do: "Unknown"
 
   defp days_until_booking(booking) do
     # Get current time in PST timezone
