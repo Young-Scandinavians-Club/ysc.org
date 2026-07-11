@@ -2233,7 +2233,12 @@ defmodule YscWeb.BookingReceiptLive do
          summary
        ) do
     cond do
-      stripe_desc in [nil, "Credit Card (Stripe)", "Credit Card", "Credit or debit card"] ->
+      stripe_desc in [
+        nil,
+        "Credit Card (Stripe)",
+        "Credit Card",
+        "Credit or debit card"
+      ] ->
         summary
 
       payment_method_description_blank?(summary.description) ->
