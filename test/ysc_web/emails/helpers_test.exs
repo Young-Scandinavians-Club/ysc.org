@@ -45,7 +45,8 @@ defmodule YscWeb.Emails.HelpersTest do
       assert Helpers.membership_url() == origin <> "/users/membership"
       assert Helpers.upcoming_events_url() == origin <> "/events"
       assert Helpers.payment_methods_url() == origin <> "/users/payment-methods"
-      assert Helpers.security_settings_url() == origin <> "/users/settings/security"
+      assert Helpers.security_settings_url() ==
+               origin <> "/users/settings/security"
       assert Helpers.news_url() == origin <> "/news"
       assert Helpers.home_url() == origin <> "/"
     end
@@ -59,7 +60,9 @@ defmodule YscWeb.Emails.HelpersTest do
       assert Helpers.sign_in_method_label(%{metadata: %{auth_method: "google"}}) ==
                "Google"
 
-      assert Helpers.sign_in_method_label(%{metadata: %{"auth_method" => "oauth"}}) ==
+      assert Helpers.sign_in_method_label(%{
+               metadata: %{"auth_method" => "oauth"}
+             }) ==
                "Google or Facebook"
 
       assert Helpers.sign_in_method_label(%{metadata: %{}}) == "Sign-in"
@@ -72,7 +75,10 @@ defmodule YscWeb.Emails.HelpersTest do
                operating_system: "macOS"
              }) == "Chrome on macOS"
 
-      assert Helpers.sign_in_device_description(%{browser: nil, operating_system: nil}) ==
+      assert Helpers.sign_in_device_description(%{
+               browser: nil,
+               operating_system: nil
+             }) ==
                "Unknown browser on Unknown OS"
     end
 

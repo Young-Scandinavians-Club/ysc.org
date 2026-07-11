@@ -1286,7 +1286,7 @@ defmodule Ysc.Accounts.AuthServiceTest do
         AuthEvent.login_failure_changeset(%{
           email: user.email,
           ip_address: "203.0.113.1",
-          failure_reason: "invalid_password"
+          failure_reason: "invalid_credentials"
         })
         |> Repo.insert()
 

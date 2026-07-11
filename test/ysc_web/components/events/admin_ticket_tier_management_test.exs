@@ -380,17 +380,20 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
       updated_event = %{event | max_attendees: 150}
 
       {_updated_socket, query_count} =
-        Ysc.QueryCounter.with_query_counter(fn ->
-          TicketTierManagement.update(
-            %{
-              id: "tier-management",
-              event_id: event.id,
-              event: updated_event,
-              current_user: user
-            },
-            socket
-          )
-        end)
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            TicketTierManagement.update(
+              %{
+                id: "tier-management",
+                event_id: event.id,
+                event: updated_event,
+                current_user: user
+              },
+              socket
+            )
+          end,
+          caller_pids: [self()]
+        )
 
       assert query_count == 0
 
