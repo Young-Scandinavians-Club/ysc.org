@@ -219,4 +219,29 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       refute safe_order.id in blocking
     end
   end
+
+  describe "expire_ticket_order/1 payment guards" do
+    test "skips expiration when payment intent is processing" do
+      user = user_fixture()
+      event = event_fixture(%{max_attendees: 100})
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      {:ok, order} =
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+
+      payment_intent_id = "pi_processing_expire_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:ok, returned} = Tickets.expire_ticket_order(order)
+      assert returned.status == :pending
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+  end
 end

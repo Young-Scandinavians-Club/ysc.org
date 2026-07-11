@@ -5572,19 +5572,44 @@ defmodule YscWeb.EventDetailsLive do
 
   @impl true
   def handle_event("checkout-expired", _params, socket) do
-    # Expire the ticket order to release reserved tickets
-    if socket.assigns.ticket_order do
+    skipped_expire? =
+      case socket.assigns.ticket_order do
+        %Ysc.Tickets.TicketOrder{} = ticket_order ->
+          not pending_checkout_safe_to_cancel?(ticket_order,
+            payment_redirect_in_progress:
+              socket.assigns[:payment_redirect_in_progress],
+            context: "checkout-expired"
+          )
+
+        _ ->
+          false
+      end
+
+    # Expire the ticket order to release reserved tickets unless payment is in flight
+    if socket.assigns.ticket_order && not skipped_expire? do
       Ysc.Tickets.expire_ticket_order(socket.assigns.ticket_order)
     end
+
+    socket =
+      if skipped_expire? do
+        YscWeb.Flash.put_toast(
+          socket,
+          :info,
+          "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
+          title: "Payment"
+        )
+      else
+        YscWeb.Flash.put_toast(
+          socket,
+          :error,
+          "Your checkout session has expired. Please select your tickets again to continue.",
+          title: "Checkout"
+        )
+      end
 
     # Handle checkout expiration
     {:noreply,
      socket
-     |> YscWeb.Flash.put_toast(
-       :error,
-       "Your checkout session has expired. Please select your tickets again to continue.",
-       title: "Checkout"
-     )
      |> assign(:show_payment_modal, false)
      |> assign(:stripe_payment_element_ready, false)
      |> assign(:payment_intent, nil)

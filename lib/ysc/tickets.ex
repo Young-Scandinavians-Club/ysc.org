@@ -17,6 +17,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Tickets.TicketOrder
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.AdminGrants
+  alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketTier
   alias Ysc.Events.Event
@@ -661,8 +662,29 @@ defmodule Ysc.Tickets do
 
   @doc """
   Expires a ticket order that has exceeded the payment timeout.
+
+  Skips expiration when checkout payment is in flight (same guard as
+  `CheckoutCancel`), so a late capture is not raced against released tickets.
   """
   def expire_ticket_order(ticket_order) do
+    if CheckoutCancel.pending_order_safe_to_cancel?(ticket_order,
+         context: "expire_ticket_order"
+       ) do
+      do_expire_ticket_order(ticket_order)
+    else
+      require Ysc.Logging
+
+      Ysc.Logging.info(
+        "Skipped ticket order expiration while checkout payment is in flight",
+        ticket_order_id: ticket_order.id,
+        payment_intent_id: ticket_order.payment_intent_id
+      )
+
+      {:ok, ticket_order}
+    end
+  end
+
+  defp do_expire_ticket_order(ticket_order) do
     require Ysc.Logging
 
     now = DateTime.utc_now()
