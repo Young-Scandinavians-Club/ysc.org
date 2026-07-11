@@ -779,7 +779,8 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       assert :ok =
                perform_job(EmailNotifier, %{
                  "recipient" => user.email,
-                 "idempotency_key" => "new_sign_in_wrong_user_#{System.unique_integer()}",
+                 "idempotency_key" =>
+                   "new_sign_in_wrong_user_#{System.unique_integer()}",
                  "subject" => "New Sign-In to Your YSC Account",
                  "template" => "new_sign_in_detected",
                  "params" => %{"auth_event_id" => auth_event.id},
@@ -805,7 +806,8 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       assert :ok =
                perform_job(EmailNotifier, %{
                  "recipient" => user.email,
-                 "idempotency_key" => "new_sign_in_missing_user_#{System.unique_integer()}",
+                 "idempotency_key" =>
+                   "new_sign_in_missing_user_#{System.unique_integer()}",
                  "subject" => "New Sign-In to Your YSC Account",
                  "template" => "new_sign_in_detected",
                  "params" => %{"auth_event_id" => auth_event.id},

@@ -45,8 +45,10 @@ defmodule YscWeb.Emails.HelpersTest do
       assert Helpers.membership_url() == origin <> "/users/membership"
       assert Helpers.upcoming_events_url() == origin <> "/events"
       assert Helpers.payment_methods_url() == origin <> "/users/payment-methods"
+
       assert Helpers.security_settings_url() ==
                origin <> "/users/settings/security"
+
       assert Helpers.news_url() == origin <> "/news"
       assert Helpers.home_url() == origin <> "/"
     end
@@ -54,7 +56,9 @@ defmodule YscWeb.Emails.HelpersTest do
 
   describe "sign-in email helpers" do
     test "sign_in_method_label/1 maps auth methods to member-facing labels" do
-      assert Helpers.sign_in_method_label(%{metadata: %{"auth_method" => "passkey"}}) ==
+      assert Helpers.sign_in_method_label(%{
+               metadata: %{"auth_method" => "passkey"}
+             }) ==
                "Passkey"
 
       assert Helpers.sign_in_method_label(%{metadata: %{auth_method: "google"}}) ==
