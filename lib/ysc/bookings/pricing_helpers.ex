@@ -134,7 +134,7 @@ defmodule Ysc.Bookings.PricingHelpers do
            children_count: children_count
          ) do
       {:ok, base_price, base_breakdown} ->
-        {calculated_price, price_breakdown} =
+        {socket, calculated_price, price_breakdown} =
           apply_entitlement_discount_to_preview(
             socket,
             property,
@@ -213,7 +213,7 @@ defmodule Ysc.Bookings.PricingHelpers do
             |> Map.put(:billable_people, billable_people)
             |> Map.put(:using_minimum_pricing, using_minimum_pricing)
 
-          {calculated_price, price_breakdown} =
+          {socket, calculated_price, price_breakdown} =
             apply_entitlement_discount_to_preview(
               socket,
               property,
@@ -248,7 +248,7 @@ defmodule Ysc.Bookings.PricingHelpers do
            guests_count: guests_count
          ) do
       {:ok, base_price, base_breakdown} ->
-        {calculated_price, price_breakdown} =
+        {socket, calculated_price, price_breakdown} =
           apply_entitlement_discount_to_preview(
             socket,
             property,
@@ -273,6 +273,13 @@ defmodule Ysc.Bookings.PricingHelpers do
     end
   end
 
+  @doc """
+  Clears cached entitlement hold/user lookups so the next price preview refetches.
+  """
+  def invalidate_entitlement_pricing_cache(socket) do
+    assign(socket, :entitlement_pricing_context, nil)
+  end
+
   # Helper to assign error state
   defp assign_error(socket, error_message) do
     assign(socket,
@@ -293,6 +300,8 @@ defmodule Ysc.Bookings.PricingHelpers do
     user = socket.assigns[:current_user]
 
     if user do
+      {socket, pricing_context} = ensure_entitlement_pricing_context(socket, user.id)
+
       {final_total, _items, subtotal, discount, ent_id} =
         Entitlements.apply_best_entitlement(
           user.id,
@@ -302,7 +311,7 @@ defmodule Ysc.Bookings.PricingHelpers do
           socket.assigns.checkout_date,
           gross,
           %{},
-          opts
+          Keyword.merge(opts, pricing_context: pricing_context)
         )
 
       bd =
@@ -312,9 +321,31 @@ defmodule Ysc.Bookings.PricingHelpers do
           applied_entitlement_id: ent_id
         })
 
-      {final_total, bd}
+      {socket, final_total, bd}
     else
-      {gross, breakdown}
+      {socket, gross, breakdown}
+    end
+  end
+
+  defp ensure_entitlement_pricing_context(socket, user_id) do
+    exclude_booking_id =
+      Map.get(socket.assigns, :booking_id) ||
+        Map.get(socket.assigns, :hold_booking_id)
+
+    case socket.assigns[:entitlement_pricing_context] do
+      %{
+        user_id: ^user_id,
+        exclude_booking_id: ^exclude_booking_id
+      } = pricing_context ->
+        {socket, pricing_context}
+
+      _ ->
+        pricing_context =
+          Entitlements.pricing_context(user_id,
+            exclude_booking_id: exclude_booking_id
+          )
+
+        {assign(socket, entitlement_pricing_context: pricing_context), pricing_context}
     end
   end
 
