@@ -1,6 +1,7 @@
 defmodule YscWeb.Workers.EmailNotifierTest do
   use Ysc.DataCase, async: false
 
+  alias Ysc.Accounts.AuthEvent
   alias YscWeb.Emails.Notifier
   alias YscWeb.Workers.EmailNotifier
   import Ysc.AccountsFixtures
@@ -718,6 +719,102 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       assert :ok = EmailNotifier.perform(job)
 
       assert_email_sent(subject: "Meta job struct")
+    end
+  end
+
+  describe "perform/1 new_sign_in_detected deferred rendering" do
+    test "resolves auth event details at send time and delivers email" do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS",
+          country: "SE",
+          region: "Stockholm",
+          city: "Stockholm",
+          threat_indicators: ["new_device"]
+        })
+        |> Ysc.Repo.insert()
+
+      idempotency_key = "new_sign_in_#{user.id}_#{auth_event.id}"
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => idempotency_key,
+                 "subject" => "New Sign-In to Your YSC Account",
+                 "template" => "new_sign_in_detected",
+                 "params" => %{"auth_event_id" => auth_event.id},
+                 "text_body" => "",
+                 "user_id" => user.id,
+                 "category" => "account"
+               })
+
+      assert_email_sent(
+        subject: "New Sign-In to Your YSC Account",
+        to: {nil, user.email},
+        text_body: ~r/new device or browser/,
+        html_body: ~r/Stockholm, Stockholm, SE/
+      )
+
+      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: idempotency_key
+             )
+    end
+
+    test "skips delivery when auth event cannot be resolved for the user" do
+      user = user_fixture()
+      other = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(other, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Ysc.Repo.insert()
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => "new_sign_in_wrong_user_#{System.unique_integer()}",
+                 "subject" => "New Sign-In to Your YSC Account",
+                 "template" => "new_sign_in_detected",
+                 "params" => %{"auth_event_id" => auth_event.id},
+                 "text_body" => "",
+                 "user_id" => user.id,
+                 "category" => "account"
+               })
+
+      refute_email_sent()
+    end
+
+    test "skips delivery when deferred template is missing user_id" do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "203.0.113.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Ysc.Repo.insert()
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" => "new_sign_in_missing_user_#{System.unique_integer()}",
+                 "subject" => "New Sign-In to Your YSC Account",
+                 "template" => "new_sign_in_detected",
+                 "params" => %{"auth_event_id" => auth_event.id},
+                 "text_body" => "",
+                 "user_id" => nil,
+                 "category" => "account"
+               })
+
+      refute_email_sent()
     end
   end
 

@@ -45,8 +45,58 @@ defmodule YscWeb.Emails.HelpersTest do
       assert Helpers.membership_url() == origin <> "/users/membership"
       assert Helpers.upcoming_events_url() == origin <> "/events"
       assert Helpers.payment_methods_url() == origin <> "/users/payment-methods"
+      assert Helpers.security_settings_url() == origin <> "/users/settings/security"
       assert Helpers.news_url() == origin <> "/news"
       assert Helpers.home_url() == origin <> "/"
+    end
+  end
+
+  describe "sign-in email helpers" do
+    test "sign_in_method_label/1 maps auth methods to member-facing labels" do
+      assert Helpers.sign_in_method_label(%{metadata: %{"auth_method" => "passkey"}}) ==
+               "Passkey"
+
+      assert Helpers.sign_in_method_label(%{metadata: %{auth_method: "google"}}) ==
+               "Google"
+
+      assert Helpers.sign_in_method_label(%{metadata: %{"auth_method" => "oauth"}}) ==
+               "Google or Facebook"
+
+      assert Helpers.sign_in_method_label(%{metadata: %{}}) == "Sign-in"
+      assert Helpers.sign_in_method_label(%{}) == "Sign-in"
+    end
+
+    test "sign_in_device_description/1 formats browser and OS" do
+      assert Helpers.sign_in_device_description(%{
+               browser: "Chrome",
+               operating_system: "macOS"
+             }) == "Chrome on macOS"
+
+      assert Helpers.sign_in_device_description(%{browser: nil, operating_system: nil}) ==
+               "Unknown browser on Unknown OS"
+    end
+
+    test "sign_in_location/1 prefers geo labels and falls back to IP" do
+      assert Helpers.sign_in_location(%{
+               city: "Stockholm",
+               region: "Stockholm",
+               country: "SE",
+               ip_address: "24.206.103.29"
+             }) == "Stockholm, Stockholm, SE (24.206.103.29)"
+
+      assert Helpers.sign_in_location(%{
+               city: nil,
+               region: nil,
+               country: nil,
+               ip_address: "203.0.113.1"
+             }) == "203.0.113.1"
+
+      assert Helpers.sign_in_location(%{
+               city: nil,
+               region: nil,
+               country: nil,
+               ip_address: nil
+             }) == "Unknown location"
     end
   end
 
