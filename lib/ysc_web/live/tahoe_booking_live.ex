@@ -5097,13 +5097,13 @@ defmodule YscWeb.TahoeBookingLive do
           {:error, %Ecto.Changeset{} = changeset} ->
             {:noreply,
              socket
-             |> YscWeb.Flash.put_toast(:error, "Please fix the errors below.",
+             |> YscWeb.Flash.put_toast(:error, "Please fix the errors above.",
                title: "Booking"
              )
              |> assign(
                form_errors: format_errors(changeset),
                calculated_price: nil,
-               price_error: "Validation errors",
+               price_error: "Please fix the errors above",
                show_confirm_modal: false
              )}
 

@@ -7928,12 +7928,12 @@ defmodule YscWeb.EventDetailsLive do
                ~p"/events/#{socket.assigns.event.id}?checkout=payment&order_id=#{ticket_order.id}"
            )}
 
-        {:error, reason} ->
+        {:error, _reason} ->
           {:noreply,
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to create payment: #{reason}",
+             "We couldn't start checkout. Please try again in a moment. If it keeps failing, email #{Ysc.EmailConfig.contact_email()} with the event name.",
              title: "Payment"
            )
            |> assign(:show_ticket_modal, false)

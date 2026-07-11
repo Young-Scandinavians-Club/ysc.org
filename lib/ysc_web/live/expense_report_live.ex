@@ -477,7 +477,7 @@ defmodule YscWeb.ExpenseReportLive do
                 reason: inspect(reason)
               )
 
-              {:error, "Upload failed: #{inspect(reason)}"}
+              {:error, :external_client_failure}
           end
         end)
 
@@ -517,7 +517,7 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload receipt: #{reason}",
+             expense_upload_error_message(reason),
              title: "Expense report"
            )}
 
@@ -621,7 +621,7 @@ defmodule YscWeb.ExpenseReportLive do
                 reason: inspect(reason)
               )
 
-              {:error, "Upload failed: #{inspect(reason)}"}
+              {:error, :external_client_failure}
           end
         end)
 
@@ -661,7 +661,7 @@ defmodule YscWeb.ExpenseReportLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Failed to upload proof: #{reason}",
+             expense_upload_error_message(reason),
              title: "Expense report"
            )}
 
@@ -3706,5 +3706,9 @@ defmodule YscWeb.ExpenseReportLive do
       limit: 1
     )
     |> Repo.one()
+  end
+
+  defp expense_upload_error_message(reason) do
+    YscWeb.UploadErrors.error_to_string(reason, :expense)
   end
 end
