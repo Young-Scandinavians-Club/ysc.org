@@ -277,7 +277,7 @@ defmodule Ysc.Bookings.PricingHelpers do
   Clears cached entitlement hold/user lookups so the next price preview refetches.
   """
   def invalidate_entitlement_pricing_cache(socket) do
-    assign(socket, :entitlement_pricing_context, nil)
+    assign(socket, entitlement_pricing_context: nil)
   end
 
   # Helper to assign error state

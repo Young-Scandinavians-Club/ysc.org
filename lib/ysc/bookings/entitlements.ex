@@ -256,8 +256,7 @@ defmodule Ysc.Bookings.Entitlements do
     room_ids = Keyword.get(opts, :room_ids, [])
     headcount = guests + children
 
-    {reserved_entitlement_ids, entitlements} =
-      entitlement_inputs_for_preview(user_id, opts)
+    entitlements = entitlement_inputs_for_preview(user_id, opts)
 
     {ent, discount, final_total} =
       EntitlementDiscount.pick_best(
@@ -286,15 +285,13 @@ defmodule Ysc.Bookings.Entitlements do
     case Keyword.get(opts, :pricing_context) do
       %{
         user_id: ^user_id,
-        reserved_entitlement_ids: reserved_entitlement_ids,
         active_entitlements: active_entitlements
       } ->
-        {reserved_entitlement_ids, active_entitlements}
+        active_entitlements
 
       _ ->
-        context = pricing_context(user_id, exclude_booking_id: Keyword.get(opts, :exclude_booking_id))
-
-        {context.reserved_entitlement_ids, context.active_entitlements}
+        pricing_context(user_id, exclude_booking_id: Keyword.get(opts, :exclude_booking_id))
+        |> Map.fetch!(:active_entitlements)
     end
   end
 
