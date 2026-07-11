@@ -71,7 +71,16 @@ defmodule Ysc.Payments.PaymentDisplay do
   """
   def get_payment_title(%{type: :booking, booking: booking})
       when not is_nil(booking) do
-    "#{PropertyDisplay.short_name(booking.property)} Booking"
+    property_label =
+      case booking.property do
+        property when property in [:tahoe, :clear_lake] ->
+          PropertyDisplay.short_name(property)
+
+        _ ->
+          "Cabin"
+      end
+
+    "#{property_label} Booking"
   end
 
   def get_payment_title(%{type: :ticket, event: event})

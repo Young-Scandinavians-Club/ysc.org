@@ -13,6 +13,7 @@ defmodule Ysc.Bookings.PropertyDisplay do
   """
   def short_name(property, default \\ "Cabin")
 
+  def short_name(nil, default), do: default
   def short_name(:tahoe, _default), do: "Tahoe"
   def short_name(:clear_lake, _default), do: "Clear Lake"
   def short_name("tahoe", default), do: short_name(:tahoe, default)
