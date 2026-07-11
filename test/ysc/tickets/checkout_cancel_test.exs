@@ -222,13 +222,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
 
   describe "expire_ticket_order/1 payment guards" do
     test "skips expiration when payment intent is processing" do
-      user = user_fixture()
-      event = event_fixture(%{max_attendees: 100})
-      tier = ticket_tier_fixture(%{event_id: event.id})
-
-      {:ok, order} =
-        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
-
+      order = ticket_order_fixture()
       payment_intent_id = "pi_processing_expire_#{order.id}"
 
       assert {:ok, order} =
