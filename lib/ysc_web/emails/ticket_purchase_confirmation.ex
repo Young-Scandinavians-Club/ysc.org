@@ -344,7 +344,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmation do
   defp get_payment_method_description(payment) do
     case payment.payment_method do
       nil ->
-        "Credit Card (Stripe)"
+        "Credit or debit card"
 
       payment_method ->
         case payment_method.type do

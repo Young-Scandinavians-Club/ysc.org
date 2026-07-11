@@ -2233,7 +2233,12 @@ defmodule YscWeb.BookingReceiptLive do
          summary
        ) do
     cond do
-      stripe_desc in [nil, "Credit Card (Stripe)", "Credit Card"] ->
+      stripe_desc in [
+        nil,
+        "Credit Card (Stripe)",
+        "Credit Card",
+        "Credit or debit card"
+      ] ->
         summary
 
       payment_method_description_blank?(summary.description) ->
@@ -2327,10 +2332,10 @@ defmodule YscWeb.BookingReceiptLive do
   end
 
   defp get_payment_method_from_stripe_id(nil),
-    do: %{description: "Credit Card (Stripe)", logo_path: nil}
+    do: %{description: "Credit or debit card", logo_path: nil}
 
   defp get_payment_method_from_stripe_id(payment_intent_id) do
-    stripe_fallback = %{description: "Credit Card (Stripe)", logo_path: nil}
+    stripe_fallback = %{description: "Credit or debit card", logo_path: nil}
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
     case stripe_client.retrieve_payment_intent(payment_intent_id, %{

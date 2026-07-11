@@ -956,7 +956,7 @@ defmodule YscWeb.OrderConfirmationLive do
   end
 
   defp stripe_payment_method_fallback do
-    %{description: "Credit Card (Stripe)", logo_path: nil}
+    %{description: "Credit or debit card", logo_path: nil}
   end
 
   defp payment_method_label(ticket_order, description, async_data_loaded?) do
@@ -964,18 +964,18 @@ defmodule YscWeb.OrderConfirmationLive do
       ticket_order.payment ->
         description ||
           if(async_data_loaded? && ticket_order.payment.external_payment_id,
-            do: "Credit Card (Stripe)",
-            else: "…"
+            do: "Credit or debit card",
+            else: "Loading payment details…"
           )
 
       free_order?(ticket_order) ->
         "Free"
 
       async_data_loaded? && ticket_order.payment_intent_id ->
-        "Credit Card (Stripe)"
+        "Credit or debit card"
 
       true ->
-        "…"
+        "Loading payment details…"
     end
   end
 

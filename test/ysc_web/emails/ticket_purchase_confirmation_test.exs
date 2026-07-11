@@ -117,7 +117,7 @@ defmodule YscWeb.Emails.TicketPurchaseConfirmationTest do
 
       data = TicketPurchaseConfirmation.prepare_email_data(ticket_order)
 
-      assert data.payment_method == "Credit Card (Stripe)"
+      assert data.payment_method == "Credit or debit card"
     end
 
     test "describes card with brand and last four when present", %{
