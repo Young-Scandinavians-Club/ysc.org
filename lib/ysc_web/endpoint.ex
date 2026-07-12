@@ -113,5 +113,8 @@ defmodule YscWeb.Endpoint do
   # Prometheus metrics endpoint - must be before router
   plug PromEx.Plug, prom_ex_module: Ysc.PromEx, path: "/metrics"
 
+  # Canonicalize URLs for SEO: redirect `/path/` → `/path` on all routes
+  plug YscWeb.Plugs.TrailingSlashRedirect
+
   plug YscWeb.Router
 end
