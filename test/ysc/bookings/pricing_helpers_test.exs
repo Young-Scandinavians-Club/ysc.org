@@ -438,10 +438,11 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       assert entitlement_queries == 2
     end
 
-    test "booking_id on socket excludes the hold from entitlement reservation", %{
-      room: room,
-      room2: room2
-    } do
+    test "booking_id on socket excludes the hold from entitlement reservation",
+         %{
+           room: room,
+           room2: room2
+         } do
       user = user_fixture()
       admin = user_fixture()
 

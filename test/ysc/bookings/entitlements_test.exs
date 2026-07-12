@@ -818,10 +818,11 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert elem(uncached, 3) == elem(cached, 3)
     end
 
-    test "exclude_booking_id keeps the hold's entitlement available for repricing", %{
-      user: user,
-      admin: admin
-    } do
+    test "exclude_booking_id keeps the hold's entitlement available for repricing",
+         %{
+           user: user,
+           admin: admin
+         } do
       {:ok, category} =
         %Ysc.Bookings.RoomCategory{}
         |> Ysc.Bookings.RoomCategory.changeset(%{
@@ -874,19 +875,28 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert booking.applied_booking_entitlement_id == entitlement.id
 
       without_exclude = Entitlements.pricing_context(user.id)
+
       with_exclude =
         Entitlements.pricing_context(user.id, exclude_booking_id: booking.id)
 
-      refute entitlement.id in Enum.map(without_exclude.active_entitlements, & &1.id)
+      refute entitlement.id in Enum.map(
+               without_exclude.active_entitlements,
+               & &1.id
+             )
 
-      assert entitlement.id in Enum.map(with_exclude.active_entitlements, & &1.id)
+      assert entitlement.id in Enum.map(
+               with_exclude.active_entitlements,
+               & &1.id
+             )
+
       assert with_exclude.exclude_booking_id == booking.id
     end
 
-    test "apply_best_entitlement/7 ignores pricing_context for a different user", %{
-      user: user,
-      admin: admin
-    } do
+    test "apply_best_entitlement/7 ignores pricing_context for a different user",
+         %{
+           user: user,
+           admin: admin
+         } do
       other_user = user_fixture()
 
       assert {:ok, _} =
