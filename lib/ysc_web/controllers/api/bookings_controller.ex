@@ -12,18 +12,27 @@ defmodule YscWeb.Api.BookingsController do
 
   @valid_properties ~w(tahoe clear_lake)
 
+  # Default kiosk listing window when dates are omitted: recent past through near future.
+  # Prevents unbounded export of full booking history if the shared bearer token leaks.
+  @default_index_past_days 7
+  @default_index_future_days 30
+
   @doc """
   List bookings for a given property and optional date range.
 
   Query params:
     - property: "tahoe" or "clear_lake" (required)
-    - start_date: ISO 8601 date string (optional)
-    - end_date: ISO 8601 date string (optional)
+    - start_date: ISO 8601 date string (optional, defaults to 7 days ago)
+    - end_date: ISO 8601 date string (optional, defaults to 30 days ahead)
   """
   def index(conn, params) do
+    today = Date.utc_today()
+    default_start = Date.add(today, -@default_index_past_days)
+    default_end = Date.add(today, @default_index_future_days)
+
     with {:ok, property} <- parse_property(params),
-         {:ok, start_date} <- parse_date(params, "start_date"),
-         {:ok, end_date} <- parse_date(params, "end_date") do
+         {:ok, start_date} <- parse_date(params, "start_date", default_start),
+         {:ok, end_date} <- parse_date(params, "end_date", default_end) do
       bookings =
         Bookings.list_bookings(property, start_date, end_date,
           preload: [
@@ -107,8 +116,6 @@ defmodule YscWeb.Api.BookingsController do
   defp parse_property(_params) do
     {:error, :missing_property}
   end
-
-  defp parse_date(_params, _key, default \\ nil)
 
   defp parse_date(params, key, default) do
     case Map.get(params, key) do

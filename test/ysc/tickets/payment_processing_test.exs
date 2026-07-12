@@ -50,7 +50,11 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
     build_payment_intent(%{
       id: payment_intent_id,
       status: "succeeded",
-      amount: amount_cents
+      amount: amount_cents,
+      metadata: %{
+        "ticket_order_id" => ticket_order.id,
+        "user_id" => ticket_order.user_id
+      }
     })
   end
 
@@ -60,7 +64,10 @@ defmodule Ysc.Tickets.PaymentProcessingTest do
       status: "succeeded",
       amount: 5000,
       currency: "usd",
-      metadata: %{}
+      metadata: %{
+        "ticket_order_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+        "user_id" => "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+      }
     }
 
     struct(Stripe.PaymentIntent, Map.merge(defaults, attrs))

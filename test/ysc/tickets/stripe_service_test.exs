@@ -257,7 +257,10 @@ defmodule Ysc.Tickets.StripeServiceTest do
         id: "pi_success_#{ticket_order.id}",
         status: "succeeded",
         amount: amount_cents,
-        metadata: %{"ticket_order_id" => ticket_order.id}
+        metadata: %{
+          "ticket_order_id" => ticket_order.id,
+          "user_id" => ticket_order.user_id
+        }
       }
 
       struct(Stripe.PaymentIntent, Map.merge(defaults, Map.new(overrides)))

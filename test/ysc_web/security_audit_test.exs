@@ -20,6 +20,8 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 20 (CRITICAL) Booking checkout accepts foreign/underpaid Stripe PaymentIntents
   Finding 21 (HIGH)     Paid ticket checkout bypassed via checkout=free URL / confirm-free-tickets
   Finding 22 (MEDIUM)   Kiosk check-in API accepted ineligible bookings (draft/canceled/future)
+  Finding 23 (MEDIUM)   Kiosk bookings index exported full history without date bounds
+  Finding 24 (MEDIUM)   Ticket payment intents did not bind metadata to order/user
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1470,7 +1472,10 @@ defmodule YscWeb.SecurityAuditTest do
         id: "pi_stale_paid_total",
         status: "succeeded",
         amount: Ysc.MoneyHelper.money_to_cents(order.total_amount),
-        metadata: %{"ticket_order_id" => order.id}
+        metadata: %{
+          "ticket_order_id" => order.id,
+          "user_id" => order.user_id
+        }
       }
 
       assert {:error, :amount_mismatch} =
@@ -1675,6 +1680,114 @@ defmodule YscWeb.SecurityAuditTest do
       assert %{"error" => error} = json_response(conn, 422)
       assert error =~ "not confirmed"
       refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 23 (MEDIUM): Kiosk bookings index must not export full history by default
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 23: kiosk bookings index date window" do
+    import Ysc.BookingsFixtures
+    import Ysc.AccountsFixtures
+
+    alias Ysc.Bookings
+
+    setup do
+      prev = Application.get_env(:ysc, :kiosk_api_key)
+      Application.put_env(:ysc, :kiosk_api_key, "security-audit-kiosk-key")
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :kiosk_api_key, prev)
+      end)
+
+      :ok
+    end
+
+    test "omitted dates exclude bookings outside the default window", %{
+      conn: conn
+    } do
+      today = Date.utc_today()
+      old_checkin = Date.add(today, -120)
+      old_checkout = Date.add(old_checkin, 3)
+
+      {:ok, old_booking} =
+        %{
+          checkin_date: old_checkin,
+          checkout_date: old_checkout,
+          guests_count: 2,
+          property: :tahoe,
+          booking_mode: :buyout,
+          user_id: user_fixture().id,
+          status: :complete,
+          total_price: Money.new(200, :USD)
+        }
+        |> Ysc.Bookings.create_booking()
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
+        |> put_req_header("accept", "application/json")
+
+      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+      assert %{"data" => bookings} = json_response(response, 200)
+
+      refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 24 (MEDIUM): Ticket payment intents must bind to order and user metadata
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 24: ticket payment intent metadata validation" do
+    import Ysc.TicketsFixtures
+
+    alias Ysc.Tickets
+
+    test "process_ticket_order_payment rejects a succeeded intent for another order" do
+      user = user_with_membership(:lifetime)
+      event = event_with_tickets(tier_count: 0, state: :upcoming)
+
+      {:ok, tier} =
+        Ysc.Events.create_ticket_tier(%{
+          name: "General",
+          type: :paid,
+          price: Money.new(40, :USD),
+          quantity: 50,
+          event_id: event.id
+        })
+
+      order_a =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :pending
+        })
+        |> stabilize_pending_ticket_order!()
+
+      order_b =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :pending
+        })
+        |> stabilize_pending_ticket_order!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_ticket_foreign",
+        status: "succeeded",
+        amount: Ysc.MoneyHelper.money_to_cents(order_a.total_amount),
+        metadata: %{
+          "ticket_order_id" => order_a.id,
+          "user_id" => user.id
+        }
+      }
+
+      assert {:error, :payment_metadata_mismatch} =
+               Tickets.process_ticket_order_payment(order_b, payment_intent)
     end
   end
 
