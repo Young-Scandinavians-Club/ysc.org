@@ -3,7 +3,8 @@ defmodule Ysc.SentryScrubber do
 
   # Sentry 13.3+ scrubs password/passwd/secret from URLs by default. Extend the
   # list for auth flows that put one-time tokens in query strings.
-  @sensitive_param_keys Sentry.Scrubber.default_param_keys() ++ ~w(token setup_token code)
+  @sensitive_param_keys Sentry.Scrubber.default_param_keys() ++
+                          ~w(token setup_token code)
 
   @spec scrub_url(Plug.Conn.t()) :: String.t()
   def scrub_url(conn) do

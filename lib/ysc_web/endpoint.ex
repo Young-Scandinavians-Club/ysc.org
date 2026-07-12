@@ -101,6 +101,7 @@ defmodule YscWeb.Endpoint do
   plug Sentry.PlugContext,
     url_scrubber: {Ysc.SentryScrubber, :scrub_url},
     body_scrubber: {Ysc.SentryScrubber, :scrub_params}
+
   plug RemoteIp
   plug Plug.MethodOverride
   plug Plug.Head
