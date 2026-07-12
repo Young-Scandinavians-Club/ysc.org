@@ -54,6 +54,60 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
       %{conn: log_in_user(conn, admin), admin: admin}
     end
 
+    test "dead render does not query events before connect", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Deferred Event Title XYZ",
+          state: :published
+        })
+
+      events_pattern = ~r/FROM "events"/i
+
+      {html, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            conn
+            |> get(~p"/admin/events/#{event.id}/check-in")
+            |> html_response(200)
+          end,
+          pattern: events_pattern
+        )
+
+      assert query_count == 0
+      refute html =~ "Deferred Event Title XYZ"
+      assert html =~ ~s|id="check-in-search-form"|
+    end
+
+    test "connected mount loads event at most once", %{conn: conn, admin: admin} do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Single Fetch Event XYZ",
+          state: :published
+        })
+
+      events_pattern = ~r/FROM "events"/i
+
+      {{:ok, view, _html}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, html} =
+              live(conn, ~p"/admin/events/#{event.id}/check-in")
+
+            render(view)
+            {:ok, view, html}
+          end,
+          pattern: events_pattern
+        )
+
+      assert query_count == 1
+      assert render(view) =~ "Single Fetch Event XYZ"
+    end
+
     test "initial connect issues at most one ticket list query", %{
       conn: conn,
       admin: admin
