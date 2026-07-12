@@ -40,7 +40,12 @@ defmodule YscWeb.Plugs.TrailingSlashRedirect do
 
   defp trailing_slash?(path), do: path != "/" and String.ends_with?(path, "/")
 
-  defp strip_trailing_slash(path), do: String.trim_trailing(path, "/")
+  defp strip_trailing_slash(path) do
+    case String.trim_trailing(path, "/") do
+      "" -> "/"
+      stripped -> stripped
+    end
+  end
 
   defp with_query_string(path, ""), do: path
   defp with_query_string(path, query_string), do: path <> "?" <> query_string
