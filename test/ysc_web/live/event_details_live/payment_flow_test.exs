@@ -218,16 +218,21 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "payment intent creation failures" do
+    defp checkout_error_flash(view) do
+      :sys.get_state(view.pid).socket.assigns.flash
+    end
+
     test "handles Stripe API error gracefully", %{conn: conn, user: user} do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      # Mock Stripe error
+      stripe_message = "Your card was declined."
+
       expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
         {:error,
          %Stripe.Error{
-           message: "Your card was declined.",
+           message: stripe_message,
            code: "card_declined",
            source: :stripe
          }}
@@ -241,9 +246,13 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
 
-      # Should not crash
-      html = render(view)
-      assert is_binary(html)
+      flash = checkout_error_flash(view)
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "We couldn't start checkout"
+      assert error =~ Ysc.EmailConfig.contact_email()
+      refute error =~ stripe_message
+      refute error =~ "card_declined"
     end
 
     test "handles network timeout error", %{conn: conn, user: user} do
@@ -261,11 +270,14 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "proceed-to-checkout")
 
-      result = render_click(view, "proceed-to-checkout")
+      flash = checkout_error_flash(view)
+      error = Phoenix.Flash.get(flash, :error)
 
-      # Should handle error gracefully
-      assert is_binary(result)
+      assert error =~ "We couldn't start checkout"
+      assert error =~ Ysc.EmailConfig.contact_email()
+      refute error =~ "timeout"
     end
 
     test "handles invalid payment parameters", %{conn: conn, user: user} do
@@ -273,8 +285,10 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
+      raw_error = "Invalid request: amount must be at least $0.50"
+
       expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
-        {:error, "Invalid request: amount must be at least $0.50"}
+        {:error, raw_error}
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
@@ -285,9 +299,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
 
-      # Should not crash
-      html = render(view)
-      assert is_binary(html)
+      flash = checkout_error_flash(view)
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "We couldn't start checkout"
+      assert error =~ Ysc.EmailConfig.contact_email()
+      refute error =~ raw_error
     end
   end
 

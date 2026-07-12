@@ -817,6 +817,119 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert cached_queries == 0
       assert elem(uncached, 3) == elem(cached, 3)
     end
+
+    test "exclude_booking_id keeps the hold's entitlement available for repricing",
+         %{
+           user: user,
+           admin: admin
+         } do
+      {:ok, category} =
+        %Ysc.Bookings.RoomCategory{}
+        |> Ysc.Bookings.RoomCategory.changeset(%{
+          name: "Pricing ctx category #{System.unique_integer([:positive])}"
+        })
+        |> Repo.insert()
+
+      assert {:ok, _} =
+               Bookings.create_pricing_rule(%{
+                 amount: Money.new(:USD, 100),
+                 booking_mode: :room,
+                 price_unit: :per_person_per_night,
+                 property: :tahoe,
+                 season_id: nil,
+                 room_id: nil,
+                 room_category_id: category.id
+               })
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Pricing ctx room",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, booking} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert booking.applied_booking_entitlement_id == entitlement.id
+
+      without_exclude = Entitlements.pricing_context(user.id)
+
+      with_exclude =
+        Entitlements.pricing_context(user.id, exclude_booking_id: booking.id)
+
+      refute entitlement.id in Enum.map(
+               without_exclude.active_entitlements,
+               & &1.id
+             )
+
+      assert entitlement.id in Enum.map(
+               with_exclude.active_entitlements,
+               & &1.id
+             )
+
+      assert with_exclude.exclude_booking_id == booking.id
+    end
+
+    test "apply_best_entitlement/7 ignores pricing_context for a different user",
+         %{
+           user: user,
+           admin: admin
+         } do
+      other_user = user_fixture()
+
+      assert {:ok, _} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      stale_context = Entitlements.pricing_context(other_user.id)
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 2)
+      subtotal = Money.new(:USD, 200)
+
+      {_final_total, _items, _subtotal, discount, ent_id} =
+        Entitlements.apply_best_entitlement(
+          user.id,
+          :tahoe,
+          :buyout,
+          checkin,
+          checkout,
+          subtotal,
+          %{},
+          pricing_context: stale_context
+        )
+
+      assert ent_id != nil
+      assert Money.cmp(discount, Money.new(:USD, 25)) == 0
+    end
   end
 
   defp duplicate_pricing_rule?(%Ecto.Changeset{} = cs) do
