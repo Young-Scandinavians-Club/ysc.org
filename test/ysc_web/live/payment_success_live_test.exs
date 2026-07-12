@@ -153,12 +153,14 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
     test "redirects to order confirmation with confetti", %{
       conn: conn,
+      user: user,
       order: order
     } do
       payment_intent_id = "pi_ticket_success_#{order.id}"
 
       client_module =
-        stripe_client_module(%{"ticket_order_id" => order.id},
+        stripe_client_module(
+          %{"ticket_order_id" => order.id, "user_id" => user.id},
           amount_cents: 5000
         )
 
@@ -181,6 +183,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
 
     test "completes pending ticket order after redirect payment", %{
       conn: conn,
+      user: user,
       order: order
     } do
       payment_intent_id = "pi_ticket_complete_#{order.id}"
@@ -188,7 +191,8 @@ defmodule YscWeb.PaymentSuccessLiveTest do
       assert pending_order.status == :pending
 
       client_module =
-        stripe_client_module(%{"ticket_order_id" => order.id},
+        stripe_client_module(
+          %{"ticket_order_id" => order.id, "user_id" => user.id},
           amount_cents: 5000
         )
 
