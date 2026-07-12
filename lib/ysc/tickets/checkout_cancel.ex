@@ -30,6 +30,14 @@ defmodule Ysc.Tickets.CheckoutCancel do
   end
 
   @doc """
+  Returns true when checkout has a Stripe payment that must not be cancelled,
+  repriced, or expired (3DS, processing, succeeded, or redirect in progress).
+  """
+  def checkout_payment_in_flight?(%TicketOrder{} = order, opts \\ []) do
+    not pending_order_safe_to_cancel?(order, opts)
+  end
+
+  @doc """
   Returns whether a pending ticket order can be cancelled without racing Stripe.
   """
   def pending_order_safe_to_cancel?(%TicketOrder{} = order, opts \\ []) do

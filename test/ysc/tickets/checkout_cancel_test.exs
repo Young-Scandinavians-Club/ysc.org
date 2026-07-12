@@ -220,6 +220,57 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
     end
   end
 
+  describe "checkout_payment_in_flight?/2" do
+    test "returns false when order has no payment intent" do
+      refute CheckoutCancel.checkout_payment_in_flight?(order_struct())
+    end
+
+    test "returns true for blocked payment intent statuses" do
+      for status <-
+            ~w(requires_action processing requires_confirmation succeeded) do
+        payment_intent_id = "pi_in_flight_#{status}"
+
+        order =
+          order_struct(payment_intent_id: payment_intent_id)
+
+        expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                            _opts ->
+          {:ok, payment_intent(status, payment_intent_id)}
+        end)
+
+        assert CheckoutCancel.checkout_payment_in_flight?(order)
+      end
+    end
+  end
+
+  describe "sync_pending_order_pricing/1 payment guards" do
+    test "skips repricing while checkout payment is in flight" do
+      order =
+        ticket_order_fixture()
+        |> Ysc.Repo.preload(tickets: :ticket_tier)
+
+      tier = hd(order.tickets).ticket_tier
+      payment_intent_id = "pi_sync_blocked_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_action", payment_intent_id)}
+      end)
+
+      {:ok, _tier} =
+        Ysc.Events.update_ticket_tier(tier, %{price: Money.new(99, :USD)})
+
+      assert {:ok, synced} = Tickets.sync_pending_order_pricing(order)
+      assert Money.equal?(synced.total_amount, order.total_amount)
+
+      reloaded = Tickets.get_ticket_order(order.id)
+      assert Money.equal?(reloaded.total_amount, order.total_amount)
+    end
+  end
+
   describe "expire_ticket_order/1 payment guards" do
     test "skips expiration when payment intent is processing" do
       order = ticket_order_fixture()

@@ -4626,28 +4626,17 @@ defmodule YscWeb.EventDetailsLive do
       expected_cents = Ysc.MoneyHelper.money_to_cents(ticket_order.total_amount)
 
       if ticket_order.payment_intent_id do
-        # Try to retrieve existing payment intent
         case stripe_client.retrieve_payment_intent(
                ticket_order.payment_intent_id,
                %{}
              ) do
           {:ok, payment_intent} ->
-            # Check if payment intent is still valid (not succeeded or canceled)
-            if payment_intent.status in [
-                 "requires_payment_method",
-                 "requires_confirmation",
-                 "requires_action"
-               ] and payment_intent.amount == expected_cents do
-              {:ok, payment_intent}
-            else
-              Ysc.Tickets.StripeService.cancel_payment_intent(
-                ticket_order.payment_intent_id
-              )
-
-              Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
-                customer_id: user.stripe_id
-              )
-            end
+            retrieve_or_replace_payment_intent(
+              ticket_order,
+              user,
+              payment_intent,
+              expected_cents
+            )
 
           {:error, _} ->
             # Payment intent not found, create a new one
@@ -4664,6 +4653,40 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
+  defp retrieve_or_replace_payment_intent(
+         ticket_order,
+         user,
+         payment_intent,
+         expected_cents
+       ) do
+    if payment_intent.status in [
+         "requires_payment_method",
+         "requires_confirmation",
+         "requires_action",
+         "processing"
+       ] and payment_intent.amount == expected_cents do
+      {:ok, payment_intent}
+    else
+      if Ysc.Tickets.CheckoutCancel.checkout_payment_in_flight?(ticket_order,
+           context: "retrieve_or_create_payment_intent"
+         ) do
+        if payment_intent.amount == expected_cents do
+          {:ok, payment_intent}
+        else
+          {:error, :checkout_payment_in_progress}
+        end
+      else
+        Ysc.Tickets.StripeService.cancel_payment_intent(
+          ticket_order.payment_intent_id
+        )
+
+        Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
+          customer_id: user.stripe_id
+        )
+      end
+    end
+  end
+
   defp maybe_refresh_open_checkout_payment_intent(socket) do
     require Ysc.Logging
 
@@ -4671,6 +4694,7 @@ defmodule YscWeb.EventDetailsLive do
          %Ysc.Tickets.TicketOrder{status: :pending} = order <-
            socket.assigns[:ticket_order],
          user when not is_nil(user) <- socket.assigns[:current_user],
+         false <- socket.assigns[:payment_redirect_in_progress],
          {:ok, synced_order} <- Ysc.Tickets.sync_pending_order_pricing(order) do
       current_pi = socket.assigns[:payment_intent]
       current_cents = current_pi && current_pi.amount
@@ -4725,11 +4749,18 @@ defmodule YscWeb.EventDetailsLive do
                 reason: inspect(reason)
               )
 
+              error_message =
+                if reason == :checkout_payment_in_progress do
+                  "Ticket prices were updated while your payment is processing. Please finish this payment first, then start a new checkout if you need the updated price."
+                else
+                  "Ticket prices were updated but we couldn't refresh checkout. Please close and reopen checkout."
+                end
+
               socket
               |> assign(:ticket_order, synced_order)
               |> YscWeb.Flash.put_toast(
                 :error,
-                "Ticket prices were updated but we couldn't refresh checkout. Please close and reopen checkout.",
+                error_message,
                 title: "Checkout"
               )
           end
