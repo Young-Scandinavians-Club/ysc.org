@@ -112,7 +112,8 @@ defmodule YscWeb.SEO do
       meta_description: description,
       og_type: "article",
       og_url: absolute_url(path),
-      og_image: image_url(loaded_assoc(post, :featured_image)) || default_og_image_url(),
+      og_image:
+        image_url(loaded_assoc(post, :featured_image)) || default_og_image_url(),
       canonical_url: absolute_url(path)
     }
   end
@@ -135,7 +136,8 @@ defmodule YscWeb.SEO do
       meta_description: description,
       og_type: "website",
       og_url: absolute_url(path),
-      og_image: image_url(loaded_assoc(event, :cover_image)) || default_og_image_url(),
+      og_image:
+        image_url(loaded_assoc(event, :cover_image)) || default_og_image_url(),
       canonical_url: absolute_url(path)
     }
   end

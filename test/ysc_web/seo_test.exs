@@ -91,7 +91,10 @@ defmodule YscWeb.SEOTest do
       seo = SEO.assigns_for_post(post)
 
       assert seo.page_title == "Club Picnic"
-      assert seo.meta_description == "Join us for the annual picnic in the park."
+
+      assert seo.meta_description ==
+               "Join us for the annual picnic in the park."
+
       assert seo.og_type == "article"
       assert seo.og_url == YscWeb.Endpoint.url() <> "/posts/club-picnic"
       assert seo.canonical_url == seo.og_url
@@ -121,7 +124,9 @@ defmodule YscWeb.SEOTest do
       seo = SEO.assigns_for_post(post)
 
       assert seo.meta_description =~ "Young Scandinavians Club news feed"
-      assert seo.og_image == YscWeb.Endpoint.url() <> SEO.default_og_image_path()
+
+      assert seo.og_image ==
+               YscWeb.Endpoint.url() <> SEO.default_og_image_path()
     end
   end
 
