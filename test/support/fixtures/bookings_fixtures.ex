@@ -142,6 +142,27 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
+  Returns `{checkin, checkout}` for a past Mon-Thu stay that satisfies Tahoe rules.
+
+  Use when tests need a confirmed booking that has already ended regardless of
+  which weekday "today" falls on (avoids Saturday-without-Sunday and 4-night cap).
+  """
+  def past_ended_stay_dates(today_pst \\ nil) do
+    today =
+      today_pst ||
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+    checkin =
+      today
+      |> Date.add(-14)
+      |> first_monday_on_or_before()
+
+    checkout = Date.add(checkin, 3)
+    {checkin, checkout}
+  end
+
+  @doc """
   Creates a confirmed booking in an active stay window for kiosk check-in tests.
   """
   def active_check_in_booking_fixture(attrs \\ %{}) do
@@ -157,8 +178,8 @@ defmodule Ysc.BookingsFixtures do
 
     attrs
     |> Map.put_new(:status, :complete)
-    |> Map.put_new(:checkin_date, checkin)
-    |> Map.put_new(:checkout_date, checkout)
+    |> Map.put(:checkin_date, checkin)
+    |> Map.put(:checkout_date, checkout)
     |> booking_fixture()
   end
 end
