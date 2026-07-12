@@ -21,16 +21,24 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     user_fixture(Map.put(attrs, :email, email))
   end
 
-  defp with_stripe_payment_intent_mock(payment_intent_id, amount_cents, fun) do
+  defp with_stripe_payment_intent_mock(
+         payment_intent_id,
+         amount_cents,
+         metadata,
+         fun
+       )
+       when is_map(metadata) do
     unique = System.unique_integer([:positive])
     module_name = :"TestStripeClientTickets#{unique}"
     amount = amount_cents
+    escaped_metadata = Macro.escape(metadata)
 
     mod =
       quote do
         defmodule unquote(module_name) do
           @behaviour Ysc.StripeBehaviour
           @mock_amount unquote(amount)
+          @mock_metadata unquote(escaped_metadata)
 
           def create_payment_intent(_params, _opts),
             do: {:error, :not_implemented}
@@ -52,7 +60,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
                id: id,
                status: "succeeded",
                amount: @mock_amount,
-               metadata: %{}
+               metadata: @mock_metadata
              }}
           end
         end
@@ -68,6 +76,10 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     after
       Application.put_env(:ysc, :stripe_client, original_client)
     end
+  end
+
+  defp payment_intent_metadata(%{id: order_id, user_id: user_id}) do
+    %{"ticket_order_id" => order_id, "user_id" => user_id}
   end
 
   setup do
@@ -127,6 +139,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       amount_cents,
+      payment_intent_metadata(expired),
       fn pi_id ->
         assert {:ok, completed} =
                  Tickets.process_ticket_order_payment(expired, pi_id)
@@ -190,6 +203,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       amount_cents,
+      payment_intent_metadata(expired),
       fn pi_id ->
         assert {:error, reason} =
                  Tickets.process_ticket_order_payment(expired, pi_id)
@@ -251,6 +265,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       amount_cents,
+      payment_intent_metadata(cancelled),
       fn pi_id ->
         assert {:error, :cannot_complete_order} =
                  Tickets.process_ticket_order_payment(cancelled, pi_id)
@@ -276,6 +291,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       amount_cents,
+      payment_intent_metadata(order),
       fn pi_id ->
         payment_task =
           Task.async(fn ->
@@ -312,6 +328,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       amount_cents,
+      payment_intent_metadata(order),
       fn pi_id ->
         assert {:ok, completed} =
                  Tickets.process_ticket_order_payment(order, pi_id)
@@ -346,6 +363,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       amount_cents,
+      payment_intent_metadata(order),
       fn pi_id ->
         assert {:ok, completed} =
                  Tickets.process_ticket_order_payment(order, pi_id)
@@ -400,6 +418,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       synced_amount_cents,
+      payment_intent_metadata(order),
       fn pi_id ->
         assert {:ok, completed} =
                  Tickets.process_ticket_order_payment(order, pi_id)
@@ -437,6 +456,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       synced_amount_cents,
+      payment_intent_metadata(expired),
       fn pi_id ->
         assert {:ok, completed} =
                  Tickets.process_ticket_order_payment(expired, pi_id)
@@ -486,6 +506,7 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
     with_stripe_payment_intent_mock(
       payment_intent_id,
       stale_amount_cents,
+      payment_intent_metadata(order),
       fn pi_id ->
         assert {:error, :amount_mismatch} =
                  Tickets.process_ticket_order_payment(order, pi_id)

@@ -130,6 +130,32 @@ defmodule YscWeb.Api.BookingsControllerTest do
       _ = far_future
     end
 
+    test "defaults to a bounded date window when dates are omitted", %{
+      conn: conn
+    } do
+      today = Date.utc_today()
+      old_checkin = Date.add(today, -120)
+      old_checkout = Date.add(old_checkin, 3)
+
+      {:ok, old_booking} =
+        %{
+          checkin_date: old_checkin,
+          checkout_date: old_checkout,
+          guests_count: 2,
+          property: :tahoe,
+          booking_mode: :buyout,
+          user_id: user_fixture().id,
+          status: :complete,
+          total_price: Money.new(200, :USD)
+        }
+        |> Ysc.Bookings.create_booking()
+
+      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+
+      assert %{"data" => bookings} = json_response(response, 200)
+      refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+    end
+
     test "returns 401 without auth token", %{conn: conn} do
       unauthed_conn = delete_req_header(conn, "authorization")
       response = get(unauthed_conn, ~p"/api/v1/mobile/bookings?property=tahoe")

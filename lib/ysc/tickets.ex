@@ -1689,14 +1689,29 @@ defmodule Ysc.Tickets do
   end
 
   defp validate_payment_intent(payment_intent, ticket_order) do
+    metadata = payment_intent.metadata || %{}
+
+    metadata_order_id =
+      Map.get(metadata, "ticket_order_id") ||
+        Map.get(metadata, :ticket_order_id)
+
+    metadata_user_id =
+      Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
     expected_amount = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
     cond do
-      payment_intent.amount != expected_amount ->
-        {:error, :amount_mismatch}
-
       payment_intent.status != "succeeded" ->
         {:error, :payment_not_succeeded}
+
+      to_string(metadata_order_id || "") != to_string(ticket_order.id) ->
+        {:error, :payment_metadata_mismatch}
+
+      to_string(metadata_user_id || "") != to_string(ticket_order.user_id) ->
+        {:error, :payment_metadata_mismatch}
+
+      payment_intent.amount != expected_amount ->
+        {:error, :amount_mismatch}
 
       true ->
         :ok

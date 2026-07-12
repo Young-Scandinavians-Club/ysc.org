@@ -97,7 +97,7 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "The YSC Spirit",
           content:
-            "Since **1993**, this cabin has been a community effort. We keep rates low because we don't hire a cleaning crew—**you are the steward of the cabin during your stay.**\n\n**Wi-Fi:** `YSC-Tahoe` | **Pass:** `Welcome2024!`\n**Address:** `2685 Cedar Lane, Homewood, CA`\n**Payment:** Must be completed **in advance** on the website before your arrival."
+            "Since **1993**, this cabin has been a community effort. We keep rates low because we don't hire a cleaning crew—**you are the steward of the cabin during your stay.**\n\n**Wi-Fi:** See the network and password fields above.\n**Address:** `2685 Cedar Lane, Homewood, CA`\n**Payment:** Must be completed **in advance** on the website before your arrival."
         },
         %{
           title: "The Must-Bring List",
