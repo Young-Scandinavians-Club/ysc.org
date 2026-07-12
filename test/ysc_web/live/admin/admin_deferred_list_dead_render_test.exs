@@ -177,10 +177,11 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static Detail Session"
   end
 
-  test "dead render skips event check-in event query and shows loading shell", %{
-    conn: conn,
-    admin: admin
-  } do
+  test "dead render skips event check-in event query and shows loading shell",
+       %{
+         conn: conn,
+         admin: admin
+       } do
     event =
       event_fixture(%{
         organizer_id: admin.id,

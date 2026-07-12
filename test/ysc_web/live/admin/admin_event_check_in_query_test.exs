@@ -54,7 +54,10 @@ defmodule YscWeb.AdminEventCheckInQueryTest do
       %{conn: log_in_user(conn, admin), admin: admin}
     end
 
-    test "dead render does not query events before connect", %{conn: conn, admin: admin} do
+    test "dead render does not query events before connect", %{
+      conn: conn,
+      admin: admin
+    } do
       event =
         event_fixture(%{
           organizer_id: admin.id,
