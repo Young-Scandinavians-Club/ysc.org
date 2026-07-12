@@ -23,7 +23,11 @@ defmodule YscWeb.AdminEventCheckInLive do
           <.back navigate={~p"/admin/events"}>Events</.back>
           <span class="text-zinc-300 select-none hidden sm:inline">/</span>
           <h1 class="text-base font-semibold text-zinc-900 truncate hidden sm:block">
-            {@event.title}
+            <%= if @event do %>
+              {@event.title}
+            <% else %>
+              <.skeleton_block class="h-5 w-48 max-w-full rounded" />
+            <% end %>
           </h1>
           <.admin_help_link
             topic="day-of/check-in"
@@ -231,13 +235,12 @@ defmodule YscWeb.AdminEventCheckInLive do
       Scanning.subscribe_checkin(event_id)
     end
 
-    event = Events.get_event!(event_id)
-
     {:ok,
      socket
-     |> assign(:page_title, "Check-in: #{event.title}")
+     |> assign(:page_title, "Check-in")
      |> assign(:active_page, :events)
-     |> assign(:event, event)
+     |> assign(:event_id, event_id)
+     |> assign(:event, nil)
      |> assign(:search_query, "")
      |> assign(:loading, true)
      |> assign(:checked_in_count, 0)
@@ -262,7 +265,12 @@ defmodule YscWeb.AdminEventCheckInLive do
     # Defer ticket loading until the WebSocket connects so the static HTML
     # response stays fast and the loading panel can render on first paint.
     if connected?(socket) do
-      {:noreply, reload_tickets(socket, search)}
+      socket =
+        socket
+        |> ensure_event_loaded()
+        |> reload_tickets(search)
+
+      {:noreply, socket}
     else
       {:noreply, socket}
     end
@@ -428,8 +436,24 @@ defmodule YscWeb.AdminEventCheckInLive do
   # Private
   # ---------------------------------------------------------------------------
 
+  defp ensure_event_loaded(socket) do
+    %{event_id: event_id, event: event} = socket.assigns
+
+    case event do
+      %{id: ^event_id} ->
+        socket
+
+      _ ->
+        event = Events.get_event!(event_id)
+
+        socket
+        |> assign(:event, event)
+        |> assign(:page_title, "Check-in: #{event.title}")
+    end
+  end
+
   defp reload_tickets(socket, search) do
-    event_id = socket.assigns.event.id
+    event_id = socket.assigns.event_id
     tickets = Scanning.list_event_checkin_tickets(event_id, search)
 
     {checked_in_count, total_count} =
@@ -562,7 +586,7 @@ defmodule YscWeb.AdminEventCheckInLive do
   defp assign_scan_session_from_params(socket, %{
          "scan_session_id" => session_id
        }) do
-    event_id = socket.assigns.event.id
+    event_id = socket.assigns.event_id
 
     case Scanning.get_session!(session_id) do
       %{event_id: ^event_id, type: :event, closed_at: nil} = session ->

@@ -177,6 +177,34 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
     refute html =~ "Static Detail Session"
   end
 
+  test "dead render skips event check-in event query and shows loading shell", %{
+    conn: conn,
+    admin: admin
+  } do
+    event =
+      event_fixture(%{
+        organizer_id: admin.id,
+        title: "Static Render Check-in Event",
+        state: :published
+      })
+
+    events_pattern = ~r/FROM "events"/i
+
+    {html, query_count} =
+      Ysc.QueryCounter.with_query_counter(
+        fn ->
+          conn
+          |> get("/admin/events/#{event.id}/check-in")
+          |> html_response(200)
+        end,
+        pattern: events_pattern
+      )
+
+    assert query_count == 0
+    assert html =~ ~s|id="check-in-search-form"|
+    refute html =~ "Static Render Check-in Event"
+  end
+
   test "dead render skips newsletter edition query and shows loading state", %{
     conn: conn,
     admin: admin
