@@ -218,6 +218,10 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   end
 
   describe "payment intent creation failures" do
+    defp checkout_error_flash(view) do
+      :sys.get_state(view.pid).socket.assigns.flash
+    end
+
     test "handles Stripe API error gracefully", %{conn: conn, user: user} do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
@@ -242,11 +246,13 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
 
-      html = render(view)
-      assert html =~ "We couldn't start checkout"
-      assert html =~ Ysc.EmailConfig.contact_email()
-      refute html =~ stripe_message
-      refute html =~ "card_declined"
+      flash = checkout_error_flash(view)
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "We couldn't start checkout"
+      assert error =~ Ysc.EmailConfig.contact_email()
+      refute error =~ stripe_message
+      refute error =~ "card_declined"
     end
 
     test "handles network timeout error", %{conn: conn, user: user} do
@@ -264,11 +270,14 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      html = render_click(view, "proceed-to-checkout")
+      render_click(view, "proceed-to-checkout")
 
-      assert html =~ "We couldn't start checkout"
-      assert html =~ Ysc.EmailConfig.contact_email()
-      refute html =~ "timeout"
+      flash = checkout_error_flash(view)
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "We couldn't start checkout"
+      assert error =~ Ysc.EmailConfig.contact_email()
+      refute error =~ "timeout"
     end
 
     test "handles invalid payment parameters", %{conn: conn, user: user} do
@@ -288,11 +297,14 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      html = render_click(view, "proceed-to-checkout")
+      render_click(view, "proceed-to-checkout")
 
-      assert html =~ "We couldn't start checkout"
-      assert html =~ Ysc.EmailConfig.contact_email()
-      refute html =~ raw_error
+      flash = checkout_error_flash(view)
+      error = Phoenix.Flash.get(flash, :error)
+
+      assert error =~ "We couldn't start checkout"
+      assert error =~ Ysc.EmailConfig.contact_email()
+      refute error =~ raw_error
     end
   end
 
