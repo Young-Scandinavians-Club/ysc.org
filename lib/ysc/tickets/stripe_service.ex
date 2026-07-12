@@ -112,11 +112,11 @@ defmodule Ysc.Tickets.StripeService do
             payment_intent_amount_cents: payment_intent.amount
           )
 
-          {:error, "Payment initialization failed"}
+          {:error, Ysc.PaymentUserMessages.payment_setup_failed()}
         end
 
       {:error, %Stripe.Error{} = error} ->
-        {:error, error.message}
+        {:error, Ysc.PaymentUserMessages.format_stripe_error(error)}
 
       {:error, reason} ->
         {:error, reason}

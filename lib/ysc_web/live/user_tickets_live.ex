@@ -165,7 +165,7 @@ defmodule YscWeb.UserTicketsLive do
                         </p>
                         <div class="mt-3 pt-3 border-t border-zinc-50 flex justify-between items-center">
                           <span class="text-xs font-bold text-teal-600 uppercase">
-                            {String.capitalize(to_string(ticket.status))}
+                            {Ysc.Tickets.Display.ticket_status_label(ticket.status)}
                           </span>
                           <span class="text-xs font-bold text-zinc-900">
                             <%= case ticket.ticket_tier.type do %>
@@ -427,16 +427,13 @@ defmodule YscWeb.UserTicketsLive do
         _ -> "bg-zinc-50 text-zinc-700 ring-zinc-100"
       end
     ]}>
-      {status_label(@status)}
+      {order_status_label(@status)}
     </span>
     """
   end
 
-  defp status_label(:pending), do: "Payment needed"
-  defp status_label(:completed), do: "Paid"
-  defp status_label(:expired), do: "Reservation expired"
-  defp status_label(:cancelled), do: "Cancelled"
-  defp status_label(status), do: String.capitalize(to_string(status))
+  defp order_status_label(status),
+    do: Ysc.Tickets.Display.order_status_label(status)
 
   defp format_date(datetime) do
     Timex.format!(datetime, "{Mshort} {D}, {YYYY}")

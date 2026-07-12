@@ -311,19 +311,7 @@ defmodule YscWeb.BookingCheckoutLive do
              stripe_payment_element_ready: false
            )}
 
-        {:error, reason} ->
-          message =
-            if is_binary(reason) do
-              reason
-            else
-              Ysc.Logging.error("[BookingCheckout] Payment intent setup failed",
-                reason: inspect(reason),
-                booking_id: booking.id
-              )
-
-              YscWeb.BookingUserMessages.checkout_payment_setup_failed()
-            end
-
+        {:error, message} ->
           {:ok,
            assign(socket,
              payment_error: message
@@ -1438,20 +1426,7 @@ defmodule YscWeb.BookingCheckoutLive do
                      title: "Checkout"
                    )}
 
-                {:error, reason} ->
-                  message =
-                    if is_binary(reason) do
-                      reason
-                    else
-                      Ysc.Logging.error(
-                        "[BookingCheckout] Payment intent setup failed",
-                        reason: inspect(reason),
-                        booking_id: booking.id
-                      )
-
-                      YscWeb.BookingUserMessages.checkout_payment_setup_failed()
-                    end
-
+                {:error, message} ->
                   {:noreply,
                    assign(socket,
                      payment_error: message,
@@ -1995,11 +1970,11 @@ defmodule YscWeb.BookingCheckoutLive do
           "Stripe payment intent creation failed: #{inspect(error)}"
         )
 
-        {:error, error.message}
+        {:error, Ysc.PaymentUserMessages.format_stripe_error(error)}
 
       {:error, reason} ->
         Ysc.Logging.error("Payment intent creation failed: #{inspect(reason)}")
-        {:error, "Payment initialization failed"}
+        {:error, Ysc.PaymentUserMessages.payment_setup_failed()}
     end
   end
 
