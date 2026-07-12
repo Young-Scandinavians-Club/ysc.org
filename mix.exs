@@ -264,7 +264,7 @@ defmodule Ysc.MixProject do
       {:remote_ip, "~> 1.2"},
       {:req, "~> 0.6"},
       {:retry_on, "~> 0.1"},
-      {:sentry, "~> 13.2"},
+      {:sentry, "~> 13.3"},
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
       {:stripity_stripe, "~> 3.3"},
       # EEF-CVE-2026-54893: Microsoft Graph adapter URL path injection; fixed in 1.26.3+ (we use SES)
