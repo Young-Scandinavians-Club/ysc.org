@@ -334,10 +334,12 @@ defmodule YscWeb.Api.CheckInsControllerTest do
         DateTime.now!("America/Los_Angeles")
         |> DateTime.to_date()
 
+      {checkin, checkout} = past_ended_stay_dates(today_pst)
+
       booking =
         active_check_in_booking_fixture(%{
-          checkin_date: Date.add(today_pst, -5),
-          checkout_date: Date.add(today_pst, -1)
+          checkin_date: checkin,
+          checkout_date: checkout
         })
 
       payload = %{
