@@ -969,7 +969,9 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         end)
 
         stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
-          flunk("cancel_payment_intent should not run during in-flight 3DS repricing")
+          flunk(
+            "cancel_payment_intent should not run during in-flight 3DS repricing"
+          )
         end)
 
         {:ok, view, _html} =
