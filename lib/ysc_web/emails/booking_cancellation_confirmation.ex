@@ -19,6 +19,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
 
   alias Ysc.Repo
   alias Ysc.Bookings.Booking
+  alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name() do
     "booking_cancellation_confirmation"
@@ -55,7 +56,7 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
     booking = validate_and_load_booking(booking)
     formatted_dates = format_booking_dates(booking)
     formatted_amounts = format_payment_amounts(payment, refund_amount)
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     build_email_data(
       booking,
@@ -150,12 +151,4 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
       booking_url: booking_url(booking.id)
     }
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 end

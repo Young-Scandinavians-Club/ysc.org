@@ -6,7 +6,7 @@ defmodule YscWeb.BookingReceiptLive do
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
+  alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund, PropertyDisplay}
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -228,7 +228,7 @@ defmodule YscWeb.BookingReceiptLive do
             </h1>
             <p class="text-zinc-500 mt-2 text-lg">
               Your booking at
-              <strong>{format_property_name(@booking.property)}</strong>
+              <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
               has been cancelled.
               <%= if @refund_data && @refund_data.total_refunded do %>
                 <%= if @refund_data.has_pending_refund do %>
@@ -271,14 +271,14 @@ defmodule YscWeb.BookingReceiptLive do
               <%= cond do %>
                 <% @show_reservation_updated -> %>
                   Your updated stay at
-                  <strong>{format_property_name(@booking.property)}</strong>
+                  <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
                   is confirmed. We've sent an email with your new reservation details.
                 <% @booking_in_past -> %>
-                  Hope you had an amazing time at <strong>{format_property_name(@booking.property)}</strong>.
+                  Hope you had an amazing time at <strong>{PropertyDisplay.full_name(@booking.property)}</strong>.
                   See you next time!
                 <% true -> %>
                   Your stay at
-                  <strong>{format_property_name(@booking.property)}</strong>
+                  <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
                   is all set.
                   We've sent a copy of these details to your email.
               <% end %>
@@ -394,7 +394,7 @@ defmodule YscWeb.BookingReceiptLive do
             ]}>
               <img
                 src={get_property_thumbnail(@booking.property)}
-                alt={format_property_name(@booking.property)}
+                alt={PropertyDisplay.full_name(@booking.property)}
                 class="w-full h-full object-cover"
               />
               <%= if @booking.status == :canceled do %>
@@ -1288,7 +1288,7 @@ defmodule YscWeb.BookingReceiptLive do
       <!-- Footer Note -->
       <div class="mt-12 pt-8 border-t border-zinc-100">
         <p class="text-sm text-zinc-500 text-center">
-          The YSC is run by members like you. If you have questions about your stay, contact the {format_property_name(
+          The YSC is run by members like you. If you have questions about your stay, contact the {PropertyDisplay.medium_name(
             @booking.property
           )} Cabin Master at
           <a
@@ -2374,10 +2374,6 @@ defmodule YscWeb.BookingReceiptLive do
         stripe_fallback
     end
   end
-
-  defp format_property_name(:tahoe), do: "Lake Tahoe Cabin"
-  defp format_property_name(:clear_lake), do: "Clear Lake Cabin"
-  defp format_property_name(_), do: "Unknown"
 
   defp get_property_thumbnail(property) do
     case property do

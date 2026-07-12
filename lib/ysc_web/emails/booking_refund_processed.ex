@@ -18,6 +18,7 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
     ]
 
   alias Ysc.Repo
+  alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name() do
     "booking_refund_processed"
@@ -83,7 +84,7 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
     original_amount = if payment, do: format_money(payment.amount), else: "N/A"
 
     # Get property name
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     %{
       first_name: member_greeting_name(booking.user),
@@ -110,12 +111,4 @@ defmodule YscWeb.Emails.BookingRefundProcessed do
       booking_url: booking_url(booking.id)
     }
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 end

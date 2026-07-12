@@ -14,6 +14,7 @@ defmodule YscWeb.Emails.BookingCancellationCabinMasterNotification do
 
   alias Ysc.Repo
   alias Ysc.Bookings.Booking
+  alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name() do
     "booking_cancellation_cabin_master_notification"
@@ -96,7 +97,7 @@ defmodule YscWeb.Emails.BookingCancellationCabinMasterNotification do
         else: nil
 
     # Get property name
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     # Determine if review is required
     requires_review = not is_nil(pending_refund)
@@ -159,12 +160,4 @@ defmodule YscWeb.Emails.BookingCancellationCabinMasterNotification do
   defp booking_url(booking_id) do
     absolute_url("/admin/bookings/#{booking_id}")
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 end

@@ -15,6 +15,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
     ]
 
   alias Ysc.Repo
+  alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name, do: "booking_modification_confirmation"
 
@@ -43,7 +44,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
       raise ArgumentError, "Booking with user is required"
     end
 
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     room_names =
       if booking.rooms && booking.rooms != [] do
@@ -114,12 +115,4 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
           Map.get(details, "additional_payment")
     }
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 end

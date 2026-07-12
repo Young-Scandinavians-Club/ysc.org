@@ -5,6 +5,8 @@ defmodule Ysc.Payments.PaymentDisplay do
   Extracted from UserSettingsLive to improve code organization and reusability.
   """
 
+  alias Ysc.Bookings.PropertyDisplay
+
   @doc """
   Gets the icon name for a payment type.
   """
@@ -69,14 +71,16 @@ defmodule Ysc.Payments.PaymentDisplay do
   """
   def get_payment_title(%{type: :booking, booking: booking})
       when not is_nil(booking) do
-    property_name =
+    property_label =
       case booking.property do
-        :tahoe -> "Tahoe"
-        :clear_lake -> "Clear Lake"
-        _ -> "Cabin"
+        property when property in [:tahoe, :clear_lake] ->
+          PropertyDisplay.short_name(property)
+
+        _ ->
+          "Cabin"
       end
 
-    "#{property_name} Booking"
+    "#{property_label} Booking"
   end
 
   def get_payment_title(%{type: :ticket, event: event})

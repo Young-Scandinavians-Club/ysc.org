@@ -13,6 +13,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
 
   alias Ysc.Repo
   alias Ysc.Bookings
+  alias Ysc.Bookings.PropertyDisplay
   alias YscWeb.Emails.OutageNotification
 
   def get_template_name() do
@@ -20,7 +21,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
   end
 
   def get_subject(booking) do
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
     "Your #{property_name} Check-In Instructions - YSC Cabin Stay 🏡"
   end
 
@@ -71,8 +72,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     door_code = Bookings.get_active_door_code(booking.property)
 
     # Get property information
-    property_name = get_property_name(booking.property)
-    property_address = get_property_address(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
+    property_address = PropertyDisplay.address(booking.property)
 
     # Get cabin master information
     cabin_master = OutageNotification.get_cabin_master(booking.property)
@@ -156,21 +157,6 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       booking_url: booking_url(booking.id)
     }
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
-
-  defp get_property_address(:tahoe), do: "2685 Cedar Lane, Homewood, CA 96141"
-
-  defp get_property_address(:clear_lake),
-    do: "9325 Bass Road, Kelseyville, CA 95451"
-
-  defp get_property_address(_), do: "Property Address"
 
   defp get_booking_mode_description(:room), do: "Room Booking"
   defp get_booking_mode_description(:day), do: "Day Booking"

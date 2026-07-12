@@ -18,6 +18,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     ]
 
   alias Ysc.Repo
+  alias Ysc.Bookings.PropertyDisplay
 
   def get_template_name() do
     "booking_confirmation"
@@ -80,7 +81,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     total_amount = format_money(booking.total_price)
 
     # Get property name
-    property_name = get_property_name(booking.property)
+    property_name = PropertyDisplay.short_name(booking.property)
 
     # Get booking mode description
     booking_mode_description =
@@ -123,14 +124,6 @@ defmodule YscWeb.Emails.BookingConfirmation do
       booking_url: booking_url(booking.id)
     }
   end
-
-  defp get_property_name(:clear_lake), do: "Clear Lake"
-  defp get_property_name(:tahoe), do: "Tahoe"
-
-  defp get_property_name(property) when is_atom(property),
-    do: String.capitalize(to_string(property))
-
-  defp get_property_name(property), do: to_string(property)
 
   defp get_booking_mode_description(:room), do: "Room Booking"
   defp get_booking_mode_description(:day), do: "Day Booking"
