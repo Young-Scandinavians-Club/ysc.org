@@ -13,7 +13,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
 
   alias Ysc.Repo
   alias Ysc.Bookings
-  alias Ysc.Bookings.PropertyDisplay
+  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay}
   alias YscWeb.Emails.OutageNotification
 
   def get_template_name() do
@@ -107,8 +107,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     days_until_checkin = Date.diff(booking.checkin_date, today_pst)
 
     # Get booking mode description
-    booking_mode_description =
-      get_booking_mode_description(booking.booking_mode)
+    booking_mode_description = BookingModeDisplay.label(booking.booking_mode)
 
     # Get room names if applicable
     room_names =
@@ -122,7 +121,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     nights = Date.diff(booking.checkout_date, booking.checkin_date)
 
     # Check if this is a buyout booking
-    is_buyout = booking.booking_mode == :buyout
+    is_buyout = BookingModeDisplay.buyout?(booking.booking_mode)
 
     # Normalize property to string for consistent comparison in templates
     # Email templates may serialize atoms to strings, so we normalize here
@@ -158,12 +157,4 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     }
   end
 
-  defp get_booking_mode_description(:room), do: "Room Booking"
-  defp get_booking_mode_description(:day), do: "Day Booking"
-  defp get_booking_mode_description(:buyout), do: "Entire cabin"
-
-  defp get_booking_mode_description(mode) when is_atom(mode),
-    do: String.capitalize(to_string(mode))
-
-  defp get_booking_mode_description(mode), do: to_string(mode)
 end
