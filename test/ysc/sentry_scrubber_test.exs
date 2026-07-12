@@ -12,15 +12,16 @@ defmodule Ysc.SentryScrubberTest do
         )
 
       url = SentryScrubber.scrub_url(conn)
+      query = url |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
 
       refute url =~ "secret-login-token"
       refute url =~ "setup-abc"
       refute url =~ "hunter2"
       refute url =~ "oauth-code"
-      assert url =~ "token=#{Sentry.Scrubber.scrubbed_value()}"
-      assert url =~ "setup_token=#{Sentry.Scrubber.scrubbed_value()}"
-      assert url =~ "password=#{Sentry.Scrubber.scrubbed_value()}"
-      assert url =~ "code=#{Sentry.Scrubber.scrubbed_value()}"
+      assert query["token"] == Sentry.Scrubber.scrubbed_value()
+      assert query["setup_token"] == Sentry.Scrubber.scrubbed_value()
+      assert query["password"] == Sentry.Scrubber.scrubbed_value()
+      assert query["code"] == Sentry.Scrubber.scrubbed_value()
     end
 
     test "leaves non-sensitive query parameters unchanged" do
