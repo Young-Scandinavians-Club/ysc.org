@@ -24,7 +24,9 @@ defmodule YscWeb.Plugs.TrailingSlashRedirect do
     path = conn.request_path
 
     if trailing_slash?(path) do
-      location = strip_trailing_slash(path) |> with_query_string(conn.query_string)
+      location =
+        strip_trailing_slash(path) |> with_query_string(conn.query_string)
+
       status = redirect_status(conn.method)
 
       conn

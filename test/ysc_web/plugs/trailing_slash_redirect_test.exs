@@ -85,7 +85,9 @@ defmodule YscWeb.Plugs.TrailingSlashRedirectTest do
   end
 
   describe "endpoint integration" do
-    test "redirects trailing-slash browser paths through the endpoint", %{conn: conn} do
+    test "redirects trailing-slash browser paths through the endpoint", %{
+      conn: conn
+    } do
       conn = get(conn, "/history/")
 
       assert conn.status == 301
