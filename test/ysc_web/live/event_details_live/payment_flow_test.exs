@@ -223,11 +223,12 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
-      # Mock Stripe error
+      stripe_message = "Your card was declined."
+
       expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
         {:error,
          %Stripe.Error{
-           message: "Your card was declined.",
+           message: stripe_message,
            code: "card_declined",
            source: :stripe
          }}
@@ -241,9 +242,11 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
       render_click(view, "proceed-to-checkout")
 
-      # Should not crash
       html = render(view)
-      assert is_binary(html)
+      assert html =~ "We couldn't start checkout"
+      assert html =~ Ysc.EmailConfig.contact_email()
+      refute html =~ stripe_message
+      refute html =~ "card_declined"
     end
 
     test "handles network timeout error", %{conn: conn, user: user} do
@@ -261,11 +264,11 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      html = render_click(view, "proceed-to-checkout")
 
-      result = render_click(view, "proceed-to-checkout")
-
-      # Should handle error gracefully
-      assert is_binary(result)
+      assert html =~ "We couldn't start checkout"
+      assert html =~ Ysc.EmailConfig.contact_email()
+      refute html =~ "timeout"
     end
 
     test "handles invalid payment parameters", %{conn: conn, user: user} do
@@ -273,8 +276,10 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       event = Repo.preload(event, :ticket_tiers, force: true)
       tier = hd(event.ticket_tiers)
 
+      raw_error = "Invalid request: amount must be at least $0.50"
+
       expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
-        {:error, "Invalid request: amount must be at least $0.50"}
+        {:error, raw_error}
       end)
 
       {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
@@ -283,11 +288,11 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         wait_for_async(view)
 
       render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
-      render_click(view, "proceed-to-checkout")
+      html = render_click(view, "proceed-to-checkout")
 
-      # Should not crash
-      html = render(view)
-      assert is_binary(html)
+      assert html =~ "We couldn't start checkout"
+      assert html =~ Ysc.EmailConfig.contact_email()
+      refute html =~ raw_error
     end
   end
 

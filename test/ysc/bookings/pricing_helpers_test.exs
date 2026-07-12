@@ -437,5 +437,75 @@ defmodule Ysc.Bookings.PricingHelpersTest do
 
       assert entitlement_queries == 2
     end
+
+    test "booking_id on socket excludes the hold from entitlement reservation", %{
+      room: room,
+      room2: room2
+    } do
+      user = user_fixture()
+      admin = user_fixture()
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25)
+                 },
+                 send_notification: false
+               )
+
+      assert {:ok, booking} =
+               Ysc.Bookings.BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 @checkin,
+                 @checkout,
+                 2
+               )
+
+      assert booking.applied_booking_entitlement_id == entitlement.id
+
+      reprice_socket =
+        lv_socket(%{
+          current_user: user,
+          booking_id: booking.id,
+          checkin_date: @checkin,
+          checkout_date: @checkout,
+          selected_booking_mode: :room,
+          selected_room_id: room.id,
+          guests_count: 2,
+          children_count: 0,
+          available_rooms: [%{id: room.id, min_billable_occupancy: 1}]
+        })
+
+      repriced = PricingHelpers.calculate_price_if_ready(reprice_socket, :tahoe)
+
+      assert repriced.assigns.price_breakdown.applied_entitlement_id ==
+               entitlement.id
+
+      assert Money.cmp(
+               repriced.assigns.price_breakdown.entitlement_discount,
+               Money.new(:USD, 25)
+             ) == 0
+
+      other_room_socket =
+        lv_socket(%{
+          current_user: user,
+          checkin_date: @checkin,
+          checkout_date: @checkout,
+          selected_booking_mode: :room,
+          selected_room_id: room2.id,
+          guests_count: 2,
+          children_count: 0,
+          available_rooms: [%{id: room2.id, min_billable_occupancy: 2}]
+        })
+
+      without_hold_context =
+        PricingHelpers.calculate_price_if_ready(other_room_socket, :tahoe)
+
+      refute without_hold_context.assigns.price_breakdown.applied_entitlement_id
+    end
   end
 end

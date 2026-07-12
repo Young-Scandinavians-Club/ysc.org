@@ -237,5 +237,28 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert returned.status == :pending
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
+
+    test "skips expiration when Stripe cannot retrieve payment intent" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_missing_expire_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :api_error,
+           message: "not found",
+           extra: %{}
+         }}
+      end)
+
+      assert {:ok, returned} = Tickets.expire_ticket_order(order)
+      assert returned.status == :pending
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
   end
 end
