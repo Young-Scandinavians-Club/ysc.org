@@ -151,5 +151,4 @@ defmodule YscWeb.Emails.BookingCancellationConfirmation do
       booking_url: booking_url(booking.id)
     }
   end
-
 end

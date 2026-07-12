@@ -158,8 +158,6 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
     }
   end
 
-
-
   defp get_booking_mode_description(:room), do: "Room Booking"
   defp get_booking_mode_description(:day), do: "Day Booking"
   defp get_booking_mode_description(:buyout), do: "Entire cabin"

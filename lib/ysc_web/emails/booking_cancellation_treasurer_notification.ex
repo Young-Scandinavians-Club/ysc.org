@@ -160,5 +160,4 @@ defmodule YscWeb.Emails.BookingCancellationTreasurerNotification do
   defp booking_url(booking_id) do
     absolute_url("/admin/bookings/#{booking_id}")
   end
-
 end

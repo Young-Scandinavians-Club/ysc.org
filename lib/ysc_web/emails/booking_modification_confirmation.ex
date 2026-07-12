@@ -115,5 +115,4 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
           Map.get(details, "additional_payment")
     }
   end
-
 end

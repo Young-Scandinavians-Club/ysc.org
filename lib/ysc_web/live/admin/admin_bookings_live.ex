@@ -2585,7 +2585,10 @@ defmodule YscWeb.AdminBookingsLive do
                           Booking: {pending_refund.booking.reference_id}
                         </.link>
                         <span class="text-sm text-zinc-600">
-                          {PropertyDisplay.full_name(pending_refund.booking.property, "Cabin")}
+                          {PropertyDisplay.full_name(
+                            pending_refund.booking.property,
+                            "Cabin"
+                          )}
                         </span>
                       </div>
                       <div class="text-sm text-zinc-600 space-y-1">

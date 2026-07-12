@@ -119,6 +119,4 @@ defmodule YscWeb.Emails.BookingCheckoutReminder do
       booking_url: booking_url(booking.id)
     }
   end
-
-
 end

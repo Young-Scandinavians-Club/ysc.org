@@ -126,5 +126,4 @@ defmodule YscWeb.Emails.BookingRefundPending do
       booking_url: booking_url(booking.id)
     }
   end
-
 end
