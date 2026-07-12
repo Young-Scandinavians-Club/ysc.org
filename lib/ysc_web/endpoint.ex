@@ -98,7 +98,9 @@ defmodule YscWeb.Endpoint do
     # Cache raw body so webhook controllers can verify HMAC signatures
     body_reader: {YscWeb.Plugs.CacheRawBody, :read_body, []}
 
-  plug Sentry.PlugContext
+  plug Sentry.PlugContext,
+    url_scrubber: {Ysc.SentryScrubber, :scrub_url},
+    body_scrubber: {Ysc.SentryScrubber, :scrub_params}
   plug RemoteIp
   plug Plug.MethodOverride
   plug Plug.Head
