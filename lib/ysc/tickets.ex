@@ -1141,6 +1141,20 @@ defmodule Ysc.Tickets do
       when status in [:pending, :expired] do
     ticket_order = ensure_ticket_order_for_payment(ticket_order)
 
+    if CheckoutCancel.checkout_payment_in_flight?(ticket_order,
+         context: "sync_pending_order_pricing"
+       ) do
+      {:ok, ticket_order}
+    else
+      do_sync_pending_order_pricing(ticket_order)
+    end
+  end
+
+  def sync_pending_order_pricing(%TicketOrder{} = ticket_order) do
+    {:ok, ensure_ticket_order_for_payment(ticket_order)}
+  end
+
+  defp do_sync_pending_order_pricing(ticket_order) do
     with {:ok, total, discount} <-
            recalculate_pending_order_pricing(ticket_order) do
       attrs = pending_order_pricing_attrs(total, discount)
@@ -1157,10 +1171,6 @@ defmodule Ysc.Tickets do
         end
       end
     end
-  end
-
-  def sync_pending_order_pricing(%TicketOrder{} = ticket_order) do
-    {:ok, ensure_ticket_order_for_payment(ticket_order)}
   end
 
   @doc """
