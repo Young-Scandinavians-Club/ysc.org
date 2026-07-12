@@ -127,8 +127,10 @@ defmodule Ysc.Tickets.StripeServiceTest do
          }}
       end)
 
-      assert {:error, "Card declined"} =
+      assert {:error, message} =
                StripeService.create_payment_intent(ticket_order)
+
+      assert message =~ "declined"
     end
 
     test "syncs order pricing before creating payment intent when tier price increased",
@@ -203,8 +205,11 @@ defmodule Ysc.Tickets.StripeServiceTest do
          }}
       end)
 
-      assert {:error, "Payment initialization failed"} =
+      assert {:error, message} =
                StripeService.create_payment_intent(ticket_order)
+
+      assert message =~ "couldn't set up payment"
+      refute message =~ "initialization"
     end
   end
 

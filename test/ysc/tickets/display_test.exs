@@ -102,6 +102,21 @@ defmodule Ysc.Tickets.DisplayTest do
     end
   end
 
+  describe "ticket_status_label/1" do
+    test "uses member-friendly labels instead of raw enum values" do
+      assert Display.ticket_status_label(:confirmed) == "Ready to use"
+      assert Display.ticket_status_label(:pending) == "Awaiting payment"
+      refute Display.ticket_status_label(:confirmed) == "Confirmed"
+    end
+  end
+
+  describe "order_status_label/1" do
+    test "matches ticket order vocabulary used on My Tickets" do
+      assert Display.order_status_label(:completed) == "Paid"
+      assert Display.order_status_label(:pending) == "Payment needed"
+    end
+  end
+
   describe "format_ledger_order_description/1" do
     test "includes tier summary when tickets are present" do
       ticket_order = %{

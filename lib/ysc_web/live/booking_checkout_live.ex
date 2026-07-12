@@ -1995,11 +1995,11 @@ defmodule YscWeb.BookingCheckoutLive do
           "Stripe payment intent creation failed: #{inspect(error)}"
         )
 
-        {:error, error.message}
+        {:error, Ysc.PaymentUserMessages.format_stripe_error(error)}
 
       {:error, reason} ->
         Ysc.Logging.error("Payment intent creation failed: #{inspect(reason)}")
-        {:error, "Payment initialization failed"}
+        {:error, Ysc.PaymentUserMessages.payment_setup_failed()}
     end
   end
 

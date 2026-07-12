@@ -3144,7 +3144,8 @@ defmodule YscWeb.ClearLakeBookingLive do
     do: "Please fill in all required fields."
 
   defp format_booking_error(:invalid_booking_mode),
-    do: "Invalid booking mode selected."
+    do:
+      "We couldn't book with the option you selected for these dates. Try different dates, or switch between Group booking and Reserve the whole cabin."
 
   defp format_booking_error(:membership_required),
     do: YscWeb.BookingUserMessages.membership_required_plain_message()

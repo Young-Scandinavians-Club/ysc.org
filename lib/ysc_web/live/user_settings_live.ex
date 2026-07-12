@@ -5018,24 +5018,8 @@ defmodule YscWeb.UserSettingsLive do
      )}
   end
 
-  @dialyzer {:nowarn_function, format_payment_error: 1}
-  defp format_payment_error(%Stripe.Error{code: code})
-       when code in [:card_declined, "card_declined"] do
-    "Your card was declined. Please try a different payment method or contact your bank."
-  end
-
-  defp format_payment_error(%Stripe.Error{message: message})
-       when is_binary(message) do
-    message
-  end
-
-  defp format_payment_error(error) when is_binary(error) do
-    if String.contains?(String.downcase(error), "declined") do
-      "Your card was declined. Please try a different payment method or contact your bank."
-    else
-      error
-    end
-  end
+  defp format_payment_error(error),
+    do: Ysc.PaymentUserMessages.format_stripe_error(error)
 
   defp invalidate_membership_cache(user) do
     MembershipCache.invalidate_user(user.id)
@@ -6061,18 +6045,11 @@ defmodule YscWeb.UserSettingsLive do
            )}
 
         {:error, error_message} when is_binary(error_message) ->
-          display_message =
-            if String.contains?(String.downcase(error_message), "declined") do
-              "Your card was declined. Please try a different payment method or contact your bank."
-            else
-              "Failed to retry payment: #{error_message}. Please update your payment method and try again."
-            end
-
           {:noreply,
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             display_message,
+             Ysc.PaymentUserMessages.invoice_retry_error(error_message),
              title: "Invoice"
            )}
 

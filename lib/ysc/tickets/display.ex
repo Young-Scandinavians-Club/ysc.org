@@ -108,4 +108,26 @@ defmodule Ysc.Tickets.Display do
 
   defp cancelled?(%{status: :cancelled}), do: true
   defp cancelled?(_), do: false
+
+  @doc """
+  Member-facing label for an individual ticket's status.
+  """
+  def ticket_status_label(:confirmed), do: "Ready to use"
+  def ticket_status_label(:pending), do: "Awaiting payment"
+  def ticket_status_label(:cancelled), do: "Cancelled"
+  def ticket_status_label(:expired), do: "Expired"
+
+  def ticket_status_label(status),
+    do: status |> to_string() |> String.capitalize()
+
+  @doc """
+  Member-facing label for a ticket order's status.
+  """
+  def order_status_label(:pending), do: "Payment needed"
+  def order_status_label(:completed), do: "Paid"
+  def order_status_label(:expired), do: "Reservation expired"
+  def order_status_label(:cancelled), do: "Cancelled"
+
+  def order_status_label(status),
+    do: status |> to_string() |> String.capitalize()
 end
