@@ -225,6 +225,34 @@ defmodule YscWeb.PostLiveTest do
 
       assert page_title(view) =~ "Amazing Article"
     end
+
+    test "emits Open Graph and Twitter Card tags with featured image", %{
+      conn: conn
+    } do
+      image = create_post_image()
+
+      post =
+        create_post(%{
+          title: "OG Article",
+          url_name: "og-article-#{System.unique_integer()}",
+          preview_text: "A short preview for social sharing.",
+          image_id: image.id
+        })
+
+      {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
+
+      assert html =~ ~s(property="og:title")
+      assert html =~ "OG Article"
+      assert html =~ ~s(property="og:description")
+      assert html =~ "A short preview for social sharing."
+      assert html =~ ~s(property="og:type" content="article")
+      assert html =~ ~s(property="og:image")
+      assert html =~ "/uploads/post_opt.jpg"
+      assert html =~ ~s(name="twitter:card" content="summary_large_image")
+      assert html =~ ~s(name="twitter:image")
+      assert html =~ ~s(rel="canonical")
+      assert html =~ "/posts/#{post.url_name}"
+    end
   end
 
   describe "post display" do
