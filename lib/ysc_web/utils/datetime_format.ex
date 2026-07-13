@@ -93,18 +93,12 @@ defmodule Ysc.Events.DateTimeFormatter do
 
   def format_event_start(start_date, start_time, opts) do
     separator = Keyword.get(opts, :separator, " at ")
-    default = Keyword.get(opts, :default, "Date TBD")
     time = event_start_time(start_time)
 
-    cond do
-      is_nil(start_date) ->
-        default
-
-      time ->
-        "#{format_date(start_date)}#{separator}#{format_time(time)}"
-
-      true ->
-        format_date(start_date)
+    if time do
+      "#{format_date(start_date)}#{separator}#{format_time(time)}"
+    else
+      format_date(start_date)
     end
   end
 
