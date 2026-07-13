@@ -139,6 +139,32 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert page_title(view) =~ "Annual Gala"
     end
 
+    test "emits Open Graph and Twitter Card tags with cover image", %{
+      conn: conn
+    } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "OG Event Night",
+            description: "Dance under the stars with the club."
+          }
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ ~s(property="og:title")
+      assert html =~ "OG Event Night"
+      assert html =~ ~s(property="og:description")
+      assert html =~ "Dance under the stars with the club."
+      assert html =~ ~s(property="og:image")
+      assert html =~ "/uploads/test_image_optimized.jpg"
+      assert html =~ ~s(name="twitter:card" content="summary_large_image")
+      assert html =~ ~s(name="twitter:image")
+      assert html =~ ~s(rel="canonical")
+      assert html =~ "/events/#{event.id}"
+    end
+
     test "loads upcoming event", %{conn: conn} do
       event =
         event_with_state(:upcoming,

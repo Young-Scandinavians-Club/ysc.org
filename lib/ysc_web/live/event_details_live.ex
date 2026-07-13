@@ -17,6 +17,7 @@ defmodule YscWeb.EventDetailsLive do
 
   alias Ysc.Agendas
   alias YscWeb.DateDisplay
+  alias YscWeb.SEO
 
   @impl true
   def render(assigns) do
@@ -3509,12 +3510,7 @@ defmodule YscWeb.EventDetailsLive do
     show_ticket_modal = socket.assigns.live_action == :tickets
 
     socket
-    |> assign(:page_title, event.title)
-    |> assign(
-      :meta_description,
-      event.description ||
-        "View event details and purchase tickets on Young Scandinavians Club."
-    )
+    |> SEO.assign_seo(SEO.assigns_for_event(event))
     |> assign(:event, event_with_pricing)
     # Async data - will be populated after connection
     |> assign(:agendas, [])
