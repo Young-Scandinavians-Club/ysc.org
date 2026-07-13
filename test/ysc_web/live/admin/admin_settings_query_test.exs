@@ -16,9 +16,10 @@ defmodule YscWeb.AdminSettingsQueryTest do
       %{conn: log_in_user(conn, admin), admin: admin}
     end
 
-    test "dead render does not query site_settings or google_photos_connections", %{
-      conn: conn
-    } do
+    test "dead render does not query site_settings or google_photos_connections",
+         %{
+           conn: conn
+         } do
       settings_pattern = ~r/FROM "site_settings"/i
       google_photos_pattern = ~r/FROM "google_photos_connections"/i
 
@@ -49,7 +50,9 @@ defmodule YscWeb.AdminSettingsQueryTest do
       refute html =~ ~s|id="admin-settings-form"|
     end
 
-    test "connected mount loads settings and google photos status once", %{conn: conn} do
+    test "connected mount loads settings and google photos status once", %{
+      conn: conn
+    } do
       settings_pattern = ~r/FROM "site_settings"/i
       google_photos_pattern = ~r/FROM "google_photos_connections"/i
 
@@ -63,7 +66,7 @@ defmodule YscWeb.AdminSettingsQueryTest do
           pattern: settings_pattern
         )
 
-      {{:ok, view, _html}, google_photos_count} =
+      {_result, google_photos_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, html} = live(conn, ~p"/admin/settings")
