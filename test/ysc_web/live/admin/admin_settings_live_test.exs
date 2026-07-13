@@ -27,6 +27,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
 
     test "shows connect when not connected", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      render_async(view)
       assert has_element?(view, "#google-photos-connect")
       refute has_element?(view, "#google-photos-disconnect")
     end
@@ -44,6 +45,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
       )
 
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      render_async(view)
 
       assert has_element?(view, "#google-photos-disconnect")
       assert has_element?(view, "#google-photos-test-connection")
@@ -66,7 +68,8 @@ defmodule YscWeb.AdminSettingsLiveTest do
         "photos@example.com"
       )
 
-      {:ok, _view, html} = live(conn, ~p"/admin/settings")
+      {:ok, view, _html} = live(conn, ~p"/admin/settings")
+      html = render_async(view)
 
       assert html =~ "Missing upload, read, or edit permissions"
       assert html =~ "Disconnect and connect again"
@@ -78,7 +81,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
       # Drain connected mount work before submitting. temporary_assigns clears
       # form/scopes after the dead render, so an immediate submit can post %{} and
       # raise FunctionClauseError in handle_event/3 under CI load.
-      html = render(view)
+      html = render_async(view)
       assert html =~ "Save"
       assert has_element?(view, "#admin-settings-form")
       assert has_element?(view, "input[name^='settings']")
