@@ -12,7 +12,8 @@ defmodule Ysc.Stripe.PaymentIntentHelpersTest do
         latest_charge: charge
       }
 
-      assert PaymentIntentHelpers.first_expanded_charge(payment_intent) == charge
+      assert PaymentIntentHelpers.first_expanded_charge(payment_intent) ==
+               charge
     end
 
     test "returns expanded charge map from latest_charge" do
@@ -44,7 +45,8 @@ defmodule Ysc.Stripe.PaymentIntentHelpersTest do
         charges: %Stripe.List{data: [charge]}
       }
 
-      assert PaymentIntentHelpers.first_expanded_charge(payment_intent) == charge
+      assert PaymentIntentHelpers.first_expanded_charge(payment_intent) ==
+               charge
     end
 
     test "reads legacy charges from plain maps" do
@@ -80,7 +82,9 @@ defmodule Ysc.Stripe.PaymentIntentHelpersTest do
       assert PaymentIntentHelpers.charge_id(%{latest_charge: %{id: "ch_atom"}}) ==
                "ch_atom"
 
-      assert PaymentIntentHelpers.charge_id(%{"latest_charge" => %{"id" => "ch_string"}}) ==
+      assert PaymentIntentHelpers.charge_id(%{
+               "latest_charge" => %{"id" => "ch_string"}
+             }) ==
                "ch_string"
     end
 
@@ -100,7 +104,9 @@ defmodule Ysc.Stripe.PaymentIntentHelpersTest do
     end
 
     test "returns nil when no charge is available" do
-      assert PaymentIntentHelpers.charge_id(%Stripe.PaymentIntent{id: "pi_empty"}) ==
+      assert PaymentIntentHelpers.charge_id(%Stripe.PaymentIntent{
+               id: "pi_empty"
+             }) ==
                nil
 
       assert PaymentIntentHelpers.charge_id(nil) == nil

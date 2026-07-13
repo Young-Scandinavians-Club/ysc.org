@@ -398,9 +398,10 @@ defmodule Ysc.Tickets.StripeServiceTest do
                StripeService.process_successful_payment(payment_intent)
     end
 
-    test "returns error when payment intent user_id does not match order owner", %{
-      ticket_order: ticket_order
-    } do
+    test "returns error when payment intent user_id does not match order owner",
+         %{
+           ticket_order: ticket_order
+         } do
       other_user = user_fixture()
 
       payment_intent =
