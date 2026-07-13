@@ -106,6 +106,8 @@ defmodule Ysc.Tickets.DisplayTest do
     test "uses member-friendly labels instead of raw enum values" do
       assert Display.ticket_status_label(:confirmed) == "Ready to use"
       assert Display.ticket_status_label(:pending) == "Awaiting payment"
+      assert Display.ticket_status_label(:cancelled) == "Cancelled"
+      assert Display.ticket_status_label(:expired) == "Expired"
       refute Display.ticket_status_label(:confirmed) == "Confirmed"
     end
   end
@@ -114,6 +116,8 @@ defmodule Ysc.Tickets.DisplayTest do
     test "matches ticket order vocabulary used on My Tickets" do
       assert Display.order_status_label(:completed) == "Paid"
       assert Display.order_status_label(:pending) == "Payment needed"
+      assert Display.order_status_label(:expired) == "Reservation expired"
+      assert Display.order_status_label(:cancelled) == "Cancelled"
     end
   end
 

@@ -10,8 +10,14 @@ defmodule YscWeb.AdminSettingsQueryTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  alias Ysc.Settings
+
   describe "deferred settings loading" do
     setup %{conn: conn} do
+      # Prime site_settings cache so mount_site_settings social URL lookups do not
+      # hit the DB during the dead-render query-count assertions below.
+      Settings.warm_cache()
+
       admin = user_fixture(%{role: "admin"})
       %{conn: log_in_user(conn, admin), admin: admin}
     end
