@@ -18,7 +18,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     ]
 
   alias Ysc.Repo
-  alias Ysc.Bookings.PropertyDisplay
+  alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay}
 
   def get_template_name() do
     "booking_confirmation"
@@ -84,8 +84,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     property_name = PropertyDisplay.short_name(booking.property)
 
     # Get booking mode description
-    booking_mode_description =
-      get_booking_mode_description(booking.booking_mode)
+    booking_mode_description = BookingModeDisplay.label(booking.booking_mode)
 
     # Get room names if applicable
     room_names =
@@ -99,10 +98,7 @@ defmodule YscWeb.Emails.BookingConfirmation do
     nights = Date.diff(booking.checkout_date, booking.checkin_date)
 
     # Check if this is a buyout booking
-    # Use both boolean and string check for robustness across JSON serialization
-    is_buyout =
-      booking.booking_mode == :buyout ||
-        booking_mode_description == "Entire cabin"
+    is_buyout = BookingModeDisplay.buyout?(booking.booking_mode)
 
     %{
       first_name: member_greeting_name(booking.user),
@@ -124,13 +120,4 @@ defmodule YscWeb.Emails.BookingConfirmation do
       booking_url: booking_url(booking.id)
     }
   end
-
-  defp get_booking_mode_description(:room), do: "Room Booking"
-  defp get_booking_mode_description(:day), do: "Day Booking"
-  defp get_booking_mode_description(:buyout), do: "Entire cabin"
-
-  defp get_booking_mode_description(mode) when is_atom(mode),
-    do: String.capitalize(to_string(mode))
-
-  defp get_booking_mode_description(mode), do: to_string(mode)
 end

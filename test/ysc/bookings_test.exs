@@ -70,6 +70,8 @@ defmodule Ysc.BookingsTest do
           property: :tahoe
         })
 
+      Ysc.Bookings.SeasonCache.invalidate()
+
       seasons = Bookings.list_seasons(:tahoe)
       assert Enum.any?(seasons, &(&1.id == season.id))
     end
