@@ -156,5 +156,4 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       booking_url: booking_url(booking.id)
     }
   end
-
 end

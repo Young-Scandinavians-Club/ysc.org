@@ -120,5 +120,4 @@ defmodule YscWeb.Emails.BookingConfirmation do
       booking_url: booking_url(booking.id)
     }
   end
-
 end
