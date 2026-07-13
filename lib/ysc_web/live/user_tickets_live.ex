@@ -501,6 +501,10 @@ defmodule YscWeb.UserTicketsLive do
   defp cancel_order_error_message(:not_found),
     do: "We couldn't find this order. It may have already been cancelled."
 
+  defp cancel_order_error_message(:checkout_payment_in_progress),
+    do:
+      "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation."
+
   defp cancel_order_error_message(_reason),
     do:
       "We couldn't cancel this order. Please try again, or contact info@ysc.org for help."
