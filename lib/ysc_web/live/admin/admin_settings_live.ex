@@ -108,7 +108,10 @@ defmodule YscWeb.AdminSettingsLive do
             <.skeleton_block class="h-4 w-64 rounded" />
             <.skeleton_block class="h-10 w-48 rounded" />
           </div>
-          <div :if={!@loading_settings?} class="bg-white shadow rounded-lg p-4 space-y-4">
+          <div
+            :if={!@loading_settings?}
+            class="bg-white shadow rounded-lg p-4 space-y-4"
+          >
             <%= if !@google_photos_status.oauth_configured do %>
               <p class="text-sm text-zinc-600">
                 Set
@@ -615,7 +618,10 @@ defmodule YscWeb.AdminSettingsLive do
      |> assign(:scopes, data.scopes)
      |> assign(:form, data.form)
      |> assign(:google_photos_status, google_photos_status)
-     |> assign(:google_photos_scopes_preview, scopes_preview(google_photos_status.scopes))}
+     |> assign(
+       :google_photos_scopes_preview,
+       scopes_preview(google_photos_status.scopes)
+     )}
   end
 
   def handle_async(:load_settings_data, {:exit, reason}, socket) do
@@ -624,8 +630,13 @@ defmodule YscWeb.AdminSettingsLive do
     {:noreply,
      socket
      |> assign(:loading_settings?, false)
-     |> assign(:google_photos_status, %{oauth_configured: false, connected: false})
-     |> YscWeb.Flash.put_toast(:error, "Failed to load settings", title: "Settings")}
+     |> assign(:google_photos_status, %{
+       oauth_configured: false,
+       connected: false
+     })
+     |> YscWeb.Flash.put_toast(:error, "Failed to load settings",
+       title: "Settings"
+     )}
   end
 
   @impl true
