@@ -46,12 +46,12 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/users/settings")
-      html = render(view)
+      email_form_html = view |> element("#email_form") |> render()
 
       # Should show email field but not current_password field
       assert has_element?(view, "#email_form")
-      refute html =~ "Current password"
-      assert html =~ "you'll need to sign in again"
+      refute email_form_html =~ "Current password"
+      assert email_form_html =~ "you'll need to sign in again"
     end
 
     test "validates email format before showing re-auth modal", %{conn: conn} do
