@@ -28,7 +28,28 @@ defmodule YscWeb.AdminSettingsLive do
       </div>
 
       <div class="w-full">
-        <div id="admin-settings" class="max-w-screen-md">
+        <div
+          :if={@loading_settings?}
+          id="admin-settings-loading"
+          class="max-w-screen-md space-y-6 animate-pulse"
+        >
+          <%= for _i <- 1..2 do %>
+            <div class="space-y-3">
+              <.skeleton_block class="h-6 w-32 rounded" />
+              <div class="space-y-4">
+                <%= for _j <- 1..3 do %>
+                  <div class="space-y-2">
+                    <.skeleton_block class="h-4 w-40 rounded" />
+                    <.skeleton_block class="h-10 w-full rounded" />
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+          <.skeleton_block class="h-10 w-24 rounded" />
+        </div>
+
+        <div :if={!@loading_settings?} id="admin-settings" class="max-w-screen-md">
           <.form for={@form} id="admin-settings-form" phx-submit="update-settings">
             <div :for={scope <- @scopes}>
               <h2 class="text-lg leading-8 font-semibold text-zinc-800">
@@ -80,7 +101,17 @@ defmodule YscWeb.AdminSettingsLive do
           <h2 class="text-lg leading-8 font-semibold text-zinc-800 mb-3">
             Google Photos
           </h2>
-          <div class="bg-white shadow rounded-lg p-4 space-y-4">
+          <div
+            :if={@loading_settings?}
+            class="bg-white shadow rounded-lg p-4 space-y-4 animate-pulse"
+          >
+            <.skeleton_block class="h-4 w-64 rounded" />
+            <.skeleton_block class="h-10 w-48 rounded" />
+          </div>
+          <div
+            :if={!@loading_settings?}
+            class="bg-white shadow rounded-lg p-4 space-y-4"
+          >
             <%= if !@google_photos_status.oauth_configured do %>
               <p class="text-sm text-zinc-600">
                 Set
@@ -524,35 +555,39 @@ defmodule YscWeb.AdminSettingsLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    scopes = Settings.setting_scopes()
-    all_settings = Settings.settings_grouped_by_scope()
-
-    form = to_form(all_settings, as: "settings")
-
-    google_photos_status = GooglePhotos.connection_status()
-
     socket =
       socket
       |> assign(:page_title, "Admin Settings")
       |> assign(:active_page, :admin_settings)
-      |> assign(:google_photos_status, google_photos_status)
-      |> assign(
-        :google_photos_scopes_preview,
-        scopes_preview(google_photos_status.scopes)
-      )
-      |> assign(:grouped_settings, all_settings)
-      |> assign(:scopes, scopes)
+      |> assign(:loading_settings?, true)
+      |> assign(:google_photos_status, nil)
+      |> assign(:google_photos_scopes_preview, nil)
+      |> assign(:grouped_settings, %{})
+      |> assign(:scopes, [])
       |> assign(:recent_jobs, [])
       |> assign(:queue_stats, %{})
       |> assign(:oban_data_loaded, false)
       |> assign(:selected_job, nil)
       |> assign(:show_job_modal, false)
-      |> assign(form: form)
+      |> assign(:form, nil)
       |> then(fn s ->
         if connected?(s) do
           Oban.Notifier.listen([:insert, :gossip])
 
-          start_async(s, :load_oban_data, fn ->
+          s
+          |> start_async(:load_settings_data, fn ->
+            all_settings = Settings.settings_grouped_by_scope()
+            scopes = Settings.setting_scopes()
+            google_photos_status = GooglePhotos.connection_status()
+
+            %{
+              grouped_settings: all_settings,
+              scopes: scopes,
+              form: to_form(all_settings, as: "settings"),
+              google_photos_status: google_photos_status
+            }
+          end)
+          |> start_async(:load_oban_data, fn ->
             %{
               recent_jobs: list_recent_jobs(limit: 50),
               queue_stats: get_queue_stats()
@@ -570,6 +605,38 @@ defmodule YscWeb.AdminSettingsLive do
        form: nil,
        recent_jobs: []
      ]}
+  end
+
+  @impl true
+  def handle_async(:load_settings_data, {:ok, data}, socket) do
+    google_photos_status = data.google_photos_status
+
+    {:noreply,
+     socket
+     |> assign(:loading_settings?, false)
+     |> assign(:grouped_settings, data.grouped_settings)
+     |> assign(:scopes, data.scopes)
+     |> assign(:form, data.form)
+     |> assign(:google_photos_status, google_photos_status)
+     |> assign(
+       :google_photos_scopes_preview,
+       scopes_preview(google_photos_status.scopes)
+     )}
+  end
+
+  def handle_async(:load_settings_data, {:exit, reason}, socket) do
+    Ysc.Logging.warning("Failed to load admin settings async", error: reason)
+
+    {:noreply,
+     socket
+     |> assign(:loading_settings?, false)
+     |> assign(:google_photos_status, %{
+       oauth_configured: false,
+       connected: false
+     })
+     |> YscWeb.Flash.put_toast(:error, "Failed to load settings",
+       title: "Settings"
+     )}
   end
 
   @impl true
