@@ -8,6 +8,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
 
   import YscWeb.CoreComponents
 
+  alias Ysc.Events.DateTimeFormatter
   alias Ysc.Media.Image
 
   attr :event, :map, required: true
@@ -69,7 +70,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
         <div class="max-w-[1400px]">
           <div class="flex flex-wrap items-center gap-4 mb-6">
             <span class="text-lg font-black px-4 py-2 rounded bg-white/15 backdrop-blur-sm uppercase tracking-[0.2em]">
-              {format_event_date_time(@event)}
+              {DateTimeFormatter.format_event_start(@event, separator: " · ")}
             </span>
             <span
               :if={@event.location_name}
@@ -116,28 +117,6 @@ defmodule YscWeb.Components.Events.EventTvPoster do
   defp cancelled?(event) do
     Map.get(event, :state) in [:cancelled, "cancelled"]
   end
-
-  defp format_event_date_time(event) do
-    start_date = Map.get(event, :start_date)
-    start_time = Map.get(event, :start_time)
-
-    cond do
-      start_date && start_time ->
-        date_str = Calendar.strftime(start_date, "%b %-d, %Y")
-        time_str = Calendar.strftime(event_time(start_time), "%-I:%M %p")
-        "#{date_str} · #{time_str}"
-
-      start_date ->
-        Calendar.strftime(start_date, "%b %-d, %Y")
-
-      true ->
-        "Date TBD"
-    end
-  end
-
-  defp event_time(%Time{} = time), do: time
-  defp event_time(%NaiveDateTime{} = dt), do: NaiveDateTime.to_time(dt)
-  defp event_time(%DateTime{} = dt), do: DateTime.to_time(dt)
 
   defp event_image_url(nil), do: "/images/ysc_logo.webp"
 
