@@ -51,4 +51,40 @@ defmodule Ysc.PaymentUserMessagesTest do
     assert PaymentUserMessages.invoice_retry_error("No such customer") =~
              "Membership settings"
   end
+
+  test "format_stripe_error maps specific Stripe error codes to member-friendly copy" do
+    assert PaymentUserMessages.format_stripe_error(%Stripe.Error{
+             code: "expired_card",
+             message: "Your card has expired.",
+             source: :api
+           }) =~ "expired"
+
+    assert PaymentUserMessages.format_stripe_error(%Stripe.Error{
+             code: "incorrect_cvc",
+             message: "Your card's security code is incorrect.",
+             source: :api
+           }) =~ "security code"
+
+    assert PaymentUserMessages.format_stripe_error(%Stripe.Error{
+             code: "processing_error",
+             message: "An error occurred while processing your card.",
+             source: :api
+           }) =~ "bank"
+  end
+
+  test "format_stripe_error infers guidance from raw message substrings" do
+    assert PaymentUserMessages.format_stripe_error("Card expired last month") =~
+             "expired"
+
+    assert PaymentUserMessages.format_stripe_error("Incorrect security code") =~
+             "security code"
+  end
+
+  test "generic_payment_failed includes contact email and avoids Stripe jargon" do
+    message = PaymentUserMessages.generic_payment_failed()
+
+    assert message =~ "couldn't process your payment"
+    assert message =~ "info@ysc.org"
+    refute message =~ "payment_intent"
+  end
 end

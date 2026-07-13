@@ -397,6 +397,25 @@ defmodule Ysc.Tickets.StripeServiceTest do
       assert {:error, :payment_not_succeeded} =
                StripeService.process_successful_payment(payment_intent)
     end
+
+    test "returns error when payment intent user_id does not match order owner", %{
+      ticket_order: ticket_order
+    } do
+      other_user = user_fixture()
+
+      payment_intent =
+        payment_intent_for_order(ticket_order,
+          metadata: %{
+            "ticket_order_id" => ticket_order.id,
+            "user_id" => other_user.id
+          }
+        )
+
+      deny(Ysc.StripeMock, :retrieve_payment_intent, 2)
+
+      assert {:error, :payment_metadata_mismatch} =
+               StripeService.process_successful_payment(payment_intent)
+    end
   end
 
   describe "handle_failed_payment/2" do
