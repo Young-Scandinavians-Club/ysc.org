@@ -45,7 +45,8 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      {:ok, view, html} = live(conn, ~p"/users/settings")
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      html = render(view)
 
       # Should show email field but not current_password field
       assert has_element?(view, "#email_form")
