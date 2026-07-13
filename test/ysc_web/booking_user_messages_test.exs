@@ -62,6 +62,12 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.checkout_payment_step_pay() =~ "payment details"
 
+    assert BookingUserMessages.checkout_payment_step_confirm_complimentary() =~
+             "Confirm booking"
+
+    refute BookingUserMessages.checkout_payment_step_confirm_complimentary() =~
+             "reservation"
+
     assert BookingUserMessages.checkout_confirmation_email_step() =~
              "confirmation email"
 

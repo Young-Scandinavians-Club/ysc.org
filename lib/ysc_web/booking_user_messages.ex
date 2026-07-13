@@ -97,7 +97,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_payment_step_confirm_complimentary do
-    "Review the booking details and confirm your reservation"
+    "Review the booking details below, then click Confirm booking to secure these dates"
   end
 
   def checkout_confirmation_email_step do
