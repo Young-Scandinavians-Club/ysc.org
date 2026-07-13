@@ -51,7 +51,7 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       # Should show email field but not current_password field
       assert has_element?(view, "#email_form")
       refute email_form_html =~ "Current password"
-      assert email_form_html =~ "you'll need to sign in again"
+      assert email_form_html =~ "need to sign in again before we change your email"
     end
 
     test "validates email format before showing re-auth modal", %{conn: conn} do
