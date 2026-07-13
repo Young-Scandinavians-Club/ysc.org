@@ -434,9 +434,33 @@ defmodule Ysc.Tickets do
 
   Only transitions orders in `from_statuses` (default `[:pending]`). Pass
   `from_statuses: [:completed]` when voiding tickets after an admin refund.
+
+  Pending checkout orders with in-flight Stripe payments are not cancelled so a
+  concurrent user cancel cannot race a processing or 3DS payment into a charge
+  without ticket fulfillment.
   """
   def cancel_ticket_order(ticket_order, reason \\ "User cancelled", opts \\ []) do
     from_statuses = Keyword.get(opts, :from_statuses, [:pending])
+
+    if from_statuses == [:pending] and
+         CheckoutCancel.checkout_payment_in_flight?(ticket_order,
+           context: Keyword.get(opts, :context, "cancel_ticket_order")
+         ) do
+      require Ysc.Logging
+
+      Ysc.Logging.info(
+        "Skipped ticket order cancellation while checkout payment is in flight",
+        ticket_order_id: ticket_order.id,
+        payment_intent_id: ticket_order.payment_intent_id
+      )
+
+      {:error, :checkout_payment_in_progress}
+    else
+      do_cancel_ticket_order(ticket_order, reason, from_statuses)
+    end
+  end
+
+  defp do_cancel_ticket_order(ticket_order, reason, from_statuses) do
     now = DateTime.utc_now()
     ticket_statuses = ticket_cancel_statuses(from_statuses)
 
