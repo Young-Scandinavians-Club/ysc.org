@@ -474,7 +474,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 No payment is required. Your total after discounts is {MoneyHelper.format_money!(
                   @total_price
                 )}.
-                Click below to confirm your reservation.
+                Click below to confirm your booking and secure these dates.
               </p>
               <div class="pt-2 border-t border-zinc-100 space-y-4">
                 <div class="flex flex-col sm:flex-row gap-4">

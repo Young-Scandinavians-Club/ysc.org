@@ -825,7 +825,7 @@ defmodule YscWeb.UserSettingsLive do
                   required
                 />
                 <p class="text-sm text-zinc-600 -mt-2">
-                  You will be asked to verify your identity before changing your email address.
+                  For security, you'll need to sign in again before we change your email.
                 </p>
                 <:actions>
                   <.button phx-disable-with="Continuing...">Change Email</.button>
