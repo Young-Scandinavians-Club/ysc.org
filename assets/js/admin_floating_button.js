@@ -1,13 +1,13 @@
 const STORAGE_KEY = "ysc_admin_button_corner";
 const DRAG_THRESHOLD_PX = 5;
 const BASE_CLASSES =
-  "fixed z-[60] group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
+  "fixed z-[110] group print:hidden cursor-grab active:cursor-grabbing transition-[left,right,top,bottom] duration-300 ease-out";
 
 const CORNER_CLASSES = {
-  "top-left": "top-4 left-4",
-  "top-right": "top-4 right-4",
-  "bottom-left": "bottom-4 left-4",
-  "bottom-right": "bottom-4 right-4",
+  "top-left": "admin-floating-top-left",
+  "top-right": "admin-floating-top-right",
+  "bottom-left": "admin-floating-bottom-left",
+  "bottom-right": "admin-floating-bottom-right",
 };
 
 const VALID_CORNERS = Object.keys(CORNER_CLASSES);

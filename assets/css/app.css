@@ -155,6 +155,35 @@ html {
 }
 
 
+/* Admin floating button — top corners sit below the sticky navbar */
+
+#admin-floating-button-wrap.admin-floating-top-left {
+    top: calc(var(--nav-height) + 1rem);
+    left: 1rem;
+}
+
+#admin-floating-button-wrap.admin-floating-top-right {
+    top: calc(var(--nav-height) + 1rem);
+    right: 1rem;
+}
+
+#admin-floating-button-wrap.admin-floating-bottom-left {
+    bottom: 1rem;
+    left: 1rem;
+}
+
+#admin-floating-button-wrap.admin-floating-bottom-right {
+    bottom: 1rem;
+    right: 1rem;
+}
+
+/* Fullscreen layouts omit the navbar */
+body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-left,
+body:not(:has(#rootNavbar)) #admin-floating-button-wrap.admin-floating-top-right {
+    top: 1rem;
+}
+
+
 /* =============================================
    STICKY NAVBAR
    ============================================= */
