@@ -15,6 +15,57 @@
       name="description"
       content={assigns[:meta_description]}
     />
+    <%!-- Open Graph / Twitter Card — used as link previews on external sites --%>
+    <meta property="og:site_name" content="Young Scandinavians Club" />
+    <meta property="og:locale" content="en_US" />
+    <meta
+      property="og:type"
+      content={assigns[:og_type] || "website"}
+    />
+    <meta
+      property="og:title"
+      content={assigns[:page_title] || "YSC"}
+    />
+    <meta
+      :if={assigns[:meta_description]}
+      property="og:description"
+      content={assigns[:meta_description]}
+    />
+    <meta
+      :if={assigns[:og_url]}
+      property="og:url"
+      content={assigns[:og_url]}
+    />
+    <meta
+      :if={assigns[:og_image]}
+      property="og:image"
+      content={assigns[:og_image]}
+    />
+    <meta
+      name="twitter:card"
+      content={
+        if(assigns[:og_image], do: "summary_large_image", else: "summary")
+      }
+    />
+    <meta
+      name="twitter:title"
+      content={assigns[:page_title] || "YSC"}
+    />
+    <meta
+      :if={assigns[:meta_description]}
+      name="twitter:description"
+      content={assigns[:meta_description]}
+    />
+    <meta
+      :if={assigns[:og_image]}
+      name="twitter:image"
+      content={assigns[:og_image]}
+    />
+    <link
+      :if={assigns[:canonical_url]}
+      rel="canonical"
+      href={assigns[:canonical_url]}
+    />
     <link rel="manifest" href="/site.webmanifest" />
     <link
       rel="icon"
@@ -126,7 +177,7 @@
         id="admin-floating-button-wrap"
         phx-hook="AdminFloatingButton"
         phx-update="ignore"
-        class="fixed bottom-4 left-4 z-[110] group print:hidden"
+        class="fixed z-[110] admin-floating-bottom-left group print:hidden"
       >
         <.link
           navigate={~p"/admin"}

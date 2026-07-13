@@ -1255,13 +1255,12 @@ defmodule YscWeb.HomeLive do
 
       <%!-- Dashboard Content --%>
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6 -mt-8 pb-20">
-        <%!-- Flex container for mobile reordering: dynamic content first on mobile, launcher grid first on desktop --%>
         <div class="flex flex-col">
-          <%!-- App Launcher Grid - Order 2 on mobile, Order 1 on lg+ --%>
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0 order-2 lg:order-1">
+          <%!-- Quick Actions --%>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0">
             <.link
               navigate={~p"/bookings/tahoe"}
-              class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
               <div class="w-10 h-10 bg-blue-50 rounded-md flex items-center justify-center mb-4">
                 <.icon name="hero-home" class="w-5 h-5 text-blue-600" />
@@ -1271,7 +1270,7 @@ defmodule YscWeb.HomeLive do
             </.link>
             <.link
               navigate={~p"/bookings/clear-lake"}
-              class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
               <div class="w-10 h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-4">
                 <.icon name="hero-home" class="w-5 h-5 text-emerald-600" />
@@ -1281,7 +1280,7 @@ defmodule YscWeb.HomeLive do
             </.link>
             <.link
               navigate={~p"/users/settings"}
-              class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
               <div class="w-10 h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-4">
                 <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-zinc-600" />
@@ -1292,7 +1291,7 @@ defmodule YscWeb.HomeLive do
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
                 navigate={~p"/expensereport"}
-                class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+                class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
                 <div class="w-10 h-10 bg-orange-50 rounded-md flex items-center justify-center mb-4">
                   <.icon name="hero-receipt-refund" class="w-5 h-5 text-orange-600" />
@@ -1303,7 +1302,7 @@ defmodule YscWeb.HomeLive do
             <% else %>
               <.link
                 navigate={~p"/events"}
-                class="bg-white p-6 rounded-xl border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:transition-none transition-all duration-150 group"
+                class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
                 <div class="w-10 h-10 bg-purple-50 rounded-md flex items-center justify-center mb-4">
                   <.icon name="hero-calendar-days" class="w-5 h-5 text-purple-600" />
@@ -1314,8 +1313,8 @@ defmodule YscWeb.HomeLive do
             <% end %>
           </div>
 
-          <%!-- Main Content Grid - Order 1 on mobile, Order 2 on lg+ --%>
-          <div class="grid lg:grid-cols-3 gap-12 order-1 lg:order-2">
+          <%!-- Main Content Grid --%>
+          <div class="grid lg:grid-cols-3 gap-12">
             <div class="lg:col-span-2 space-y-12">
               <%!-- Your Itinerary Section --%>
               <section>
@@ -1619,27 +1618,23 @@ defmodule YscWeb.HomeLive do
             <aside class="space-y-10">
               <%!-- Membership Status Card --%>
               <div class={[
-                "relative overflow-hidden rounded-xl p-8 text-white shadow-sm",
+                "relative overflow-hidden rounded-xl p-8 shadow-sm",
                 cond do
                   @active_membership? ->
-                    "bg-zinc-900"
+                    "bg-gradient-to-br from-blue-50 via-white to-blue-50/80 border border-blue-200 text-zinc-900"
 
                   @current_user.state == :pending_approval ->
-                    "bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950"
+                    "bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950 text-white"
 
                   true ->
-                    "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900"
+                    "bg-gradient-to-br from-amber-900 via-orange-900 to-red-900 text-white"
                 end
               ]}>
-                <div class="absolute inset-0 z-0 opacity-40">
+                <div
+                  :if={!@active_membership?}
+                  class="absolute inset-0 z-0 opacity-40"
+                >
                   <%= cond do %>
-                    <% @active_membership? -> %>
-                      <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-blue-500 blur-[80px]">
-                      </div>
-                      <div class="absolute top-[20%] -right-[10%] h-[70%] w-[70%] rounded-full bg-blue-600 blur-[80px]">
-                      </div>
-                      <div class="absolute -bottom-[20%] left-[20%] h-[60%] w-[60%] rounded-full bg-indigo-800 blur-[80px]">
-                      </div>
                     <% @current_user.state == :pending_approval -> %>
                       <div class="absolute -top-[20%] -left-[10%] h-[80%] w-[80%] rounded-full bg-sky-500 blur-[80px]">
                       </div>
@@ -1658,7 +1653,13 @@ defmodule YscWeb.HomeLive do
                 </div>
 
                 <div class="relative z-10">
-                  <div class="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md backdrop-blur-md bg-white/10">
+                  <div class={[
+                    "mb-4 inline-flex h-10 w-10 items-center justify-center rounded-md",
+                    if(@active_membership?,
+                      do: "bg-blue-50",
+                      else: "backdrop-blur-md bg-white/10"
+                    )
+                  ]}>
                     <.icon
                       name={
                         if @current_user.state == :pending_approval,
@@ -1668,7 +1669,7 @@ defmodule YscWeb.HomeLive do
                       class={[
                         "w-6 h-6",
                         cond do
-                          @active_membership? -> "text-blue-400"
+                          @active_membership? -> "text-blue-600"
                           @current_user.state == :pending_approval -> "text-sky-300"
                           true -> "text-amber-300"
                         end
@@ -1689,7 +1690,7 @@ defmodule YscWeb.HomeLive do
                   <p class={[
                     "text-base leading-relaxed mb-8",
                     cond do
-                      @active_membership? -> "text-zinc-300"
+                      @active_membership? -> "text-zinc-600"
                       @current_user.state == :pending_approval -> "text-sky-100"
                       true -> "text-amber-100 font-semibold"
                     end
@@ -1730,7 +1731,7 @@ defmodule YscWeb.HomeLive do
                         class={[
                           "flex w-full items-center justify-center rounded px-6 py-4 text-sm font-semibold leading-6 transition duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 active:scale-[0.98] active:transition-none",
                           if(@active_membership?,
-                            do: "bg-white text-zinc-900 hover:bg-blue-50",
+                            do: "bg-blue-700 text-white hover:bg-blue-800",
                             else:
                               "bg-white text-amber-900 hover:bg-amber-50 shadow-lg animate-pulse"
                           )
@@ -1752,16 +1753,24 @@ defmodule YscWeb.HomeLive do
                     :if={@active_membership?}
                     id="home-membership-qr-button"
                     type="button"
+                    variant="outline"
+                    color="blue"
                     phx-click="show_membership_qr"
                     loading_text="Opening..."
-                    class="flex w-full mt-3 px-6 py-3 min-h-[48px] !bg-white/10 !text-white hover:!bg-white/20 backdrop-blur-md border border-white/20 focus-visible:!ring-2 focus-visible:!ring-white/50 focus-visible:!ring-offset-2"
+                    class="flex w-full mt-3"
                   >
                     <.icon name="hero-qr-code" class="w-5 h-5 shrink-0" />
                     My Membership QR
                   </.button>
                 </div>
 
-                <div class="absolute right-[-10%] bottom-[-10%] z-0 opacity-10 rotate-12">
+                <div class={[
+                  "absolute right-[-10%] bottom-[-10%] z-0 rotate-12",
+                  if(@active_membership?,
+                    do: "opacity-20 text-blue-200",
+                    else: "opacity-10"
+                  )
+                ]}>
                   <.icon name="hero-identification" class="w-40 h-40" />
                 </div>
               </div>

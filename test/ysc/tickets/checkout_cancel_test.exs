@@ -312,4 +312,79 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
   end
+
+  describe "cancel_ticket_order/2 payment guards" do
+    test "rejects cancellation when payment intent is processing" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_processing_cancel_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.cancel_ticket_order(order, "User cancelled")
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "rejects cancellation when payment intent requires action" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_requires_action_cancel_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_action", payment_intent_id)}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.cancel_ticket_order(order, "User cancelled")
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+
+    test "allows cancellation when payment intent is cancellable" do
+      order = ticket_order_fixture()
+      payment_intent_id = "pi_cancellable_cancel_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+        {:ok, payment_intent("requires_payment_method", payment_intent_id)}
+      end)
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(order, "User cancelled")
+
+      assert cancelled.status == :cancelled
+    end
+
+    test "still cancels completed orders after refund without payment guard" do
+      order = ticket_order_fixture()
+
+      {:ok, completed} =
+        order
+        |> Ecto.Changeset.change(%{status: :completed})
+        |> Ysc.Repo.update!()
+        |> then(&{:ok, &1})
+
+      assert {:ok, cancelled} =
+               Tickets.cancel_ticket_order(
+                 completed,
+                 "Refund processed - tickets released",
+                 from_statuses: [:completed]
+               )
+
+      assert cancelled.status == :cancelled
+    end
+  end
 end
