@@ -107,7 +107,6 @@ defmodule Ysc.TicketsTest do
     end
 
     test "returns error when event capacity exceeded", %{
-      user: user,
       event: event
     } do
       # Use a small-capacity tier so we only need a few tickets (avoids reference_id collisions)
@@ -120,17 +119,53 @@ defmodule Ysc.TicketsTest do
           event_id: event.id
         })
 
-      # Fill up the tier to capacity
+      # Fill up the tier to capacity (one pending order per member)
       Enum.each(1..3, fn _i ->
+        user =
+          user_fixture_unique()
+          |> Ecto.Changeset.change(
+            lifetime_membership_awarded_at:
+              DateTime.truncate(DateTime.utc_now(), :second)
+          )
+          |> Ysc.Repo.update!()
+
         {:ok, _order} =
           Tickets.create_ticket_order(user.id, event.id, %{small_tier.id => 1})
       end)
 
+      fourth_user =
+        user_fixture_unique()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
       # Try to create one more order (will fail with tier validation error)
       assert {:error, :tier_validation_failed} =
-               Tickets.create_ticket_order(user.id, event.id, %{
+               Tickets.create_ticket_order(fourth_user.id, event.id, %{
                  small_tier.id => 1
                })
+    end
+
+    test "supersedes a safe pending checkout when starting a new order", %{
+      user: user,
+      event: event,
+      tier1: tier1
+    } do
+      assert {:ok, first_order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 1})
+
+      assert {:ok, second_order} =
+               Tickets.create_ticket_order(user.id, event.id, %{tier1.id => 2})
+
+      assert second_order.id != first_order.id
+      assert Ysc.Repo.get!(TicketOrder, first_order.id).status == :cancelled
+
+      assert Ysc.Repo.get!(TicketOrder, second_order.id).status in [
+               :pending,
+               :expired
+             ]
     end
 
     test "returns error when event is cancelled", %{

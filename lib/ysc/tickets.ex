@@ -50,6 +50,7 @@ defmodule Ysc.Tickets do
   - `{:error, :event_capacity_exceeded}` if event's global max_attendees limit would be exceeded
   - `{:error, :event_not_available}` if event is not available for purchase
   - `{:error, :membership_required}` if user doesn't have active membership
+  - `{:error, :checkout_payment_in_progress}` when another pending checkout has in-flight payment
   """
   def create_ticket_order(user_id, event_id, ticket_selections) do
     require Ysc.Logging
@@ -62,36 +63,36 @@ defmodule Ysc.Tickets do
 
     case validate_user_membership(user_id) do
       {:ok, _} ->
-        # Note: Ticket bookings don't update tiers/events, so optimistic locking isn't used here
-        # Capacity is checked by counting existing tickets within the transaction
-        case BookingLocker.atomic_booking(user_id, event_id, ticket_selections) do
-          {:ok, ticket_order} ->
-            # Emit telemetry event for ticket order creation
-            ticket_count =
-              if Ecto.assoc_loaded?(ticket_order.tickets) do
-                length(ticket_order.tickets)
-              else
-                0
-              end
+        with :ok <- prepare_new_checkout_session(user_id, event_id),
+             {:ok, ticket_order} <-
+               BookingLocker.atomic_booking(
+                 user_id,
+                 event_id,
+                 ticket_selections
+               ) do
+          # Emit telemetry event for ticket order creation
+          ticket_count =
+            if Ecto.assoc_loaded?(ticket_order.tickets) do
+              length(ticket_order.tickets)
+            else
+              0
+            end
 
-            :telemetry.execute(
-              [:ysc, :tickets, :order_created],
-              %{count: 1},
-              %{
-                ticket_order_id: ticket_order.id,
-                event_id: event_id,
-                user_id: user_id,
-                total_amount: Money.to_decimal(ticket_order.total_amount),
-                ticket_count: ticket_count
-              }
-            )
+          :telemetry.execute(
+            [:ysc, :tickets, :order_created],
+            %{count: 1},
+            %{
+              ticket_order_id: ticket_order.id,
+              event_id: event_id,
+              user_id: user_id,
+              total_amount: Money.to_decimal(ticket_order.total_amount),
+              ticket_count: ticket_count
+            }
+          )
 
-            # Broadcast ticket availability update to all users viewing this event
-            broadcast_ticket_availability_update(event_id)
-            {:ok, ticket_order}
-
-          error ->
-            error
+          # Broadcast ticket availability update to all users viewing this event
+          broadcast_ticket_availability_update(event_id)
+          {:ok, ticket_order}
         end
 
       error ->
@@ -1582,6 +1583,37 @@ defmodule Ysc.Tickets do
   end
 
   ## Private Functions
+
+  defp prepare_new_checkout_session(user_id, event_id) do
+    from(to in TicketOrder,
+      where:
+        to.user_id == ^user_id and to.event_id == ^event_id and
+          to.status == :pending
+    )
+    |> Repo.all()
+    |> Enum.each(fn order ->
+      cancel_ticket_order(order, "Superseded by new checkout",
+        context: "create_ticket_order"
+      )
+    end)
+
+    case CheckoutCancel.blocking_pending_orders(user_id, event_id) do
+      [] ->
+        :ok
+
+      orders ->
+        require Ysc.Logging
+
+        Ysc.Logging.info(
+          "Blocked new ticket checkout while another payment is in flight",
+          user_id: user_id,
+          event_id: event_id,
+          pending_order_ids: Enum.map(orders, & &1.id)
+        )
+
+        {:error, :checkout_payment_in_progress}
+    end
+  end
 
   defp validate_user_membership(user_id) do
     case Accounts.get_user!(user_id, [:subscriptions]) do

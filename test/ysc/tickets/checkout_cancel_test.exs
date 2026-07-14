@@ -13,6 +13,7 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
   import Ysc.TicketsFixtures
 
   alias Ysc.Tickets
+  alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Tickets.TicketOrder
 
@@ -185,11 +186,10 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       event = event_fixture()
       tier = ticket_tier_fixture(%{event_id: event.id})
 
-      assert {:ok, safe_order} =
-               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      safe_order = ticket_order_fixture(%{user: user, event: event, tier: tier})
 
       assert {:ok, unsafe_order} =
-               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+               BookingLocker.atomic_booking(user.id, event.id, %{tier.id => 1})
 
       safe_pi = "pi_safe_mixed_#{safe_order.id}"
       unsafe_pi = "pi_unsafe_mixed_#{unsafe_order.id}"
@@ -385,6 +385,32 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
                )
 
       assert cancelled.status == :cancelled
+    end
+  end
+
+  describe "create_ticket_order/3 checkout supersede" do
+    test "rejects a second checkout while payment is in flight" do
+      order =
+        ticket_order_fixture()
+        |> Ysc.Repo.preload(tickets: :ticket_tier)
+
+      [ticket] = order.tickets
+      payment_intent_id = "pi_processing_new_checkout_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                             _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.create_ticket_order(order.user_id, order.event_id, %{
+                 ticket.ticket_tier_id => 1
+               })
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
     end
   end
 end

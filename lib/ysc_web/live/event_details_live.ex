@@ -6216,6 +6216,16 @@ defmodule YscWeb.EventDetailsLive do
          )
          |> assign(:show_ticket_modal, false)}
 
+      {:error, :checkout_payment_in_progress} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your payment is still processing. If you were charged, your tickets will appear shortly or we'll email you a confirmation.",
+           title: "Payment"
+         )
+         |> assign(:show_ticket_modal, false)}
+
       {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
         # Handle changeset errors (e.g., membership validation in ticket changeset)
         error_message =
