@@ -844,9 +844,9 @@ defmodule YscWeb.HomeLive do
                     {event.title}
                   </h3>
                 </.link>
-                <%= if event.description do %>
+                <%= if description_preview = PlainText.normalize_preview(event.description) do %>
                   <p class="text-zinc-400 mt-3 sm:mt-4 line-clamp-2 text-sm leading-relaxed">
-                    {HtmlSanitizeEx.strip_tags(event.description)}
+                    {description_preview}
                   </p>
                 <% end %>
 

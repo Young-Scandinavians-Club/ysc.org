@@ -302,7 +302,7 @@ defmodule Ysc.Events.Event do
         put_change(
           changeset,
           :description,
-          HtmlSanitizeEx.strip_tags(description)
+          description |> HtmlSanitizeEx.strip_tags() |> String.trim()
         )
     end
   end

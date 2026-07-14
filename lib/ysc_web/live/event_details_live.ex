@@ -1370,7 +1370,7 @@ defmodule YscWeb.EventDetailsLive do
                             You have {reserved_quantity} {if reserved_quantity ==
                                                                1,
                                                              do: "ticket",
-                                                             else: "tickets"} reserved at the member price. Complete payment before the timer runs out to confirm your tickets.
+                                                             else: "tickets"} reserved at the member price. Your discount applies when you purchase.
                             <%= if has_discount do %>
                               <.badge
                                 type="green"

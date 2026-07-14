@@ -37,6 +37,25 @@ defmodule YscWeb.PlainTextTest do
       assert PlainText.from_html(nil) == ""
       assert PlainText.from_html("") == ""
     end
+
+    test "trims leading and trailing whitespace" do
+      assert PlainText.from_html("\n\n<p>Hello</p>\n") == "Hello"
+
+      assert PlainText.from_html("<p></p><p>First paragraph</p>") ==
+               "First paragraph"
+    end
+  end
+
+  describe "normalize_preview/1" do
+    test "returns nil for blank input" do
+      assert PlainText.normalize_preview(nil) == nil
+      assert PlainText.normalize_preview("") == nil
+      assert PlainText.normalize_preview("  \n  ") == nil
+    end
+
+    test "strips html and trims whitespace" do
+      assert PlainText.normalize_preview("\n<p>Preview</p>\n") == "Preview"
+    end
   end
 
   describe "from_post/1" do

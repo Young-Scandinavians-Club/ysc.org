@@ -12,6 +12,7 @@ defmodule YscWeb.Components.Events.EventCard do
     statics: YscWeb.static_paths()
 
   alias Ysc.Media.Image
+  alias YscWeb.PlainText
 
   attr :event, :any, required: true
   attr :class, :string, default: nil
@@ -32,6 +33,10 @@ defmodule YscWeb.Components.Events.EventCard do
           assigns.sold_out,
           assigns.selling_fast
         )
+      )
+      |> assign(
+        :description_preview,
+        PlainText.normalize_preview(assigns.event.description)
       )
 
     ~H"""
@@ -123,13 +128,13 @@ defmodule YscWeb.Components.Events.EventCard do
           </h3>
         </.link>
         <p
-          :if={@event.description}
+          :if={@description_preview}
           class={[
             "text-base leading-relaxed mb-6 line-clamp-2",
             if(@variant == "dark", do: "text-zinc-300", else: "text-zinc-500")
           ]}
         >
-          {@event.description}
+          {@description_preview}
         </p>
 
         <div class={[

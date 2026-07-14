@@ -24,7 +24,22 @@ defmodule YscWeb.PlainText do
     |> normalize_line_breaks()
     |> HtmlSanitizeEx.strip_tags()
     |> decode_html_entities()
-    |> String.trim_trailing()
+    |> String.trim()
+  end
+
+  @doc """
+  Normalizes plain text for clamped preview display.
+
+  Trims leading and trailing whitespace and returns `nil` for blank input.
+  """
+  def normalize_preview(nil), do: nil
+  def normalize_preview(""), do: nil
+
+  def normalize_preview(text) when is_binary(text) do
+    case from_html(text) do
+      "" -> nil
+      trimmed -> trimmed
+    end
   end
 
   @doc """

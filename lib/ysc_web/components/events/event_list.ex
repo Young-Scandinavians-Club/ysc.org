@@ -3,6 +3,7 @@ defmodule YscWeb.EventsListLive do
 
   alias Ysc.Events
   alias Money
+  alias YscWeb.PlainText
 
   @impl true
   def render(assigns) do
@@ -138,12 +139,11 @@ defmodule YscWeb.EventsListLive do
                     </span>
                   </div>
 
-                  <p
-                    :if={@hero_event.description}
-                    class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-prose hero-description-shadow"
-                  >
-                    {@hero_event.description}
-                  </p>
+                  <%= if description_preview = PlainText.normalize_preview(@hero_event.description) do %>
+                    <p class="text-zinc-600 sm:text-zinc-200 text-sm sm:text-base lg:text-lg leading-relaxed line-clamp-2 mb-6 max-w-prose hero-description-shadow">
+                      {description_preview}
+                    </p>
+                  <% end %>
 
                   <%!-- Footer — mobile only, matches event_card footer --%>
                   <div class="sm:hidden pt-5 border-t border-zinc-100 space-y-3">
