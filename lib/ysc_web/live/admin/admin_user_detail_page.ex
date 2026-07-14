@@ -3955,9 +3955,8 @@ defmodule YscWeb.AdminUserDetailsLive do
 
     subs
     |> Enum.filter(&Ysc.Subscriptions.valid?/1)
+    |> Repo.preload(:subscription_items)
     |> Enum.any?(fn s ->
-      s = Repo.preload(s, :subscription_items)
-
       case s.subscription_items do
         [item | _] ->
           plans = Application.get_env(:ysc, :membership_plans, [])
