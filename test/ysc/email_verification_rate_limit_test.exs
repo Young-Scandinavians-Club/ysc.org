@@ -15,7 +15,9 @@ defmodule Ysc.EmailVerificationRateLimitTest do
       assert :ok = EmailVerificationRateLimit.check(user_id, :phone)
     end
 
-    test "rate limits after exceeding the per-minute attempt limit", %{user_id: user_id} do
+    test "rate limits after exceeding the per-minute attempt limit", %{
+      user_id: user_id
+    } do
       limit =
         Application.get_env(:ysc, EmailVerificationRateLimit, [])[
           :attempt_limit_per_minute
