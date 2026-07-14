@@ -185,11 +185,14 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       event = event_fixture()
       tier = ticket_tier_fixture(%{event_id: event.id})
 
-      assert {:ok, safe_order} =
-               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      safe_order = ticket_order_fixture(%{user: user, event: event, tier: tier})
+      unsafe_order = ticket_order_fixture(%{user: user, event: event, tier: tier})
 
-      assert {:ok, unsafe_order} =
-               Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      # Second checkout supersedes the first; restore it so both pending orders exist.
+      safe_order =
+        safe_order
+        |> Ecto.Changeset.change(status: :pending)
+        |> Ysc.Repo.update!()
 
       safe_pi = "pi_safe_mixed_#{safe_order.id}"
       unsafe_pi = "pi_unsafe_mixed_#{unsafe_order.id}"

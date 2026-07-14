@@ -65,30 +65,34 @@ defmodule Ysc.Tickets do
       {:ok, _} ->
         with :ok <- prepare_new_checkout_session(user_id, event_id),
              {:ok, ticket_order} <-
-               BookingLocker.atomic_booking(user_id, event_id, ticket_selections) do
-            # Emit telemetry event for ticket order creation
-            ticket_count =
-              if Ecto.assoc_loaded?(ticket_order.tickets) do
-                length(ticket_order.tickets)
-              else
-                0
-              end
+               BookingLocker.atomic_booking(
+                 user_id,
+                 event_id,
+                 ticket_selections
+               ) do
+          # Emit telemetry event for ticket order creation
+          ticket_count =
+            if Ecto.assoc_loaded?(ticket_order.tickets) do
+              length(ticket_order.tickets)
+            else
+              0
+            end
 
-            :telemetry.execute(
-              [:ysc, :tickets, :order_created],
-              %{count: 1},
-              %{
-                ticket_order_id: ticket_order.id,
-                event_id: event_id,
-                user_id: user_id,
-                total_amount: Money.to_decimal(ticket_order.total_amount),
-                ticket_count: ticket_count
-              }
-            )
+          :telemetry.execute(
+            [:ysc, :tickets, :order_created],
+            %{count: 1},
+            %{
+              ticket_order_id: ticket_order.id,
+              event_id: event_id,
+              user_id: user_id,
+              total_amount: Money.to_decimal(ticket_order.total_amount),
+              ticket_count: ticket_count
+            }
+          )
 
-            # Broadcast ticket availability update to all users viewing this event
-            broadcast_ticket_availability_update(event_id)
-            {:ok, ticket_order}
+          # Broadcast ticket availability update to all users viewing this event
+          broadcast_ticket_availability_update(event_id)
+          {:ok, ticket_order}
         end
 
       error ->

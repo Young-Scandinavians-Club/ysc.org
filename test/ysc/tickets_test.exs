@@ -161,7 +161,11 @@ defmodule Ysc.TicketsTest do
 
       assert second_order.id != first_order.id
       assert Ysc.Repo.get!(TicketOrder, first_order.id).status == :cancelled
-      assert Ysc.Repo.get!(TicketOrder, second_order.id).status in [:pending, :expired]
+
+      assert Ysc.Repo.get!(TicketOrder, second_order.id).status in [
+               :pending,
+               :expired
+             ]
     end
 
     test "returns error when event is cancelled", %{
