@@ -130,10 +130,10 @@ defmodule Ysc.Media.Image do
   Accepts `nil` and non-image values (returns `fallback`). Defaults to
   `default_placeholder_path/0`.
   """
-  def display_path_with_fallback(nil, fallback \\ @default_placeholder_path),
-    do: fallback
+  def display_path_with_fallback(image, fallback \\ @default_placeholder_path)
+  def display_path_with_fallback(nil, fallback), do: fallback
 
-  def display_path_with_fallback(image, fallback \\ @default_placeholder_path) do
+  def display_path_with_fallback(image, fallback) do
     display_path(image) || fallback
   end
 
@@ -142,8 +142,8 @@ defmodule Ysc.Media.Image do
 
   Unlike `display_path_with_fallback/2`, does not fall back to `raw_image_path`.
   """
-  def optimized_path_with_fallback(nil, fallback \\ @default_placeholder_path),
-    do: fallback
+  def optimized_path_with_fallback(image, fallback \\ @default_placeholder_path)
+  def optimized_path_with_fallback(nil, fallback), do: fallback
 
   def optimized_path_with_fallback(
         %__MODULE__{optimized_image_path: path},
@@ -155,10 +155,10 @@ defmodule Ysc.Media.Image do
   def optimized_path_with_fallback(_, fallback), do: fallback
 
   @doc """
-  Returns the thumbnail path when present, otherwise raw, otherwise `fallback`.
+  Returns the thumbnail path when present, otherwise optimized, then raw, then `fallback`.
   """
-  def thumbnail_path_with_fallback(nil, fallback \\ @default_placeholder_path),
-    do: fallback
+  def thumbnail_path_with_fallback(image, fallback \\ @default_placeholder_path)
+  def thumbnail_path_with_fallback(nil, fallback), do: fallback
 
   def thumbnail_path_with_fallback(
         %__MODULE__{thumbnail_path: path},
