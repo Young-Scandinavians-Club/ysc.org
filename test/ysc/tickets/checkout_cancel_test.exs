@@ -387,4 +387,30 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       assert cancelled.status == :cancelled
     end
   end
+
+  describe "create_ticket_order/3 checkout supersede" do
+    test "rejects a second checkout while payment is in flight" do
+      order =
+        ticket_order_fixture()
+        |> Ysc.Repo.preload(tickets: :ticket_tier)
+
+      [ticket] = order.tickets
+      payment_intent_id = "pi_processing_new_checkout_#{order.id}"
+
+      assert {:ok, order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                             _opts ->
+        {:ok, payment_intent("processing", payment_intent_id)}
+      end)
+
+      assert {:error, :checkout_payment_in_progress} =
+               Tickets.create_ticket_order(order.user_id, order.event_id, %{
+                 ticket.ticket_tier_id => 1
+               })
+
+      assert Ysc.Repo.get!(TicketOrder, order.id).status == :pending
+    end
+  end
 end
