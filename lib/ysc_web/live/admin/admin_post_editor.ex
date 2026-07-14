@@ -129,8 +129,24 @@ defmodule YscWeb.AdminPostEditorLive do
         </div>
       </.modal>
 
+      <div
+        :if={@loading_post?}
+        id="admin-post-loading"
+        class="flex flex-col pt-4 space-y-6"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="sr-only">Loading post…</span>
+        <.skeleton_block class="h-9 w-64 rounded" />
+        <.skeleton_block class="h-5 w-40 rounded" />
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+          <.skeleton_block :for={_ <- 1..8} class="h-4 w-full rounded" />
+        </div>
+      </div>
+
       <.form
         :let={_f}
+        :if={!@loading_post?}
         for={@form}
         id="edit_post_form"
         phx-submit="save"
@@ -393,6 +409,7 @@ defmodule YscWeb.AdminPostEditorLive do
     {:ok,
      socket
      |> assign(:create_topic, create_topic)
+     |> assign(:loading_post?, false)
      |> assign(:page_title, default_title)
      |> assign(:active_page, :news)
      |> assign(:saving?, false)
@@ -414,38 +431,42 @@ defmodule YscWeb.AdminPostEditorLive do
   end
 
   def mount(%{"id" => id}, _session, socket) do
-    post = Posts.get_post!(id) |> Ysc.Repo.preload(:featured_image)
-
-    form_attrs =
-      if Slug.blank_title?(post.title) do
-        default_title = Slug.default_title()
-
-        %{
-          "title" => default_title,
-          "url_name" => post.url_name || Slug.from_title(default_title)
-        }
-      else
-        %{}
-      end
-
-    update_post_changeset = Post.editor_changeset(post, form_attrs)
-
     YscWeb.Endpoint.subscribe("post_saved:#{id}")
 
-    {:ok,
-     socket
-     |> assign(:page_title, post.title)
-     |> assign(:active_page, :news)
-     |> assign(:saving?, false)
-     |> assign(:unsaved?, false)
-     |> assign(:auto_url_name?, false)
-     |> assign(:pending_publish?, false)
-     |> assign(:pending_form_values, %{})
-     |> assign(:create_topic, nil)
-     |> assign(:post_id, post.id)
-     |> assign(:post, post)
-     |> assign(:preview_device, :computer)
-     |> assign(form: to_form(update_post_changeset, as: "post"))}
+    connected_remount? =
+      connected?(socket) &&
+        socket.assigns[:loading_post?] == false &&
+        socket.assigns[:post_id] == id
+
+    socket =
+      if connected_remount? do
+        socket
+      else
+        assign_post_loading_shell(socket, id)
+      end
+
+    {:ok, socket}
+  end
+
+  def handle_params(%{"id" => id} = _params, _uri, socket) do
+    socket =
+      socket
+      |> then(fn socket ->
+        if connected?(socket) && socket.assigns[:loading_post?] do
+          load_post(socket, id)
+        else
+          socket
+        end
+      end)
+      |> then(fn socket ->
+        if socket.assigns.live_action != :settings do
+          assign(socket, :pending_publish?, false)
+        else
+          socket
+        end
+      end)
+
+    {:noreply, socket}
   end
 
   def handle_params(_params, _uri, socket) do
@@ -982,6 +1003,58 @@ defmodule YscWeb.AdminPostEditorLive do
     else
       assign(socket, form: form)
     end
+  end
+
+  defp assign_post_loading_shell(socket, id) do
+    assign(socket,
+      loading_post?: true,
+      post_id: id,
+      post: %Post{id: id, state: :draft, title: ""},
+      page_title: "Post",
+      active_page: :news,
+      saving?: false,
+      unsaved?: false,
+      auto_url_name?: false,
+      pending_publish?: false,
+      pending_form_values: %{},
+      create_topic: nil,
+      preview_device: :computer,
+      form:
+        to_form(Post.editor_changeset(%Post{state: :draft}, %{}), as: "post")
+    )
+  end
+
+  defp load_post(socket, id) do
+    post = Posts.get_post!(id) |> Ysc.Repo.preload(:featured_image)
+
+    form_attrs =
+      if Slug.blank_title?(post.title) do
+        default_title = Slug.default_title()
+
+        %{
+          "title" => default_title,
+          "url_name" => post.url_name || Slug.from_title(default_title)
+        }
+      else
+        %{}
+      end
+
+    update_post_changeset = Post.editor_changeset(post, form_attrs)
+
+    socket
+    |> assign(:loading_post?, false)
+    |> assign(:page_title, post.title)
+    |> assign(:active_page, :news)
+    |> assign(:saving?, false)
+    |> assign(:unsaved?, false)
+    |> assign(:auto_url_name?, false)
+    |> assign(:pending_publish?, false)
+    |> assign(:pending_form_values, %{})
+    |> assign(:create_topic, nil)
+    |> assign(:post_id, post.id)
+    |> assign(:post, post)
+    |> assign(:preview_device, :computer)
+    |> assign(form: to_form(update_post_changeset, as: "post"))
   end
 
   defp post_state_to_badge_style(:draft), do: "yellow"
