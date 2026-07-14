@@ -98,6 +98,18 @@ defmodule Ysc.Events.EventTest do
       assert Ecto.Changeset.get_field(cs, :description) == "Hello"
     end
 
+    test "trims whitespace from description after stripping HTML", %{organizer: organizer} do
+      cs =
+        Event.changeset(%Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "T",
+          description: "  <p>Preview copy</p>  \n"
+        })
+
+      assert Ecto.Changeset.get_field(cs, :description) == "Preview copy"
+    end
+
     test "unlimited_capacity true clears max_attendees", %{organizer: organizer} do
       cs =
         Event.changeset(%Event{}, %{
