@@ -27,14 +27,17 @@ defmodule YscWeb.UserTicketsLiveCancelTest do
   end
 
   describe "cancel-order event" do
-    test "shows processing message when checkout payment is in flight", %{conn: conn} do
+    test "shows processing message when checkout payment is in flight", %{
+      conn: conn
+    } do
       order = ticket_order_fixture()
       payment_intent_id = "pi_processing_user_cancel_#{order.id}"
 
       assert {:ok, order} =
                Tickets.update_payment_intent(order, payment_intent_id)
 
-      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+      expect(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
         {:ok,
          %Stripe.PaymentIntent{
            id: payment_intent_id,

@@ -98,7 +98,9 @@ defmodule Ysc.Events.EventTest do
       assert Ecto.Changeset.get_field(cs, :description) == "Hello"
     end
 
-    test "trims whitespace from description after stripping HTML", %{organizer: organizer} do
+    test "trims whitespace from description after stripping HTML", %{
+      organizer: organizer
+    } do
       cs =
         Event.changeset(%Event{}, %{
           state: :draft,
