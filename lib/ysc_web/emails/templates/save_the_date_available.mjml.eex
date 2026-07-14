@@ -62,3 +62,4 @@
     </mj-text>
   </mj-column>
 </mj-section>
+<%= render_dynamic_component YscWeb.Emails.NotificationSettingsFooter, url: @notification_settings_url, link_text: "Unsubscribe from event notifications" %>
