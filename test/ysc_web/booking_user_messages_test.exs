@@ -163,6 +163,18 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     refute BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
              "confirmation number"
+
+    assert BookingUserMessages.cancel_refund_error({:calculation_failed, nil}) =~
+             "couldn't calculate your refund"
+
+    assert BookingUserMessages.cancel_refund_error({:refund_failed, nil}) =~
+             "refund couldn't be processed automatically"
+
+    assert BookingUserMessages.cancel_refund_error({:pending_refund_failed, nil}) =~
+             "couldn't submit your refund for review"
+
+    assert BookingUserMessages.cancel_refund_error({:cancellation_failed, nil}) =~
+             "couldn't cancel your reservation"
   end
 
   test "booking creation failed message" do
