@@ -922,8 +922,8 @@ defmodule YscWeb.UserSettingsLiveTest do
 
   describe "settings page — phone verification flow" do
     test "changing phone number requires reauth then opens verification", %{
-           conn: conn
-         } do
+      conn: conn
+    } do
       user = user_fixture(%{state: :active, phone_number: "+14159098268"})
       conn = log_in_user(conn, user)
 

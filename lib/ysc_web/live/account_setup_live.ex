@@ -1247,52 +1247,6 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  defp do_verify_phone_code(socket, user, code) do
-    case Accounts.verify_phone_verification_code(user, code) do
-        {:ok, :verified} ->
-          # Mark phone as verified in database
-          {:ok, updated_user} = Accounts.mark_phone_verified(user)
-
-          # Use a short-lived signed token (same pattern as email verification)
-          token =
-            Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
-
-          {:noreply,
-           socket
-           |> Phoenix.LiveView.redirect(
-             to:
-               ~p"/users/log-in/auto?#{%{token: token, redirect_to: "/account/setup/#{updated_user.id}?step=5"}}"
-           )}
-
-        {:error, :not_found} ->
-          YscWeb.Flash.send_toast(
-            :error,
-            "No verification code found. Please request a new one.",
-            title: "Phone verification"
-          )
-
-          {:noreply, socket}
-
-        {:error, :expired} ->
-          YscWeb.Flash.send_toast(
-            :error,
-            "Verification code has expired. Please request a new one.",
-            title: "Phone verification"
-          )
-
-          {:noreply, socket}
-
-        {:error, :invalid_code} ->
-          YscWeb.Flash.send_toast(
-            :error,
-            "Invalid verification code. Please try again.",
-            title: "Phone verification"
-          )
-
-          {:noreply, socket}
-      end
-  end
-
   def handle_event("resend_phone_code", _params, socket) do
     # Ensure user is authenticated and needs phone verification
     user_needs = socket.assigns.user_needs
@@ -1490,6 +1444,52 @@ defmodule YscWeb.AccountSetupLive do
       )
 
       {:noreply, socket}
+    end
+  end
+
+  defp do_verify_phone_code(socket, user, code) do
+    case Accounts.verify_phone_verification_code(user, code) do
+      {:ok, :verified} ->
+        # Mark phone as verified in database
+        {:ok, updated_user} = Accounts.mark_phone_verified(user)
+
+        # Use a short-lived signed token (same pattern as email verification)
+        token =
+          Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
+
+        {:noreply,
+         socket
+         |> Phoenix.LiveView.redirect(
+           to:
+             ~p"/users/log-in/auto?#{%{token: token, redirect_to: "/account/setup/#{updated_user.id}?step=5"}}"
+         )}
+
+      {:error, :not_found} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "No verification code found. Please request a new one.",
+          title: "Phone verification"
+        )
+
+        {:noreply, socket}
+
+      {:error, :expired} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Verification code has expired. Please request a new one.",
+          title: "Phone verification"
+        )
+
+        {:noreply, socket}
+
+      {:error, :invalid_code} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Invalid verification code. Please try again.",
+          title: "Phone verification"
+        )
+
+        {:noreply, socket}
     end
   end
 
