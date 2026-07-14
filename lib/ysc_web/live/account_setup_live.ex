@@ -1229,7 +1229,26 @@ defmodule YscWeb.AccountSetupLive do
         )
         |> normalize_verification_code()
 
-      case Accounts.verify_phone_verification_code(user, code) do
+      user_id = user.id
+
+      case Ysc.EmailVerificationRateLimit.check(user_id, :phone) do
+        :ok ->
+          do_verify_phone_code(socket, user, code)
+
+        :rate_limited ->
+          YscWeb.Flash.send_toast(
+            :error,
+            "Too many verification attempts. Please wait a minute and try again.",
+            title: "Phone verification"
+          )
+
+          {:noreply, socket}
+      end
+    end
+  end
+
+  defp do_verify_phone_code(socket, user, code) do
+    case Accounts.verify_phone_verification_code(user, code) do
         {:ok, :verified} ->
           # Mark phone as verified in database
           {:ok, updated_user} = Accounts.mark_phone_verified(user)
@@ -1272,7 +1291,6 @@ defmodule YscWeb.AccountSetupLive do
 
           {:noreply, socket}
       end
-    end
   end
 
   def handle_event("resend_phone_code", _params, socket) do

@@ -221,7 +221,7 @@ defmodule YscWeb.UserSettingsLive do
           user={@current_user}
           user_has_password={@user_has_password}
           return_to={@request_path}
-          description="For security reasons, please verify your identity before changing your email address."
+          description={reauth_modal_description(@reauth_purpose)}
         />
 
         <.modal
@@ -2624,7 +2624,10 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:membership_change_info, nil)
       |> assign(:show_reauth_modal, false)
       |> assign(:reauth_verified_at, nil)
+      |> assign(:reauth_purpose, nil)
       |> assign(:pending_email_change, nil)
+      |> assign(:pending_phone_change, nil)
+      |> assign(:pending_profile_params, nil)
       |> assign(:user_has_password, !is_nil(user.hashed_password))
       # Placeholder values for async-loaded data
       |> assign(:default_payment_method, nil)
@@ -2953,14 +2956,23 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   def handle_info(:reauth_verified, socket) do
-    {:noreply, process_email_change_after_reauth(socket)}
+    socket =
+      case socket.assigns[:reauth_purpose] do
+        :phone_change -> process_phone_change_after_reauth(socket)
+        _ -> process_email_change_after_reauth(socket)
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info(:reauth_cancelled, socket) do
     {:noreply,
      socket
      |> assign(:show_reauth_modal, false)
-     |> assign(:pending_email_change, nil)}
+     |> assign(:pending_email_change, nil)
+     |> assign(:pending_phone_change, nil)
+     |> assign(:pending_profile_params, nil)
+     |> assign(:reauth_purpose, nil)}
   end
 
   # Catch-all for messages we don't need to handle (like email deliveries in tests)
@@ -2991,7 +3003,10 @@ defmodule YscWeb.UserSettingsLive do
         |> Map.put(:action, :validate)
 
       if changeset.valid? do
-        socket = assign(socket, :pending_email_change, new_email)
+        socket =
+          socket
+          |> assign(:pending_email_change, new_email)
+          |> assign(:reauth_purpose, :email_change)
 
         if reauth_still_valid?(socket) do
           {:noreply, process_email_change_after_reauth(socket)}
@@ -3133,63 +3148,18 @@ defmodule YscWeb.UserSettingsLive do
     new_phone = user_params["phone_number"]
 
     if new_phone != current_phone and new_phone != "" and not is_nil(new_phone) do
-      # Phone number is being changed - handle with verification
-
-      # First, update other profile fields (excluding phone)
       other_params = Map.delete(user_params, "phone_number")
 
-      case Accounts.update_user_profile(user, other_params) do
-        {:ok, updated_user} ->
-          # Send verification code to new phone number.
-          # Use timestamp in suffix so idempotency key is unique per attempt (e.g. user
-          # switching back to the same number later can receive a new code).
-          timestamp = DateTime.utc_now() |> DateTime.to_unix()
+      socket =
+        socket
+        |> assign(:pending_phone_change, new_phone)
+        |> assign(:pending_profile_params, other_params)
+        |> assign(:reauth_purpose, :phone_change)
 
-          phone_code =
-            Accounts.generate_and_store_phone_verification_code(updated_user)
-
-          _job =
-            Accounts.send_phone_verification_code(
-              updated_user,
-              phone_code,
-              "settings_change_#{timestamp}",
-              new_phone
-            )
-
-          # Update form and store pending phone number
-          profile_form =
-            Accounts.change_user_profile(updated_user, user_params) |> to_form()
-
-          token =
-            Phoenix.Token.sign(
-              YscWeb.Endpoint,
-              @phone_verification_token_salt,
-              new_phone,
-              max_age: @phone_verification_token_max_age
-            )
-
-          path =
-            ~p"/users/settings/phone-verification"
-            |> URI.parse()
-            |> Map.put(:query, URI.encode_query(%{"token" => token}))
-            |> URI.to_string()
-
-          {:noreply,
-           socket
-           |> assign(:user, updated_user)
-           |> assign(:profile_form, profile_form)
-           |> assign(:pending_phone_number, new_phone)
-           |> assign(:phone_verification_code_state, %{})
-           |> push_patch(to: path)
-           |> YscWeb.Flash.put_toast(
-             :info,
-             "Phone number update initiated. Please verify the code sent to your new number.",
-             title: "Phone",
-             icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
-           )}
-
-        {:error, changeset} ->
-          {:noreply, assign(socket, profile_form: to_form(changeset))}
+      if reauth_still_valid?(socket) do
+        {:noreply, process_phone_change_after_reauth(socket)}
+      else
+        {:noreply, assign(socket, :show_reauth_modal, true)}
       end
     else
       # No phone change or phone is being cleared - normal update
@@ -3257,70 +3227,17 @@ defmodule YscWeb.UserSettingsLive do
     if pending_phone do
       case params do
         %{"verification_code" => entered_code} ->
-          # Handle both OTP array format and single string format
           code = normalize_verification_code(entered_code)
 
-          # In dev/sandbox, always accept 000000 as valid code
-          verification_result =
-            if dev_or_sandbox?() and code == "000000" do
-              {:ok, :verified}
-            else
-              Accounts.verify_phone_verification_code(user, code)
-            end
-
-          case verification_result do
-            {:ok, :verified} ->
-              # Update user's phone number and mark as verified
-              phone_params = %{"phone_number" => pending_phone}
-
-              case Accounts.update_user_phone_and_sms(user, phone_params) do
-                {:ok, updated_user} ->
-                  {:ok, _} = Accounts.mark_phone_verified(updated_user)
-
-                  {:noreply,
-                   socket
-                   |> assign(:user, updated_user)
-                   |> assign(:pending_phone_number, nil)
-                   |> assign(:phone_verification_code_state, %{})
-                   |> push_patch(to: ~p"/users/settings")
-                   |> YscWeb.Flash.put_toast(
-                     :info,
-                     "Phone number updated and verified successfully.",
-                     title: "Phone",
-                     icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
-                   )}
-
-                {:error, _} ->
-                  {:noreply,
-                   socket
-                   |> assign(
-                     :phone_verification_error,
-                     "Failed to update phone number. Please try again."
-                   )}
-              end
-
-            {:error, :not_found} ->
+          with :ok <- Ysc.EmailVerificationRateLimit.check(user.id, :phone) do
+            verify_phone_code_with_rate_limit(socket, user, pending_phone, code)
+          else
+            :rate_limited ->
               {:noreply,
                socket
                |> assign(
                  :phone_verification_error,
-                 "No verification code found. Please request a new one."
-               )}
-
-            {:error, :expired} ->
-              {:noreply,
-               socket
-               |> assign(
-                 :phone_verification_error,
-                 "Verification code has expired. Please request a new one."
-               )}
-
-            {:error, :invalid_code} ->
-              {:noreply,
-               socket
-               |> assign(
-                 :phone_verification_error,
-                 "Invalid verification code. Please try again."
+                 "Too many verification attempts. Please wait a minute and try again."
                )}
           end
 
@@ -3339,6 +3256,72 @@ defmodule YscWeb.UserSettingsLive do
          :phone_verification_error,
          "No phone verification in progress."
        )}
+    end
+  end
+
+  defp verify_phone_code_with_rate_limit(socket, user, pending_phone, code) do
+    # In dev/sandbox, always accept 000000 as valid code
+    verification_result =
+      if dev_or_sandbox?() and code == "000000" do
+        {:ok, :verified}
+      else
+        Accounts.verify_phone_verification_code(user, code)
+      end
+
+    case verification_result do
+      {:ok, :verified} ->
+        # Update user's phone number and mark as verified
+        phone_params = %{"phone_number" => pending_phone}
+
+        case Accounts.update_user_phone_and_sms(user, phone_params) do
+          {:ok, updated_user} ->
+            {:ok, _} = Accounts.mark_phone_verified(updated_user)
+
+            {:noreply,
+             socket
+             |> assign(:user, updated_user)
+             |> assign(:pending_phone_number, nil)
+             |> assign(:phone_verification_code_state, %{})
+             |> push_patch(to: ~p"/users/settings")
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Phone number updated and verified successfully.",
+               title: "Phone",
+               icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+             )}
+
+          {:error, _} ->
+            {:noreply,
+             socket
+             |> assign(
+               :phone_verification_error,
+               "Failed to update phone number. Please try again."
+             )}
+        end
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> assign(
+           :phone_verification_error,
+           "No verification code found. Please request a new one."
+         )}
+
+      {:error, :expired} ->
+        {:noreply,
+         socket
+         |> assign(
+           :phone_verification_error,
+           "Verification code has expired. Please request a new one."
+         )}
+
+      {:error, :invalid_code} ->
+        {:noreply,
+         socket
+         |> assign(
+           :phone_verification_error,
+           "Invalid verification code. Please try again."
+         )}
     end
   end
 
@@ -3456,86 +3439,15 @@ defmodule YscWeb.UserSettingsLive do
         %{"verification_code" => entered_code} ->
           code = normalize_verification_code(entered_code)
 
-          verification_result =
-            Accounts.verify_email_verification_code(user, code)
-
-          case verification_result do
-            {:ok, :verified} ->
-              # Update user's email address and mark as verified
-              email_params = %{"email" => pending_email}
-
-              case user
-                   |> Accounts.User.email_changeset(email_params)
-                   |> Ecto.Changeset.put_change(
-                     :email_verified_at,
-                     DateTime.utc_now() |> DateTime.truncate(:second)
-                   )
-                   |> Ysc.Repo.update() do
-                {:ok, updated_user} ->
-                  # Send email changed notification to the old email address for security
-                  old_email = user.email
-
-                  if old_email != updated_user.email do
-                    UserNotifier.deliver_email_changed_notification(
-                      updated_user,
-                      old_email,
-                      updated_user.email
-                    )
-
-                    # Update newsletter subscription to new email if enabled
-                    Accounts.update_newsletter_on_email_change(
-                      updated_user,
-                      old_email,
-                      updated_user.email
-                    )
-                  end
-
-                  {:noreply,
-                   socket
-                   |> assign(:user, updated_user)
-                   |> assign(:pending_email, nil)
-                   |> assign(:pending_email_token, nil)
-                   |> assign(:email_verification_code_state, %{})
-                   |> assign(:current_email, updated_user.email)
-                   |> push_patch(to: ~p"/users/settings")
-                   |> YscWeb.Flash.put_toast(
-                     :info,
-                     "Email address updated successfully.",
-                     title: "Email",
-                     icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
-                   )}
-
-                {:error, _changeset} ->
-                  {:noreply,
-                   socket
-                   |> assign(
-                     :email_verification_error,
-                     "Failed to update email address. Please try again."
-                   )}
-              end
-
-            {:error, :not_found} ->
+          with :ok <- Ysc.EmailVerificationRateLimit.check(user.id, :email) do
+            verify_email_code_after_rate_limit(socket, user, pending_email, code)
+          else
+            :rate_limited ->
               {:noreply,
                socket
                |> assign(
                  :email_verification_error,
-                 "No verification code found. Please request a new one."
-               )}
-
-            {:error, :expired} ->
-              {:noreply,
-               socket
-               |> assign(
-                 :email_verification_error,
-                 "Verification code has expired. Please request a new one."
-               )}
-
-            {:error, :invalid_code} ->
-              {:noreply,
-               socket
-               |> assign(
-                 :email_verification_error,
-                 "Invalid verification code. Please try again."
+                 "Too many verification attempts. Please wait a minute and try again."
                )}
           end
 
@@ -3554,6 +3466,90 @@ defmodule YscWeb.UserSettingsLive do
          :email_verification_error,
          "No email verification in progress."
        )}
+    end
+  end
+
+  defp verify_email_code_after_rate_limit(socket, user, pending_email, code) do
+    verification_result = Accounts.verify_email_verification_code(user, code)
+
+    case verification_result do
+      {:ok, :verified} ->
+        # Update user's email address and mark as verified
+        email_params = %{"email" => pending_email}
+
+        case user
+             |> Accounts.User.email_changeset(email_params)
+             |> Ecto.Changeset.put_change(
+               :email_verified_at,
+               DateTime.utc_now() |> DateTime.truncate(:second)
+             )
+             |> Ysc.Repo.update() do
+          {:ok, updated_user} ->
+            # Send email changed notification to the old email address for security
+            old_email = user.email
+
+            if old_email != updated_user.email do
+              UserNotifier.deliver_email_changed_notification(
+                updated_user,
+                old_email,
+                updated_user.email
+              )
+
+              # Update newsletter subscription to new email if enabled
+              Accounts.update_newsletter_on_email_change(
+                updated_user,
+                old_email,
+                updated_user.email
+              )
+            end
+
+            {:noreply,
+             socket
+             |> assign(:user, updated_user)
+             |> assign(:pending_email, nil)
+             |> assign(:pending_email_token, nil)
+             |> assign(:email_verification_code_state, %{})
+             |> assign(:current_email, updated_user.email)
+             |> push_patch(to: ~p"/users/settings")
+             |> YscWeb.Flash.put_toast(
+               :info,
+               "Email address updated successfully.",
+               title: "Email",
+               icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
+             )}
+
+          {:error, _changeset} ->
+            {:noreply,
+             socket
+             |> assign(
+               :email_verification_error,
+               "Failed to update email address. Please try again."
+             )}
+        end
+
+      {:error, :not_found} ->
+        {:noreply,
+         socket
+         |> assign(
+           :email_verification_error,
+           "No verification code found. Please request a new one."
+         )}
+
+      {:error, :expired} ->
+        {:noreply,
+         socket
+         |> assign(
+           :email_verification_error,
+           "Verification code has expired. Please request a new one."
+         )}
+
+      {:error, :invalid_code} ->
+        {:noreply,
+         socket
+         |> assign(
+           :email_verification_error,
+           "Invalid verification code. Please try again."
+         )}
     end
   end
 
@@ -4629,9 +4625,85 @@ defmodule YscWeb.UserSettingsLive do
     |> assign(:pending_email_change, nil)
     |> assign(:reauth_error, nil)
     |> assign(:reauth_verified_at, DateTime.utc_now())
+    |> assign(:reauth_purpose, nil)
     |> assign(:email_verification_error, nil)
     |> assign(:email_code_valid, false)
     |> push_patch(to: path)
+  end
+
+  defp process_phone_change_after_reauth(socket) do
+    user = socket.assigns.current_user
+    new_phone = socket.assigns.pending_phone_change
+    other_params = socket.assigns.pending_profile_params || %{}
+
+    case Accounts.update_user_profile(user, other_params) do
+      {:ok, updated_user} ->
+        timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
+        phone_code =
+          Accounts.generate_and_store_phone_verification_code(updated_user)
+
+        _job =
+          Accounts.send_phone_verification_code(
+            updated_user,
+            phone_code,
+            "settings_change_#{timestamp}",
+            new_phone
+          )
+
+        user_params = Map.put(other_params, "phone_number", new_phone)
+
+        profile_form =
+          Accounts.change_user_profile(updated_user, user_params) |> to_form()
+
+        token =
+          Phoenix.Token.sign(
+            YscWeb.Endpoint,
+            @phone_verification_token_salt,
+            new_phone,
+            max_age: @phone_verification_token_max_age
+          )
+
+        path =
+          ~p"/users/settings/phone-verification"
+          |> URI.parse()
+          |> Map.put(:query, URI.encode_query(%{"token" => token}))
+          |> URI.to_string()
+
+        socket
+        |> assign(:user, updated_user)
+        |> assign(:profile_form, profile_form)
+        |> assign(:pending_phone_number, new_phone)
+        |> assign(:pending_phone_change, nil)
+        |> assign(:pending_profile_params, nil)
+        |> assign(:phone_verification_code_state, %{})
+        |> assign(:show_reauth_modal, false)
+        |> assign(:reauth_purpose, nil)
+        |> assign(:reauth_verified_at, DateTime.utc_now())
+        |> push_patch(to: path)
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Phone number update initiated. Please verify the code sent to your new number.",
+          title: "Phone",
+          icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+        )
+
+      {:error, changeset} ->
+        socket
+        |> assign(:profile_form, to_form(changeset))
+        |> assign(:show_reauth_modal, false)
+        |> assign(:pending_phone_change, nil)
+        |> assign(:pending_profile_params, nil)
+        |> assign(:reauth_purpose, nil)
+    end
+  end
+
+  defp reauth_modal_description(:phone_change) do
+    "For security reasons, please verify your identity before changing your phone number."
+  end
+
+  defp reauth_modal_description(_) do
+    "For security reasons, please verify your identity before changing your email address."
   end
 
   defp reauth_still_valid?(socket) do

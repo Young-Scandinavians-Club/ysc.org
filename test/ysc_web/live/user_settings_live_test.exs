@@ -34,6 +34,17 @@ defmodule YscWeb.UserSettingsLiveTest do
     render(view)
   end
 
+  defp submit_phone_change_with_reauth(view, user, new_phone) do
+    render_submit(view, "update_profile", %{
+      "user" =>
+        profile_form_attrs(user, %{
+          "phone_number" => new_phone
+        })
+    })
+
+    submit_reauth_password(view, valid_user_password())
+  end
+
   defp click_cancel_reauth(view) do
     view
     |> element("#reauth-modal button[phx-click='cancel_reauth']")
@@ -910,8 +921,7 @@ defmodule YscWeb.UserSettingsLiveTest do
   end
 
   describe "settings page — phone verification flow" do
-    test "changing phone number opens verification and accepts dev code 000000",
-         %{
+    test "changing phone number requires reauth then opens verification", %{
            conn: conn
          } do
       user = user_fixture(%{state: :active, phone_number: "+14159098268"})
@@ -929,6 +939,11 @@ defmodule YscWeb.UserSettingsLiveTest do
             "phone_number" => new_phone
           })
       })
+
+      assert has_element?(view, "#reauth-modal")
+      assert render(view) =~ "changing your phone number"
+
+      submit_reauth_password(view, valid_user_password())
 
       assert render(view) =~ "Verify Your Phone Number"
       assert has_element?(view, "#phone_verification_form")
@@ -951,14 +966,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings")
       render(view)
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => "+14155550199"
-          })
-      })
-
-      render(view)
+      submit_phone_change_with_reauth(view, user, "+14155550199")
 
       render_change(view, "validate_phone_code", %{
         "verification_code" => %{
@@ -1821,12 +1829,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       new_phone =
         "+1415555#{rem(System.unique_integer([:positive]), 8000) + 1000}"
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => new_phone
-          })
-      })
+      submit_phone_change_with_reauth(view, user, new_phone)
 
       render(view)
 
@@ -2228,12 +2231,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       new_phone =
         "+1415555#{rem(System.unique_integer([:positive]), 8000) + 1000}"
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => new_phone
-          })
-      })
+      submit_phone_change_with_reauth(view, user, new_phone)
 
       render(view)
 
@@ -2256,12 +2254,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       new_phone =
         "+1415555#{rem(System.unique_integer([:positive]), 8000) + 1000}"
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => new_phone
-          })
-      })
+      submit_phone_change_with_reauth(view, user, new_phone)
 
       render(view)
 
@@ -2282,12 +2275,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       new_phone =
         "+1415555#{rem(System.unique_integer([:positive]), 8000) + 1000}"
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => new_phone
-          })
-      })
+      submit_phone_change_with_reauth(view, user, new_phone)
 
       render(view)
 
@@ -2309,12 +2297,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       new_phone =
         "+1415555#{rem(System.unique_integer([:positive]), 8000) + 1000}"
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => new_phone
-          })
-      })
+      submit_phone_change_with_reauth(view, user, new_phone)
 
       render(view)
 
@@ -2337,12 +2320,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       new_phone =
         "+1415555#{rem(System.unique_integer([:positive]), 8000) + 1000}"
 
-      render_submit(view, "update_profile", %{
-        "user" =>
-          profile_form_attrs(user, %{
-            "phone_number" => new_phone
-          })
-      })
+      submit_phone_change_with_reauth(view, user, new_phone)
 
       render(view)
 

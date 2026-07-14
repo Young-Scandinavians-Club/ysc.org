@@ -22,6 +22,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 22 (MEDIUM)   Kiosk check-in API accepted ineligible bookings (draft/canceled/future)
   Finding 23 (MEDIUM)   Kiosk bookings index exported full history without date bounds
   Finding 24 (MEDIUM)   Ticket payment intents did not bind metadata to order/user
+  Finding 25 (MEDIUM)   User settings verification lacks attempt rate limits; phone change lacks step-up reauth
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1788,6 +1789,112 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:error, :payment_metadata_mismatch} =
                Tickets.process_ticket_order_payment(order_b, payment_intent)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 25 (MEDIUM): User settings verification rate limits + phone reauth
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 25: user settings verification hardening" do
+    defp submit_reauth_password(view, password) do
+      view
+      |> element("#reauth_password_form")
+      |> render_submit(%{"password" => password})
+
+      render(view)
+    end
+
+    defp start_email_change_flow(view, new_email) do
+      render_submit(view, "request_email_change", %{
+        "user" => %{"email" => new_email}
+      })
+
+      submit_reauth_password(view, valid_user_password())
+    end
+
+    test "user settings email verification is rate limited after repeated invalid submissions",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      conn = log_in_user(conn, user)
+      new_email = "ratelimit#{System.unique_integer([:positive])}@example.com"
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+      start_email_change_flow(view, new_email)
+
+      for _ <- 1..12 do
+        render_submit(view, "verify_email_code", %{
+          "verification_code" => "111111"
+        })
+      end
+
+      render_submit(view, "verify_email_code", %{
+        "verification_code" => "111111"
+      })
+
+      assert render(view) =~ "Too many verification attempts"
+    end
+
+    test "user settings phone change requires step-up reauth before sending SMS",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active, phone_number: "+14159098268"})
+      conn = log_in_user(conn, user)
+
+      new_phone =
+        "+1415555#{rem(System.unique_integer([:positive]), 9000) + 1000}"
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_submit(view, "update_profile", %{
+        "user" => %{
+          "first_name" => user.first_name,
+          "last_name" => user.last_name,
+          "phone_number" => new_phone
+        }
+      })
+
+      assert has_element?(view, "#reauth-modal")
+      refute render(view) =~ "Verify Your Phone Number"
+
+      submit_reauth_password(view, valid_user_password())
+
+      assert render(view) =~ "Verify Your Phone Number"
+    end
+
+    test "user settings phone verification is rate limited after repeated invalid submissions",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active, phone_number: "+14159098268"})
+      conn = log_in_user(conn, user)
+
+      new_phone =
+        "+1415555#{rem(System.unique_integer([:positive]), 9000) + 1000}"
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_submit(view, "update_profile", %{
+        "user" => %{
+          "first_name" => user.first_name,
+          "last_name" => user.last_name,
+          "phone_number" => new_phone
+        }
+      })
+
+      submit_reauth_password(view, valid_user_password())
+
+      for _ <- 1..12 do
+        render_submit(view, "verify_phone_code", %{
+          "verification_code" => "111111"
+        })
+      end
+
+      render_submit(view, "verify_phone_code", %{
+        "verification_code" => "111111"
+      })
+
+      assert render(view) =~ "Too many verification attempts"
     end
   end
 
