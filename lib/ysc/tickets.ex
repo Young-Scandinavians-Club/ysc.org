@@ -1587,7 +1587,8 @@ defmodule Ysc.Tickets do
   defp prepare_new_checkout_session(user_id, event_id) do
     from(to in TicketOrder,
       where:
-        to.user_id == ^user_id and to.event_id == ^event_id and to.status == :pending
+        to.user_id == ^user_id and to.event_id == ^event_id and
+          to.status == :pending
     )
     |> Repo.all()
     |> Enum.each(fn order ->
