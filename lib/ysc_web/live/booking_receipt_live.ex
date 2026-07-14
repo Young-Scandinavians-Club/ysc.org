@@ -28,72 +28,25 @@ defmodule YscWeb.BookingReceiptLive do
        )
        |> redirect(to: ~p"/")}
     else
-      # SECURITY: Filter by user_id in the database query to prevent unauthorized access
-      # This ensures we only fetch bookings that belong to the current user
-      # PERFORMANCE: Preload all associations in a single query to avoid N+1
-      booking_query =
-        from(b in Booking,
-          where: b.id == ^booking_id and b.user_id == ^user.id,
-          preload: [
-            {:user, :current_avatar},
-            :booking_guests,
-            rooms: :room_category
-          ]
-        )
+      connected_remount? =
+        connected?(socket) &&
+          socket.assigns[:loading_booking?] == false &&
+          loaded_booking_matches?(socket, booking_id)
 
-      case Repo.one(booking_query) do
-        nil ->
-          {:ok,
-           socket
-           |> YscWeb.Flash.put_toast(
-             :error,
-             YscWeb.BookingUserMessages.reservation_not_found(),
-             title: "Booking"
-           )
-           |> redirect(to: ~p"/")}
+      cond do
+        connected_remount? ->
+          {:ok, load_receipt_data_async(socket, socket.assigns.booking)}
 
-        booking ->
-          connect_params =
-            case get_connect_params(socket) do
-              nil -> %{}
-              v -> v
-            end
+        stripe_redirect_return?(params) ->
+          mount_receipt_with_stripe_redirect(socket, user, booking_id, params)
 
-          timezone = Map.get(connect_params, "timezone", "America/Los_Angeles")
+        connected?(socket) ->
+          socket = assign_receipt_loading_shell(socket, booking_id, params)
 
-          show_confetti =
-            Map.get(params, "confetti") == "true" ||
-              Map.get(params, "redirect_status") == "succeeded"
+          {:ok, load_booking_for_receipt(socket, user, booking_id, params)}
 
-          Ysc.Logging.debug(
-            "Confetti check: params=#{inspect(params)}, show_confetti=#{show_confetti}"
-          )
-
-          socket =
-            assign_initial_receipt_state(
-              socket,
-              booking,
-              user,
-              timezone,
-              show_confetti,
-              Map.get(params, "updated") == "true"
-            )
-
-          # Finalize redirect-based payments (Amazon Pay, CashApp, etc.) whenever
-          # Stripe return params are present — including the dead render — so a
-          # succeeded charge is not left unconfirmed if the WebSocket never connects.
-          {socket, booking} =
-            if stripe_redirect_return?(params) do
-              finalize_stripe_redirect(socket, params, booking, booking_id)
-            else
-              {socket, booking}
-            end
-
-          if connected?(socket) do
-            {:ok, load_receipt_data_async(socket, booking)}
-          else
-            {:ok, socket}
-          end
+        true ->
+          {:ok, assign_receipt_loading_shell(socket, booking_id, params)}
       end
     end
   end
@@ -208,6 +161,29 @@ defmodule YscWeb.BookingReceiptLive do
   def render(assigns) do
     ~H"""
     <div
+      :if={@loading_booking?}
+      id="booking-receipt-loading"
+      class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="sr-only">Loading booking confirmation…</span>
+      <div class="max-w-xl mx-auto lg:mx-0 space-y-6">
+        <.skeleton_block class="h-9 w-56 rounded" />
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-4">
+          <.skeleton_block :for={_ <- 1..6} class="h-4 w-full rounded" />
+        </div>
+        <div class="bg-white rounded-lg border border-zinc-200 p-6 space-y-3">
+          <.skeleton_block class="h-5 w-40 rounded mb-2" />
+          <div :for={_ <- 1..3} class="flex justify-between">
+            <.skeleton_block class="h-4 w-28 rounded" />
+            <.skeleton_block class="h-4 w-20 rounded" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      :if={!@loading_booking?}
       id="booking-receipt"
       phx-hook="Confetti"
       data-show-confetti={if @show_confetti, do: "true", else: "false"}
@@ -1311,6 +1287,136 @@ defmodule YscWeb.BookingReceiptLive do
       "succeeded" -> is_binary(Map.get(params, "payment_intent"))
       "failed" -> true
       _ -> false
+    end
+  end
+
+  defp assign_receipt_loading_shell(socket, booking_id, params) do
+    assign(socket,
+      booking_id: booking_id,
+      loading_booking?: true,
+      booking: nil,
+      show_confetti: receipt_show_confetti?(params),
+      show_reservation_updated: Map.get(params, "updated") == "true",
+      page_title: "Booking Confirmation",
+      meta_description:
+        "Your cabin booking confirmation from Young Scandinavians Club."
+    )
+  end
+
+  defp receipt_show_confetti?(params) do
+    Map.get(params, "confetti") == "true" ||
+      Map.get(params, "redirect_status") == "succeeded"
+  end
+
+  defp receipt_timezone(socket) do
+    case get_connect_params(socket) do
+      nil ->
+        "America/Los_Angeles"
+
+      connect_params ->
+        Map.get(connect_params, "timezone", "America/Los_Angeles")
+    end
+  end
+
+  defp loaded_booking_matches?(socket, booking_id) do
+    match?(%Booking{id: ^booking_id}, socket.assigns[:booking])
+  end
+
+  defp fetch_user_booking(booking_id, user) do
+    # SECURITY: Filter by user_id in the database query to prevent unauthorized access
+    # PERFORMANCE: Preload all associations in a single query to avoid N+1
+    from(b in Booking,
+      where: b.id == ^booking_id and b.user_id == ^user.id,
+      preload: [
+        {:user, :current_avatar},
+        :booking_guests,
+        rooms: :room_category
+      ]
+    )
+    |> Repo.one()
+  end
+
+  defp mount_receipt_with_stripe_redirect(socket, user, booking_id, params) do
+    timezone = receipt_timezone(socket)
+    show_confetti = receipt_show_confetti?(params)
+
+    Ysc.Logging.debug(
+      "Confetti check: params=#{inspect(params)}, show_confetti=#{show_confetti}"
+    )
+
+    case fetch_user_booking(booking_id, user) do
+      nil ->
+        {:ok,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :error,
+           YscWeb.BookingUserMessages.reservation_not_found(),
+           title: "Booking"
+         )
+         |> redirect(to: ~p"/")}
+
+      booking ->
+        socket =
+          socket
+          |> assign_receipt_loading_shell(booking_id, params)
+          |> assign_initial_receipt_state(
+            booking,
+            user,
+            timezone,
+            show_confetti,
+            Map.get(params, "updated") == "true"
+          )
+          |> assign(:loading_booking?, false)
+
+        # Finalize redirect-based payments (Amazon Pay, CashApp, etc.) whenever
+        # Stripe return params are present — including the dead render — so a
+        # succeeded charge is not left unconfirmed if the WebSocket never connects.
+        {socket, booking} =
+          finalize_stripe_redirect(socket, params, booking, booking_id)
+
+        if connected?(socket) do
+          {:ok, load_receipt_data_async(socket, booking)}
+        else
+          {:ok, socket}
+        end
+    end
+  end
+
+  defp load_booking_for_receipt(socket, user, booking_id, params) do
+    timezone = receipt_timezone(socket)
+    show_confetti = receipt_show_confetti?(params)
+
+    socket =
+      if loaded_booking_matches?(socket, booking_id) do
+        assign(socket, :loading_booking?, false)
+      else
+        case fetch_user_booking(booking_id, user) do
+          nil ->
+            socket
+            |> YscWeb.Flash.put_toast(
+              :error,
+              YscWeb.BookingUserMessages.reservation_not_found(),
+              title: "Booking"
+            )
+            |> redirect(to: ~p"/")
+
+          booking ->
+            socket
+            |> assign_initial_receipt_state(
+              booking,
+              user,
+              timezone,
+              show_confetti,
+              Map.get(params, "updated") == "true"
+            )
+            |> assign(:loading_booking?, false)
+        end
+      end
+
+    if socket.redirected do
+      socket
+    else
+      load_receipt_data_async(socket, socket.assigns.booking)
     end
   end
 

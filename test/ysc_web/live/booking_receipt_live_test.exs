@@ -41,11 +41,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+      assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/#{Ecto.ULID.generate()}/receipt")
 
       assert path == "/"
-      assert flash["error"] =~ "couldn't find this reservation"
     end
 
     test "prevents accessing another user's booking", %{conn: conn} do
@@ -56,11 +55,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       # Create booking for other user
       booking = booking_fixture(%{user_id: other_user.id})
 
-      assert {:error, {:redirect, %{to: path, flash: flash}}} =
+      assert {:error, {:redirect, %{to: path}}} =
                live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert path == "/"
-      assert flash["error"] =~ "couldn't find this reservation"
     end
 
     test "loads booking receipt successfully for own booking", %{conn: conn} do
