@@ -2,6 +2,8 @@ defmodule YscWeb.EventsListLive do
   use YscWeb, :live_component
 
   alias Ysc.Events
+  alias Ysc.Events.DateTimeFormatter
+  alias Ysc.Media.Image
   alias Money
   alias YscWeb.PlainText
 
@@ -54,7 +56,7 @@ defmodule YscWeb.EventsListLive do
               ]}>
                 <canvas
                   id={"blur-hash-hero-#{@hero_event.id}"}
-                  src={get_blur_hash(@hero_event.image)}
+                  src={Image.blur_hash_for_display(@hero_event.image)}
                   class="absolute inset-0 z-0 w-full h-full object-cover"
                   phx-hook="BlurHashCanvas"
                 ></canvas>
@@ -113,7 +115,7 @@ defmodule YscWeb.EventsListLive do
                   <%!-- Date/time pill — mobile only, matches event_card --%>
                   <div class="flex items-center gap-2 mb-4 sm:hidden">
                     <span class="text-sm font-black px-2.5 py-1 rounded bg-zinc-100 text-zinc-900 uppercase tracking-[0.2em]">
-                      {format_event_date_time(@hero_event)}
+                      {DateTimeFormatter.format_event_start(@hero_event)}
                     </span>
                   </div>
 
@@ -124,7 +126,7 @@ defmodule YscWeb.EventsListLive do
                   <%!-- Date + location inline row — desktop overlay only --%>
                   <div class="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 text-white/80">
                     <span class="text-sm font-black uppercase tracking-[0.1em]">
-                      {format_event_date_time(@hero_event)}
+                      {DateTimeFormatter.format_event_start(@hero_event)}
                     </span>
                     <span
                       :if={@hero_event.location_name}
@@ -602,34 +604,10 @@ defmodule YscWeb.EventsListLive do
   end
 
   # Hero event helper functions (from EventsLive)
-  defp get_blur_hash(image) do
-    if image && image.blur_hash,
-      do: image.blur_hash,
-      else: "LKN]Rv%2Tw=w]~RBVZRi};RPxuwH"
-  end
-
   defp event_image_url(image) do
     if image && image.optimized_image_path,
       do: image.optimized_image_path,
       else: "/images/placeholder-event.jpg"
-  end
-
-  defp format_event_date_time(event) do
-    start_date = Map.get(event, :start_date)
-    start_time = Map.get(event, :start_time)
-
-    cond do
-      start_date && start_time ->
-        date_str = Timex.format!(start_date, "{Mshort} {D}, {YYYY}")
-        time_str = Timex.format!(start_time, "{h12}:{m} {AM}")
-        "#{date_str} at #{time_str}"
-
-      start_date ->
-        Timex.format!(start_date, "{Mshort} {D}, {YYYY}")
-
-      true ->
-        "Date TBD"
-    end
   end
 
   defp get_hero_event_badges(event) do

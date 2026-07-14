@@ -67,6 +67,41 @@ defmodule Ysc.Events.DateTimeFormatter do
     format_date(start_date)
   end
 
+  @doc """
+  Formats an event's start date and optional time for compact UI (hero cards, TV posters).
+
+  ## Options
+
+    * `:separator` - between date and time (default `" at "`; TV posters use `" · "`)
+    * `:default` - label when `start_date` is nil (default `"Date TBD"`)
+
+  Accepts an event map with `:start_date` and `:start_time`. `start_time` may be a
+  `%Time{}`, `%NaiveDateTime{}`, or `%DateTime{}`.
+  """
+  def format_event_start(event, opts \\ [])
+
+  def format_event_start(event, opts) when is_map(event) do
+    start_date = Map.get(event, :start_date) || Map.get(event, "start_date")
+    start_time = Map.get(event, :start_time) || Map.get(event, "start_time")
+
+    format_event_start(start_date, start_time, opts)
+  end
+
+  def format_event_start(nil, _start_time, opts) do
+    Keyword.get(opts, :default, "Date TBD")
+  end
+
+  def format_event_start(start_date, start_time, opts) do
+    separator = Keyword.get(opts, :separator, " at ")
+    time = event_start_time(start_time)
+
+    if time do
+      "#{format_date(start_date)}#{separator}#{format_time(time)}"
+    else
+      format_date(start_date)
+    end
+  end
+
   defp format_date_time(date, nil), do: format_date(date)
   defp format_date_time(nil, time), do: format_time(time)
 
@@ -78,4 +113,9 @@ defmodule Ysc.Events.DateTimeFormatter do
 
   defp format_time(nil), do: nil
   defp format_time(time), do: Timex.format!(time, "{h12}:{m} {AM}")
+
+  defp event_start_time(%Time{} = time), do: time
+  defp event_start_time(%NaiveDateTime{} = dt), do: NaiveDateTime.to_time(dt)
+  defp event_start_time(%DateTime{} = dt), do: DateTime.to_time(dt)
+  defp event_start_time(time), do: time
 end

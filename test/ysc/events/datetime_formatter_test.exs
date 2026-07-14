@@ -178,4 +178,56 @@ defmodule Ysc.Events.DateTimeFormatterTest do
       assert result == ""
     end
   end
+
+  describe "format_event_start/2" do
+    test "formats date and time with default separator" do
+      result =
+        DateTimeFormatter.format_event_start(%{
+          start_date: ~D[2024-12-01],
+          start_time: ~T[10:00:00]
+        })
+
+      assert result == "Dec 1, 2024 at 10:00 AM"
+    end
+
+    test "formats date only" do
+      result =
+        DateTimeFormatter.format_event_start(%{
+          start_date: ~D[2024-12-01],
+          start_time: nil
+        })
+
+      assert result == "Dec 1, 2024"
+    end
+
+    test "returns default label when start_date is nil" do
+      assert DateTimeFormatter.format_event_start(%{start_date: nil}) ==
+               "Date TBD"
+
+      assert DateTimeFormatter.format_event_start(%{start_date: nil},
+               default: "TBD"
+             ) ==
+               "TBD"
+    end
+
+    test "supports custom separator for TV posters" do
+      result =
+        DateTimeFormatter.format_event_start(
+          %{start_date: ~D[2026-07-28], start_time: ~T[19:00:00]},
+          separator: " · "
+        )
+
+      assert result == "Jul 28, 2026 · 7:00 PM"
+    end
+
+    test "normalizes datetime values for start_time" do
+      result =
+        DateTimeFormatter.format_event_start(%{
+          start_date: ~D[2026-07-28],
+          start_time: ~U[2026-07-28 19:00:00Z]
+        })
+
+      assert result == "Jul 28, 2026 at 7:00 PM"
+    end
+  end
 end
