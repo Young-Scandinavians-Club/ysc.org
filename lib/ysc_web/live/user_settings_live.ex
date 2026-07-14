@@ -2190,7 +2190,22 @@ defmodule YscWeb.UserSettingsLive do
             </div>
 
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-6">
-              <h2 class="text-zinc-900 font-bold text-xl">Payment History</h2>
+              <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                  <h2 class="text-zinc-900 font-bold text-xl">
+                    My Bookings & Tickets
+                  </h2>
+                  <p class="text-sm text-zinc-600 mt-1 max-w-2xl">
+                    Open a past payment below to view or manage a cabin reservation. Event tickets are listed separately.
+                  </p>
+                </div>
+                <.link
+                  navigate={~p"/users/tickets"}
+                  class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 transition-colors shrink-0"
+                >
+                  <.icon name="hero-ticket" class="w-4 h-4" /> View event tickets
+                </.link>
+              </div>
               <!-- Loading state for payments -->
               <div
                 :if={assigns[:loading_payments]}
@@ -2198,7 +2213,7 @@ defmodule YscWeb.UserSettingsLive do
                 role="status"
                 aria-live="polite"
               >
-                <span class="sr-only">Loading payment history…</span>
+                <span class="sr-only">Loading bookings and payments…</span>
                 <div class="flex flex-wrap gap-2 pb-4 border-b border-zinc-200">
                   <.skeleton_block :for={_ <- 1..4} class="h-9 w-20 rounded-full" />
                 </div>

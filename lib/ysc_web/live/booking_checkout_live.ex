@@ -729,7 +729,7 @@ defmodule YscWeb.BookingCheckoutLive do
                     4
                   </span>
                   <span>
-                    Access your booking details and manage your reservation anytime
+                    {YscWeb.BookingUserMessages.checkout_manage_booking_step()}
                   </span>
                 </li>
               <% end %>

@@ -133,11 +133,11 @@ defmodule YscWeb.BookingChangeLive do
      |> assign(:finalize_payment_intent_id, nil)
      |> assign(
        :payment_error,
-       "Your payment went through, but we couldn't save your new dates. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your booking confirmation number."
+       YscWeb.BookingUserMessages.modification_finalize_failed()
      )
      |> YscWeb.Flash.put_toast(
        :error,
-       "Your payment went through, but we couldn't save your new dates. Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your booking confirmation number.",
+       YscWeb.BookingUserMessages.modification_finalize_failed(),
        title: "Payment received"
      )}
   end
@@ -1303,7 +1303,7 @@ defmodule YscWeb.BookingChangeLive do
   defp modification_error_message_after_payment(reason) do
     "Your payment went through. " <>
       modification_error_message(reason) <>
-      " Open this booking from My Bookings and check whether the dates updated. If they didn't, email info@ysc.org with your booking confirmation number."
+      YscWeb.BookingUserMessages.modification_after_payment_recovery_suffix()
   end
 
   defp proceed_after_modification_details(socket, params, preview) do

@@ -735,7 +735,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       render(view)
 
       assert has_element?(view, "#payments-list")
-      assert render(view) =~ "Payment History"
+      assert render(view) =~ "My Bookings &amp; Tickets"
 
       view
       |> element(
@@ -743,7 +743,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "Payment History"
+      assert render(view) =~ "My Bookings &amp; Tickets"
     end
 
     test "filter-payments clear_lake updates stream without crashing", %{
@@ -779,7 +779,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       )
       |> render_click()
 
-      assert render(view) =~ "Payment History"
+      assert render(view) =~ "My Bookings &amp; Tickets"
     end
 
     test "payments tab omits benefits and reservations panels when none are usable",
@@ -1642,7 +1642,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         |> render_click()
       end
 
-      assert render(view) =~ "Payment History"
+      assert render(view) =~ "My Bookings &amp; Tickets"
     end
   end
 
