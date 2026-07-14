@@ -201,9 +201,12 @@ defmodule Ysc.Events.DateTimeFormatterTest do
     end
 
     test "returns default label when start_date is nil" do
-      assert DateTimeFormatter.format_event_start(%{start_date: nil}) == "Date TBD"
+      assert DateTimeFormatter.format_event_start(%{start_date: nil}) ==
+               "Date TBD"
 
-      assert DateTimeFormatter.format_event_start(%{start_date: nil}, default: "TBD") ==
+      assert DateTimeFormatter.format_event_start(%{start_date: nil},
+               default: "TBD"
+             ) ==
                "TBD"
     end
 
