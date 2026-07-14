@@ -73,6 +73,9 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.checkout_cabin_access_step() =~
              "cabin access details"
+
+    assert BookingUserMessages.checkout_manage_booking_step() =~
+             "My Bookings & Tickets"
   end
 
   test "cabin availability error copy" do
@@ -145,6 +148,21 @@ defmodule YscWeb.BookingUserMessagesTest do
 
     assert BookingUserMessages.modification_redirect_update_failed() =~
              "couldn't update your reservation"
+
+    assert BookingUserMessages.modification_finalize_failed() =~
+             "couldn't save your new dates"
+
+    assert BookingUserMessages.modification_after_payment_recovery_suffix() =~
+             "booking reference"
+
+    refute BookingUserMessages.modification_after_payment_recovery_suffix() =~
+             "confirmation number"
+
+    assert BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
+             "booking reference"
+
+    refute BookingUserMessages.cancel_refund_error({:payment_not_found, nil}) =~
+             "confirmation number"
   end
 
   test "booking creation failed message" do

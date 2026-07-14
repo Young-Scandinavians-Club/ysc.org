@@ -108,6 +108,10 @@ defmodule YscWeb.BookingUserMessages do
     "You'll receive cabin access details (door code or key instructions) by email before check-in"
   end
 
+  def checkout_manage_booking_step do
+    "View or change your reservation anytime from My Bookings & Tickets in your account menu, or use the link in your confirmation email"
+  end
+
   def checkout_pricing_load_failed do
     trim("""
     We couldn't load the pricing for this booking. Please go back and try again, or email info@ysc.org if this keeps happening.
@@ -146,20 +150,59 @@ defmodule YscWeb.BookingUserMessages do
 
   def modification_redirect_hold_expired do
     trim("""
-    Your payment went through, but we couldn't save your new dates in time. Your original reservation is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with your confirmation number.
+    Your payment went through, but we couldn't save your new dates in time. Your original reservation is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with #{booking_reference_support_phrase()}.
     """)
   end
 
   def modification_redirect_ledger_payment_failed do
     trim("""
-    Your payment went through, but we couldn't record it for your updated reservation. Open this booking from My Bookings & Tickets and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
+    Your payment went through, but we couldn't record it for your updated reservation. #{modification_after_payment_recovery_body()}
     """)
   end
 
   def modification_redirect_update_failed do
     trim("""
-    Your payment went through, but we couldn't update your reservation. Open this booking from My Bookings & Tickets and check whether the dates updated. If they didn't, email info@ysc.org with your confirmation number.
+    Your payment went through, but we couldn't update your reservation. #{modification_after_payment_recovery_body()}
     """)
+  end
+
+  def modification_finalize_failed do
+    trim("""
+    Your payment went through, but we couldn't save your new dates. #{modification_after_payment_recovery_body()}
+    """)
+  end
+
+  def modification_after_payment_recovery_suffix do
+    " #{modification_after_payment_recovery_body()}"
+  end
+
+  def cancel_refund_error(reason) do
+    support = "Email info@ysc.org with #{booking_reference_support_phrase()}"
+
+    case reason do
+      {:payment_not_found, _} ->
+        "We cancelled your reservation, but we couldn't find your payment record to process a refund. #{support} and we'll help."
+
+      {:calculation_failed, _} ->
+        "We cancelled your reservation, but we couldn't calculate your refund right now. #{support} and we'll follow up."
+
+      {:refund_failed, _} ->
+        "We cancelled your reservation, but your refund couldn't be processed automatically. #{support} and we'll help."
+
+      {:pending_refund_failed, _} ->
+        "We cancelled your reservation, but we couldn't submit your refund for review. #{support} and we'll follow up."
+
+      {:cancellation_failed, _} ->
+        "We couldn't cancel your reservation. Please try again, or email info@ysc.org if the problem continues."
+    end
+  end
+
+  def booking_reference_support_phrase do
+    "your booking reference (shown on your receipt as Booking Reference)"
+  end
+
+  defp modification_after_payment_recovery_body do
+    "Open this booking from My Bookings & Tickets (under your account menu) and check whether the dates updated. If they didn't, email info@ysc.org with #{booking_reference_support_phrase()}."
   end
 
   defp trim(string), do: String.trim(string)
