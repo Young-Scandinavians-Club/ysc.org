@@ -99,7 +99,8 @@ defmodule YscWeb.UserBookingDetailLive do
              |> YscWeb.Flash.put_toast(:info, refund_message, title: "Booking")}
 
           {:error, reason} ->
-            error_message = YscWeb.BookingUserMessages.cancel_refund_error(reason)
+            error_message =
+              YscWeb.BookingUserMessages.cancel_refund_error(reason)
 
             {:noreply,
              socket
