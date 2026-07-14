@@ -3230,7 +3230,12 @@ defmodule YscWeb.UserSettingsLive do
           code = normalize_verification_code(entered_code)
 
           with :ok <- Ysc.EmailVerificationRateLimit.check(user.id, :phone) do
-            verify_phone_code_with_rate_limit(socket, user, pending_phone, code)
+            verify_phone_code_with_rate_limit(
+              socket,
+              user,
+              pending_phone,
+              code
+            )
           else
             :rate_limited ->
               {:noreply,
