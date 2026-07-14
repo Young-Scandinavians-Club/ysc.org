@@ -74,8 +74,8 @@ defmodule YscWeb.NewsLive do
                   phx-hook="BlurHashCanvas"
                 ></canvas>
                 <img
-                  src={featured_image_url(@featured.featured_image)}
-                  srcset={image_srcset(@featured.featured_image)}
+                  src={Image.display_path_with_fallback(@featured.featured_image)}
+                  srcset={Image.responsive_srcset(@featured.featured_image)}
                   sizes="(max-width: 1280px) 100vw, 1280px"
                   id={"image-#{@featured.id}"}
                   phx-hook="BlurHashImage"
@@ -207,8 +207,8 @@ defmodule YscWeb.NewsLive do
                   phx-hook="BlurHashCanvas"
                 ></canvas>
                 <img
-                  src={featured_image_url(post.featured_image)}
-                  srcset={image_srcset(post.featured_image)}
+                  src={Image.display_path_with_fallback(post.featured_image)}
+                  srcset={Image.responsive_srcset(post.featured_image)}
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   id={"image-#{post.id}"}
                   loading="lazy"
@@ -418,24 +418,6 @@ defmodule YscWeb.NewsLive do
   end
 
   defp preview_text(post), do: PlainText.from_post(post)
-
-  defp featured_image_url(nil), do: "/images/ysc_logo.webp"
-
-  defp featured_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.webp"
-
-  defp featured_image_url(%Image{optimized_image_path: optimized_path}),
-    do: optimized_path
-
-  defp image_srcset(nil), do: nil
-  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
-  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
-
-  defp image_srcset(%Image{
-         thumbnail_path: thumb,
-         optimized_image_path: optimized
-       }),
-       do: "#{thumb} 500w, #{optimized} 1920w"
 
   # Calculate reading time based on word count (average 225 words per minute)
   # Uses rendered_body if available, otherwise falls back to raw_body

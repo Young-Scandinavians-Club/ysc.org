@@ -105,8 +105,8 @@ defmodule YscWeb.PostLive do
         ></canvas>
 
         <img
-          src={featured_image_url(@post.featured_image)}
-          srcset={image_srcset(@post.featured_image)}
+          src={Image.display_path_with_fallback(@post.featured_image)}
+          srcset={Image.responsive_srcset(@post.featured_image)}
           sizes="(max-width: 1280px) 100vw, 1280px"
           id={"image-#{@post.image_id}"}
           loading="eager"
@@ -381,22 +381,6 @@ defmodule YscWeb.PostLive do
 
   defp get_reply_to_id(%Comment{comment_id: nil} = comment), do: comment.id
   defp get_reply_to_id(comment), do: comment.comment_id
-
-  defp featured_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path
-
-  defp featured_image_url(%Image{optimized_image_path: optimized_path}),
-    do: optimized_path
-
-  defp image_srcset(nil), do: nil
-  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
-  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
-
-  defp image_srcset(%Image{
-         thumbnail_path: thumb,
-         optimized_image_path: optimized
-       }),
-       do: "#{thumb} 500w, #{optimized} 1920w"
 
   # Format board position using the lookup map
   defp format_board_position(position) when is_atom(position) do

@@ -21,7 +21,7 @@ defmodule YscWeb.Components.Image do
 
       <img
         src={image_url(@image, @preferred_type)}
-        srcset={image_srcset(@image)}
+        srcset={Image.responsive_srcset(@image)}
         sizes={@sizes}
         id={"image-#{@id}"}
         loading={@loading}
@@ -77,54 +77,26 @@ defmodule YscWeb.Components.Image do
 
   # Helper function to get the best available image path with fallbacks
   # Supports preferred_type: :optimized, :thumbnail, :raw, or nil (default)
-  defp image_url(nil, _preferred_type), do: "/images/ysc_logo.webp"
+  defp image_url(nil, _preferred_type), do: Image.default_placeholder_path()
 
   # Prefer optimized image (for detail pages) - skip thumbnail, fallback to raw
   defp image_url(%Image{} = image, :optimized) do
-    cond do
-      not is_nil(image.optimized_image_path) -> image.optimized_image_path
-      not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.webp"
-    end
+    Image.display_path_with_fallback(image)
   end
 
   # Prefer thumbnail (for lists/grids) - fallback to optimized, then raw
   defp image_url(%Image{} = image, :thumbnail) do
-    cond do
-      not is_nil(image.thumbnail_path) -> image.thumbnail_path
-      not is_nil(image.optimized_image_path) -> image.optimized_image_path
-      not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.webp"
-    end
+    Image.thumbnail_path_with_fallback(image)
   end
 
   # Prefer raw image only
   defp image_url(%Image{} = image, :raw) do
-    image.raw_image_path || "/images/ysc_logo.webp"
+    image.raw_image_path || Image.default_placeholder_path()
   end
 
   # Default: thumbnail > optimized > raw (backward compatible)
   defp image_url(%Image{} = image, nil) do
-    cond do
-      not is_nil(image.thumbnail_path) -> image.thumbnail_path
-      not is_nil(image.optimized_image_path) -> image.optimized_image_path
-      not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.webp"
-    end
-  end
-
-  # Build a srcset string from thumbnail (500w) and optimized (1920w) when both exist,
-  # so the browser picks the right size for the current viewport.
-  defp image_srcset(nil), do: nil
-
-  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
-  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
-
-  defp image_srcset(%Image{
-         thumbnail_path: thumb,
-         optimized_image_path: optimized
-       }) do
-    "#{thumb} 500w, #{optimized} 1920w"
+    Image.thumbnail_path_with_fallback(image)
   end
 
   defp image_dimension(nil, _), do: nil

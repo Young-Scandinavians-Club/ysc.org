@@ -61,7 +61,12 @@ defmodule YscWeb.EventsListLive do
                   phx-hook="BlurHashCanvas"
                 ></canvas>
                 <img
-                  src={event_image_url(@hero_event.image)}
+                  src={
+                    Image.optimized_path_with_fallback(
+                      @hero_event.image,
+                      "/images/placeholder-event.jpg"
+                    )
+                  }
                   id={"image-hero-#{@hero_event.id}"}
                   phx-hook="BlurHashImage"
                   class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
@@ -604,12 +609,6 @@ defmodule YscWeb.EventsListLive do
   end
 
   # Hero event helper functions (from EventsLive)
-  defp event_image_url(image) do
-    if image && image.optimized_image_path,
-      do: image.optimized_image_path,
-      else: "/images/placeholder-event.jpg"
-  end
-
   defp get_hero_event_badges(event) do
     badges = []
 
