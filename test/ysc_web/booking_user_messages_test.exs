@@ -170,7 +170,9 @@ defmodule YscWeb.BookingUserMessagesTest do
     assert BookingUserMessages.cancel_refund_error({:refund_failed, nil}) =~
              "refund couldn't be processed automatically"
 
-    assert BookingUserMessages.cancel_refund_error({:pending_refund_failed, nil}) =~
+    assert BookingUserMessages.cancel_refund_error(
+             {:pending_refund_failed, nil}
+           ) =~
              "couldn't submit your refund for review"
 
     assert BookingUserMessages.cancel_refund_error({:cancellation_failed, nil}) =~
