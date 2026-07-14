@@ -134,11 +134,5 @@
 <mj-spacer height="16px"></mj-spacer>
 <% end %>
 <%= if YscWeb.Emails.NewsletterEdition.present_unsubscribe_url?(@unsubscribe_url) do %>
-<mj-section padding="24px 48px 48px 48px">
-  <mj-column padding="0">
-    <mj-text align="center" font-size="12px" line-height="1.5" padding="0px" color="#888888">
-      <a href="<%= @unsubscribe_url %>" style="color: #888888; text-decoration: underline;">Unsubscribe from newsletters</a>
-    </mj-text>
-  </mj-column>
-</mj-section>
+<%= render_dynamic_component YscWeb.Emails.NotificationSettingsFooter, url: @unsubscribe_url, link_text: "Unsubscribe from newsletters" %>
 <% end %>
