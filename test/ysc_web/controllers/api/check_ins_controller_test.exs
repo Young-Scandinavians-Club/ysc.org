@@ -307,14 +307,12 @@ defmodule YscWeb.Api.CheckInsControllerTest do
     end
 
     test "rejects bookings that have not started yet", %{conn: conn} do
-      today_pst =
-        DateTime.now!("America/Los_Angeles")
-        |> DateTime.to_date()
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       booking =
         active_check_in_booking_fixture(%{
-          checkin_date: Date.add(today_pst, 3),
-          checkout_date: Date.add(today_pst, 5)
+          checkin_date: checkin,
+          checkout_date: checkout
         })
 
       payload = %{
