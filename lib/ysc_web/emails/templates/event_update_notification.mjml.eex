@@ -54,10 +54,6 @@
     <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
       <strong>Young Scandinavians Club</strong>
     </mj-text>
-    <mj-spacer height="24px"></mj-spacer>
-    <mj-text align="left" font-size="12px" line-height="1.5" padding="0px" color="#888888">
-      You are receiving this email because you have a ticket for this event.
-      <a href="<%= @notification_settings_url %>" style="color: #888888; text-decoration: underline;">Manage notification settings</a>
-    </mj-text>
   </mj-column>
 </mj-section>
+<%= render_dynamic_component YscWeb.Emails.NotificationSettingsFooter, url: @notification_settings_url, link_text: "Manage notification settings", context: "You are receiving this email because you have a ticket for this event." %>

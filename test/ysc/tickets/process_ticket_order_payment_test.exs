@@ -517,4 +517,75 @@ defmodule Ysc.Tickets.ProcessTicketOrderPaymentTest do
       end
     )
   end
+
+  test "rejects succeeded payment intent when user_id metadata does not match order owner",
+       %{
+         user: user,
+         event: event
+       } do
+    {:ok, tier} =
+      Ysc.Events.create_ticket_tier(%{
+        name: "General",
+        type: :paid,
+        price: Money.new(40, :USD),
+        quantity: 50,
+        event_id: event.id
+      })
+
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      end)
+
+    other_user = user_fixture_unique()
+
+    payment_intent = %Stripe.PaymentIntent{
+      id: "pi_wrong_user_#{order.id}",
+      status: "succeeded",
+      amount: Ysc.MoneyHelper.money_to_cents(order.total_amount),
+      metadata: %{
+        "ticket_order_id" => order.id,
+        "user_id" => other_user.id
+      }
+    }
+
+    assert {:error, :payment_metadata_mismatch} =
+             Tickets.process_ticket_order_payment(order, payment_intent)
+
+    assert Tickets.get_ticket_order(order.id).status == :pending
+  end
+
+  test "accepts atom-key metadata on succeeded payment intents", %{
+    user: user,
+    event: event
+  } do
+    {:ok, tier} =
+      Ysc.Events.create_ticket_tier(%{
+        name: "General",
+        type: :paid,
+        price: Money.new(40, :USD),
+        quantity: 50,
+        event_id: event.id
+      })
+
+    {:ok, order} =
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        Tickets.create_ticket_order(user.id, event.id, %{tier.id => 1})
+      end)
+
+    payment_intent = %Stripe.PaymentIntent{
+      id: "pi_atom_metadata_#{order.id}",
+      status: "succeeded",
+      amount: Ysc.MoneyHelper.money_to_cents(order.total_amount),
+      metadata: %{
+        ticket_order_id: order.id,
+        user_id: user.id
+      }
+    }
+
+    assert {:ok, completed} =
+             Tickets.process_ticket_order_payment(order, payment_intent)
+
+    assert completed.status == :completed
+  end
 end
