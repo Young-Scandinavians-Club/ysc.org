@@ -3815,8 +3815,7 @@ defmodule Ysc.BookingsTest do
       ensure_buyout_base_pricing!()
 
       user = user_fixture()
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                Ysc.Bookings.BookingLocker.create_buyout_booking(
