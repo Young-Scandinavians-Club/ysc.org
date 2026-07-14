@@ -45,9 +45,7 @@ defmodule YscWeb.BookingReceiptDeferredTest do
       Ysc.QueryCounter.with_query_counter(
         fn ->
           conn
-          |> get(
-            ~p"/bookings/#{booking.id}/receipt?redirect_status=failed"
-          )
+          |> get(~p"/bookings/#{booking.id}/receipt?redirect_status=failed")
           |> html_response(200)
         end,
         pattern: bookings_pattern

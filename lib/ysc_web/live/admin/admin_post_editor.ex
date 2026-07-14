@@ -145,8 +145,8 @@ defmodule YscWeb.AdminPostEditorLive do
       </div>
 
       <.form
-        :if={!@loading_post?}
         :let={_f}
+        :if={!@loading_post?}
         for={@form}
         id="edit_post_form"
         phx-submit="save"
@@ -465,6 +465,17 @@ defmodule YscWeb.AdminPostEditorLive do
           socket
         end
       end)
+
+    {:noreply, socket}
+  end
+
+  def handle_params(_params, _uri, socket) do
+    socket =
+      if socket.assigns.live_action != :settings do
+        assign(socket, :pending_publish?, false)
+      else
+        socket
+      end
 
     {:noreply, socket}
   end
@@ -1008,7 +1019,8 @@ defmodule YscWeb.AdminPostEditorLive do
       pending_form_values: %{},
       create_topic: nil,
       preview_device: :computer,
-      form: to_form(Post.editor_changeset(%Post{state: :draft}, %{}), as: "post")
+      form:
+        to_form(Post.editor_changeset(%Post{state: :draft}, %{}), as: "post")
     )
   end
 

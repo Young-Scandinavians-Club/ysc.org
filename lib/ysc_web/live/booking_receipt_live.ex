@@ -1310,8 +1310,11 @@ defmodule YscWeb.BookingReceiptLive do
 
   defp receipt_timezone(socket) do
     case get_connect_params(socket) do
-      nil -> "America/Los_Angeles"
-      connect_params -> Map.get(connect_params, "timezone", "America/Los_Angeles")
+      nil ->
+        "America/Los_Angeles"
+
+      connect_params ->
+        Map.get(connect_params, "timezone", "America/Los_Angeles")
     end
   end
 
@@ -1368,7 +1371,8 @@ defmodule YscWeb.BookingReceiptLive do
         # Finalize redirect-based payments (Amazon Pay, CashApp, etc.) whenever
         # Stripe return params are present — including the dead render — so a
         # succeeded charge is not left unconfirmed if the WebSocket never connects.
-        {socket, booking} = finalize_stripe_redirect(socket, params, booking, booking_id)
+        {socket, booking} =
+          finalize_stripe_redirect(socket, params, booking, booking_id)
 
         if connected?(socket) do
           {:ok, load_receipt_data_async(socket, booking)}
