@@ -186,7 +186,8 @@ defmodule Ysc.Tickets.CheckoutCancelTest do
       tier = ticket_tier_fixture(%{event_id: event.id})
 
       safe_order = ticket_order_fixture(%{user: user, event: event, tier: tier})
-      unsafe_order = ticket_order_fixture(%{user: user, event: event, tier: tier})
+      unsafe_order =
+        ticket_order_fixture(%{user: user, event: event, tier: tier})
 
       # Second checkout supersedes the first; restore it so both pending orders exist.
       safe_order =
