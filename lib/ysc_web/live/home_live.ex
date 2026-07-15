@@ -35,9 +35,6 @@ defmodule YscWeb.HomeLive do
           just_logged_in: just_logged_in
         )
 
-      # Note: The just_logged_in session flag will persist for this page load
-      # It will be cleared on the next page navigation
-
       if connected?(socket) do
         PublicContentCache.subscribe()
         {:ok, load_home_data_async(socket)}

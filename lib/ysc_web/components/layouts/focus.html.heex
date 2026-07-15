@@ -1,4 +1,3 @@
-<% {toasts_sync, flash} = YscWeb.Layouts.toasts_sync_with_flash(assigns) %>
 <div class="min-h-screen bg-zinc-50 flex flex-col">
   <header class="pt-8 pb-4 px-4">
     <div class="max-w-lg mx-auto flex justify-center">
@@ -21,11 +20,9 @@
       {@inner_content}
     </div>
   </main>
-  <.toast_group
-    flash={flash}
+  <.toast_group_with_bridge
     connected={assigns[:socket] != nil}
     corner={:top_right}
-    toasts_sync={toasts_sync}
-    group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
+    {assigns}
   />
 </div>

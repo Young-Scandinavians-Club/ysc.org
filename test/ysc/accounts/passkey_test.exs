@@ -244,6 +244,33 @@ defmodule Ysc.Accounts.PasskeyTest do
       assert Accounts.should_show_passkey_prompt?(user) == false
     end
 
+    test "returns false when preloaded passkeys are stale but DB has passkeys",
+         %{
+           user: user
+         } do
+      credential_id = :crypto.strong_rand_bytes(16)
+
+      public_key_map = %{
+        -3 => :crypto.strong_rand_bytes(32),
+        -2 => :crypto.strong_rand_bytes(32),
+        -1 => 1,
+        1 => 2,
+        3 => -7
+      }
+
+      {:ok, _passkey} =
+        Accounts.create_user_passkey(user, %{
+          external_id: credential_id,
+          public_key: UserPasskey.encode_public_key(public_key_map),
+          nickname: "Test Device"
+        })
+
+      stale_user = user |> Ysc.Repo.preload(:passkeys) |> Map.put(:passkeys, [])
+
+      assert Ecto.assoc_loaded?(stale_user.passkeys)
+      assert Accounts.should_show_passkey_prompt?(stale_user) == false
+    end
+
     test "returns false when user dismissed less than 30 days ago", %{
       user: user
     } do

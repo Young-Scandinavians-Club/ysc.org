@@ -492,6 +492,22 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
       assert html =~ "remind" or html =~ "30 days"
     end
+
+    test "does not show banner when user already has a passkey", %{conn: conn} do
+      user = user_fixture()
+      passkey_fixture(user)
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> put_session("just_logged_in", true)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+
+      refute has_element?(view, "#passkey-prompt-banner")
+    end
   end
 
   describe "guest — marketing sections and edge cases" do

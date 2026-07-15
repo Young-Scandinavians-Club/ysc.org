@@ -63,6 +63,7 @@ import TicketCheckout from "./ticket_checkout";
 import WalletPlatform, { detectWalletPlatform } from "./wallet_platform";
 import AvatarCropper from "./avatar_cropper";
 import { createLiveToastHook } from "../vendor/live_toast.esm.js";
+import { ToastFlashBridge } from "./toast_flash_bridge";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
 const TOAST_DURATION_MS = 6000;
@@ -104,6 +105,7 @@ let Hooks = {
     WalletPlatform,
     AvatarCropper,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
+    ToastFlashBridge,
 };
 Hooks.LivePhone = LivePhone;
 

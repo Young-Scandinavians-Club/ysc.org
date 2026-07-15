@@ -315,9 +315,16 @@ defmodule Ysc.Accounts do
   Creates a new user passkey.
   """
   def create_user_passkey(user, attrs) do
-    %UserPasskey{}
-    |> UserPasskey.create_changeset(Map.merge(attrs, %{user_id: user.id}))
-    |> Repo.insert()
+    case %UserPasskey{}
+         |> UserPasskey.create_changeset(Map.merge(attrs, %{user_id: user.id}))
+         |> Repo.insert() do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(user)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -336,7 +343,14 @@ defmodule Ysc.Accounts do
   Deletes a user passkey.
   """
   def delete_user_passkey(passkey) do
-    Repo.delete(passkey)
+    case Repo.delete(passkey) do
+      {:ok, _} = ok ->
+        invalidate_user_profile_cache(passkey.user_id)
+        ok
+
+      error ->
+        error
+    end
   end
 
   @doc """
@@ -347,10 +361,11 @@ defmodule Ysc.Accounts do
   - Either passkey_prompt_dismissed_at is nil OR it's been more than 30 days since dismissal
   """
   def should_show_passkey_prompt?(user) do
-    # Check if user has any passkeys
-    passkeys = get_user_passkeys(user)
-
-    if Enum.empty?(passkeys) do
+    # Always query the database: preloaded :passkeys from UserProfileCache can be
+    # stale if the user registered a passkey during the same session.
+    if user_has_passkeys?(user) do
+      false
+    else
       # User has no passkeys, check dismissal status
       if is_nil(user.passkey_prompt_dismissed_at) do
         # Never dismissed, show prompt
@@ -366,10 +381,12 @@ defmodule Ysc.Accounts do
 
         days_since_dismissal >= 30
       end
-    else
-      # User has passkeys, don't show prompt
-      false
     end
+  end
+
+  defp user_has_passkeys?(user) do
+    from(p in UserPasskey, where: p.user_id == ^user.id, select: 1, limit: 1)
+    |> Repo.exists?()
   end
 
   @doc """

@@ -91,6 +91,34 @@ defmodule YscWeb.Layouts do
   defp default_icon_for_kind(:warning),
     do: &YscWeb.CoreComponents.flash_toast_icon_warning/1
 
+  attr :connected, :boolean, required: true
+  attr :corner, :atom, default: :top_right
+
+  @doc """
+  Renders the LiveToast group with promoted flash and a client hook that clears
+  server flash when promoted toasts are shown.
+  """
+  def toast_group_with_bridge(assigns) do
+    {toasts_sync, flash} = toasts_sync_with_flash(assigns)
+
+    assigns =
+      assigns
+      |> assign(:toasts_sync, toasts_sync)
+      |> assign(:flash_for_toast, flash)
+
+    ~H"""
+    <div id="toast-flash-bridge" phx-hook="ToastFlashBridge">
+      <.toast_group
+        flash={@flash_for_toast}
+        connected={@connected}
+        corner={@corner}
+        toasts_sync={@toasts_sync}
+        group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
+      />
+    </div>
+    """
+  end
+
   @doc """
   Toast container classes with z-[10000] so toasts render above modals (z-50)
   and mobile menu overlays (z-[9999]).

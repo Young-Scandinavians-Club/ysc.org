@@ -37,6 +37,18 @@ defmodule Ysc.Accounts.UserProfileCacheTest do
     assert reloaded.first_name == updated.first_name
   end
 
+  test "create_user_passkey invalidates cached profile preloads" do
+    user = user_fixture()
+
+    cached = UserProfileCache.get_user!(user.id, [:passkeys])
+    assert cached.passkeys == []
+
+    passkey_fixture(user)
+
+    refreshed = UserProfileCache.get_user!(user.id, [:passkeys])
+    assert length(refreshed.passkeys) == 1
+  end
+
   test "get_user_by_session_token does not depend on UserProfileCache" do
     user = user_fixture()
     token = Accounts.generate_user_session_token(user)

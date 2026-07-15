@@ -1,11 +1,8 @@
 <div id="app-container" class="w-full flex flex-col min-h-screen">
-  <% {toasts_sync, flash} = YscWeb.Layouts.toasts_sync_with_flash(assigns) %>
-  <.toast_group
-    flash={flash}
+  <.toast_group_with_bridge
     connected={assigns[:socket] != nil}
     corner={:top_right}
-    toasts_sync={toasts_sync}
-    group_class_fn={&YscWeb.Layouts.toast_group_class_fn/1}
+    {assigns}
   />
   <%!-- Screen-reader mirror of flash; keeps flash text in the DOM so tests and assistive technology can detect it --%>
   <div id="flash-mirror" aria-live="polite" class="sr-only">
