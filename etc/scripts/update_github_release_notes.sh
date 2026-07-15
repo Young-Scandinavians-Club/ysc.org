@@ -8,10 +8,12 @@
 #   GITHUB_REPOSITORY               (optional)  "owner/name"; inferred from `git remote` if unset
 #   OPENROUTER_MODEL                (optional)  default: google/gemma-4-31b-it
 #   OPENROUTER_REFERER              (optional)  HTTP-Referer for OpenRouter (default: this repo on GitHub)
-#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 20)
-#   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 40; use after git scope)
+#   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 100)
+#   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 200; use after git scope)
+#   OPENROUTER_PR_BODY_MAX          (optional)  max characters per PR body fetched from GitHub (default: 8000)
+#   OPENROUTER_MAX_TOKENS           (optional)  max completion tokens for the LLM response (default: 8192)
 #   OPENROUTER_SMALL_RELEASE_MAX_COMMITS (opt.)  if previous tag exists and rev-list --count PREV..TAG is at most this, do not
-#                                   cap LLM input (no OPENROUTER_MAX_* trim; per-PR body fetch up to 1M chars) (default: 8; 0 disables)
+#                                   cap LLM input (no OPENROUTER_MAX_* trim; per-PR body fetch up to 1M chars) (default: 50; 0 disables)
 #   When a previous v* tag exists, PRs are scoped by git (PREV..TAG), not only by merge timestamps on GitHub
 #   DRY_RUN                         (optional)  if 1, print notes to stdout; skip GitHub release API
 #
@@ -31,6 +33,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 DRY_RUN="${DRY_RUN:-0}"
 OPENROUTER_MODEL="${OPENROUTER_MODEL:-google/gemma-4-31b-it}"
+OPENROUTER_PR_BODY_MAX="${OPENROUTER_PR_BODY_MAX:-8000}"
+OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-8192}"
 GITHUB_API="${GITHUB_API:-https://api.github.com}"
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
 
@@ -265,9 +269,9 @@ search_merged_prs() {
         title: .title,
         author: .user.login,
         url: .html_url,
-        body: ((.body // "") | if length > 2000 then .[0:2000] + "..." else . end)
+        body: ((.body // "") | if length > $lim then .[0:$lim] + "..." else . end)
       })
-  ' "$accf"; then
+  ' --argjson lim "$OPENROUTER_PR_BODY_MAX" "$accf"; then
     sc_search_rm
     return 1
   fi
@@ -275,10 +279,10 @@ search_merged_prs() {
 }
 
 # Fetches merged PRs by number into a JSON array file (for when id-list ⊄ timestamp search result).
-# Optional 3rd arg: max body length before truncation in JSON (default 2000). Use a large value when not capping LLM input.
+# Optional 3rd arg: max body length before truncation in JSON (default OPENROUTER_PR_BODY_MAX). Use a large value when not capping LLM input.
 rebuild_pr_file_from_fetched() {
   local outf="$1" numsf="$2"
-  local body_max="${3:-2000}"
+  local body_max="${3:-$OPENROUTER_PR_BODY_MAX}"
   local token n resp line
   token=$(github_token)
   local _nd
@@ -323,8 +327,8 @@ pr_json_shrink_for_openrouter() {
   local f="$1"
   local no_cap="${2:-0}"
   local max_bodies max_prs n
-  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-20}
-  max_prs=${OPENROUTER_MAX_PRS:-40}
+  max_bodies=${OPENROUTER_MAX_FULL_PR_BODIES:-100}
+  max_prs=${OPENROUTER_MAX_PRS:-200}
   if [ "$no_cap" = "1" ]; then
     max_bodies=999999
     max_prs=999999
@@ -351,19 +355,25 @@ openrouter_changelog() {
   local version="$2"
   local prev_version="$3"
   local system
-  system="You write SHORT GitHub release notes in Markdown for one version.
+  system="You write comprehensive GitHub release notes in Markdown for one production release.
 
 The user JSON has merged_pull_requests and commits_in_range (git commit subjects in this tag range, newest first). These are the ONLY sources: do not mention features, tickets, or areas not supported by the PR titles/bodies or commit subjects you were given. Never invent product areas, past releases, or themes that do not appear in the data.
 
 Scoping rules (strict):
-- If merged_pull_requests is non-empty: use PR titles and short bodies (when present) as the primary source. You may use commits_in_range only as a tie-break or to phrase titles; it must not add new themes beyond the PRs.
-- If merged_pull_requests is empty and commits_in_range is non-empty: summarize SOLELY from those commit subjects (and version bump / chore lines). One short H2 and a few bullets; match the real scope. Do not invent work not in those subjects.
+- If merged_pull_requests is non-empty: use PR titles and bodies (when present) as the primary source. Document every PR in the input at least once. You may use commits_in_range to clarify wording, but it must not add themes beyond the PRs.
+- If merged_pull_requests is empty and commits_in_range is non-empty: summarize from those commit subjects. Bullet each meaningful change; skip pure version-bump or empty chore lines unless they are the only content. Do not invent work not in those subjects.
 - If both are empty: one sentence, e.g. no merged PRs or commits in range.
 
-Output rules (strict):
-- Default: at most one short H2, then 3–6 bullets (single level). If there are 1–2 items, 1 short paragraph is fine. Never more than about 200 words.
-- If there are more than 8 PRs, group by theme in at most 3–4 bullets. Do not use nested Added/Fixed/Changed each with long sub-bullets.
-- Mention at most 2–3 PR numbers in total, only where helpful.
+Structure:
+- Optional 1–2 sentence release summary at the top when the data supports a clear theme.
+- Use H2 sections as appropriate: ## Highlights, ## Added, ## Changed, ## Fixed, ## Security, ## Internal / Technical. Omit empty sections.
+- Under each section, use bullets; nest one level when grouping closely related PRs.
+- Link PRs as [#NNN](url) when url is in the data, or #NNN otherwise.
+
+Length and detail:
+- Be thorough and specific: prefer concrete user-visible outcomes over vague \"improvements\".
+- Aim for roughly one substantive bullet per PR on small releases; on large releases, group related PRs but ensure every PR number still appears.
+- Target roughly 500–3000 words depending on PR count — longer when there are many PRs. Do not artificially truncate coverage of the input.
 - Output Markdown only, no preamble or code fences around the whole text."
 
   local referer req_tmp
@@ -376,16 +386,18 @@ Output rules (strict):
     --arg sys "$system" \
     --arg ver "$version" \
     --arg prev "${prev_version:-<none: first v* release>}" \
+    --argjson max_tokens "$OPENROUTER_MAX_TOKENS" \
     --rawfile payload "$pr_data_path" \
     '
     ($payload | fromjson) as $p
     | {
         model: $model,
+        max_tokens: $max_tokens,
         messages: [
           { role: "system", content: $sys },
           { role: "user", content: (
               {
-                instruction: "Write short user-facing release notes (see system rules).",
+                instruction: "Write comprehensive user-facing release notes (see system rules). Cover every PR in the input.",
                 new_version: $ver,
                 previous_version_tag: $prev,
                 merged_pull_requests: ($p.merged_pull_requests // []),
@@ -528,18 +540,18 @@ t_end=$(ref_timestamp "$TAG")
 # How many commits land between tags? Very small ranges skip OPENROUTER_MAX_* caps and widen PR body fetch.
 COMMIT_IN_RELEASE=0
 NO_CAP=0
-PR_BODY_MAX=2000
+PR_BODY_MAX=$OPENROUTER_PR_BODY_MAX
 if [ -n "$PREV_TAG" ]; then
   COMMIT_IN_RELEASE=$(git -C "$PROJECT_ROOT" rev-list --count "$PREV_TAG".."$TAG" 2>/dev/null || echo 0)
-  # OPENROUTER_SMALL_RELEASE_MAX_COMMITS=0 means never auto-relax (always use caps and 2k PR bodies)
-  _sr_max="${OPENROUTER_SMALL_RELEASE_MAX_COMMITS:-8}"
+  # OPENROUTER_SMALL_RELEASE_MAX_COMMITS=0 means never auto-relax (always use caps and OPENROUTER_PR_BODY_MAX bodies)
+  _sr_max="${OPENROUTER_SMALL_RELEASE_MAX_COMMITS:-50}"
   if [ "$_sr_max" != "0" ] && [ "$COMMIT_IN_RELEASE" -le "$_sr_max" ]; then
     NO_CAP=1
     PR_BODY_MAX=1000000
   fi
   echo "${TEAL}Commits in ${PREV_TAG}..${TAG}: ${COMMIT_IN_RELEASE} (auto skip LLM input caps when ≤${_sr_max} commits, enabled: $([ "$NO_CAP" = "1" ] && echo yes || echo no))${RESET}" >&2
 else
-  echo "${TEAL}No previous v* tag; standard LLM input caps and 2k PR body fetch apply.${RESET}" >&2
+  echo "${TEAL}No previous v* tag; standard LLM input caps and ${OPENROUTER_PR_BODY_MAX}-char PR body fetch apply.${RESET}" >&2
 fi
 
 pr_file=$(mktemp)
