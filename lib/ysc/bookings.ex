@@ -162,13 +162,25 @@ defmodule Ysc.Bookings do
 
   @doc """
   Lists all pricing rules, with preloaded associations.
+
+  Optionally filters by `property` so admin views can load only the active
+  property's rules instead of fetching every rule and filtering in memory.
   """
-  def list_pricing_rules do
-    from(pr in PricingRule,
-      order_by: [asc: pr.property, asc: pr.booking_mode, asc: pr.price_unit],
-      preload: [:room, :room_category, :season]
-    )
-    |> Repo.all()
+  def list_pricing_rules(property \\ nil) do
+    query =
+      from(pr in PricingRule,
+        order_by: [asc: pr.property, asc: pr.booking_mode, asc: pr.price_unit],
+        preload: [:room, :room_category, :season]
+      )
+
+    query =
+      if property do
+        from pr in query, where: pr.property == ^property
+      else
+        query
+      end
+
+    Repo.all(query)
   end
 
   @doc """
