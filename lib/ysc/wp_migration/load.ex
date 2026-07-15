@@ -1648,9 +1648,7 @@ defmodule Ysc.WpMigration.Load do
     media_dir = Path.join(export_dir, "media")
     dry_run = Keyword.get(opts, :dry_run, false)
 
-    unless File.dir?(media_dir) do
-      {:error, "Media directory not found: #{media_dir}"}
-    else
+    if File.dir?(media_dir) do
       broken =
         Repo.all(
           from i in Image,
@@ -1697,6 +1695,8 @@ defmodule Ysc.WpMigration.Load do
         end)
 
       {:ok, stats}
+    else
+      {:error, "Media directory not found: #{media_dir}"}
     end
   end
 
