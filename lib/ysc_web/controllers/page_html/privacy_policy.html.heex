@@ -1,191 +1,423 @@
 <div class="py-8 lg:py-10 max-w-screen-xl mx-auto px-4">
   <div class="max-w-3xl mx-auto prose prose-zinc prose-lg prose-a:text-blue-600 prose-headings:scroll-mt-20 pb-10">
     <h1 class="uppercase">Privacy Policy</h1>
-    <p class="text-lg font-bold">Last updated: March 11, 2026</p>
+    <p class="text-lg font-bold">Last updated: July 15, 2026</p>
 
     <p>
-      At the Young Scandinavians Club ("YSC"), we believe that being a member-run organization means treating your data with the same respect we show you at our events. This policy explains how we collect, use, and protect your information when you use ysc.org.
+      At the Young Scandinavians Club ("YSC", "we", "us"), we believe that being a member-run organization means treating your data with the same respect we show you at our events. This policy explains—in plain language—what personal data we collect through ysc.org, why we collect it, who we share it with, and what rights you have.
+    </p>
+
+    <p>
+      If you are in the European Economic Area (EEA), United Kingdom, or Switzerland, the sections on
+      <.link href="#lawful-bases">lawful bases</.link>
+      and <.link href="#your-rights">your rights</.link>
+      apply to you under the General Data Protection Regulation (GDPR) and similar laws.
     </p>
 
     <h3 id="what-we-collect">1. What Information We Collect</h3>
 
     <p>
-      We only collect what is necessary to run the Club and manage your membership:
+      We follow data minimization: we collect only what we need to run the Club, process memberships, and deliver the services you ask for.
     </p>
 
-    <p class="font-bold">Member Profile:</p>
+    <p class="font-bold">Account &amp; membership information</p>
+    <ul>
+      <li>Name, email address, phone number, and date of birth</li>
+      <li>Mailing address and billing address</li>
+      <li>
+        Password (stored as a secure hash—we never store plain-text passwords)
+      </li>
+      <li>Family member names and birth dates (for family memberships)</li>
+      <li>
+        Profile photo (if you upload one or sign in with Google or Facebook)
+      </li>
+      <li>Passkey credentials (if you enable passwordless login)</li>
+      <li>
+        Membership eligibility information required by our
+        <.link navigate={~p"/bylaws"}>Bylaws</.link>
+        (for example, place of birth, citizenship, and your connection to Scandinavia)
+      </li>
+      <li>Notification preferences (email and SMS opt-in choices)</li>
+    </ul>
+
+    <p class="font-bold">Payment &amp; billing information</p>
+    <ul>
+      <li>
+        Payment card or bank account details are collected and processed by <strong>Stripe</strong>.
+        We do not store your full card number on our servers.
+      </li>
+      <li>
+        We store payment metadata (such as card brand, last four digits, and expiry) so you can manage saved payment methods.
+      </li>
+      <li>
+        Transaction history (dues, event tickets, cabin bookings, refunds)
+      </li>
+      <li>
+        Bank account details for expense reimbursements (encrypted on our servers; only if you submit an expense report)
+      </li>
+    </ul>
+
+    <p class="font-bold">Activity &amp; booking information</p>
+    <ul>
+      <li>
+        Event ticket purchases and, when required for an event, attendee names and emails
+      </li>
+      <li>
+        Cabin reservation details, including guest names and check-in information
+      </li>
+      <li>Event check-in and QR scan records</li>
+      <li>Posts, comments, and photos you choose to share on the site</li>
+      <li>
+        Volunteer sign-ups, contact form messages, and conduct violation reports you submit
+      </li>
+    </ul>
+
+    <p class="font-bold">Communications</p>
+    <ul>
+      <li>
+        Newsletter email address and optional name (only if you subscribe)
+      </li>
+      <li>
+        SMS message content and delivery status (only if you opt in to text notifications)
+      </li>
+      <li>
+        Email delivery, open, and click data for club newsletters (not for one-time transactional emails)
+      </li>
+    </ul>
+
+    <p class="font-bold">Technical &amp; security information</p>
+    <ul>
+      <li>
+        IP address, browser type, device information, and login timestamps
+      </li>
+      <li>
+        Approximate location derived from IP address (for security alerts about new sign-ins)
+      </li>
+      <li>
+        Session cookies that keep you logged in (see
+        <.link href="#cookies">Cookies</.link>
+        below)
+      </li>
+      <li>
+        Error and performance data when something goes wrong on the site (see third parties below)
+      </li>
+    </ul>
+
     <p>
-      When you register, we collect your name, email, mailing address, and phone number.
+      We do not knowingly collect information from children under 13. Our services are intended for adults (18+).
     </p>
 
-    <p class="font-bold">Verification Data:</p>
-    <p>
-      To confirm eligibility, we may collect details regarding your Scandinavian heritage or connection as required by our <.link navigate={
-        ~p"/bylaws"
-      }>Bylaws</.link>.
-    </p>
+    <h3 id="lawful-bases">2. Why We Collect It (Lawful Bases)</h3>
 
-    <p class="font-bold">Transaction Data:</p>
-    <p>
-      When you pay dues or book an event, our third-party payment processors (like Stripe) handle your credit card info. We do not store your full credit card details on our servers.
-    </p>
-
-    <p class="font-bold">Activity Data:</p>
-    <p>
-      We keep track of your event registrations and cabin bookings to manage club operations.
-    </p>
-
-    <h3 id="how-we-use">2. How We Use Your Information</h3>
-
-    <p>
-      We use your data to keep the Club running smoothly:
-    </p>
+    <p>We process your personal data only when we have a valid legal reason:</p>
 
     <ul>
       <li>
-        <strong>Club Operations:</strong>
-        Processing memberships, managing cabin bookings, and organizing events.
+        <strong>Contract:</strong>
+        To create and manage your membership, process payments, fulfill event tickets and cabin bookings, and provide account features you sign up for.
+      </li>
+      <li>
+        <strong>Consent:</strong>
+        For optional communications such as the newsletter, SMS notifications (when you opt in), and certain profile choices. You can withdraw consent at any time.
+      </li>
+      <li>
+        <strong>Legitimate interests:</strong>
+        To keep the site secure (login monitoring, fraud prevention), improve reliability, and run club operations—balanced against your privacy rights.
+      </li>
+      <li>
+        <strong>Legal obligation:</strong>
+        To maintain financial and tax records where required by law.
+      </li>
+    </ul>
+
+    <h3 id="how-we-use">3. How We Use Your Information</h3>
+
+    <ul>
+      <li>
+        <strong>Club operations:</strong>
+        Processing memberships, managing cabin bookings, organizing events, and verifying eligibility.
       </li>
       <li>
         <strong>Communication:</strong>
-        Sending the newsletter, club announcements, and responding to your inquiries.
+        Sending newsletters (if subscribed), club announcements, booking confirmations, and responding to inquiries.
       </li>
       <li>
-        <strong>Security &amp; 2FA:</strong>
-        Sending transactional SMS/text messages for Two-Factor Authentication (2FA) codes and urgent booking alerts (e.g., weather closures at the Tahoe cabin).
+        <strong>Security:</strong>
+        Sending transactional SMS for two-factor authentication, login verification, and urgent booking alerts (for example, weather closures at the Tahoe cabin).
       </li>
       <li>
-        <strong>Member Directory:</strong>
-        If you choose to be listed, your name and contact info may be visible to other logged-in members. You can control your visibility settings in your account profile.
+        <strong>Member directory:</strong>
+        If you choose to be listed, your name and contact information may be visible to other logged-in members. You control visibility in your account settings.
+      </li>
+      <li>
+        <strong>Accounting:</strong>
+        Syncing membership and payment records with our accounting system for club financial management.
       </li>
     </ul>
 
-    <h3 id="how-we-protect">3. How We Protect Your Data</h3>
+    <h3 id="how-we-store">4. How We Store &amp; Share Your Data</h3>
 
+    <p class="font-bold">Where data is stored</p>
     <p>
-      As a club managed by software professionals, we take security seriously:
+      Your data is stored on secure servers in the <strong>United States</strong>, operated by our hosting provider. Uploaded files (such as profile photos and expense receipts) are stored in object storage with access controls.
     </p>
 
-    <p class="font-bold">Encryption:</p>
+    <p class="font-bold">Who can access it</p>
     <p>
-      We use industry-standard SSL/TLS encryption for all data transmitted between your browser and our servers.
+      Within YSC, personal information is limited to Board members and authorized volunteers who need it for their duties (for example, the Treasurer for billing or event organizers for check-in lists). All such access is on a need-to-know basis.
     </p>
 
-    <p class="font-bold">Limited Access:</p>
+    <p class="font-bold">Third-party service providers</p>
     <p>
-      Your personal information is only accessible to a small number of Board members (like the Treasurer and Secretary) who need it to perform their duties.
-    </p>
-
-    <p class="font-bold">No "Selling" Data:</p>
-    <p>
-      We do not sell, trade, or rent your personal information to third parties. Ever.
-    </p>
-
-    <h3 id="sms-privacy">4. SMS &amp; Mobile Privacy</h3>
-
-    <p>
-      We maintain strict "SMS Isolation":
-    </p>
-
-    <p class="font-bold">No Marketing:</p>
-    <p>
-      Your mobile number is used strictly for transactional purposes (2FA and bookings).
-    </p>
-
-    <p class="font-bold">No Sharing:</p>
-    <p>
-      We do not share your mobile opt-in data with any third parties or affiliates for their marketing purposes.
-    </p>
-
-    <h3 id="cookies">5. Cookies &amp; Technical Data</h3>
-
-    <p>
-      We use "cookies" (small files stored on your device) to make the website work:
-    </p>
-
-    <p class="font-bold">Essential Cookies:</p>
-    <p>
-      These keep you logged in as you move through the site.
-    </p>
-
-    <p class="font-bold">Performance:</p>
-    <p>
-      We use basic, privacy-respecting analytics to see which pages are popular so we can improve the site.
-    </p>
-
-    <p class="font-bold">Control:</p>
-    <p>
-      You can disable cookies in your browser settings, but please note that our member portal and booking system may not function without them.
-    </p>
-
-    <h3 id="third-party">6. Third-Party Services</h3>
-
-    <p>
-      We use trusted partners to provide specific services:
+      We use trusted partners to deliver specific services. They process data on our instructions and only for the purposes described here:
     </p>
 
     <ul>
       <li>
-        <strong>Payment Processing:</strong>
-        To handle dues and tickets securely.
+        <strong>Stripe</strong> — payment processing
       </li>
       <li>
-        <strong>Web Hosting:</strong> To keep the site online.
+        <strong>Fly.io</strong> — application hosting and database
       </li>
       <li>
-        <strong>Email/SMS Gateways:</strong> To deliver your notifications.
+        <strong>Amazon Web Services (SES)</strong> — outbound email delivery
+      </li>
+      <li>
+        <strong>FlowRoute</strong> — transactional SMS delivery
+      </li>
+      <li>
+        <strong>Intuit QuickBooks</strong>
+        — club accounting and financial records
+      </li>
+      <li>
+        <strong>Sentry</strong> — error monitoring and application stability
+      </li>
+      <li>
+        <strong>Cloudflare</strong>
+        — content delivery, security (including bot protection on forms), and optional privacy-friendly analytics
+      </li>
+      <li>
+        <strong>Radar</strong>
+        — address autocomplete and maps on registration and booking forms
+      </li>
+      <li>
+        <strong>Google</strong>
+        and <strong>Facebook</strong>
+        — optional social login (email and basic profile only, if you choose to use them)
+      </li>
+      <li>
+        <strong>Apple Wallet</strong>
+        and <strong>Google Wallet</strong>
+        — digital membership or event passes you choose to add to your phone
       </li>
     </ul>
 
     <p>
-      These partners are contractually obligated to keep your data confidential and only use it for the service they are providing to the YSC.
+      When you click links to external sites (such as Partiful event pages or social media), those sites have their own privacy policies.
     </p>
 
-    <h3 id="your-rights">7. Your Rights &amp; California Privacy (CalOPPA)</h3>
-
+    <p class="font-bold">International transfers</p>
     <p>
-      Consistent with California law and our commitment to transparency:
+      If you access our site from outside the United States, your data may be transferred to and processed in the US. We rely on appropriate safeguards with our service providers (such as standard contractual clauses) where required by law.
     </p>
 
-    <p class="font-bold">Access &amp; Correction:</p>
+    <p class="font-bold">No selling of data</p>
     <p>
-      You can review and change your personal information at any time by logging into your account at ysc.org.
+      We do not sell, rent, or trade your personal information. Ever.
     </p>
 
-    <p class="font-bold">Do Not Track:</p>
-    <p>
-      We honor "Do Not Track" signals from your browser.
-    </p>
-
-    <p class="font-bold">Data Breach:</p>
-    <p>
-      In the unlikely event of a data breach, we will notify all affected members via email within 7 business days.
-    </p>
-
-    <h3 id="coppa">8. Children's Privacy (COPPA)</h3>
+    <h3 id="retention">5. How Long We Keep Your Data</h3>
 
     <p>
-      Our website is intended for adults (18+). We do not knowingly collect information from children under the age of 13.
-    </p>
-
-    <h3 id="can-spam">9. CAN-SPAM Act Compliance</h3>
-
-    <p>
-      We hate spam as much as you do. We agree to:
+      We keep personal data only as long as needed for the purposes above:
     </p>
 
     <ul>
-      <li>Not use false or misleading email subjects or addresses.</li>
-      <li>Include our physical mailing address in club-wide emails.</li>
       <li>
-        Provide an easy "unsubscribe" link at the bottom of our newsletters.
+        <strong>Active membership:</strong>
+        For the duration of your membership and a reasonable period afterward for account recovery and club records.
+      </li>
+      <li>
+        <strong>Financial records:</strong>
+        As long as required for tax, accounting, and audit purposes.
+      </li>
+      <li>
+        <strong>Security logs:</strong>
+        Login and security event data for a limited period to detect abuse and protect accounts.
+      </li>
+      <li>
+        <strong>Newsletter:</strong>
+        Until you unsubscribe, plus a short suppression period to honor your opt-out.
       </li>
     </ul>
 
-    <h3 id="contact">Contacting Us</h3>
+    <p>
+      When data is no longer needed, we delete or anonymize it where feasible.
+    </p>
+
+    <h3 id="how-we-protect">6. How We Protect Your Data</h3>
+
+    <p class="font-bold">Encryption</p>
+    <p>
+      We use industry-standard TLS encryption for data in transit between your browser and our servers. Sensitive data such as bank account numbers for reimbursements is encrypted at rest.
+    </p>
+
+    <p class="font-bold">Access controls</p>
+    <p>
+      Administrative access is restricted, authenticated, and logged. Payment data is handled within Stripe's PCI-compliant environment.
+    </p>
+
+    <p class="font-bold">Data breaches</p>
+    <p>
+      In the unlikely event of a data breach that affects your personal data, we will notify affected members and relevant authorities as required by law, typically within 72 hours where GDPR applies.
+    </p>
+
+    <h3 id="sms-privacy">7. SMS &amp; Mobile Privacy</h3>
+
+    <p>We maintain strict SMS isolation:</p>
+
+    <p class="font-bold">No marketing blasts</p>
+    <p>
+      Your mobile number is used for transactional purposes you opt into: two-factor authentication, booking alerts, and account security—not promotional text campaigns.
+    </p>
+
+    <p class="font-bold">No sharing for third-party marketing</p>
+    <p>
+      We do not share your mobile opt-in data with third parties or affiliates for their marketing purposes.
+    </p>
+
+    <p class="font-bold">How to opt out</p>
+    <p>
+      Reply <strong>STOP</strong>
+      to unsubscribe from SMS, or change your preferences in account settings. Note that opting out of security texts may affect login if two-factor authentication is enabled.
+    </p>
+
+    <h3 id="cookies">8. Cookies &amp; Similar Technologies</h3>
+
+    <p>We use cookies (small files on your device) and similar technologies:</p>
+
+    <p class="font-bold">Essential cookies (required)</p>
+    <ul>
+      <li>
+        <strong>Session cookie (<code>_ysc_key</code>):</strong>
+        Keeps you logged in and powers the member portal and booking system.
+      </li>
+    </ul>
+
+    <p class="font-bold">Optional cookies</p>
+    <ul>
+      <li>
+        <strong>Remember-me cookie (<code>_ysc_web_user_remember_me</code>):</strong>
+        Only set if you check "Remember me" at login (up to 60 days).
+      </li>
+      <li>
+        <strong>Admin preferences:</strong>
+        Sidebar and layout preferences for board administrators only.
+      </li>
+    </ul>
+
+    <p class="font-bold">Analytics</p>
+    <p>
+      We do not use Google Analytics or advertising trackers. We may use privacy-respecting analytics (such as Cloudflare Web Analytics) to understand which pages are popular and improve the site. These tools do not track you across other websites.
+    </p>
+
+    <p class="font-bold">Your choices</p>
+    <p>
+      You can disable cookies in your browser settings, but the member portal and booking system may not work without essential session cookies.
+    </p>
+
+    <h3 id="your-rights">9. Your Rights</h3>
 
     <p>
-      If you have any questions regarding this Privacy Policy or your data, please contact the Board:
+      Depending on where you live, you may have the following rights regarding your personal data:
+    </p>
+
+    <ul>
+      <li>
+        <strong>Access:</strong>
+        Request a copy of the personal data we hold about you.
+      </li>
+      <li>
+        <strong>Rectification:</strong>
+        Correct inaccurate or incomplete data. You can update most profile information by logging into your account at ysc.org.
+      </li>
+      <li>
+        <strong>Erasure ("right to be forgotten"):</strong>
+        Request deletion of your personal data when it is no longer necessary or when you withdraw consent, subject to legal exceptions (for example, financial record-keeping).
+      </li>
+      <li>
+        <strong>Restriction:</strong>
+        Ask us to limit how we use your data in certain circumstances.
+      </li>
+      <li>
+        <strong>Portability:</strong>
+        Request your data in a structured, commonly used format where technically feasible.
+      </li>
+      <li>
+        <strong>Objection:</strong>
+        Object to processing based on legitimate interests.
+      </li>
+      <li>
+        <strong>Withdraw consent:</strong>
+        Unsubscribe from the newsletter via the link in any email, opt out of SMS via STOP or account settings, or contact us for other consent-based processing.
+      </li>
+    </ul>
+
+    <p>
+      To exercise any of these rights, email us at
+      <.link href="mailto:info@ysc.org?subject=Privacy%20Request">info@ysc.org</.link>
+      with the subject line "Privacy Request" and describe what you need (for example, a copy of your data or account deletion). Requests are handled manually by the Board—we do not offer automated self-service export or deletion in the member portal. We will respond within 30 days (or sooner where required by law) and may verify your identity before fulfilling a request.
+    </p>
+
+    <p>
+      If you are in the EEA or UK and believe we have not addressed your concern, you have the right to lodge a complaint with your local data protection authority.
+    </p>
+
+    <h3 id="california">10. California Privacy (CCPA / CalOPPA)</h3>
+
+    <p>California residents have additional rights under state law:</p>
+
+    <ul>
+      <li>
+        Right to know what personal information we collect and how it is used (this policy)
+      </li>
+      <li>Right to delete personal information, subject to exceptions</li>
+      <li>
+        Right to opt out of the "sale" of personal information—we do not sell your data
+      </li>
+      <li>Right to non-discrimination for exercising privacy rights</li>
+    </ul>
+
+    <p>
+      We honor <strong>Do Not Track</strong> signals where technically feasible.
+    </p>
+
+    <h3 id="coppa">11. Children's Privacy (COPPA)</h3>
+
+    <p>
+      Our website is intended for adults (18+). We do not knowingly collect information from children under the age of 13. If you believe we have collected a child's information, contact us and we will delete it promptly.
+    </p>
+
+    <h3 id="can-spam">12. Email &amp; Newsletter (CAN-SPAM)</h3>
+
+    <p>We agree to:</p>
+
+    <ul>
+      <li>Not use false or misleading email subjects or addresses</li>
+      <li>Include our physical mailing address in club-wide emails</li>
+      <li>Provide an easy "unsubscribe" link at the bottom of newsletters</li>
+    </ul>
+
+    <h3 id="changes">13. Changes to This Policy</h3>
+
+    <p>
+      We may update this policy from time to time. We will post the revised version on this page with an updated "Last updated" date. For material changes, we may also notify members by email.
+    </p>
+
+    <h3 id="contact">14. Contact Us</h3>
+
+    <p>
+      For privacy questions, data requests, or concerns about how we handle your information, contact the Board:
     </p>
 
     <p>
@@ -195,6 +427,7 @@
       <% end %>
       <br />USA<br /> Email:
       <.link href="mailto:info@ysc.org">info@ysc.org</.link>
+      (use subject "Privacy Request" for data rights requests)
     </p>
   </div>
 </div>
