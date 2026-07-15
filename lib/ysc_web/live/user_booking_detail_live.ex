@@ -163,8 +163,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 color="zinc"
                 id="change-reservation-button"
               >
-                <.icon name="hero-pencil-square" class="w-5 h-5" />
-                Change Reservation
+                <.icon name="hero-pencil-square" class="w-5 h-5" /> Change Booking
               </.button>
               <.button
                 :if={@can_cancel}
@@ -187,7 +186,7 @@ defmodule YscWeb.UserBookingDetailLive do
               <div class="text-sm text-blue-800 space-y-3">
                 <%= if Map.get(@refund_info, :modified) do %>
                   <p class="font-medium text-amber-900">
-                    This reservation was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
+                    This booking was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
                   </p>
                 <% else %>
                   <%= if @refund_info.estimated_refund do %>
@@ -247,7 +246,7 @@ defmodule YscWeb.UserBookingDetailLive do
 
                 <div class="pt-3 border-t border-blue-200 space-y-2">
                   <p class="font-medium">
-                    Important: Even if the cancellation policy does not provide a refund, canceling your reservation will free up the room for other members to book.
+                    Important: Even if the cancellation policy does not provide a refund, canceling your booking will free up the room for other members to book.
                   </p>
                   <p>
                     If you need to cancel due to weather conditions or have other inquiries, please reach out to the cabin master at <.link
@@ -293,7 +292,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 </.badge>
                 <%= if @booking.status == :hold do %>
                   <p class="mt-2 text-sm text-zinc-600">
-                    Payment is still required to confirm this reservation.
+                    Payment is still required to confirm this booking.
                     <.link
                       navigate={~p"/bookings/checkout/#{@booking.id}"}
                       class="font-medium text-teal-600 hover:underline"
@@ -343,7 +342,7 @@ defmodule YscWeb.UserBookingDetailLive do
               </div>
 
               <div>
-                <div class="text-sm text-zinc-600">Reservation type</div>
+                <div class="text-sm text-zinc-600">Booking type</div>
                 <div class="font-medium text-zinc-900">
                   <%= if @booking.booking_mode == :buyout do %>
                     Entire cabin
@@ -459,13 +458,13 @@ defmodule YscWeb.UserBookingDetailLive do
 
             <div class="space-y-4">
               <p class="text-zinc-600">
-                Cancel this reservation? This can't be undone.
+                Cancel this booking? This can't be undone.
               </p>
 
               <%= if Map.get(@refund_info, :modified) do %>
                 <div class="bg-amber-50 border border-amber-200 rounded-md p-3">
                   <p class="text-sm text-amber-800">
-                    This reservation was modified. You may cancel, but you will not receive a refund.
+                    This booking was modified. You may cancel, but you will not receive a refund.
                   </p>
                 </div>
               <% else %>

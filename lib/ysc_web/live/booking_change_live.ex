@@ -438,7 +438,7 @@ defmodule YscWeb.BookingChangeLive do
         </.link>
       </div>
 
-      <h1 class="text-3xl font-bold text-zinc-900 mb-2">Change Reservation</h1>
+      <h1 class="text-3xl font-bold text-zinc-900 mb-2">Change Booking</h1>
       <p class="text-zinc-600 mb-6">
         Booking {@booking.reference_id} · {property_label(@booking.property)}
       </p>
@@ -724,7 +724,7 @@ defmodule YscWeb.BookingChangeLive do
       booking_id: booking_id,
       loading_booking?: true,
       booking: nil,
-      page_title: "Change Reservation"
+      page_title: "Change Booking"
     )
   end
 
@@ -789,7 +789,7 @@ defmodule YscWeb.BookingChangeLive do
 
   defp assign_change_page_shell(socket, booking, calendar, form) do
     socket
-    |> assign(:page_title, "Change Reservation")
+    |> assign(:page_title, "Change Booking")
     |> assign(:booking, booking)
     |> assign(:form, form)
     |> assign(:availability_snapshot, nil)
@@ -1237,8 +1237,8 @@ defmodule YscWeb.BookingChangeLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your reservation has been updated.",
-           title: "Reservation updated"
+           "Your booking has been updated.",
+           title: "Booking updated"
          )
          |> push_navigate(
            to: ~p"/bookings/#{booking.id}/receipt?updated=true&confetti=true"
@@ -1250,8 +1250,8 @@ defmodule YscWeb.BookingChangeLive do
          |> assign(:submitting, false)
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your reservation has been updated.",
-           title: "Reservation updated"
+           "Your booking has been updated.",
+           title: "Booking updated"
          )
          |> YscWeb.Flash.put_toast(
            :warning,

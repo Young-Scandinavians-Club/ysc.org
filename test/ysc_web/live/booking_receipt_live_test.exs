@@ -144,7 +144,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Reservation Confirmed"
+      assert html =~ "Booking Confirmed"
       assert html =~ booking.reference_id
       assert html =~ "Lake Tahoe Cabin"
       assert has_element?(view, ~s(#booking-receipt))
@@ -158,7 +158,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Reservation Cancelled"
+      assert html =~ "Booking Cancelled"
       assert html =~ "Booking Cancelled"
       assert html =~ booking.reference_id
     end
@@ -367,13 +367,13 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, view, html} =
         live(conn, ~p"/bookings/#{booking.id}/receipt?updated=true")
 
-      assert html =~ "Reservation Updated"
+      assert html =~ "Booking Updated"
 
       render_async(view, @async_timeout_ms)
 
       html = render(view)
       assert has_element?(view, "#reservation-updated-notice")
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
       assert html =~ "Your changes are saved"
     end
 
@@ -435,7 +435,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert has_element?(view, "#booking-payment-history")
       refute has_element?(view, "#payment-method-summary")
       refute has_element?(view, "#payment-date-summary")
-      assert html =~ "Reservation total"
+      assert html =~ "Booking total"
       assert html =~ "$150.00"
       assert html =~ "$50.00"
       assert html =~ "$100.00"
@@ -520,7 +520,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert result =~ "Cancel Booking"
       assert result =~ "Cancellation Reason"
-      assert result =~ "Cancel this reservation?"
+      assert result =~ "Cancel this booking?"
       assert result =~ "be undone"
     end
 
@@ -638,7 +638,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       render_async(view, @async_timeout_ms)
 
-      assert has_element?(view, ~s(button), "Cancel Reservation")
+      assert has_element?(view, ~s(button), "Cancel Booking")
     end
 
     test "shows change reservation link for future complete bookings", %{
@@ -686,10 +686,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
       render_async(view, @async_timeout_ms)
 
-      view |> element(~s(button), "Cancel Reservation") |> render_click()
+      view |> element(~s(button), "Cancel Booking") |> render_click()
 
       html = render(view)
-      assert html =~ "reservation was modified"
+      assert html =~ "booking was modified"
       assert html =~ "will not receive a refund"
     end
 
@@ -716,7 +716,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      refute has_element?(view, ~s(button), "Cancel Reservation")
+      refute has_element?(view, ~s(button), "Cancel Booking")
     end
 
     test "does not show cancel button for cancelled bookings", %{conn: conn} do
@@ -727,7 +727,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      refute has_element?(view, ~s(button), "Cancel Reservation")
+      refute has_element?(view, ~s(button), "Cancel Booking")
     end
   end
 
@@ -904,7 +904,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Entire cabin"
-      assert html =~ "Reservation type"
+      assert html =~ "Booking type"
     end
 
     test "displays Clear Lake in copy", %{conn: conn} do
@@ -1693,7 +1693,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
 
       reloaded = Repo.get!(Booking, booking.id)
       assert reloaded.checkout_date == checkout
@@ -1907,7 +1907,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
 
       reloaded = Repo.get!(Booking, booking.id) |> Repo.preload(:booking_guests)
       assert reloaded.guests_count == 3
@@ -2104,7 +2104,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
       assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
 
       reloaded = Repo.get!(Booking, booking.id)
@@ -2293,7 +2293,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
 
       final_booking = Repo.get!(Booking, booking.id)
       assert final_booking.checkout_date == checkout
@@ -2458,7 +2458,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Individual room(s)"
-      assert html =~ "Reservation type"
+      assert html =~ "Booking type"
     end
   end
 

@@ -19,7 +19,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmation do
 
   def get_template_name, do: "booking_modification_confirmation"
 
-  def get_subject, do: "Your reservation has been updated"
+  def get_subject, do: "Your booking has been updated"
 
   def booking_url(booking_id),
     do: absolute_url("/bookings/#{booking_id}/receipt")

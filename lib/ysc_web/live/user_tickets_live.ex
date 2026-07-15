@@ -132,9 +132,9 @@ defmodule YscWeb.UserTicketsLive do
                         phx-value-order-id={ticket_order.id}
                         color="red"
                         class="flex-1"
-                        data-confirm="Cancel this reservation? You'll lose your held tickets and member price. You can buy tickets again if they're still available."
+                        data-confirm="Cancel this order? You'll lose your held tickets and member price. You can buy tickets again if they're still available."
                       >
-                        Cancel reservation
+                        Cancel order
                       </.button>
                     </div>
                   </div>

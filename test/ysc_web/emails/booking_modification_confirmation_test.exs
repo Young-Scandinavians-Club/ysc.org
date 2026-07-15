@@ -91,13 +91,13 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
 
       html = BookingModificationConfirmation.render(data)
 
-      assert html =~ "Reservation Updated"
+      assert html =~ "Booking Updated"
       assert html =~ "yellow-alert-box"
       assert html =~ "#FEF3C7"
       assert html =~ "#F59E0B"
       assert html =~ "cancellation refunds no longer apply"
       assert html =~ "What Changed"
-      assert html =~ "View Updated Reservation"
+      assert html =~ "View Updated Booking"
     end
   end
 
@@ -106,7 +106,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
       booking = booking_with_user()
 
       assert BookingModificationConfirmation.get_subject() ==
-               "Your reservation has been updated"
+               "Your booking has been updated"
 
       assert BookingModificationConfirmation.get_template_name() ==
                "booking_modification_confirmation"

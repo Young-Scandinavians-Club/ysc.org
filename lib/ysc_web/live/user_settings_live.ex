@@ -2196,7 +2196,7 @@ defmodule YscWeb.UserSettingsLive do
                     My Bookings & Tickets
                   </h2>
                   <p class="text-sm text-zinc-600 mt-1 max-w-2xl">
-                    Open a past payment below to view or manage a cabin reservation. Event tickets are listed separately.
+                    View your cabin and event payment history below. Unpaid cabin bookings won't appear here until checkout is complete — use the link in your email or return to the cabin page to finish. Event tickets are listed separately.
                   </p>
                 </div>
                 <.link
@@ -2417,7 +2417,9 @@ defmodule YscWeb.UserSettingsLive do
                 </div>
 
                 <div :if={@payments_total == 0} class="text-center py-12">
-                  <p class="text-zinc-600 text-sm">No payments found.</p>
+                  <p class="text-zinc-600 text-sm">
+                    No payments yet. Cabin bookings you've paid for and event purchases will show up here.
+                  </p>
                 </div>
 
                 <div
