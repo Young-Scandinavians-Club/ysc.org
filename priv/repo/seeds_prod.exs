@@ -2,7 +2,7 @@
 # Run with: mix run priv/repo/seeds_prod.exs
 #
 # This script seeds essential data for production:
-# - SiteSettings (Instagram and Facebook)
+# - SiteSettings (Instagram, Facebook, Partiful, and WhatsApp)
 # - Admin user for login
 # - Default seasons for Tahoe cabin (Winter and Summer)
 # - Default seasons for Clear Lake cabin (Winter and Summer)
@@ -13,33 +13,10 @@
 
 alias Ysc.Repo
 alias Ysc.Accounts.User
-alias Ysc.SiteSettings.SiteSetting
+alias Ysc.Settings
 alias Ysc.Bookings.{Season, RoomCategory, Room, PricingRule}
 alias Ysc.Bookings
 alias Money
-
-insert_site_setting = fn attrs ->
-  cs = SiteSetting.site_setting_changeset(%SiteSetting{}, attrs)
-
-  case Repo.insert(cs,
-         on_conflict: :nothing,
-         conflict_target: [:name]
-       ) do
-    {:ok, _} ->
-      :ok
-
-    {:ok, nil} ->
-      :ok
-
-    {:error, changeset} ->
-      name = Map.get(attrs, :name) || Map.get(attrs, "name")
-
-      IO.puts(
-        :stderr,
-        "  ⚠️  SiteSetting #{inspect(name)} skipped: #{inspect(changeset.errors)}"
-      )
-  end
-end
 
 # registration_changeset/3 does not cast role, state, verification, or onboarding fields;
 # they must be set with put_change/3 (same pattern as priv/repo/seeds.exs).
@@ -63,29 +40,7 @@ IO.puts("🌱 Starting production seed...")
 # 1. Seed SiteSettings
 IO.puts("📝 Seeding SiteSettings...")
 
-insert_site_setting.(%{
-  group: "socials",
-  name: "instagram",
-  value: "https://www.instagram.com/theysc"
-})
-
-insert_site_setting.(%{
-  group: "socials",
-  name: "facebook",
-  value: "https://www.facebook.com/YoungScandinaviansClub/"
-})
-
-insert_site_setting.(%{
-  group: "socials",
-  name: "discord",
-  value: "https://discord.gg/dn2gdXRZbW"
-})
-
-insert_site_setting.(%{
-  group: "socials",
-  name: "whatsapp",
-  value: "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
-})
+Settings.seed_default_social_settings()
 
 IO.puts("  ✅ SiteSettings seeded")
 
@@ -977,7 +932,7 @@ if clear_lake_day_policy do
 end
 
 IO.puts("\n✅ Production seed completed successfully!")
-IO.puts("   - SiteSettings: Instagram and Facebook")
+IO.puts("   - SiteSettings: Instagram, Facebook, Partiful, and WhatsApp")
 IO.puts("   - Admin user: admin@ysc.org")
 IO.puts("   - Tahoe seasons: Winter and Summer")
 IO.puts("   - Clear Lake seasons: Winter and Summer")

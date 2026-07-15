@@ -10,48 +10,16 @@
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
 
+# Default social links (dev)
+alias Ysc.Settings
+
+Settings.seed_default_social_settings()
+
 alias Ysc.Repo
 alias Ysc.Accounts.{Address, User}
 alias Ysc.SiteSettings.SiteSetting
 alias Ysc.Bookings
 import Ecto.Query
-
-# Default settings
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "instagram",
-    value: "https://www.instagram.com/theysc"
-  }),
-  on_conflict: :nothing
-)
-
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "facebook",
-    value: "https://www.facebook.com/YoungScandinaviansClub/"
-  }),
-  on_conflict: :nothing
-)
-
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "discord",
-    value: "https://discord.gg/dn2gdXRZbW"
-  }),
-  on_conflict: :nothing
-)
-
-Repo.insert!(
-  SiteSetting.site_setting_changeset(%SiteSetting{}, %{
-    group: "socials",
-    name: "whatsapp",
-    value: "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
-  }),
-  on_conflict: :nothing
-)
 
 first_names = [
   "Karl",
@@ -720,7 +688,7 @@ if length(users_for_notes) > 0 and admin_user do
     "Participated in the Nordic cooking workshop",
     "Referred a friend who joined the club",
     "Asked about event ticket pricing",
-    "Very engaged in Discord community discussions",
+    "Very engaged in Partiful community events",
     "Attended multiple social gatherings this year",
     "Helped organize the winter holiday event",
     "Requested information about Scandinavian language classes",

@@ -606,10 +606,11 @@ defmodule YscWeb.EventsLiveTest do
       refute html =~ "chat.whatsapp.com"
     end
 
-    test "shows Discord link", %{conn: conn} do
+    test "shows Partiful link", %{conn: conn} do
       {:ok, _view, html} = live(conn, ~p"/events")
 
-      assert html =~ "discord.gg"
+      assert html =~ "partiful.com"
+      assert html =~ "Partiful"
     end
   end
 

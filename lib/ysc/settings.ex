@@ -16,6 +16,79 @@ defmodule Ysc.Settings do
   @settings_cache_key "all-site-settings"
   @site_setting_name_max_length 255
 
+  @instagram_social_url "https://www.instagram.com/theysc"
+  @facebook_social_url "https://www.facebook.com/YoungScandinaviansClub/"
+  @partiful_social_url "https://partiful.com/u/nm9TVCDwC3y28CL4fcTX"
+  @whatsapp_social_url "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
+
+  @doc false
+  def instagram_social_url, do: @instagram_social_url
+
+  @doc false
+  def facebook_social_url, do: @facebook_social_url
+
+  @doc false
+  def partiful_social_url, do: @partiful_social_url
+
+  @doc false
+  def whatsapp_social_url, do: @whatsapp_social_url
+
+  @doc false
+  def default_social_settings do
+    [
+      %{
+        group: "socials",
+        name: "instagram",
+        value: @instagram_social_url
+      },
+      %{
+        group: "socials",
+        name: "facebook",
+        value: @facebook_social_url
+      },
+      %{
+        group: "socials",
+        name: "partiful",
+        value: @partiful_social_url
+      },
+      %{
+        group: "socials",
+        name: "whatsapp",
+        value: @whatsapp_social_url
+      }
+    ]
+  end
+
+  @doc """
+  Inserts default social site settings when missing.
+
+  Used by dev/test/prod seed scripts so every environment gets the same social links.
+  """
+  def seed_default_social_settings(repo \\ Repo) do
+    Enum.each(default_social_settings(), fn attrs ->
+      changeset = SiteSetting.site_setting_changeset(%SiteSetting{}, attrs)
+
+      case repo.insert(changeset,
+             on_conflict: :nothing,
+             conflict_target: [:name]
+           ) do
+        {:ok, _} ->
+          :ok
+
+        {:error, changeset} ->
+          Ysc.Logging.warning("Failed to seed social site setting",
+            extra: %{name: attrs.name, errors: changeset.errors}
+          )
+      end
+    end)
+
+    maybe_warm_cache()
+  end
+
+  defp maybe_warm_cache do
+    if Process.whereis(:ysc_cache), do: warm_cache()
+  end
+
   def start_link(_opts \\ []) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
@@ -350,25 +423,11 @@ defmodule Ysc.Settings do
   Useful for tests and initial setup.
   """
   def ensure_settings_exist do
-    default_settings = [
-      %{group: "general", name: "site_name", value: "YSC"},
-      %{group: "general", name: "contact_email", value: "support@ysc.org"},
-      %{
-        group: "socials",
-        name: "instagram",
-        value: "https://www.instagram.com/theysc"
-      },
-      %{
-        group: "socials",
-        name: "facebook",
-        value: "https://www.facebook.com/YoungScandinaviansClub/"
-      },
-      %{
-        group: "socials",
-        name: "discord",
-        value: "https://discord.gg/dn2gdXRZbW"
-      }
-    ]
+    default_settings =
+      [
+        %{group: "general", name: "site_name", value: "YSC"},
+        %{group: "general", name: "contact_email", value: "support@ysc.org"}
+      ] ++ default_social_settings()
 
     for setting <- default_settings do
       case Repo.get_by(SiteSetting, name: setting.name) do

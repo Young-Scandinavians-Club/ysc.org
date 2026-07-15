@@ -451,6 +451,50 @@ defmodule Ysc.SettingsTest do
     end
   end
 
+  describe "seed_default_social_settings/1" do
+    test "inserts all default social links when missing" do
+      Settings.seed_default_social_settings()
+
+      assert Settings.get_social_url("instagram") ==
+               Settings.instagram_social_url()
+
+      assert Settings.get_social_url("facebook") ==
+               Settings.facebook_social_url()
+
+      assert Settings.get_social_url("partiful") ==
+               Settings.partiful_social_url()
+
+      assert Settings.get_social_url("whatsapp") ==
+               Settings.whatsapp_social_url()
+    end
+
+    test "does not overwrite existing social settings" do
+      %SiteSetting{
+        name: "partiful",
+        value: "https://partiful.com/u/custom",
+        group: "socials"
+      }
+      |> Repo.insert!()
+
+      Settings.seed_default_social_settings()
+
+      assert Repo.get_by!(SiteSetting, name: "partiful").value ==
+               "https://partiful.com/u/custom"
+    end
+
+    test "warms cache for partiful and other social settings when Cachex is running" do
+      Settings.clear_cache()
+
+      Settings.seed_default_social_settings()
+
+      assert Cachex.get(:ysc_cache, "site-settings:partiful") ==
+               {:ok, Settings.partiful_social_url()}
+
+      assert Settings.get_social_url("partiful") ==
+               Settings.partiful_social_url()
+    end
+  end
+
   describe "ensure_settings_exist/0" do
     test "creates default settings if they don't exist" do
       Settings.ensure_settings_exist()
@@ -459,6 +503,11 @@ defmodule Ysc.SettingsTest do
       assert Repo.get_by(SiteSetting, name: "site_name") != nil
       assert Repo.get_by(SiteSetting, name: "contact_email") != nil
       assert Repo.get_by(SiteSetting, name: "instagram") != nil
+      assert Repo.get_by(SiteSetting, name: "partiful") != nil
+      assert Repo.get_by(SiteSetting, name: "whatsapp") != nil
+
+      assert Settings.get_social_url("partiful") ==
+               Settings.partiful_social_url()
     end
 
     test "does not overwrite existing settings" do

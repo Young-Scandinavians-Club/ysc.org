@@ -76,26 +76,44 @@ defmodule YscWeb.EventsLive do
                 </.link>
                 <div
                   :if={
-                    @site_setting_socials_discord ||
+                    @site_setting_socials_partiful ||
                       (@current_user && @site_setting_socials_whatsapp)
                   }
                   class="border-t border-zinc-100 pt-3"
                 >
                   <p class="text-sm text-zinc-500 mb-2 uppercase tracking-wide font-semibold">
-                    Community Chat
+                    Events & Community
                   </p>
                   <div class="flex flex-col gap-2">
                     <a
-                      :if={@site_setting_socials_discord}
-                      href={@site_setting_socials_discord}
+                      :if={@site_setting_socials_partiful}
+                      href={@site_setting_socials_partiful}
                       target="_blank"
                       rel="noopener noreferrer"
                       class="inline-flex items-center text-sm font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                     >
-                      <.icon
-                        name="hero-chat-bubble-left-right"
-                        class="w-4 h-4 me-2"
-                      /> Discord
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 48 48"
+                        aria-hidden="true"
+                        class="w-4 h-4 me-2 shrink-0"
+                      >
+                        <path
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M14.358 43.5c4.39 0 7.755-4.082 7.755-7.965c0-2.35-1.224-3.266-1.224-4.998c0-1.434.916-1.942 1.732-1.942c1.026 0 2.14.816 4.59.816c5.714 0 13.89-4.49 13.89-12.047C41.1 9.299 31.81 4.5 23.028 4.5c-7.248 0-15.004 2.957-15.004 8.065c0 5.516 8.98 5.715 8.98 9.907c0 4.49-10.105 5.108-10.105 12.864c0 4.292 3.166 8.164 7.458 8.164"
+                        />
+                        <path
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M12.416 37.896c-1.942 0-2.757-1.322-2.757-3.363c0-6.333 12.145-8.187 12.145-13.892c0-4.899-10.07-2.66-10.07-6.532c0-2.449 2.822-3.067 5.988-3.067c6.63 0 13.78 2.858 13.78 8.683c0 3.265-1.947 7.266-6.647 7.266c-.816 0-1.413-.253-2.44-.253c-8.074 0-3.56 11.169-10.01 11.169h.01z"
+                        />
+                      </svg>
+                      Partiful
                     </a>
                     <a
                       :if={@current_user && @site_setting_socials_whatsapp}

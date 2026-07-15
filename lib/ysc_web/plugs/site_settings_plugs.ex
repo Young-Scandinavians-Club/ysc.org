@@ -24,7 +24,10 @@ defmodule YscWeb.Plugs.SiteSettingsPlugs do
       :site_setting_socials_facebook,
       Settings.get_social_url("facebook")
     )
-    |> assign(:site_setting_socials_discord, Settings.get_social_url("discord"))
+    |> assign(
+      :site_setting_socials_partiful,
+      Settings.get_social_url("partiful")
+    )
     |> assign(
       :site_setting_socials_whatsapp,
       Settings.get_social_url("whatsapp")
@@ -38,8 +41,8 @@ defmodule YscWeb.Plugs.SiteSettingsPlugs do
     |> Phoenix.Component.assign_new(:site_setting_socials_facebook, fn ->
       Settings.get_social_url("facebook")
     end)
-    |> Phoenix.Component.assign_new(:site_setting_socials_discord, fn ->
-      Settings.get_social_url("discord")
+    |> Phoenix.Component.assign_new(:site_setting_socials_partiful, fn ->
+      Settings.get_social_url("partiful")
     end)
     |> Phoenix.Component.assign_new(:site_setting_socials_whatsapp, fn ->
       Settings.get_social_url("whatsapp")

@@ -213,11 +213,12 @@ Two refund policies are created for Tahoe:
 
 ### Site Settings
 
-Social media links are configured:
+Social media links are seeded via `Ysc.Settings.seed_default_social_settings/0` in dev, test, and production:
 
 - **Instagram**: https://www.instagram.com/theysc
 - **Facebook**: https://www.facebook.com/YoungScandinaviansClub/
-- **Discord**: https://discord.gg/dn2gdXRZbW
+- **Partiful**: https://partiful.com/u/nm9TVCDwC3y28CL4fcTX
+- **WhatsApp**: https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ
 
 ### Images
 
