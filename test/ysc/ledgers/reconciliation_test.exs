@@ -70,6 +70,36 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
     end)
 
+    stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _params, _opts ->
+      {:ok, %{"Id" => "qb_refund_receipt_default", "TotalAmt" => "0.00"}}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn
+      "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+      _ -> {:error, :not_found}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn
+      "Events" -> {:ok, "events_class_default"}
+      "Administration" -> {:ok, "admin_class_default"}
+      "Tahoe" -> {:ok, "tahoe_class_default"}
+      "Clear Lake" -> {:ok, "clear_lake_class_default"}
+      _ -> {:error, :not_found}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn _name, _opts ->
+      {:ok, "qb_item_default"}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :get_item_by_id, fn _item_id ->
+      {:ok,
+       %{
+         "Id" => "item_123",
+         "Name" => "Test Item",
+         "IncomeAccountRef" => %{"value" => "income_account_123"}
+       }}
+    end)
+
     user = user_fixture()
 
     %{user: user}
@@ -2532,10 +2562,12 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       payment_method_id: nil
     }
 
-    {:ok, {payment, _tx, _entries}} =
-      Ledgers.process_payment(Map.merge(defaults, attrs))
+    Oban.Testing.with_testing_mode(:manual, fn ->
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(Map.merge(defaults, attrs))
 
-    payment
+      payment
+    end)
   end
 
   # Inserts a refund record + ledger transaction (with refund_id) + ledger
