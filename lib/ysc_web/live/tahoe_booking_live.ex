@@ -1066,7 +1066,7 @@ defmodule YscWeb.TahoeBookingLive do
                   </span>
                   Choose Booking Type
                 </h2>
-                <p class="text-sm text-zinc-600 mb-6">
+                <p class="text-base text-zinc-600 mb-6">
                   Select how you'd like to book the Tahoe cabin:
                 </p>
                 <fieldset>
@@ -1837,7 +1837,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <div class="p-4 flex-1 flex flex-col">
                             <div class="flex items-start justify-between mb-2">
                               <div class="flex-1">
-                                <div class="font-bold text-zinc-900 text-base mb-1">
+                                <div class="font-bold text-zinc-900 text-lg mb-1">
                                   {room.name}
                                 </div>
                                 <div class="text-xs text-zinc-600 line-clamp-2">
@@ -2040,7 +2040,7 @@ defmodule YscWeb.TahoeBookingLive do
                           <div class="p-4 flex-1 flex flex-col opacity-60">
                             <div class="flex items-start justify-between mb-2">
                               <div class="flex-1">
-                                <div class="font-bold text-zinc-900 text-base mb-1">
+                                <div class="font-bold text-zinc-900 text-lg mb-1">
                                   {room.name}
                                 </div>
                                 <div class="text-xs text-zinc-600 line-clamp-2">
@@ -2588,9 +2588,9 @@ defmodule YscWeb.TahoeBookingLive do
                              @date_validation_errors
                            ) &&
                              Map.get(assigns, :terms_agreed, false) do
-                          "w-full text-lg py-3"
+                          "w-full text-lg py-4"
                         else
-                          "w-full bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed py-3"
+                          "w-full bg-zinc-200 text-zinc-600 hover:bg-zinc-300 opacity-50 cursor-not-allowed py-4"
                         end
                       }
                     >
@@ -4198,7 +4198,7 @@ defmodule YscWeb.TahoeBookingLive do
                           class="w-6 h-6 text-red-700 flex-shrink-0 mt-0.5"
                         />
                         <div>
-                          <p class="font-bold text-red-900 text-base mb-1">
+                          <p class="font-bold text-red-900 text-lg mb-1">
                             ⚠️ Critical: Linens and towels are NOT provided
                           </p>
                           <p class="text-sm text-red-800">
