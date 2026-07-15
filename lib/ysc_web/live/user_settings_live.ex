@@ -2417,7 +2417,9 @@ defmodule YscWeb.UserSettingsLive do
                 </div>
 
                 <div :if={@payments_total == 0} class="text-center py-12">
-                  <p class="text-zinc-600 text-sm">No payments yet. Cabin bookings you've paid for and event purchases will show up here.</p>
+                  <p class="text-zinc-600 text-sm">
+                    No payments yet. Cabin bookings you've paid for and event purchases will show up here.
+                  </p>
                 </div>
 
                 <div

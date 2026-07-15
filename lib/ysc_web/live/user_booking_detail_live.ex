@@ -163,8 +163,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 color="zinc"
                 id="change-reservation-button"
               >
-                <.icon name="hero-pencil-square" class="w-5 h-5" />
-                Change Booking
+                <.icon name="hero-pencil-square" class="w-5 h-5" /> Change Booking
               </.button>
               <.button
                 :if={@can_cancel}

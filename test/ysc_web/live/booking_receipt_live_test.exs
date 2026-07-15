@@ -638,7 +638,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       render_async(view, @async_timeout_ms)
 
-      assert has_element?(view, ~s(button), "Cancel Reservation")
+      assert has_element?(view, ~s(button), "Cancel Booking")
     end
 
     test "shows change reservation link for future complete bookings", %{
@@ -686,10 +686,10 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
       render_async(view, @async_timeout_ms)
 
-      view |> element(~s(button), "Cancel Reservation") |> render_click()
+      view |> element(~s(button), "Cancel Booking") |> render_click()
 
       html = render(view)
-      assert html =~ "reservation was modified"
+      assert html =~ "booking was modified"
       assert html =~ "will not receive a refund"
     end
 
@@ -716,7 +716,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      refute has_element?(view, ~s(button), "Cancel Reservation")
+      refute has_element?(view, ~s(button), "Cancel Booking")
     end
 
     test "does not show cancel button for cancelled bookings", %{conn: conn} do
@@ -727,7 +727,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      refute has_element?(view, ~s(button), "Cancel Reservation")
+      refute has_element?(view, ~s(button), "Cancel Booking")
     end
   end
 
