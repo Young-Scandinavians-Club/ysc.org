@@ -26,21 +26,26 @@ defmodule YscWeb.LiveToastMount do
       |> attach_hook(
         :clear_consumed_flash,
         :handle_info,
-        &clear_consumed_flash/3
+        &clear_consumed_flash_info/2
       )
 
     {:cont, socket}
   end
 
   defp clear_consumed_flash(_event, _params, socket) do
-    socket =
-      if socket.assigns[:allow_flash_display?] do
-        Phoenix.LiveView.Utils.assign(socket, :allow_flash_display?, false)
-      else
-        clear_one_shot_flash(socket)
-      end
+    {:cont, maybe_clear_flash(socket)}
+  end
 
-    {:cont, socket}
+  defp clear_consumed_flash_info(_message, socket) do
+    {:cont, maybe_clear_flash(socket)}
+  end
+
+  defp maybe_clear_flash(socket) do
+    if socket.assigns[:allow_flash_display?] do
+      Phoenix.LiveView.Utils.assign(socket, :allow_flash_display?, false)
+    else
+      clear_one_shot_flash(socket)
+    end
   end
 
   defp clear_one_shot_flash(socket) do
