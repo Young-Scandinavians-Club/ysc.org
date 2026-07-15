@@ -77,4 +77,20 @@ defmodule Ysc.WpMigration.MembershipPlanTest do
       assert MembershipPlan.resolve(%{}) == "single"
     end
   end
+
+  describe "lifetime_membership_date?/1" do
+    test "returns true for renewal dates more than five years in the future" do
+      far_future = DateTime.utc_now() |> DateTime.add(6 * 365, :day)
+      assert MembershipPlan.lifetime_membership_date?(far_future)
+    end
+
+    test "returns false for renewal dates within five years" do
+      near_future = DateTime.utc_now() |> DateTime.add(2 * 365, :day)
+      refute MembershipPlan.lifetime_membership_date?(near_future)
+    end
+
+    test "returns false for nil" do
+      refute MembershipPlan.lifetime_membership_date?(nil)
+    end
+  end
 end

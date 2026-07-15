@@ -5,6 +5,7 @@
     "[scrollbar-gutter:stable]",
     assigns[:sidebar_collapsed] && "sidebar-collapsed"
   ]}
+  data-app-env={Application.get_env(:ysc, :environment, "production")}
   data-s3-use-custom-domain={
     if Ysc.S3Config.use_custom_s3_domain?(), do: "true", else: "false"
   }

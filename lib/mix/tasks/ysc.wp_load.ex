@@ -12,9 +12,9 @@ defmodule Mix.Tasks.Ysc.WpLoad do
 
   Options:
     --create-stripe-subscriptions  Creates real Stripe customers and subscriptions in the
-                                   connected Stripe account (sandbox/dev). Each subscription
-                                   is created with trial_end set to the WP renewal date so
-                                   no immediate charge fires. Useful for local testing.
+                                   connected Stripe account. Each subscription is created
+                                   with trial_end set to the membership renewal date (capped at
+                                   Stripe's two-year trial maximum) so no immediate charge fires.
   """
 
   use Mix.Task

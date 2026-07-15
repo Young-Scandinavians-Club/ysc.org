@@ -140,6 +140,7 @@ waitForSentry().then((available) => {
 
         window.Sentry.init({
             dsn: "https://9f1197d8becaf697a4ca018daa8c88b5@o4510359659216896.ingest.us.sentry.io/4510359660396544",
+            environment: document.documentElement.dataset.appEnv || "production",
             integrations: integrations,
             // Performance Monitoring - capture 10% of transactions
             tracesSampleRate: 0.1,

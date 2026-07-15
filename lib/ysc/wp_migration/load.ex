@@ -24,6 +24,7 @@ defmodule Ysc.WpMigration.Load do
   alias Ysc.WpMigration.StripeImport
   alias Ysc.WpMigration.UserNames
   alias Ysc.WpMigration.IgnoredAccounts
+  alias Ysc.Newsletter
 
   @doc """
   Runs the load. Reads export_dir (users.json, applications.json, posts.json, media/, stripe_customer_lookup.json)
@@ -46,23 +47,7 @@ defmodule Ysc.WpMigration.Load do
     upload_media = Keyword.get(opts, :upload_media, true)
     create_stripe_subscriptions = opts[:create_stripe_subscriptions] || false
 
-    only_emails =
-      case opts[:only_emails] do
-        nil ->
-          nil
-
-        email when is_binary(email) ->
-          MapSet.new([String.downcase(email)])
-
-        emails when is_list(emails) ->
-          valid =
-            emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
-
-          if valid == [], do: nil, else: MapSet.new(valid)
-
-        _ ->
-          nil
-      end
+    only_emails = normalize_only_emails_option(opts[:only_emails])
 
     if export_dir do
       export_dir = Path.expand(export_dir)
@@ -81,6 +66,57 @@ defmodule Ysc.WpMigration.Load do
     else
       {:error, "Missing :export_dir"}
     end
+  end
+
+  @doc """
+  Creates real Stripe subscriptions for users who still have local `migrated_*` placeholders.
+
+  WordPress managed memberships in the database only; this links each active migrated
+  subscription to a real Stripe subscription with `trial_end` set to the DB
+  `current_period_end` so members are not charged until their existing term ends.
+
+  ## Options
+
+  - `:dry_run` — log only, no Stripe or DB writes (default: false)
+  - `:only_emails` — a single email or list of emails to limit the run
+  """
+  def create_migration_stripe_subscriptions(opts \\ []) do
+    dry_run = Keyword.get(opts, :dry_run, false)
+    only_emails = normalize_only_emails_option(opts[:only_emails])
+    report = StripeImport.new_report()
+
+    Ysc.Logging.info(
+      "[WP Load] Backfilling Stripe subscriptions for migrated placeholders",
+      dry_run: dry_run,
+      only_emails: only_emails
+    )
+
+    subs = list_migrated_subscriptions(only_emails)
+
+    {stats, report} =
+      Enum.reduce(
+        subs,
+        {%{created: 0, lifetime: 0, skipped: 0, failed: 0, dry_run: 0}, report},
+        fn sub, {stats, report} ->
+          case backfill_stripe_subscription_for_migration(sub, dry_run, report) do
+            {status, updated_report} ->
+              stats =
+                case status do
+                  :created -> %{stats | created: stats.created + 1}
+                  :lifetime -> %{stats | lifetime: stats.lifetime + 1}
+                  :skipped -> %{stats | skipped: stats.skipped + 1}
+                  :failed -> %{stats | failed: stats.failed + 1}
+                  :dry_run -> %{stats | dry_run: stats.dry_run + 1}
+                end
+
+              {stats, updated_report}
+          end
+        end
+      )
+
+    StripeImport.log_summary(report)
+
+    {:ok, %{stats: stats, stripe_import_report: report}}
   end
 
   defp do_run(
@@ -271,6 +307,190 @@ defmodule Ysc.WpMigration.Load do
     end)
   end
 
+  defp normalize_only_emails_option(nil), do: nil
+
+  defp normalize_only_emails_option(email) when is_binary(email) do
+    MapSet.new([String.downcase(email)])
+  end
+
+  defp normalize_only_emails_option(emails) when is_list(emails) do
+    valid = emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
+    if valid == [], do: nil, else: MapSet.new(valid)
+  end
+
+  defp normalize_only_emails_option(_), do: nil
+
+  defp list_migrated_subscriptions(only_emails) do
+    Subscription
+    |> join(:inner, [s], u in User, on: s.user_id == u.id)
+    |> where([s], like(s.stripe_id, "migrated_%"))
+    |> maybe_filter_user_emails(only_emails)
+    |> order_by([_s, u], asc: u.email)
+    |> preload([_s, u], subscription_items: [], user: u)
+    |> Repo.all()
+  end
+
+  defp maybe_filter_user_emails(query, nil), do: query
+
+  defp maybe_filter_user_emails(query, only_emails) do
+    from [s, u] in query, where: u.email in ^MapSet.to_list(only_emails)
+  end
+
+  defp backfill_stripe_subscription_for_migration(
+         %Subscription{} = sub,
+         dry_run,
+         report
+       ) do
+    user = sub.user
+    email = user.email
+
+    context = %{
+      user_id: user.id,
+      email: email,
+      wp_user_id: nil,
+      wp_stripe_customer_id: user.stripe_id
+    }
+
+    cond do
+      is_nil(sub.current_period_end) ->
+        Ysc.Logging.warning(
+          "[WP Load] Skipping Stripe backfill for #{email}: no current_period_end"
+        )
+
+        {:skipped, report}
+
+      MembershipPlan.lifetime_membership_date?(sub.current_period_end) ->
+        if dry_run do
+          Ysc.Logging.info(
+            "[WP Load] Dry run: would award lifetime membership for #{email} " <>
+              "(period_end=#{DateTime.to_iso8601(sub.current_period_end)})"
+          )
+
+          {:dry_run, report}
+        else
+          case award_lifetime_membership_from_migration(user, sub.start_date) do
+            {:ok, _} ->
+              {:lifetime, report}
+
+            {:error, reason} ->
+              Ysc.Logging.warning(
+                "[WP Load] Failed to award lifetime membership for #{email}: #{inspect(reason)}"
+              )
+
+              {:failed, report}
+          end
+        end
+
+      DateTime.compare(sub.current_period_end, DateTime.utc_now()) != :gt ->
+        Ysc.Logging.info(
+          "[WP Load] Skipping Stripe backfill for #{email}: membership period ended at #{DateTime.to_iso8601(sub.current_period_end)}"
+        )
+
+        {:skipped, report}
+
+      dry_run ->
+        membership_plan = membership_plan_from_subscription(sub)
+
+        Ysc.Logging.info(
+          "[WP Load] Dry run: would create Stripe subscription for #{email} " <>
+            "(plan=#{membership_plan}, trial_end=#{DateTime.to_iso8601(sub.current_period_end)})"
+        )
+
+        {:dry_run, report}
+
+      true ->
+        case ensure_user_stripe_customer(user, context, report) do
+          {:ok, user, report} ->
+            case backfill_create_stripe_subscription(user, sub, report) do
+              :ok -> {:created, report}
+              {:skip, report} -> {:skipped, report}
+              {:error, report} -> {:failed, report}
+            end
+
+          {:error, _reason, report} ->
+            {:failed, report}
+        end
+    end
+  end
+
+  defp ensure_user_stripe_customer(
+         %User{stripe_id: stripe_id} = user,
+         _context,
+         report
+       )
+       when is_binary(stripe_id) and stripe_id != "" do
+    {:ok, user, report}
+  end
+
+  defp ensure_user_stripe_customer(%User{} = user, context, report) do
+    case StripeImport.ensure_stripe_customer_for_user(user, context, report) do
+      {:ok, user, report} -> {:ok, user, report}
+      {:error, reason, report} -> {:error, reason, report}
+    end
+  end
+
+  defp backfill_create_stripe_subscription(
+         %User{} = user,
+         %Subscription{} = sub,
+         report
+       ) do
+    membership_plan = membership_plan_from_subscription(sub)
+    auto_renew = is_nil(sub.ends_at)
+    row = %{"email" => user.email, "wp_user_id" => nil}
+    failures_before = StripeImport.failure_count(report)
+
+    report =
+      create_stripe_subscription_if_needed(
+        row,
+        user,
+        sub.current_period_end,
+        sub.start_date || sub.current_period_end,
+        auto_renew,
+        membership_plan,
+        report
+      )
+
+    updated_sub =
+      Repo.one(
+        from s in Subscription,
+          where: s.user_id == ^user.id,
+          limit: 1
+      )
+
+    cond do
+      updated_sub && !String.starts_with?(updated_sub.stripe_id, "migrated_") ->
+        :ok
+
+      StripeImport.failure_count(report) > failures_before ->
+        {:error, report}
+
+      true ->
+        Ysc.Logging.warning(
+          "[WP Load] Stripe backfill for #{user.email} did not produce a real subscription"
+        )
+
+        {:skip, report}
+    end
+  end
+
+  defp membership_plan_from_subscription(%Subscription{
+         subscription_items: [item | _]
+       }) do
+    membership_plan_from_price_id(item.stripe_price_id)
+  end
+
+  defp membership_plan_from_subscription(_), do: "single"
+
+  defp membership_plan_from_price_id(price_id) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case Enum.find(plans, &(&1.stripe_price_id == price_id)) do
+      %{id: :family} -> "family"
+      %{id: :single} -> "single"
+      _ -> "single"
+    end
+  end
+
   defp filter_by_wp_user_ids(rows, nil, _field), do: rows
 
   defp filter_by_wp_user_ids(rows, only_wp_user_ids, field) do
@@ -331,12 +551,14 @@ defmodule Ysc.WpMigration.Load do
                  |> apply_migration_user_verification(row)
                  |> backdate_timestamp(row["user_registered"])
                  |> Repo.update() do
-              {:ok, _} ->
-                upsert_address(existing.id, row)
-                {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
+              {:ok, user} ->
+                upsert_address(user.id, row)
+                subscribe_migrated_user_to_newsletter(user)
+                {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
 
               {:error, _} ->
                 upsert_address(existing.id, row)
+                subscribe_migrated_user_to_newsletter(existing)
                 {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
             end
 
@@ -369,6 +591,7 @@ defmodule Ysc.WpMigration.Load do
             case Repo.insert(changeset) do
               {:ok, user} ->
                 upsert_address(user.id, row)
+                subscribe_migrated_user_to_newsletter(user)
                 {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
 
               {:error, changeset} ->
@@ -423,6 +646,43 @@ defmodule Ysc.WpMigration.Load do
     case parse_date(raw) do
       nil -> attrs
       date -> Map.put(attrs, "date_of_birth", date)
+    end
+  end
+
+  defp subscribe_migrated_user_to_newsletter(%User{} = user) do
+    metadata = %{
+      "user_id" => user.id,
+      "wp_migration" => true,
+      "role" => to_string(user.role || "member"),
+      "state" => to_string(user.state || "active")
+    }
+
+    case Newsletter.subscribe(user.email,
+           user_id: user.id,
+           first_name: user.first_name,
+           last_name: user.last_name,
+           source: "wp_migration",
+           metadata: metadata
+         ) do
+      {:ok, _subscriber} ->
+        :ok
+
+      {:error, :invalid_email} ->
+        :ok
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        Ysc.Logging.warning(
+          "[WP Load] Failed to subscribe user #{user.id} to newsletter: #{inspect(changeset.errors)}"
+        )
+
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "[WP Load] Failed to subscribe user #{user.id} to newsletter: #{inspect(reason)}"
+        )
+
+        :ok
     end
   end
 
@@ -1270,19 +1530,7 @@ defmodule Ysc.WpMigration.Load do
         subdir = Path.join(media_dir, att_id)
         meta_path = Path.join(subdir, "meta.json")
 
-        image_file =
-          subdir
-          |> File.ls!()
-          |> Enum.find(
-            &(String.downcase(Path.extname(&1)) in [
-                ".jpg",
-                ".jpeg",
-                ".png",
-                ".gif",
-                ".webp"
-              ])
-          )
-
+        image_file = find_image_file_in_subdir(subdir)
         file_path = image_file && Path.join(subdir, image_file)
 
         if is_nil(file_path) or not File.exists?(file_path) do
@@ -1301,7 +1549,8 @@ defmodule Ysc.WpMigration.Load do
                   fragment("(upload_data->>'wp_attachment_id') = ?", ^att_id)
             )
 
-          if existing do
+          if existing &&
+               not broken_migration_image_path?(existing.raw_image_path) do
             fname_acc =
               add_filename_entry(
                 fname_acc,
@@ -1330,14 +1579,30 @@ defmodule Ysc.WpMigration.Load do
                   }
                 }
 
-                changeset =
-                  %Image{user_id: uploader.id}
-                  |> Image.add_image_changeset(attrs)
-                  |> backdate_timestamp(meta["created"])
+                result =
+                  if existing do
+                    attrs =
+                      Map.merge(attrs, %{
+                        optimized_image_path: nil,
+                        thumbnail_path: nil,
+                        blur_hash: nil,
+                        width: nil,
+                        height: nil,
+                        processing_state: "unprocessed"
+                      })
 
-                case Repo.insert(changeset) do
+                    existing
+                    |> Image.add_image_changeset(attrs)
+                    |> Repo.update()
+                  else
+                    %Image{user_id: uploader.id}
+                    |> Image.add_image_changeset(attrs)
+                    |> backdate_timestamp(meta["created"])
+                    |> Repo.insert()
+                  end
+
+                case result do
                   {:ok, img} ->
-                    # Kick off image processing to generate optimized/thumbnail
                     ImageProcessor.new(%{id: img.id}) |> Oban.insert()
 
                     fname_acc =
@@ -1350,8 +1615,10 @@ defmodule Ysc.WpMigration.Load do
                     {:cont, {:ok, Map.put(img_acc, att_id, img), fname_acc}}
 
                   {:error, changeset} ->
+                    action = if existing, do: "update", else: "insert"
+
                     Ysc.Logging.warning(
-                      "[WP Load] Failed to insert image for attachment #{att_id}: #{inspect(changeset.errors)}"
+                      "[WP Load] Failed to #{action} image for attachment #{att_id}: #{inspect(changeset.errors)}"
                     )
 
                     {:cont, {:ok, img_acc, fname_acc}}
@@ -1368,6 +1635,147 @@ defmodule Ysc.WpMigration.Load do
         end
       end)
     end
+  end
+
+  @image_extensions [".jpg", ".jpeg", ".png", ".gif", ".webp"]
+
+  @doc """
+  Re-uploads migration media that were imported from macOS AppleDouble `._*` files
+  and updates `raw_image_path` in place. Returns `{:ok, stats}`.
+  """
+  def repair_migration_media(export_dir, opts \\ []) do
+    export_dir = Path.expand(export_dir)
+    media_dir = Path.join(export_dir, "media")
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    unless File.dir?(media_dir) do
+      {:error, "Media directory not found: #{media_dir}"}
+    else
+      broken =
+        Repo.all(
+          from i in Image,
+            where:
+              not is_nil(fragment("upload_data->>'wp_attachment_id'")) and
+                ilike(i.raw_image_path, "%/._%")
+        )
+
+      stats = %{repaired: 0, skipped: 0, failed: 0}
+
+      stats =
+        Enum.reduce(broken, stats, fn image, acc ->
+          att_id = image.upload_data["wp_attachment_id"]
+          subdir = Path.join(media_dir, att_id)
+
+          case find_image_file_in_subdir(subdir) do
+            nil ->
+              Ysc.Logging.warning(
+                "[WP Load] Repair skipped attachment #{att_id}: no image file in #{subdir}"
+              )
+
+              %{acc | skipped: acc.skipped + 1}
+
+            image_file ->
+              file_path = Path.join(subdir, image_file)
+              key = "migration/#{att_id}/#{image_file}"
+
+              if dry_run do
+                Ysc.Logging.info(
+                  "[WP Load] Repair dry run attachment #{att_id}: would upload #{file_path} as #{key}"
+                )
+
+                %{acc | repaired: acc.repaired + 1}
+              else
+                case repair_migration_image(image, file_path, key) do
+                  :ok ->
+                    %{acc | repaired: acc.repaired + 1}
+
+                  :error ->
+                    %{acc | failed: acc.failed + 1}
+                end
+              end
+          end
+        end)
+
+      {:ok, stats}
+    end
+  end
+
+  defp repair_migration_image(image, file_path, key) do
+    case Media.upload_file_to_s3(file_path, key) do
+      %{body: %{location: location}} when is_binary(location) ->
+        raw_image_path = URI.encode(location)
+
+        upload_data =
+          image.upload_data
+          |> Map.put("key", key)
+
+        changeset =
+          image
+          |> Image.add_image_changeset(%{
+            raw_image_path: raw_image_path,
+            upload_data: upload_data,
+            optimized_image_path: nil,
+            thumbnail_path: nil,
+            blur_hash: nil,
+            width: nil,
+            height: nil,
+            processing_state: "unprocessed"
+          })
+
+        case Repo.update(changeset) do
+          {:ok, updated} ->
+            ImageProcessor.new(%{id: updated.id}) |> Oban.insert()
+            :ok
+
+          {:error, changeset} ->
+            Ysc.Logging.warning(
+              "[WP Load] Repair failed to update image #{image.id}: #{inspect(changeset.errors)}"
+            )
+
+            :error
+        end
+
+      other ->
+        Ysc.Logging.warning(
+          "[WP Load] Repair failed to upload image #{image.id}: #{inspect(other)}"
+        )
+
+        :error
+    end
+  end
+
+  defp broken_migration_image_path?(path) when is_binary(path),
+    do: String.contains?(path, "/._")
+
+  defp broken_migration_image_path?(_), do: false
+
+  defp find_image_file_in_subdir(subdir) when is_binary(subdir) do
+    case File.ls(subdir) do
+      {:ok, names} ->
+        names
+        |> Enum.reject(&skip_media_filename?/1)
+        |> Enum.filter(&image_extension?/1)
+        |> prefer_extracted_image_file()
+
+      {:error, _} ->
+        nil
+    end
+  end
+
+  defp skip_media_filename?(name) do
+    name == "meta.json" or String.starts_with?(name, "._")
+  end
+
+  defp image_extension?(name) do
+    String.downcase(Path.extname(name)) in @image_extensions
+  end
+
+  # Phase 1 extract writes `file.<ext>`; prefer that over other names in the folder.
+  defp prefer_extracted_image_file([]), do: nil
+
+  defp prefer_extracted_image_file(files) do
+    Enum.find(files, &String.match?(&1, ~r/^file\.[^.]+$/i)) ||
+      List.first(files)
   end
 
   # Adds a normalized-filename → url entry to fname_acc.
@@ -1765,6 +2173,26 @@ defmodule Ysc.WpMigration.Load do
 
             acc_report
 
+          MembershipPlan.lifetime_membership_date?(recorded_end_dt) ->
+            user = Repo.get!(User, user_id)
+
+            case award_lifetime_membership_from_migration(user, start_dt) do
+              {:ok, _} ->
+                Ysc.Logging.info(
+                  "[WP Load] Awarded lifetime membership for user #{user_id} (#{row["email"]}) " <>
+                    "from far-future WP renewal date #{DateTime.to_iso8601(recorded_end_dt)}"
+                )
+
+                acc_report
+
+              {:error, reason} ->
+                Ysc.Logging.warning(
+                  "[WP Load] Failed to award lifetime membership for user #{user_id} (#{row["email"]}): #{inspect(reason)}"
+                )
+
+                acc_report
+            end
+
           true ->
             user = Repo.get!(User, user_id)
 
@@ -2058,10 +2486,49 @@ defmodule Ysc.WpMigration.Load do
        ) do
     user_id = user.id
 
+    if MembershipPlan.lifetime_membership_date?(renewal_dt) do
+      case award_lifetime_membership_from_migration(user, start_dt) do
+        {:ok, _} ->
+          Ysc.Logging.info(
+            "[WP Load] Awarded lifetime membership for user #{user_id} instead of creating Stripe subscription"
+          )
+
+          report
+
+        {:error, reason} ->
+          Ysc.Logging.warning(
+            "[WP Load] Failed to award lifetime membership for user #{user_id}: #{inspect(reason)}"
+          )
+
+          report
+      end
+    else
+      do_create_stripe_subscription_if_needed(
+        row,
+        user,
+        renewal_dt,
+        start_dt,
+        auto_renew,
+        membership_plan,
+        report
+      )
+    end
+  end
+
+  defp do_create_stripe_subscription_if_needed(
+         row,
+         user,
+         renewal_dt,
+         start_dt,
+         auto_renew,
+         membership_plan,
+         report
+       ) do
+    user_id = user.id
     price_id = resolve_stripe_price_id(membership_plan)
 
     if price_id do
-      trial_end = DateTime.to_unix(renewal_dt)
+      trial_end = stripe_trial_end_unix(renewal_dt)
 
       existing =
         Repo.one(
@@ -2256,6 +2723,56 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
+  defp award_lifetime_membership_from_migration(
+         %User{} = user,
+         awarded_at \\ nil
+       ) do
+    awarded_at =
+      case awarded_at do
+        %DateTime{} = dt -> DateTime.truncate(dt, :second)
+        _ -> DateTime.utc_now() |> DateTime.truncate(:second)
+      end
+
+    active_sub =
+      Repo.one(
+        from s in Subscription,
+          where: s.user_id == ^user.id,
+          limit: 1
+      )
+
+    if active_sub && Subscriptions.active?(active_sub) &&
+         !String.starts_with?(active_sub.stripe_id, "migrated_") do
+      case Subscriptions.cancel(active_sub) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.warning(
+            "[WP Load] Failed to cancel Stripe subscription for user #{user.id} when awarding lifetime: #{inspect(reason)}"
+          )
+      end
+    end
+
+    StripeImport.remove_migrated_placeholder(user.id)
+
+    if is_nil(user.lifetime_membership_awarded_at) do
+      user
+      |> User.update_user_changeset(%{
+        lifetime_membership_awarded_at: awarded_at
+      })
+      |> Repo.update()
+      |> tap(fn
+        {:ok, updated} ->
+          Ysc.Accounts.MembershipCache.invalidate_user(updated.id)
+
+        _ ->
+          :ok
+      end)
+    else
+      {:ok, user}
+    end
+  end
+
   defp format_stripe_failure_reason(%Stripe.Error{} = error) do
     parts =
       [
@@ -2269,6 +2786,26 @@ defmodule Ysc.WpMigration.Load do
 
   defp format_stripe_failure_reason(reason) when is_binary(reason), do: reason
   defp format_stripe_failure_reason(reason), do: inspect(reason)
+
+  # Stripe allows at most 730 days (two years) of trial.
+  defp stripe_trial_end_unix(%DateTime{} = renewal_dt) do
+    renewal_unix = DateTime.to_unix(renewal_dt)
+
+    max_unix =
+      DateTime.utc_now()
+      |> DateTime.add(730 - 7, :day)
+      |> DateTime.to_unix()
+
+    capped = min(renewal_unix, max_unix)
+
+    if capped != renewal_unix do
+      Ysc.Logging.info(
+        "[WP Load] Capped Stripe trial_end from #{renewal_unix} to #{capped} (Stripe two-year trial limit)"
+      )
+    end
+
+    capped
+  end
 
   defp resolve_stripe_price_id(membership_plan) do
     plan_id =
@@ -2317,30 +2854,39 @@ defmodule Ysc.WpMigration.Load do
         subscription_id: subscription.id
       )
 
-    unless existing do
-      attrs = %{
-        stripe_id: stripe_item_id,
-        stripe_product_id: stripe_product_id,
-        stripe_price_id: price_id,
-        quantity: 1,
-        subscription_id: subscription.id
-      }
+    attrs = %{
+      stripe_id: stripe_item_id,
+      stripe_product_id: stripe_product_id,
+      stripe_price_id: price_id,
+      quantity: 1,
+      subscription_id: subscription.id
+    }
 
-      case %Ysc.Subscriptions.SubscriptionItem{}
-           |> Ysc.Subscriptions.SubscriptionItem.changeset(attrs)
-           |> Repo.insert() do
-        {:ok, _} ->
-          Ysc.Accounts.MembershipCache.invalidate_user(subscription.user_id)
+    result =
+      case existing do
+        nil ->
+          %Ysc.Subscriptions.SubscriptionItem{}
+          |> Ysc.Subscriptions.SubscriptionItem.changeset(attrs)
+          |> Repo.insert()
 
-          Ysc.Logging.info(
-            "[WP Load] Created subscription_item for user #{subscription.user_id}: plan=#{plan && plan.name}, price=#{price_id}"
-          )
-
-        {:error, changeset} ->
-          Ysc.Logging.warning(
-            "[WP Load] Failed to create subscription_item for user #{subscription.user_id}: #{inspect(changeset.errors)}"
-          )
+        item ->
+          item
+          |> Ysc.Subscriptions.SubscriptionItem.changeset(attrs)
+          |> Repo.update()
       end
+
+    case result do
+      {:ok, _} ->
+        Ysc.Accounts.MembershipCache.invalidate_user(subscription.user_id)
+
+        Ysc.Logging.info(
+          "[WP Load] Created subscription_item for user #{subscription.user_id}: plan=#{plan && plan.name}, price=#{price_id}"
+        )
+
+      {:error, changeset} ->
+        Ysc.Logging.warning(
+          "[WP Load] Failed to create subscription_item for user #{subscription.user_id}: #{inspect(changeset.errors)}"
+        )
     end
   end
 

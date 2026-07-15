@@ -73,7 +73,7 @@ auto_stop_machines = 'stop'
 auto_start_machines = true
 # Rolling deploys need at least two started machines; CI enforces this before release.
 min_machines_running = 2
-max_machines_running = 3
+max_machines_running = 4
 processes = ['app']
 
 [http_service.concurrency]
@@ -82,9 +82,9 @@ hard_limit = 800
 soft_limit = 400
 
 [[vm]]
-size = 'shared-cpu-1x'
+size = 'shared-cpu-2x'
 memory = '1gb'
-cpus = 1
+cpus = 2
 
 [[metrics]]
 port = 4000

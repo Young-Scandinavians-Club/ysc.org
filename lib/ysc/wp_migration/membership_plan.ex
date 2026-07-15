@@ -7,7 +7,32 @@ defmodule Ysc.WpMigration.MembershipPlan do
   1. WooCommerce Membership / Subscription product name from WP
   2. Signup application `membership_type`
   3. User usermeta `membership_type`
+
+  Renewal dates more than five years in the future are treated as lifetime
+  memberships (WordPress often used far-future placeholders).
   """
+
+  @lifetime_membership_threshold_years 5
+  @lifetime_membership_threshold_days @lifetime_membership_threshold_years * 365
+
+  @doc """
+  Returns true when `renewal_dt` is more than five years in the future.
+
+  WordPress often stored complimentary or lifetime members with placeholder end dates
+  (e.g. year 2099). Those should become `lifetime_membership_awarded_at` in the new
+  system rather than Stripe subscriptions with capped trials.
+  """
+  def lifetime_membership_date?(nil), do: false
+
+  def lifetime_membership_date?(%DateTime{} = renewal_dt) do
+    threshold =
+      DateTime.utc_now()
+      |> DateTime.add(@lifetime_membership_threshold_days, :day)
+
+    DateTime.compare(renewal_dt, threshold) == :gt
+  end
+
+  def lifetime_membership_date?(_), do: false
 
   @doc """
   Infers `"single"` or `"family"` from a WooCommerce product title.

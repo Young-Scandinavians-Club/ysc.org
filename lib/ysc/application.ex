@@ -21,7 +21,13 @@ defmodule Ysc.Application do
     Req.default_options(compressed: true)
 
     :logger.add_handler(:ysc_sentry_handler, Sentry.LoggerHandler, %{
-      config: %{metadata: [:file, :line]}
+      config: %{
+        capture_metadata: [:file, :line],
+        # Most call sites use Ysc.Logging.error/2 without an :error struct; still report
+        # those Logger.error lines to Sentry (crashes were already captured by default).
+        capture_log_messages: true,
+        capture_level: :error
+      }
     })
 
     maybe_start_geo_ip_loader()

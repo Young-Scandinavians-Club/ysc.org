@@ -127,6 +127,19 @@ if System.get_env("PHX_SERVER") do
 end
 
 if config_env() == :prod do
+  # Sentry reads config when the :sentry app starts (after this file runs). Use runtime
+  # env so the Sentry UI matches Fly [env] (ENVIRONMENT=production), not Mix :prod.
+  config :sentry,
+    environment_name:
+      System.get_env("SENTRY_ENVIRONMENT") ||
+        System.get_env("ENVIRONMENT") ||
+        System.get_env("APP_ENV") ||
+        "production",
+    release:
+      System.get_env("SENTRY_RELEASE") ||
+        System.get_env("BUILD_VERSION") ||
+        to_string(Application.spec(:ysc, :vsn) || "unknown")
+
   # Fly.io `release_command` runs e.g. `/app/bin/migrate` in a one-off machine before
   # app VMs update. That process still loads this file, but only needs Repo + Endpoint.
   # Set `RELEASE_COMMAND=1` for the migrate step only (see fly-*.toml) so deploys are not

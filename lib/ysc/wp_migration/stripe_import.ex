@@ -60,7 +60,11 @@ defmodule Ysc.WpMigration.StripeImport do
         path
 
       {:error, reason} ->
-        raise "Unable to write #{@report_filename} under #{export_dir}: #{inspect(reason)}"
+        Ysc.Logging.warning(
+          "[WP Load] Unable to write #{@report_filename} under #{export_dir}: #{inspect(reason)}"
+        )
+
+        nil
     end
   end
 

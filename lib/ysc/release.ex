@@ -54,7 +54,7 @@ defmodule Ysc.Release do
   Options (keyword list as second argument):
   - `:dry_run` — log only, no DB or S3 writes (default: false)
   - `:upload_media` — upload media/ to Tigris and create Image records (default: true)
-  - `:create_stripe_subscriptions` — create Stripe subs in the connected account (default: false; sandbox only)
+  - `:create_stripe_subscriptions` — create Stripe subs in the connected account (default: false)
   - `:only_emails` — load a single email or list of emails for targeted runs
   """
   def wp_load(export_dir, opts \\ []) when is_binary(export_dir) do
@@ -104,6 +104,89 @@ defmodule Ysc.Release do
       {:error, message} ->
         Ysc.Logging.error("WP migration load failed", error: message)
         {:error, message}
+    end
+  end
+
+  @doc """
+  Repairs WP migration images whose `raw_image_path` points at macOS AppleDouble `._*`
+  files instead of the real upload.
+
+      bin/ysc eval 'Ysc.Release.wp_repair_migration_media("/tmp/wp_migration_export")'
+  """
+  def wp_repair_migration_media(export_dir, opts \\ [])
+      when is_binary(export_dir) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    Ysc.Logging.info("WP migration media repair starting",
+      export_dir: export_dir,
+      dry_run: dry_run
+    )
+
+    case Ysc.WpMigration.Load.repair_migration_media(export_dir,
+           dry_run: dry_run
+         ) do
+      {:ok, stats} ->
+        Ysc.Logging.info("WP migration media repair finished", stats)
+        {:ok, stats}
+
+      {:error, message} = error ->
+        Ysc.Logging.error("WP migration media repair failed", error: message)
+        error
+    end
+  end
+
+  @doc """
+  Creates real Stripe subscriptions for users with local `migrated_*` placeholder subs.
+
+  Uses each subscription's DB period end and plan (not the WP export), with `trial_end`
+  set to `current_period_end` so members are not charged until their existing term ends.
+
+      bin/ysc eval "Ysc.Release.wp_create_migration_stripe_subscriptions()"
+      bin/ysc eval "Ysc.Release.wp_create_migration_stripe_subscriptions(only_emails: [\"user@example.com\"])"
+      bin/ysc eval "Ysc.Release.wp_create_migration_stripe_subscriptions(dry_run: true)"
+
+  ## Options
+
+  - `:dry_run` — log only (default: false)
+  - `:only_emails` — single email or list of emails to limit the run
+  """
+  def wp_create_migration_stripe_subscriptions(opts \\ []) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+    only_emails = Keyword.get(opts, :only_emails)
+
+    Ysc.Logging.info("WP migration Stripe subscription backfill starting",
+      dry_run: dry_run,
+      only_emails: only_emails
+    )
+
+    load_opts =
+      if only_emails,
+        do: [dry_run: dry_run, only_emails: only_emails],
+        else: [dry_run: dry_run]
+
+    case Ysc.WpMigration.Load.create_migration_stripe_subscriptions(load_opts) do
+      {:ok, %{stats: stats} = result} ->
+        Ysc.Logging.info(
+          "WP migration Stripe subscription backfill finished",
+          stats
+        )
+
+        {:ok, result}
+
+      {:error, message} = error ->
+        Ysc.Logging.error("WP migration Stripe subscription backfill failed",
+          error: message
+        )
+
+        error
     end
   end
 
