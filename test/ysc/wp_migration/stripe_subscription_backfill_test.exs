@@ -1,6 +1,8 @@
 defmodule Ysc.WpMigration.StripeSubscriptionBackfillTest do
   use Ysc.DataCase, async: true
 
+  import Ysc.AccountsFixtures
+
   alias Ysc.Accounts.User
   alias Ysc.Repo
   alias Ysc.Subscriptions.Subscription

@@ -22,13 +22,13 @@ defmodule Ysc.WpMigration.MediaRepairTest do
     File.write!(Path.join(media_dir, "._file.jpg"), "appledouble")
     File.write!(Path.join(media_dir, "file.jpg"), "real-image-bytes")
 
-    %Image{}
-    |> Image.add_image_changeset(%{
-      raw_image_path: "https://assets.ysc.org/migration/123/._file.jpg",
-      user_id: user.id,
-      upload_data: %{"wp_attachment_id" => "123"}
-    })
-    |> Repo.insert!()
+    {:ok, _image} =
+      %Image{user_id: user.id}
+      |> Image.add_image_changeset(%{
+        raw_image_path: "https://assets.ysc.org/migration/123/._file.jpg",
+        upload_data: %{"wp_attachment_id" => "123"}
+      })
+      |> Repo.insert()
 
     assert {:ok, %{repaired: 1, skipped: 0, failed: 0}} =
              Load.repair_migration_media(export_dir)
@@ -52,13 +52,13 @@ defmodule Ysc.WpMigration.MediaRepairTest do
 
     broken_path = "https://assets.ysc.org/migration/456/._file.png"
 
-    %Image{}
-    |> Image.add_image_changeset(%{
-      raw_image_path: broken_path,
-      user_id: user.id,
-      upload_data: %{"wp_attachment_id" => "456"}
-    })
-    |> Repo.insert!()
+    {:ok, _image} =
+      %Image{user_id: user.id}
+      |> Image.add_image_changeset(%{
+        raw_image_path: broken_path,
+        upload_data: %{"wp_attachment_id" => "456"}
+      })
+      |> Repo.insert()
 
     assert {:ok, %{repaired: 1, skipped: 0, failed: 0}} =
              Load.repair_migration_media(export_dir, dry_run: true)
