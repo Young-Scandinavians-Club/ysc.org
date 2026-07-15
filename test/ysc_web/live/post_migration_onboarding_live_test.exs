@@ -331,7 +331,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       refute Accounts.needs_post_migration_onboarding?(user)
     end
 
-    test "complete_family_step requires at least one family member", %{
+    test "complete_family_step without members completes onboarding", %{
       conn: conn
     } do
       user = family_onboarding_user!()
@@ -340,12 +340,12 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       view = live_onboarding!(conn)
       go_to_family_step!(view)
 
-      render_click(view, "complete_family_step")
+      html = render_click(view, "complete_family_step")
+      assert html =~ "all set"
 
       user = Accounts.get_user!(user.id, [:family_members])
       assert user.family_members == []
-      assert Accounts.needs_post_migration_onboarding?(user)
-      assert render(view) =~ "Add Family Members"
+      refute Accounts.needs_post_migration_onboarding?(user)
     end
 
     test "remove_family_member deletes a saved member when multiple rows exist",

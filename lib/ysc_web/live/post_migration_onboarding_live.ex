@@ -614,7 +614,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Add Family Members
         <:subtitle>
-          Family memberships must include at least one other person (spouse, partner, or child under 18). Add everyone who should be on your membership now. We'll save their details when you continue, and email an invite to anyone you add an email for.
+          Add spouse, partner, or children under 18 who should be on your membership. If your account was marked as family by mistake, you can continue without adding anyone. We'll save details for anyone you add and email an invite when you provide an email.
         </:subtitle>
       </.header>
 
@@ -1341,15 +1341,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
         {:noreply, finalize_onboarding(socket)}
 
-      {:error, :no_members} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Please add at least one family member (spouse, partner, or child) before continuing, or contact info@ysc.org if you need help.",
-          title: "Family Members Required"
-        )
-
-        {:noreply, socket}
-
       {:error, :validation_failed, updated_forms} ->
         YscWeb.Flash.send_toast(
           :error,
@@ -1992,7 +1983,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       Enum.reject(params_list, &family_member_params_blank?/1)
 
     if filled == [] do
-      {:error, :no_members}
+      {:ok, reindex_family_member_forms(params_list), []}
     else
       case validate_all_family_members(user, params_list) do
         {:error, updated_forms} ->
