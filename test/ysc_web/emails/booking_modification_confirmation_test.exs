@@ -106,7 +106,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
       booking = booking_with_user()
 
       assert BookingModificationConfirmation.get_subject() ==
-               "Your reservation has been updated"
+               "Your booking has been updated"
 
       assert BookingModificationConfirmation.get_template_name() ==
                "booking_modification_confirmation"

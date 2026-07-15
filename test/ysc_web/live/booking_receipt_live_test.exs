@@ -373,7 +373,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       html = render(view)
       assert has_element?(view, "#reservation-updated-notice")
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
       assert html =~ "Your changes are saved"
     end
 
@@ -1693,7 +1693,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
 
       reloaded = Repo.get!(Booking, booking.id)
       assert reloaded.checkout_date == checkout
@@ -1907,7 +1907,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
 
       reloaded = Repo.get!(Booking, booking.id) |> Repo.preload(:booking_guests)
       assert reloaded.guests_count == 3
@@ -2104,7 +2104,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
       assert Ysc.Ledgers.get_payment_by_external_id(payment_intent_id)
 
       reloaded = Repo.get!(Booking, booking.id)
@@ -2293,7 +2293,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
           ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{payment_intent_id}&updated=true"
         )
 
-      assert html =~ "Reservation updated"
+      assert html =~ "Booking updated"
 
       final_booking = Repo.get!(Booking, booking.id)
       assert final_booking.checkout_date == checkout

@@ -1237,8 +1237,8 @@ defmodule YscWeb.BookingChangeLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your reservation has been updated.",
-           title: "Reservation updated"
+           "Your booking has been updated.",
+           title: "Booking updated"
          )
          |> push_navigate(
            to: ~p"/bookings/#{booking.id}/receipt?updated=true&confetti=true"
@@ -1250,8 +1250,8 @@ defmodule YscWeb.BookingChangeLive do
          |> assign(:submitting, false)
          |> YscWeb.Flash.put_toast(
            :info,
-           "Your reservation has been updated.",
-           title: "Reservation updated"
+           "Your booking has been updated.",
+           title: "Booking updated"
          )
          |> YscWeb.Flash.put_toast(
            :warning,
