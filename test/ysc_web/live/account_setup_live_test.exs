@@ -726,6 +726,28 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert render(view) =~ "Invalid verification code"
     end
 
+    test "phone verification is rate limited after repeated invalid submissions",
+         %{
+           conn: conn,
+           user: user
+         } do
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "4"}))
+
+      for _ <- 1..12 do
+        view
+        |> form("#phone_verification_form", %{"verification_code" => @invalid_otp})
+        |> render_submit()
+      end
+
+      view
+      |> form("#phone_verification_form", %{"verification_code" => @invalid_otp})
+      |> render_submit()
+
+      html = render(view)
+      assert html =~ "Too many verification attempts"
+    end
+
     test "valid code redirects to auto-login", %{
       conn: conn,
       user: user,

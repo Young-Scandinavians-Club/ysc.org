@@ -217,6 +217,47 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     end
   end
 
+  describe "duplicate checkout while payment is in flight" do
+    test "proceed-to-checkout shows processing toast when another payment is in flight" do
+      order = ticket_order_fixture()
+      order = Ysc.Repo.preload(order, tickets: :ticket_tier)
+      [ticket] = order.tickets
+      user = Ysc.Accounts.get_user!(order.user_id)
+
+      payment_intent_id = "pi_processing_duplicate_checkout_#{order.id}"
+
+      assert {:ok, _order} =
+               Tickets.update_payment_intent(order, payment_intent_id)
+
+      expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
+                                                              _opts ->
+        {:ok,
+         build_payment_intent(%{
+           id: payment_intent_id,
+           status: "processing"
+         })}
+      end)
+
+      conn = log_in_user(build_conn(), user)
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{order.event_id}")
+
+      view = wait_for_async(view)
+
+      render_click(view, "increase-ticket-quantity", %{
+        "tier-id" => ticket.ticket_tier_id
+      })
+      render_click(view, "proceed-to-checkout")
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      info = Phoenix.Flash.get(flash, :info)
+
+      assert info =~ "Your payment is still processing"
+      assert info =~ "If you were charged"
+      assert Ysc.Repo.get!(Ysc.Tickets.TicketOrder, order.id).status == :pending
+    end
+  end
+
   describe "payment intent creation failures" do
     defp checkout_error_flash(view) do
       :sys.get_state(view.pid).socket.assigns.flash
