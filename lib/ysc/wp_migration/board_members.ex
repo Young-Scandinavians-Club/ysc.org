@@ -133,7 +133,7 @@ defmodule Ysc.WpMigration.BoardMembers do
   @doc """
   Applies the board position for a single user when their email is on the roster.
   """
-  @spec sync_for_user(%User{}) :: :ok | :not_board_member
+  @spec sync_for_user(User.t()) :: :ok | :not_board_member
   def sync_for_user(%User{} = user) do
     case member_config_for_email(user.email) do
       nil ->
