@@ -188,6 +188,36 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert query_count <= 1
       assert render(view) =~ "Calendar"
     end
+
+    test "configuration section shows only pricing rules for selected property",
+         %{conn: conn} do
+      _tahoe_rule =
+        insert_pricing_rule!(%{property: :tahoe, amount: Money.new(111, :USD)})
+
+      _clear_lake_rule =
+        insert_pricing_rule!(%{
+          property: :clear_lake,
+          amount: Money.new(222, :USD)
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/bookings?property=tahoe")
+
+      view
+      |> element("button[phx-value-section=config]", "Configuration")
+      |> render_click()
+
+      html = render(view)
+      assert html =~ "$111.00"
+      refute html =~ "$222.00"
+
+      view
+      |> element("a[href*=\"property=clear_lake\"]", "Clear Lake")
+      |> render_click()
+
+      html = render(view)
+      assert html =~ "$222.00"
+      refute html =~ "$111.00"
+    end
   end
 
   describe "navigation and calendar controls" do
@@ -1206,5 +1236,21 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
       assert html =~ "Henry"
       refute html =~ "Grace"
     end
+  end
+
+  defp insert_pricing_rule!(attrs) do
+    default_attrs = %{
+      amount: Money.new(100, :USD),
+      booking_mode: :room,
+      price_unit: :per_person_per_night,
+      property: :tahoe
+    }
+
+    {:ok, rule} =
+      default_attrs
+      |> Map.merge(attrs)
+      |> Bookings.create_pricing_rule()
+
+    rule
   end
 end

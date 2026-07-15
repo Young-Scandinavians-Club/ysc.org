@@ -3482,11 +3482,10 @@ defmodule YscWeb.AdminBookingsLive do
     # Load critical data first (needed for calendar view)
     # Parallelize independent queries for better performance
     tasks = [
-      Task.async(fn -> Bookings.list_seasons() end),
-      Task.async(fn -> Bookings.list_pricing_rules() end),
-      Task.async(fn -> Bookings.list_refund_policies() end),
+      Task.async(fn ->
+        load_property_reference_data_tasks(selected_property)
+      end),
       Task.async(fn -> Bookings.list_room_categories() end),
-      Task.async(fn -> Bookings.list_rooms() end),
       Task.async(fn -> Bookings.list_door_codes(selected_property) end),
       Task.async(fn -> Bookings.get_active_door_code(selected_property) end)
     ]
@@ -3495,15 +3494,14 @@ defmodule YscWeb.AdminBookingsLive do
     results = Task.await_many(tasks, :infinity)
 
     [
-      seasons,
-      pricing_rules,
-      refund_policies,
+      property_reference_data,
       room_categories,
-      rooms,
       door_codes,
       active_door_code
     ] =
       results
+
+    [seasons, pricing_rules, refund_policies, rooms] = property_reference_data
 
     {:noreply,
      socket
@@ -3628,12 +3626,19 @@ defmodule YscWeb.AdminBookingsLive do
         socket =
           socket
           |> assign(:selected_property, property_atom)
-          |> assign_filtered_data(
-            property_atom,
-            socket.assigns.seasons,
-            socket.assigns.pricing_rules,
-            socket.assigns.refund_policies
-          )
+          |> then(fn socket ->
+            if connected?(socket) && property_changed do
+              load_property_reference_data(socket, property_atom)
+            else
+              assign_filtered_data(
+                socket,
+                property_atom,
+                socket.assigns.seasons,
+                socket.assigns.pricing_rules,
+                socket.assigns.refund_policies
+              )
+            end
+          end)
 
         {socket, property_changed}
       else
@@ -4313,22 +4318,16 @@ defmodule YscWeb.AdminBookingsLive do
   def handle_event("select-property", %{"property" => property}, socket) do
     property_atom = String.to_existing_atom(property)
 
-    # Reload door codes for the new property
+    # Reload door codes and property-scoped reference data for the new property
     door_codes = Bookings.list_door_codes(property_atom)
     active_door_code = Bookings.get_active_door_code(property_atom)
 
     {:noreply,
      socket
-     |> assign(:selected_property, property_atom)
      |> assign(:door_codes, door_codes)
      |> assign(:active_door_code, active_door_code)
      |> assign(:door_code_warning, nil)
-     |> assign_filtered_data(
-       property_atom,
-       socket.assigns.seasons,
-       socket.assigns.pricing_rules,
-       socket.assigns.refund_policies
-     )
+     |> load_property_reference_data(property_atom)
      |> update_calendar_view(property_atom)}
   end
 
@@ -5812,7 +5811,8 @@ defmodule YscWeb.AdminBookingsLive do
 
     case Bookings.delete_pricing_rule(pricing_rule) do
       {:ok, _deleted} ->
-        pricing_rules = Bookings.list_pricing_rules()
+        pricing_rules =
+          Bookings.list_pricing_rules(socket.assigns.selected_property)
 
         {:noreply,
          socket
@@ -5944,7 +5944,7 @@ defmodule YscWeb.AdminBookingsLive do
     case result do
       {:ok, _season} ->
         # Reload seasons to reflect changes
-        seasons = Bookings.list_seasons()
+        seasons = Bookings.list_seasons(socket.assigns.selected_property)
 
         {:noreply,
          socket
@@ -6019,7 +6019,8 @@ defmodule YscWeb.AdminBookingsLive do
     case result do
       {:ok, _refund_policy} ->
         # Reload refund policies
-        refund_policies = Bookings.list_refund_policies()
+        refund_policies =
+          Bookings.list_refund_policies(socket.assigns.selected_property)
 
         {:noreply,
          socket
@@ -6272,7 +6273,7 @@ defmodule YscWeb.AdminBookingsLive do
     case result do
       {:ok, _room} ->
         # Reload rooms to reflect changes
-        rooms = Bookings.list_rooms()
+        rooms = Bookings.list_rooms(socket.assigns.selected_property)
 
         {:noreply,
          socket
@@ -6301,7 +6302,7 @@ defmodule YscWeb.AdminBookingsLive do
     Bookings.delete_room(room)
 
     # Reload rooms to reflect changes
-    rooms = Bookings.list_rooms()
+    rooms = Bookings.list_rooms(socket.assigns.selected_property)
 
     {:noreply,
      socket
@@ -6340,35 +6341,43 @@ defmodule YscWeb.AdminBookingsLive do
 
   defp assign_filtered_data(
          socket,
-         property,
+         _property,
          seasons,
          pricing_rules,
          refund_policies
        ) do
-    filtered_seasons =
-      Enum.filter(seasons, fn season -> season.property == property end)
-
-    filtered_pricing_rules =
-      Enum.filter(pricing_rules, fn rule -> rule.property == property end)
-
-    filtered_refund_policies =
-      Enum.filter(refund_policies, fn policy -> policy.property == property end)
-
-    # Filter rooms by property (rooms are already loaded in socket.assigns.rooms)
-    filtered_rooms =
-      if socket.assigns[:rooms] do
-        Enum.filter(socket.assigns.rooms, fn room ->
-          room.property == property
-        end)
-      else
-        []
-      end
+    # Reference data is already scoped to the selected property when loaded.
+    filtered_rooms = socket.assigns[:rooms] || []
 
     socket
-    |> assign(:filtered_seasons, filtered_seasons)
-    |> assign(:filtered_pricing_rules, filtered_pricing_rules)
-    |> assign(:filtered_refund_policies, filtered_refund_policies)
+    |> assign(:filtered_seasons, seasons)
+    |> assign(:filtered_pricing_rules, pricing_rules)
+    |> assign(:filtered_refund_policies, refund_policies)
     |> assign(:filtered_rooms, filtered_rooms)
+  end
+
+  defp load_property_reference_data(socket, property) do
+    [seasons, pricing_rules, refund_policies, rooms] =
+      load_property_reference_data_tasks(property)
+
+    socket
+    |> assign(:selected_property, property)
+    |> assign(:seasons, seasons)
+    |> assign(:pricing_rules, pricing_rules)
+    |> assign(:refund_policies, refund_policies)
+    |> assign(:rooms, rooms)
+    |> assign_filtered_data(property, seasons, pricing_rules, refund_policies)
+  end
+
+  defp load_property_reference_data_tasks(property) do
+    tasks = [
+      Task.async(fn -> Bookings.list_seasons(property) end),
+      Task.async(fn -> Bookings.list_pricing_rules(property) end),
+      Task.async(fn -> Bookings.list_refund_policies(property) end),
+      Task.async(fn -> Bookings.list_rooms(property) end)
+    ]
+
+    Task.await_many(tasks, :infinity)
   end
 
   defp season_options(seasons) do

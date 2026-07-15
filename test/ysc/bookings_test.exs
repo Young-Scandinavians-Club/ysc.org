@@ -621,6 +621,22 @@ defmodule Ysc.BookingsTest do
       assert Enum.any?(rules, &(&1.id == rule2.id))
     end
 
+    test "list_pricing_rules/1 returns only rules for the given property" do
+      tahoe_rule = create_pricing_rule_fixture(%{property: :tahoe})
+      clear_lake_rule = create_pricing_rule_fixture(%{property: :clear_lake})
+
+      tahoe_rules = Bookings.list_pricing_rules(:tahoe)
+      clear_lake_rules = Bookings.list_pricing_rules(:clear_lake)
+
+      assert Enum.any?(tahoe_rules, &(&1.id == tahoe_rule.id))
+      refute Enum.any?(tahoe_rules, &(&1.id == clear_lake_rule.id))
+      assert Enum.all?(tahoe_rules, &(&1.property == :tahoe))
+
+      assert Enum.any?(clear_lake_rules, &(&1.id == clear_lake_rule.id))
+      refute Enum.any?(clear_lake_rules, &(&1.id == tahoe_rule.id))
+      assert Enum.all?(clear_lake_rules, &(&1.property == :clear_lake))
+    end
+
     test "get_pricing_rule!/1 returns the pricing rule with given id" do
       rule = create_pricing_rule_fixture()
       found = Bookings.get_pricing_rule!(rule.id)
