@@ -2723,10 +2723,7 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
-  defp award_lifetime_membership_from_migration(
-         %User{} = user,
-         awarded_at \\ nil
-       ) do
+  defp award_lifetime_membership_from_migration(%User{} = user, awarded_at) do
     awarded_at =
       case awarded_at do
         %DateTime{} = dt -> DateTime.truncate(dt, :second)
