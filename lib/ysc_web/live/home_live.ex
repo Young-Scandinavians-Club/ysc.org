@@ -1954,9 +1954,6 @@ defmodule YscWeb.HomeLive do
                         <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
                           {post.title}
                         </h3>
-                        <p class="text-xs text-zinc-500 line-clamp-1 whitespace-pre-line">
-                          {preview_text_plain(post)}
-                        </p>
                       </div>
                     </.link>
                   <% end %>
@@ -2707,9 +2704,6 @@ defmodule YscWeb.HomeLive do
         max(0, available)
     end
   end
-
-  # Helper functions for news posts
-  defp preview_text_plain(post), do: PlainText.from_post(post)
 
   defp format_event_time(event_start_date, %Time{} = time) do
     # Convert event date and time to PST for display

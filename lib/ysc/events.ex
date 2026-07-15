@@ -2733,6 +2733,45 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Batch count of reserved tickets per tier (active, non-expired holds only).
+
+  Returns `%{tier_id => reserved_quantity}`.
+  """
+  def batch_count_reserved_tickets_for_tiers(tier_ids) when is_list(tier_ids) do
+    tier_ids = Enum.uniq(tier_ids)
+
+    if tier_ids == [] do
+      %{}
+    else
+      TicketReservation
+      |> where([tr], tr.ticket_tier_id in ^tier_ids)
+      |> where_ticket_reservation_hold_active()
+      |> group_by([tr], tr.ticket_tier_id)
+      |> select([tr], {tr.ticket_tier_id, sum(tr.quantity)})
+      |> Repo.all()
+      |> Map.new(fn {tier_id, count} -> {tier_id, count || 0} end)
+    end
+  end
+
+  @doc """
+  Sums active reservation holds across non-donation tiers.
+
+  `reserved_counts` is typically from `batch_count_reserved_tickets_for_tiers/1`.
+  """
+  def non_donation_reserved_count_from_tiers(ticket_tiers, reserved_counts)
+      when is_list(ticket_tiers) and is_map(reserved_counts) do
+    ticket_tiers
+    |> Enum.reject(fn tier ->
+      tier_type = Map.get(tier, :type) || Map.get(tier, "type")
+      tier_type == :donation or tier_type == "donation"
+    end)
+    |> Enum.reduce(0, fn tier, acc ->
+      tier_id = Map.get(tier, :id) || Map.get(tier, "id")
+      acc + Map.get(reserved_counts, tier_id, 0)
+    end)
+  end
+
+  @doc """
   Count total reserved tickets for a tier (active, non-expired reservations only).
   """
   def count_reserved_tickets_for_tier(tier_id) do

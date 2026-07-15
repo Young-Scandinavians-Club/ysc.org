@@ -115,7 +115,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       {String.capitalize(to_string(ticket_tier.type))} Tier
                     </p>
 
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 lg:gap-8">
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
                       <div>
                         <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
                           Price
@@ -153,7 +153,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                           </p>
                           <div
                             :if={ticket_tier.quantity && ticket_tier.quantity > 0}
-                            class="hidden sm:block w-16 h-1.5 bg-zinc-100 rounded-full overflow-hidden"
+                            class="hidden sm:block w-16 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0"
                           >
                             <div
                               class={[
@@ -183,7 +183,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
                           Sales Period
                         </p>
-                        <p class="text-sm text-zinc-700 whitespace-nowrap">
+                        <p class="text-sm text-zinc-700 leading-tight">
                           {format_sales_period(
                             ticket_tier.start_date,
                             ticket_tier.end_date
@@ -272,19 +272,23 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       </p>
                       <div class="space-y-2">
                         <%= for reservation <- reservations do %>
-                          <div class="flex items-center justify-between p-2 bg-amber-50 rounded border border-amber-200">
-                            <div class="flex-1">
-                              <p class="text-sm font-medium text-zinc-900">
+                          <div class="flex items-start justify-between gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <div class="flex-1 min-w-0">
+                              <p class="text-sm font-medium text-zinc-900 truncate">
                                 {reservation.user.first_name} {reservation.user.last_name}
                               </p>
-                              <p class="text-xs text-zinc-600">
-                                {reservation.user.email} • {reservation.quantity} ticket{if reservation.quantity !=
-                                                                                              1,
-                                                                                            do:
-                                                                                              "s"}
+                              <p class="text-xs text-zinc-600 truncate">
+                                {reservation.user.email}
+                              </p>
+                              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-zinc-600">
+                                <span>
+                                  {reservation.quantity} ticket{if reservation.quantity !=
+                                                                     1,
+                                                                   do: "s"}
+                                </span>
                                 <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
                                   <span class="text-green-600 font-medium">
-                                    • {Decimal.to_float(
+                                    {Decimal.to_float(
                                       reservation.discount_percentage
                                     )
                                     |> Float.round(2)}% off
@@ -294,9 +298,9 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                                   :if={reservation.expires_at}
                                   class="text-amber-600"
                                 >
-                                  • Expires {format_date(reservation.expires_at)}
+                                  Expires {format_date(reservation.expires_at)}
                                 </span>
-                              </p>
+                              </div>
                             </div>
                             <button
                               phx-click="cancel-reservation"
@@ -304,7 +308,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                               phx-target={@myself}
                               phx-disable-with="Cancelling..."
                               data-confirm="Are you sure you want to cancel this reservation?"
-                              class="p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              class="shrink-0 p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             >
                               <.icon name="hero-x-mark" class="w-4 h-4" />
                             </button>
@@ -323,28 +327,32 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                       </p>
                       <div class="space-y-2">
                         <%= for reservation <- expired_reservations do %>
-                          <div class="flex items-center justify-between p-2 bg-zinc-100 rounded border border-zinc-300">
-                            <div class="flex-1">
-                              <p class="text-sm font-medium text-zinc-900">
+                          <div class="flex items-start justify-between gap-3 p-3 bg-zinc-100 rounded-lg border border-zinc-300">
+                            <div class="flex-1 min-w-0">
+                              <p class="text-sm font-medium text-zinc-900 truncate">
                                 {reservation.user.first_name} {reservation.user.last_name}
                               </p>
-                              <p class="text-xs text-zinc-600">
-                                {reservation.user.email} • {reservation.quantity} ticket{if reservation.quantity !=
-                                                                                              1,
-                                                                                            do:
-                                                                                              "s"}
+                              <p class="text-xs text-zinc-600 truncate">
+                                {reservation.user.email}
+                              </p>
+                              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-zinc-600">
+                                <span>
+                                  {reservation.quantity} ticket{if reservation.quantity !=
+                                                                     1,
+                                                                   do: "s"}
+                                </span>
                                 <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
                                   <span class="text-green-600 font-medium">
-                                    • {Decimal.to_float(
+                                    {Decimal.to_float(
                                       reservation.discount_percentage
                                     )
                                     |> Float.round(2)}% off
                                   </span>
                                 <% end %>
                                 <span class="text-red-700 font-medium">
-                                  • Ended {format_date(reservation.expires_at)}
+                                  Ended {format_date(reservation.expires_at)}
                                 </span>
-                              </p>
+                              </div>
                             </div>
                             <button
                               phx-click="cancel-reservation"
@@ -352,7 +360,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                               phx-target={@myself}
                               phx-disable-with="Cancelling..."
                               data-confirm="Are you sure you want to cancel this reservation?"
-                              class="p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                              class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                             >
                               <.icon name="hero-x-mark" class="w-4 h-4" />
                             </button>
@@ -368,24 +376,24 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
         </div>
         <!-- Ticket Purchases Summary -->
         <div class="border border-zinc-200 rounded p-4 sm:p-6">
-          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0 mb-4">
-            <h3 class="text-lg font-semibold">Ticket Purchases</h3>
-            <div class="flex items-center gap-3">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div class="flex items-baseline gap-2 min-w-0">
+              <h3 class="text-lg font-semibold">Ticket Purchases</h3>
               <span class="text-sm text-zinc-600">
                 {length(@ticket_purchases)} purchase{if length(@ticket_purchases) !=
                                                           1,
                                                         do: "s"}
               </span>
-              <.button
-                phx-click="export-tickets-csv"
-                phx-target={@myself}
-                phx-disable-with="Exporting..."
-                color="blue"
-                class="w-full sm:w-auto"
-              >
-                <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
-              </.button>
             </div>
+            <.button
+              phx-click="export-tickets-csv"
+              phx-target={@myself}
+              phx-disable-with="Exporting..."
+              color="blue"
+              class="w-full sm:w-auto shrink-0"
+            >
+              <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
+            </.button>
           </div>
 
           <div

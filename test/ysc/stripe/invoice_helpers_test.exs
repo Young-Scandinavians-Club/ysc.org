@@ -1,7 +1,20 @@
 defmodule Ysc.Stripe.InvoiceHelpersTest do
   use ExUnit.Case, async: true
 
+  alias Ysc.Stripe.HttpClient.ReqStub
   alias Ysc.Stripe.InvoiceHelpers
+
+  setup context do
+    Req.Test.set_req_test_from_context(context)
+
+    on_exit(fn ->
+      Application.delete_env(:ysc, :stripe_http_req_opts)
+    end)
+
+    Application.put_env(:ysc, :stripe_http_req_opts, plug: {Req.Test, ReqStub})
+
+    :ok
+  end
 
   describe "charge_id/1" do
     test "returns legacy charge ids from maps" do
@@ -20,6 +33,14 @@ defmodule Ysc.Stripe.InvoiceHelpersTest do
     end
 
     test "falls back to invoice payments when charge is absent" do
+      Req.Test.stub(ReqStub, fn conn ->
+        Req.Test.json(conn, %{
+          "id" => "pi_missing_charge",
+          "object" => "payment_intent",
+          "latest_charge" => nil
+        })
+      end)
+
       invoice = %{
         payments: %Stripe.List{
           data: [%{payment: %{payment_intent: "pi_missing_charge"}}]

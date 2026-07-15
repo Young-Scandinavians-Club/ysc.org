@@ -3,6 +3,7 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
 
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
+  import Ysc.AccountsFixtures
   import EventDetailsLiveHelpers
   import Mox
 
@@ -173,7 +174,7 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
   end
 
   describe "PubSub ticket reservation events" do
-    test "TicketReservationCreated refreshes availability without clearing sold-out state",
+    test "TicketReservationCreated lets the holder purchase when tier is publicly sold out",
          %{conn: conn, user: user} do
       event =
         event_with_tickets(
@@ -192,17 +193,30 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
       expires_at =
         DateTime.add(DateTime.utc_now() |> DateTime.truncate(:second), 1, :day)
 
+      other_user =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+        |> Repo.update!()
+
       for _ <- 1..2 do
         %Ticket{
           id: Ecto.ULID.generate(),
           event_id: event.id,
-          user_id: user.id,
+          user_id: other_user.id,
           ticket_tier_id: tier.id,
           status: :confirmed,
           expires_at: expires_at
         }
         |> Repo.insert!()
       end
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}/tickets")
+      html = render_async(view)
+
+      assert html =~ "Sold Out"
 
       reservation =
         %TicketReservation{}
@@ -215,19 +229,19 @@ defmodule YscWeb.EventDetailsLive.AsyncPubsubTest do
         })
         |> Repo.insert!()
 
-      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
-      html = render_async(view)
-
-      assert html =~ "Sold Out"
-
       Phoenix.PubSub.broadcast(
         Ysc.PubSub,
         "events",
-        {Ysc.Events, %TicketReservationCreated{ticket_reservation: reservation}}
+        {Ysc.Events,
+         %TicketReservationCreated{
+           ticket_reservation: reservation,
+           event_id: event.id
+         }}
       )
 
       html = render(view)
-      assert html =~ "Sold Out"
+      assert html =~ "Get Tickets"
+      assert html =~ "1 remaining"
     end
   end
 
