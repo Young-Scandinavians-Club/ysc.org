@@ -108,6 +108,30 @@ defmodule Ysc.Release do
   end
 
   @doc """
+  Assigns board positions to the canonical BOD roster.
+
+      bin/ysc eval 'Ysc.Release.wp_sync_board_members()'
+      bin/ysc eval 'Ysc.Release.wp_sync_board_members(dry_run: true)'
+  """
+  def wp_sync_board_members(opts \\ []) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    case Ysc.WpMigration.BoardMembers.sync_all(dry_run: dry_run) do
+      {:ok, stats} ->
+        Ysc.Logging.info("WP board member sync finished", stats)
+        {:ok, stats}
+
+      other ->
+        Ysc.Logging.error("WP board member sync failed", result: inspect(other))
+        other
+    end
+  end
+
+  @doc """
   Repairs WP migration images whose `raw_image_path` points at macOS AppleDouble `._*`
   files instead of the real upload.
 

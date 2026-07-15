@@ -7,7 +7,7 @@ defmodule Ysc.WpMigration.Load do
   require Ysc.Logging
   import Ecto.Query
   alias Ysc.Repo
-  alias Ysc.Accounts.{User, Address, SignupApplication}
+  alias Ysc.Accounts.{User, Address, SignupApplication, Email}
   alias Ysc.Media
   alias Ysc.Media.Image
   alias Ysc.Posts.Post
@@ -24,6 +24,7 @@ defmodule Ysc.WpMigration.Load do
   alias Ysc.WpMigration.StripeImport
   alias Ysc.WpMigration.UserNames
   alias Ysc.WpMigration.IgnoredAccounts
+  alias Ysc.WpMigration.BoardMembers
   alias Ysc.Newsletter
 
   @doc """
@@ -303,18 +304,18 @@ defmodule Ysc.WpMigration.Load do
   defp filter_by_emails(rows, only_emails) do
     Enum.filter(rows, fn row ->
       email = row["email"]
-      is_binary(email) and MapSet.member?(only_emails, String.downcase(email))
+      is_binary(email) and MapSet.member?(only_emails, Email.normalize(email))
     end)
   end
 
   defp normalize_only_emails_option(nil), do: nil
 
   defp normalize_only_emails_option(email) when is_binary(email) do
-    MapSet.new([String.downcase(email)])
+    MapSet.new([Email.normalize(email)])
   end
 
   defp normalize_only_emails_option(emails) when is_list(emails) do
-    valid = emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
+    valid = emails |> Enum.filter(&is_binary/1) |> Enum.map(&Email.normalize/1)
     if valid == [], do: nil, else: MapSet.new(valid)
   end
 
@@ -324,16 +325,18 @@ defmodule Ysc.WpMigration.Load do
     Subscription
     |> join(:inner, [s], u in User, on: s.user_id == u.id)
     |> where([s], like(s.stripe_id, "migrated_%"))
-    |> maybe_filter_user_emails(only_emails)
     |> order_by([_s, u], asc: u.email)
     |> preload([_s, u], subscription_items: [], user: u)
     |> Repo.all()
+    |> maybe_filter_subscriptions_by_emails(only_emails)
   end
 
-  defp maybe_filter_user_emails(query, nil), do: query
+  defp maybe_filter_subscriptions_by_emails(subs, nil), do: subs
 
-  defp maybe_filter_user_emails(query, only_emails) do
-    from [s, u] in query, where: u.email in ^MapSet.to_list(only_emails)
+  defp maybe_filter_subscriptions_by_emails(subs, only_emails) do
+    Enum.filter(subs, fn %{user: %{email: email}} ->
+      Email.normalize(email) in only_emails
+    end)
   end
 
   defp backfill_stripe_subscription_for_migration(
@@ -519,7 +522,11 @@ defmodule Ysc.WpMigration.Load do
     user_map = %{}
 
     Enum.reduce_while(users_data, {:ok, user_map}, fn row, {:ok, acc} ->
-      email = row["email"]
+      email =
+        case row["email"] do
+          value when is_binary(value) -> Email.normalize(value)
+          _ -> nil
+        end
 
       if is_nil(email) or email == "" do
         {:cont, {:ok, acc}}
@@ -554,11 +561,13 @@ defmodule Ysc.WpMigration.Load do
               {:ok, user} ->
                 upsert_address(user.id, row)
                 subscribe_migrated_user_to_newsletter(user)
+                BoardMembers.sync_for_user(user)
                 {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
 
               {:error, _} ->
                 upsert_address(existing.id, row)
                 subscribe_migrated_user_to_newsletter(existing)
+                BoardMembers.sync_for_user(existing)
                 {:cont, {:ok, Map.put(acc, row["wp_user_id"], existing.id)}}
             end
 
@@ -592,6 +601,7 @@ defmodule Ysc.WpMigration.Load do
               {:ok, user} ->
                 upsert_address(user.id, row)
                 subscribe_migrated_user_to_newsletter(user)
+                BoardMembers.sync_for_user(user)
                 {:cont, {:ok, Map.put(acc, row["wp_user_id"], user.id)}}
 
               {:error, changeset} ->

@@ -58,111 +58,116 @@
       </div>
     </div>
 
-    <%!-- Right Column: Join the Board Section --%>
+    <%!-- Right Column: Join the Board / Get Involved --%>
     <div
-      :if={@vacant_positions != []}
+      :if={@bod_members != []}
       class="prose prose-zinc prose-a:text-blue-600 max-w-none w-full min-w-0 lg:max-w-md lg:justify-self-end"
     >
       <div class="p-6 lg:p-7 bg-blue-50 rounded-3xl border border-blue-100 h-fit sticky top-8">
         <div class="prose prose-zinc max-w-none mb-6">
           <h2>Help Shape the Future of YSC</h2>
-          <p>
-            We are currently looking for passionate members to fill the following roles. Annual elections take place at the beginning of each year, and we welcome inquiries year-round.
-          </p>
+          <%= if not Enum.empty?(@vacant_positions) do %>
+            <p>
+              We are currently looking for passionate members to fill the following roles. Annual elections take place at the beginning of each year, and we welcome inquiries year-round.
+            </p>
+          <% else %>
+            <p>
+              All board positions are currently filled—thank you to our dedicated directors! The club still thrives on member involvement beyond the board itself.
+            </p>
+            <p>
+              Serve on a committee, volunteer at events and cabins, or let us know you're interested in next year's elections. We welcome inquiries year-round.
+            </p>
+          <% end %>
         </div>
-        <div class="not-prose space-y-4">
-          <%= for position <- @vacant_positions do %>
-            <div class="bg-white p-5 rounded-xl border border-zinc-100 hover:border-zinc-200 transition-colors duration-200">
-              <div class="flex justify-between items-start gap-4">
-                <div class="flex-1">
-                  <h3 class="font-semibold text-zinc-900 mb-1">
-                    {atom_to_readable(position)}
-                  </h3>
-                  <p class="text-sm text-zinc-600">
-                    <%= case position do %>
-                      <% :president -> %>
-                        Lead the organization and set strategic direction for the club.
-                      <% :vice_president -> %>
-                        Support the President and step in when needed.
-                      <% :secretary -> %>
-                        Manage board meetings, minutes, and official documentation.
-                      <% :treasurer -> %>
-                        Oversee financial operations and budgeting.
-                      <% :tahoe_cabin_master -> %>
-                        Oversee the maintenance and magic of our mountain retreat.
-                      <% :clear_lake_cabin_master -> %>
-                        Manage our Clear Lake cabin and coordinate bookings.
-                      <% :event_director -> %>
-                        Plan and coordinate club events and activities.
-                      <% :member_outreach -> %>
-                        Connect with members and build community engagement.
-                      <% :membership_director -> %>
-                        Manage membership applications and member relations.
-                      <% _ -> %>
-                        Help guide the club's vision and operations.
-                    <% end %>
-                  </p>
+        <%= if not Enum.empty?(@vacant_positions) do %>
+          <div class="not-prose space-y-4">
+            <%= for position <- @vacant_positions do %>
+              <div class="bg-white p-5 rounded-xl border border-zinc-100 hover:border-zinc-200 transition-colors duration-200">
+                <div class="flex justify-between items-start gap-4">
+                  <div class="flex-1">
+                    <h3 class="font-semibold text-zinc-900 mb-1">
+                      {atom_to_readable(position)}
+                    </h3>
+                    <p class="text-sm text-zinc-600">
+                      <%= case position do %>
+                        <% :president -> %>
+                          Lead the organization and set strategic direction for the club.
+                        <% :vice_president -> %>
+                          Support the President and step in when needed.
+                        <% :secretary -> %>
+                          Manage board meetings, minutes, and official documentation.
+                        <% :treasurer -> %>
+                          Oversee financial operations and budgeting.
+                        <% :tahoe_cabin_master -> %>
+                          Oversee the maintenance and magic of our mountain retreat.
+                        <% :clear_lake_cabin_master -> %>
+                          Manage our Clear Lake cabin and coordinate bookings.
+                        <% :event_director -> %>
+                          Plan and coordinate club events and activities.
+                        <% :member_outreach -> %>
+                          Connect with members and build community engagement.
+                        <% :membership_director -> %>
+                          Manage membership applications and member relations.
+                        <% _ -> %>
+                          Help guide the club's vision and operations.
+                      <% end %>
+                    </p>
+                  </div>
+                  <.link
+                    navigate={
+                      ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'm interested in the #{atom_to_readable(position)} position on the YSC Board of Directors. I'd love to learn more about the role and how I can contribute.")}"
+                    }
+                    class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0 ml-4 transition-colors duration-150"
+                  >
+                    Inquire<.icon
+                      name="hero-arrow-right-solid"
+                      class="w-4 h-4 -mt-0.5 inline-block ms-1"
+                    />
+                  </.link>
                 </div>
-                <.link
-                  navigate={
-                    ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'm interested in the #{atom_to_readable(position)} position on the YSC Board of Directors. I'd love to learn more about the role and how I can contribute.")}"
-                  }
-                  class="text-sm font-bold text-blue-600 hover:text-blue-600 hover:underline whitespace-nowrap flex-shrink-0 ml-4 transition-colors duration-150"
-                >
-                  Inquire<.icon
-                    name="hero-arrow-right-solid"
-                    class="w-4 h-4 -mt-0.5 inline-block ms-1"
-                  />
-                </.link>
               </div>
-            </div>
-          <% end %>
-        </div>
-      </div>
-    </div>
-
-    <%!-- Full Width: Active Members if no vacancies --%>
-    <div
-      :if={@vacant_positions == [] && @bod_members != []}
-      class="lg:col-span-2 prose prose-zinc prose-a:text-blue-600 max-w-3xl"
-    >
-      <h2>Current Board Members</h2>
-      <div class="not-prose">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <%= for member <- @bod_members do %>
-            <div class="flex flex-col items-center gap-5 p-6 border border-zinc-200 rounded-xl bg-white hover:border-zinc-300 transition-colors duration-200 sm:flex-row sm:items-start sm:gap-6">
-              <.user_avatar_image
-                user={member}
-                size={:large}
-                class="h-64 w-64 shrink-0 rounded-full object-cover mx-auto sm:mx-0"
-              />
-              <div class="flex-1 min-w-0 w-full text-center sm:text-left">
-                <h3 class="text-xl font-bold text-zinc-900">
-                  {member.first_name} {member.last_name}
+            <% end %>
+          </div>
+        <% else %>
+          <div class="not-prose space-y-3">
+            <.link
+              navigate={~p"/volunteer"}
+              class="flex items-center justify-between gap-4 bg-white p-5 rounded-xl border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group"
+            >
+              <div>
+                <h3 class="font-semibold text-zinc-900 mb-1">
+                  Volunteer with the YSC
                 </h3>
-                <p class="text-blue-600 font-medium mt-1">
-                  {atom_to_readable(member.board_position)}
+                <p class="text-sm text-zinc-600">
+                  Help with events, cabins, outreach, and more—the club is 100% volunteer-led.
                 </p>
-                <%= if String.trim(Map.get(member, :board_bio) || "") != "" do %>
-                  <p class="text-sm text-zinc-600 mt-3 leading-relaxed whitespace-pre-line">
-                    {String.trim(Map.get(member, :board_bio, ""))}
-                  </p>
-                <% else %>
-                  <p class="text-sm text-zinc-600 mt-3 leading-relaxed">
-                    Board bio coming soon.
-                  </p>
-                <% end %>
               </div>
-            </div>
-          <% end %>
-        </div>
-      </div>
-      <div class="not-prose mt-12">
-        <div class="p-6 bg-green-50 rounded-xl border border-green-200">
-          <p class="text-green-800 font-semibold">
-            All board positions are currently filled! Thank you to our dedicated board members.
-          </p>
-        </div>
+              <.icon
+                name="hero-arrow-right-solid"
+                class="w-4 h-4 shrink-0 text-blue-600 group-hover:translate-x-0.5 transition-transform duration-150"
+              />
+            </.link>
+            <.link
+              navigate={
+                ~p"/contact?subject=Board of Directors&message=#{URI.encode("Hi, I'd like to learn more about getting involved with the YSC—whether on a committee or in a future board election.")}"
+              }
+              class="flex items-center justify-between gap-4 bg-white p-5 rounded-xl border border-zinc-100 hover:border-zinc-200 transition-colors duration-200 group"
+            >
+              <div>
+                <h3 class="font-semibold text-zinc-900 mb-1">
+                  Contact the Board
+                </h3>
+                <p class="text-sm text-zinc-600">
+                  Ask about committees, future elections, or other ways to contribute.
+                </p>
+              </div>
+              <.icon
+                name="hero-arrow-right-solid"
+                class="w-4 h-4 shrink-0 text-blue-600 group-hover:translate-x-0.5 transition-transform duration-150"
+              />
+            </.link>
+          </div>
+        <% end %>
       </div>
     </div>
   </div>

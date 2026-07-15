@@ -6,6 +6,8 @@ defmodule Ysc.WpMigration.Extract do
 
   require Ysc.Logging
 
+  alias Ysc.Accounts.Email
+
   alias Ysc.WpMigration.{
     WpRepo,
     PhpDeserialize,
@@ -40,11 +42,11 @@ defmodule Ysc.WpMigration.Extract do
           nil
 
         email when is_binary(email) ->
-          MapSet.new([String.downcase(email)])
+          MapSet.new([Email.normalize(email)])
 
         emails when is_list(emails) ->
           valid =
-            emails |> Enum.filter(&is_binary/1) |> Enum.map(&String.downcase/1)
+            emails |> Enum.filter(&is_binary/1) |> Enum.map(&Email.normalize/1)
 
           if valid == [], do: nil, else: MapSet.new(valid)
 
@@ -162,14 +164,14 @@ defmodule Ysc.WpMigration.Extract do
     |> MapSet.new()
   end
 
-  # Filters rows whose `email_field` (downcased) is in the given MapSet.
+  # Filters rows whose `email_field` is in the given MapSet after Gmail normalization.
   # Passes through unchanged when only_emails is nil.
   defp filter_by_emails(rows, nil, _field), do: rows
 
   defp filter_by_emails(rows, only_emails, field) do
     Enum.filter(rows, fn row ->
       email = row[field]
-      is_binary(email) and MapSet.member?(only_emails, String.downcase(email))
+      is_binary(email) and MapSet.member?(only_emails, Email.normalize(email))
     end)
   end
 

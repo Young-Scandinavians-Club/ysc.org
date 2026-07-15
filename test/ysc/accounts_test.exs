@@ -194,6 +194,28 @@ defmodule Ysc.AccountsTest do
       user_fixture(%{email: "john.doe@example.com"})
       refute Accounts.get_user_by_email("johndoe@example.com")
     end
+
+    test "finds Gmail users stored with dots in the database" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "user.#{tag}@gmail.com"
+      canonical_email = "user#{tag}@gmail.com"
+
+      %User{}
+      |> Ecto.Changeset.change(%{
+        email: dotted_email,
+        first_name: "Legacy",
+        last_name: "Dots",
+        state: :active,
+        role: :member
+      })
+      |> Repo.insert!()
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(canonical_email)
+
+      assert %User{email: ^dotted_email} =
+               Accounts.get_user_by_email(dotted_email)
+    end
   end
 
   describe "get_user_by_phone_number/1" do

@@ -72,6 +72,31 @@ defmodule YscWeb.PageHTMLTest do
       assert html =~ "&lt;script&gt;"
       refute html =~ "<script>x</script>"
     end
+
+    test "encourages involvement when all board positions are filled" do
+      html =
+        YscWeb.PageHTML.board(%{
+          bod_members: [
+            %{
+              first_name: "A",
+              last_name: "B",
+              email: "a@example.com",
+              id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+              most_connected_country: "SE",
+              board_position: :secretary
+            }
+          ],
+          vacant_positions: MapSet.new([])
+        })
+        |> rendered_to_binary()
+
+      assert html =~ "All board positions are currently filled"
+      assert html =~ "Volunteer with the YSC"
+      assert html =~ "Contact the Board"
+
+      refute html =~
+               "We are currently looking for passionate members to fill the following roles"
+    end
   end
 
   describe "contact/1" do

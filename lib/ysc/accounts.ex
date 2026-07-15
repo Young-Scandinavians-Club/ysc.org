@@ -50,7 +50,14 @@ defmodule Ysc.Accounts do
   """
   def get_user_by_email(email) when is_binary(email) do
     normalized_email = Email.normalize(email)
-    Repo.get_by(User, email: normalized_email)
+
+    case Repo.get_by(User, email: normalized_email) do
+      %User{} = user ->
+        user
+
+      nil ->
+        find_user_by_canonical_email(normalized_email)
+    end
   end
 
   @doc """
@@ -141,6 +148,20 @@ defmodule Ysc.Accounts do
     end
   end
 
+  defp find_user_by_canonical_email(normalized_email) do
+    if Email.gmail?(normalized_email) do
+      [_local, domain] = String.split(normalized_email, "@", parts: 2)
+
+      from(u in User, where: ilike(u.email, ^"%@#{domain}"))
+      |> Repo.all()
+      |> Enum.find(fn user ->
+        Email.normalize(user.email) == normalized_email
+      end)
+    else
+      nil
+    end
+  end
+
   @spec get_user_by_email_and_password(binary(), binary()) :: any()
   @doc """
   Gets a user by email and password.
@@ -159,8 +180,7 @@ defmodule Ysc.Accounts do
   """
   def get_user_by_email_and_password(email, password)
       when is_binary(email) and is_binary(password) do
-    normalized_email = Email.normalize(email)
-    user = Repo.get_by(User, email: normalized_email)
+    user = get_user_by_email(email)
     if User.valid_password?(user, password), do: user
   end
 
@@ -285,9 +305,7 @@ defmodule Ysc.Accounts do
   (dots and plus-addressing).
   """
   def get_user_by_email_for_passkey(email) when is_binary(email) do
-    normalized_email = Email.normalize(email)
-
-    case Repo.get_by(User, email: normalized_email) do
+    case get_user_by_email(email) do
       nil -> nil
       user -> Repo.preload(user, :passkeys)
     end

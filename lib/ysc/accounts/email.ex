@@ -68,6 +68,37 @@ defmodule Ysc.Accounts.Email do
     end
   end
 
+  @doc """
+  Returns true when two addresses are the same after normalization.
+
+  Gmail addresses with different dot or plus-tag placements compare equal.
+
+  ## Examples
+
+      iex> Ysc.Accounts.Email.equiv?("eaz.holm@gmail.com", "eazholm@gmail.com")
+      true
+
+      iex> Ysc.Accounts.Email.equiv?("user@example.com", "user@example.com")
+      true
+
+      iex> Ysc.Accounts.Email.equiv?("user@example.com", "other@example.com")
+      false
+  """
+  @spec equiv?(String.t(), String.t()) :: boolean()
+  def equiv?(left, right) when is_binary(left) and is_binary(right) do
+    normalize(left) == normalize(right)
+  end
+
+  @doc """
+  Normalizes a list or map set of emails for lookups and filters.
+  """
+  @spec normalize_set(Enum.t()) :: MapSet.t(String.t())
+  def normalize_set(emails) do
+    emails
+    |> Enum.map(&normalize/1)
+    |> MapSet.new()
+  end
+
   # Private functions
 
   defp normalize_gmail_if_applicable(email) do

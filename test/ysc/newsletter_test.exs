@@ -57,6 +57,31 @@ defmodule Ysc.NewsletterTest do
                Newsletter.subscribe("user@#{domain}")
     end
 
+    test "treats Gmail addresses with dots as the same subscriber" do
+      tag = Integer.to_string(System.unique_integer([:positive]))
+      dotted_email = "news.#{tag}@gmail.com"
+      canonical_email = "news#{tag}@gmail.com"
+
+      %Subscriber{}
+      |> Subscriber.create_changeset(%{
+        email: dotted_email,
+        subscribed: true,
+        subscription_token: Subscriber.generate_subscription_token(),
+        subscribed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        source: "public_signup"
+      })
+      |> Repo.insert!()
+
+      assert {:ok, subscriber} =
+               Newsletter.subscribe(canonical_email, source: "public_signup")
+
+      assert subscriber.email == canonical_email
+      assert subscriber.subscribed == true
+
+      assert Newsletter.get_subscriber_by_email(dotted_email).id ==
+               subscriber.id
+    end
+
     test "updates existing subscriber when subscribing again (re-activates)" do
       {:ok, first} =
         Newsletter.subscribe("again@example.com", source: "public_signup")

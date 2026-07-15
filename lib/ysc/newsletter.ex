@@ -13,6 +13,7 @@ defmodule Ysc.Newsletter do
 
   alias Ysc.Repo
   alias Ysc.Newsletter.Subscriber
+  alias Ysc.Accounts.Email
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.EmailEvent
   alias Ysc.Events.Event
@@ -83,15 +84,20 @@ defmodule Ysc.Newsletter do
   def subscribe(email, opts \\ [])
 
   def subscribe(email, opts) when is_binary(email) do
-    trimmed_email = String.trim(email)
-
-    case Ysc.Newsletter.EmailValidator.validate_email(trimmed_email) do
-      :ok -> do_subscribe(trimmed_email, opts)
-      {:error, reason} -> {:error, reason}
-    end
+    email
+    |> String.trim()
+    |> Email.normalize()
+    |> subscribe_normalized(opts)
   end
 
   def subscribe(_email, _opts), do: {:error, :invalid_email}
+
+  defp subscribe_normalized(email, opts) when is_binary(email) do
+    case Ysc.Newsletter.EmailValidator.validate_email(email) do
+      :ok -> do_subscribe(email, opts)
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   defp do_subscribe(email, opts) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -121,7 +127,8 @@ defmodule Ysc.Newsletter do
           first_name,
           last_name,
           source,
-          metadata
+          metadata,
+          email
         )
     end
   end
@@ -160,13 +167,15 @@ defmodule Ysc.Newsletter do
          first_name,
          last_name,
          source,
-         metadata
+         metadata,
+         email
        ) do
     # If we now have a user_id but existing record doesn't, link them
     link_user = user_id && is_nil(existing.user_id)
     new_source = if link_user, do: "user_registration_linked", else: source
 
     attrs = %{
+      email: email,
       subscribed: true,
       unsubscribed_at: nil,
       source: new_source,
@@ -192,6 +201,20 @@ defmodule Ysc.Newsletter do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp find_subscriber_by_canonical_email(normalized_email) do
+    if Email.gmail?(normalized_email) do
+      [_local, domain] = String.split(normalized_email, "@", parts: 2)
+
+      from(s in Subscriber, where: ilike(s.email, ^"%@#{domain}"))
+      |> Repo.all()
+      |> Enum.find(fn subscriber ->
+        Email.normalize(subscriber.email) == normalized_email
+      end)
+    else
+      nil
+    end
+  end
 
   @doc """
   Unsubscribes by email or by subscription token.
@@ -237,7 +260,15 @@ defmodule Ysc.Newsletter do
   Returns the subscriber for the given email, or nil.
   """
   def get_subscriber_by_email(email) when is_binary(email) do
-    Repo.get_by(Subscriber, email: email)
+    normalized_email = Email.normalize(email)
+
+    case Repo.get_by(Subscriber, email: normalized_email) do
+      %Subscriber{} = subscriber ->
+        subscriber
+
+      nil ->
+        find_subscriber_by_canonical_email(normalized_email)
+    end
   end
 
   @doc """
