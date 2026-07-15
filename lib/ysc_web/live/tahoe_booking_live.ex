@@ -34,6 +34,7 @@ defmodule YscWeb.TahoeBookingLive do
   alias Ysc.Accounts
   alias Ysc.Subscriptions
   alias Ysc.Repo
+  alias YscWeb.DateDisplay
   require Ysc.Logging
   import Ecto.Query
 
@@ -6749,7 +6750,7 @@ defmodule YscWeb.TahoeBookingLive do
     latest_checkout_date = get_latest_checkout_date(active_bookings_list)
 
     if latest_checkout_date && booking_still_active?(latest_checkout_date) do
-      formatted_date = format_date(latest_checkout_date)
+      formatted_date = DateDisplay.format_date_long(latest_checkout_date)
 
       {
         false,
@@ -6782,7 +6783,7 @@ defmodule YscWeb.TahoeBookingLive do
     checkout_date = active_booking.checkout_date
 
     if booking_still_active?(checkout_date) do
-      formatted_date = format_date(checkout_date)
+      formatted_date = DateDisplay.format_date_long(checkout_date)
 
       {title, body} =
         if active_booking.user_id == user.id do
@@ -7004,10 +7005,6 @@ defmodule YscWeb.TahoeBookingLive do
           {restricted_min, restricted_max}
         end
     end
-  end
-
-  defp format_date(date) do
-    Calendar.strftime(date, "%B %d, %Y")
   end
 
   defp can_select_multiple_rooms?(assigns) do

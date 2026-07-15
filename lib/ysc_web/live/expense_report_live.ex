@@ -14,6 +14,7 @@ defmodule YscWeb.ExpenseReportLive do
   alias Ysc.Accounts.User
   alias Ysc.Events
   alias Ysc.Repo
+  alias YscWeb.DateDisplay
   alias YscWeb.Validators.FileValidator
 
   import Ecto.Query
@@ -1357,9 +1358,8 @@ defmodule YscWeb.ExpenseReportLive do
                 <div>
                   <dt class="text-sm font-medium text-zinc-500">Related Event</dt>
                   <dd class="mt-1 text-sm text-zinc-900">
-                    {@expense_report.event.title} - {Calendar.strftime(
-                      @expense_report.event.start_date,
-                      "%B %d, %Y"
+                    {@expense_report.event.title} - {DateDisplay.format_date_long(
+                      @expense_report.event.start_date
                     )}
                   </dd>
                 </div>
@@ -1384,10 +1384,7 @@ defmodule YscWeb.ExpenseReportLive do
               <div>
                 <dt class="text-sm font-medium text-zinc-500">Submitted</dt>
                 <dd class="mt-1 text-sm text-zinc-900">
-                  {Calendar.strftime(
-                    @expense_report.inserted_at,
-                    "%B %d, %Y at %I:%M %p"
-                  )}
+                  {DateDisplay.format_datetime_at(@expense_report.inserted_at)}
                 </dd>
               </div>
               <div>
@@ -1425,7 +1422,7 @@ defmodule YscWeb.ExpenseReportLive do
                             Vendor: {item.vendor} •
                           <% end %>
                           <%= if item.date do %>
-                            Date: {Calendar.strftime(item.date, "%B %d, %Y")}
+                            Date: {DateDisplay.format_date_long(item.date)}
                           <% end %>
                         </p>
                         <%= if item.receipt_s3_path do %>
@@ -1492,7 +1489,7 @@ defmodule YscWeb.ExpenseReportLive do
                         </p>
                         <p class="text-sm text-zinc-500 mt-1">
                           <%= if item.date do %>
-                            Date: {Calendar.strftime(item.date, "%B %d, %Y")}
+                            Date: {DateDisplay.format_date_long(item.date)}
                           <% end %>
                         </p>
                         <%= if item.proof_s3_path do %>
@@ -1702,9 +1699,8 @@ defmodule YscWeb.ExpenseReportLive do
                           <div class="flex items-center gap-4 text-sm text-zinc-600">
                             <span class="font-mono text-xs">{report.id}</span>
                             <span>
-                              Submitted {Calendar.strftime(
-                                report.inserted_at,
-                                "%B %d, %Y"
+                              Submitted {DateDisplay.format_date_long(
+                                report.inserted_at
                               )}
                             </span>
                           </div>
@@ -1915,7 +1911,7 @@ defmodule YscWeb.ExpenseReportLive do
                             {"None - Not related to an event", ""}
                             | Enum.map(@events, fn event ->
                                 label =
-                                  "#{event.title} - #{Calendar.strftime(event.start_date, "%B %d, %Y")}"
+                                  "#{event.title} - #{DateDisplay.format_date_long(event.start_date)}"
 
                                 {label, event.id}
                               end)

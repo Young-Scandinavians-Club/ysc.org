@@ -2,6 +2,7 @@ defmodule YscWeb.BookingReceiptLive do
   use YscWeb, :live_view
 
   alias YscWeb.BookingGuestForm
+  alias YscWeb.DateDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
@@ -416,7 +417,7 @@ defmodule YscWeb.BookingReceiptLive do
                     else: "text-zinc-900"
                   )
                 ]}>
-                  {format_date(@booking.checkin_date, @timezone)}
+                  {DateDisplay.format_date_long(@booking.checkin_date, "—")}
                 </p>
                 <p class={[
                   "text-sm",
@@ -445,7 +446,7 @@ defmodule YscWeb.BookingReceiptLive do
                     else: "text-zinc-900"
                   )
                 ]}>
-                  {format_date(@booking.checkout_date, @timezone)}
+                  {DateDisplay.format_date_long(@booking.checkout_date, "—")}
                 </p>
                 <p class={[
                   "text-sm",
@@ -914,9 +915,10 @@ defmodule YscWeb.BookingReceiptLive do
                               else: "text-zinc-400"
                             )
                           }>
-                            {format_payment_date(
+                            {DateDisplay.format_in_zone(
                               entry.payment.payment_date,
-                              @timezone
+                              @timezone,
+                              "—"
                             )}
                           </p>
                           <%= if entry.method_description do %>
@@ -1098,7 +1100,11 @@ defmodule YscWeb.BookingReceiptLive do
                       Date
                     </span>
                     <span>
-                      {format_payment_date(@payment.payment_date, @timezone)}
+                      {DateDisplay.format_in_zone(
+                        @payment.payment_date,
+                        @timezone,
+                        "—"
+                      )}
                     </span>
                   </div>
                 <% end %>
@@ -2492,29 +2498,6 @@ defmodule YscWeb.BookingReceiptLive do
       :clear_lake -> ~p"/bookings/clear-lake?tab=information#cabin-rules"
       _ -> ~p"/"
     end
-  end
-
-  # Timezone-aware formatting functions
-  defp format_date(%Date{} = date, _timezone) do
-    Calendar.strftime(date, "%B %d, %Y")
-  end
-
-  defp format_date(nil, _timezone), do: "—"
-  defp format_date(_, _timezone), do: "—"
-
-  @dialyzer {:nowarn_function, format_datetime: 2}
-  defp format_datetime(%DateTime{} = datetime, timezone) do
-    datetime
-    |> DateTime.shift_zone!(timezone)
-    |> Calendar.strftime("%B %d, %Y at %I:%M %p %Z")
-  end
-
-  defp format_payment_date(%DateTime{} = datetime, timezone) do
-    format_datetime(datetime, timezone)
-  end
-
-  defp format_payment_date(%Date{} = date, timezone) do
-    format_date(date, timezone)
   end
 
   defp get_cabin_master_email(property) do

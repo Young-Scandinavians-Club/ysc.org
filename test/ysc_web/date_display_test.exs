@@ -59,4 +59,42 @@ defmodule YscWeb.DateDisplayTest do
       assert DateDisplay.format_datetime_display(:atom) == ""
     end
   end
+
+  describe "format_datetime_at/1" do
+    test "formats DateTime values without timezone conversion" do
+      dt = ~U[2024-06-15 15:30:00Z]
+
+      assert DateDisplay.format_datetime_at(dt) == "June 15, 2024 at 03:30 PM"
+    end
+
+    test "returns empty string for nil and invalid values" do
+      assert DateDisplay.format_datetime_at(nil) == ""
+      assert DateDisplay.format_datetime_at(~D[2024-06-15]) == ""
+    end
+
+    test "accepts a custom default" do
+      assert DateDisplay.format_datetime_at(nil, "—") == "—"
+    end
+  end
+
+  describe "format_in_zone/2" do
+    test "formats Date values as long dates" do
+      assert DateDisplay.format_in_zone(~D[2024-06-15], "America/Los_Angeles") ==
+               "June 15, 2024"
+    end
+
+    test "formats DateTime values in the given timezone" do
+      dt = ~U[2024-06-15 22:30:00Z]
+
+      assert DateDisplay.format_in_zone(dt, "America/Los_Angeles") ==
+               "June 15, 2024 at 03:30 PM PDT"
+    end
+
+    test "returns default for nil and invalid values" do
+      assert DateDisplay.format_in_zone(nil, "America/Los_Angeles") == ""
+
+      assert DateDisplay.format_in_zone("invalid", "America/Los_Angeles", "—") ==
+               "—"
+    end
+  end
 end
