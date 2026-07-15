@@ -120,15 +120,9 @@ defmodule Ysc.Release do
 
     dry_run = Keyword.get(opts, :dry_run, false)
 
-    case Ysc.WpMigration.BoardMembers.sync_all(dry_run: dry_run) do
-      {:ok, stats} ->
-        Ysc.Logging.info("WP board member sync finished", stats)
-        {:ok, stats}
-
-      other ->
-        Ysc.Logging.error("WP board member sync failed", result: inspect(other))
-        other
-    end
+    {:ok, stats} = Ysc.WpMigration.BoardMembers.sync_all(dry_run: dry_run)
+    Ysc.Logging.info("WP board member sync finished", stats)
+    {:ok, stats}
   end
 
   @doc """

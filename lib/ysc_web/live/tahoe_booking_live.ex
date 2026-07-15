@@ -297,9 +297,10 @@ defmodule YscWeb.TahoeBookingLive do
     children_changed =
       parsed_params.children_count != socket.assigns.children_count
 
+    # Info-tab URL patches omit booking_mode; only treat explicit URL changes as updates.
     booking_mode_changed =
-      (parsed_params.booking_mode || :room) !=
-        socket.assigns.selected_booking_mode
+      not is_nil(parsed_params.booking_mode) &&
+        parsed_params.booking_mode != socket.assigns.selected_booking_mode
 
     info_tab =
       parsed_params.requested_info_tab || socket.assigns[:info_tab] || :general
