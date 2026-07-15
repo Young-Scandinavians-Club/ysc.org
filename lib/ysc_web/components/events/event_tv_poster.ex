@@ -34,7 +34,7 @@ defmodule YscWeb.Components.Events.EventTvPoster do
         cancelled?(@event) && "grayscale"
       ]}>
         <img
-          src={event_image_url(@event.image)}
+          src={Image.display_path_with_fallback(@event.image)}
           alt={event_image_alt(@event)}
           class="absolute inset-0 h-full w-full object-cover"
         />
@@ -117,14 +117,6 @@ defmodule YscWeb.Components.Events.EventTvPoster do
   defp cancelled?(event) do
     Map.get(event, :state) in [:cancelled, "cancelled"]
   end
-
-  defp event_image_url(nil), do: "/images/ysc_logo.webp"
-
-  defp event_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.webp"
-
-  defp event_image_url(%Image{optimized_image_path: path}), do: path
-  defp event_image_url(_), do: "/images/ysc_logo.webp"
 
   defp event_image_alt(event) do
     case Map.get(event, :image) do

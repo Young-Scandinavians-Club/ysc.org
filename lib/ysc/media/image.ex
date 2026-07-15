@@ -19,6 +19,7 @@ defmodule Ysc.Media.Image do
   import Ecto.Changeset
 
   @default_blur_hash "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+  @default_placeholder_path "/images/ysc_logo.webp"
 
   @derive {
     Flop.Schema,
@@ -115,6 +116,82 @@ defmodule Ysc.Media.Image do
   def display_path(%{raw_image_path: _} = image) do
     Map.get(image, :optimized_image_path) || Map.get(image, :raw_image_path)
   end
+
+  @doc """
+  Returns the default placeholder image path for views without a real image.
+
+  Used when `display_path/1` would return `nil`.
+  """
+  def default_placeholder_path, do: @default_placeholder_path
+
+  @doc """
+  Returns the best display path for an image, or `fallback` when none exists.
+
+  Accepts `nil` and non-image values (returns `fallback`). Defaults to
+  `default_placeholder_path/0`.
+  """
+  def display_path_with_fallback(image, fallback \\ @default_placeholder_path)
+  def display_path_with_fallback(nil, fallback), do: fallback
+
+  def display_path_with_fallback(image, fallback) do
+    display_path(image) || fallback
+  end
+
+  @doc """
+  Returns the optimized image path when present, otherwise `fallback`.
+
+  Unlike `display_path_with_fallback/2`, does not fall back to `raw_image_path`.
+  """
+  def optimized_path_with_fallback(image, fallback \\ @default_placeholder_path)
+  def optimized_path_with_fallback(nil, fallback), do: fallback
+
+  def optimized_path_with_fallback(
+        %__MODULE__{optimized_image_path: path},
+        _fallback
+      )
+      when is_binary(path),
+      do: path
+
+  def optimized_path_with_fallback(_, fallback), do: fallback
+
+  @doc """
+  Returns the thumbnail path when present, otherwise optimized, then raw, then `fallback`.
+  """
+  def thumbnail_path_with_fallback(image, fallback \\ @default_placeholder_path)
+  def thumbnail_path_with_fallback(nil, fallback), do: fallback
+
+  def thumbnail_path_with_fallback(
+        %__MODULE__{thumbnail_path: path},
+        _fallback
+      )
+      when is_binary(path),
+      do: path
+
+  def thumbnail_path_with_fallback(%__MODULE__{} = image, fallback) do
+    image.thumbnail_path || image.optimized_image_path || image.raw_image_path ||
+      fallback
+  end
+
+  def thumbnail_path_with_fallback(_, fallback), do: fallback
+
+  @doc """
+  Builds a responsive `srcset` from thumbnail (500w) and optimized (1920w) paths.
+
+  Returns `nil` when either path is missing.
+  """
+  def responsive_srcset(nil), do: nil
+
+  def responsive_srcset(%__MODULE__{thumbnail_path: nil}), do: nil
+  def responsive_srcset(%__MODULE__{optimized_image_path: nil}), do: nil
+
+  def responsive_srcset(%__MODULE__{
+        thumbnail_path: thumb,
+        optimized_image_path: optimized
+      }) do
+    "#{thumb} 500w, #{optimized} 1920w"
+  end
+
+  def responsive_srcset(_), do: nil
 
   @doc """
   Returns the default blur hash used when an image has no blur hash yet.

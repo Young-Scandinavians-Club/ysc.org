@@ -790,7 +790,7 @@ defmodule YscWeb.HomeLive do
                   phx-hook="BlurHashCanvas"
                 ></canvas>
                 <img
-                  src={event_image_url(event.image)}
+                  src={Image.display_path_with_fallback(event.image)}
                   id={"image-event-#{event.id}"}
                   phx-hook="BlurHashImage"
                   class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500 opacity-80 group-hover:opacity-100"
@@ -930,7 +930,7 @@ defmodule YscWeb.HomeLive do
                   phx-hook="BlurHashCanvas"
                 ></canvas>
                 <img
-                  src={featured_image_url_for_news(post.featured_image)}
+                  src={Image.display_path_with_fallback(post.featured_image)}
                   id={"image-news-#{post.id}"}
                   phx-hook="BlurHashImage"
                   class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-700 group-hover:scale-105"
@@ -1927,7 +1927,11 @@ defmodule YscWeb.HomeLive do
                             phx-hook="BlurHashCanvas"
                           ></canvas>
                           <img
-                            src={thumbnail_image_url(post.featured_image)}
+                            src={
+                              Image.thumbnail_path_with_fallback(
+                                post.featured_image
+                              )
+                            }
                             id={"image-sidebar-#{post.id}"}
                             loading="lazy"
                             phx-hook="BlurHashImage"
@@ -2796,28 +2800,6 @@ defmodule YscWeb.HomeLive do
 
   defp days_since_inserted(_), do: 999
 
-  defp event_image_url(nil), do: "/images/ysc_logo.webp"
-
-  defp event_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.webp"
-
-  defp event_image_url(%Image{optimized_image_path: optimized_path}),
-    do: optimized_path
-
-  defp event_image_url(_), do: "/images/ysc_logo.webp"
-
-  defp featured_image_url_for_news(nil), do: "/images/ysc_logo.webp"
-
-  defp featured_image_url_for_news(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.webp"
-
-  defp featured_image_url_for_news(%Image{
-         optimized_image_path: optimized_path
-       }),
-       do: optimized_path
-
-  defp featured_image_url_for_news(_), do: "/images/ysc_logo.webp"
-
   defp reading_time_for_news(%Post{rendered_body: nil}), do: 1
 
   defp reading_time_for_news(%Post{rendered_body: rendered_body}) do
@@ -2841,14 +2823,6 @@ defmodule YscWeb.HomeLive do
       text
     end
   end
-
-  defp thumbnail_image_url(nil), do: "/images/ysc_logo.webp"
-
-  defp thumbnail_image_url(%Image{thumbnail_path: nil} = image),
-    do: image.raw_image_path
-
-  defp thumbnail_image_url(%Image{thumbnail_path: thumbnail_path}),
-    do: thumbnail_path
 
   defp greeting_for_country(nil), do: "Hej"
   defp greeting_for_country("Sweden"), do: "Hej"

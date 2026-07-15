@@ -60,8 +60,8 @@ defmodule YscWeb.Components.Events.EventCard do
             phx-hook="BlurHashCanvas"
           ></canvas>
           <img
-            src={event_image_url(@event.image)}
-            srcset={image_srcset(@event.image)}
+            src={Image.display_path_with_fallback(@event.image)}
+            srcset={Image.responsive_srcset(@event.image)}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             id={"image-card-#{@event.id}"}
             phx-hook="BlurHashImage"
@@ -187,26 +187,6 @@ defmodule YscWeb.Components.Events.EventCard do
   defp format_event_date(event) do
     Timex.format!(event.start_date, "{Mshort} {D}")
   end
-
-  defp event_image_url(nil), do: "/images/ysc_logo.webp"
-
-  defp event_image_url(%Image{optimized_image_path: nil} = image),
-    do: image.raw_image_path || "/images/ysc_logo.webp"
-
-  defp event_image_url(%Image{optimized_image_path: optimized_path}),
-    do: optimized_path
-
-  defp event_image_url(_), do: "/images/ysc_logo.webp"
-
-  defp image_srcset(nil), do: nil
-  defp image_srcset(%Image{thumbnail_path: nil}), do: nil
-  defp image_srcset(%Image{optimized_image_path: nil}), do: nil
-
-  defp image_srcset(%Image{
-         thumbnail_path: thumb,
-         optimized_image_path: optimized
-       }),
-       do: "#{thumb} 500w, #{optimized} 1920w"
 
   defp get_event_badges_for_card(event, sold_out, selling_fast) do
     state = Map.get(event, :state) || Map.get(event, "state")
