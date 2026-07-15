@@ -230,7 +230,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
                Tickets.update_payment_intent(order, payment_intent_id)
 
       expect(Ysc.StripeMock, :retrieve_payment_intent, 2, fn ^payment_intent_id,
-                                                              _opts ->
+                                                             _opts ->
         {:ok,
          build_payment_intent(%{
            id: payment_intent_id,
@@ -247,6 +247,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "increase-ticket-quantity", %{
         "tier-id" => ticket.ticket_tier_id
       })
+
       render_click(view, "proceed-to-checkout")
 
       flash = :sys.get_state(view.pid).socket.assigns.flash

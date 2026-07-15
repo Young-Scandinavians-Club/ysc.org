@@ -736,7 +736,9 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       for _ <- 1..12 do
         view
-        |> form("#phone_verification_form", %{"verification_code" => @invalid_otp})
+        |> form("#phone_verification_form", %{
+          "verification_code" => @invalid_otp
+        })
         |> render_submit()
       end
 
