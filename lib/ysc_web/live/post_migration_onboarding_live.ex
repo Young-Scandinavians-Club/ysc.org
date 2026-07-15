@@ -6,7 +6,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     1 - Profile review/edit (name, phone, date of birth, country)
     2 - Phone verification via SMS OTP (only if phone was added/changed or unverified)
     3 - Payment method collection + Stripe subscription creation
-    5 - Family member listing; saved on continue, invites sent when email provided (family plans only)
+    5 - Family member listing; saved on continue, invites sent when email provided (family and lifetime plans)
   """
   use YscWeb, :live_view
 
@@ -1366,7 +1366,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  defp needs_family_members_step?(plan), do: plan == :family
+  defp needs_family_members_step?(plan), do: plan in [:family, :lifetime]
 
   defp build_steps(
          needs_family_members_step,

@@ -172,7 +172,8 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert html =~ "Membership Type"
     end
 
-    test "lifetime members skip the payment step in the stepper", %{conn: conn} do
+    test "lifetime members skip payment but include the family step in the stepper",
+         %{conn: conn} do
       user = user_needing_post_migration_onboarding()
 
       {:ok, user} =
@@ -188,10 +189,11 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       html = render(view)
 
       assert has_element?(view, ~s|button[phx-value-step="1"]|)
-      refute has_element?(view, ~s|button[phx-value-step="2"]|)
+      assert has_element?(view, ~s|button[phx-value-step="2"]|)
+      refute has_element?(view, ~s|button[phx-value-step="3"]|)
       refute html =~ "Membership Type"
-      refute html =~ ">Family</span>"
-      refute html =~ "Add Family Members"
+      refute html =~ "Renewal Payment"
+      assert html =~ ">Family</span>"
     end
   end
 
@@ -270,6 +272,25 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user = family_onboarding_user!()
       conn = log_in_user(conn, user)
 
+      view = live_onboarding!(conn)
+      go_to_family_step!(view)
+
+      assert render(view) =~ "Add Family Members"
+      assert has_element?(view, "#family-member-form-0")
+    end
+
+    test "shows family step for lifetime membership onboarding", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(%{
+          lifetime_membership_awarded_at:
+            DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
       view = live_onboarding!(conn)
       go_to_family_step!(view)
 
