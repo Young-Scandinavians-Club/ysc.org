@@ -97,7 +97,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
       assert html =~ "#F59E0B"
       assert html =~ "cancellation refunds no longer apply"
       assert html =~ "What Changed"
-      assert html =~ "View Updated Reservation"
+      assert html =~ "View Updated Booking"
     end
   end
 
