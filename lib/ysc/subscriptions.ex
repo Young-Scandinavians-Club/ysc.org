@@ -1590,6 +1590,58 @@ defmodule Ysc.Subscriptions do
   end
 
   @doc """
+  Persists a Stripe subscription locally, then removes WP migration placeholder rows.
+
+  Placeholders are deleted only after the real row is stored so a failed insert cannot
+  leave the member with no local subscription while Stripe already has an active sub.
+  """
+  def adopt_stripe_subscription_replacing_migrated(user, stripe_subscription) do
+    with {:ok, subscription} <-
+           create_subscription_from_stripe(user, stripe_subscription) do
+      delete_migrated_placeholder_subscriptions(user)
+      {:ok, subscription}
+    end
+  end
+
+  @doc """
+  Deletes WP migration placeholder subscriptions (`stripe_id` prefixed with `migrated_`).
+  """
+  def delete_migrated_placeholder_subscriptions(%Ysc.Accounts.User{} = user) do
+    user
+    |> list_subscriptions()
+    |> Enum.filter(&migrated_placeholder_subscription?/1)
+    |> Enum.each(&delete_migrated_placeholder_subscription/1)
+
+    :ok
+  end
+
+  defp delete_migrated_placeholder_subscription(%Subscription{} = subscription) do
+    case delete_subscription(subscription) do
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        require Ysc.Logging
+
+        Ysc.Logging.warning(
+          "Failed to remove migrated placeholder subscription",
+          user_id: subscription.user_id,
+          subscription_id: subscription.id,
+          reason: inspect(reason)
+        )
+
+        :error
+    end
+  end
+
+  defp migrated_placeholder_subscription?(%Subscription{stripe_id: stripe_id})
+       when is_binary(stripe_id) do
+    String.starts_with?(stripe_id, "migrated_")
+  end
+
+  defp migrated_placeholder_subscription?(_), do: false
+
+  @doc """
   Retries payment for a failed invoice.
 
   Validates that the invoice belongs to the user and attempts to pay it via Stripe.

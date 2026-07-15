@@ -1640,14 +1640,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
              idempotency_key: idempotency_key
            ) do
         {:ok, stripe_subscription} ->
-          # Delete migrated placeholder subscriptions only after Stripe succeeds
-          # to avoid data loss if the Stripe call fails or the process crashes.
-          user
-          |> Subscriptions.list_subscriptions()
-          |> Enum.filter(&migrated_subscription?/1)
-          |> Enum.each(&Subscriptions.delete_subscription/1)
-
-          Subscriptions.create_subscription_from_stripe(
+          Subscriptions.adopt_stripe_subscription_replacing_migrated(
             user,
             stripe_subscription
           )

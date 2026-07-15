@@ -4,6 +4,7 @@ defmodule Ysc.SubscriptionsTest do
   """
   use Ysc.DataCase, async: true
 
+  alias Ysc.Accounts
   alias Ysc.Accounts.User
   alias Ysc.Repo
   alias Ysc.Subscriptions
@@ -1384,6 +1385,96 @@ defmodule Ysc.SubscriptionsTest do
 
       assert returned.id == existing.id
       assert returned.stripe_id == "sub_dup_check"
+    end
+  end
+
+  describe "adopt_stripe_subscription_replacing_migrated/2" do
+    test "removes migrated placeholder only after the real subscription is stored",
+         %{
+           user: user
+         } do
+      {:ok, migrated} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Migrated Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      now = System.os_time(:second)
+      period_end = now + 365 * 86_400
+
+      stripe_sub =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: "sub_adopt_#{System.unique_integer([:positive])}",
+          status: "active",
+          start_date: now,
+          current_period_start: now,
+          current_period_end: period_end,
+          items: %Stripe.List{
+            data: [
+              %{
+                id: "si_adopt_#{System.unique_integer([:positive])}",
+                price: %{id: "price_adopt", product: "prod_adopt"},
+                quantity: 1,
+                current_period_start: now,
+                current_period_end: period_end
+              }
+            ],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          }
+        )
+
+      assert {:ok, %Subscription{} = adopted} =
+               Subscriptions.adopt_stripe_subscription_replacing_migrated(
+                 user,
+                 stripe_sub
+               )
+
+      assert adopted.stripe_id == stripe_sub.id
+      refute Repo.get(Subscription, migrated.id)
+      assert Accounts.has_active_membership?(user)
+    end
+
+    test "keeps migrated placeholder when local Stripe subscription insert fails",
+         %{
+           user: user
+         } do
+      {:ok, migrated} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Migrated Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      stripe_sub =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: "sub_fail_#{System.unique_integer([:positive])}",
+          status: nil,
+          start_date: System.os_time(:second),
+          current_period_start: System.os_time(:second),
+          current_period_end: System.os_time(:second) + 1000,
+          items: %Stripe.List{
+            data: [],
+            has_more: false,
+            object: "list",
+            url: "/v1/items"
+          }
+        )
+
+      assert {:error, %Ecto.Changeset{}} =
+               Subscriptions.adopt_stripe_subscription_replacing_migrated(
+                 user,
+                 stripe_sub
+               )
+
+      assert Repo.get!(Subscription, migrated.id).id == migrated.id
+      assert Accounts.has_active_membership?(user)
     end
   end
 
