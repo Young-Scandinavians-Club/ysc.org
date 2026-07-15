@@ -60,8 +60,7 @@ defmodule YscWeb.TahoeBookingDeferredTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 45)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(45)
 
       path =
         "/bookings/tahoe?" <>
@@ -74,8 +73,13 @@ defmodule YscWeb.TahoeBookingDeferredTest do
 
       {:ok, view, _html} = live(conn, path)
 
+      # Drain connected mount work before measuring tab navigation queries.
       html = render(view)
       assert html =~ "Tahoe"
+
+      # Drain any availability-cache invalidation broadcasts from parallel tests
+      # before measuring info-tab navigation query counts.
+      drain_availability_cache_messages(view)
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.active_tab == :information
@@ -94,6 +98,16 @@ defmodule YscWeb.TahoeBookingDeferredTest do
 
       assert query_count == 0
       assert :sys.get_state(view.pid).socket.assigns.info_tab == :rules
+    end
+  end
+
+  defp drain_availability_cache_messages(view) do
+    html = render(view)
+
+    receive do
+      :availability_cache_invalidated -> drain_availability_cache_messages(view)
+    after
+      0 -> html
     end
   end
 end
