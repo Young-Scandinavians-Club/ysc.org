@@ -91,7 +91,7 @@ defmodule YscWeb.Emails.BookingModificationConfirmationTest do
 
       html = BookingModificationConfirmation.render(data)
 
-      assert html =~ "Reservation Updated"
+      assert html =~ "Booking Updated"
       assert html =~ "yellow-alert-box"
       assert html =~ "#FEF3C7"
       assert html =~ "#F59E0B"

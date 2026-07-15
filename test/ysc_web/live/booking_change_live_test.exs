@@ -98,7 +98,7 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     {view, html} = live_change(conn, booking)
 
-    assert html =~ "Change Reservation"
+    assert html =~ "Change Booking"
     assert html =~ "You will not get a refund if you change these dates"
     assert html =~ "cannot get a refund later"
     assert html =~ "cannot be undone"
@@ -169,13 +169,13 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     {view, html} = live_change(conn, booking)
 
-    assert html =~ "Change Reservation"
+    assert html =~ "Change Booking"
 
     html =
       view
       |> render_click("payment-redirect-started", %{})
 
-    assert html =~ "Change Reservation"
+    assert html =~ "Change Booking"
   end
 
   test "shows guest info step when adding guests to tahoe room booking", %{

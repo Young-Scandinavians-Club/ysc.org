@@ -144,7 +144,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Reservation Confirmed"
+      assert html =~ "Booking Confirmed"
       assert html =~ booking.reference_id
       assert html =~ "Lake Tahoe Cabin"
       assert has_element?(view, ~s(#booking-receipt))
@@ -158,7 +158,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
-      assert html =~ "Reservation Cancelled"
+      assert html =~ "Booking Cancelled"
       assert html =~ "Booking Cancelled"
       assert html =~ booking.reference_id
     end
@@ -367,7 +367,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, view, html} =
         live(conn, ~p"/bookings/#{booking.id}/receipt?updated=true")
 
-      assert html =~ "Reservation Updated"
+      assert html =~ "Booking Updated"
 
       render_async(view, @async_timeout_ms)
 
@@ -435,7 +435,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert has_element?(view, "#booking-payment-history")
       refute has_element?(view, "#payment-method-summary")
       refute has_element?(view, "#payment-date-summary")
-      assert html =~ "Reservation total"
+      assert html =~ "Booking total"
       assert html =~ "$150.00"
       assert html =~ "$50.00"
       assert html =~ "$100.00"
@@ -520,7 +520,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       assert result =~ "Cancel Booking"
       assert result =~ "Cancellation Reason"
-      assert result =~ "Cancel this reservation?"
+      assert result =~ "Cancel this booking?"
       assert result =~ "be undone"
     end
 
@@ -904,7 +904,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Entire cabin"
-      assert html =~ "Reservation type"
+      assert html =~ "Booking type"
     end
 
     test "displays Clear Lake in copy", %{conn: conn} do
@@ -2458,7 +2458,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       {:ok, _view, html} = live(conn, ~p"/bookings/#{booking.id}/receipt")
 
       assert html =~ "Individual room(s)"
-      assert html =~ "Reservation type"
+      assert html =~ "Booking type"
     end
   end
 

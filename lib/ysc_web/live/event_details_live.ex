@@ -7169,7 +7169,7 @@ defmodule YscWeb.EventDetailsLive do
       DateTime.compare(now, ticket_order.expires_at) == :gt ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This reservation has expired.",
+         |> YscWeb.Flash.put_toast(:error, "This order has expired.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7292,7 +7292,7 @@ defmodule YscWeb.EventDetailsLive do
     do: "This order requires payment."
 
   defp free_ticket_confirm_error_message(:order_expired),
-    do: "This reservation has expired."
+    do: "This order has expired."
 
   defp free_ticket_confirm_error_message(:order_not_pending),
     do: "This order is no longer available."

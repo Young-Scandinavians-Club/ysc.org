@@ -180,7 +180,7 @@ defmodule YscWeb.BookingReceiptLive do
             <div class="flex items-center gap-2 text-red-600 mb-2">
               <.icon name="hero-x-circle" class="w-6 h-6" />
               <span class="font-bold uppercase tracking-wider text-sm">
-                Reservation Cancelled
+                Booking Cancelled
               </span>
             </div>
             <h1 class="text-4xl font-bold text-zinc-900">
@@ -213,14 +213,14 @@ defmodule YscWeb.BookingReceiptLive do
               <.icon name="hero-check-circle-solid" class="w-6 h-6" />
               <span class="font-bold uppercase tracking-wider text-sm">
                 {if @show_reservation_updated,
-                  do: "Reservation Updated",
-                  else: "Reservation Confirmed"}
+                  do: "Booking Updated",
+                  else: "Booking Confirmed"}
               </span>
             </div>
             <h1 class="text-4xl font-bold text-zinc-900">
               <%= cond do %>
                 <% @show_reservation_updated -> %>
-                  Your reservation has been updated, {@user_first_name}!
+                  Your booking has been updated, {@user_first_name}!
                 <% @booking_in_past -> %>
                   What a stay, {@user_first_name}!
                 <% true -> %>
@@ -232,7 +232,7 @@ defmodule YscWeb.BookingReceiptLive do
                 <% @show_reservation_updated -> %>
                   Your updated stay at
                   <strong>{PropertyDisplay.full_name(@booking.property)}</strong>
-                  is confirmed. We've sent an email with your new reservation details.
+                  is confirmed. We've sent an email with your new booking details.
                 <% @booking_in_past -> %>
                   Hope you had an amazing time at <strong>{PropertyDisplay.full_name(@booking.property)}</strong>.
                   See you next time!
@@ -330,7 +330,7 @@ defmodule YscWeb.BookingReceiptLive do
                     This Booking Has Been Cancelled
                   </h3>
                   <p class="text-sm text-red-800 leading-relaxed">
-                    This reservation is no longer active. You will not have access to the property for these dates.
+                    This booking is no longer active. You will not have access to the property for these dates.
                     <%= if @refund_data && @refund_data.total_refunded do %>
                       Your refund information is shown in the payment summary on the right.
                     <% end %>
@@ -468,7 +468,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <%= if Ecto.assoc_loaded?(@booking.rooms) && length(@booking.rooms) > 0 do %>
                     {if length(@booking.rooms) == 1, do: "Room", else: "Rooms"}
                   <% else %>
-                    Reservation type
+                    Booking type
                   <% end %>
                 </p>
                 <p class={[
@@ -685,10 +685,10 @@ defmodule YscWeb.BookingReceiptLive do
                     />
                     <div>
                       <p class="font-semibold text-emerald-300">
-                        Reservation updated
+                        Booking updated
                       </p>
                       <p class="text-sm text-zinc-400 mt-1">
-                        Your changes are saved. The details below reflect your updated reservation.
+                        Your changes are saved. The details below reflect your updated booking.
                       </p>
                     </div>
                   </div>
@@ -877,7 +877,7 @@ defmodule YscWeb.BookingReceiptLive do
                         else: "text-zinc-400"
                       )
                     }>
-                      Reservation total
+                      Booking total
                     </span>
                     <span class={
                       if(@booking.status == :canceled,
@@ -1113,12 +1113,12 @@ defmodule YscWeb.BookingReceiptLive do
                 class="w-full py-3"
                 id="change-reservation-button"
               >
-                <.icon name="hero-pencil-square" class="w-5 h-5" />Change Reservation
+                <.icon name="hero-pencil-square" class="w-5 h-5" />Change Booking
               </.button>
             <% end %>
             <%= if @booking.status != :canceled && @can_cancel do %>
               <.button phx-click="show-cancel-modal" class="w-full py-3" color="red">
-                <.icon name="hero-x-circle" class="w-5 h-5" />Cancel Reservation
+                <.icon name="hero-x-circle" class="w-5 h-5" />Cancel Booking
               </.button>
             <% end %>
             <.button
@@ -1145,7 +1145,7 @@ defmodule YscWeb.BookingReceiptLive do
 
           <div class="space-y-4">
             <p class="text-zinc-600">
-              Cancel this reservation? This can't be undone.
+              Cancel this booking? This can't be undone.
             </p>
             <!-- Refund Information -->
             <%= if @refund_info && Map.get(@refund_info, :modified) do %>
@@ -1155,7 +1155,7 @@ defmodule YscWeb.BookingReceiptLive do
                   <p class="font-semibold">No Refund Available</p>
                 </div>
                 <p class="text-sm text-amber-700 mt-2 pl-7">
-                  This reservation was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
+                  This booking was modified, so cancellation refunds no longer apply. You may still cancel, but you will not receive a refund.
                 </p>
               </div>
             <% else %>
@@ -1507,8 +1507,8 @@ defmodule YscWeb.BookingReceiptLive do
                 YscWeb.Flash.put_toast(
                   socket,
                   :info,
-                  "Your reservation has been updated.",
-                  title: "Reservation updated"
+                  "Your booking has been updated.",
+                  title: "Booking updated"
                 )
               else
                 YscWeb.Flash.put_toast(
