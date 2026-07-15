@@ -172,22 +172,15 @@ defmodule Ysc.Release do
         do: [dry_run: dry_run, only_emails: only_emails],
         else: [dry_run: dry_run]
 
-    case Ysc.WpMigration.Load.create_migration_stripe_subscriptions(load_opts) do
-      {:ok, %{stats: stats} = result} ->
-        Ysc.Logging.info(
-          "WP migration Stripe subscription backfill finished",
-          stats
-        )
+    {:ok, %{stats: stats} = result} =
+      Ysc.WpMigration.Load.create_migration_stripe_subscriptions(load_opts)
 
-        {:ok, result}
+    Ysc.Logging.info(
+      "WP migration Stripe subscription backfill finished",
+      stats
+    )
 
-      {:error, message} = error ->
-        Ysc.Logging.error("WP migration Stripe subscription backfill failed",
-          error: message
-        )
-
-        error
-    end
+    {:ok, result}
   end
 
   @doc """
