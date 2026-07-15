@@ -1927,7 +1927,11 @@ defmodule YscWeb.HomeLive do
                             phx-hook="BlurHashCanvas"
                           ></canvas>
                           <img
-                            src={Image.thumbnail_path_with_fallback(post.featured_image)}
+                            src={
+                              Image.thumbnail_path_with_fallback(
+                                post.featured_image
+                              )
+                            }
                             id={"image-sidebar-#{post.id}"}
                             loading="lazy"
                             phx-hook="BlurHashImage"

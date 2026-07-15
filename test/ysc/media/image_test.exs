@@ -57,7 +57,8 @@ defmodule Ysc.Media.ImageTest do
 
   describe "display_path_with_fallback/2" do
     test "returns fallback for nil" do
-      assert Image.display_path_with_fallback(nil) == Image.default_placeholder_path()
+      assert Image.display_path_with_fallback(nil) ==
+               Image.default_placeholder_path()
     end
 
     test "returns custom fallback for nil" do
@@ -79,7 +80,9 @@ defmodule Ysc.Media.ImageTest do
       assert Image.display_path_with_fallback(image) == "/raw.jpg"
 
       image = %Image{optimized_image_path: nil, raw_image_path: nil}
-      assert Image.display_path_with_fallback(image) == Image.default_placeholder_path()
+
+      assert Image.display_path_with_fallback(image) ==
+               Image.default_placeholder_path()
     end
   end
 
