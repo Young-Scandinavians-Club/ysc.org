@@ -237,17 +237,20 @@ defmodule YscWeb.Emails.MembershipRenewalPaymentMethodReminderTest do
         current_period_start: DateTime.utc_now()
       }
 
-      # Should raise FunctionClauseError when trying to call DateTime.to_date on nil
-      assert_raise FunctionClauseError, fn ->
-        Ysc.Test.Invoke.call(
-          MembershipRenewalPaymentMethodReminder,
-          :prepare_email_data,
-          [
-            user,
-            subscription
-          ]
-        )
-      end
+      assert %{
+               first_name: _,
+               renewal_date: "N/A",
+               payment_methods_url: _,
+               membership_url: _
+             } =
+               Ysc.Test.Invoke.call(
+                 MembershipRenewalPaymentMethodReminder,
+                 :prepare_email_data,
+                 [
+                   user,
+                   subscription
+                 ]
+               )
     end
   end
 
