@@ -687,10 +687,7 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   defp mask_ip(ip) do
-    case Ysc.IpAddress.mask(ip) do
-      masked when is_binary(masked) -> masked
-      _ -> "—"
-    end
+    Ysc.IpAddress.mask(ip) || "—"
   end
 
   defp login_status_badge(event) do

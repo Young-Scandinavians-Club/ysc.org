@@ -58,20 +58,18 @@ defmodule Ysc.IpAddress do
   def mask(_), do: nil
 
   defp mask_normalized(ip) do
-    parts = String.split(ip, ".")
+    case String.split(ip, ".") do
+      [a, b, _, _] ->
+        "#{a}.#{b}.xxx.xxx"
 
-    if length(parts) == 4 do
-      [a, b | _] = parts
-      "#{a}.#{b}.xxx.xxx"
-    else
-      parts = String.split(ip, ":")
+      _ ->
+        case String.split(ip, ":") do
+          [a, b, _ | _] ->
+            "#{a}:#{b}:xxxx:..."
 
-      if length(parts) > 2 do
-        [a, b | _] = parts
-        "#{a}:#{b}:xxxx:..."
-      else
-        nil
-      end
+          _ ->
+            nil
+        end
     end
   end
 end

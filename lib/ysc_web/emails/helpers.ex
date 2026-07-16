@@ -111,7 +111,9 @@ defmodule YscWeb.Emails.Helpers do
     country_label = sign_in_country_label(event.country)
 
     [event.city, event.region, country_label]
-    |> Enum.reject(&(is_nil(&1) || &1 == ""))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
     |> Enum.uniq()
     |> case do
       [] -> nil
