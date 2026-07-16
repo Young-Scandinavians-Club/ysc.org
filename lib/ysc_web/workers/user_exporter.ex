@@ -17,6 +17,47 @@ defmodule YscWeb.Workers.UserExporter do
   alias Ysc.Subscriptions.Subscription
 
   @stream_rows_count 100
+  @export_ready_attempts 20
+  @export_ready_sleep_ms 50
+
+  @type export_opts :: [
+          channel: String.t(),
+          fields: [atom()],
+          only_subscribed: boolean(),
+          created_by_user_id: String.t()
+        ]
+
+  @doc """
+  Builds a user CSV export on the local node.
+
+  Broadcasts `user_export:progress` on `channel` while exporting.
+  Returns the authenticated admin download path when the file is ready.
+  """
+  @spec run_export(export_opts()) :: {:ok, String.t()} | {:error, String.t()}
+  def run_export(opts) when is_list(opts) do
+    channel = Keyword.fetch!(opts, :channel)
+    fields = normalize_fields(Keyword.fetch!(opts, :fields))
+    only_subscribed = Keyword.fetch!(opts, :only_subscribed)
+    created_by_user_id = Keyword.fetch!(opts, :created_by_user_id)
+
+    Ysc.Logging.info(
+      "UserExporter: Starting export with fields: #{inspect(fields)}, only_subscribed: #{only_subscribed}"
+    )
+
+    try do
+      build_csv(fields, only_subscribed, created_by_user_id)
+      output_path = await_csv(channel)
+
+      with :ok <- ensure_export_file_ready!(output_path) do
+        {:ok, export_download_path(output_path)}
+      end
+    rescue
+      e ->
+        Ysc.Logging.error("UserExporter: Error during export: #{inspect(e)}")
+        Ysc.Logging.error(Exception.format(:error, e, __STACKTRACE__))
+        {:error, "Export failed: #{Exception.message(e)}"}
+    end
+  end
 
   def perform(%_{
         args: %{
@@ -26,26 +67,19 @@ defmodule YscWeb.Workers.UserExporter do
           "created_by_user_id" => created_by_user_id
         }
       }) do
-    Ysc.Logging.info(
-      "UserExporter: Starting export with fields: #{inspect(fields)}, only_subscribed: #{only_subscribed}"
-    )
+    case run_export(
+           channel: channel,
+           fields: fields,
+           only_subscribed: only_subscribed,
+           created_by_user_id: created_by_user_id
+         ) do
+      {:ok, export_path} ->
+        YscWeb.Endpoint.broadcast(channel, "user_export:complete", export_path)
+        :ok
 
-    try do
-      build_csv(fields, only_subscribed, created_by_user_id)
-      await_csv(channel)
-      :ok
-    rescue
-      e ->
-        Ysc.Logging.error("UserExporter: Error during export: #{inspect(e)}")
-        Ysc.Logging.error(Exception.format(:error, e, __STACKTRACE__))
-
-        YscWeb.Endpoint.broadcast(
-          channel,
-          "user_export:failed",
-          "Export failed: #{Exception.message(e)}"
-        )
-
-        {:error, e}
+      {:error, message} ->
+        YscWeb.Endpoint.broadcast(channel, "user_export:failed", message)
+        {:error, message}
     end
   end
 
@@ -365,24 +399,40 @@ defmodule YscWeb.Workers.UserExporter do
         await_csv(channel)
 
       {:complete, export_path} ->
-        Ysc.Logging.info(
-          "Broadcasting to `user_export:complete` with value #{export_path}"
-        )
-
-        YscWeb.Endpoint.broadcast(
-          channel,
-          "user_export:complete",
-          "/admin/exports/#{Path.basename(export_path)}"
-        )
+        Ysc.Logging.info("UserExporter: CSV build complete at #{export_path}")
+        export_path
     after
       30_000 ->
-        YscWeb.Endpoint.broadcast(
-          channel,
-          "user_export:failed",
-          "Failed to export Users to CSV"
-        )
-
         raise RuntimeError, "No progress after 30s. Giving up."
+    end
+  end
+
+  defp normalize_fields(fields) do
+    Enum.map(fields, fn
+      field when is_atom(field) -> field
+      field when is_binary(field) -> String.to_existing_atom(field)
+    end)
+  end
+
+  defp export_download_path(output_path) do
+    "/admin/exports/#{Path.basename(output_path)}"
+  end
+
+  defp ensure_export_file_ready!(
+         output_path,
+         attempts \\ @export_ready_attempts
+       )
+
+  defp ensure_export_file_ready!(_output_path, 0) do
+    {:error, "Export file is not available yet. Please try again."}
+  end
+
+  defp ensure_export_file_ready!(output_path, attempts) do
+    if File.regular?(output_path) do
+      :ok
+    else
+      Process.sleep(@export_ready_sleep_ms)
+      ensure_export_file_ready!(output_path, attempts - 1)
     end
   end
 
