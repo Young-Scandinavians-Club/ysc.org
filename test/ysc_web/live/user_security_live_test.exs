@@ -369,7 +369,7 @@ defmodule YscWeb.UserSecurityLiveTest do
       html =
         render_click(view, "revoke_session", %{"session_id" => other_encoded})
 
-      assert html =~ "Session signed out"
+      assert html =~ "Signed out on that device"
     end
 
     test "revoking current session redirects to log-in", %{conn: conn} do
@@ -733,8 +733,8 @@ defmodule YscWeb.UserSecurityLiveTest do
     end
   end
 
-  describe "current session and device labels (coverage)" do
-    test "shows Current session when auth event matches live session id", %{
+  describe "current device and device labels (coverage)" do
+    test "shows This device when auth event matches live session id", %{
       conn: conn
     } do
       user = user_fixture()
@@ -759,7 +759,8 @@ defmodule YscWeb.UserSecurityLiveTest do
 
       render_async(view)
 
-      assert render(view) =~ "Current session"
+      assert render(view) =~ "This device"
+      assert render(view) =~ "Signed in here now"
       assert render(view) =~ "Firefox on Linux"
     end
 

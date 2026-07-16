@@ -624,7 +624,7 @@ defmodule YscWeb.FamilyManagementLive do
                     data-confirm="Remove this family member from your list? This only removes their details from your account. It does not remove anyone who has already accepted an invitation and appears under Linked Family Members."
                     class="text-red-600 hover:text-red-800"
                   >
-                    Remove
+                    Remove from list
                   </button>
                 </td>
               </tr>
@@ -690,7 +690,7 @@ defmodule YscWeb.FamilyManagementLive do
                       data-confirm="Are you sure you want to remove this family member from your membership? They will lose access to membership benefits and receive an email notification."
                       class="text-red-600 hover:text-red-800"
                     >
-                      Remove
+                      Remove from membership
                     </button>
                   </td>
                 </tr>
