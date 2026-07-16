@@ -1796,6 +1796,46 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "list_pending_approval_users/1 and count_pending_approval_users/0" do
+    test "limit returns oldest pending users first" do
+      older =
+        oauth_user_fixture(%{
+          phone_number: "+14159098320",
+          state: :pending_approval,
+          inserted_at: ~U[2026-01-01 12:00:00Z]
+        })
+
+      newer =
+        oauth_user_fixture(%{
+          phone_number: "+14159098321",
+          state: :pending_approval,
+          inserted_at: ~U[2026-06-01 12:00:00Z]
+        })
+
+      preview = Accounts.list_pending_approval_users(limit: 1)
+      assert length(preview) == 1
+      assert hd(preview).id == older.id
+      refute Enum.any?(preview, &(&1.id == newer.id))
+    end
+
+    test "count reflects all pending users regardless of list limit" do
+      _pending1 =
+        oauth_user_fixture(%{
+          phone_number: "+14159098322",
+          state: :pending_approval
+        })
+
+      _pending2 =
+        oauth_user_fixture(%{
+          phone_number: "+14159098323",
+          state: :pending_approval
+        })
+
+      assert Accounts.count_pending_approval_users() >= 2
+      assert length(Accounts.list_pending_approval_users(limit: 1)) == 1
+    end
+  end
+
   describe "revoke_user_session_by_id/2" do
     test "revokes session when encoded id matches a session token" do
       user = user_fixture(%{phone_number: "+14159098307"})
