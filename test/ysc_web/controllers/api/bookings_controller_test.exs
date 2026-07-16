@@ -133,9 +133,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
     test "defaults to a bounded date window when dates are omitted", %{
       conn: conn
     } do
-      today = Date.utc_today()
-      old_checkin = Date.add(today, -120)
-      old_checkout = Date.add(old_checkin, 3)
+      {old_checkin, old_checkout} = past_booking_dates_outside_default_window()
 
       {:ok, old_booking} =
         %{
