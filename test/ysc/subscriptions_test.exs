@@ -1388,6 +1388,48 @@ defmodule Ysc.SubscriptionsTest do
     end
   end
 
+  describe "delete_migrated_placeholder_subscriptions/1" do
+    test "removes only migrated_ placeholder rows and keeps real Stripe subscriptions",
+         %{user: user} do
+      {:ok, migrated} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "migrated_#{user.id}",
+          stripe_status: "active",
+          name: "Migrated Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, real} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_real_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Stripe Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert :ok = Subscriptions.delete_migrated_placeholder_subscriptions(user)
+
+      refute Repo.get(Subscription, migrated.id)
+      assert Repo.get!(Subscription, real.id).id == real.id
+    end
+
+    test "returns :ok when the user has no migrated placeholders", %{user: user} do
+      {:ok, real} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_only_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          name: "Stripe Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      assert :ok = Subscriptions.delete_migrated_placeholder_subscriptions(user)
+      assert Repo.get!(Subscription, real.id).id == real.id
+    end
+  end
+
   describe "adopt_stripe_subscription_replacing_migrated/2" do
     test "removes migrated placeholder only after the real subscription is stored",
          %{

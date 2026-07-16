@@ -49,6 +49,20 @@ defmodule Ysc.Accounts.UserProfileCacheTest do
     assert length(refreshed.passkeys) == 1
   end
 
+  test "delete_user_passkey invalidates cached profile preloads" do
+    user = user_fixture()
+    passkey_fixture(user)
+
+    cached = UserProfileCache.get_user!(user.id, [:passkeys])
+    assert length(cached.passkeys) == 1
+
+    [passkey] = Accounts.get_user_passkeys(user)
+    assert {:ok, _} = Accounts.delete_user_passkey(passkey)
+
+    refreshed = UserProfileCache.get_user!(user.id, [:passkeys])
+    assert refreshed.passkeys == []
+  end
+
   test "get_user_by_session_token does not depend on UserProfileCache" do
     user = user_fixture()
     token = Accounts.generate_user_session_token(user)

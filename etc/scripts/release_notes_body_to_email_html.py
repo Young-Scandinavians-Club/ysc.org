@@ -341,6 +341,49 @@ This release focuses on critical correctness fixes.
     assert "<br" not in out
     assert "## Highlights" not in out
 
+    assert changelog_to_fragment("org/repo", "") == ""
+
+    hr_sample = "## Section\n\n---\n\nAfter rule."
+    hr_out = changelog_to_fragment("org/repo", hr_sample)
+    assert "<hr/>" in hr_out
+    assert "---" not in hr_out
+
+    inline_sample = "Use `mix test` and visit https://example.com for PR #42."
+    inline_out = changelog_to_fragment("org/repo", inline_sample)
+    assert "<code>mix test</code>" in inline_out
+    assert 'href="https://example.com"' in inline_out
+    assert 'href="https://github.com/org/repo/pull/42"' in inline_out
+
+    nested_sample = """\
+## Nested
+
+- Parent
+    - Child item
+"""
+    nested_out = changelog_to_fragment("org/repo", nested_sample)
+    assert nested_out.count("<ul>") >= 2
+    assert "Child item" in nested_out
+
+    email_html = build_committee_release_email_html(
+        "org/repo",
+        'Intro with <script>alert("x")</script>',
+        sample,
+        "https://github.com/org/repo/releases/tag/v1.0.0",
+    )
+    assert "<!DOCTYPE html>" in email_html
+    assert "<style>" in email_html
+    assert "<script>" not in email_html
+    assert "&lt;script&gt;" in email_html
+    assert 'href="https://github.com/org/repo/releases/tag/v1.0.0"' in email_html
+
+    empty_email = build_committee_release_email_html(
+        "org/repo",
+        "No changelog body.",
+        "",
+        "https://github.com/org/repo/releases/tag/v1.0.0",
+    )
+    assert "(No release body.)" in empty_email
+
 
 def main() -> None:
     if len(sys.argv) >= 2 and sys.argv[1] == "--self-test":
