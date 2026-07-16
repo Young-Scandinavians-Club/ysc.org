@@ -142,6 +142,44 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
+  Returns `{checkin, checkout}` for a past Mon-Thu stay outside the kiosk/mobile
+  bookings index default window (7 days past through 30 days ahead).
+
+  Use when tests assert omitted date params exclude old bookings. Dates satisfy
+  Tahoe weekend and buyout-in-summer rules regardless of which weekday "today" is.
+  """
+  def past_booking_dates_outside_default_window(
+        past_days \\ 120,
+        today_pst \\ nil
+      ) do
+    today =
+      today_pst ||
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+    checkin =
+      today
+      |> Date.add(-past_days)
+      |> first_monday_on_or_before()
+
+    # Buyout is only allowed in summer at Tahoe.
+    checkin =
+      if tahoe_winter_month?(checkin.month) do
+        year =
+          if checkin.month in [1, 2, 3, 4],
+            do: checkin.year - 1,
+            else: checkin.year
+
+        first_monday_on_or_after(Date.new!(year, 6, 1))
+      else
+        checkin
+      end
+
+    checkout = Date.add(checkin, 3)
+    {checkin, checkout}
+  end
+
+  @doc """
   Returns `{checkin, checkout}` for a past Mon-Thu stay that satisfies Tahoe rules.
 
   Use when tests need a confirmed booking that has already ended regardless of

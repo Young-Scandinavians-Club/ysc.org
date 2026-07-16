@@ -133,17 +133,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
     test "defaults to a bounded date window when dates are omitted", %{
       conn: conn
     } do
-      today = Date.utc_today()
-
-      # Monday–Thursday stay avoids Tahoe weekend validation for historical bookings.
-      old_checkin =
-        today
-        |> Date.add(-120)
-        |> then(fn date ->
-          Date.add(date, -(Date.day_of_week(date, :monday) - 1))
-        end)
-
-      old_checkout = Date.add(old_checkin, 3)
+      {old_checkin, old_checkout} = past_booking_dates_outside_default_window()
 
       {:ok, old_booking} =
         %{
