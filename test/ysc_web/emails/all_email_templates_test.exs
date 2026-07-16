@@ -166,7 +166,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           "We noticed a sign-in to Young Scandinavians Club from a new device or browser.",
         signed_in_at: "July 8, 2026 at 10:30 AM PDT",
         device: "Chrome on macOS",
-        location: "Stockholm, Stockholm, SE (24.206.103.29)",
+        location: "Stockholm, Sweden",
         security_url: "https://example.com/users/settings/security"
       }
 
