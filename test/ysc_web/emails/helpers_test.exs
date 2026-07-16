@@ -86,20 +86,27 @@ defmodule YscWeb.Emails.HelpersTest do
                "Unknown browser on Unknown OS"
     end
 
-    test "sign_in_location/1 prefers geo labels and falls back to IP" do
+    test "sign_in_location/1 prefers geo labels and masks IP when geo is unavailable" do
       assert Helpers.sign_in_location(%{
                city: "Stockholm",
                region: "Stockholm",
                country: "SE",
                ip_address: "24.206.103.29"
-             }) == "Stockholm, Stockholm, SE (24.206.103.29)"
+             }) == "Stockholm, Sweden"
 
       assert Helpers.sign_in_location(%{
                city: nil,
                region: nil,
                country: nil,
                ip_address: "203.0.113.1"
-             }) == "203.0.113.1"
+             }) == "203.0.xxx.xxx"
+
+      assert Helpers.sign_in_location(%{
+               city: nil,
+               region: nil,
+               country: nil,
+               ip_address: "2607:fb90:8e93:2ba1:ac39:6d57:509c:f8ac"
+             }) == "2607:fb90:xxxx:..."
 
       assert Helpers.sign_in_location(%{
                city: nil,

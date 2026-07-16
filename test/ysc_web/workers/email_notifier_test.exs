@@ -756,7 +756,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
         subject: "New Sign-In to Your YSC Account",
         to: {nil, user.email},
         text_body: ~r/new device or browser/,
-        html_body: ~r/Stockholm, Stockholm, SE/
+        html_body: ~r/Stockholm, Sweden/
       )
 
       assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,

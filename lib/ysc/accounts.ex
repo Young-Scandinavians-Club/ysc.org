@@ -1440,13 +1440,45 @@ defmodule Ysc.Accounts do
   Gets all users that have signed up and need their application reviewed.
   These are users with pending_approval state.
   """
-  def get_pending_approval_users() do
-    Repo.all(
-      from u in User,
-        where: u.state == :pending_approval,
-        preload: [:registration_form, :current_avatar],
-        order_by: [asc: u.inserted_at]
-    )
+  def get_pending_approval_users do
+    list_pending_approval_users()
+  end
+
+  @doc """
+  Returns the number of users awaiting application review.
+  """
+  def count_pending_approval_users do
+    pending_approval_users_base_query()
+    |> select([u], count(u.id))
+    |> Repo.one()
+  end
+
+  @doc """
+  Lists users awaiting application review, oldest first.
+
+  Pass `limit:` to cap rows (e.g. admin dashboard preview cards).
+  """
+  def list_pending_approval_users(opts \\ []) do
+    pending_approval_users_query()
+    |> maybe_limit_pending_approval_users(Keyword.get(opts, :limit))
+    |> Repo.all()
+  end
+
+  defp pending_approval_users_base_query do
+    from u in User, where: u.state == :pending_approval
+  end
+
+  defp pending_approval_users_query do
+    pending_approval_users_base_query()
+    |> preload([:registration_form, :current_avatar])
+    |> order_by([u], asc: u.inserted_at, asc: u.id)
+  end
+
+  defp maybe_limit_pending_approval_users(query, nil), do: query
+
+  defp maybe_limit_pending_approval_users(query, limit)
+       when is_integer(limit) and limit > 0 do
+    from u in query, limit: ^limit
   end
 
   def list_paginated_users(params) do

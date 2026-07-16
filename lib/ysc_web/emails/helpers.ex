@@ -95,25 +95,41 @@ defmodule YscWeb.Emails.Helpers do
   Formats location from an auth event for email copy.
   """
   def sign_in_location(event) do
-    geo =
-      [event.city, event.region, event.country]
-      |> Enum.reject(&(is_nil(&1) || &1 == ""))
-      |> case do
-        [] -> nil
-        parts -> Enum.join(parts, ", ")
-      end
+    case format_sign_in_geo_location(event) do
+      geo when is_binary(geo) and geo != "" ->
+        geo
 
-    ip =
-      case event.ip_address do
-        ip when is_binary(ip) and ip != "" -> ip
-        _ -> nil
-      end
+      _ ->
+        case Ysc.IpAddress.mask(event.ip_address) do
+          masked when is_binary(masked) -> masked
+          _ -> "Unknown location"
+        end
+    end
+  end
 
-    case {geo, ip} do
-      {geo, ip} when is_binary(geo) and is_binary(ip) -> "#{geo} (#{ip})"
-      {geo, _} when is_binary(geo) -> geo
-      {_, ip} when is_binary(ip) -> ip
-      _ -> "Unknown location"
+  defp format_sign_in_geo_location(event) do
+    country_label = sign_in_country_label(event.country)
+
+    [event.city, event.region, country_label]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.uniq()
+    |> case do
+      [] -> nil
+      parts -> Enum.join(parts, ", ")
+    end
+  end
+
+  defp sign_in_country_label(nil), do: nil
+  defp sign_in_country_label(""), do: nil
+
+  defp sign_in_country_label(country_code) when is_binary(country_code) do
+    country_code = country_code |> String.trim() |> String.upcase()
+
+    case Cldr.Territory.display_name(country_code, backend: Ysc.Cldr) do
+      {:ok, name} -> name
+      _ -> country_code
     end
   end
 
