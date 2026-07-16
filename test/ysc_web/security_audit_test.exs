@@ -1709,7 +1709,15 @@ defmodule YscWeb.SecurityAuditTest do
       conn: conn
     } do
       today = Date.utc_today()
-      old_checkin = Date.add(today, -120)
+
+      # Monday–Thursday stay avoids Tahoe weekend validation for historical bookings.
+      old_checkin =
+        today
+        |> Date.add(-120)
+        |> then(fn date ->
+          Date.add(date, -(Date.day_of_week(date, :monday) - 1))
+        end)
+
       old_checkout = Date.add(old_checkin, 3)
 
       {:ok, old_booking} =
