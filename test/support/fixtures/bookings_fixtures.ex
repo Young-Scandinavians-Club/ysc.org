@@ -169,6 +169,7 @@ defmodule Ysc.BookingsFixtures do
           if checkin.month in [1, 2, 3, 4],
             do: checkin.year - 1,
             else: checkin.year
+
         first_monday_on_or_after(Date.new!(year, 6, 1))
       else
         checkin
