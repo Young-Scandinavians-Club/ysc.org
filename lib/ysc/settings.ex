@@ -19,7 +19,7 @@ defmodule Ysc.Settings do
   @instagram_social_url "https://www.instagram.com/theysc"
   @facebook_social_url "https://www.facebook.com/YoungScandinaviansClub/"
   @partiful_social_url "https://partiful.com/u/nm9TVCDwC3y28CL4fcTX"
-  @whatsapp_social_url "https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ"
+  @whatsapp_social_url "https://chat.whatsapp.com/LvsXNcpGPuH2pSTuGGaUwF?s=cl&p=i&ilr=1"
 
   @doc false
   def instagram_social_url, do: @instagram_social_url

@@ -218,7 +218,7 @@ Social media links are seeded via `Ysc.Settings.seed_default_social_settings/0` 
 - **Instagram**: https://www.instagram.com/theysc
 - **Facebook**: https://www.facebook.com/YoungScandinaviansClub/
 - **Partiful**: https://partiful.com/u/nm9TVCDwC3y28CL4fcTX
-- **WhatsApp**: https://chat.whatsapp.com/DfTCpY2BHar7mmenrkDACZ
+- **WhatsApp**: https://chat.whatsapp.com/LvsXNcpGPuH2pSTuGGaUwF?s=cl&p=i&ilr=1
 
 ### Images
 
