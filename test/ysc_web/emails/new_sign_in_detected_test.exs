@@ -27,7 +27,7 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
 
       assert assigns.first_name == Ysc.title_case(user.first_name)
       assert assigns.device == "Chrome on macOS"
-      assert assigns.location == "Stockholm, Stockholm, SE (24.206.103.29)"
+      assert assigns.location == "Stockholm, Sweden"
       assert assigns.security_url =~ "/users/settings/security"
       assert is_binary(assigns.signed_in_at)
 
@@ -49,7 +49,7 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
 
       {:ok, assigns} = NewSignInDetected.prepare_email_data(user, auth_event.id)
 
-      assert assigns.location == "203.0.113.1"
+      assert assigns.location == "203.0.xxx.xxx"
 
       assert assigns.intro_text ==
                "We noticed a sign-in to Young Scandinavians Club from a new location."
@@ -93,14 +93,14 @@ defmodule YscWeb.Emails.NewSignInDetectedTest do
             "We noticed a sign-in to Young Scandinavians Club from a new location.",
           signed_in_at: "Jan 1, 2026 at 9:00 AM PST",
           device: "Chrome on macOS",
-          location: "Stockholm, Stockholm, SE (24.206.103.29)",
+          location: "Stockholm, Sweden",
           security_url: "https://example.com/users/settings/security"
         })
 
       assert body =~ "Hi Ada,"
       assert body =~ "new location"
       assert body =~ "Platform: Chrome on macOS"
-      assert body =~ "Location: Stockholm, Stockholm, SE (24.206.103.29)"
+      assert body =~ "Location: Stockholm, Sweden"
       assert body =~ "Time: Jan 1, 2026 at 9:00 AM PST"
       assert body =~ "https://example.com/users/settings/security"
     end

@@ -686,26 +686,10 @@ defmodule YscWeb.UserSecurityLive do
     |> Calendar.strftime("%b %d, %Y at %H:%M")
   end
 
-  defp mask_ip(nil), do: "—"
-  defp mask_ip(""), do: "—"
-
-  defp mask_ip(ip) when is_binary(ip) do
-    # IPv4: mask last two octets (e.g. 192.168.xxx.xxx)
-    parts = String.split(ip, ".")
-
-    if length(parts) == 4 do
-      [a, b | _] = parts
-      "#{a}.#{b}.xxx.xxx"
-    else
-      # IPv6: show first two groups and mask rest
-      parts = String.split(ip, ":")
-
-      if length(parts) > 2 do
-        [a, b | _] = parts
-        "#{a}:#{b}:xxxx:..."
-      else
-        "—"
-      end
+  defp mask_ip(ip) do
+    case Ysc.IpAddress.mask(ip) do
+      masked when is_binary(masked) -> masked
+      _ -> "—"
     end
   end
 

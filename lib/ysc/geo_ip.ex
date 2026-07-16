@@ -29,7 +29,12 @@ defmodule Ysc.GeoIP do
   """
   def lookup(ip_address) when is_binary(ip_address) do
     if configured?() do
-      do_lookup(ip_address)
+      ip_address
+      |> Ysc.IpAddress.normalize()
+      |> case do
+        nil -> %{}
+        normalized -> do_lookup(normalized)
+      end
     else
       %{}
     end
