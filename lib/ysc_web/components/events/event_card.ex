@@ -12,6 +12,7 @@ defmodule YscWeb.Components.Events.EventCard do
     statics: YscWeb.static_paths()
 
   alias Ysc.Media.Image
+  alias YscWeb.DateDisplay
   alias YscWeb.PlainText
 
   attr :event, :any, required: true
@@ -185,7 +186,7 @@ defmodule YscWeb.Components.Events.EventCard do
   end
 
   defp format_event_date(event) do
-    Timex.format!(event.start_date, "{Mshort} {D}")
+    DateDisplay.format_event_date_range(event)
   end
 
   defp get_event_badges_for_card(event, sold_out, selling_fast) do

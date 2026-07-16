@@ -229,5 +229,16 @@ defmodule Ysc.Events.DateTimeFormatterTest do
 
       assert result == "Jul 28, 2026 at 7:00 PM"
     end
+
+    test "formats multi-day date range without time" do
+      result =
+        DateTimeFormatter.format_event_start(%{
+          start_date: ~D[2026-03-05],
+          end_date: ~D[2026-03-07],
+          start_time: nil
+        })
+
+      assert result == "Mar 5 – Mar 7, 2026"
+    end
   end
 end

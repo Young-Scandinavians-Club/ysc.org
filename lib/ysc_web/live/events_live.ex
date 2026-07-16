@@ -8,6 +8,7 @@ defmodule YscWeb.EventsLive do
   alias Ysc.Events
   alias Ysc.Events.EventListCache
   alias Ysc.Media.Image
+  alias YscWeb.DateDisplay
 
   @impl true
   def render(assigns) do
@@ -209,7 +210,7 @@ defmodule YscWeb.EventsLive do
                         :if={event.start_date}
                         class="text-white/80 text-sm font-medium mt-1"
                       >
-                        {format_event_date(event.start_date)}
+                        {DateDisplay.format_event_date_range(event, with_year: true)}
                       </p>
                     </div>
                   </div>
@@ -445,15 +446,6 @@ defmodule YscWeb.EventsLive do
   end
 
   # Helper functions
-  defp format_event_date(%DateTime{} = dt) do
-    dt |> DateTime.to_date() |> Calendar.strftime("%b %d, %Y")
-  end
-
-  defp format_event_date(%Date{} = date),
-    do: Calendar.strftime(date, "%b %d, %Y")
-
-  defp format_event_date(_), do: ""
-
   defp random_past_events_title do
     ["Hvad var", "Det Som Varit", "Hva var", "Mikä oli", "Hvað var"]
     |> Enum.random()

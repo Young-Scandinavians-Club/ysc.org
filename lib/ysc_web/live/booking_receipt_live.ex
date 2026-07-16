@@ -541,7 +541,7 @@ defmodule YscWeb.BookingReceiptLive do
                       )
                     ]}>
                       <div class={[
-                        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden",
+                        "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
                         if(guest.is_child,
                           do: "bg-green-100 text-green-700",
                           else: "bg-blue-100 text-blue-700"
@@ -551,7 +551,7 @@ defmodule YscWeb.BookingReceiptLive do
                           <%= if Ecto.assoc_loaded?(@booking.user) && @booking.user do %>
                             <.user_avatar_image
                               user={@booking.user}
-                              class="w-full h-full object-cover"
+                              class="w-8 h-8"
                             />
                           <% else %>
                             <.icon name="hero-user-circle" class="w-5 h-5" />

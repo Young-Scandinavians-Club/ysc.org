@@ -52,12 +52,10 @@ defmodule YscWeb.VolunteerLive do
               class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
             >
               <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 ring-2 ring-blue-200">
-                  <.user_avatar_image
-                    user={@current_user}
-                    class="w-full h-full object-cover"
-                  />
-                </div>
+                <.user_avatar_image
+                  user={@current_user}
+                  class="w-10 h-10 shrink-0 ring-2 ring-blue-200"
+                />
                 <div>
                   <p class="text-sm font-semibold text-blue-900">Submitting as</p>
                   <p class="text-sm text-blue-700">

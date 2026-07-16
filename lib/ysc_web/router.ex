@@ -210,6 +210,7 @@ defmodule YscWeb.Router do
           {YscWeb.Plugs.RequestPath, :set_request_path}
         ] do
         live "/button-showcase", DevButtonShowcaseLive, :index
+        live "/avatar-showcase", DevAvatarShowcaseLive, :index
       end
     end
   end

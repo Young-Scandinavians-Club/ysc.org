@@ -4,6 +4,9 @@ defmodule Ysc.Events.DateTimeFormatter do
 
   Provides functions to format date-time combinations in a human-readable format.
   """
+
+  alias YscWeb.DateDisplay
+
   @doc """
   Nicely formats and concatenates start_date, start_time, end_date, and end_time for display.
 
@@ -81,10 +84,27 @@ defmodule Ysc.Events.DateTimeFormatter do
   def format_event_start(event, opts \\ [])
 
   def format_event_start(event, opts) when is_map(event) do
-    start_date = Map.get(event, :start_date) || Map.get(event, "start_date")
     start_time = Map.get(event, :start_time) || Map.get(event, "start_time")
+    separator = Keyword.get(opts, :separator, " at ")
+    default = Keyword.get(opts, :default, "Date TBD")
 
-    format_event_start(start_date, start_time, opts)
+    date_label =
+      DateDisplay.format_event_date_range(event,
+        default: default,
+        with_year: true
+      )
+
+    if date_label == default do
+      default
+    else
+      time = event_start_time(start_time)
+
+      if time do
+        "#{date_label}#{separator}#{format_time(time)}"
+      else
+        date_label
+      end
+    end
   end
 
   def format_event_start(nil, _start_time, opts) do
