@@ -163,6 +163,36 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
+  Returns `{checkin, checkout}` for a past Mon-Thu Tahoe buyout stay outside the
+  kiosk bookings index default window (7 days in the past).
+
+  Avoids Saturday-without-Sunday and winter buyout validation regardless of when
+  the test runs.
+  """
+  def past_stay_outside_kiosk_index_window(today \\ Date.utc_today()) do
+    checkin =
+      today
+      |> Date.add(-8)
+      |> Date.add(-30)
+      |> first_monday_on_or_before()
+      |> summer_monday_for_tahoe_buyout()
+
+    checkout = Date.add(checkin, 3)
+    {checkin, checkout}
+  end
+
+  defp summer_monday_for_tahoe_buyout(date) do
+    if tahoe_winter_month?(date.month) do
+      year = if date.month in [1, 2, 3, 4], do: date.year - 1, else: date.year
+
+      Date.new!(year, 8, 1)
+      |> first_monday_on_or_before()
+    else
+      date
+    end
+  end
+
+  @doc """
   Creates a confirmed booking in an active stay window for kiosk check-in tests.
   """
   def active_check_in_booking_fixture(attrs \\ %{}) do

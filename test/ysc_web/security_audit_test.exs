@@ -1708,17 +1708,7 @@ defmodule YscWeb.SecurityAuditTest do
     test "omitted dates exclude bookings outside the default window", %{
       conn: conn
     } do
-      today = Date.utc_today()
-
-      # Monday–Thursday stay avoids Tahoe weekend validation for historical bookings.
-      old_checkin =
-        today
-        |> Date.add(-120)
-        |> then(fn date ->
-          Date.add(date, -(Date.day_of_week(date, :monday) - 1))
-        end)
-
-      old_checkout = Date.add(old_checkin, 3)
+      {old_checkin, old_checkout} = past_stay_outside_kiosk_index_window()
 
       {:ok, old_booking} =
         %{

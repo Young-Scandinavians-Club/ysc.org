@@ -6,15 +6,18 @@ defmodule YscWeb.HomeLiveTest do
   # Home newsletter tests also share Hammer rate-limit state per IP.
   use YscWeb.ConnCase, async: false
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures, only: [event_fixture: 1, ticket_tier_fixture: 1]
   import Ysc.TicketsFixtures, only: [ticket_order_fixture: 1]
 
   alias Ysc.Bookings
+  alias Ysc.Events.Event
   alias Ysc.Events.Ticket
   alias Ysc.Newsletter
   alias Ysc.Posts
+  alias Ysc.PublicContentCache
   alias Ysc.Repo
 
   describe "guest" do
@@ -515,16 +518,20 @@ defmodule YscWeb.HomeLiveTest do
          %{
            conn: conn
          } do
+      # async: false uses a shared SQL sandbox, so upcoming events from earlier
+      # tests in this module would otherwise keep the bar visible.
+      cancel_future_published_events()
+
       author = user_fixture()
-      title = "Happening Soon News #{System.unique_integer()}"
+      title = "Club News Only #{System.unique_integer()}"
 
       {:ok, _post} =
         %Posts.Post{}
         |> Posts.Post.new_post_changeset(%{
           title: title,
-          raw_body: "<p>News body for happening soon bar.</p>",
-          preview_text: "Preview for the bar.",
-          url_name: "happening-soon-news-#{System.unique_integer()}",
+          raw_body: "<p>News body for the home page latest news block.</p>",
+          preview_text: "Preview for the news card.",
+          url_name: "club-news-only-#{System.unique_integer()}",
           state: :published,
           published_on: DateTime.utc_now(),
           user_id: author.id,
@@ -535,7 +542,7 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
       html = render(view)
 
-      refute html =~ "Happening Soon"
+      refute has_element?(view, "#happening-soon-bar")
       assert html =~ title
     end
 
@@ -874,5 +881,17 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ "Thank you for subscribing" or
                html =~ "Thank you for subscribing!"
     end
+  end
+
+  defp cancel_future_published_events do
+    now = DateTime.utc_now()
+
+    from(e in Event,
+      where: e.state == :published,
+      where: e.start_date > ^now
+    )
+    |> Repo.update_all(set: [state: :cancelled])
+
+    PublicContentCache.invalidate_events()
   end
 end
