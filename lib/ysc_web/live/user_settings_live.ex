@@ -330,15 +330,17 @@ defmodule YscWeb.UserSettingsLive do
             </div>
             <%!-- Section 2: Add new payment method button OR Stripe form --%>
             <div :if={!@show_new_payment_form} class="flex justify-center py-2">
-              <button
+              <.button
                 id="add-payment-method"
                 type="button"
+                variant="outline"
+                color="zinc"
                 phx-click="add-new-payment-method"
                 phx-disable-with="Loading..."
-                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border-2 border-dashed border-zinc-300 text-sm font-medium text-zinc-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-all duration-150"
+                class="border-2 border-dashed border-zinc-300 px-5 text-zinc-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
               >
                 <.icon name="hero-plus-circle" class="w-5 h-5" /> Add Payment Method
-              </button>
+              </.button>
             </div>
             <div :if={@show_new_payment_form && @payment_intent_secret}>
               <form

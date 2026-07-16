@@ -1075,19 +1075,17 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             Timezone: <span data-tz-label>detecting…</span>
           </p>
           <div class="mt-6 flex justify-end gap-2">
-            <button
+            <.button
               type="button"
-              class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+              variant="outline"
+              color="zinc"
               phx-click="close-schedule-modal"
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              class="rounded-lg bg-blue-600 text-white px-4 py-2 text-sm font-semibold hover:bg-blue-700"
-            >
+            </.button>
+            <.button type="submit" phx-disable-with="Scheduling...">
               Schedule
-            </button>
+            </.button>
           </div>
         </.form>
       </.modal>

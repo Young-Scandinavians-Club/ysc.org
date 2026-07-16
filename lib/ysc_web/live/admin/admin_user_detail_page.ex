@@ -71,12 +71,9 @@ defmodule YscWeb.AdminUserDetailsLive do
               name="_csrf_token"
               value={Phoenix.Controller.get_csrf_token()}
             />
-            <button
-              type="submit"
-              class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-semibold"
-            >
+            <.button type="submit">
               <.icon name="hero-user-circle" class="w-5 h-5" /> Sign in as User
-            </button>
+            </.button>
           </form>
         </div>
 
@@ -666,14 +663,14 @@ defmodule YscWeb.AdminUserDetailsLive do
                     label="Internal note (optional)"
                     class="mt-3 w-full min-h-[4rem] border border-zinc-300 rounded-md px-3 py-2 text-sm"
                   />
-                  <button
+                  <.button
                     type="submit"
                     id="grant-entitlement-submit"
                     phx-disable-with="Granting..."
-                    class="mt-4 px-4 py-2 bg-blue-600 text-white rounded font-semibold text-sm hover:bg-blue-700"
+                    class="mt-4"
                   >
                     Grant benefit & email member
-                  </button>
+                  </.button>
                 </.form>
               </div>
 
@@ -739,15 +736,17 @@ defmodule YscWeb.AdminUserDetailsLive do
                         <% end %>
                       </td>
                       <td class="px-4 py-3 text-right">
-                        <button
+                        <.button
                           :if={ent.status == :active}
                           type="button"
+                          variant="outline"
+                          color="red"
                           phx-click="revoke_booking_entitlement"
                           phx-value-id={ent.id}
-                          class="text-red-600 hover:underline text-xs font-semibold"
+                          class="!min-h-0 !text-xs !px-2 !py-1"
                         >
                           Revoke
-                        </button>
+                        </.button>
                       </td>
                     </tr>
                   </tbody>
@@ -761,14 +760,16 @@ defmodule YscWeb.AdminUserDetailsLive do
                   class="px-4 py-6 text-center text-sm"
                 >
                   <span class="text-red-600">Could not load entitlements.</span>
-                  <button
+                  <.button
                     type="button"
                     id="retry-booking-entitlements-load"
+                    variant="outline"
+                    color="blue"
                     phx-click="retry_load_booking_entitlements"
-                    class="mt-2 block mx-auto text-blue-600 hover:underline font-semibold"
+                    class="mt-2 mx-auto"
                   >
                     Retry
-                  </button>
+                  </.button>
                 </p>
                 <p
                   :if={
@@ -1537,23 +1538,25 @@ defmodule YscWeb.AdminUserDetailsLive do
                         )}
                       </p>
                     </div>
-                    <button
+                    <.button
                       :if={@unsealed_account_id != bank_account.id}
                       type="button"
+                      variant="outline"
+                      color="blue"
                       phx-click="unseal_bank_account"
                       phx-value-id={bank_account.id}
-                      class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100"
                     >
                       Unseal Details
-                    </button>
-                    <button
+                    </.button>
+                    <.button
                       :if={@unsealed_account_id == bank_account.id}
                       type="button"
+                      variant="outline"
+                      color="zinc"
                       phx-click="seal_bank_account"
-                      class="px-4 py-2 text-sm font-medium text-zinc-600 bg-zinc-50 rounded-md hover:bg-zinc-100"
                     >
                       Seal Details
-                    </button>
+                    </.button>
                   </div>
 
                   <div
@@ -1906,15 +1909,18 @@ defmodule YscWeb.AdminUserDetailsLive do
                       >
                         View
                       </.link>
-                      <button
+                      <.button
+                        type="button"
+                        variant="outline"
+                        color="red"
                         phx-click="admin_remove_family_user"
                         phx-value-user_id={sub_account.id}
                         phx-disable-with="Removing..."
                         data-confirm="Remove this user from the family membership? They will lose access to membership benefits and receive an email notification."
-                        class="text-sm text-red-600 hover:underline"
+                        class="!min-h-0 !text-sm !px-3 !py-1.5"
                       >
                         Remove
-                      </button>
+                      </.button>
                     </div>
                   </div>
                 <% end %>
@@ -1943,15 +1949,18 @@ defmodule YscWeb.AdminUserDetailsLive do
                           )}
                         </span>
                       </div>
-                      <button
+                      <.button
+                        type="button"
+                        variant="outline"
+                        color="red"
                         phx-click="admin_cancel_family_invite"
                         phx-value-invite_id={invite.id}
                         phx-disable-with="Cancelling..."
                         data-confirm="Cancel this invite? The invitee will receive an email notification."
-                        class="text-sm text-red-600 hover:underline"
+                        class="!min-h-0 !text-sm !px-3 !py-1.5 shrink-0"
                       >
                         Cancel invite
-                      </button>
+                      </.button>
                     </div>
                   <% end %>
                 </div>
@@ -2255,13 +2264,14 @@ defmodule YscWeb.AdminUserDetailsLive do
             rows="4"
           />
           <div class="flex flex-row justify-end gap-3 pt-2">
-            <button
+            <.button
               type="button"
+              variant="outline"
+              color="zinc"
               phx-click="cancel_activation_override"
-              class="px-4 py-2 rounded-md text-sm font-medium border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
             >
               Cancel
-            </button>
+            </.button>
             <.button phx-disable-with="Activating..." type="submit">
               Activate & Save Note
             </.button>

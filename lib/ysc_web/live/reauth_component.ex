@@ -356,14 +356,15 @@ defmodule YscWeb.ReauthComponent do
         </div>
 
         <div class="mt-4 text-center">
-          <button
+          <.button
             type="button"
+            variant="outline"
+            color="zinc"
             phx-click="cancel_reauth"
             phx-target={@myself}
-            class="text-sm text-zinc-500 hover:text-zinc-700"
           >
             Cancel
-          </button>
+          </.button>
         </div>
       </.modal>
     </div>
