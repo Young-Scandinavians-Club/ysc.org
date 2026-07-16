@@ -1471,7 +1471,7 @@ defmodule Ysc.Accounts do
   defp pending_approval_users_query do
     pending_approval_users_base_query()
     |> preload([:registration_form, :current_avatar])
-    |> order_by([u], asc: u.inserted_at)
+    |> order_by([u], asc: u.inserted_at, asc: u.id)
   end
 
   defp maybe_limit_pending_approval_users(query, nil), do: query
