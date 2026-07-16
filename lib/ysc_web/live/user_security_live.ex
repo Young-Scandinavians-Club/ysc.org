@@ -166,7 +166,7 @@ defmodule YscWeb.UserSecurityLive do
           {:noreply,
            socket
            |> YscWeb.Flash.put_toast(:info, "You have signed out.",
-             title: "Session ended",
+             title: "Signed out",
              icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
            )
            |> push_navigate(to: ~p"/users/log-in")}
@@ -176,8 +176,8 @@ defmodule YscWeb.UserSecurityLive do
            |> assign(:revoked_session_ids, [
              encoded_session_id | socket.assigns.revoked_session_ids
            ])
-           |> YscWeb.Flash.put_toast(:info, "Session signed out.",
-             title: "Session ended",
+           |> YscWeb.Flash.put_toast(:info, "Signed out on that device.",
+             title: "Signed out",
              icon: &YscWeb.CoreComponents.flash_toast_icon_shield/1
            )}
         end
@@ -191,8 +191,8 @@ defmodule YscWeb.UserSecurityLive do
          ])
          |> YscWeb.Flash.put_toast(
            :info,
-           "That session may already be signed out.",
-           title: "Session"
+           "That device may already be signed out.",
+           title: "Sign out"
          )}
     end
   end
@@ -524,7 +524,7 @@ defmodule YscWeb.UserSecurityLive do
             <div class="rounded border border-zinc-100 py-4 px-4 space-y-4">
               <h2 class="text-zinc-900 font-bold text-xl">Recent Activity</h2>
               <p class="text-zinc-600 text-sm">
-                Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out other sessions.
+                Review where and how you signed in. If you see an unfamiliar sign-in, change your password and sign out on your other devices.
               </p>
 
               <div
@@ -559,13 +559,13 @@ defmodule YscWeb.UserSecurityLive do
                   <%= if current_event do %>
                     <div>
                       <h3 class="text-sm font-semibold text-zinc-700 mb-3">
-                        Current session
+                        This device
                       </h3>
                       <div class="flex items-start justify-between gap-4 p-4 border border-blue-200 rounded-lg bg-blue-50/50">
                         <div class="flex-1 min-w-0">
                           <div class="flex items-center gap-2 flex-wrap mb-1">
                             <span class="inline-flex items-center rounded-md bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                              Current session
+                              Signed in here now
                             </span>
                             <span class="text-zinc-600 text-xs">
                               {sign_in_method_label(current_event)}
@@ -629,12 +629,12 @@ defmodule YscWeb.UserSecurityLive do
                             <.button
                               phx-click="revoke_session"
                               phx-value-session_id={event.session_id}
-                              phx-confirm="Sign out this session? You will need to sign in again on that device."
+                              phx-confirm="Sign out on this device? You will need to sign in again there."
                               phx-disable-with="Signing out..."
                               variant="secondary"
                               class="text-sm"
                             >
-                              Sign out this session
+                              Sign out on this device
                             </.button>
                           <% else %>
                             <%= if !event.success do %>

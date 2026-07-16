@@ -5731,8 +5731,8 @@ defmodule YscWeb.EventDetailsLive do
         YscWeb.Flash.put_toast(
           socket,
           :error,
-          "Your checkout session has expired. Please select your tickets again to continue.",
-          title: "Checkout"
+          "Time ran out to finish your ticket purchase. Please select your tickets again to continue.",
+          title: "Time ran out"
         )
       end
 
