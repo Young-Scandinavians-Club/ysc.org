@@ -1023,7 +1023,7 @@ defmodule YscWeb.AdminDashboardLive do
           class="space-y-3"
         >
           <div
-            :for={user <- Enum.take(@pending_users, 3)}
+            :for={user <- @pending_users}
             class={[
               "flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-zinc-50/80 border border-zinc-100 rounded-lg hover:ring-2 hover:ring-zinc-200 transition-all group relative overflow-hidden",
               get_application_card_classes(user)
@@ -1315,7 +1315,10 @@ defmodule YscWeb.AdminDashboardLive do
             {:latest_comments, fn -> Posts.get_latest_comments(5) end},
             {:events_with_tickets,
              fn -> Events.get_upcoming_events_with_ticket_tier_counts() end},
-            {:pending_users, fn -> Accounts.get_pending_approval_users() end},
+            {:pending_users,
+             fn -> Accounts.list_pending_approval_users(limit: 3) end},
+            {:pending_reviews_count,
+             fn -> Accounts.count_pending_approval_users() end},
             {:revenue, fn -> calculate_all_revenue_stats() end},
             {:pending_refunds_summary,
              fn -> Bookings.pending_refunds_dashboard_summary() end},
@@ -1343,6 +1346,7 @@ defmodule YscWeb.AdminDashboardLive do
           end)
 
         pending_users = Map.fetch!(data, :pending_users)
+        pending_reviews_count = Map.fetch!(data, :pending_reviews_count)
 
         {applications_this_month, applications_this_year,
          applications_last_month, applications_last_year,
@@ -1364,7 +1368,7 @@ defmodule YscWeb.AdminDashboardLive do
         |> assign(:events_with_tickets, events_with_tickets)
         |> assign_dashboard_check_in_sessions(events_with_tickets)
         |> assign(:pending_users, pending_users)
-        |> assign(:pending_reviews_count, length(pending_users))
+        |> assign(:pending_reviews_count, pending_reviews_count)
         |> assign(:applications_this_month, applications_this_month)
         |> assign(:applications_this_year, applications_this_year)
         |> assign(:applications_last_month, applications_last_month)
