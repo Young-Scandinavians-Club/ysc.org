@@ -671,6 +671,7 @@ defmodule YscWeb.HomeLive do
       :if={
         @current_user == nil && @async_data_loaded && length(@upcoming_events) > 0
       }
+      id="happening-soon-bar"
       class="bg-blue-900 text-white py-4 border-b border-blue-800/30 overflow-hidden"
     >
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6">

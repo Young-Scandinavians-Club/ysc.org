@@ -150,9 +150,8 @@ defmodule YscWeb.HomeLiveTest do
       _event = Ysc.TestDataFactory.event_with_state(:upcoming)
 
       {:ok, view, _html} = live(conn, ~p"/")
-      html = render(view)
 
-      assert html =~ "Happening Soon"
+      assert has_element?(view, "#happening-soon-bar", "Happening Soon")
     end
 
     test "does not list cancelled events in the guest upcoming events section",
@@ -516,7 +515,7 @@ defmodule YscWeb.HomeLiveTest do
            conn: conn
          } do
       author = user_fixture()
-      title = "Happening Soon News #{System.unique_integer()}"
+      title = "News Only Home #{System.unique_integer()}"
 
       {:ok, _post} =
         %Posts.Post{}
@@ -524,7 +523,7 @@ defmodule YscWeb.HomeLiveTest do
           title: title,
           raw_body: "<p>News body for happening soon bar.</p>",
           preview_text: "Preview for the bar.",
-          url_name: "happening-soon-news-#{System.unique_integer()}",
+          url_name: "news-only-home-#{System.unique_integer()}",
           state: :published,
           published_on: DateTime.utc_now(),
           user_id: author.id,
@@ -535,7 +534,7 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
       html = render(view)
 
-      refute html =~ "Happening Soon"
+      refute has_element?(view, "#happening-soon-bar")
       assert html =~ title
     end
 
