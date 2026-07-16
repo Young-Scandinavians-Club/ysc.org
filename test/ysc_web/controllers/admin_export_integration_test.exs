@@ -56,47 +56,40 @@ defmodule YscWeb.AdminExportIntegrationTest do
 
     {:ok, view, _html} = live(conn, ~p"/admin/users")
 
-    html =
-      view
-      |> form("form[phx-submit=export-csv]", %{
-        "csv_export" => %{
-          "id" => "true",
-          "email" => "true",
-          "first_name" => "false",
-          "last_name" => "false",
-          "phone_number" => "false",
-          "state" => "false",
-          "address" => "false",
-          "only_subscribers" => "false"
-        }
-      })
-      |> render_submit()
+    view
+    |> form("form[phx-submit=export-csv]", %{
+      "csv_export" => %{
+        "id" => "true",
+        "email" => "true",
+        "first_name" => "false",
+        "last_name" => "false",
+        "phone_number" => "false",
+        "state" => "false",
+        "address" => "false",
+        "only_subscribers" => "false"
+      }
+    })
+    |> render_submit()
 
-    refute html =~ "Export file is no longer available"
+    render_async(view, 15_000)
 
     assert has_element?(
              view,
-             "#download-user-export-button[href*='/admin/exports/']"
+             "#download-user-export-button[phx-click='download-export-csv']"
            )
 
-    href =
-      view
-      |> element("#download-user-export-button")
-      |> render()
-      |> extract_href!()
+    view
+    |> element("#download-user-export-button")
+    |> render_click()
 
-    filename = href |> String.replace_prefix("/admin/exports/", "")
+    assert_push_event(view, "download-csv", %{
+      content: content,
+      filename: filename
+    })
 
-    assert YscWeb.AdminExportFiles.owned_by_user?(filename, admin)
-
-    download_conn = get(conn, href)
-    assert download_conn.status == 200
-    assert hd(get_resp_header(download_conn, "content-type")) =~ "text/csv"
-  end
-
-  defp extract_href!(html) do
-    [_, href] = Regex.run(~r/href="([^"]+)"/, html)
-    href
+    assert YscWeb.AdminExportFiles.valid_filename?(filename)
+    assert is_binary(content)
+    assert Base.decode64!(content) =~ "email"
   end
 
   test "missing export file returns 404 not 406", %{conn: conn} do

@@ -13,7 +13,8 @@ defmodule YscWeb.AdminUsersLive do
   alias Ysc.Customers
   alias Ysc.Payments
   alias Ysc.Subscriptions
-  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers}
+  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers, AdminExportFiles}
+  alias YscWeb.Workers.UserExporter
 
   def render(assigns) do
     ~H"""
@@ -498,18 +499,18 @@ defmodule YscWeb.AdminUsersLive do
                 {@export_error}
               </p>
 
-              <a
+              <button
                 :if={@export_status == :complete}
                 id="download-user-export-button"
-                href={@file_export_path}
-                phx-click={hide_dropdown("#export-users-button")}
+                type="button"
+                phx-click="download-export-csv"
                 class="flex gap-1 mt-1 text-sm leading-6 text-blue-800 hover:underline"
               >
                 <.icon
                   name="hero-document-check"
                   class="mt-0.5 w-5 h-5 flex-none text-green-600"
                 /> Download file
-              </a>
+              </button>
             </form>
           </div>
         </.dropdown>
@@ -945,17 +946,40 @@ defmodule YscWeb.AdminUsersLive do
     topic = exporter_topic(exporting_user)
     YscWeb.Endpoint.subscribe(topic)
 
-    # Async exporter
-    %{
-      channel: topic,
-      fields: reduced_fields,
-      only_subscribed: only_subscribed?,
-      created_by_user_id: to_string(exporting_user.id)
-    }
-    |> YscWeb.Workers.UserExporter.new()
-    |> Oban.insert()
+    {:noreply,
+     socket
+     |> assign(:export_status, :in_progress)
+     |> assign(:export_progress, 0)
+     |> assign(:file_export_path, "")
+     |> start_async(:user_export, fn ->
+       UserExporter.run_export(
+         channel: topic,
+         fields: reduced_fields,
+         only_subscribed: only_subscribed?,
+         created_by_user_id: to_string(exporting_user.id)
+       )
+     end)}
+  end
 
-    {:noreply, socket |> assign(:export_status, :in_progress)}
+  def handle_event("download-export-csv", _params, socket) do
+    user = exporting_admin_user(socket)
+
+    case AdminExportFiles.read_from_path(socket.assigns.file_export_path, user) do
+      {:ok, content, filename} ->
+        {:noreply,
+         push_event(socket, "download-csv", %{
+           content: Base.encode64(content),
+           filename: filename
+         })}
+
+      {:error, _message} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :info,
+           "The export file is still being prepared. Please wait a moment and try again."
+         )}
+    end
   end
 
   def handle_event("update-filter", params, socket) do
@@ -1188,20 +1212,7 @@ defmodule YscWeb.AdminUsersLive do
     end
   end
 
-  def handle_info(
-        %Phoenix.Socket.Broadcast{
-          event: "user_export:progress",
-          payload: progress
-        },
-        socket
-      ) do
-    {:noreply, socket |> assign(:export_progress, progress)}
-  end
-
-  def handle_info(
-        %Phoenix.Socket.Broadcast{event: "user_export:complete", payload: path},
-        socket
-      ) do
+  def handle_async(:user_export, {:ok, {:ok, path}}, socket) do
     unsubscribe_exporter(socket)
 
     {:noreply,
@@ -1211,14 +1222,32 @@ defmodule YscWeb.AdminUsersLive do
      |> assign(:file_export_path, path)}
   end
 
-  def handle_info(
-        %Phoenix.Socket.Broadcast{event: "user_export:failed", payload: msg},
-        socket
-      ) do
+  def handle_async(:user_export, {:ok, {:error, message}}, socket) do
     unsubscribe_exporter(socket)
 
     {:noreply,
-     socket |> assign(:export_status, :failed) |> assign(:export_error, msg)}
+     socket
+     |> assign(:export_status, :failed)
+     |> assign(:export_error, message)}
+  end
+
+  def handle_async(:user_export, {:exit, reason}, socket) do
+    unsubscribe_exporter(socket)
+
+    {:noreply,
+     socket
+     |> assign(:export_status, :failed)
+     |> assign(:export_error, export_failure_message(reason))}
+  end
+
+  def handle_info(
+        %Phoenix.Socket.Broadcast{
+          event: "user_export:progress",
+          payload: progress
+        },
+        socket
+      ) do
+    {:noreply, socket |> assign(:export_progress, progress)}
   end
 
   def handle_info(_msg, socket), do: {:noreply, socket}
@@ -1231,6 +1260,13 @@ defmodule YscWeb.AdminUsersLive do
 
   defp unsubscribe_exporter(socket) do
     YscWeb.Endpoint.unsubscribe(exporter_topic(exporting_admin_user(socket)))
+  end
+
+  defp export_failure_message(reason) do
+    case reason do
+      message when is_binary(message) -> message
+      _ -> "Something went wrong while exporting users."
+    end
   end
 
   defp maybe_update_filter(%{"value" => [""]} = filter),
