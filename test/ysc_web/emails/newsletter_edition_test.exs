@@ -162,6 +162,34 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert assigns.edition_title == "Spring Update"
     end
 
+    test "includes edition_date from sent_at when present" do
+      sent_at = ~U[2026-07-09 12:00:00Z]
+      edition = Map.put(base_edition(), :sent_at, sent_at)
+
+      assigns =
+        NewsletterEdition.build_assigns(
+          edition,
+          base_subscriber(),
+          [],
+          []
+        )
+
+      assert assigns.edition_date == "Newsletter, July 9, 2026"
+    end
+
+    test "uses today's date for edition_date when sent_at is nil" do
+      assigns =
+        NewsletterEdition.build_assigns(
+          base_edition(),
+          base_subscriber(),
+          [],
+          []
+        )
+
+      today = Calendar.strftime(Date.utc_today(), "%B %-d, %Y")
+      assert assigns.edition_date == "Newsletter, #{today}"
+    end
+
     test "falls back to 'there' when subscriber first_name is nil" do
       subscriber = %{base_subscriber() | first_name: nil}
 
@@ -273,6 +301,19 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert assigns.first_name == "there"
       assert assigns.unsubscribe_url =~ "preview"
     end
+
+    test "includes edition_date from sent_at" do
+      edition = %{
+        title: "Archive Title",
+        intro_text: "<p>Archived intro</p>",
+        cover_image: nil,
+        sent_at: ~U[2026-07-09 12:00:00Z]
+      }
+
+      assigns = NewsletterEdition.build_archive_assigns(edition, [], [])
+
+      assert assigns.edition_date == "Newsletter, July 9, 2026"
+    end
   end
 
   describe "email_safe_html/1 — extra branches" do
@@ -374,6 +415,7 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       html = NewsletterEdition.render(assigns)
       assert html =~ "Weekly"
       assert html =~ "Hi"
+      assert html =~ "Newsletter,"
     end
   end
 
@@ -770,6 +812,7 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assigns = %{
         first_name: "there",
         edition_title: "Weekly",
+        edition_date: "Newsletter, July 9, 2026",
         intro_text: Phoenix.HTML.raw("<p>x</p>"),
         intro_text?: true,
         cover_image_url: "https://cdn.example.com/cover.jpg",

@@ -205,6 +205,7 @@ defmodule YscWeb.Emails.NewsletterEdition do
     %{
       first_name: first_name,
       edition_title: edition.title,
+      edition_date: edition_date_label(Map.get(edition, :sent_at)),
       intro_text: Phoenix.HTML.raw(intro_html),
       intro_text?: intro_html != "",
       cover_image_url: cover_image_url(edition),
@@ -227,7 +228,8 @@ defmodule YscWeb.Emails.NewsletterEdition do
       edition.intro_text,
       cover_image_url(edition),
       posts,
-      events
+      events,
+      Map.get(edition, :sent_at)
     )
   end
 
@@ -240,12 +242,20 @@ defmodule YscWeb.Emails.NewsletterEdition do
   # intro_html is produced by email_safe_html/1 which strips all attributes and
   # unknown tags via Floki; content is admin-authored only.
   # sobelow_skip ["XSS.Raw"]
-  def build_preview_assigns(title, intro_text, cover_image_url, posts, events) do
+  def build_preview_assigns(
+        title,
+        intro_text,
+        cover_image_url,
+        posts,
+        events,
+        sent_at \\ nil
+      ) do
     intro_html = email_safe_html(intro_text)
 
     %{
       first_name: "there",
       edition_title: title,
+      edition_date: edition_date_label(sent_at),
       intro_text: Phoenix.HTML.raw(intro_html),
       intro_text?: intro_html != "",
       cover_image_url: cover_image_url,
@@ -257,6 +267,16 @@ defmodule YscWeb.Emails.NewsletterEdition do
 
   defp cover_image_url(%{cover_image: nil}), do: nil
   defp cover_image_url(%{cover_image: img}), do: Image.display_path(img)
+
+  defp edition_date_label(nil) do
+    DateTime.utc_now()
+    |> DateTime.truncate(:second)
+    |> edition_date_label()
+  end
+
+  defp edition_date_label(%DateTime{} = dt) do
+    "Newsletter, #{Calendar.strftime(dt, "%B %-d, %Y")}"
+  end
 
   defp post_render_map(post) do
     %{

@@ -669,8 +669,7 @@ defmodule YscWeb.HomeLive do
     <%!-- Happening Now Bar --%>
     <div
       :if={
-        @current_user == nil && @async_data_loaded &&
-          (length(@upcoming_events) > 0 || length(@latest_news) > 0)
+        @current_user == nil && @async_data_loaded && length(@upcoming_events) > 0
       }
       class="bg-blue-900 text-white py-4 border-b border-blue-800/30 overflow-hidden"
     >
@@ -683,43 +682,21 @@ defmodule YscWeb.HomeLive do
                 Happening Soon
               </span>
             </div>
-            <%= if length(@upcoming_events) > 0 do %>
-              <span class="h-4 w-px bg-white/30"></span>
-              <.link
-                navigate={~p"/events/#{List.first(@upcoming_events).id}"}
-                class="text-sm font-bold hover:text-blue-100 transition-colors line-clamp-1"
-              >
-                {List.first(@upcoming_events).title} →
-              </.link>
-            <% else %>
-              <%= if length(@latest_news) > 0 do %>
-                <span class="h-4 w-px bg-white/30"></span>
-                <.link
-                  navigate={~p"/posts/#{List.first(@latest_news).url_name}"}
-                  class="text-sm font-bold hover:text-blue-100 transition-colors line-clamp-1"
-                >
-                  {List.first(@latest_news).title} →
-                </.link>
-              <% end %>
-            <% end %>
+            <span class="h-4 w-px bg-white/30"></span>
+            <.link
+              navigate={~p"/events/#{List.first(@upcoming_events).id}"}
+              class="text-sm font-bold hover:text-blue-100 transition-colors line-clamp-1"
+            >
+              {List.first(@upcoming_events).title} →
+            </.link>
           </div>
           <div class="flex items-center gap-4">
-            <%= if length(@upcoming_events) > 0 do %>
-              <.link
-                navigate={~p"/events"}
-                class="text-xs font-bold uppercase tracking-widest hover:text-blue-100 transition-colors"
-              >
-                View Events
-              </.link>
-            <% end %>
-            <%= if length(@latest_news) > 0 do %>
-              <.link
-                navigate={~p"/news"}
-                class="text-xs font-bold uppercase tracking-widest hover:text-blue-100 transition-colors"
-              >
-                View News
-              </.link>
-            <% end %>
+            <.link
+              navigate={~p"/events"}
+              class="text-xs font-bold uppercase tracking-widest hover:text-blue-100 transition-colors"
+            >
+              View Events
+            </.link>
           </div>
         </div>
       </div>

@@ -7,6 +7,12 @@
     <mj-spacer height="16px"></mj-spacer>
     <% end %>
     <mj-spacer height="16px"></mj-spacer>
+    <%= if @edition_date do %>
+    <mj-text align="left" font-size="12px" font-weight="bold" color="#1447e6" letter-spacing="0.1em" padding="0 48px">
+      <%= @edition_date %>
+    </mj-text>
+    <mj-spacer height="8px"></mj-spacer>
+    <% end %>
     <%= if @edition_title do %>
     <mj-text align="left" color="#000000" font-size="26px" line-height="1.25" padding="0 48px" font-weight="bold">
       <%= @edition_title %>
@@ -27,8 +33,18 @@
 <%= if @posts && length(@posts) > 0 do %>
 <mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px 8px 0 0">
   <mj-column padding="0">
-    <mj-text align="left" font-size="24px" font-weight="bold" color="#0f172a" padding-bottom="12px">Club Updates</mj-text>
-    <mj-divider border-width="1px" border-color="#e2e8f0" padding-bottom="16px"></mj-divider>
+    <mj-text align="left" padding="0" padding-bottom="16px">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:32px;padding-right:12px;vertical-align:middle;">
+            <div style="width:32px;height:1px;background-color:#e4e4e7;font-size:1px;line-height:1px;">&nbsp;</div>
+          </td>
+          <td style="vertical-align:middle;font-size:24px;font-weight:900;color:#18181b;letter-spacing:-0.025em;line-height:1.25;font-family:Arial,Helvetica,sans-serif;">
+            Club Updates
+          </td>
+        </tr>
+      </table>
+    </mj-text>
   </mj-column>
 </mj-section>
 <%= for post <- @posts do %>
@@ -60,8 +76,18 @@
 <%= if @events && length(@events) > 0 do %>
 <mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px 8px 0 0">
   <mj-column padding="0">
-    <mj-text align="left" font-size="24px" font-weight="bold" color="#0f172a" padding-bottom="12px">Upcoming events</mj-text>
-    <mj-divider border-width="1px" border-color="#e2e8f0" padding-bottom="20px"></mj-divider>
+    <mj-text align="left" padding="0" padding-bottom="20px">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:32px;padding-right:12px;vertical-align:middle;">
+            <div style="width:32px;height:1px;background-color:#e4e4e7;font-size:1px;line-height:1px;">&nbsp;</div>
+          </td>
+          <td style="vertical-align:middle;font-size:24px;font-weight:900;color:#18181b;letter-spacing:-0.025em;line-height:1.25;font-family:Arial,Helvetica,sans-serif;">
+            Upcoming events
+          </td>
+        </tr>
+      </table>
+    </mj-text>
   </mj-column>
 </mj-section>
 <%= for event <- @events do %>

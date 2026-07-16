@@ -146,7 +146,7 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ title
     end
 
-    test "shows happening soon bar when events or news exist", %{conn: conn} do
+    test "shows happening soon bar when upcoming events exist", %{conn: conn} do
       _event = Ysc.TestDataFactory.event_with_state(:upcoming)
 
       {:ok, view, _html} = live(conn, ~p"/")
@@ -511,7 +511,7 @@ defmodule YscWeb.HomeLiveTest do
   end
 
   describe "guest — marketing sections and edge cases" do
-    test "shows happening soon bar linked to news when no upcoming events exist",
+    test "does not show happening soon bar when only news exists",
          %{
            conn: conn
          } do
@@ -535,7 +535,7 @@ defmodule YscWeb.HomeLiveTest do
       {:ok, view, _html} = live(conn, ~p"/")
       html = render(view)
 
-      assert html =~ "Happening Soon"
+      refute html =~ "Happening Soon"
       assert html =~ title
     end
 

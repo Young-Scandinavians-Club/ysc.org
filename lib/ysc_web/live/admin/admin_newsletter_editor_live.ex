@@ -227,13 +227,20 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     title = Phoenix.HTML.Form.input_value(form, :title) || ""
     intro_text = intro_raw || ""
 
+    edition_sent_at =
+      case socket.assigns.edition do
+        %{sent_at: sent_at} -> sent_at
+        _ -> nil
+      end
+
     preview_assigns =
       NewsletterEdition.build_preview_assigns(
         title,
         intro_text,
         cover_image_url,
         preview_posts,
-        preview_events
+        preview_events,
+        edition_sent_at
       )
 
     preview_html =
