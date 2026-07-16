@@ -12,6 +12,7 @@ defmodule YscWeb.Emails.OutageNotification do
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Repo
   import Ecto.Query
+  import YscWeb.Emails.Helpers, only: [format_date: 2]
 
   def get_template_name() do
     "outage_notification"
@@ -67,23 +68,10 @@ defmodule YscWeb.Emails.OutageNotification do
     end
   end
 
-  def format_date(date) when is_binary(date) do
-    case Date.from_iso8601(date) do
-      {:ok, date_struct} ->
-        Calendar.strftime(date_struct, "%B %d, %Y")
+  def format_date(value) when is_binary(value) or is_struct(value, Date),
+    do: format_date(value, "Unknown date")
 
-      {:error, _} ->
-        date
-    end
-  end
-
-  def format_date(%Date{} = date) do
-    Calendar.strftime(date, "%B %d, %Y")
-  end
-
-  def format_date(_) do
-    "Unknown date"
-  end
+  def format_date(_), do: "Unknown date"
 
   @doc """
   Gets the cabin master for a given property.

@@ -9,6 +9,7 @@ defmodule YscWeb.Emails.TicketReservationCreated do
   import YscWeb.Emails.Helpers,
     only: [
       absolute_url: 1,
+      format_datetime: 1,
       format_event_start_datetime: 2,
       member_greeting_name: 1,
       plain_text_from_html: 1
@@ -104,10 +105,7 @@ defmodule YscWeb.Emails.TicketReservationCreated do
       "No fixed end date — complete checkout on the event page when you are ready."
 
   defp format_hold_expires(%DateTime{} = dt) do
-    pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-
-    "Complete checkout before " <>
-      Calendar.strftime(pst, "%B %d, %Y at %I:%M %p %Z")
+    "Complete checkout before #{format_datetime(dt)}"
   end
 
   defp notes_present?(notes) when is_binary(notes), do: String.trim(notes) != ""
