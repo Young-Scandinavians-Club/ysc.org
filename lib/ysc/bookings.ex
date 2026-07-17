@@ -935,6 +935,15 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @doc false
+  def maybe_sync_hold_pricing_from_calculation(%Booking{status: :hold} = booking) do
+    sync_hold_pricing_from_calculation(booking)
+  end
+
+  def maybe_sync_hold_pricing_from_calculation(%Booking{} = booking) do
+    {:ok, booking}
+  end
+
   defp put_optional_checkout_money(changeset, field, %Money{} = value) do
     Ecto.Changeset.put_change(changeset, field, value)
   end

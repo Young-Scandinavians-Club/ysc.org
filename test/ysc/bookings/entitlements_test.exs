@@ -170,7 +170,10 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert ent.consumed_booking_id in [booking_a.id, booking_b.id]
     end
 
-    test "consume_for_booking! rejects expired entitlements", %{user: user, admin: admin} do
+    test "consume_for_booking! rejects expired entitlements", %{
+      user: user,
+      admin: admin
+    } do
       past =
         DateTime.add(DateTime.utc_now(), -86_400, :second)
         |> DateTime.truncate(:second)

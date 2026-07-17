@@ -2058,7 +2058,7 @@ defmodule YscWeb.BookingCheckoutLive do
          }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
-          case Bookings.sync_hold_pricing_from_calculation(booking) do
+          case Bookings.maybe_sync_hold_pricing_from_calculation(booking) do
             {:ok, synced_booking} ->
               case Bookings.verify_booking_payment_intent(
                      payment_intent,
