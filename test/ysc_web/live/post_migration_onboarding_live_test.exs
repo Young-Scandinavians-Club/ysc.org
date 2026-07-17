@@ -5,12 +5,18 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ecto.Query
 
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Avatars
+  alias Ysc.Avatars.Avatar
   alias Ysc.Repo
   alias Ysc.Subscriptions
+
+  @tiny_png Base.decode64!(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            )
 
   # WP-style user inserted without going through register_user/1 (which marks
   # post-migration onboarding complete). Mirrors Accounts post-migration tests.
@@ -156,6 +162,55 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       render(view)
 
       assert has_element?(view, "#onboarding-avatar-#{avatar.id}")
+    end
+
+    test "validate_avatar leaves the upload form rendered", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      assert render_change(view, "validate_avatar", %{})
+      assert has_element?(view, "#onboarding-avatar-upload-form")
+    end
+
+    test "save_avatar completes upload and creates an avatar record", %{
+      conn: conn
+    } do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      avatar_upload =
+        file_input(view, "#onboarding-avatar-upload-form", :avatar, [
+          %{
+            last_modified: System.system_time(:millisecond),
+            name: "avatar.png",
+            content: @tiny_png,
+            type: "image/png"
+          }
+        ])
+
+      assert render_upload(avatar_upload, "avatar.png") =~ "100%"
+
+      render_submit(view, "save_avatar")
+
+      assert render(view) =~ "Photo uploaded"
+
+      avatar =
+        Repo.one!(
+          from(a in Avatar,
+            where: a.user_id == ^user.id,
+            order_by: [desc: a.inserted_at],
+            limit: 1
+          )
+        )
+
+      assert avatar.source == :upload
+      assert avatar.processing_state in [:pending, :failed]
     end
   end
 

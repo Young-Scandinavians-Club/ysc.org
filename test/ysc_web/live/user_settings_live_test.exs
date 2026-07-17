@@ -7,11 +7,14 @@ defmodule YscWeb.UserSettingsLiveTest do
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
   import Ysc.EventsFixtures
+  import Ecto.Query
 
   alias Money
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.MembershipCache
+  alias Ysc.Avatars
+  alias Ysc.Avatars.Avatar
   alias Ysc.Bookings.Entitlements
   alias Ysc.Events.TicketReservation
   alias Ysc.LedgersFixtures
@@ -22,6 +25,10 @@ defmodule YscWeb.UserSettingsLiveTest do
   alias Ysc.Subscriptions
 
   setup :verify_on_exit!
+
+  @tiny_png Base.decode64!(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            )
 
   # Helpers that target the ReauthComponent (a LiveComponent) rather than the
   # parent UserSettingsLive, since reauth events are now handled by the component.
@@ -411,6 +418,73 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "h2", "Profile Picture")
       assert has_element?(view, "h2", "Personal Information")
       assert has_element?(view, "h2", "Billing Address")
+    end
+
+    test "select_avatar sets a completed avatar as current", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      assert has_element?(view, "#avatar-#{avatar.id}")
+
+      view
+      |> element("#avatar-#{avatar.id}")
+      |> render_click()
+
+      updated_user = Accounts.get_user!(user.id)
+      assert updated_user.current_avatar_id == avatar.id
+    end
+
+    test "save_avatar completes upload and creates an avatar record", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      avatar_upload =
+        file_input(view, "#avatar-upload-form", :avatar, [
+          %{
+            last_modified: System.system_time(:millisecond),
+            name: "avatar.png",
+            content: @tiny_png,
+            type: "image/png"
+          }
+        ])
+
+      assert render_upload(avatar_upload, "avatar.png") =~ "100%"
+
+      render_submit(view, "save_avatar")
+
+      assert render(view) =~ "Photo uploaded"
+
+      avatar =
+        Repo.one!(
+          from(a in Avatar,
+            where: a.user_id == ^user.id,
+            order_by: [desc: a.inserted_at],
+            limit: 1
+          )
+        )
+
+      assert avatar.source == :upload
+      assert avatar.processing_state in [:pending, :failed]
     end
 
     test "update_profile shows validation errors for invalid first name", %{

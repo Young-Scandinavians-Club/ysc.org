@@ -10,6 +10,9 @@ defmodule Ysc.AvatarsTest do
     test "derives MIME type from allowed extensions" do
       assert Avatars.content_type_for_extension(".png") == "image/png"
       assert Avatars.content_type_for_extension(".webp") == "image/webp"
+      assert Avatars.content_type_for_extension(".jpg") == "image/jpeg"
+      assert Avatars.content_type_for_extension(".gif") == "image/gif"
+      assert Avatars.content_type_for_extension(".unknown") == "image/jpeg"
     end
   end
 
