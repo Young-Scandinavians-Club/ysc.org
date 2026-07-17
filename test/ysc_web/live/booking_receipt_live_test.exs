@@ -993,8 +993,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -1172,8 +1171,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -1267,8 +1265,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -1365,8 +1362,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
       user = user_fixture()
       conn = log_in_user(conn, user)
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(

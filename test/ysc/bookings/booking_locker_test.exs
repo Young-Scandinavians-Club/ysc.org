@@ -9,6 +9,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
   alias Ysc.Bookings.PropertyInventory
   alias Ysc.Bookings
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
   import Ecto.Query
 
   defp ensure_clear_lake_day_pricing_rule do
@@ -52,8 +53,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          } do
       user1 = user_fixture()
       user2 = user_fixture()
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       results =
         [user1, user2]
@@ -165,8 +165,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
   describe "create_buyout_booking/6" do
     test "creates a buyout booking for Tahoe", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, %Booking{} = booking} =
                BookingLocker.create_buyout_booking(
@@ -207,8 +206,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "creates a buyout booking for Clear Lake", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       assert {:ok, %Booking{} = booking} =
                BookingLocker.create_buyout_booking(
@@ -225,8 +223,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "prevents overlapping buyout bookings", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       # Create first booking
       assert {:ok, _booking1} =
@@ -457,8 +454,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       result =
         BookingLocker.create_room_booking(
@@ -622,8 +618,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       # Create first booking
       first_result =
@@ -947,8 +942,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "refund_complete_booking returns error for non-complete booking", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       {:ok, hold_booking} =
         BookingLocker.create_buyout_booking(
@@ -1279,8 +1273,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "releases a hold booking", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1339,8 +1332,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "returns invalid_status when booking is not a hold", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1482,8 +1474,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "cancels a complete booking", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1590,8 +1581,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
         |> Ysc.Repo.update!()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1646,8 +1636,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
         )
         |> Ysc.Repo.update!()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(

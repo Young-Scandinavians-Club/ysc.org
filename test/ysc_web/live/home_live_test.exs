@@ -149,6 +149,8 @@ defmodule YscWeb.HomeLiveTest do
     test "shows happening soon bar when upcoming events exist", %{conn: conn} do
       _event = Ysc.TestDataFactory.event_with_state(:upcoming)
 
+      Ysc.PublicContentCache.invalidate()
+
       {:ok, view, _html} = live(conn, ~p"/")
 
       assert has_element?(view, "#happening-soon-bar", "Happening Soon")

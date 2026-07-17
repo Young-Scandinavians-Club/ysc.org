@@ -72,8 +72,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       assert {:ok, booking_a} =
                BookingLocker.create_room_booking(
@@ -247,8 +246,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       assert {:ok, booking_a} =
                BookingLocker.create_room_booking(
@@ -613,8 +611,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
       user = user_fixture()
       admin = user_fixture()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -718,8 +715,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
       subtotal = Money.new(:USD, 200)
 
       assert {:ok, booking_a} =
@@ -799,8 +795,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
                )
 
       context = Entitlements.pricing_context(user.id)
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
       subtotal = Money.new(:USD, 200)
 
       entitlement_query? =
@@ -887,8 +882,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
       assert {:ok, booking} =
                BookingLocker.create_room_booking(
@@ -938,8 +932,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
                )
 
       stale_context = Entitlements.pricing_context(other_user.id)
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(7, 2)
       subtotal = Money.new(:USD, 200)
 
       {_final_total, _items, _subtotal, discount, ent_id} =

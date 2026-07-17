@@ -96,6 +96,17 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
+  Returns `{checkin, checkout}` for a Tahoe room stay with a safe Monday check-in.
+
+  `nights` is the number of nights (checkout is `checkin + nights`). Uses
+  `tahoe_booking_dates/1` for the check-in so weekend and advance-booking rules hold.
+  """
+  def tahoe_room_booking_dates(offset_days \\ 7, nights \\ 2) do
+    {checkin, _} = tahoe_booking_dates(offset_days)
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  @doc """
   Ensures inclusive stay dates containing Saturday also include Sunday (Tahoe weekend rule).
   """
   def ensure_sunday_when_saturday_included(checkin, checkout) do
