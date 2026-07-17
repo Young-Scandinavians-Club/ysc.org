@@ -9,9 +9,14 @@ const AvatarCropper = {
     this.cropperInstance = null;
     this.pollTimer = null;
 
-    const fileInput = this.el.querySelector("[data-avatar-file-input]");
+    const fileInput = this.getFileInput();
     if (fileInput) {
       fileInput.addEventListener("change", (e) => this.handleFileSelect(e));
+    }
+
+    const trigger = this.el.querySelector("[data-avatar-file-trigger]");
+    if (trigger && fileInput) {
+      trigger.addEventListener("click", () => fileInput.click());
     }
 
     const confirmBtn = this.el.querySelector("[data-cropper-confirm]");

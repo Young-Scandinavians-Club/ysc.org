@@ -400,8 +400,17 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(view, "#profile_form")
       assert has_element?(view, "#address_form")
       assert has_element?(view, "#email_form")
-      assert render(view) =~ "Personal Information"
-      assert render(view) =~ "Billing Address"
+      assert has_element?(view, "#avatar-upload-form")
+
+      assert has_element?(
+               view,
+               "button[data-avatar-file-trigger]",
+               "Upload new photo"
+             )
+
+      assert has_element?(view, "h2", "Profile Picture")
+      assert has_element?(view, "h2", "Personal Information")
+      assert has_element?(view, "h2", "Billing Address")
     end
 
     test "update_profile shows validation errors for invalid first name", %{

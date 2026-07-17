@@ -26,6 +26,35 @@ defmodule Ysc.Avatars do
   end
 
   @doc """
+  Creates an avatar and enqueues processing in a single database transaction.
+  """
+  def create_avatar_and_enqueue_job(%User{} = user, attrs) do
+    Repo.transaction(fn ->
+      case create_avatar(user, attrs) do
+        {:ok, avatar} ->
+          case Oban.insert(YscWeb.Workers.AvatarProcessor.new(%{id: avatar.id})) do
+            {:ok, _job} ->
+              avatar
+
+            {:error, reason} ->
+              Repo.rollback(reason)
+          end
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          Repo.rollback(changeset)
+
+        {:error, reason} ->
+          Repo.rollback(reason)
+      end
+    end)
+  end
+
+  @doc """
+  Returns the server-controlled MIME type for an avatar file extension.
+  """
+  def content_type_for_extension(ext) when is_binary(ext), do: mime_for_ext(ext)
+
+  @doc """
   Returns all avatars for a user that have completed processing, most recent first.
   """
   def list_user_avatars(%User{} = user) do
@@ -47,21 +76,23 @@ defmodule Ysc.Avatars do
   def get_avatar!(id), do: Repo.get!(Avatar, id)
 
   @doc """
-  Sets the user's current avatar. Verifies the avatar belongs to the user.
+  Sets the user's current avatar. Verifies the avatar belongs to the user and
+  has completed processing.
   """
   def set_current_avatar(%User{} = user, avatar_id) do
-    case Repo.get(Avatar, avatar_id) do
+    case from(a in Avatar,
+           where:
+             a.id == ^avatar_id and a.user_id == ^user.id and
+               a.processing_state == :completed
+         )
+         |> Repo.one() do
       nil ->
         {:error, :not_found}
 
       avatar ->
-        if avatar.user_id == user.id do
-          user
-          |> Ecto.Changeset.change(current_avatar_id: avatar.id)
-          |> Repo.update()
-        else
-          {:error, :not_owner}
-        end
+        user
+        |> Ecto.Changeset.change(current_avatar_id: avatar.id)
+        |> Repo.update()
     end
   end
 
@@ -212,20 +243,17 @@ defmodule Ysc.Avatars do
       {:ok, location} =
         upload_to_s3(tmp_path, key, content_type: mime_for_ext(extension))
 
-      {:ok, avatar} =
-        create_avatar(user, %{
-          source: source,
-          original_path: location,
-          source_url: image_url
-        })
-
-      case Oban.insert(YscWeb.Workers.AvatarProcessor.new(%{id: avatar.id})) do
-        {:ok, _job} ->
+      case create_avatar_and_enqueue_job(user, %{
+             source: source,
+             original_path: location,
+             source_url: image_url
+           }) do
+        {:ok, avatar} ->
           {:ok, avatar}
 
         {:error, reason} ->
           Ysc.Logging.warning("Failed to enqueue avatar processing job",
-            extra: %{avatar_id: avatar.id, reason: inspect(reason)}
+            extra: %{reason: inspect(reason)}
           )
 
           {:error, reason}

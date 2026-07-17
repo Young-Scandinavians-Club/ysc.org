@@ -8,6 +8,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyMember
+  alias Ysc.Avatars
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -66,12 +67,95 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       assert has_element?(view, "#onboarding-profile-form")
       assert has_element?(view, "#onboarding-avatar-section")
-      assert render(view) =~ "make sure your details are up to date"
-      assert render(view) =~ "Welcome back!"
-      assert render(view) =~ "update anything that"
-      assert render(view) =~ "out of date"
-      assert render(view) =~ "Profile photo"
-      assert render(view) =~ "Optional"
+      assert has_element?(view, "#onboarding-avatar-upload-form")
+
+      assert has_element?(
+               view,
+               "button[data-avatar-file-trigger]",
+               "Upload photo"
+             )
+
+      assert has_element?(view, "h1", "make sure your details are up to date")
+      assert has_element?(view, "h3", "Profile photo")
+
+      assert has_element?(
+               view,
+               "p",
+               "Optional — helps other members recognize you at events."
+             )
+    end
+  end
+
+  describe "profile step avatar" do
+    defp completed_avatar!(user) do
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
+        })
+
+      avatar
+    end
+
+    test "select_avatar sets a completed avatar as current", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      avatar = completed_avatar!(user)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      assert has_element?(view, "#onboarding-avatar-#{avatar.id}")
+
+      view
+      |> element("#onboarding-avatar-#{avatar.id}")
+      |> render_click()
+
+      updated_user = Accounts.get_user!(user.id)
+      assert updated_user.current_avatar_id == avatar.id
+    end
+
+    test "select_avatar rejects non-completed avatars", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      refute has_element?(view, "#onboarding-avatar-#{avatar.id}")
+
+      render_click(view, "select_avatar", %{"id" => avatar.id})
+
+      updated_user = Accounts.get_user!(user.id)
+      assert is_nil(updated_user.current_avatar_id)
+    end
+
+    test "refreshes avatar library after avatar is processed", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      avatar = completed_avatar!(user)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      send(view.pid, {:avatar_processed, user.id})
+      render(view)
+
+      assert has_element?(view, "#onboarding-avatar-#{avatar.id}")
     end
   end
 

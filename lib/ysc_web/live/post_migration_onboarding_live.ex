@@ -23,9 +23,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   alias Ysc.Avatars
   alias Ysc.Customers
   alias Ysc.Repo
-  alias Ysc.S3Config
   alias Ysc.Subscriptions
-  alias YscWeb.S3.SimpleS3Upload
 
   @payment_method_module Application.compile_env(
                            :ysc,
@@ -60,7 +58,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           accept: ~w(.jpg .jpeg .png .webp .gif),
           max_entries: 1,
           max_file_size: 10_000_000,
-          external: &presign_avatar_upload/2,
+          external: fn entry, socket ->
+            YscWeb.AvatarUpload.presign(entry, socket, socket.assigns.user)
+          end,
           auto_upload: true
         )
 
@@ -276,15 +276,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             >
               <div id="onboarding-avatar-uploader" phx-hook="AvatarCropper">
                 <div phx-update="ignore" id="onboarding-avatar-cropper-ui">
-                  <label class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg cursor-pointer hover:bg-zinc-50 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    class="sr-only"
+                    data-avatar-file-input
+                  />
+                  <button
+                    type="button"
+                    data-avatar-file-trigger
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg cursor-pointer hover:bg-zinc-50 transition-colors"
+                  >
                     <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> Upload photo
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/gif"
-                      class="hidden"
-                      data-avatar-file-input
-                    />
-                  </label>
+                  </button>
 
                   <div
                     data-cropper-modal
@@ -1032,29 +1036,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   def handle_event("save_avatar", _params, socket) do
     user = socket.assigns.user
-
-    uploaded_avatars =
-      consume_uploaded_entries(socket, :avatar, fn %{key: key}, _entry ->
-        location = S3Config.object_url(key, S3Config.avatars_bucket_name())
-
-        with {:ok, avatar} <-
-               Avatars.create_avatar(user, %{
-                 source: :upload,
-                 original_path: location
-               }),
-             {:ok, _job} <-
-               %{id: avatar.id}
-               |> YscWeb.Workers.AvatarProcessor.new()
-               |> Oban.insert() do
-          {:ok, avatar}
-        else
-          {:error, reason} -> {:error, reason}
-        end
-      end)
+    uploaded_outcomes = YscWeb.AvatarUpload.consume(socket, user)
 
     socket =
-      case uploaded_avatars do
-        [_avatar | _] ->
+      cond do
+        YscWeb.AvatarUpload.upload_succeeded?(uploaded_outcomes) ->
           socket
           |> YscWeb.Flash.put_toast(
             :info,
@@ -1064,7 +1050,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           |> assign(:user_avatars, load_user_avatars(user))
           |> assign(:avatar_processing, true)
 
-        _ ->
+        YscWeb.AvatarUpload.upload_failed?(uploaded_outcomes) ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :error,
+            "Could not upload profile picture. Please try again.",
+            title: "Profile Picture"
+          )
+
+        true ->
           socket
       end
 
@@ -2633,50 +2627,6 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp payment_method_display(_), do: "Card on file"
-
-  @allowed_avatar_extensions ~w(.jpg .jpeg .png .webp .gif .svg)
-
-  defp presign_avatar_upload(entry, socket) do
-    user = socket.assigns.user
-    avatar_id = Ecto.ULID.generate()
-
-    ext =
-      entry.client_name
-      |> Path.extname()
-      |> String.downcase()
-      |> then(fn e ->
-        if e in @allowed_avatar_extensions, do: e, else: ".webp"
-      end)
-
-    key = "#{user.id}/#{avatar_id}/original#{ext}"
-
-    config = %{
-      region: S3Config.region(),
-      access_key_id: S3Config.aws_access_key_id(),
-      secret_access_key: S3Config.aws_secret_access_key()
-    }
-
-    {:ok, fields} =
-      SimpleS3Upload.sign_form_upload(config, S3Config.avatars_bucket_name(),
-        key: key,
-        content_type: entry.client_type,
-        max_file_size: socket.assigns.uploads.avatar.max_file_size,
-        expires_in: :timer.hours(1),
-        server_side_encryption: S3Config.server_side_encryption?()
-      )
-
-    upload_url = S3Config.avatars_upload_url()
-    :ok = S3Config.assert_direct_upload_url!(upload_url, :avatars)
-
-    meta = %{
-      uploader: "S3",
-      key: key,
-      url: upload_url,
-      fields: fields
-    }
-
-    {:ok, meta, socket}
-  end
 
   defp assign_avatar_data(socket, user) do
     socket
