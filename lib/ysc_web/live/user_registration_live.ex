@@ -96,7 +96,7 @@ defmodule YscWeb.UserRegistrationLive do
                     options={SignupApplication.eligibility_options()}
                   />
                   <p class="text-sm leading-6 text-zinc-600 mt-4">
-                    When we say Scandinavia, we mean Denmark, Finland, Iceland, Norway, and Sweden.
+                    When we say Scandinavia or Scandinavian countries, we mean Denmark, Finland, Iceland, Norway, and Sweden.
                   </p>
                 </.inputs_for>
               </div>
@@ -306,9 +306,6 @@ defmodule YscWeb.UserRegistrationLive do
               }
             >
               <.header class="text-left">Additional Questions</.header>
-              <p class="text-sm leading-6 text-zinc-600 -mt-2 mb-2">
-                When we say Scandinavian countries, we mean Denmark, Finland, Iceland, Norway, and Sweden.
-              </p>
               <.inputs_for :let={rf} field={@form[:registration_form]}>
                 <.input
                   prompt="Select country"
@@ -443,7 +440,7 @@ defmodule YscWeb.UserRegistrationLive do
                     disabled={next_step_disabled?}
                     aria-disabled={next_step_disabled?}
                   >
-                    Next Step
+                    Next step
                     <.icon name="hero-arrow-right-solid" class="w-4 h-4 shrink-0" />
                   </.button>
                 </div>

@@ -66,7 +66,9 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       assert has_element?(view, "#onboarding-profile-form")
       assert render(view) =~ "make sure your details are up to date"
-      assert render(view) =~ "recently moved member accounts"
+      assert render(view) =~ "Welcome back!"
+      assert render(view) =~ "update anything that"
+      assert render(view) =~ "out of date"
     end
   end
 

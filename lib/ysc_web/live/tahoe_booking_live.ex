@@ -1652,8 +1652,8 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                   <div class="ms-2 flex-1">
                     <p class="text-sm text-blue-800">
-                      <strong>Second Room Booking:</strong>
-                      Since you already have one room reserved, your second room booking must be within the same time period. The date range is restricted to ensure both bookings overlap and stay within the 4-night maximum.
+                      <strong>Booking a second room:</strong>
+                      Family memberships can include up to two rooms in one trip (4 nights total). Your second room must overlap the dates of your first reservation. Choose dates within the highlighted range, or change your first booking if you need different dates.
                     </p>
                   </div>
                 </div>
