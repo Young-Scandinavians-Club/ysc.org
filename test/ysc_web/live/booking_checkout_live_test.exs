@@ -1128,9 +1128,94 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       Mox.verify!(StripeMock)
     end
-  end
 
-  describe "payment-success rejects foreign payment intent" do
+    test "payment-success rejects stale discounted price when entitlement expired before payment",
+         %{
+           conn: conn,
+           user: user
+         } do
+      Ysc.TestHelpers.setup_quickbooks_mocks()
+
+      checkin = Date.utc_today() |> Date.add(7)
+      checkout = Date.add(checkin, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      full_total = booking.total_price
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> change(%{applied_booking_entitlement_id: entitlement.id})
+        |> Repo.update!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
+
+      synced = Repo.get!(Booking, booking.id)
+      assert Money.cmp(synced.total_price, full_total) == :lt
+
+      discounted_cents = Ysc.MoneyHelper.money_to_cents(synced.total_price)
+      pi_id = "pi_expired_entitlement_#{System.unique_integer([:positive])}"
+
+      past =
+        DateTime.add(DateTime.utc_now(), -60, :second)
+        |> DateTime.truncate(:second)
+
+      entitlement
+      |> Ecto.Changeset.change(expires_at: past)
+      |> Repo.update!()
+
+      assert {:ok, %{expired: 1}} = Entitlements.expire_passed_entitlements()
+
+      expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: pi_id,
+           status: "succeeded",
+           amount: discounted_cents,
+           metadata: %{
+             "booking_id" => booking.id,
+             "user_id" => booking.user_id
+           },
+           customer: nil,
+           payment_method: nil,
+           latest_charge: nil
+         }}
+      end)
+
+      html =
+        render_click(view, "payment-success", %{
+          "payment_intent_id" => pi_id
+        })
+
+      assert html =~ "Something went wrong while confirming your booking"
+
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.status == :hold
+      assert booking_ledger_payment_count(booking.id) == 0
+
+      Mox.verify!(StripeMock)
+    end
+  end
     setup %{conn: conn} do
       user = user_with_membership()
       %{conn: log_in_user(conn, user), user: user}

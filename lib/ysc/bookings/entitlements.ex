@@ -652,7 +652,9 @@ defmodule Ysc.Bookings.Entitlements do
     {n, _} =
       Repo.update_all(
         from(e in BookingEntitlement,
-          where: e.id == ^entitlement_id and e.status == :active
+          where: e.id == ^entitlement_id,
+          where: e.status == :active,
+          where: is_nil(e.expires_at) or e.expires_at > ^now
         ),
         set: [
           status: :consumed,
