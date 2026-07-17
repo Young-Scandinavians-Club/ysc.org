@@ -550,14 +550,15 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ title
     end
 
-    test "renders Nordic Living and membership options sections", %{conn: conn} do
+    test "renders Nordic Living and membership sections", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/")
-      html = render(view)
 
-      assert html =~ "Nordic Living"
-      assert html =~ "Join Our Community Today"
-      assert html =~ "Single Membership"
-      assert html =~ "Family Membership"
+      assert has_element?(view, "#membership-section")
+      assert has_element?(view, "#membership-heading", "Membership")
+      assert has_element?(view, "#membership-single", "Single")
+      assert has_element?(view, "#membership-family", "Family")
+      assert has_element?(view, "#membership-apply-link")
+      assert render(view) =~ "Nordic Living"
     end
 
     test "shows guest event card with description, location, and Just Added badge",
