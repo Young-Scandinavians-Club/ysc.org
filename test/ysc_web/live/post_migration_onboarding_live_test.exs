@@ -127,6 +127,19 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       updated_user = Accounts.get_user!(user.id)
       assert updated_user.current_avatar_id == avatar.id
+      assert render(view) =~ "Profile picture updated"
+    end
+
+    test "select_avatar shows an error for unknown avatars", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      render_click(view, "select_avatar", %{"id" => Ecto.ULID.generate()})
+
+      assert render(view) =~ "Could not update profile picture"
     end
 
     test "select_avatar rejects non-completed avatars", %{conn: conn} do
@@ -211,6 +224,18 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       assert avatar.source == :upload
       assert avatar.processing_state in [:pending, :failed]
+    end
+
+    test "save_avatar without an upload is a no-op", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      render_submit(view, "save_avatar")
+
+      refute Repo.exists?(from(a in Avatar, where: a.user_id == ^user.id))
     end
   end
 

@@ -251,7 +251,6 @@
     "lib/ysc/media\\.ex",
     "lib/ysc/customers\\.ex",
 
-    "lib/ysc_web/live/user_settings_live\\.ex",
     "lib/ysc_web/live/home_live\\.ex",
 
     "lib/ysc_web/live/passkey_registration_live\\.ex",
