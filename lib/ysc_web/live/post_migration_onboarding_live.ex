@@ -3,7 +3,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   Full-screen onboarding wizard for WP-migrated users completing their first login.
 
   Steps:
-    1 - Profile review/edit (name, phone, date of birth, country)
+    1 - Profile review/edit (name, phone, date of birth, country, optional avatar)
     2 - Phone verification via SMS OTP (only if phone was added/changed or unverified)
     3 - Payment method collection + Stripe subscription creation
     5 - Family member listing; saved on continue, invites sent when email provided (family and lifetime plans)
@@ -20,8 +20,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.FamilyMembers
+  alias Ysc.Avatars
   alias Ysc.Customers
+  alias Ysc.Repo
+  alias Ysc.S3Config
   alias Ysc.Subscriptions
+  alias YscWeb.S3.SimpleS3Upload
 
   @payment_method_module Application.compile_env(
                            :ysc,
@@ -52,9 +56,17 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         socket
         |> assign(:loading_onboarding_data, true)
         |> assign_onboarding_shell(user)
+        |> allow_upload(:avatar,
+          accept: ~w(.jpg .jpeg .png .webp .gif),
+          max_entries: 1,
+          max_file_size: 10_000_000,
+          external: &presign_avatar_upload/2,
+          auto_upload: true
+        )
 
       if connected?(socket) do
         send(self(), :load_onboarding_data)
+        Avatars.subscribe_avatar_updates(user.id)
       end
 
       {:ok, socket}
@@ -70,6 +82,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         :family_members,
         :registration_form,
         :billing_address,
+        :current_avatar,
         subscriptions: :subscription_items
       ])
 
@@ -78,7 +91,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     {:noreply,
      socket
      |> assign_onboarding_data(user, default_payment_method)
+     |> assign_avatar_data(user)
+     |> assign(:loading_avatars, false)
      |> assign(:loading_onboarding_data, false)}
+  end
+
+  def handle_info({:avatar_processed, _user_id}, socket) do
+    user = Accounts.get_user!(socket.assigns.user.id, [:current_avatar])
+
+    {:noreply,
+     socket
+     |> assign(:user, user)
+     |> assign(:user_avatars, load_user_avatars(user))
+     |> assign(:current_avatar_url, resolve_current_avatar_url(user))
+     |> assign(:avatar_processing, false)}
   end
 
   @impl true
@@ -122,7 +148,16 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <%!-- Step content --%>
           <div class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 md:p-8">
             <%= if @current_step == 1 do %>
-              <.step_profile form={@profile_form} />
+              <.step_profile
+                form={@profile_form}
+                user={@user}
+                uploads={@uploads}
+                user_avatars={@user_avatars}
+                current_avatar_url={@current_avatar_url}
+                avatar_processing={@avatar_processing}
+                loading_avatars={@loading_avatars}
+                selecting_avatar_id={@selecting_avatar_id}
+              />
             <% end %>
             <%= if @current_step == 2 do %>
               <.step_address form={@address_form} />
@@ -176,6 +211,13 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   # ---------------------------------------------------------------------------
 
   attr :form, :any, required: true
+  attr :user, :map, required: true
+  attr :uploads, :map, required: true
+  attr :user_avatars, :list, required: true
+  attr :current_avatar_url, :string, default: nil
+  attr :avatar_processing, :boolean, default: false
+  attr :loading_avatars, :boolean, default: false
+  attr :selecting_avatar_id, :string, default: nil
 
   defp step_profile(assigns) do
     ~H"""
@@ -186,6 +228,184 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           Welcome back! Please review your contact details below and update anything that's out of date. This helps us keep your membership and bookings on track.
         </:subtitle>
       </.header>
+
+      <div
+        id="onboarding-avatar-section"
+        class="mt-6 rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-4"
+      >
+        <div>
+          <h3 class="text-base font-semibold text-zinc-900">Profile photo</h3>
+          <p class="text-sm text-zinc-500 mt-1">
+            Optional — helps other members recognize you at events.
+          </p>
+        </div>
+
+        <div class="flex items-start gap-6">
+          <div class="shrink-0 relative">
+            <div
+              :if={@loading_avatars}
+              class="w-20 h-20 rounded-full bg-zinc-200 animate-pulse"
+            >
+            </div>
+            <.user_avatar_image
+              :if={!@loading_avatars}
+              user={@user}
+              avatar_url={@current_avatar_url}
+              class={
+                if @avatar_processing,
+                  do: "w-20 h-20 rounded-full opacity-50",
+                  else: "w-20 h-20 rounded-full"
+              }
+            />
+            <div
+              :if={@avatar_processing}
+              class="absolute inset-0 flex items-center justify-center"
+            >
+              <.icon
+                name="hero-arrow-path"
+                class="w-6 h-6 text-blue-600 animate-spin"
+              />
+            </div>
+          </div>
+
+          <div class="flex-1 space-y-4">
+            <form
+              id="onboarding-avatar-upload-form"
+              phx-change="validate_avatar"
+              phx-submit="save_avatar"
+            >
+              <div id="onboarding-avatar-uploader" phx-hook="AvatarCropper">
+                <div phx-update="ignore" id="onboarding-avatar-cropper-ui">
+                  <label class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg cursor-pointer hover:bg-zinc-50 transition-colors">
+                    <.icon name="hero-arrow-up-tray" class="w-4 h-4" /> Upload photo
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      class="hidden"
+                      data-avatar-file-input
+                    />
+                  </label>
+
+                  <div
+                    data-cropper-modal
+                    class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                  >
+                    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+                      <h3 class="text-lg font-semibold text-zinc-900">
+                        Crop your photo
+                      </h3>
+                      <div
+                        data-cropper-container
+                        class="w-full overflow-hidden rounded-lg"
+                      >
+                      </div>
+                      <div class="flex justify-end gap-3">
+                        <button
+                          type="button"
+                          data-cropper-cancel
+                          class="px-4 py-2 text-sm font-medium text-zinc-700 bg-zinc-100 rounded-lg hover:bg-zinc-200 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          data-cropper-confirm
+                          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <.live_file_input upload={@uploads.avatar} class="hidden" />
+              </div>
+            </form>
+
+            <%= for entry <- @uploads.avatar.entries do %>
+              <div class="flex items-center gap-3">
+                <div class="w-full bg-zinc-200 rounded-full h-2">
+                  <div
+                    class="bg-blue-600 h-2 rounded-full transition-all"
+                    style={"width: #{entry.progress}%"}
+                  >
+                  </div>
+                </div>
+                <span class="text-sm text-zinc-500 tabular-nums">
+                  {entry.progress}%
+                </span>
+              </div>
+              <%= for err <- upload_errors(@uploads.avatar, entry) do %>
+                <p class="text-sm text-red-600">
+                  <.icon
+                    name="hero-exclamation-circle"
+                    class="w-4 h-4 -mt-0.5 inline"
+                  />
+                  {YscWeb.UploadErrors.error_to_string(err, :avatar)}
+                </p>
+              <% end %>
+            <% end %>
+
+            <div
+              :if={@avatar_processing}
+              class="flex items-center gap-2 text-sm text-blue-600"
+            >
+              <.icon name="hero-arrow-path" class="w-4 h-4 animate-spin" />
+              Processing your photo…
+            </div>
+
+            <div :if={@loading_avatars} class="pt-2">
+              <div class="h-4 w-20 bg-zinc-200 rounded animate-pulse mb-2"></div>
+              <div class="flex flex-wrap gap-2">
+                <%= for _i <- 1..3 do %>
+                  <div class="w-12 h-12 rounded-full bg-zinc-200 animate-pulse">
+                  </div>
+                <% end %>
+              </div>
+            </div>
+
+            <div :if={!@loading_avatars && @user_avatars != []} class="pt-2">
+              <p class="text-sm font-medium text-zinc-900 mb-2">Your photos</p>
+              <div class="flex flex-wrap gap-2">
+                <%= for avatar <- @user_avatars do %>
+                  <div class="relative">
+                    <button
+                      type="button"
+                      phx-click="select_avatar"
+                      phx-value-id={avatar.id}
+                      id={"onboarding-avatar-#{avatar.id}"}
+                      disabled={@selecting_avatar_id == avatar.id}
+                      class={[
+                        "w-12 h-12 rounded-full border-2 transition-all hover:scale-105 cursor-pointer overflow-hidden",
+                        if(@user.current_avatar_id == avatar.id,
+                          do: "border-blue-600 ring-2 ring-blue-200",
+                          else: "border-zinc-200 hover:border-zinc-400"
+                        )
+                      ]}
+                    >
+                      <img
+                        src={Avatars.avatar_url(avatar, :thumb)}
+                        alt="Previous avatar"
+                        class="w-full h-full object-cover"
+                      />
+                    </button>
+                    <div
+                      :if={@selecting_avatar_id == avatar.id}
+                      class="absolute inset-0 flex items-center justify-center rounded-full bg-white/60"
+                    >
+                      <.icon
+                        name="hero-arrow-path"
+                        class="w-4 h-4 text-blue-600 animate-spin"
+                      />
+                    </div>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <.simple_form
         for={@form}
@@ -803,6 +1023,83 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
       {:error, changeset} ->
         {:noreply, assign(socket, :profile_form, to_form(changeset))}
+    end
+  end
+
+  def handle_event("validate_avatar", _params, socket) do
+    {:noreply, socket}
+  end
+
+  def handle_event("save_avatar", _params, socket) do
+    user = socket.assigns.user
+
+    uploaded_avatars =
+      consume_uploaded_entries(socket, :avatar, fn %{key: key}, _entry ->
+        location = S3Config.object_url(key, S3Config.avatars_bucket_name())
+
+        with {:ok, avatar} <-
+               Avatars.create_avatar(user, %{
+                 source: :upload,
+                 original_path: location
+               }),
+             {:ok, _job} <-
+               %{id: avatar.id}
+               |> YscWeb.Workers.AvatarProcessor.new()
+               |> Oban.insert() do
+          {:ok, avatar}
+        else
+          {:error, reason} -> {:error, reason}
+        end
+      end)
+
+    socket =
+      case uploaded_avatars do
+        [_avatar | _] ->
+          socket
+          |> YscWeb.Flash.put_toast(
+            :info,
+            "Photo uploaded! It will be ready shortly.",
+            title: "Profile Picture"
+          )
+          |> assign(:user_avatars, load_user_avatars(user))
+          |> assign(:avatar_processing, true)
+
+        _ ->
+          socket
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("select_avatar", %{"id" => avatar_id}, socket) do
+    user = socket.assigns.user
+    socket = assign(socket, :selecting_avatar_id, avatar_id)
+
+    case Avatars.set_current_avatar(user, avatar_id) do
+      {:ok, updated_user} ->
+        updated_user = Repo.preload(updated_user, :current_avatar)
+
+        {:noreply,
+         socket
+         |> assign(:selecting_avatar_id, nil)
+         |> assign(:user, updated_user)
+         |> assign(
+           :current_avatar_url,
+           resolve_current_avatar_url(updated_user)
+         )
+         |> YscWeb.Flash.put_toast(:info, "Profile picture updated.",
+           title: "Profile Picture"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> assign(:selecting_avatar_id, nil)
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Could not update profile picture.",
+           title: "Profile Picture"
+         )}
     end
   end
 
@@ -1523,6 +1820,11 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     )
     |> assign(:family_members_forms, [])
     |> assign(:invite_results, [])
+    |> assign(:user_avatars, [])
+    |> assign(:current_avatar_url, nil)
+    |> assign(:avatar_processing, false)
+    |> assign(:selecting_avatar_id, nil)
+    |> assign(:loading_avatars, true)
   end
 
   defp assign_onboarding_data(socket, user, default_payment_method) do
@@ -2331,6 +2633,65 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp payment_method_display(_), do: "Card on file"
+
+  @allowed_avatar_extensions ~w(.jpg .jpeg .png .webp .gif .svg)
+
+  defp presign_avatar_upload(entry, socket) do
+    user = socket.assigns.user
+    avatar_id = Ecto.ULID.generate()
+
+    ext =
+      entry.client_name
+      |> Path.extname()
+      |> String.downcase()
+      |> then(fn e ->
+        if e in @allowed_avatar_extensions, do: e, else: ".webp"
+      end)
+
+    key = "#{user.id}/#{avatar_id}/original#{ext}"
+
+    config = %{
+      region: S3Config.region(),
+      access_key_id: S3Config.aws_access_key_id(),
+      secret_access_key: S3Config.aws_secret_access_key()
+    }
+
+    {:ok, fields} =
+      SimpleS3Upload.sign_form_upload(config, S3Config.avatars_bucket_name(),
+        key: key,
+        content_type: entry.client_type,
+        max_file_size: socket.assigns.uploads.avatar.max_file_size,
+        expires_in: :timer.hours(1),
+        server_side_encryption: S3Config.server_side_encryption?()
+      )
+
+    upload_url = S3Config.avatars_upload_url()
+    :ok = S3Config.assert_direct_upload_url!(upload_url, :avatars)
+
+    meta = %{
+      uploader: "S3",
+      key: key,
+      url: upload_url,
+      fields: fields
+    }
+
+    {:ok, meta, socket}
+  end
+
+  defp assign_avatar_data(socket, user) do
+    socket
+    |> assign(:user_avatars, load_user_avatars(user))
+    |> assign(:current_avatar_url, resolve_current_avatar_url(user))
+  end
+
+  defp load_user_avatars(user), do: Avatars.list_user_avatars(user)
+
+  defp resolve_current_avatar_url(user) do
+    case user.current_avatar do
+      nil -> nil
+      avatar -> Avatars.avatar_url(avatar, :profile)
+    end
+  end
 
   defp nordic_country_options do
     [
