@@ -2074,9 +2074,12 @@ defmodule Ysc.AccountsTest do
 
         assert Accounts.list_memberships(type: :family, limit: 500) == []
 
-        assert Enum.any?(Accounts.list_memberships(type: :single, limit: 500), fn m ->
-                 m.primary_user.id == family_primary.id
-               end)
+        assert Enum.any?(
+                 Accounts.list_memberships(type: :single, limit: 500),
+                 fn m ->
+                   m.primary_user.id == family_primary.id
+                 end
+               )
       after
         Application.put_env(:ysc, :membership_plans, plans)
       end
