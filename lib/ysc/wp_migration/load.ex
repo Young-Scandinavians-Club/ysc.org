@@ -1565,7 +1565,7 @@ defmodule Ysc.WpMigration.Load do
               add_filename_entry(
                 fname_acc,
                 meta["original_filename"],
-                existing.raw_image_path
+                image_url_for_post_content(existing)
               )
 
             {:cont, {:ok, Map.put(img_acc, att_id, existing), fname_acc}}
@@ -1754,6 +1754,380 @@ defmodule Ysc.WpMigration.Load do
     end
   end
 
+  @doc """
+  Reassigns migrated news post authors using `posts.json` and `users.json` from the
+  WordPress export.
+
+  Posts imported before their authors existed in the app may have been assigned a
+  fallback admin user. This repair looks up each post's `wp_author_id` in the
+  export, resolves the matching app user by email, and updates `user_id` (and
+  `board_position_at_publish` from the author's current board role).
+
+  Returns `{:ok, stats}` with `:updated`, `:unchanged`, `:skipped`, and `:failed`.
+
+  ## Options
+
+  - `:dry_run` — log only, no DB writes (default: false)
+  - `:author_overrides` — map of `wp_author_id` string to app `user_id` when email
+    lookup is insufficient, e.g. `%{"187" => "01KXKFZCXKW85KGK2TB9KZQKN1"}`
+  """
+  def repair_post_authors(export_dir, opts \\ []) do
+    export_dir = Path.expand(export_dir)
+    posts_path = Path.join(export_dir, "posts.json")
+    users_path = Path.join(export_dir, "users.json")
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    overrides =
+      normalize_author_overrides(Keyword.get(opts, :author_overrides, %{}))
+
+    if File.exists?(posts_path) do
+      posts_data = read_json(posts_path)
+      users_data = read_json(users_path)
+      users_by_wp_id = Map.new(users_data, &{to_string(&1["wp_user_id"]), &1})
+
+      author_user_map =
+        build_wp_author_user_map(posts_data, users_by_wp_id, overrides)
+
+      stats = %{updated: 0, unchanged: 0, skipped: 0, failed: 0}
+
+      stats =
+        Enum.reduce(posts_data, stats, fn row, acc ->
+          repair_post_author_row(row, author_user_map, dry_run, acc)
+        end)
+
+      {:ok, stats}
+    else
+      {:error, "Posts file not found: #{posts_path}"}
+    end
+  end
+
+  @doc """
+  Repairs image links in migrated news posts using `posts.json` from the WordPress export.
+
+  Rebuilds the attachment URL map from migration images already in the media library,
+  re-transforms each post's original WordPress HTML with `HtmlTransformer`, and updates
+  `raw_body`, `rendered_body`, `preview_text`, and `image_id` when they change.
+
+  Returns `{:ok, stats}` with `:updated`, `:unchanged`, `:skipped`, and `:failed`.
+
+  ## Options
+
+  - `:dry_run` — log only, no DB writes (default: false)
+  """
+  def repair_post_images(export_dir, opts \\ []) do
+    export_dir = Path.expand(export_dir)
+    posts_path = Path.join(export_dir, "posts.json")
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    if File.exists?(posts_path) do
+      posts_data = read_json(posts_path)
+      {url_map, image_map} = build_migration_image_maps(export_dir)
+
+      stats = %{updated: 0, unchanged: 0, skipped: 0, failed: 0}
+
+      stats =
+        Enum.reduce(posts_data, stats, fn row, acc ->
+          repair_post_image_row(row, url_map, image_map, dry_run, acc)
+        end)
+
+      {:ok, stats}
+    else
+      {:error, "Posts file not found: #{posts_path}"}
+    end
+  end
+
+  defp normalize_author_overrides(overrides) when is_map(overrides) do
+    Map.new(overrides, fn {wp_id, user_id} -> {to_string(wp_id), user_id} end)
+  end
+
+  defp normalize_author_overrides(_), do: %{}
+
+  defp build_wp_author_user_map(posts_data, users_by_wp_id, overrides) do
+    posts_data
+    |> Enum.map(&to_string(&1["wp_author_id"]))
+    |> Enum.uniq()
+    |> Map.new(fn wp_author_id ->
+      user_id =
+        case Map.get(overrides, wp_author_id) do
+          nil -> resolve_wp_author_user_id(wp_author_id, users_by_wp_id)
+          override -> resolve_author_override(override)
+        end
+
+      {wp_author_id, user_id}
+    end)
+  end
+
+  defp resolve_author_override(override) when is_binary(override) do
+    cond do
+      String.contains?(override, "@") ->
+        case Ysc.Accounts.get_user_by_email(Email.normalize(override)) do
+          %User{id: id} -> id
+          nil -> nil
+        end
+
+      true ->
+        case Repo.get(User, override) do
+          %User{id: id} -> id
+          nil -> nil
+        end
+    end
+  end
+
+  defp resolve_author_override(_), do: nil
+
+  defp resolve_wp_author_user_id(wp_author_id, users_by_wp_id) do
+    case Map.get(users_by_wp_id, wp_author_id) do
+      %{"email" => email} when is_binary(email) ->
+        case Ysc.Accounts.get_user_by_email(Email.normalize(email)) do
+          %User{id: id} -> id
+          nil -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp repair_post_author_row(row, author_user_map, dry_run, stats) do
+    wp_author_id = to_string(row["wp_author_id"])
+    author_id = Map.get(author_user_map, wp_author_id)
+
+    cond do
+      is_nil(author_id) ->
+        Ysc.Logging.warning(
+          "[WP Load] Post author repair skipped \"#{row["title"]}\": no app user for wp_author_id #{wp_author_id}"
+        )
+
+        %{stats | skipped: stats.skipped + 1}
+
+      true ->
+        case find_post_for_export_row(row) do
+          nil ->
+            Ysc.Logging.warning(
+              "[WP Load] Post author repair skipped \"#{row["title"]}\": post not found in database"
+            )
+
+            %{stats | skipped: stats.skipped + 1}
+
+          %Post{user_id: ^author_id} = post ->
+            if dry_run do
+              Ysc.Logging.info(
+                "[WP Load] Post author repair dry run \"#{post.title}\": already assigned to #{author_id}"
+              )
+            end
+
+            %{stats | unchanged: stats.unchanged + 1}
+
+          %Post{} = post ->
+            if dry_run do
+              if Repo.get(User, author_id) do
+                Ysc.Logging.info(
+                  "[WP Load] Post author repair dry run \"#{post.title}\": would change user_id #{post.user_id} -> #{author_id}"
+                )
+
+                %{stats | updated: stats.updated + 1}
+              else
+                Ysc.Logging.warning(
+                  "[WP Load] Post author repair skipped \"#{post.title}\": author user #{author_id} not found"
+                )
+
+                %{stats | skipped: stats.skipped + 1}
+              end
+            else
+              case assign_post_author(post, author_id) do
+                {:ok, _} ->
+                  %{stats | updated: stats.updated + 1}
+
+                {:error, changeset} ->
+                  Ysc.Logging.warning(
+                    "[WP Load] Post author repair failed \"#{post.title}\": #{inspect(changeset.errors)}"
+                  )
+
+                  %{stats | failed: stats.failed + 1}
+              end
+            end
+        end
+    end
+  end
+
+  defp repair_post_image_row(row, url_map, image_map, dry_run, stats) do
+    case find_post_for_export_row(row) do
+      nil ->
+        Ysc.Logging.warning(
+          "[WP Load] Post image repair skipped \"#{row["title"]}\": post not found in database"
+        )
+
+        %{stats | skipped: stats.skipped + 1}
+
+      %Post{} = post ->
+        attrs = post_content_attrs_from_export_row(row, url_map, image_map)
+
+        if post_image_attrs_unchanged?(post, attrs) do
+          %{stats | unchanged: stats.unchanged + 1}
+        else
+          if dry_run do
+            Ysc.Logging.info(
+              "[WP Load] Post image repair dry run \"#{post.title}\": would update image links"
+            )
+
+            %{stats | updated: stats.updated + 1}
+          else
+            case update_post_image_content(post, attrs) do
+              {:ok, _} ->
+                %{stats | updated: stats.updated + 1}
+
+              {:error, changeset} ->
+                Ysc.Logging.warning(
+                  "[WP Load] Post image repair failed \"#{post.title}\": #{inspect(changeset.errors)}"
+                )
+
+                %{stats | failed: stats.failed + 1}
+            end
+          end
+        end
+    end
+  end
+
+  defp post_image_attrs_unchanged?(%Post{} = post, attrs) do
+    post.raw_body == attrs.raw_body and
+      post.rendered_body == attrs.rendered_body and
+      post.preview_text == attrs.preview_text and
+      post.image_id == attrs.image_id
+  end
+
+  defp update_post_image_content(%Post{} = post, attrs) do
+    post
+    |> Post.update_post_changeset(attrs, validate_url_name: false)
+    |> Repo.update()
+    |> tap(fn
+      {:ok, _} -> Ysc.PublicContentCache.invalidate_posts()
+      _ -> :ok
+    end)
+  end
+
+  defp build_migration_image_maps(export_dir) do
+    images =
+      Repo.all(
+        from i in Image,
+          where: not is_nil(fragment("upload_data->>'wp_attachment_id'"))
+      )
+
+    image_map =
+      Map.new(images, fn image ->
+        {to_string(image.upload_data["wp_attachment_id"]), image}
+      end)
+
+    url_map =
+      Enum.reduce(images, %{}, fn image, acc ->
+        att_id = to_string(image.upload_data["wp_attachment_id"])
+        url = image_url_for_post_content(image)
+
+        acc
+        |> Map.put(att_id, url)
+        |> add_filename_entries_for_migration_image(image, export_dir, url)
+      end)
+
+    {url_map, image_map}
+  end
+
+  defp add_filename_entries_for_migration_image(acc, image, export_dir, url) do
+    att_id = to_string(image.upload_data["wp_attachment_id"])
+    media_meta_path = Path.join([export_dir, "media", att_id, "meta.json"])
+
+    original_filename =
+      if File.exists?(media_meta_path) do
+        case read_json(media_meta_path) do
+          %{"original_filename" => filename} when is_binary(filename) ->
+            filename
+
+          _ ->
+            nil
+        end
+      else
+        nil
+      end
+      |> Kernel.||(original_filename_from_upload_data(image.upload_data))
+      |> Kernel.||(original_filename_from_image_path(image.raw_image_path))
+
+    add_filename_entry(acc, original_filename, url)
+  end
+
+  defp original_filename_from_upload_data(%{"key" => key}) when is_binary(key),
+    do: Path.basename(key)
+
+  defp original_filename_from_upload_data(_), do: nil
+
+  defp original_filename_from_image_path(path) when is_binary(path) do
+    case URI.parse(path) do
+      %URI{path: basename} when is_binary(basename) -> Path.basename(basename)
+      _ -> nil
+    end
+  end
+
+  defp original_filename_from_image_path(_), do: nil
+
+  defp post_content_attrs_from_export_row(row, url_map, image_map) do
+    raw_body = HtmlTransformer.wp_to_trix(row["post_content"], url_map)
+
+    rendered_body =
+      HtmlSanitizeEx.Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+
+    preview_text = generate_preview_text(rendered_body)
+
+    featured_att_id = get_in(row, ["featured_image", "wp_attachment_id"])
+
+    image_id =
+      featured_att_id &&
+        (image_map_image_id(image_map, featured_att_id) ||
+           db_image_id_for_wp_attachment(featured_att_id))
+
+    image_id =
+      image_id ||
+        first_body_image_id(row["wp_attachment_ids_in_content"], image_map) ||
+        first_body_image_id_from_src(raw_body)
+
+    %{
+      raw_body: raw_body,
+      rendered_body: rendered_body,
+      preview_text: preview_text,
+      image_id: image_id
+    }
+  end
+
+  defp find_post_for_export_row(row) do
+    url_name = row["post_name"] || slugify(row["title"])
+    wp_post_id = row["wp_post_id"]
+
+    Repo.get_by(Post, url_name: url_name) ||
+      (wp_post_id && Repo.get_by(Post, url_name: "#{url_name}-#{wp_post_id}"))
+  end
+
+  defp assign_post_author(%Post{} = post, author_id) do
+    case Repo.get(User, author_id) do
+      %User{} = author ->
+        board_position_at_publish =
+          if author.board_position,
+            do: to_string(author.board_position),
+            else: nil
+
+        post
+        |> Ecto.Changeset.change(
+          user_id: author_id,
+          board_position_at_publish: board_position_at_publish
+        )
+        |> Repo.update()
+        |> tap(fn
+          {:ok, _} -> Ysc.PublicContentCache.invalidate_posts()
+          _ -> :ok
+        end)
+
+      nil ->
+        {:error,
+         Ecto.Changeset.change(post)
+         |> Ecto.Changeset.add_error(:user_id, "author user not found")}
+    end
+  end
+
   defp broken_migration_image_path?(path) when is_binary(path),
     do: String.contains?(path, "/._")
 
@@ -1791,6 +2165,9 @@ defmodule Ysc.WpMigration.Load do
   # Adds a normalized-filename → url entry to fname_acc.
   # Normalizes by stripping the WP dimension suffix (e.g. "-841x1024") and
   # lowercasing, so "IMG_5613-841x1024.jpg" maps the same as "IMG_5613.jpg".
+  defp image_url_for_post_content(%Image{} = image),
+    do: Image.display_path(image)
+
   defp add_filename_entry(acc, nil, _url), do: acc
   defp add_filename_entry(acc, "", _url), do: acc
 
@@ -1815,7 +2192,9 @@ defmodule Ysc.WpMigration.Load do
     # filename_map keys are already normalized (lowercase, no WP size suffix).
     url_map =
       image_map
-      |> Map.new(fn {att_id, img} -> {att_id, img.raw_image_path} end)
+      |> Map.new(fn {att_id, img} ->
+        {att_id, image_url_for_post_content(img)}
+      end)
       |> Map.merge(filename_map)
 
     Enum.reduce_while(posts_data, {:ok, :done}, fn row, {:ok, _} ->
@@ -1825,42 +2204,21 @@ defmodule Ysc.WpMigration.Load do
       if is_nil(author_id) do
         {:cont, {:ok, :done}}
       else
-        featured_att_id = get_in(row, ["featured_image", "wp_attachment_id"])
-
-        image_id =
-          featured_att_id &&
-            (image_map_image_id(image_map, featured_att_id) ||
-               db_image_id_for_wp_attachment(featured_att_id))
-
         url_name = row["post_name"] || slugify(row["title"])
         published_on = parse_datetime(row["post_date"])
 
-        raw_body = HtmlTransformer.wp_to_trix(row["post_content"], url_map)
+        content_attrs =
+          post_content_attrs_from_export_row(row, url_map, image_map)
 
-        rendered_body =
-          HtmlSanitizeEx.Scrubber.scrub(raw_body, Ysc.TrixScrubber)
-
-        preview_text = generate_preview_text(rendered_body)
-
-        # If no WP featured image, fall back to the first image found in the
-        # post body: try by wp-image-{id} att_ids extracted at export time first,
-        # then scan the transformed raw_body for the first <img src> as a last resort.
-        image_id =
-          image_id ||
-            first_body_image_id(row["wp_attachment_ids_in_content"], image_map) ||
-            first_body_image_id_from_src(raw_body)
-
-        attrs = %{
-          user_id: author_id,
-          state: "published",
-          title: row["title"],
-          url_name: url_name,
-          raw_body: raw_body,
-          rendered_body: rendered_body,
-          preview_text: preview_text,
-          published_on: published_on,
-          image_id: image_id
-        }
+        attrs =
+          %{
+            user_id: author_id,
+            state: "published",
+            title: row["title"],
+            url_name: url_name,
+            published_on: published_on
+          }
+          |> Map.merge(content_attrs)
 
         existing = Repo.get_by(Post, url_name: url_name)
 
@@ -2019,7 +2377,7 @@ defmodule Ysc.WpMigration.Load do
     if src do
       Repo.one(
         from i in Image,
-          where: i.raw_image_path == ^src,
+          where: i.raw_image_path == ^src or i.optimized_image_path == ^src,
           select: i.id,
           limit: 1
       )

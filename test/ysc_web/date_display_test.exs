@@ -42,6 +42,50 @@ defmodule YscWeb.DateDisplayTest do
     end
   end
 
+  describe "format_event_date_range/2" do
+    test "formats a single date without year" do
+      assert DateDisplay.format_event_date_range(%{start_date: ~D[2024-03-05]}) ==
+               "Mar 5"
+    end
+
+    test "formats a multi-day range within the same year" do
+      assert DateDisplay.format_event_date_range(%{
+               start_date: ~D[2024-03-05],
+               end_date: ~D[2024-03-07]
+             }) == "Mar 5 – Mar 7"
+    end
+
+    test "formats a multi-day range across years" do
+      assert DateDisplay.format_event_date_range(%{
+               start_date: ~D[2025-12-30],
+               end_date: ~D[2026-01-02]
+             }) == "Dec 30, 2025 – Jan 2, 2026"
+    end
+
+    test "includes year for single-day labels when requested" do
+      assert DateDisplay.format_event_date_range(%{start_date: ~D[2024-03-05]},
+               with_year: true
+             ) == "Mar 5, 2024"
+    end
+
+    test "includes year on the end of same-year ranges when requested" do
+      assert DateDisplay.format_event_date_range(
+               %{
+                 start_date: ~D[2024-03-05],
+                 end_date: ~D[2024-03-07]
+               },
+               with_year: true
+             ) == "Mar 5 – Mar 7, 2024"
+    end
+
+    test "returns default when start date is missing" do
+      assert DateDisplay.format_event_date_range(%{start_date: nil},
+               default: "TBD"
+             ) ==
+               "TBD"
+    end
+  end
+
   describe "format_datetime_display/1" do
     test "formats Date values" do
       assert DateDisplay.format_datetime_display(~D[2024-12-01]) ==

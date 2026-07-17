@@ -1543,8 +1543,7 @@ defmodule YscWeb.SecurityAuditTest do
       user = user_with_membership(:none)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 60)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(60)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -1585,8 +1584,7 @@ defmodule YscWeb.SecurityAuditTest do
       user = user_with_membership(:none)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 60)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(60)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),

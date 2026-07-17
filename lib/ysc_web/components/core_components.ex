@@ -2515,30 +2515,160 @@ defmodule YscWeb.CoreComponents do
     doc: "Avatar size variant (:thumb, :profile, :large)"
 
   def user_avatar_image(assigns) do
+    user_avatar_identity(Map.put(assigns, :variant, :badge))
+  end
+
+  @doc """
+  Returns ordered flag hex colors for a Nordic country code (falls back to Sweden).
+  """
+  def country_flag_colors(country) when is_binary(country) do
+    case normalize_nordic_country_code(country) do
+      "SE" -> ["#006AA7", "#FECC00"]
+      "NO" -> ["#BA0C2F", "#FFFFFF", "#00205B"]
+      "DK" -> ["#C8102E", "#FFFFFF"]
+      "FI" -> ["#003580", "#FFFFFF"]
+      "IS" -> ["#02529C", "#FFFFFF", "#DC1E35"]
+      _ -> country_flag_colors("SE")
+    end
+  end
+
+  def country_flag_colors(_), do: country_flag_colors("SE")
+
+  attr :user, :any,
+    default: nil,
+    doc:
+      "User struct or map; when provided, derives email/user_id/country/avatar_url automatically"
+
+  attr :email, :string, default: nil
+  attr :user_id, :string, default: nil
+  attr :country, :string, default: nil
+  attr :class, :string, default: ""
+  attr :avatar_url, :string, default: nil
+
+  attr :size, :atom,
+    default: :profile,
+    doc: "Avatar size variant (:thumb, :profile, :large)"
+
+  attr :variant, :atom,
+    default: :badge,
+    values: [:ring, :badge, :peek],
+    doc:
+      "Identity treatment: flag-color ring, corner badge, or rounded-square flag peek"
+
+  def user_avatar_identity(assigns) do
     assigns = derive_avatar_assigns(assigns)
 
-    full_path =
-      if is_binary(assigns[:avatar_url]) and assigns[:avatar_url] != "" do
-        assigns[:avatar_url]
-      else
-        user_id = assigns[:user_id] || "0"
-        country = assigns[:country] || "SE"
+    country = normalize_nordic_country_code(assigns[:country] || "SE")
+    assigns = assign(assigns, :country, country)
 
-        image_id =
-          user_id
-          |> String.replace(~r/[^\d]/, "")
-          |> then(fn s -> if s == "", do: "0", else: s end)
-          |> String.to_integer()
-          |> rem(2)
-
-        default_avatar_path(country, image_id)
-      end
-
-    assigns = assign(assigns, :full_path, full_path)
+    assigns =
+      assigns
+      |> assign(:full_path, resolve_user_avatar_src(assigns))
+      |> assign(:flag_path, country_flag_image_path(country))
+      |> assign(:ring_gradient, country_flag_ring_gradient(country))
 
     ~H"""
-    <img class={@class} src={@full_path} loading="lazy" alt="User avatar" />
+    <%= case @variant do %>
+      <% :ring -> %>
+        <div
+          class={[
+            "avatar-identity-ring inline-flex rounded-full p-[2px] shrink-0",
+            @class
+          ]}
+          style={"background: #{@ring_gradient};"}
+        >
+          <div class="rounded-full overflow-hidden bg-white w-full h-full">
+            <img
+              class="w-full h-full object-cover"
+              src={@full_path}
+              loading="lazy"
+              alt="User avatar"
+            />
+          </div>
+        </div>
+      <% :badge -> %>
+        <div class={["relative inline-flex shrink-0", @class]}>
+          <img
+            class="w-full h-full rounded-full object-cover"
+            src={@full_path}
+            loading="lazy"
+            alt="User avatar"
+          />
+          <span
+            class="avatar-identity-badge absolute -bottom-0.5 -right-0.5 w-[30%] min-w-[0.65rem] aspect-square rounded-full overflow-hidden ring-2 ring-white shadow-sm"
+            aria-hidden="true"
+          >
+            <img
+              class="w-full h-full object-cover"
+              src={@flag_path}
+              alt=""
+            />
+          </span>
+        </div>
+      <% :peek -> %>
+        <div class={["avatar-identity-peek relative inline-flex shrink-0", @class]}>
+          <div
+            class="absolute inset-y-0 right-0 w-[18%] rounded-r-md overflow-hidden"
+            aria-hidden="true"
+          >
+            <img class="h-full w-full object-cover" src={@flag_path} alt="" />
+          </div>
+          <div class="absolute inset-0 right-[12%] rounded-xl overflow-hidden shadow-sm ring-1 ring-white/80">
+            <img
+              class="w-full h-full object-cover"
+              src={@full_path}
+              loading="lazy"
+              alt="User avatar"
+            />
+          </div>
+        </div>
+    <% end %>
     """
+  end
+
+  defp resolve_user_avatar_src(assigns) do
+    if is_binary(assigns[:avatar_url]) and assigns[:avatar_url] != "" do
+      assigns[:avatar_url]
+    else
+      user_id = assigns[:user_id] || "0"
+      country = assigns[:country] || "SE"
+
+      image_id =
+        user_id
+        |> String.replace(~r/[^\d]/, "")
+        |> then(fn s -> if s == "", do: "0", else: s end)
+        |> String.to_integer()
+        |> rem(2)
+
+      default_avatar_path(country, image_id)
+    end
+  end
+
+  defp normalize_nordic_country_code(country) when is_binary(country) do
+    country |> String.trim() |> String.upcase() |> String.slice(0, 2)
+  end
+
+  defp normalize_nordic_country_code(_), do: "SE"
+
+  defp country_flag_image_path(country) do
+    code = country |> normalize_nordic_country_code() |> String.downcase()
+    "/images/flagicons/flags/1x1/#{code}.svg"
+  end
+
+  defp country_flag_ring_gradient(country) do
+    colors = country_flag_colors(country)
+    count = length(colors)
+
+    stops =
+      colors
+      |> Enum.with_index()
+      |> Enum.map_join(", ", fn {color, index} ->
+        start_pct = Float.round(index / count * 100, 2)
+        end_pct = Float.round((index + 1) / count * 100, 2)
+        "#{color} #{start_pct}% #{end_pct}%"
+      end)
+
+    "conic-gradient(from 135deg, #{stops})"
   end
 
   defp derive_avatar_assigns(%{user: user} = assigns) when not is_nil(user) do

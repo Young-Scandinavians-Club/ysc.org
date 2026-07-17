@@ -11,6 +11,7 @@ defmodule Ysc.Events.Event do
 
   alias Ysc.Events.EventDateTime
   alias Ysc.ReferenceGenerator
+  alias YscWeb.PlainText
 
   @reference_prefix "EVT"
 
@@ -299,11 +300,7 @@ defmodule Ysc.Events.Event do
         changeset
 
       description ->
-        put_change(
-          changeset,
-          :description,
-          description |> HtmlSanitizeEx.strip_tags() |> String.trim()
-        )
+        put_change(changeset, :description, PlainText.from_html(description))
     end
   end
 

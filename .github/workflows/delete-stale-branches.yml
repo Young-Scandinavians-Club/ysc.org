@@ -1,0 +1,62 @@
+# Delete remote branches left behind after pull requests are closed or merged.
+#
+# Never deletes `main`, branches named like release tags (v*), or git tags (refs/tags/*).
+# - On PR close: delete the head branch immediately (same-repo PRs only).
+# - Weekly schedule: sweep branches for PRs closed at least 7 days ago (safety net).
+
+name: Delete stale PR branches
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    # Mondays 09:00 UTC
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      stale_days:
+        description: Delete branches for PRs closed at least this many days ago
+        required: false
+        default: "7"
+      dry_run:
+        description: List branches that would be deleted without deleting them
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete_on_close:
+    name: Delete branch on PR close
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Delete closed PR head branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          STALE_DAYS: "0"
+        run: bash etc/scripts/delete_stale_pr_branches.sh
+
+  delete_stale:
+    name: Delete stale PR branches
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Delete stale PR branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          STALE_DAYS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.stale_days || '7' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == true && '1' || '0' }}
+        run: bash etc/scripts/delete_stale_pr_branches.sh

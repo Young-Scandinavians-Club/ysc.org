@@ -48,6 +48,44 @@ defmodule YscWeb.DateDisplay do
   def format_date_short(_, default), do: default
 
   @doc """
+  Formats an event date or date range for compact UI (cards, pills).
+
+  Accepts an event map with `:start_date` and `:end_date`.
+
+  ## Options
+
+    * `:default` — when start date is missing (default `""`)
+    * `:with_year` — include year on single-day labels and on the end of ranges
+      (default `false`)
+  """
+  def format_event_date_range(event, opts \\ [])
+
+  def format_event_date_range(%{} = event, opts) do
+    start_date = Map.get(event, :start_date) || Map.get(event, "start_date")
+    end_date = Map.get(event, :end_date) || Map.get(event, "end_date")
+    default = Keyword.get(opts, :default, "")
+    with_year? = Keyword.get(opts, :with_year, false)
+
+    case calendar_date(start_date) do
+      nil ->
+        default
+
+      start ->
+        case calendar_date(end_date) do
+          end_date when not is_nil(end_date) ->
+            if Date.compare(start, end_date) == :eq do
+              format_event_single_date(start, with_year?, default)
+            else
+              format_event_date_span(start, end_date, with_year?)
+            end
+
+          _ ->
+            format_event_single_date(start, with_year?, default)
+        end
+    end
+  end
+
+  @doc """
   Formats a date as a short month/day/year label (e.g. `"Mar 15, 2024"`).
 
   Returns `default` for nil or other non-date values.
@@ -101,4 +139,31 @@ defmodule YscWeb.DateDisplay do
   end
 
   def format_in_zone(_, _timezone, default), do: default
+
+  defp format_event_single_date(date, true, _default),
+    do: Calendar.strftime(date, "%b %-d, %Y")
+
+  defp format_event_single_date(date, false, _default),
+    do: format_date_short(date)
+
+  defp format_event_date_span(start_date, end_date, true) do
+    if start_date.year == end_date.year do
+      "#{format_date_short(start_date)} – #{Calendar.strftime(end_date, "%b %-d, %Y")}"
+    else
+      "#{format_datetime_display(start_date)} – #{format_datetime_display(end_date)}"
+    end
+  end
+
+  defp format_event_date_span(start_date, end_date, false) do
+    if start_date.year == end_date.year do
+      "#{format_date_short(start_date)} – #{format_date_short(end_date)}"
+    else
+      "#{format_datetime_display(start_date)} – #{format_datetime_display(end_date)}"
+    end
+  end
+
+  defp calendar_date(nil), do: nil
+  defp calendar_date(%DateTime{} = dt), do: DateTime.to_date(dt)
+  defp calendar_date(%Date{} = date), do: date
+  defp calendar_date(_), do: nil
 end

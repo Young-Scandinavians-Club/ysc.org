@@ -142,7 +142,7 @@ defmodule YscWeb.EventDetailsLive do
                   :if={@event.description != nil && @event.description != ""}
                   class="hidden sm:block text-lg text-zinc-600 font-normal leading-relaxed"
                 >
-                  {HtmlSanitizeEx.strip_tags(@event.description)}
+                  {YscWeb.PlainText.from_html(@event.description)}
                 </p>
               </div>
             </div>
@@ -374,22 +374,13 @@ defmodule YscWeb.EventDetailsLive do
                   When
                 </p>
                 <p class="font-black text-xl text-zinc-900 tracking-tight leading-none">
-                  <%= if @event.start_date != nil do %>
-                    {DateDisplay.format_date_short(@event.start_date)}
-                  <% else %>
-                    TBD
-                  <% end %>
+                  {format_event_when_date_heading(@event)}
                 </p>
-                <p class="text-sm text-zinc-500 mt-2 font-medium">
-                  <%= if @event.start_time != nil do %>
-                    Starts at {case format_time(@event.start_time) do
-                      %Time{} = time -> Timex.format!(time, "{h12}:{m} {AM}")
-                      _ -> ""
-                    end}
-                  <% else %>
-                    Time TBD
-                  <% end %>
-                </p>
+                <%= if time_subline = format_event_when_time_subline(@event) do %>
+                  <p class="text-sm text-zinc-500 mt-2 font-medium">
+                    {time_subline}
+                  </p>
+                <% end %>
                 <%= if !event_in_past?(@event) && @event.state != :cancelled do %>
                   <div class="mt-3 inline-flex items-center gap-2 bg-blue-50 px-2 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
@@ -6382,6 +6373,24 @@ defmodule YscWeb.EventDetailsLive do
     do: Calendar.strftime(date, "%a, %b %-d")
 
   def format_start_date_short(_), do: ""
+
+  defp format_event_when_date_heading(%Event{start_date: nil}), do: "TBD"
+
+  defp format_event_when_date_heading(%Event{} = event) do
+    DateDisplay.format_event_date_range(event, default: "TBD")
+  end
+
+  defp format_event_when_time_subline(%Event{start_time: nil}), do: nil
+
+  defp format_event_when_time_subline(%Event{start_time: start_time}) do
+    case format_time(start_time) do
+      %Time{} = time ->
+        "Starts at #{Timex.format!(time, "{h12}:{m} {AM}")}"
+
+      _ ->
+        nil
+    end
+  end
 
   defp event_body(%Event{rendered_details: nil} = event),
     do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)

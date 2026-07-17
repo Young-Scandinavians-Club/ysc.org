@@ -3542,3 +3542,18 @@ cropper-canvas {
         height: 300px;
     }
 }
+
+
+/* Nordic avatar identity treatments (dev showcase + future rollout) */
+
+.avatar-identity-ring {
+    box-sizing: border-box;
+}
+
+.avatar-identity-peek {
+    box-sizing: border-box;
+}
+
+.avatar-identity-badge img {
+    display: block;
+}

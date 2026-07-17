@@ -37,19 +37,19 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
         <% {_, booking_user_data} = booking_user_guest %>
         <div class="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
           <div class="flex items-start gap-3">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-200">
-              <%= if @current_user do %>
-                <.user_avatar_image
-                  user={@current_user}
-                  class="w-full h-full object-cover"
-                />
-              <% else %>
+            <%= if @current_user do %>
+              <.user_avatar_image
+                user={@current_user}
+                class="shrink-0 w-10 h-10 ring-2 ring-blue-200"
+              />
+            <% else %>
+              <div class="shrink-0 w-10 h-10 rounded-full overflow-hidden ring-2 ring-blue-200">
                 <.icon
                   name="hero-user-circle"
                   class="w-full h-full text-blue-600 p-2"
                 />
-              <% end %>
-            </div>
+              </div>
+            <% end %>
             <div class="flex-1">
               <div class="flex items-center gap-2 mb-1">
                 <p class="text-sm font-semibold text-blue-900">

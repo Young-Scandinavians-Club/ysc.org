@@ -112,6 +112,19 @@ defmodule Ysc.Events.EventTest do
       assert Ecto.Changeset.get_field(cs, :description) == "Preview copy"
     end
 
+    test "preserves ampersands in description", %{organizer: organizer} do
+      cs =
+        Event.changeset(%Event{}, %{
+          state: :draft,
+          organizer_id: organizer.id,
+          title: "T",
+          description: "food & drinks at The Junction"
+        })
+
+      assert Ecto.Changeset.get_field(cs, :description) ==
+               "food & drinks at The Junction"
+    end
+
     test "unlimited_capacity true clears max_attendees", %{organizer: organizer} do
       cs =
         Event.changeset(%Event{}, %{

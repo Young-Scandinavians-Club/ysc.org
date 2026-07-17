@@ -210,6 +210,7 @@ defmodule YscWeb.Router do
           {YscWeb.Plugs.RequestPath, :set_request_path}
         ] do
         live "/button-showcase", DevButtonShowcaseLive, :index
+        live "/avatar-showcase", DevAvatarShowcaseLive, :index
       end
     end
   end
@@ -222,6 +223,8 @@ defmodule YscWeb.Router do
       :redirect_if_user_is_authenticated,
       :auth_rate_limit
     ]
+
+    get "/register", LegacyRedirectController, :register
 
     live_session :redirect_if_user_is_authenticated,
       on_mount: [
