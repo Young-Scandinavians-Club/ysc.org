@@ -60,8 +60,7 @@ defmodule YscWeb.TahoeBookingDeferredTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 45)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(45)
 
       path =
         "/bookings/tahoe?" <>

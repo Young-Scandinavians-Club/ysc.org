@@ -514,6 +514,18 @@ defmodule YscWeb.HomeLiveTest do
          %{
            conn: conn
          } do
+      import Ecto.Query
+
+      alias Ysc.Events.Event
+
+      # Isolate from upcoming events left in the shared sandbox by earlier tests in this module.
+      from(e in Event,
+        where: e.start_date > ^DateTime.utc_now() and e.state == :published
+      )
+      |> Repo.update_all(set: [state: :draft])
+
+      Ysc.PublicContentCache.invalidate()
+
       author = user_fixture()
       title = "News Only Home #{System.unique_integer()}"
 

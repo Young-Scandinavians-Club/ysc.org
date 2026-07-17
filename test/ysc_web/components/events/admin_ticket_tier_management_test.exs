@@ -1,5 +1,7 @@
 defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
-  use YscWeb.ConnCase, async: true
+  # Query-counter assertions must run with async: false — parallel tests can add
+  # unrelated queries and make counts flaky in CI.
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.EventsFixtures
