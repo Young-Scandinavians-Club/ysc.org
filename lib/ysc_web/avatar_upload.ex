@@ -62,25 +62,33 @@ defmodule YscWeb.AvatarUpload do
   Consumes uploaded avatar entries and creates avatar records with processing jobs.
   """
   def consume(socket, %User{} = user, upload_name \\ :avatar) do
-    consume_uploaded_entries(socket, upload_name, fn %{key: key}, _entry ->
-      location = S3Config.object_url(key, S3Config.avatars_bucket_name())
-
-      outcome =
-        case Avatars.create_avatar_and_enqueue_job(user, %{
-               source: :upload,
-               original_path: location
-             }) do
-          {:ok, avatar} -> {:ok, avatar}
-          {:error, reason} -> {:error, reason}
-        end
-
-      {:ok, outcome}
+    consume_uploaded_entries(socket, upload_name, fn meta, _entry ->
+      {:ok, consume_upload_meta(user, meta)}
     end)
   end
 
+  @doc false
+  def consume_upload_meta(%User{} = user, %{key: key}) do
+    location = S3Config.object_url(key, S3Config.avatars_bucket_name())
+
+    case Avatars.create_avatar_and_enqueue_job(user, %{
+           source: :upload,
+           original_path: location
+         }) do
+      {:ok, avatar} -> {:ok, avatar}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Returns true when at least one consumed upload succeeded.
+  """
   def upload_succeeded?([{:ok, _} | _]), do: true
   def upload_succeeded?(_), do: false
 
+  @doc """
+  Returns true when at least one consumed upload failed.
+  """
   def upload_failed?([{:error, _} | _]), do: true
   def upload_failed?(_), do: false
 end
