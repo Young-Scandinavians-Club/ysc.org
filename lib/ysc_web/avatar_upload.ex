@@ -86,12 +86,12 @@ defmodule YscWeb.AvatarUpload do
   @doc """
   Returns true when at least one consumed upload succeeded.
   """
-  def upload_succeeded?([{:ok, _} | _]), do: true
-  def upload_succeeded?(_), do: false
+  def upload_succeeded?(outcomes),
+    do: Enum.any?(outcomes, &match?({:ok, _}, &1))
 
   @doc """
   Returns true when at least one consumed upload failed.
   """
-  def upload_failed?([{:error, _} | _]), do: true
-  def upload_failed?(_), do: false
+  def upload_failed?(outcomes),
+    do: Enum.any?(outcomes, &match?({:error, _}, &1))
 end

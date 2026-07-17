@@ -1071,7 +1071,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
     case Avatars.set_current_avatar(user, avatar_id) do
       {:ok, updated_user} ->
-        updated_user = Repo.preload(updated_user, :current_avatar)
+        updated_user = Repo.preload(updated_user, :current_avatar, force: true)
 
         {:noreply,
          socket

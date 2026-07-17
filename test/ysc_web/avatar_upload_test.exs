@@ -99,12 +99,22 @@ defmodule YscWeb.AvatarUploadTest do
       assert AvatarUpload.upload_succeeded?([{:ok, %{id: "1"}}])
       refute AvatarUpload.upload_succeeded?([{:error, :boom}])
       refute AvatarUpload.upload_succeeded?([])
+
+      assert AvatarUpload.upload_succeeded?([
+               {:error, :first},
+               {:ok, %{id: "2"}}
+             ])
     end
 
     test "upload_failed?/1" do
       assert AvatarUpload.upload_failed?([{:error, :boom}])
       refute AvatarUpload.upload_failed?([{:ok, %{id: "1"}}])
       refute AvatarUpload.upload_failed?([])
+
+      assert AvatarUpload.upload_failed?([
+               {:ok, %{id: "1"}},
+               {:error, :second}
+             ])
     end
   end
 end

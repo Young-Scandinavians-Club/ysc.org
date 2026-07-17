@@ -6256,7 +6256,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp resolve_current_avatar_url(user) do
-    user = Repo.preload(user, :current_avatar)
+    user = Repo.preload(user, :current_avatar, force: true)
 
     case user.current_avatar do
       nil -> nil
