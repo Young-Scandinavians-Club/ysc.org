@@ -158,6 +158,87 @@ defmodule Ysc.Release do
   end
 
   @doc """
+  Reassigns migrated news post authors from the WordPress export.
+
+      bin/ysc eval 'Ysc.Release.wp_repair_post_authors("/data/wp_migration_export", dry_run: true)'
+      bin/ysc eval 'Ysc.Release.wp_repair_post_authors("/data/wp_migration_export")'
+      bin/ysc eval 'Ysc.Release.wp_repair_post_authors("/data/wp_migration_export", author_overrides: %{"187" => "01KXKFZCXKW85KGK2TB9KZQKN1"})'
+
+  ## Options
+
+  - `:dry_run` — log only (default: false)
+  - `:author_overrides` — map of `wp_author_id` to app `user_id` when email lookup fails
+  """
+  def wp_repair_post_authors(export_dir, opts \\ [])
+      when is_binary(export_dir) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+    author_overrides = Keyword.get(opts, :author_overrides, %{})
+
+    Ysc.Logging.info("WP migration post author repair starting",
+      export_dir: export_dir,
+      dry_run: dry_run,
+      author_overrides: map_size(author_overrides)
+    )
+
+    case Ysc.WpMigration.Load.repair_post_authors(export_dir,
+           dry_run: dry_run,
+           author_overrides: author_overrides
+         ) do
+      {:ok, stats} ->
+        Ysc.Logging.info("WP migration post author repair finished", stats)
+        {:ok, stats}
+
+      {:error, message} = error ->
+        Ysc.Logging.error("WP migration post author repair failed",
+          error: message
+        )
+
+        error
+    end
+  end
+
+  @doc """
+  Repairs image links in migrated news posts from the WordPress export.
+
+      bin/ysc eval 'Ysc.Release.wp_repair_post_images("/data/wp_migration_export", dry_run: true)'
+      bin/ysc eval 'Ysc.Release.wp_repair_post_images("/data/wp_migration_export")'
+
+  ## Options
+
+  - `:dry_run` — log only (default: false)
+  """
+  def wp_repair_post_images(export_dir, opts \\ [])
+      when is_binary(export_dir) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    Ysc.Logging.info("WP migration post image repair starting",
+      export_dir: export_dir,
+      dry_run: dry_run
+    )
+
+    case Ysc.WpMigration.Load.repair_post_images(export_dir, dry_run: dry_run) do
+      {:ok, stats} ->
+        Ysc.Logging.info("WP migration post image repair finished", stats)
+        {:ok, stats}
+
+      {:error, message} = error ->
+        Ysc.Logging.error("WP migration post image repair failed",
+          error: message
+        )
+
+        error
+    end
+  end
+
+  @doc """
   Creates real Stripe subscriptions for users with local `migrated_*` placeholder subs.
 
   Uses each subscription's DB period end and plan (not the WP export), with `trial_end`

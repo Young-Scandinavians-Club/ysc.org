@@ -31,6 +31,7 @@ defmodule Ysc.WpMigration.HtmlTransformer do
     |> expand_caption_shortcodes()
     |> expand_gallery_shortcodes(url_map)
     |> strip_wp_block_comments()
+    |> quote_unquoted_html_attributes()
     |> Floki.parse_fragment!()
     |> transform_nodes(url_map)
     |> Floki.raw_html()
@@ -140,6 +141,27 @@ defmodule Ysc.WpMigration.HtmlTransformer do
   # Examples stripped: <!-- wp:image {"id":123} --> and <!-- /wp:image -->
   defp strip_wp_block_comments(html) do
     String.replace(html, ~r/<!--\s*\/?wp:[\s\S]*?-->/, "")
+  end
+
+  # WordPress exports sometimes omit quotes around attribute values, which breaks
+  # Floki parsing (e.g. class=wp-image-123 is swallowed into alt). Quote known
+  # attributes before parsing so attachment IDs and src URLs resolve correctly.
+  defp quote_unquoted_html_attributes(html) do
+    html =
+      Regex.replace(
+        ~r/\b(src|href|width|height|id)=([^\s>"']+)/,
+        html,
+        fn _, attr, val -> "#{attr}=\"#{val}\"" end
+      )
+
+    html =
+      Regex.replace(
+        ~r/\bclass=([^>]+?)(?=\s*\/?>)/,
+        html,
+        fn _, val -> "class=\"#{String.trim(val)}\"" end
+      )
+
+    Regex.replace(~r/\balt=(?=\s|\/|>)/, html, "alt=\"\"")
   end
 
   # ---------------------------------------------------------------------------

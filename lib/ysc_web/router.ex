@@ -224,6 +224,8 @@ defmodule YscWeb.Router do
       :auth_rate_limit
     ]
 
+    get "/register", LegacyRedirectController, :register
+
     live_session :redirect_if_user_is_authenticated,
       on_mount: [
         {YscWeb.LiveToastMount, :mount_toasts_sync},
