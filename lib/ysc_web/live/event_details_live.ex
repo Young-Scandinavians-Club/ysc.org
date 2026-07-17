@@ -142,7 +142,7 @@ defmodule YscWeb.EventDetailsLive do
                   :if={@event.description != nil && @event.description != ""}
                   class="hidden sm:block text-lg text-zinc-600 font-normal leading-relaxed"
                 >
-                  {HtmlSanitizeEx.strip_tags(@event.description)}
+                  {YscWeb.PlainText.from_html(@event.description)}
                 </p>
               </div>
             </div>

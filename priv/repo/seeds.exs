@@ -17,7 +17,6 @@ Settings.seed_default_social_settings()
 
 alias Ysc.Repo
 alias Ysc.Accounts.{Address, User}
-alias Ysc.SiteSettings.SiteSetting
 alias Ysc.Bookings
 import Ecto.Query
 
