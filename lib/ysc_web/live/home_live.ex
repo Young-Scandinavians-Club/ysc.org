@@ -340,35 +340,6 @@ defmodule YscWeb.HomeLive do
             Explore Our Events
           </.link>
         </div>
-
-        <div class="hidden md:flex mt-16 flex-wrap items-center justify-center gap-10 text-white/80 border-t border-white/20 pt-8 w-full max-w-3xl">
-          <div class="text-center">
-            <div class="text-xl font-semibold text-white tracking-wide">
-              Since 1951
-            </div>
-            <div class="text-sm font-light uppercase tracking-widest mt-1 opacity-80">
-              Established
-            </div>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-white/40"></div>
-          <div class="text-center">
-            <div class="text-xl font-semibold text-white tracking-wide">
-              Clear Lake & Tahoe
-            </div>
-            <div class="text-sm font-light uppercase tracking-widest mt-1 opacity-80">
-              Private Cabins
-            </div>
-          </div>
-          <div class="w-1.5 h-1.5 rounded-full bg-white/40"></div>
-          <div class="text-center">
-            <div class="text-xl font-semibold text-white tracking-wide">
-              Bay Area
-            </div>
-            <div class="text-sm font-light uppercase tracking-widest mt-1 opacity-80">
-              Community
-            </div>
-          </div>
-        </div>
       </.hero>
     </div>
 
@@ -401,12 +372,7 @@ defmodule YscWeb.HomeLive do
               <strong class="text-zinc-900">Swedish</strong>
               heritage may qualify for membership, with rates starting at just
               <strong class="text-blue-700">
-                {Ysc.MoneyHelper.format_money!(
-                  Money.new(
-                    :USD,
-                    Enum.at(Application.get_env(:ysc, :membership_plans), 0).amount
-                  )
-                )}
+                {format_membership_plan_price(:single)}
               </strong>
               per year.
             </p>
@@ -940,96 +906,71 @@ defmodule YscWeb.HomeLive do
       </div>
     </section>
 
-    <%!-- Membership Options Section --%>
+    <%!-- Membership Section --%>
     <section
       :if={@current_user == nil}
-      class="py-12 sm:py-16 lg:py-24 bg-blue-900 overflow-hidden"
+      id="membership-section"
+      class="relative py-16 sm:py-24 bg-blue-900 overflow-hidden isolate"
     >
-      <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
-        <div class="text-center max-w-3xl mx-auto mb-8 sm:mb-12">
-          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-white break-words">
-            Join Our Community Today
+      <div class="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-700/30 via-blue-900 to-gray-900">
+      </div>
+
+      <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="max-w-2xl mx-auto text-center">
+          <h2
+            id="membership-heading"
+            class="text-3xl sm:text-4xl font-bold text-white tracking-tight"
+          >
+            Membership
           </h2>
-          <p class="mt-3 sm:mt-4 text-base sm:text-lg text-blue-100">
-            We offer two membership options to fit your lifestyle.
+          <p class="mt-4 text-lg sm:text-xl text-blue-100 leading-relaxed">
+            Cabins, events, and community — same access for everyone. Choose who is covered.
           </p>
         </div>
 
-        <div class="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto">
-          <%!-- Single Membership --%>
-          <div class="bg-white rounded-xl p-6 sm:p-8 border border-zinc-100">
-            <h3 class="text-xl font-bold text-zinc-900">Single Membership</h3>
-            <div class="mt-4">
-              <span class="text-4xl font-bold text-zinc-900">
-                {Ysc.MoneyHelper.format_money!(
-                  Money.new(
-                    :USD,
-                    Enum.at(Application.get_env(:ysc, :membership_plans), 0).amount
-                  )
-                )}
+        <dl class="mt-12 grid gap-6 sm:grid-cols-2 lg:max-w-4xl mx-auto text-left">
+          <div
+            id="membership-single"
+            class="p-8 rounded-lg bg-blue-800 border border-transparent transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:border-blue-400/20 cursor-default"
+          >
+            <dt>
+              <span class="block text-lg font-medium text-blue-200">Single</span>
+              <span class="block mt-2 text-3xl font-bold text-white">
+                {format_membership_plan_price(:single)}<span class="text-lg font-normal text-blue-200">/year</span>
               </span>
-              <span class="text-zinc-500">/year</span>
-            </div>
-            <p class="mt-4 text-zinc-600">
-              Enjoy all the benefits of the YSC for yourself.
-            </p>
-            <ul class="mt-6 space-y-3">
-              <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
-                Access to both cabins
-              </li>
-              <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
-                Member events
-              </li>
-              <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
-                Community access
-              </li>
-            </ul>
+            </dt>
+            <dd class="mt-4 text-base text-blue-100 leading-relaxed">
+              Just you
+            </dd>
           </div>
 
-          <%!-- Family Membership --%>
-          <div class="bg-white rounded-xl p-6 sm:p-8 border border-zinc-100">
-            <h3 class="text-xl font-bold text-zinc-900">Family Membership</h3>
-            <div class="mt-4">
-              <span class="text-4xl font-bold text-zinc-900">
-                {Ysc.MoneyHelper.format_money!(
-                  Money.new(
-                    :USD,
-                    Enum.at(Application.get_env(:ysc, :membership_plans), 1).amount
-                  )
-                )}
+          <div
+            id="membership-family"
+            class="p-8 rounded-lg bg-blue-800 border border-transparent transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:border-blue-400/20 cursor-default"
+          >
+            <dt>
+              <span class="block text-lg font-medium text-blue-200">Family</span>
+              <span class="block mt-2 text-3xl font-bold text-white">
+                {format_membership_plan_price(:family)}<span class="text-lg font-normal text-blue-200">/year</span>
               </span>
-              <span class="text-zinc-500">/year</span>
-            </div>
-            <p class="mt-4 text-zinc-600">
-              Share the YSC experience with your loved ones! Covers you, your spouse, and children under 18.
-            </p>
-            <ul class="mt-6 space-y-3">
-              <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
-                Everything in Single
-              </li>
-              <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
-                Spouse included
-              </li>
-              <li class="flex items-center text-zinc-700">
-                <.icon name="hero-check" class="w-5 h-5 text-blue-700 mr-3" />
-                Children under 18 included
-              </li>
-            </ul>
+            </dt>
+            <dd class="mt-4 text-base text-blue-100 leading-relaxed">
+              You, your spouse or partner, and children under 18
+            </dd>
           </div>
-        </div>
+        </dl>
 
-        <div class="text-center mt-12">
+        <div class="mt-10 sm:mt-12 flex justify-center">
           <.link
+            id="membership-apply-link"
             navigate={~p"/users/register"}
-            class="inline-flex items-center px-8 py-4 text-lg font-bold text-blue-700 bg-white rounded hover:bg-zinc-100 transition-colors duration-200"
+            class="group inline-flex items-center justify-center min-h-[48px] px-8 py-3.5 text-base font-bold text-blue-900 bg-white rounded hover:bg-blue-50 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-blue-900"
           >
             Check Eligibility & Apply
-            <.icon name="hero-arrow-right" class="ml-2 w-5 h-5" />
+            <.icon
+              name="hero-arrow-right"
+              class="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform duration-300"
+            />
           </.link>
         </div>
       </div>
@@ -2752,6 +2693,33 @@ defmodule YscWeb.HomeLive do
   end
 
   defp format_post_date(_), do: ""
+
+  defp format_membership_plan_price(plan_id) when is_atom(plan_id) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    case Enum.find(plans, &(&1.id == plan_id)) do
+      %{amount: amount, currency: currency}
+      when is_number(amount) and is_binary(currency) ->
+        case membership_plan_currency(currency) do
+          nil ->
+            ""
+
+          currency_atom ->
+            Ysc.MoneyHelper.format_money!(Money.new(currency_atom, amount))
+        end
+
+      _ ->
+        ""
+    end
+  end
+
+  defp membership_plan_currency(currency) when is_binary(currency) do
+    currency
+    |> String.upcase()
+    |> String.to_existing_atom()
+  rescue
+    ArgumentError -> nil
+  end
 
   defp format_membership_date(%DateTime{} = dt) do
     dt
