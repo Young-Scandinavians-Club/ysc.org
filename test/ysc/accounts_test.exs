@@ -2037,6 +2037,51 @@ defmodule Ysc.AccountsTest do
       assert subscription_preload_count == 0
     end
 
+    test "list_memberships type :single excludes lifetime primaries" do
+      lifetime_primary =
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+
+      single_primary =
+        user_with_single_subscription(%{phone_number: unique_user_phone()})
+
+      single_only = Accounts.list_memberships(type: :single, limit: 500)
+
+      assert Enum.any?(single_only, fn m ->
+               m.primary_user.id == single_primary.id
+             end)
+
+      refute Enum.any?(single_only, fn m ->
+               m.primary_user.id == lifetime_primary.id
+             end)
+    end
+
+    test "get_membership_stats reports zero family when family plan is unconfigured" do
+      plans = Application.get_env(:ysc, :membership_plans)
+
+      family_primary =
+        user_with_family_subscription(%{phone_number: unique_user_phone()})
+
+      try do
+        Application.put_env(
+          :ysc,
+          :membership_plans,
+          Enum.reject(plans, &(&1.id == :family))
+        )
+
+        stats = Accounts.get_membership_stats()
+        assert stats.family == 0
+        assert stats.single == stats.total - stats.lifetime
+
+        assert Accounts.list_memberships(type: :family, limit: 500) == []
+
+        assert Enum.any?(Accounts.list_memberships(type: :single, limit: 500), fn m ->
+                 m.primary_user.id == family_primary.id
+               end)
+      after
+        Application.put_env(:ysc, :membership_plans, plans)
+      end
+    end
+
     test "get_membership_joins_ytd_comparison returns comparable YTD join stats" do
       cmp = Accounts.get_membership_joins_ytd_comparison()
 
