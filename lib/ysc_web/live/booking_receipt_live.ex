@@ -1577,41 +1577,41 @@ defmodule YscWeb.BookingReceiptLive do
          }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
-          booking =
-            case Bookings.sync_hold_pricing_from_calculation(booking) do
-              {:ok, updated_booking} ->
-                updated_booking
+          case Bookings.maybe_sync_hold_pricing_from_calculation(booking) do
+            {:ok, synced_booking} ->
+              verification_result =
+                if modification_payment_intent?(payment_intent) do
+                  Bookings.verify_modification_redirect_payment_intent(
+                    payment_intent,
+                    synced_booking
+                  )
+                else
+                  Bookings.verify_booking_payment_intent(
+                    payment_intent,
+                    synced_booking
+                  )
+                end
 
-              {:error, reason} ->
-                Ysc.Logging.warning(
-                  "[BookingReceipt] Failed to sync recalculated hold pricing before payment verification",
-                  booking_id: booking.id,
-                  reason: inspect(reason)
-                )
+              case verification_result do
+                :ok ->
+                  process_verified_booking_payment_success(
+                    synced_booking,
+                    payment_intent,
+                    payment_intent_id
+                  )
 
-                booking
-            end
+                {:error, reason} ->
+                  {:error, reason}
+              end
 
-          verification_result =
-            if modification_payment_intent?(payment_intent) do
-              Bookings.verify_modification_redirect_payment_intent(
-                payment_intent,
-                booking
+            {:error, reason} = error ->
+              Ysc.Logging.warning(
+                "[BookingReceipt] Failed to sync recalculated hold pricing before payment verification",
+                booking_id: booking.id,
+                reason: inspect(reason)
               )
-            else
-              Bookings.verify_booking_payment_intent(payment_intent, booking)
-            end
 
-          case verification_result do
-            :ok ->
-              process_verified_booking_payment_success(
-                booking,
-                payment_intent,
-                payment_intent_id
-              )
-
-            {:error, reason} ->
-              {:error, reason}
+              error
           end
         else
           {:error, :payment_not_succeeded}

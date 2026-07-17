@@ -6,6 +6,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
   alias Ysc.Bookings.{BookingLocker, Entitlements}
   alias Ysc.Repo
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -167,6 +168,32 @@ defmodule Ysc.Bookings.EntitlementsTest do
       ent = Entitlements.get_entitlement!(entitlement.id)
       assert ent.status == :consumed
       assert ent.consumed_booking_id in [booking_a.id, booking_b.id]
+    end
+
+    test "consume_for_booking! rejects expired entitlements", %{
+      user: user,
+      admin: admin
+    } do
+      past =
+        DateTime.add(DateTime.utc_now(), -86_400, :second)
+        |> DateTime.truncate(:second)
+
+      assert {:ok, entitlement} =
+               Entitlements.create_entitlement(
+                 %{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 25),
+                   expires_at: past
+                 },
+                 send_notification: false
+               )
+
+      booking = booking_fixture(%{user_id: user.id, status: :hold})
+
+      assert {:error, :entitlement_consume_failed} =
+               Entitlements.consume_for_booking!(entitlement.id, booking.id)
     end
   end
 

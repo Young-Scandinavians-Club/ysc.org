@@ -2058,31 +2058,31 @@ defmodule YscWeb.BookingCheckoutLive do
          }) do
       {:ok, payment_intent} ->
         if payment_intent.status == "succeeded" do
-          booking =
-            case Bookings.sync_hold_pricing_from_calculation(booking) do
-              {:ok, updated_booking} ->
-                updated_booking
+          case Bookings.maybe_sync_hold_pricing_from_calculation(booking) do
+            {:ok, synced_booking} ->
+              case Bookings.verify_booking_payment_intent(
+                     payment_intent,
+                     synced_booking
+                   ) do
+                :ok ->
+                  process_verified_booking_payment_success(
+                    synced_booking,
+                    payment_intent,
+                    payment_intent_id
+                  )
 
-              {:error, reason} ->
-                Ysc.Logging.warning(
-                  "[BookingCheckout] Failed to sync recalculated hold pricing before payment verification",
-                  booking_id: booking.id,
-                  reason: inspect(reason)
-                )
+                {:error, reason} ->
+                  {:error, reason}
+              end
 
-                booking
-            end
-
-          case Bookings.verify_booking_payment_intent(payment_intent, booking) do
-            :ok ->
-              process_verified_booking_payment_success(
-                booking,
-                payment_intent,
-                payment_intent_id
+            {:error, reason} = error ->
+              Ysc.Logging.warning(
+                "[BookingCheckout] Failed to sync recalculated hold pricing before payment verification",
+                booking_id: booking.id,
+                reason: inspect(reason)
               )
 
-            {:error, reason} ->
-              {:error, reason}
+              error
           end
         else
           {:error, :payment_not_succeeded}
