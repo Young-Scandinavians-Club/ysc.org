@@ -27,7 +27,7 @@ defmodule Ysc.Accounts do
   }
 
   alias Ysc.Newsletter
-  alias Ysc.Subscriptions.Subscription
+  alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
 
   @blocked_session_states [:suspended, :rejected, :deleted]
 
@@ -3435,12 +3435,13 @@ defmodule Ysc.Accounts do
   List of maps: `%{primary_user: user, type: atom, associated_users: [user], user_count: integer}`
   """
   def list_memberships(opts \\ []) do
-    {_stats, memberships} = load_admin_memberships_page(opts)
-    memberships
+    opts
+    |> active_primary_users_for_memberships()
+    |> membership_rows_from_primaries()
   end
 
   @doc """
-  Loads admin membership stats and list rows in one database round-trip.
+  Loads admin membership stats and a paginated membership list.
 
   Stats always reflect all active memberships; `opts` (`:type`, `:limit`, `:offset`)
   only filter the returned list.
@@ -3450,24 +3451,52 @@ defmodule Ysc.Accounts do
   `memberships` matches `list_memberships/1`.
   """
   def load_admin_memberships_page(opts \\ []) do
-    rows =
-      membership_rows_from_primaries(active_primary_users_for_memberships())
-
-    stats = membership_stats_from_rows(rows)
-    memberships = paginate_membership_rows(rows, opts)
-    {stats, memberships}
+    {get_membership_stats(), list_memberships(opts)}
   end
 
   @doc """
   Returns membership counts by type for admin dashboard.
 
+  Uses SQL `COUNT` queries instead of loading every active primary user.
+
   ## Returns
   `%{total: integer, single: integer, family: integer, lifetime: integer}`
   """
   def get_membership_stats do
-    active_primary_users_for_membership_stats()
-    |> Enum.map(&get_membership_type_for_primary/1)
-    |> membership_stats_from_types()
+    base = active_membership_primary_users_query()
+
+    total = from(u in base, select: count(u.id)) |> Repo.one()
+
+    lifetime =
+      from(u in base,
+        where: not is_nil(u.lifetime_membership_awarded_at),
+        select: count(u.id)
+      )
+      |> Repo.one()
+
+    family =
+      case family_membership_price_id() do
+        nil ->
+          0
+
+        family_price_id ->
+          from(u in base,
+            where: is_nil(u.lifetime_membership_awarded_at),
+            where:
+              u.id in subquery(
+                active_family_membership_user_ids_query(family_price_id)
+              ),
+            select: count(u.id)
+          )
+          |> Repo.one()
+      end
+
+    %{
+      total: total,
+      single: total - lifetime - family,
+      family: family,
+      lifetime: lifetime
+    }
   end
 
   defp active_membership_primary_users_query do
@@ -3491,15 +3520,76 @@ defmodule Ysc.Accounts do
     )
   end
 
-  defp active_primary_users_for_membership_stats do
-    active_membership_primary_users_query()
-    |> preload([:sub_accounts, subscriptions: :subscription_items])
-    |> Repo.all()
+  defp active_family_membership_user_ids_query(family_price_id) do
+    now = DateTime.utc_now()
+
+    from(si in SubscriptionItem,
+      join: s in Subscription,
+      on: si.subscription_id == s.id,
+      where: s.stripe_status in ["active", "trialing"],
+      where: s.current_period_end > ^now,
+      where: is_nil(s.ends_at) or s.ends_at > ^now,
+      where: si.stripe_price_id == ^family_price_id,
+      select: s.user_id,
+      distinct: true
+    )
   end
 
-  defp active_primary_users_for_memberships do
+  defp family_membership_price_id do
+    Application.get_env(:ysc, :membership_plans, [])
+    |> Enum.find_value(fn plan ->
+      if plan.id == :family, do: plan.stripe_price_id
+    end)
+  end
+
+  defp apply_membership_type_filter(query, nil), do: query
+
+  defp apply_membership_type_filter(query, :lifetime) do
+    from(u in query, where: not is_nil(u.lifetime_membership_awarded_at))
+  end
+
+  defp apply_membership_type_filter(query, :family) do
+    case family_membership_price_id() do
+      nil ->
+        from(u in query, where: false)
+
+      family_price_id ->
+        from(u in query,
+          where: is_nil(u.lifetime_membership_awarded_at),
+          where:
+            u.id in subquery(
+              active_family_membership_user_ids_query(family_price_id)
+            )
+        )
+    end
+  end
+
+  defp apply_membership_type_filter(query, :single) do
+    case family_membership_price_id() do
+      nil ->
+        from(u in query, where: is_nil(u.lifetime_membership_awarded_at))
+
+      family_price_id ->
+        from(u in query,
+          where: is_nil(u.lifetime_membership_awarded_at),
+          where:
+            u.id not in subquery(
+              active_family_membership_user_ids_query(family_price_id)
+            )
+        )
+    end
+  end
+
+  defp active_primary_users_for_memberships(opts) do
+    type_filter = Keyword.get(opts, :type)
+    limit = Keyword.get(opts, :limit, 100)
+    offset = Keyword.get(opts, :offset, 0)
+
     active_membership_primary_users_query()
+    |> apply_membership_type_filter(type_filter)
     |> order_by([u], asc: u.last_name, asc: u.first_name)
+    |> limit(^limit)
+    |> offset(^offset)
     |> preload([
       {:sub_accounts, :current_avatar},
       :current_avatar,
@@ -3520,40 +3610,6 @@ defmodule Ysc.Accounts do
         user_count: length(associated)
       }
     end)
-  end
-
-  defp paginate_membership_rows(rows, opts) do
-    type_filter = Keyword.get(opts, :type)
-    limit = Keyword.get(opts, :limit, 100)
-    offset = Keyword.get(opts, :offset, 0)
-
-    rows
-    |> maybe_filter_membership_rows_by_type(type_filter)
-    |> Enum.drop(offset)
-    |> Enum.take(limit)
-  end
-
-  defp maybe_filter_membership_rows_by_type(rows, nil), do: rows
-
-  defp maybe_filter_membership_rows_by_type(rows, type_filter) do
-    Enum.filter(rows, &(&1.type == type_filter))
-  end
-
-  defp membership_stats_from_rows(rows) do
-    rows
-    |> Enum.map(& &1.type)
-    |> membership_stats_from_types()
-  end
-
-  defp membership_stats_from_types(types) do
-    by_type = Enum.frequencies(types)
-
-    %{
-      total: length(types),
-      single: Map.get(by_type, :single, 0),
-      family: Map.get(by_type, :family, 0),
-      lifetime: Map.get(by_type, :lifetime, 0)
-    }
   end
 
   @doc """

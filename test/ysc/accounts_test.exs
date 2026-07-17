@@ -1992,13 +1992,13 @@ defmodule Ysc.AccountsTest do
              } = stats
     end
 
-    test "load_admin_memberships_page returns stats and list from one pass" do
+    test "load_admin_memberships_page returns stats matching get_membership_stats" do
       {stats, memberships} = Accounts.load_admin_memberships_page(limit: 500)
       list_stats = Accounts.get_membership_stats()
 
       assert stats == list_stats
       assert is_list(memberships)
-      assert length(memberships) <= stats.total
+      assert length(memberships) <= min(stats.total, 500)
 
       {stats_family, family_rows} =
         Accounts.load_admin_memberships_page(type: :family, limit: 500)
@@ -2006,6 +2006,35 @@ defmodule Ysc.AccountsTest do
       assert stats_family == stats
       assert Enum.all?(family_rows, &(&1.type == :family))
       refute Enum.any?(family_rows, &(&1.type == :lifetime))
+    end
+
+    test "list_memberships applies SQL limit before loading membership rows" do
+      for idx <- 1..30 do
+        user_with_lifetime_membership(%{
+          phone_number: unique_user_phone(),
+          last_name:
+            "SqlLimit#{String.pad_leading(Integer.to_string(idx), 2, "0")}"
+        })
+      end
+
+      assert length(Accounts.list_memberships(limit: 5)) == 5
+      assert length(Accounts.list_memberships(limit: 5, offset: 5)) == 5
+    end
+
+    test "get_membership_stats uses COUNT queries without subscription preloads" do
+      for _ <- 1..10 do
+        user_with_lifetime_membership(%{phone_number: unique_user_phone()})
+      end
+
+      subscription_preload_pattern = ~r/FROM "subscriptions".*user_id.*ANY/i
+
+      {_stats, subscription_preload_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn -> Accounts.get_membership_stats() end,
+          pattern: subscription_preload_pattern
+        )
+
+      assert subscription_preload_count == 0
     end
 
     test "get_membership_joins_ytd_comparison returns comparable YTD join stats" do
