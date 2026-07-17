@@ -1171,7 +1171,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/checkout/#{booking.id}")
 
       synced = Repo.get!(Booking, booking.id)
-      assert Money.cmp(synced.total_price, full_total) == :lt
+      assert Money.cmp(synced.total_price, full_total) == -1
 
       discounted_cents = Ysc.MoneyHelper.money_to_cents(synced.total_price)
       pi_id = "pi_expired_entitlement_#{System.unique_integer([:positive])}"
