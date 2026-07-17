@@ -535,6 +535,30 @@ defmodule YscWeb.UserSecurityLiveTest do
       assert html =~ "192.168.xxx.xxx"
     end
 
+    test "masks IPv6 addresses in sign-in history instead of showing full address", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      AuthEvent.login_success_changeset(user, %{
+        ip_address: "2607:fb90:8e93:2ba1:ac39:6d57:509c:f8ac",
+        user_agent: "Mozilla/5.0",
+        device_type: "desktop",
+        browser: "Chrome",
+        operating_system: "macOS"
+      })
+      |> Repo.insert!()
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings/security")
+
+      render_async(view)
+
+      html = render(view)
+      assert html =~ "2607:fb90:xxxx:..."
+      refute html =~ "509c:f8ac"
+    end
+
     test "displays OAuth sign-in method as Google or Facebook", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)

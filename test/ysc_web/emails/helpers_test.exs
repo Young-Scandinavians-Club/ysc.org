@@ -115,6 +115,15 @@ defmodule YscWeb.Emails.HelpersTest do
                ip_address: nil
              }) == "Unknown location"
     end
+
+    test "sign_in_location/1 deduplicates repeated geo parts" do
+      assert Helpers.sign_in_location(%{
+               city: "Oslo",
+               region: "Oslo",
+               country: "NO",
+               ip_address: "198.51.100.10"
+             }) == "Oslo, Norway"
+    end
   end
 
   describe "format_date/1" do

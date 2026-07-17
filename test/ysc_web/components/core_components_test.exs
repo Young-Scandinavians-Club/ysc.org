@@ -269,4 +269,92 @@ defmodule YscWeb.CoreComponentsTest do
       assert ops =~ "dropdown-open"
     end
   end
+
+  describe "country_flag_colors/1" do
+    test "returns Nordic flag palettes" do
+      assert country_flag_colors("SE") == ["#006AA7", "#FECC00"]
+      assert country_flag_colors("NO") == ["#BA0C2F", "#FFFFFF", "#00205B"]
+      assert country_flag_colors("DK") == ["#C8102E", "#FFFFFF"]
+      assert country_flag_colors("FI") == ["#003580", "#FFFFFF"]
+      assert country_flag_colors("IS") == ["#02529C", "#FFFFFF", "#DC1E35"]
+    end
+
+    test "normalizes country codes and falls back to Sweden" do
+      assert country_flag_colors(" no ") == country_flag_colors("NO")
+      assert country_flag_colors("de") == country_flag_colors("SE")
+      assert country_flag_colors(nil) == country_flag_colors("SE")
+    end
+  end
+
+  describe "user_avatar_identity/1 and user_avatar_image/1" do
+    test "badge variant renders country flag overlay and custom avatar URL" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.user_avatar_image
+          country="NO"
+          user_id="42"
+          avatar_url="https://cdn.example.com/avatar.jpg"
+          class="w-10 h-10"
+        />
+        """)
+
+      assert html =~ "avatar-identity-badge"
+      assert html =~ ~s(src="https://cdn.example.com/avatar.jpg")
+      assert html =~ ~s(src="/images/flagicons/flags/1x1/no.svg")
+      assert html =~ "w-10 h-10"
+    end
+
+    test "ring variant renders conic gradient from country colors" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.user_avatar_identity
+          variant={:ring}
+          country="FI"
+          user_id="1"
+          avatar_url="https://cdn.example.com/fi.jpg"
+          class="w-12 h-12"
+        />
+        """)
+
+      assert html =~ "avatar-identity-ring"
+      assert html =~ "conic-gradient"
+      assert html =~ "#003580"
+      assert html =~ ~s(src="https://cdn.example.com/fi.jpg")
+    end
+
+    test "peek variant renders flag strip beside avatar" do
+      assigns = %{}
+
+      html =
+        rendered_to_string(~H"""
+        <.user_avatar_identity
+          variant={:peek}
+          country="DK"
+          user_id="7"
+          avatar_url="https://cdn.example.com/dk.jpg"
+        />
+        """)
+
+      assert html =~ "avatar-identity-peek"
+      assert html =~ ~s(src="/images/flagicons/flags/1x1/dk.svg")
+      assert html =~ ~s(src="https://cdn.example.com/dk.jpg")
+    end
+
+    test "derives country from user struct when provided" do
+      user = %{id: "01JTEST", email: "nordic@example.com", most_connected_country: "IS"}
+      assigns = %{user: user}
+
+      html =
+        rendered_to_string(~H"""
+        <.user_avatar_image user={@user} class="w-8 h-8" />
+        """)
+
+      assert html =~ ~s(src="/images/flagicons/flags/1x1/is.svg")
+      assert html =~ "/images/default_avatars/"
+    end
+  end
 end
