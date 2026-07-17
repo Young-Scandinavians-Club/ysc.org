@@ -131,9 +131,10 @@ defmodule YscWeb.Emails.HelpersTest do
       assert Helpers.format_date(:invalid) == "N/A"
     end
 
-    test "parses ISO8601 date strings and passes through invalid strings" do
+    test "parses ISO8601 date strings and returns default for invalid strings" do
       assert Helpers.format_date("2026-01-15") == "January 15, 2026"
-      assert Helpers.format_date("not-a-date") == "not-a-date"
+      assert Helpers.format_date("not-a-date") == "N/A"
+      assert Helpers.format_date("invalid") == "N/A"
     end
   end
 
