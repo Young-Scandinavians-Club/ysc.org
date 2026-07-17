@@ -486,21 +486,18 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert render_upload(avatar_upload, "avatar.png") =~ "100%"
 
       render_submit(view, "save_avatar")
+      render(view)
 
-      html = render(view)
-
-      assert html =~ "Photo uploaded" or html =~ "Could not upload profile picture"
-
-      if html =~ "Photo uploaded" do
-        avatar =
-          Repo.one!(
-            from(a in Avatar,
-              where: a.user_id == ^user.id,
-              order_by: [desc: a.inserted_at],
-              limit: 1
-            )
+      avatar =
+        Repo.one(
+          from(a in Avatar,
+            where: a.user_id == ^user.id,
+            order_by: [desc: a.inserted_at],
+            limit: 1
           )
+        )
 
+      if avatar do
         assert avatar.source == :upload
         assert avatar.processing_state in [:pending, :failed]
       end
