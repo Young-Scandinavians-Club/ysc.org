@@ -303,8 +303,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            conn: conn,
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -380,8 +379,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          } do
       Ysc.TestHelpers.setup_quickbooks_mocks()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -435,8 +433,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          } do
       Ysc.TestHelpers.setup_quickbooks_mocks()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -500,8 +497,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          } do
       Ysc.TestHelpers.setup_quickbooks_mocks()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -647,8 +643,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       conn: conn,
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -728,8 +723,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            conn: conn,
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -812,8 +806,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            conn: conn,
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -872,8 +865,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          } do
       ensure_buyout_base_pricing!()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -935,8 +927,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
     test "shows entitlement summary on checkout with partial fixed discount",
          %{conn: conn, user: user} do
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(
@@ -1136,8 +1127,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
          } do
       Ysc.TestHelpers.setup_quickbooks_mocks()
 
-      checkin = Date.utc_today() |> Date.add(7)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(

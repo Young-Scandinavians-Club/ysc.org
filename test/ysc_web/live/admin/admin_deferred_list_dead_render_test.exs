@@ -47,7 +47,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/posts")
           |> html_response(200)
         end,
-        pattern: posts_pattern
+        pattern: posts_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -70,7 +71,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/events")
           |> html_response(200)
         end,
-        pattern: events_pattern
+        pattern: events_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -92,7 +94,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/users")
           |> html_response(200)
         end,
-        pattern: users_pattern
+        pattern: users_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -141,7 +144,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/scanner/sessions")
           |> html_response(200)
         end,
-        pattern: sessions_pattern
+        pattern: sessions_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -169,7 +173,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/scanner/sessions/#{session.id}")
           |> html_response(200)
         end,
-        pattern: sessions_pattern
+        pattern: sessions_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -198,7 +203,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/events/#{event.id}/check-in")
           |> html_response(200)
         end,
-        pattern: events_pattern
+        pattern: events_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -225,7 +231,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/newsletters/#{edition.id}/edit")
           |> html_response(200)
         end,
-        pattern: editions_pattern
+        pattern: editions_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -248,7 +255,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/money/payments/#{payment.id}")
           |> html_response(200)
         end,
-        pattern: payments_pattern
+        pattern: payments_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -269,7 +277,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/money/payments/#{payment.id}/refund")
           |> html_response(200)
         end,
-        pattern: refunds_pattern
+        pattern: refunds_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
@@ -292,7 +301,8 @@ defmodule YscWeb.AdminDeferredListDeadRenderTest do
           |> get("/admin/bookings/#{booking.id}")
           |> html_response(200)
         end,
-        pattern: bookings_pattern
+        pattern: bookings_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
