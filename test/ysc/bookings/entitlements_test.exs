@@ -6,6 +6,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
   alias Ysc.Bookings.{BookingLocker, Entitlements}
   alias Ysc.Repo
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()

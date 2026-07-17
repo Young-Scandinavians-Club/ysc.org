@@ -1216,6 +1216,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       Mox.verify!(StripeMock)
     end
   end
+
+  describe "payment-success rejects foreign payment intent" do
     setup %{conn: conn} do
       user = user_with_membership()
       %{conn: log_in_user(conn, user), user: user}
