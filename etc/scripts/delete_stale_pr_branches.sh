@@ -33,10 +33,12 @@ resolve_repo() {
 
   case "$remote_url" in
     git@github.com:*)
-      echo "${remote_url#git@github.com:}" | sed 's/\.git$//'
+      local repo_path="${remote_url#git@github.com:}"
+      echo "${repo_path%.git}"
       ;;
     https://github.com/*)
-      echo "${remote_url#https://github.com/}" | sed 's/\.git$//'
+      local repo_path="${remote_url#https://github.com/}"
+      echo "${repo_path%.git}"
       ;;
     *)
       echo "Could not resolve GITHUB_REPOSITORY from git remote." >&2
