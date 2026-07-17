@@ -535,9 +535,10 @@ defmodule YscWeb.UserSecurityLiveTest do
       assert html =~ "192.168.xxx.xxx"
     end
 
-    test "masks IPv6 addresses in sign-in history instead of showing full address", %{
-      conn: conn
-    } do
+    test "masks IPv6 addresses in sign-in history instead of showing full address",
+         %{
+           conn: conn
+         } do
       user = user_fixture()
       conn = log_in_user(conn, user)
 

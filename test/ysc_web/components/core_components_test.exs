@@ -345,7 +345,12 @@ defmodule YscWeb.CoreComponentsTest do
     end
 
     test "derives country from user struct when provided" do
-      user = %{id: "01JTEST", email: "nordic@example.com", most_connected_country: "IS"}
+      user = %{
+        id: "01JTEST",
+        email: "nordic@example.com",
+        most_connected_country: "IS"
+      }
+
       assigns = %{user: user}
 
       html =
