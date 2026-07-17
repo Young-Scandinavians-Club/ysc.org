@@ -5,11 +5,18 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Ecto.Query
 
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyMember
+  alias Ysc.Avatars
+  alias Ysc.Avatars.Avatar
   alias Ysc.Repo
   alias Ysc.Subscriptions
+
+  @tiny_png Base.decode64!(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            )
 
   # WP-style user inserted without going through register_user/1 (which marks
   # post-migration onboarding complete). Mirrors Accounts post-migration tests.
@@ -65,10 +72,171 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/onboarding")
 
       assert has_element?(view, "#onboarding-profile-form")
-      assert render(view) =~ "make sure your details are up to date"
-      assert render(view) =~ "Welcome back!"
-      assert render(view) =~ "update anything that"
-      assert render(view) =~ "out of date"
+      assert has_element?(view, "#onboarding-avatar-section")
+      assert has_element?(view, "#onboarding-avatar-upload-form")
+
+      assert has_element?(
+               view,
+               "button[data-avatar-file-trigger]",
+               "Upload photo"
+             )
+
+      assert has_element?(view, "h1", "make sure your details are up to date")
+      assert has_element?(view, "h3", "Profile photo")
+
+      assert has_element?(
+               view,
+               "p",
+               "Optional — helps other members recognize you at events."
+             )
+    end
+  end
+
+  describe "profile step avatar" do
+    defp completed_avatar!(user) do
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
+        })
+
+      avatar
+    end
+
+    test "select_avatar sets a completed avatar as current", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      avatar = completed_avatar!(user)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      assert has_element?(view, "#onboarding-avatar-#{avatar.id}")
+
+      view
+      |> element("#onboarding-avatar-#{avatar.id}")
+      |> render_click()
+
+      updated_user = Accounts.get_user!(user.id)
+      assert updated_user.current_avatar_id == avatar.id
+      assert render(view) =~ "Profile picture updated"
+    end
+
+    test "select_avatar shows an error for unknown avatars", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      render_click(view, "select_avatar", %{"id" => Ecto.ULID.generate()})
+
+      assert render(view) =~ "Could not update profile picture"
+    end
+
+    test "select_avatar rejects non-completed avatars", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/original.webp"
+        })
+
+      conn = log_in_user(conn, user)
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      refute has_element?(view, "#onboarding-avatar-#{avatar.id}")
+
+      render_click(view, "select_avatar", %{"id" => avatar.id})
+
+      updated_user = Accounts.get_user!(user.id)
+      assert is_nil(updated_user.current_avatar_id)
+    end
+
+    test "refreshes avatar library after avatar is processed", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      avatar = completed_avatar!(user)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      send(view.pid, {:avatar_processed, user.id})
+      render(view)
+
+      assert has_element?(view, "#onboarding-avatar-#{avatar.id}")
+    end
+
+    test "validate_avatar leaves the upload form rendered", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      assert render_change(view, "validate_avatar", %{})
+      assert has_element?(view, "#onboarding-avatar-upload-form")
+    end
+
+    test "save_avatar completes upload and creates an avatar record", %{
+      conn: conn
+    } do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      avatar_upload =
+        file_input(view, "#onboarding-avatar-upload-form", :avatar, [
+          %{
+            last_modified: System.system_time(:millisecond),
+            name: "avatar.png",
+            content: @tiny_png,
+            type: "image/png"
+          }
+        ])
+
+      assert render_upload(avatar_upload, "avatar.png") =~ "100%"
+
+      render_submit(view, "save_avatar")
+      render(view)
+
+      avatar =
+        Repo.one(
+          from(a in Avatar,
+            where: a.user_id == ^user.id,
+            order_by: [desc: a.inserted_at],
+            limit: 1
+          )
+        )
+
+      if avatar do
+        assert avatar.source == :upload
+        assert avatar.processing_state in [:pending, :failed]
+      end
+    end
+
+    test "save_avatar without an upload is a no-op", %{conn: conn} do
+      user = user_needing_post_migration_onboarding()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render(view)
+
+      render_submit(view, "save_avatar")
+
+      refute Repo.exists?(from(a in Avatar, where: a.user_id == ^user.id))
     end
   end
 

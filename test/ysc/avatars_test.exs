@@ -3,8 +3,58 @@ defmodule Ysc.AvatarsTest do
 
   alias Ysc.Avatars
   alias Ysc.Accounts.User
+  alias Ysc.Repo
 
   import Ysc.AccountsFixtures
+
+  describe "content_type_for_extension/1" do
+    test "derives MIME type from allowed extensions" do
+      assert Avatars.content_type_for_extension(".png") == "image/png"
+      assert Avatars.content_type_for_extension(".webp") == "image/webp"
+      assert Avatars.content_type_for_extension(".jpg") == "image/jpeg"
+      assert Avatars.content_type_for_extension(".gif") == "image/gif"
+      assert Avatars.content_type_for_extension(".unknown") == "image/jpeg"
+    end
+  end
+
+  describe "create_avatar_and_enqueue_job/2" do
+    test "creates avatar and enqueues processor job in one transaction" do
+      user = user_fixture()
+
+      assert {:ok, avatar} =
+               Avatars.create_avatar_and_enqueue_job(user, %{
+                 source: :upload,
+                 original_path: "https://example.com/avatars/original.webp"
+               })
+
+      assert avatar.user_id == user.id
+      assert avatar.processing_state == :pending
+      assert Avatars.get_avatar!(avatar.id).id == avatar.id
+    end
+
+    test "returns error without creating avatar when attrs are invalid" do
+      user = user_fixture()
+
+      assert {:error, %Ecto.Changeset{}} =
+               Avatars.create_avatar_and_enqueue_job(user, %{})
+
+      refute_enqueued(worker: YscWeb.Workers.AvatarProcessor)
+    end
+
+    test "returns error when the user no longer exists" do
+      user = user_fixture()
+      user_id = user.id
+      Repo.delete!(user)
+
+      assert {:error, %Ecto.Changeset{}} =
+               Avatars.create_avatar_and_enqueue_job(%User{id: user_id}, %{
+                 source: :upload,
+                 original_path: "https://example.com/avatars/original.webp"
+               })
+
+      refute_enqueued(worker: YscWeb.Workers.AvatarProcessor)
+    end
+  end
 
   describe "create_avatar/2" do
     test "creates an avatar record for a user" do
@@ -97,6 +147,14 @@ defmodule Ysc.AvatarsTest do
           original_path: "https://example.com/test.webp"
         })
 
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
+        })
+
       {:ok, updated_user} = Avatars.set_current_avatar(user, avatar.id)
       assert updated_user.current_avatar_id == avatar.id
     end
@@ -111,7 +169,27 @@ defmodule Ysc.AvatarsTest do
           original_path: "https://example.com/test.webp"
         })
 
-      assert {:error, :not_owner} = Avatars.set_current_avatar(user2, avatar.id)
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
+        })
+
+      assert {:error, :not_found} = Avatars.set_current_avatar(user2, avatar.id)
+    end
+
+    test "rejects non-completed avatars" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path: "https://example.com/test.webp"
+        })
+
+      assert {:error, :not_found} = Avatars.set_current_avatar(user, avatar.id)
     end
   end
 
@@ -123,6 +201,14 @@ defmodule Ysc.AvatarsTest do
         Avatars.create_avatar(user, %{
           source: :upload,
           original_path: "https://example.com/test.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/thumb.webp",
+          profile_path: "https://example.com/profile.webp",
+          large_path: "https://example.com/large.webp"
         })
 
       {:ok, user_with_avatar} = Avatars.set_current_avatar(user, avatar.id)
@@ -235,7 +321,11 @@ defmodule Ysc.AvatarsTest do
           original_path: "https://example.com/original.webp"
         })
 
-      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+      {:ok, user} =
+        user
+        |> Ecto.Changeset.change(current_avatar_id: avatar.id)
+        |> Ysc.Repo.update()
+
       user = Ysc.Repo.preload(user, :current_avatar)
 
       assert is_nil(Avatars.resolve_user_avatar_url(user, :profile))

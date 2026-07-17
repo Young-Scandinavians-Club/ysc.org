@@ -37,6 +37,7 @@ defmodule Ysc.Avatars.Avatar do
     |> validate_required([:source, :original_path])
     |> validate_length(:original_path, max: 2048)
     |> validate_length(:source_url, max: 2048)
+    |> foreign_key_constraint(:user_id)
   end
 
   def processing_changeset(avatar, attrs) do
