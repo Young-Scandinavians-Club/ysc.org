@@ -372,12 +372,7 @@ defmodule YscWeb.HomeLive do
               <strong class="text-zinc-900">Swedish</strong>
               heritage may qualify for membership, with rates starting at just
               <strong class="text-blue-700">
-                {Ysc.MoneyHelper.format_money!(
-                  Money.new(
-                    :USD,
-                    Enum.at(Application.get_env(:ysc, :membership_plans), 0).amount
-                  )
-                )}
+                {format_membership_plan_price(:single)}
               </strong>
               per year.
             </p>
@@ -2703,12 +2698,27 @@ defmodule YscWeb.HomeLive do
     plans = Application.get_env(:ysc, :membership_plans, [])
 
     case Enum.find(plans, &(&1.id == plan_id)) do
-      %{amount: amount} ->
-        Ysc.MoneyHelper.format_money!(Money.new(:USD, amount))
+      %{amount: amount, currency: currency}
+      when is_number(amount) and is_binary(currency) ->
+        case membership_plan_currency(currency) do
+          nil ->
+            ""
 
-      nil ->
+          currency_atom ->
+            Ysc.MoneyHelper.format_money!(Money.new(currency_atom, amount))
+        end
+
+      _ ->
         ""
     end
+  end
+
+  defp membership_plan_currency(currency) when is_binary(currency) do
+    currency
+    |> String.upcase()
+    |> String.to_existing_atom()
+  rescue
+    ArgumentError -> nil
   end
 
   defp format_membership_date(%DateTime{} = dt) do
