@@ -1780,9 +1780,7 @@ defmodule Ysc.WpMigration.Load do
     overrides =
       normalize_author_overrides(Keyword.get(opts, :author_overrides, %{}))
 
-    unless File.exists?(posts_path) do
-      {:error, "Posts file not found: #{posts_path}"}
-    else
+    if File.exists?(posts_path) do
       posts_data = read_json(posts_path)
       users_data = read_json(users_path)
       users_by_wp_id = Map.new(users_data, &{to_string(&1["wp_user_id"]), &1})
@@ -1798,6 +1796,8 @@ defmodule Ysc.WpMigration.Load do
         end)
 
       {:ok, stats}
+    else
+      {:error, "Posts file not found: #{posts_path}"}
     end
   end
 
@@ -1819,9 +1819,7 @@ defmodule Ysc.WpMigration.Load do
     posts_path = Path.join(export_dir, "posts.json")
     dry_run = Keyword.get(opts, :dry_run, false)
 
-    unless File.exists?(posts_path) do
-      {:error, "Posts file not found: #{posts_path}"}
-    else
+    if File.exists?(posts_path) do
       posts_data = read_json(posts_path)
       {url_map, image_map} = build_migration_image_maps(export_dir)
 
@@ -1833,6 +1831,8 @@ defmodule Ysc.WpMigration.Load do
         end)
 
       {:ok, stats}
+    else
+      {:error, "Posts file not found: #{posts_path}"}
     end
   end
 
