@@ -936,7 +936,9 @@ defmodule Ysc.Bookings do
   end
 
   @doc false
-  def maybe_sync_hold_pricing_from_calculation(%Booking{status: :hold} = booking) do
+  def maybe_sync_hold_pricing_from_calculation(
+        %Booking{status: :hold} = booking
+      ) do
     sync_hold_pricing_from_calculation(booking)
   end
 
