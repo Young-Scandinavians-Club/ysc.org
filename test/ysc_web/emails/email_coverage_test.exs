@@ -397,7 +397,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     end
 
     test "format_date with invalid binary" do
-      assert OutageNotification.format_date("invalid") == "invalid"
+      assert OutageNotification.format_date("invalid") == "Unknown date"
     end
 
     test "format_date with other types" do
