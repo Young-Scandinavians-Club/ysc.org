@@ -24,7 +24,8 @@ defmodule YscWeb.TahoeBookingLive do
     Room,
     RoomsListCache,
     BookingLocker,
-    PropertyInventory
+    PropertyInventory,
+    RefundPolicyDisplay
   }
 
   alias Ysc.Bookings.SeasonHelpers
@@ -3931,49 +3932,23 @@ defmodule YscWeb.TahoeBookingLive do
                           </thead>
                           <tbody>
                             <%= if @buyout_refund_policy || @room_refund_policy do %>
-                              <% # Get all unique days_before_checkin values from both policies
-                              buyout_days =
-                                if @buyout_refund_policy &&
-                                     @buyout_refund_policy.rules,
-                                   do:
-                                     Enum.map(
-                                       @buyout_refund_policy.rules,
-                                       & &1.days_before_checkin
-                                     ),
-                                   else: []
-
-                              room_days =
-                                if @room_refund_policy && @room_refund_policy.rules,
-                                  do:
-                                    Enum.map(
-                                      @room_refund_policy.rules,
-                                      & &1.days_before_checkin
-                                    ),
-                                  else: []
-
-                              all_days =
-                                Enum.uniq(buyout_days ++ room_days)
-                                |> Enum.sort(:desc) %>
+                              <% all_days =
+                                RefundPolicyDisplay.unique_threshold_days_desc([
+                                  @buyout_refund_policy && @buyout_refund_policy.rules,
+                                  @room_refund_policy && @room_refund_policy.rules
+                                ]) %>
                               <%= for days <- all_days do %>
                                 <% buyout_rule =
-                                  if @buyout_refund_policy &&
-                                       @buyout_refund_policy.rules,
-                                     do:
-                                       Enum.find(
-                                         @buyout_refund_policy.rules,
-                                         &(&1.days_before_checkin == days)
-                                       ),
-                                     else: nil
+                                  RefundPolicyDisplay.find_rule_for_days(
+                                    @buyout_refund_policy && @buyout_refund_policy.rules,
+                                    days
+                                  )
 
                                 room_rule =
-                                  if @room_refund_policy &&
-                                       @room_refund_policy.rules,
-                                     do:
-                                       Enum.find(
-                                         @room_refund_policy.rules,
-                                         &(&1.days_before_checkin == days)
-                                       ),
-                                     else: nil %>
+                                  RefundPolicyDisplay.find_rule_for_days(
+                                    @room_refund_policy && @room_refund_policy.rules,
+                                    days
+                                  ) %>
                                 <tr class="border-b border-zinc-100 hover:bg-white">
                                   <td class="px-4 py-3 font-semibold text-zinc-900">
                                     {days}+ days
@@ -3982,28 +3957,15 @@ defmodule YscWeb.TahoeBookingLive do
                                     "px-4 py-3 text-center border-l border-zinc-100",
                                     if(buyout_rule && buyout_rule.refund_percentage,
                                       do:
-                                        if(
-                                          Decimal.to_float(
-                                            buyout_rule.refund_percentage
-                                          ) >= 100,
-                                          do: "text-green-700 font-bold",
-                                          else:
-                                            if(
-                                              Decimal.to_float(
-                                                buyout_rule.refund_percentage
-                                              ) >= 50,
-                                              do: "text-amber-700 font-semibold",
-                                              else: "text-red-700 font-semibold"
-                                            )
+                                        RefundPolicyDisplay.refund_percentage_tier_class(
+                                          buyout_rule.refund_percentage
                                         ),
                                       else: "text-zinc-400"
                                     )
                                   ]}>
                                     <%= if buyout_rule && buyout_rule.refund_percentage do %>
-                                      {trunc(
-                                        Decimal.to_float(
-                                          buyout_rule.refund_percentage
-                                        )
+                                      {RefundPolicyDisplay.refund_percentage_int(
+                                        buyout_rule.refund_percentage
                                       )}%
                                     <% else %>
                                       —
@@ -4013,28 +3975,15 @@ defmodule YscWeb.TahoeBookingLive do
                                     "px-4 py-3 text-center border-l border-zinc-100",
                                     if(room_rule && room_rule.refund_percentage,
                                       do:
-                                        if(
-                                          Decimal.to_float(
-                                            room_rule.refund_percentage
-                                          ) >= 100,
-                                          do: "text-green-700 font-bold",
-                                          else:
-                                            if(
-                                              Decimal.to_float(
-                                                room_rule.refund_percentage
-                                              ) >= 50,
-                                              do: "text-amber-700 font-semibold",
-                                              else: "text-red-700 font-semibold"
-                                            )
+                                        RefundPolicyDisplay.refund_percentage_tier_class(
+                                          room_rule.refund_percentage
                                         ),
                                       else: "text-zinc-400"
                                     )
                                   ]}>
                                     <%= if room_rule && room_rule.refund_percentage do %>
-                                      {trunc(
-                                        Decimal.to_float(
-                                          room_rule.refund_percentage
-                                        )
+                                      {RefundPolicyDisplay.refund_percentage_int(
+                                        room_rule.refund_percentage
                                       )}%
                                     <% else %>
                                       —
@@ -4070,11 +4019,9 @@ defmodule YscWeb.TahoeBookingLive do
                                 else: "Entire cabin"}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
-                              <%= for rule <- Enum.sort_by(@buyout_refund_policy.rules, & &1.days_before_checkin, :desc) do %>
-                                <% refund_pct =
-                                  trunc(Decimal.to_float(rule.refund_percentage)) %>
+                              <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@buyout_refund_policy.rules) do %>
                                 <li>
-                                  If you cancel {rule.days_before_checkin} or more days before check-in, you'll receive a {refund_pct}% refund.
+                                  {RefundPolicyDisplay.rule_threshold_summary(rule)}
                                 </li>
                               <% end %>
                             </ul>
@@ -4088,11 +4035,9 @@ defmodule YscWeb.TahoeBookingLive do
                                 else: "Room Booking"}:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
-                              <%= for rule <- Enum.sort_by(@room_refund_policy.rules, & &1.days_before_checkin, :desc) do %>
-                                <% refund_pct =
-                                  trunc(Decimal.to_float(rule.refund_percentage)) %>
+                              <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@room_refund_policy.rules) do %>
                                 <li>
-                                  If you cancel {rule.days_before_checkin} or more days before check-in, you'll receive a {refund_pct}% refund.
+                                  {RefundPolicyDisplay.rule_threshold_summary(rule)}
                                 </li>
                               <% end %>
                             </ul>

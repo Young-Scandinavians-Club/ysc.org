@@ -10,8 +10,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
 
   require Ysc.Logging
   import Ecto.Query
-  alias Ysc.Bookings.{RefundPolicy, RefundPolicyRule}
-  alias Ysc.Repo
+  alias Ysc.Bookings.{RefundPolicy}
 
   @cache_name :ysc_cache
   @cache_prefix "refund_policy:"
@@ -127,29 +126,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
 
   # Internal function that actually queries the database (called by cache on miss)
   defp get_active_refund_policy_db(property, booking_mode) do
-    policy =
-      from(rp in RefundPolicy,
-        where: rp.property == ^property,
-        where: rp.booking_mode == ^booking_mode,
-        where: rp.is_active == true,
-        order_by: [desc: rp.inserted_at, desc: rp.id],
-        limit: 1
-      )
-      |> Repo.one()
-
-    if policy do
-      # Load rules ordered by days_before_checkin descending
-      rules =
-        from(r in RefundPolicyRule,
-          where: r.refund_policy_id == ^policy.id
-        )
-        |> RefundPolicyRule.ordered_by_days()
-        |> Repo.all()
-
-      %{policy | rules: rules}
-    else
-      nil
-    end
+    Ysc.Bookings.get_active_refund_policy_db(property, booking_mode)
   end
 
   @doc false

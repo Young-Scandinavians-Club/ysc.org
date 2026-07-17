@@ -2,7 +2,7 @@ defmodule YscWeb.UserBookingDetailLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, PropertyDisplay}
+  alias Ysc.Bookings.{Booking, PropertyDisplay, RefundPolicyDisplay}
   alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -202,34 +202,10 @@ defmodule YscWeb.UserBookingDetailLive do
                     <div class="pt-3 border-t border-blue-200">
                       <p class="font-semibold mb-2">Cancellation Policy:</p>
                       <div class="text-sm text-blue-800 space-y-2">
-                        {# Sort rules by days_before_checkin ascending (most restrictive first)
-                        sorted_rules =
-                          Enum.sort_by(
-                            @refund_info.policy_rules,
-                            fn rule -> rule.days_before_checkin end,
-                            :asc
-                          )
-
-                        for rule <- sorted_rules do
-                          refund_percentage =
-                            rule.refund_percentage
-                            |> Decimal.to_float()
-
-                          cond do
-                            refund_percentage == 0.0 ->
-                              "If you cancel within #{rule.days_before_checkin} days of your check-in date, you will not receive a refund."
-
-                            refund_percentage > 0 and refund_percentage < 100.0 ->
-                              refund_pct =
-                                refund_percentage |> Float.round(0) |> trunc()
-
-                              "If you cancel within #{rule.days_before_checkin} days of your check-in date, you receive a #{refund_pct}% refund."
-
-                            true ->
-                              "If you cancel #{rule.days_before_checkin} or more days before your check-in date, you are eligible for a full refund."
-                          end
-                        end
-                        |> Enum.map(fn text -> "<p>#{text}</p>" end)
+                        {RefundPolicyDisplay.rules_sorted_asc(@refund_info.policy_rules)
+                        |> Enum.map(
+                          &("<p>#{RefundPolicyDisplay.cancellation_rule_summary(&1)}</p>")
+                        )
                         |> Enum.join("")
                         |> raw()}
                       </div>
