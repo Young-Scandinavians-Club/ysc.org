@@ -227,6 +227,27 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert html =~ "Join us for an amazing outdoor adventure"
     end
 
+    test "renders ampersands in event description without HTML escaping", %{
+      conn: conn
+    } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "Social Night",
+            description: "food & drinks at The Junction"
+          }
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               "p.hidden.sm\\:block",
+               "food & drinks at The Junction"
+             )
+    end
+
     test "displays event with image", %{conn: conn} do
       event =
         event_with_state(:upcoming,
