@@ -4,6 +4,8 @@ defmodule YscWeb.AvatarUploadTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.S3Config
+  alias Ysc.Accounts.User
+  alias Ysc.Repo
   alias YscWeb.AvatarUpload
 
   defp upload_socket!(max_file_size \\ 10_000_000) do
@@ -78,6 +80,17 @@ defmodule YscWeb.AvatarUploadTest do
 
       assert avatar.original_path ==
                S3Config.object_url(key, S3Config.avatars_bucket_name())
+    end
+
+    test "returns error when avatar creation fails" do
+      user = user_fixture()
+      user_id = user.id
+      Repo.delete!(user)
+
+      assert {:error, %Ecto.Changeset{}} =
+               AvatarUpload.consume_upload_meta(%User{id: user_id}, %{
+                 key: "#{user_id}/#{Ecto.ULID.generate()}/original.webp"
+               })
     end
   end
 

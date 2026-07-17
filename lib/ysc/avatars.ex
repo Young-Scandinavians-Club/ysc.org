@@ -42,9 +42,6 @@ defmodule Ysc.Avatars do
 
         {:error, %Ecto.Changeset{} = changeset} ->
           Repo.rollback(changeset)
-
-        {:error, reason} ->
-          Repo.rollback(reason)
       end
     end)
   end

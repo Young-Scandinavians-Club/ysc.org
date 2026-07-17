@@ -3,6 +3,7 @@ defmodule Ysc.AvatarsTest do
 
   alias Ysc.Avatars
   alias Ysc.Accounts.User
+  alias Ysc.Repo
 
   import Ysc.AccountsFixtures
 
@@ -36,6 +37,20 @@ defmodule Ysc.AvatarsTest do
 
       assert {:error, %Ecto.Changeset{}} =
                Avatars.create_avatar_and_enqueue_job(user, %{})
+
+      refute_enqueued(worker: YscWeb.Workers.AvatarProcessor)
+    end
+
+    test "returns error when the user no longer exists" do
+      user = user_fixture()
+      user_id = user.id
+      Repo.delete!(user)
+
+      assert {:error, %Ecto.Changeset{}} =
+               Avatars.create_avatar_and_enqueue_job(%User{id: user_id}, %{
+                 source: :upload,
+                 original_path: "https://example.com/avatars/original.webp"
+               })
 
       refute_enqueued(worker: YscWeb.Workers.AvatarProcessor)
     end

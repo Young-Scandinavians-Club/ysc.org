@@ -63,7 +63,10 @@ defmodule YscWeb.AvatarUpload do
   """
   def consume(socket, %User{} = user, upload_name \\ :avatar) do
     consume_uploaded_entries(socket, upload_name, fn meta, _entry ->
-      {:ok, consume_upload_meta(user, meta)}
+      case consume_upload_meta(user, meta) do
+        {:ok, avatar} -> {:ok, avatar}
+        {:error, reason} -> {:error, reason}
+      end
     end)
   end
 

@@ -415,6 +415,11 @@ defmodule YscWeb.UserSettingsLiveTest do
                "Upload new photo"
              )
 
+      assert has_element?(
+               view,
+               "input[data-avatar-file-input][accept*='image/png']"
+             )
+
       assert has_element?(view, "h2", "Profile Picture")
       assert has_element?(view, "h2", "Personal Information")
       assert has_element?(view, "h2", "Billing Address")
