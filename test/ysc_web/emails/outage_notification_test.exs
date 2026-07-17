@@ -62,8 +62,8 @@ defmodule YscWeb.Emails.OutageNotificationTest do
       assert OutageNotification.format_date("2024-12-01") =~ "December"
     end
 
-    test "returns original string when ISO date is invalid" do
-      assert OutageNotification.format_date("not-a-date") == "not-a-date"
+    test "returns Unknown date when ISO date string is invalid" do
+      assert OutageNotification.format_date("not-a-date") == "Unknown date"
     end
 
     test "returns Unknown date for unsupported values" do

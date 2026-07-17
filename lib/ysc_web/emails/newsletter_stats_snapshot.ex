@@ -7,6 +7,8 @@ defmodule YscWeb.Emails.NewsletterStatsSnapshot do
     mjml_template: "templates/newsletter_stats_snapshot.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
+  import YscWeb.Emails.Helpers, only: [format_datetime: 1]
+
   def get_template_name do
     "newsletter_stats_snapshot"
   end
@@ -113,14 +115,6 @@ defmodule YscWeb.Emails.NewsletterStatsSnapshot do
     ---
     This stats snapshot was generated 24 hours after the newsletter was sent.
     """
-  end
-
-  def format_datetime(nil), do: "N/A"
-
-  def format_datetime(datetime) do
-    datetime
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> Calendar.strftime("%B %d, %Y at %I:%M %p %Z")
   end
 
   def calculate_rate(_count, 0), do: "0.0"

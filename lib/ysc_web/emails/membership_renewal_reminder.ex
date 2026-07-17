@@ -10,7 +10,7 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
     layout: YscWeb.Emails.BaseLayout
 
   import YscWeb.Emails.Helpers,
-    only: [member_greeting_name: 1, membership_url: 0]
+    only: [member_greeting_name: 1, membership_url: 0, format_date: 1]
 
   def get_template_name() do
     "membership_renewal_reminder"
@@ -31,10 +31,7 @@ defmodule YscWeb.Emails.MembershipRenewalReminder do
 
     first_name = member_greeting_name(user)
 
-    renewal_date =
-      subscription.current_period_end
-      |> DateTime.to_date()
-      |> Calendar.strftime("%B %d, %Y")
+    renewal_date = format_date(subscription.current_period_end)
 
     %{
       first_name: first_name,

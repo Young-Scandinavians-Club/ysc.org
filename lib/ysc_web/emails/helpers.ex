@@ -161,7 +161,8 @@ defmodule YscWeb.Emails.Helpers do
   @doc """
   Formats a date for email copy (`"January 15, 2026"`).
 
-  Returns `default` when the value is nil or not a date/datetime.
+  ISO8601 date strings are parsed when possible. Returns `default` when the
+  value is nil, not a date/datetime, or not a parseable date string.
   """
   def format_date(value, default \\ "N/A")
 
@@ -172,6 +173,13 @@ defmodule YscWeb.Emails.Helpers do
 
   def format_date(%DateTime{} = datetime, default),
     do: format_date(DateTime.to_date(datetime), default)
+
+  def format_date(date_string, default) when is_binary(date_string) do
+    case Date.from_iso8601(date_string) do
+      {:ok, date} -> format_date(date, default)
+      {:error, _} -> default
+    end
+  end
 
   def format_date(_, default), do: default
 
