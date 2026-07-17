@@ -142,7 +142,7 @@ defmodule YscWeb.EventDetailsLive.ReservationPurchasingTest do
 
       assert html =~ "2 remaining"
       assert html =~ "2 held at member rate"
-      assert html =~ "We're holding 2 tickets"
+      assert html =~ "holding 2 tickets"
     end
 
     test "stranger sees zero remaining when only holds are left", %{conn: conn} do
