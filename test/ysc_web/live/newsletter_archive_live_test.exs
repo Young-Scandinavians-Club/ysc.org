@@ -256,6 +256,8 @@ defmodule YscWeb.NewsletterArchiveLiveTest do
 
       assert html =~ "Full Issue"
       assert html =~ "newsletter-frame"
+      assert html =~ ~s(sandbox="")
+      assert has_element?(view, "#newsletter-frame[sandbox]")
     end
 
     test "renders placeholder when archived HTML is missing", %{conn: conn} do

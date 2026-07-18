@@ -99,6 +99,61 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert result =~ "<strong>Point</strong>"
       refute result =~ "class="
     end
+
+    test "strips script tags and event-handler attributes" do
+      html =
+        "<p>Hi</p><img src=x onerror=\"alert(1)\"><script>alert(2)</script>"
+
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Hi"
+      refute result =~ "onerror"
+      refute result =~ "<script"
+    end
+
+    test "strips javascript: URLs from href attributes" do
+      href = "javascript" <> ":alert(1)"
+      html = "<a href=\"" <> href <> "\">Click me</a>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Click me"
+      refute result =~ href
+    end
+
+    test "strips case-insensitive javascript: URLs from href attributes" do
+      href = "JAVASCRIPT" <> ":alert(1)"
+      html = "<a href=\"" <> href <> "\">Click me</a>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Click me"
+      refute String.downcase(result) =~ "javascript"
+    end
+
+    test "preserves safe href attributes" do
+      html = ~s(<a href="/events/summer-fest">Details</a>)
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ ~s(href="/events/summer-fest")
+      assert result =~ "Details"
+    end
+
+    test "strips on* event handler attributes such as onload" do
+      html = "<img src=\"/photo.jpg\" onload=\"evil" <> "()\">"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "/photo.jpg"
+      refute result =~ "onload"
+    end
+
+    test "strips style tags entirely" do
+      css = "display" <> ":none"
+      html = "<p>Safe</p><style>body{" <> css <> "}</style>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Safe"
+      refute result =~ "<style"
+      refute result =~ css
+    end
   end
 
   # ---------------------------------------------------------------------------
