@@ -3480,9 +3480,10 @@ defmodule YscWeb.EventDetailsLive do
   defp mount_minimal_assigns(socket, event, _event_id) do
     # Cover image for the hero; pricing/tiers via EventPricingCache (same sold-count
     # query as list_ticket_tiers_for_event, cached) so connect can reuse tiers.
+    event_for_seo = Repo.preload(event, :cover_image)
+
     event =
-      event
-      |> Repo.preload(:cover_image)
+      event_for_seo
       |> EventPricingCache.enrich_event()
 
     ticket_tiers =
@@ -3498,7 +3499,7 @@ defmodule YscWeb.EventDetailsLive do
     show_ticket_modal = socket.assigns.live_action == :tickets
 
     socket
-    |> SEO.assign_seo(SEO.assigns_for_event(event))
+    |> SEO.assign_seo(SEO.assigns_for_event(event_for_seo))
     |> assign(:event, event)
     # Async data - will be populated after connection
     |> assign(:agendas, [])
