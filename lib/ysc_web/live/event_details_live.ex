@@ -3485,7 +3485,11 @@ defmodule YscWeb.EventDetailsLive do
       |> Repo.preload(:cover_image)
       |> EventPricingCache.enrich_event()
 
-    ticket_tiers = Map.get(event, :ticket_tiers, [])
+    ticket_tiers =
+      case event.ticket_tiers do
+        tiers when is_list(tiers) -> tiers
+        _ -> []
+      end
 
     has_ticket_tiers = ticket_tiers != []
     has_ticket_info = has_ticket_tiers || event.tickets_tbd
@@ -3648,6 +3652,7 @@ defmodule YscWeb.EventDetailsLive do
     results
     |> Map.put(:availability, availability)
     |> Map.put(:reserved_counts_by_tier, reserved_counts_by_tier)
+    |> Map.put(:ticket_tiers, ticket_tiers)
   end
 
   # Tiers from EventPricingCache.enrich_event/1 already include sold_tickets_count

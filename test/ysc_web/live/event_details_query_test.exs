@@ -7,12 +7,14 @@ defmodule YscWeb.EventDetailsQueryTest do
   """
   use YscWeb.ConnCase, async: false
 
+  @moduletag process_caches: true
+
   import Phoenix.LiveViewTest
   import Ysc.EventsFixtures
 
   alias Ysc.Events.EventPricingCache
 
-  @ticket_tiers_pattern ~r/FROM "ticket_tiers"/i
+  @tier_list_pattern ~r/FROM "ticket_tiers".*GROUP BY/s
 
   describe "tier loading" do
     setup do
@@ -20,7 +22,7 @@ defmodule YscWeb.EventDetailsQueryTest do
       :ok
     end
 
-    test "dead render and connect load ticket tiers at most once", %{conn: conn} do
+    test "dead render and connect avoid duplicate tier list fetches", %{conn: conn} do
       event =
         event_fixture(%{
           title: "Single Tier Fetch Event XYZ",
@@ -29,21 +31,27 @@ defmodule YscWeb.EventDetailsQueryTest do
 
       ticket_tier_fixture(%{event_id: event.id})
 
+      # Grouped tier-list queries (preload, enrich batch load, list_ticket_tiers_for_event).
+      # event_selling_fast?/1 also joins ticket_tiers but is unrelated to the duplicate we remove.
+      tier_list_pattern = ~r/FROM "ticket_tiers".*GROUP BY/s
+
       {{:ok, view, _html}, query_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
             render_async(view)
-            {view, html}
+            {:ok, view, html}
           end,
-          pattern: @ticket_tiers_pattern
+          pattern: tier_list_pattern
         )
 
-      assert query_count <= 1
-      assert has_element?(view, "#event-cover-#{event.id}")
+      # Before: dead-render preload + async list_ticket_tiers_for_event (2 grouped queries).
+      # After: EventPricingCache enrich once, reused on connect (1 grouped query).
+      assert query_count == 1
+      assert render(view) =~ "Single Tier Fetch Event XYZ"
     end
 
-    test "dead render does not preload ticket tiers via association", %{conn: conn} do
+    test "dead render loads tiers via pricing cache not association preload", %{conn: conn} do
       event =
         event_fixture(%{
           title: "Dead Render Tier Query XYZ",
@@ -59,12 +67,10 @@ defmodule YscWeb.EventDetailsQueryTest do
             |> get(~p"/events/#{event.id}")
             |> html_response(200)
           end,
-          pattern: @ticket_tiers_pattern
+          pattern: @tier_list_pattern
         )
 
-      # Pricing enrichment may issue one grouped tier query; a second preload-style
-      # fetch on connect is what we avoid (covered by the connected test above).
-      assert query_count <= 1
+      assert query_count == 1
     end
   end
 end
