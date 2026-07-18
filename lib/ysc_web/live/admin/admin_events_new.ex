@@ -1425,6 +1425,10 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   def handle_event("validate", %{"event" => event_params}, socket) do
+    # rendered_details is computed server-side on editor-update; never trust client params.
+    event_params =
+      Map.drop(event_params, ["rendered_details", :rendered_details])
+
     # Reload event to ensure we have the latest lock_version
     current_event = Events.get_event!(socket.assigns[:event].id)
 

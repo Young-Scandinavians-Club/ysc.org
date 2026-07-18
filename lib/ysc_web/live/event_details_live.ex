@@ -6426,10 +6426,10 @@ defmodule YscWeb.EventDetailsLive do
   defp event_calendar_date(%Date{} = date), do: date
   defp event_calendar_date(_), do: nil
 
-  defp event_body(%Event{rendered_details: nil} = event),
-    do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)
-
-  defp event_body(%Event{} = event), do: event.rendered_details
+  defp event_body(%Event{} = event) do
+    html = event.rendered_details || event.raw_details || ""
+    Scrubber.scrub(html, Ysc.TrixScrubber)
+  end
 
   defp format_relative_time(%DateTime{} = dt), do: Timex.from_now(dt)
 
