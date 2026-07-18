@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.ContactFormBoardNotification do
     mjml_template: "templates/contact_form_board_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: []
 
   def get_template_name() do
     "contact_form_board_notification"
@@ -18,7 +18,5 @@ defmodule YscWeb.Emails.ContactFormBoardNotification do
     "New Contact Form Submission - YSC"
   end
 
-  def admin_dashboard_url() do
-    absolute_url("/admin")
-  end
+  def admin_dashboard_url(), do: YscWeb.Emails.Helpers.admin_dashboard_url()
 end

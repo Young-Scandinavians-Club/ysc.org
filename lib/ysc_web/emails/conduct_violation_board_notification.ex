@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.ConductViolationBoardNotification do
     mjml_template: "templates/conduct_violation_board_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: []
 
   def get_template_name() do
     "conduct_violation_board_notification"
@@ -18,7 +18,5 @@ defmodule YscWeb.Emails.ConductViolationBoardNotification do
     "New Conduct Violation Report - Immediate Board Review Required"
   end
 
-  def admin_dashboard_url() do
-    absolute_url("/admin")
-  end
+  def admin_dashboard_url(), do: YscWeb.Emails.Helpers.admin_dashboard_url()
 end

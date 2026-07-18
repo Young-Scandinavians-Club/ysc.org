@@ -64,6 +64,11 @@ defmodule YscWeb.Emails.Helpers do
   def security_settings_url, do: absolute_url("/users/settings/security")
 
   @doc """
+  Absolute URL for the admin dashboard.
+  """
+  def admin_dashboard_url, do: absolute_url("/admin")
+
+  @doc """
   Formats sign-in method from an auth event for email copy.
   """
   def sign_in_method_label(%{metadata: metadata}) when is_map(metadata) do
