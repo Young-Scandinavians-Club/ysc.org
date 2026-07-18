@@ -7,7 +7,15 @@ defmodule YscWeb.BookingReceiptLive do
   alias YscWeb.PaymentMethodLogo
   alias YscWeb.BookingActions
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund, PropertyDisplay}
+
+  alias Ysc.Bookings.{
+    Booking,
+    BookingLocker,
+    PendingRefund,
+    PropertyDisplay,
+    RefundPolicyDisplay
+  }
+
   alias Ysc.Ledgers.Refund
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -1191,14 +1199,10 @@ defmodule YscWeb.BookingReceiptLive do
                       </span>
                     </div>
                     <%= if @refund_info.applied_rule do %>
-                      <% refund_percent =
-                        Decimal.to_float(
-                          @refund_info.applied_rule.refund_percentage
-                        )
-                        |> Float.round(0)
-                        |> trunc() %>
                       <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                        Based on cancellation policy: {refund_percent}% refund if cancelled {@refund_info.applied_rule.days_before_checkin} days or more before check-in.
+                        Based on cancellation policy: {RefundPolicyDisplay.applied_rule_summary(
+                          @refund_info.applied_rule
+                        )}
                       </p>
                     <% else %>
                       <p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-200">
