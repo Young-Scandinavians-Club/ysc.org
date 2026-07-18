@@ -120,6 +120,31 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       refute result =~ href
     end
 
+    test "strips case-insensitive javascript: URLs from href attributes" do
+      href = "JAVASCRIPT" <> ":alert(1)"
+      html = "<a href=\"" <> href <> "\">Click me</a>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Click me"
+      refute String.downcase(result) =~ "javascript"
+    end
+
+    test "preserves safe href attributes" do
+      html = ~s(<a href="/events/summer-fest">Details</a>)
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ ~s(href="/events/summer-fest")
+      assert result =~ "Details"
+    end
+
+    test "strips on* event handler attributes such as onload" do
+      html = "<img src=\"/photo.jpg\" onload=\"evil" <> "()\">"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "/photo.jpg"
+      refute result =~ "onload"
+    end
+
     test "strips style tags entirely" do
       css = "display" <> ":none"
       html = "<p>Safe</p><style>body{" <> css <> "}</style>"
