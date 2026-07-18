@@ -248,6 +248,107 @@ defmodule YscWeb.EventDetailsLiveTest do
              )
     end
 
+    test "shows weekday date for single-day events in the When section", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Single Day Event",
+          start_date: ~U[2026-07-18 18:00:00Z],
+          end_date: ~U[2026-07-18 22:00:00Z]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "p.font-black.text-xl", "Sat, Jul 18")
+    end
+
+    test "shows weekday date range for multi-day events in the same year", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Multi Day Event",
+          start_date: ~U[2026-07-18 10:00:00Z],
+          end_date: ~U[2026-07-20 22:00:00Z]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               "p.font-black.text-xl",
+               "Sat, Jul 18 – Mon, Jul 20"
+             )
+    end
+
+    test "shows weekday date range with years for multi-day events across years", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "New Year Event",
+          start_date: ~U[2025-12-30 10:00:00Z],
+          end_date: ~U[2026-01-02 22:00:00Z]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               "p.font-black.text-xl",
+               "Tue, Dec 30, 2025 – Fri, Jan 2, 2026"
+             )
+    end
+
+    test "shows TBD in the When section when start date is missing", %{conn: conn} do
+      event =
+        event_fixture(%{
+          title: "Date TBD Event",
+          start_date: nil,
+          end_date: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "p.font-black.text-xl", "TBD")
+    end
+
+    test "shows start and end times in the When section", %{conn: conn} do
+      event =
+        event_fixture(%{
+          title: "Timed Event",
+          start_date: ~U[2026-07-18 18:00:00Z],
+          end_date: ~U[2026-07-18 22:00:00Z],
+          start_time: ~T[19:00:00],
+          end_time: ~T[22:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               "p.text-sm.text-zinc-500",
+               "7:00 PM - 10:00 PM"
+             )
+    end
+
+    test "shows start time only when end time is missing", %{conn: conn} do
+      event =
+        event_fixture(%{
+          title: "Start Time Only Event",
+          start_date: ~U[2026-07-18 18:00:00Z],
+          end_date: ~U[2026-07-18 22:00:00Z],
+          start_time: ~T[19:00:00],
+          end_time: nil
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(view, "p.text-sm.text-zinc-500", "7:00 PM")
+      refute has_element?(view, "p.text-sm.text-zinc-500", "7:00 PM -")
+    end
+
     test "displays event with image", %{conn: conn} do
       event =
         event_with_state(:upcoming,
