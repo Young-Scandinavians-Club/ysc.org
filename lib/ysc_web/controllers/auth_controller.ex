@@ -4,41 +4,17 @@ defmodule YscWeb.AuthController do
   """
   use YscWeb, :controller
 
+  plug YscWeb.Plugs.StoreOAuthRedirect
   plug Ueberauth
 
   alias Ysc.Accounts
   alias YscWeb.UserAuth
 
   @doc """
-  Handles OAuth request phase - redirects to provider.
-  This is handled automatically by Ueberauth plug.
-  Stores redirect_to (normal login) or reauth metadata in session for callback.
+  OAuth request phase entry point. Ueberauth handles the provider redirect;
+  `YscWeb.Plugs.StoreOAuthRedirect` stores `redirect_to` / reauth metadata in session.
   """
-  def request(conn, %{"reauth" => "true"} = params) do
-    return_to = Map.get(params, "return_to", "/")
-
-    if YscWeb.UserAuth.valid_internal_redirect?(return_to) do
-      conn
-      |> put_session(:reauth_mode, true)
-      |> put_session(:reauth_return_to, return_to)
-    else
-      conn
-    end
-  end
-
-  def request(conn, %{"redirect_to" => redirect_to}) do
-    conn = UserAuth.clear_reauth_session(conn)
-
-    if YscWeb.UserAuth.valid_internal_redirect?(redirect_to) do
-      put_session(conn, :oauth_redirect_to, redirect_to)
-    else
-      conn
-    end
-  end
-
-  def request(conn, _params) do
-    UserAuth.clear_reauth_session(conn)
-  end
+  def request(conn, _params), do: conn
 
   @doc """
   Handles OAuth callback phase for Google authentication.
