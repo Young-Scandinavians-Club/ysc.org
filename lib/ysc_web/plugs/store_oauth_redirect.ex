@@ -28,6 +28,11 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
   defp oauth_request_path?(_), do: false
 
   defp store_redirect(%{params: %{"reauth" => "true"} = params} = conn) do
+    conn =
+      conn
+      |> delete_session(:oauth_redirect_to)
+      |> UserAuth.clear_reauth_session()
+
     return_to = Map.get(params, "return_to", "/")
 
     if UserAuth.valid_internal_redirect?(return_to) do
@@ -40,7 +45,10 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
   end
 
   defp store_redirect(%{params: %{"redirect_to" => redirect_to}} = conn) do
-    conn = UserAuth.clear_reauth_session(conn)
+    conn =
+      conn
+      |> delete_session(:oauth_redirect_to)
+      |> UserAuth.clear_reauth_session()
 
     if UserAuth.valid_internal_redirect?(redirect_to) do
       put_session(conn, :oauth_redirect_to, redirect_to)
@@ -50,6 +58,8 @@ defmodule YscWeb.Plugs.StoreOAuthRedirect do
   end
 
   defp store_redirect(conn) do
-    UserAuth.clear_reauth_session(conn)
+    conn
+    |> delete_session(:oauth_redirect_to)
+    |> UserAuth.clear_reauth_session()
   end
 end
