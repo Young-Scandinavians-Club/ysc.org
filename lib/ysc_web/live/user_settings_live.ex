@@ -832,7 +832,9 @@ defmodule YscWeb.UserSettingsLive do
                   For security, you'll need to sign in again before we change your email.
                 </p>
                 <:actions>
-                  <.button phx-disable-with="Continuing...">Change Email</.button>
+                  <.button phx-disable-with="Opening verification...">
+                    Continue to verify identity
+                  </.button>
                 </:actions>
               </.simple_form>
             </div>
@@ -2112,7 +2114,7 @@ defmodule YscWeb.UserSettingsLive do
                       Unfinished ticket orders
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
-                      You started buying event tickets but did not finish payment. Your selections and member price are still saved — complete payment before the deadline on each item below.
+                      You started buying event tickets but didn't finish payment. Your selections and member price are still saved. Finish checkout before the time shown on each item — or as soon as you can if no time is listed.
                     </p>
                   </div>
                   <div class="hidden sm:flex items-center text-zinc-400">
@@ -2175,7 +2177,7 @@ defmodule YscWeb.UserSettingsLive do
                             "%b %-d, %Y %H:%M PT"
                           )}
                         <% else %>
-                          No deadline — complete payment when you are ready
+                          Finish checkout soon — your held tickets may be released if you wait too long
                         <% end %>
                       </span>
                     </div>
@@ -3917,7 +3919,7 @@ defmodule YscWeb.UserSettingsLive do
                YscWeb.Flash.put_toast(
                  socket,
                  :error,
-                 "Failed to store payment method",
+                 "We couldn't save your card. Please try again, or email info@ysc.org if this keeps happening.",
                  title: "Payment"
                )}
           end
@@ -4004,7 +4006,7 @@ defmodule YscWeb.UserSettingsLive do
        socket
        |> YscWeb.Flash.put_toast(
          :error,
-         "Failed to create payment account. Please try again, or contact us at info@ysc.org if this continues.",
+         "We couldn't open the secure payment form. Please refresh the page and try again, or email info@ysc.org for help adding your card.",
          title: "Payment"
        )
        |> assign(:show_new_payment_form, false)}
@@ -6177,7 +6179,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp retry_invoice_link_help_message do
-    "This payment link didn't work — it may have expired. Go to Membership in your account settings to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
+    "This payment link didn't work — it may have expired. Open Manage Membership in your account settings to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
   end
 
   defp subscription_items_contain_price?(subscription, price_id) do
