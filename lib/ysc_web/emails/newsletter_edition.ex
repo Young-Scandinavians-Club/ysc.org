@@ -164,19 +164,18 @@ defmodule YscWeb.Emails.NewsletterEdition do
     safe_attrs =
       Enum.reject(attrs, fn {name, value} ->
         String.starts_with?(name, "data-trix") or name == "class" or
-          String.starts_with?(name, "on") or dangerous_url_value?(value)
+          String.starts_with?(name, "on") or
+          (is_binary(value) and
+             String.match?(
+               String.trim(value) |> String.downcase(),
+               ~r/^javascript:/
+             ))
       end)
 
     [{tag, safe_attrs, transform_nodes_for_email(children)}]
   end
 
   defp transform_node_for_email(text) when is_binary(text), do: [text]
-
-  defp dangerous_url_value?(value) when is_binary(value) do
-    String.match?(String.trim(value) |> String.downcase(), ~r/^javascript:/)
-  end
-
-  defp dangerous_url_value?(_), do: false
 
   defp floki_attr(attrs, name) do
     case Enum.find(attrs, fn {k, _} -> k == name end) do
