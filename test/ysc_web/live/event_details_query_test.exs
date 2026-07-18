@@ -22,7 +22,9 @@ defmodule YscWeb.EventDetailsQueryTest do
       :ok
     end
 
-    test "dead render and connect avoid duplicate tier list fetches", %{conn: conn} do
+    test "dead render and connect avoid duplicate tier list fetches", %{
+      conn: conn
+    } do
       event =
         event_fixture(%{
           title: "Single Tier Fetch Event XYZ",
@@ -51,7 +53,9 @@ defmodule YscWeb.EventDetailsQueryTest do
       assert render(view) =~ "Single Tier Fetch Event XYZ"
     end
 
-    test "dead render loads tiers via pricing cache not association preload", %{conn: conn} do
+    test "dead render loads tiers via pricing cache not association preload", %{
+      conn: conn
+    } do
       event =
         event_fixture(%{
           title: "Dead Render Tier Query XYZ",

@@ -3593,31 +3593,34 @@ defmodule YscWeb.EventDetailsLive do
       if reuse_ticket_tiers? do
         []
       else
-        [{:ticket_tiers, fn -> Events.list_ticket_tiers_for_event(event_id) end}]
+        [
+          {:ticket_tiers,
+           fn -> Events.list_ticket_tiers_for_event(event_id) end}
+        ]
       end
 
     tasks =
       [
         {:agendas, fn -> Agendas.list_agendas_for_event(event_id) end},
         {:selling_fast, fn -> Events.event_selling_fast?(event_id) end},
-      {:user_tickets, fn -> load_user_tickets(current_user, event_id) end},
-      {:attendees,
-       fn -> load_attendees(active_membership?, current_user, event_id) end},
-      {:user_reservations,
-       fn -> load_user_reservations(current_user, event_id) end},
-      {:event_updates, fn -> Events.list_visible_event_updates(event_id) end},
-      {:save_the_date_subscription,
-       fn ->
-         if current_user do
-           Events.subscribed_to_event_notification?(
-             event,
-             current_user.id,
-             "save_the_date"
-           )
-         else
-           false
-         end
-       end}
+        {:user_tickets, fn -> load_user_tickets(current_user, event_id) end},
+        {:attendees,
+         fn -> load_attendees(active_membership?, current_user, event_id) end},
+        {:user_reservations,
+         fn -> load_user_reservations(current_user, event_id) end},
+        {:event_updates, fn -> Events.list_visible_event_updates(event_id) end},
+        {:save_the_date_subscription,
+         fn ->
+           if current_user do
+             Events.subscribed_to_event_notification?(
+               event,
+               current_user.id,
+               "save_the_date"
+             )
+           else
+             false
+           end
+         end}
       ] ++ tier_task
 
     results =
@@ -3637,6 +3640,7 @@ defmodule YscWeb.EventDetailsLive do
       else
         Map.get(results, :ticket_tiers, [])
       end
+
     tier_ids = Enum.map(ticket_tiers, & &1.id)
 
     reserved_counts_by_tier =
