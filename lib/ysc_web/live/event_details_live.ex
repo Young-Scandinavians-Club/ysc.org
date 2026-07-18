@@ -6302,7 +6302,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You need an active YSC membership to buy tickets. Go to Membership to check your status or pay dues, then try again.",
+           "You need an active, paid YSC membership to buy these tickets. Open Manage Membership in your account menu to renew or activate, then try again.",
            title: "Membership"
          )
          |> assign(:show_ticket_modal, false)}
@@ -6322,7 +6322,7 @@ defmodule YscWeb.EventDetailsLive do
         error_message =
           case changeset.errors do
             [user_id: {"active membership required to purchase tickets", _}] ->
-              "You need an active YSC membership to buy tickets. Go to Membership to check your status or pay dues, then try again."
+              "You need an active, paid YSC membership to buy these tickets. Open Manage Membership in your account menu to renew or activate, then try again."
 
             _ ->
               "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening."
