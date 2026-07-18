@@ -3934,13 +3934,15 @@ defmodule YscWeb.TahoeBookingLive do
                             <%= if @buyout_refund_policy || @room_refund_policy do %>
                               <% all_days =
                                 RefundPolicyDisplay.unique_threshold_days_desc([
-                                  @buyout_refund_policy && @buyout_refund_policy.rules,
+                                  @buyout_refund_policy &&
+                                    @buyout_refund_policy.rules,
                                   @room_refund_policy && @room_refund_policy.rules
                                 ]) %>
                               <%= for days <- all_days do %>
                                 <% buyout_rule =
                                   RefundPolicyDisplay.find_rule_for_days(
-                                    @buyout_refund_policy && @buyout_refund_policy.rules,
+                                    @buyout_refund_policy &&
+                                      @buyout_refund_policy.rules,
                                     days
                                   )
 

@@ -5,8 +5,12 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
 
   describe "refund_percentage_int/1" do
     test "rounds Decimal percentages to whole numbers" do
-      assert RefundPolicyDisplay.refund_percentage_int(Decimal.new("75.4")) == 75
-      assert RefundPolicyDisplay.refund_percentage_int(Decimal.new("100")) == 100
+      assert RefundPolicyDisplay.refund_percentage_int(Decimal.new("75.4")) ==
+               75
+
+      assert RefundPolicyDisplay.refund_percentage_int(Decimal.new("100")) ==
+               100
+
       assert RefundPolicyDisplay.refund_percentage_int(Decimal.new("0")) == 0
     end
 
@@ -23,10 +27,16 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
         %{days_before_checkin: 14}
       ]
 
-      assert Enum.map(RefundPolicyDisplay.rules_sorted_desc(rules), & &1.days_before_checkin) ==
+      assert Enum.map(
+               RefundPolicyDisplay.rules_sorted_desc(rules),
+               & &1.days_before_checkin
+             ) ==
                [30, 14, 7]
 
-      assert Enum.map(RefundPolicyDisplay.rules_sorted_asc(rules), & &1.days_before_checkin) ==
+      assert Enum.map(
+               RefundPolicyDisplay.rules_sorted_asc(rules),
+               & &1.days_before_checkin
+             ) ==
                [7, 14, 30]
     end
   end
@@ -74,7 +84,9 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
 
   describe "refund_percentage_tier_class/1" do
     test "returns tier classes for refund percentages" do
-      assert RefundPolicyDisplay.refund_percentage_tier_class(Decimal.new("100")) ==
+      assert RefundPolicyDisplay.refund_percentage_tier_class(
+               Decimal.new("100")
+             ) ==
                "text-green-700 font-bold"
 
       assert RefundPolicyDisplay.refund_percentage_tier_class(Decimal.new("75")) ==
@@ -83,7 +95,8 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
       assert RefundPolicyDisplay.refund_percentage_tier_class(Decimal.new("25")) ==
                "text-red-700 font-semibold"
 
-      assert RefundPolicyDisplay.refund_percentage_tier_class(nil) == "text-zinc-400"
+      assert RefundPolicyDisplay.refund_percentage_tier_class(nil) ==
+               "text-zinc-400"
     end
   end
 
@@ -98,7 +111,10 @@ defmodule Ysc.Bookings.RefundPolicyDisplayTest do
         %{days_before_checkin: 14, refund_percentage: Decimal.new("50")}
       ]
 
-      assert RefundPolicyDisplay.unique_threshold_days_desc([buyout_rules, room_rules]) ==
+      assert RefundPolicyDisplay.unique_threshold_days_desc([
+               buyout_rules,
+               room_rules
+             ]) ==
                [30, 14, 7]
 
       assert RefundPolicyDisplay.find_rule_for_days(buyout_rules, 30) ==

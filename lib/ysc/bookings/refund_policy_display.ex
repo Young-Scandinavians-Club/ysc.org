@@ -38,7 +38,10 @@ defmodule Ysc.Bookings.RefundPolicyDisplay do
 
   Example: `"If you cancel 30 or more days before check-in, you'll receive a 100% refund."`
   """
-  def rule_threshold_summary(%{days_before_checkin: days, refund_percentage: percentage}) do
+  def rule_threshold_summary(%{
+        days_before_checkin: days,
+        refund_percentage: percentage
+      }) do
     refund_pct = refund_percentage_int(percentage)
 
     "If you cancel #{days} or more days before check-in, you'll receive a #{refund_pct}% refund."
@@ -47,7 +50,10 @@ defmodule Ysc.Bookings.RefundPolicyDisplay do
   @doc """
   Cancellation flow policy line with tier-based messaging.
   """
-  def cancellation_rule_summary(%{days_before_checkin: days, refund_percentage: percentage}) do
+  def cancellation_rule_summary(%{
+        days_before_checkin: days,
+        refund_percentage: percentage
+      }) do
     refund_percentage = Decimal.to_float(percentage)
 
     cond do
@@ -69,7 +75,10 @@ defmodule Ysc.Bookings.RefundPolicyDisplay do
 
   Example: `"75% refund if cancelled 14 days or more before check-in."`
   """
-  def applied_rule_summary(%{days_before_checkin: days, refund_percentage: percentage}) do
+  def applied_rule_summary(%{
+        days_before_checkin: days,
+        refund_percentage: percentage
+      }) do
     refund_pct = refund_percentage_int(percentage)
 
     "#{refund_pct}% refund if cancelled #{days} days or more before check-in."

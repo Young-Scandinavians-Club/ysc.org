@@ -202,9 +202,11 @@ defmodule YscWeb.UserBookingDetailLive do
                     <div class="pt-3 border-t border-blue-200">
                       <p class="font-semibold mb-2">Cancellation Policy:</p>
                       <div class="text-sm text-blue-800 space-y-2">
-                        {RefundPolicyDisplay.rules_sorted_asc(@refund_info.policy_rules)
+                        {RefundPolicyDisplay.rules_sorted_asc(
+                          @refund_info.policy_rules
+                        )
                         |> Enum.map(
-                          &("<p>#{RefundPolicyDisplay.cancellation_rule_summary(&1)}</p>")
+                          &"<p>#{RefundPolicyDisplay.cancellation_rule_summary(&1)}</p>"
                         )
                         |> Enum.join("")
                         |> raw()}
