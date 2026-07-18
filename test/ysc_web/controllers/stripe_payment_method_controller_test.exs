@@ -36,11 +36,15 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       assert redirected_to(conn) == "/users/log-in"
     end
 
-    test "GET /billing/user/:user_id/payment-method requires authentication", %{
+    test "POST /billing/user/:user_id/payment-method requires authentication", %{
       conn: conn,
       user: user
     } do
-      conn = get(conn, "/billing/user/#{user.id}/payment-method")
+      conn =
+        post(conn, "/billing/user/#{user.id}/payment-method", %{
+          "payment_method_id" => "pm_test123"
+        })
+
       assert redirected_to(conn) == "/users/log-in"
     end
   end
@@ -198,7 +202,7 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       conn =
         conn
         |> log_in_user(user)
-        |> get("/billing/user/#{user.id}/payment-method", %{
+        |> post("/billing/user/#{user.id}/payment-method", %{
           "payment_method_id" => "pm_test123"
         })
 
@@ -228,7 +232,7 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       conn =
         conn
         |> log_in_user(user)
-        |> get("/billing/user/#{user.id}/payment-method", %{
+        |> post("/billing/user/#{user.id}/payment-method", %{
           "payment_method_id" => "pm_invalid"
         })
 
@@ -246,7 +250,7 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       conn =
         conn
         |> log_in_user(user)
-        |> get("/billing/user/#{user.id}/payment-method")
+        |> post("/billing/user/#{user.id}/payment-method", %{})
 
       # Should fail because payment_method_id is nil
       assert conn.status in [400, 500]
@@ -277,7 +281,7 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       conn =
         conn
         |> log_in_user(user1)
-        |> get("/billing/user/#{user2.id}/payment-method", %{
+        |> post("/billing/user/#{user2.id}/payment-method", %{
           "payment_method_id" => "pm_test"
         })
 

@@ -1270,6 +1270,25 @@ defmodule YscWeb.SecurityAuditTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Payment method storage must not be CSRF-able via GET
+  # ---------------------------------------------------------------------------
+
+  describe "payment method storage CSRF hardening" do
+    test "GET /billing/user/:user_id/payment-method is not routed (state change requires POST)" do
+      user = user_fixture(%{stripe_id: "cus_csrf_test"})
+
+      conn =
+        build_conn()
+        |> log_in_user(user)
+        |> get("/billing/user/#{user.id}/payment-method", %{
+          "payment_method_id" => "pm_attacker"
+        })
+
+      assert conn.status == 404
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Post editor: lifecycle fields must not be mass-assignable from LiveView
   # ---------------------------------------------------------------------------
 

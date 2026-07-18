@@ -177,6 +177,7 @@ defmodule YscWeb.NewsletterArchiveLive do
           <iframe
             id="newsletter-frame"
             srcdoc={@edition.archived_html}
+            sandbox=""
             class="w-full border-0 rounded-xl"
             style="min-height:1400px"
             phx-hook="AutoResizeIframe"

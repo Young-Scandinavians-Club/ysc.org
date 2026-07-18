@@ -99,6 +99,17 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert result =~ "<strong>Point</strong>"
       refute result =~ "class="
     end
+
+    test "strips script tags and event-handler attributes" do
+      html =
+        "<p>Hi</p><img src=x onerror=\"alert(1)\"><script>alert(2)</script>"
+
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Hi"
+      refute result =~ "onerror"
+      refute result =~ "<script"
+    end
   end
 
   # ---------------------------------------------------------------------------
