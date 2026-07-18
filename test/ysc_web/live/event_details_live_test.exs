@@ -271,6 +271,29 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert html =~ "No Photo Event"
     end
+
+    test "sanitizes stored overview HTML before rendering (no script or inline handlers)",
+         %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Overview Sanitization"}
+        )
+
+      {:ok, event} =
+        Ysc.Events.update_event(event, %{
+          rendered_details:
+            "<p>Legitimate copy</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      article_html = view |> element("#article-body") |> render()
+
+      assert article_html =~ "Legitimate copy"
+      refute article_html =~ "<script"
+      refute article_html =~ "onerror="
+    end
   end
 
   describe "unauthenticated user interactions" do

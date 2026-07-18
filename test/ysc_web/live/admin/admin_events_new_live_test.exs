@@ -71,6 +71,39 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "editor validate auto-save" do
+    setup [:create_admin]
+
+    test "validate ignores client-supplied rendered_details", %{
+      conn: conn,
+      admin: admin
+    } do
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Safe Overview",
+          raw_details: "<p>Original overview</p>",
+          rendered_details: "<p>Original overview</p>"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "Safe Overview",
+          "description" => event.description,
+          "rendered_details" =>
+            "<p>Injected</p><script>document.cookie</script><img src=x onerror=alert(1)>"
+        }
+      })
+
+      reloaded = Events.get_event!(event.id)
+      assert reloaded.rendered_details == "<p>Original overview</p>"
+    end
+  end
+
   describe "hosts - edit page UI" do
     setup [:create_admin]
 
