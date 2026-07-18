@@ -133,7 +133,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     end
 
     test "admin_dashboard_url points at the admin path" do
-      url = ContactFormBoardNotification.admin_dashboard_url()
+      url = YscWeb.Emails.Helpers.admin_dashboard_url()
       assert url =~ "/admin"
       assert url == YscWeb.Endpoint.url() <> "/admin"
     end

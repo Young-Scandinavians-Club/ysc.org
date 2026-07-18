@@ -39,7 +39,7 @@ defmodule YscWeb.Emails.HelpersTest do
   end
 
   describe "site URL helpers" do
-    test "membership_url/0, upcoming_events_url/0, payment_methods_url/0, news_url/0, and home_url/0" do
+    test "membership_url/0, upcoming_events_url/0, payment_methods_url/0, news_url/0, home_url/0, and admin_dashboard_url/0" do
       origin = YscWeb.Endpoint.url()
 
       assert Helpers.membership_url() == origin <> "/users/membership"
@@ -51,6 +51,7 @@ defmodule YscWeb.Emails.HelpersTest do
 
       assert Helpers.news_url() == origin <> "/news"
       assert Helpers.home_url() == origin <> "/"
+      assert Helpers.admin_dashboard_url() == origin <> "/admin"
     end
   end
 

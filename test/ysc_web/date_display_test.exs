@@ -104,6 +104,30 @@ defmodule YscWeb.DateDisplayTest do
     end
   end
 
+  describe "format_pacific_date/1" do
+    test "formats Date values without conversion" do
+      assert DateDisplay.format_pacific_date(~D[2024-12-01]) == "Dec 1, 2024"
+    end
+
+    test "formats UTC DateTime values using the Pacific calendar date" do
+      # Late UTC evening still counts as the same Pacific calendar day.
+      assert DateDisplay.format_pacific_date(~U[2024-12-01 06:00:00Z]) ==
+               "Nov 30, 2024"
+
+      assert DateDisplay.format_pacific_date(~U[2024-12-01 08:00:00Z]) ==
+               "Dec 1, 2024"
+    end
+
+    test "returns empty string for nil and invalid values" do
+      assert DateDisplay.format_pacific_date(nil) == ""
+      assert DateDisplay.format_pacific_date(:atom) == ""
+    end
+
+    test "accepts a custom default" do
+      assert DateDisplay.format_pacific_date(nil, "—") == "—"
+    end
+  end
+
   describe "format_datetime_at/1" do
     test "formats DateTime values without timezone conversion" do
       dt = ~U[2024-06-15 15:30:00Z]

@@ -12,6 +12,7 @@ defmodule YscWeb.DateDisplay do
   @datetime_display_format "%b %-d, %Y"
   @long_datetime_format "%B %d, %Y at %I:%M %p"
   @long_datetime_with_zone_format "%B %d, %Y at %I:%M %p %Z"
+  @pacific_timezone "America/Los_Angeles"
 
   @doc """
   Formats a date as a long label (e.g. `"March 15, 2024"`).
@@ -101,6 +102,30 @@ defmodule YscWeb.DateDisplay do
     do: format_datetime_display(DateTime.to_date(datetime), default)
 
   def format_datetime_display(_, default), do: default
+
+  @doc """
+  Formats a UTC datetime as a short Pacific calendar date (e.g. `"Mar 15, 2024"`).
+
+  Datetimes are shifted to `America/Los_Angeles` before formatting. Dates use the
+  short month/day/year format without conversion.
+
+  Returns `default` for nil or other non-date values.
+  """
+  def format_pacific_date(value, default \\ "")
+
+  def format_pacific_date(nil, default), do: default
+
+  def format_pacific_date(%Date{} = date, _default),
+    do: Calendar.strftime(date, @datetime_display_format)
+
+  def format_pacific_date(%DateTime{} = datetime, default) do
+    datetime
+    |> DateTime.shift_zone!(@pacific_timezone)
+    |> DateTime.to_date()
+    |> format_datetime_display(default)
+  end
+
+  def format_pacific_date(_, default), do: default
 
   @doc """
   Formats a datetime as a long date and time label without timezone conversion

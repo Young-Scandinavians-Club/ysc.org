@@ -8,7 +8,7 @@ defmodule YscWeb.Emails.VolunteerBoardNotification do
     mjml_template: "templates/volunteer_board_notification.mjml.eex",
     layout: YscWeb.Emails.BaseLayout
 
-  import YscWeb.Emails.Helpers, only: [absolute_url: 1]
+  import YscWeb.Emails.Helpers, only: [admin_dashboard_url: 0]
 
   def get_template_name() do
     "volunteer_board_notification"
@@ -16,9 +16,5 @@ defmodule YscWeb.Emails.VolunteerBoardNotification do
 
   def get_subject() do
     "New Volunteer Signup - YSC Board Review"
-  end
-
-  def admin_dashboard_url() do
-    absolute_url("/admin")
   end
 end

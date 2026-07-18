@@ -21,8 +21,7 @@ defmodule YscWeb.CoreComponents do
   import Phoenix.Controller, only: [get_csrf_token: 0]
 
   alias Phoenix.LiveView.JS
-  alias YscWeb.FormHelpers
-  alias YscWeb.UploadErrors
+  alias YscWeb.{DateDisplay, FormHelpers, UploadErrors}
 
   @doc """
   Renders a modal.
@@ -3963,11 +3962,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= format_utc_date_display(get_membership_ends_at(@current_membership)) %>
+              <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
               </strong>, at which point you will no longer have access to the YSC membership features.
             <% else %>
               You are still an active member until <strong>
-              <%= format_utc_date_display(get_membership_ends_at(@current_membership)) %>
+              <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
               </strong>, at which point you will no longer have access to the YSC membership features.
             <% end %>
           </p>
@@ -4018,7 +4017,7 @@ defmodule YscWeb.CoreComponents do
             <strong class="text-green-900">automatically renew</strong>
             on
             <strong class="text-green-900">
-              {format_utc_date_display(
+              {DateDisplay.format_pacific_date(
                 get_membership_renewal_date(@current_membership)
               )}
             </strong>
@@ -4071,11 +4070,11 @@ defmodule YscWeb.CoreComponents do
           >
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
-              <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
+              <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
               </strong>. After that date, you will no longer have access to YSC membership features.
             <% else %>
               You are still an active member until <strong>
-              <%= format_utc_date_display(get_membership_renewal_date(@current_membership)) %>
+              <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
               </strong>. After that date, you will no longer have access to YSC membership features.
             <% end %>
           </p>
@@ -4184,18 +4183,6 @@ defmodule YscWeb.CoreComponents do
   defp get_membership_renewal_date(subscription) when is_struct(subscription) do
     subscription.current_period_end
   end
-
-  defp format_utc_date_display(%DateTime{} = dt) do
-    dt
-    |> DateTime.shift_zone!("America/Los_Angeles")
-    |> DateTime.to_date()
-    |> Calendar.strftime("%b %-d, %Y")
-  end
-
-  defp format_utc_date_display(%Date{} = date),
-    do: Calendar.strftime(date, "%b %-d, %Y")
-
-  defp format_utc_date_display(_), do: ""
 
   @doc """
   Renders a hero section with a background image or video and optional overlay content.
