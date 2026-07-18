@@ -155,18 +155,17 @@ defmodule YscWeb.Emails.NewsletterEdition do
   end
 
   # Strip data-trix-* and class attrs from all other tags, recurse into children
-  defp transform_node_for_email({tag, _attrs, _children}) when tag in ["script", "style"] do
+  defp transform_node_for_email({tag, _attrs, _children})
+       when tag in ["script", "style"] do
     []
   end
 
   defp transform_node_for_email({tag, attrs, children}) do
     safe_attrs =
-      attrs
-      |> Enum.reject(fn {name, _} ->
+      Enum.reject(attrs, fn {name, value} ->
         String.starts_with?(name, "data-trix") or name == "class" or
-          String.starts_with?(name, "on")
+          String.starts_with?(name, "on") or dangerous_url_value?(value)
       end)
-      |> Enum.reject(fn {_, value} -> dangerous_url_value?(value) end)
 
     [{tag, safe_attrs, transform_nodes_for_email(children)}]
   end

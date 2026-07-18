@@ -36,10 +36,11 @@ defmodule YscWeb.Controllers.StripePaymentMethodControllerTest do
       assert redirected_to(conn) == "/users/log-in"
     end
 
-    test "POST /billing/user/:user_id/payment-method requires authentication", %{
-      conn: conn,
-      user: user
-    } do
+    test "POST /billing/user/:user_id/payment-method requires authentication",
+         %{
+           conn: conn,
+           user: user
+         } do
       conn =
         post(conn, "/billing/user/#{user.id}/payment-method", %{
           "payment_method_id" => "pm_test123"
