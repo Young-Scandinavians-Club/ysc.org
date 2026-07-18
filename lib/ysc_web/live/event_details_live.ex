@@ -6374,20 +6374,57 @@ defmodule YscWeb.EventDetailsLive do
   defp format_event_when_date_heading(%Event{start_date: nil}), do: "TBD"
 
   defp format_event_when_date_heading(%Event{} = event) do
-    DateDisplay.format_event_date_range(event, default: "TBD")
+    start = event_calendar_date(event.start_date)
+    end_date = event_calendar_date(event.end_date)
+
+    case {start, end_date} do
+      {nil, _} ->
+        "TBD"
+
+      {start, nil} ->
+        format_start_date_short(start)
+
+      {start, finish} ->
+        if Date.compare(start, finish) == :eq do
+          format_start_date_short(start)
+        else
+          format_event_when_weekday_range(start, finish)
+        end
+    end
   end
 
   defp format_event_when_time_subline(%Event{start_time: nil}), do: nil
 
-  defp format_event_when_time_subline(%Event{start_time: start_time}) do
-    case format_time(start_time) do
-      %Time{} = time ->
-        "Starts at #{Timex.format!(time, "{h12}:{m} {AM}")}"
-
-      _ ->
-        nil
+  defp format_event_when_time_subline(%Event{} = event) do
+    case format_start_end(event.start_time, event.end_time) do
+      nil -> nil
+      time_label -> time_label
     end
   end
+
+  defp format_event_when_weekday_range(start, finish) do
+    if start.year == finish.year do
+      "#{format_weekday_date(start, false)} – #{format_weekday_date(finish, false)}"
+    else
+      "#{format_weekday_date(start, true)} – #{format_weekday_date(finish, true)}"
+    end
+  end
+
+  defp format_weekday_date(%Date{} = date, include_year?) do
+    format =
+      if include_year? do
+        "%a, %b %-d, %Y"
+      else
+        "%a, %b %-d"
+      end
+
+    Calendar.strftime(date, format)
+  end
+
+  defp event_calendar_date(nil), do: nil
+  defp event_calendar_date(%DateTime{} = dt), do: DateTime.to_date(dt)
+  defp event_calendar_date(%Date{} = date), do: date
+  defp event_calendar_date(_), do: nil
 
   defp event_body(%Event{rendered_details: nil} = event),
     do: Scrubber.scrub(event.raw_details, Ysc.TrixScrubber)
