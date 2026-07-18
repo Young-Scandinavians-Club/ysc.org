@@ -110,6 +110,25 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       refute result =~ "onerror"
       refute result =~ "<script"
     end
+
+    test "strips javascript: URLs from href attributes" do
+      href = "javascript" <> ":alert(1)"
+      html = "<a href=\"" <> href <> "\">Click me</a>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Click me"
+      refute result =~ href
+    end
+
+    test "strips style tags entirely" do
+      css = "display" <> ":none"
+      html = "<p>Safe</p><style>body{" <> css <> "}</style>"
+      result = NewsletterEdition.email_safe_html(html)
+
+      assert result =~ "Safe"
+      refute result =~ "<style"
+      refute result =~ css
+    end
   end
 
   # ---------------------------------------------------------------------------
