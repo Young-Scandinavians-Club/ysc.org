@@ -10,6 +10,7 @@ defmodule YscWeb.EventDetailsLive do
 
   alias Ysc.Events
   alias Ysc.Events.Event
+  alias Ysc.Events.EventPricingCache
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.DonationDisplay
@@ -3477,35 +3478,20 @@ defmodule YscWeb.EventDetailsLive do
 
   # Minimal assigns for fast initial static render (SEO-friendly)
   defp mount_minimal_assigns(socket, event, _event_id) do
-    # Preload ticket tiers for pricing display and cover image to avoid per-component queries
-    event = Repo.preload(event, [:ticket_tiers, :cover_image])
+    # Cover image for the hero; pricing/tiers via EventPricingCache (same sold-count
+    # query as list_ticket_tiers_for_event, cached) so connect can reuse tiers.
+    event =
+      event
+      |> Repo.preload(:cover_image)
+      |> EventPricingCache.enrich_event()
 
-    # Convert preloaded tiers to map format expected by pricing functions
-    # Add sold_tickets_count: 0 as placeholder (will be updated after async load)
-    ticket_tiers_as_maps =
-      Enum.map(event.ticket_tiers, fn tier ->
-        %{
-          id: tier.id,
-          name: tier.name,
-          description: tier.description,
-          type: tier.type,
-          price: tier.price,
-          quantity: tier.quantity,
-          requires_registration: tier.requires_registration,
-          start_date: tier.start_date,
-          end_date: tier.end_date,
-          event_id: tier.event_id,
-          lock_version: tier.lock_version,
-          inserted_at: tier.inserted_at,
-          updated_at: tier.updated_at,
-          sold_tickets_count: 0
-        }
-      end)
+    ticket_tiers =
+      case event.ticket_tiers do
+        tiers when is_list(tiers) -> tiers
+        _ -> []
+      end
 
-    event_with_pricing =
-      add_pricing_info_from_tiers(event, ticket_tiers_as_maps)
-
-    has_ticket_tiers = event.ticket_tiers != []
+    has_ticket_tiers = ticket_tiers != []
     has_ticket_info = has_ticket_tiers || event.tickets_tbd
 
     # Check if we're on the tickets route (live_action == :tickets)
@@ -3513,13 +3499,13 @@ defmodule YscWeb.EventDetailsLive do
 
     socket
     |> SEO.assign_seo(SEO.assigns_for_event(event))
-    |> assign(:event, event_with_pricing)
+    |> assign(:event, event)
     # Async data - will be populated after connection
     |> assign(:agendas, [])
     |> assign(:active_agenda, nil)
     |> assign(:user_tickets, [])
     |> assign(:all_tickets_by_order, %{})
-    |> assign(:ticket_tiers, ticket_tiers_as_maps)
+    |> assign(:ticket_tiers, ticket_tiers)
     # Availability data - loading state until async completes
     |> assign(:availability_data, nil)
     |> assign(:event_at_capacity, false)
@@ -3575,42 +3561,67 @@ defmodule YscWeb.EventDetailsLive do
     active_membership? = socket.assigns.active_membership?
     # Pass the event we already have to avoid re-fetching it
     event = socket.assigns.event
+    existing_ticket_tiers = socket.assigns.ticket_tiers
 
     socket
     |> start_async(:load_event_data, fn ->
-      load_event_data_async(event, event_id, current_user, active_membership?)
+      load_event_data_async(
+        event,
+        event_id,
+        current_user,
+        active_membership?,
+        existing_ticket_tiers
+      )
     end)
   end
 
   # Background task to load all event data in parallel
   # Note: event is passed from socket.assigns to avoid re-fetching it
-  defp load_event_data_async(event, event_id, current_user, active_membership?) do
+  defp load_event_data_async(
+         event,
+         event_id,
+         current_user,
+         active_membership?,
+         existing_ticket_tiers
+       ) do
     # Run queries in parallel using Task.async_stream
     # Note: We removed check_availability_with_lock as it's expensive (runs transaction with locks
     # and re-fetches event/ticket_tiers). Instead, we compute availability from ticket_tiers data.
-    tasks = [
-      {:agendas, fn -> Agendas.list_agendas_for_event(event_id) end},
-      {:ticket_tiers, fn -> Events.list_ticket_tiers_for_event(event_id) end},
-      {:selling_fast, fn -> Events.event_selling_fast?(event_id) end},
-      {:user_tickets, fn -> load_user_tickets(current_user, event_id) end},
-      {:attendees,
-       fn -> load_attendees(active_membership?, current_user, event_id) end},
-      {:user_reservations,
-       fn -> load_user_reservations(current_user, event_id) end},
-      {:event_updates, fn -> Events.list_visible_event_updates(event_id) end},
-      {:save_the_date_subscription,
-       fn ->
-         if current_user do
-           Events.subscribed_to_event_notification?(
-             event,
-             current_user.id,
-             "save_the_date"
-           )
-         else
-           false
-         end
-       end}
-    ]
+    reuse_ticket_tiers? = tiers_reusable_for_async?(existing_ticket_tiers)
+
+    tier_task =
+      if reuse_ticket_tiers? do
+        []
+      else
+        [
+          {:ticket_tiers,
+           fn -> Events.list_ticket_tiers_for_event(event_id) end}
+        ]
+      end
+
+    tasks =
+      [
+        {:agendas, fn -> Agendas.list_agendas_for_event(event_id) end},
+        {:selling_fast, fn -> Events.event_selling_fast?(event_id) end},
+        {:user_tickets, fn -> load_user_tickets(current_user, event_id) end},
+        {:attendees,
+         fn -> load_attendees(active_membership?, current_user, event_id) end},
+        {:user_reservations,
+         fn -> load_user_reservations(current_user, event_id) end},
+        {:event_updates, fn -> Events.list_visible_event_updates(event_id) end},
+        {:save_the_date_subscription,
+         fn ->
+           if current_user do
+             Events.subscribed_to_event_notification?(
+               event,
+               current_user.id,
+               "save_the_date"
+             )
+           else
+             false
+           end
+         end}
+      ] ++ tier_task
 
     results =
       tasks
@@ -3623,7 +3634,13 @@ defmodule YscWeb.EventDetailsLive do
 
     # Compute availability from ticket_tiers data (avoids expensive locking transaction)
     # list_ticket_tiers_for_event already includes sold_tickets_count via LEFT JOIN
-    ticket_tiers = Map.get(results, :ticket_tiers, [])
+    ticket_tiers =
+      if reuse_ticket_tiers? do
+        existing_ticket_tiers
+      else
+        Map.get(results, :ticket_tiers, [])
+      end
+
     tier_ids = Enum.map(ticket_tiers, & &1.id)
 
     reserved_counts_by_tier =
@@ -3639,6 +3656,16 @@ defmodule YscWeb.EventDetailsLive do
     results
     |> Map.put(:availability, availability)
     |> Map.put(:reserved_counts_by_tier, reserved_counts_by_tier)
+    |> Map.put(:ticket_tiers, ticket_tiers)
+  end
+
+  # Tiers from EventPricingCache.enrich_event/1 already include sold_tickets_count
+  # (same shape as list_ticket_tiers_for_event/1), so the async loader can skip a
+  # second tier query on connect.
+  defp tiers_reusable_for_async?(ticket_tiers) when is_list(ticket_tiers) do
+    Enum.all?(ticket_tiers, fn tier ->
+      is_map(tier) and Map.has_key?(tier, :sold_tickets_count)
+    end)
   end
 
   # Compute availability data from ticket_tiers without expensive database transaction.
@@ -4873,21 +4900,22 @@ defmodule YscWeb.EventDetailsLive do
       ) do
     # Only update if this is the event we're viewing
     if event.id == socket.assigns.event.id do
-      event = Repo.preload(event, [:ticket_tiers, :cover_image])
-
-      event_with_pricing =
-        add_pricing_info_from_tiers(event, event.ticket_tiers)
+      event =
+        event
+        |> Repo.preload(:cover_image)
+        |> EventPricingCache.enrich_event()
 
       subscribed =
         Events.subscribed_to_event_notification?(
-          event_with_pricing,
+          event,
           socket.assigns[:current_user] && socket.assigns.current_user.id,
           "save_the_date"
         )
 
       {:noreply,
        socket
-       |> assign(:event, event_with_pricing)
+       |> assign(:event, event)
+       |> assign(:ticket_tiers, Map.get(event, :ticket_tiers, []))
        |> assign(:subscribed_to_save_the_date, subscribed)}
     else
       {:noreply, socket}
