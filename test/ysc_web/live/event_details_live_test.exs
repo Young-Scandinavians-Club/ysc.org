@@ -282,9 +282,10 @@ defmodule YscWeb.EventDetailsLiveTest do
              )
     end
 
-    test "shows weekday date range with years for multi-day events across years", %{
-      conn: conn
-    } do
+    test "shows weekday date range with years for multi-day events across years",
+         %{
+           conn: conn
+         } do
       event =
         event_fixture(%{
           title: "New Year Event",
@@ -301,7 +302,9 @@ defmodule YscWeb.EventDetailsLiveTest do
              )
     end
 
-    test "shows TBD in the When section when start date is missing", %{conn: conn} do
+    test "shows TBD in the When section when start date is missing", %{
+      conn: conn
+    } do
       event =
         event_fixture(%{
           title: "Date TBD Event",
