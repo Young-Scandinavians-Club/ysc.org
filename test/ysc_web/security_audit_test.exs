@@ -1673,7 +1673,8 @@ defmodule YscWeb.SecurityAuditTest do
     import Ysc.BookingsFixtures
 
     setup do
-      original = KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
+      original =
+        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
 
       on_exit(fn ->
         KioskAPIKeyHelper.restore_kiosk_api_key!(original)
@@ -1712,7 +1713,8 @@ defmodule YscWeb.SecurityAuditTest do
     alias Ysc.Bookings
 
     setup do
-      original = KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
+      original =
+        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
 
       on_exit(fn ->
         KioskAPIKeyHelper.restore_kiosk_api_key!(original)
