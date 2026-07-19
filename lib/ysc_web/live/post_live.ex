@@ -232,25 +232,9 @@ defmodule YscWeb.PostLive do
     preloads = [{:author, :current_avatar}, :featured_image]
     viewer = socket.assigns.current_user
 
-    # LiveView calls mount twice (dead render, then WebSocket). Reuse post assigns
-    # from the dead render to avoid a second get_post_for_page on connect.
-    connected_remount? =
-      connected?(socket) &&
-        match?(%Posts.Post{}, socket.assigns[:post]) &&
-        socket.assigns.post_id == id
-
-    post =
-      if connected_remount? do
-        socket.assigns.post
-      else
-        case Ecto.ULID.cast(id) do
-          {:ok, ulid_id} ->
-            Posts.get_post_for_page(ulid_id, viewer, preloads)
-
-          :error ->
-            Posts.get_post_for_page_by_url_name(id, viewer, preloads)
-        end
-      end
+    # Load post synchronously - essential for SEO (title, content, image).
+    # Cache briefly so the connected mount reuses the dead-render fetch.
+    post = fetch_post_for_mount(id, viewer, preloads)
 
     case post do
       nil ->
@@ -262,28 +246,23 @@ defmodule YscWeb.PostLive do
          |> redirect(to: ~p"/news")}
 
       post ->
-        socket =
-          if connected_remount? do
-            socket
-          else
-            # Essential assigns for initial render (SEO-critical)
-            new_comment_changeset =
-              Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})
+        new_comment_changeset =
+          Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})
 
-            socket
-            |> assign(:post_id, id)
-            |> assign(:post, post)
-            |> assign(:content_preview?, post.state != :published)
-            |> SEO.assign_seo(SEO.assigns_for_post(post))
-            |> assign(:animate_insert, false)
-            # Use cached comment_count from post for initial render
-            |> assign(:n_comments, post.comment_count)
-            |> assign(:loading, false)
-            |> assign(:comments_loaded, false)
-            |> assign_form(new_comment_changeset)
-            # Initialize empty stream for comments (will be populated after connection)
-            |> stream(:comments, [])
-          end
+        socket =
+          socket
+          |> assign(:post_id, id)
+          |> assign(:post, post)
+          |> assign(:content_preview?, post.state != :published)
+          |> SEO.assign_seo(SEO.assigns_for_post(post))
+          |> assign(:animate_insert, false)
+          # Use cached comment_count from post for initial render
+          |> assign(:n_comments, post.comment_count)
+          |> assign(:loading, false)
+          |> assign(:comments_loaded, false)
+          |> assign_form(new_comment_changeset)
+          # Initialize empty stream for comments (will be populated after connection)
+          |> stream(:comments, [])
 
         if connected?(socket) do
           # Subscribe to real-time updates only when connected
@@ -296,6 +275,46 @@ defmodule YscWeb.PostLive do
           {:ok, socket, temporary_assigns: [form: nil]}
         end
     end
+  end
+
+  @post_mount_cache_ttl :timer.seconds(30)
+
+  defp fetch_post_for_mount(id, viewer, preloads) do
+    cache_key = post_mount_cache_key(id, viewer)
+
+    if Ysc.ProcessCache.enabled?() do
+      case Cachex.get(:ysc_cache, cache_key) do
+        {:ok, %Post{} = post} ->
+          post
+
+        _ ->
+          post = load_post_for_page(id, viewer, preloads)
+          Cachex.put(:ysc_cache, cache_key, post, ttl: @post_mount_cache_ttl)
+          post
+      end
+    else
+      load_post_for_page(id, viewer, preloads)
+    end
+  end
+
+  defp load_post_for_page(id, viewer, preloads) do
+    case Ecto.ULID.cast(id) do
+      {:ok, ulid_id} ->
+        Posts.get_post_for_page(ulid_id, viewer, preloads)
+
+      :error ->
+        Posts.get_post_for_page_by_url_name(id, viewer, preloads)
+    end
+  end
+
+  defp post_mount_cache_key(id, viewer) do
+    viewer_key =
+      case viewer do
+        %{id: user_id} -> user_id
+        _ -> "guest"
+      end
+
+    "post:mount:#{id}:#{viewer_key}"
   end
 
   # Load comments asynchronously after WebSocket connection

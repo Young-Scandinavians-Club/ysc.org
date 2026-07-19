@@ -10,10 +10,12 @@ defmodule YscWeb.PostLiveQueryTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
 
+  @moduletag process_caches: true
+
   alias Ysc.Posts
   alias Ysc.Repo
 
-  defp post_fixture(author, attrs \\ %{}) do
+  defp post_fixture(author, attrs) do
     {:ok, post} =
       %Posts.Post{}
       |> Posts.Post.new_post_changeset(
