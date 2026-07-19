@@ -5074,11 +5074,11 @@ defmodule YscWeb.AdminBookingsLive do
 
     bookings =
       Bookings.list_bookings(:clear_lake, date, date,
-        preload: [user: :current_avatar]
+        preload: [user: :current_avatar],
+        exclude_statuses: [:canceled, :refunded]
       )
       |> Enum.filter(fn b ->
-        b.status not in [:canceled, :refunded] &&
-          Date.compare(b.checkin_date, date) != :gt &&
+        Date.compare(b.checkin_date, date) != :gt &&
           Date.compare(b.checkout_date, date) == :gt
       end)
 
@@ -6801,30 +6801,23 @@ defmodule YscWeb.AdminBookingsLive do
           end),
           Task.async(fn ->
             Bookings.list_bookings(property, start_date, end_date,
-              preload: [rooms: :room_category, user: :current_avatar]
+              preload: [rooms: :room_category, user: :current_avatar],
+              exclude_statuses: [:canceled, :refunded]
             )
           end)
         ],
         :infinity
       )
 
-    # Filter out canceled and refunded bookings (only show active bookings on calendar)
-    # Note: This filtering in memory is acceptable since we're already loading a filtered set
-    # and need to process bookings anyway to separate room vs buyout bookings
-    active_bookings =
-      Enum.filter(bookings_in_range, fn booking ->
-        booking.status != :canceled && booking.status != :refunded
-      end)
-
     # Separate room bookings from buyout bookings
     # Room bookings have rooms associated, buyout bookings have no rooms
     room_bookings =
-      Enum.filter(active_bookings, fn booking ->
+      Enum.filter(bookings_in_range, fn booking ->
         Ecto.assoc_loaded?(booking.rooms) && booking.rooms != []
       end)
 
     buyout_bookings =
-      Enum.filter(active_bookings, fn booking ->
+      Enum.filter(bookings_in_range, fn booking ->
         !Ecto.assoc_loaded?(booking.rooms) || booking.rooms == []
       end)
 

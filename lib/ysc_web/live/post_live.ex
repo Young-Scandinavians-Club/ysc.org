@@ -232,14 +232,24 @@ defmodule YscWeb.PostLive do
     preloads = [{:author, :current_avatar}, :featured_image]
     viewer = socket.assigns.current_user
 
-    # Load post synchronously - essential for SEO (title, content, image)
-    post =
-      case Ecto.ULID.cast(id) do
-        {:ok, ulid_id} ->
-          Posts.get_post_for_page(ulid_id, viewer, preloads)
+    # LiveView calls mount twice (dead render, then WebSocket). Reuse post assigns
+    # from the dead render to avoid a second get_post_for_page on connect.
+    connected_remount? =
+      connected?(socket) &&
+        match?(%Posts.Post{}, socket.assigns[:post]) &&
+        socket.assigns.post_id == id
 
-        :error ->
-          Posts.get_post_for_page_by_url_name(id, viewer, preloads)
+    post =
+      if connected_remount? do
+        socket.assigns.post
+      else
+        case Ecto.ULID.cast(id) do
+          {:ok, ulid_id} ->
+            Posts.get_post_for_page(ulid_id, viewer, preloads)
+
+          :error ->
+            Posts.get_post_for_page_by_url_name(id, viewer, preloads)
+        end
       end
 
     case post do
@@ -252,24 +262,28 @@ defmodule YscWeb.PostLive do
          |> redirect(to: ~p"/news")}
 
       post ->
-        # Essential assigns for initial render (SEO-critical)
-        new_comment_changeset =
-          Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})
-
         socket =
-          socket
-          |> assign(:post_id, id)
-          |> assign(:post, post)
-          |> assign(:content_preview?, post.state != :published)
-          |> SEO.assign_seo(SEO.assigns_for_post(post))
-          |> assign(:animate_insert, false)
-          # Use cached comment_count from post for initial render
-          |> assign(:n_comments, post.comment_count)
-          |> assign(:loading, false)
-          |> assign(:comments_loaded, false)
-          |> assign_form(new_comment_changeset)
-          # Initialize empty stream for comments (will be populated after connection)
-          |> stream(:comments, [])
+          if connected_remount? do
+            socket
+          else
+            # Essential assigns for initial render (SEO-critical)
+            new_comment_changeset =
+              Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})
+
+            socket
+            |> assign(:post_id, id)
+            |> assign(:post, post)
+            |> assign(:content_preview?, post.state != :published)
+            |> SEO.assign_seo(SEO.assigns_for_post(post))
+            |> assign(:animate_insert, false)
+            # Use cached comment_count from post for initial render
+            |> assign(:n_comments, post.comment_count)
+            |> assign(:loading, false)
+            |> assign(:comments_loaded, false)
+            |> assign_form(new_comment_changeset)
+            # Initialize empty stream for comments (will be populated after connection)
+            |> stream(:comments, [])
+          end
 
         if connected?(socket) do
           # Subscribe to real-time updates only when connected
