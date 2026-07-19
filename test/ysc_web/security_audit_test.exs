@@ -42,6 +42,7 @@ defmodule YscWeb.SecurityAuditTest do
   alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
+  alias Ysc.Test.KioskAPIKeyHelper
   alias YscWeb.AuthController
 
   import Ysc.AccountsFixtures
@@ -1672,11 +1673,11 @@ defmodule YscWeb.SecurityAuditTest do
     import Ysc.BookingsFixtures
 
     setup do
-      prev = Application.get_env(:ysc, :kiosk_api_key)
-      Application.put_env(:ysc, :kiosk_api_key, "security-audit-kiosk-key")
+      original =
+        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
 
       on_exit(fn ->
-        Application.put_env(:ysc, :kiosk_api_key, prev)
+        KioskAPIKeyHelper.restore_kiosk_api_key!(original)
       end)
 
       :ok
@@ -1712,11 +1713,11 @@ defmodule YscWeb.SecurityAuditTest do
     alias Ysc.Bookings
 
     setup do
-      prev = Application.get_env(:ysc, :kiosk_api_key)
-      Application.put_env(:ysc, :kiosk_api_key, "security-audit-kiosk-key")
+      original =
+        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
 
       on_exit(fn ->
-        Application.put_env(:ysc, :kiosk_api_key, prev)
+        KioskAPIKeyHelper.restore_kiosk_api_key!(original)
       end)
 
       :ok
