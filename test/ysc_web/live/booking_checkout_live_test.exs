@@ -1089,7 +1089,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            booking_a: booking_a,
            booking_b: booking_b
          } do
-      expect(StripeMock, :retrieve_payment_intent, fn _id, _opts ->
+      expect(StripeMock, :retrieve_payment_intent, 2, fn _id, _opts ->
         {:ok,
          %Stripe.PaymentIntent{
            id: "pi_entitlement_shared_#{System.unique_integer([:positive])}",
@@ -1097,7 +1097,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            amount: 50_000,
            customer: nil,
            payment_method: nil,
-           latest_charge: nil
+           latest_charge: "ch_entitlement_shared_test"
          }}
       end)
 

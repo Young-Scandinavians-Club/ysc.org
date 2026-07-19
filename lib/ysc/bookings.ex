@@ -1059,14 +1059,17 @@ defmodule Ysc.Bookings do
          %Stripe.PaymentIntent{} = payment_intent,
          reason
        ) do
-    payment_intent.status == "succeeded" and booking.status in [:hold, :canceled] and
+    payment_intent.status == "succeeded" and
+      booking.status in [:hold, :canceled] and
       reason in @refundable_unfulfilled_checkout_errors
   end
 
   defp normalize_checkout_failure_reason({:error, reason}),
     do: normalize_checkout_failure_reason(reason)
 
-  defp normalize_checkout_failure_reason(reason) when is_atom(reason), do: reason
+  defp normalize_checkout_failure_reason(reason) when is_atom(reason),
+    do: reason
+
   defp normalize_checkout_failure_reason(_), do: :unknown
 
   @doc false
