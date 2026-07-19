@@ -2290,7 +2290,7 @@ defmodule YscWeb.TahoeBookingLive do
                               class="w-4 h-4 text-green-600 flex-shrink-0"
                             />
                             <p class="text-xs text-green-900">
-                              {room.name}: Guest count OK
+                              {room.name}: Enough beds for your group
                             </p>
                           </div>
                         <% end %>

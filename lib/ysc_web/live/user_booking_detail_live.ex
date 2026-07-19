@@ -216,7 +216,9 @@ defmodule YscWeb.UserBookingDetailLive do
                     <div class="pt-3 border-t border-blue-200">
                       <p class="font-semibold mb-2">Cancellation Policy:</p>
                       <div class="text-sm text-blue-800">
-                        <p>Full refund available for cancellations.</p>
+                        <p>
+                          See your confirmation email or contact the cabin master for cancellation and refund details.
+                        </p>
                       </div>
                     </div>
                   <% end %>

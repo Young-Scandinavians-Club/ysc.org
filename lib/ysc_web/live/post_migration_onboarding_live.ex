@@ -688,7 +688,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               phx-click="confirm_payment_step"
               phx-disable-with="Continuing..."
             >
-              Continue <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
+              Continue to next step
+              <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>
         <% else %>
@@ -1503,7 +1504,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             YscWeb.Flash.send_toast(
               :error,
-              "Your membership renewal is already set up. Click Continue at the bottom of this page to finish updating your profile.",
+              "Your membership renewal is already set up. Click Continue to next step at the bottom of this page to finish updating your profile.",
               title: "Membership renewal"
             )
 
