@@ -234,7 +234,7 @@ defmodule Ysc.MixProject do
       # Pin exact version: jose is pulled by joken (~> 1.11.10) and goth (~> 1.11).
       {:jose, "1.11.12", override: true},
       {:joken, "~> 2.6"},
-      {:let_me, "~> 1.2.3"},
+      {:let_me, "~> 3.0"},
       {:live_toast, "~> 0.8"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
