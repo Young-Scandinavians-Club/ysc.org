@@ -169,7 +169,11 @@ defmodule Ysc.Accounts.UserToken do
   to ensure it can only be used once.
   """
   def verify_passkey_login_token_query(token) do
-    verify_one_time_login_token_query(token, "passkey_login", @passkey_login_validity_in_seconds)
+    verify_one_time_login_token_query(
+      token,
+      "passkey_login",
+      @passkey_login_validity_in_seconds
+    )
   end
 
   @doc """
@@ -199,7 +203,11 @@ defmodule Ysc.Accounts.UserToken do
   to ensure it can only be used once.
   """
   def verify_auto_login_token_query(token) do
-    verify_one_time_login_token_query(token, "auto_login", @auto_login_validity_in_seconds)
+    verify_one_time_login_token_query(
+      token,
+      "auto_login",
+      @auto_login_validity_in_seconds
+    )
   end
 
   defp verify_one_time_login_token_query(token, context, validity_in_seconds) do

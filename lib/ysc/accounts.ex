@@ -2096,7 +2096,10 @@ defmodule Ysc.Accounts do
   window), ensuring strict one-time-use semantics even under load.
   """
   def verify_and_consume_passkey_login_token(token) do
-    verify_and_consume_one_time_login_token(token, &UserToken.verify_passkey_login_token_query/1)
+    verify_and_consume_one_time_login_token(
+      token,
+      &UserToken.verify_passkey_login_token_query/1
+    )
   end
 
   @doc """
@@ -2105,7 +2108,10 @@ defmodule Ysc.Accounts do
   Uses the same cluster-safe one-time consumption semantics as passkey login.
   """
   def verify_and_consume_auto_login_token(token) do
-    verify_and_consume_one_time_login_token(token, &UserToken.verify_auto_login_token_query/1)
+    verify_and_consume_one_time_login_token(
+      token,
+      &UserToken.verify_auto_login_token_query/1
+    )
   end
 
   defp generate_one_time_login_token(user, builder) do

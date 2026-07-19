@@ -1819,7 +1819,9 @@ defmodule YscWeb.SecurityAuditTest do
       %{user: user}
     end
 
-    test "generate_auto_login_token/1 persists a token record in the DB", %{user: user} do
+    test "generate_auto_login_token/1 persists a token record in the DB", %{
+      user: user
+    } do
       token = Accounts.generate_auto_login_token(user)
 
       assert is_binary(token)
@@ -1835,7 +1837,9 @@ defmodule YscWeb.SecurityAuditTest do
          %{user: user} do
       token = Accounts.generate_auto_login_token(user)
 
-      assert {:ok, returned_user} = Accounts.verify_and_consume_auto_login_token(token)
+      assert {:ok, returned_user} =
+               Accounts.verify_and_consume_auto_login_token(token)
+
       assert returned_user.id == user.id
 
       hashed =
@@ -1866,7 +1870,10 @@ defmodule YscWeb.SecurityAuditTest do
              "Expected a session to be created after auto-login"
     end
 
-    test "auto_login endpoint rejects an already-consumed token", %{conn: conn, user: user} do
+    test "auto_login endpoint rejects an already-consumed token", %{
+      conn: conn,
+      user: user
+    } do
       token = Accounts.generate_auto_login_token(user)
 
       conn1 = get(build_conn(), ~p"/users/log-in/auto?#{%{token: token}}")
