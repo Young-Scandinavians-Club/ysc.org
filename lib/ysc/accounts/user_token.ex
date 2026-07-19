@@ -139,6 +139,8 @@ defmodule Ysc.Accounts.UserToken do
 
   # Passkey login tokens expire after 2 minutes (stored as seconds for query)
   @passkey_login_validity_in_seconds 120
+  # Auto-login magic links expire after 90 seconds (matches UserSessionController)
+  @auto_login_validity_in_seconds 90
 
   @doc """
   Builds a one-time token for completing a passkey login.
@@ -167,16 +169,48 @@ defmodule Ysc.Accounts.UserToken do
   to ensure it can only be used once.
   """
   def verify_passkey_login_token_query(token) do
+    verify_one_time_login_token_query(token, "passkey_login", @passkey_login_validity_in_seconds)
+  end
+
+  @doc """
+  Builds a one-time token for completing an auto-login redirect after account setup.
+
+  The raw (unhashed) token is returned for embedding in the redirect URL.
+  Only the hash is stored in the database. The token must be consumed
+  (deleted) on first use to prevent replay attacks.
+  """
+  def build_auto_login_token(user) do
+    token = :crypto.strong_rand_bytes(@rand_size)
+    hashed_token = :crypto.hash(@hash_algorithm, token)
+
+    {Base.url_encode64(token, padding: false),
+     %UserToken{
+       token: hashed_token,
+       context: "auto_login",
+       user_id: user.id
+     }}
+  end
+
+  @doc """
+  Verifies an auto-login token and returns a query for the associated user.
+
+  The token must have been issued within the last #{@auto_login_validity_in_seconds}
+  seconds. The caller is responsible for deleting the token after a successful lookup
+  to ensure it can only be used once.
+  """
+  def verify_auto_login_token_query(token) do
+    verify_one_time_login_token_query(token, "auto_login", @auto_login_validity_in_seconds)
+  end
+
+  defp verify_one_time_login_token_query(token, context, validity_in_seconds) do
     case Base.url_decode64(token, padding: false) do
       {:ok, decoded_token} ->
         hashed_token = :crypto.hash(@hash_algorithm, decoded_token)
 
         query =
-          from t in by_token_and_context_query(hashed_token, "passkey_login"),
+          from t in by_token_and_context_query(hashed_token, context),
             join: user in assoc(t, :user),
-            where:
-              t.inserted_at >
-                ago(^@passkey_login_validity_in_seconds, "second"),
+            where: t.inserted_at > ago(^validity_in_seconds, "second"),
             select: {user, t}
 
         {:ok, query}

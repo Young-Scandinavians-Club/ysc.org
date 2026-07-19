@@ -3,6 +3,9 @@ defmodule YscWeb.UserSessionControllerTest do
 
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts.UserToken
+  alias Ysc.Repo
+
   setup do
     %{user: user_fixture()}
   end
@@ -202,7 +205,7 @@ defmodule YscWeb.UserSessionControllerTest do
 
       # Short-lived one-time token (same as account setup flow)
       one_time_token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+        Ysc.Accounts.generate_auto_login_token(user)
 
       conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
 
@@ -216,7 +219,7 @@ defmodule YscWeb.UserSessionControllerTest do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       one_time_token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+        Ysc.Accounts.generate_auto_login_token(user)
 
       conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
 
@@ -232,7 +235,7 @@ defmodule YscWeb.UserSessionControllerTest do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       one_time_token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+        Ysc.Accounts.generate_auto_login_token(user)
 
       conn1 = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
       assert redirected_to(conn1) == ~p"/"
@@ -260,7 +263,7 @@ defmodule YscWeb.UserSessionControllerTest do
       user = user_fixture(%{state: :suspended})
 
       one_time_token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+        Ysc.Accounts.generate_auto_login_token(user)
 
       conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
 
@@ -276,25 +279,17 @@ defmodule YscWeb.UserSessionControllerTest do
       assert redirected_to(conn) == ~p"/users/log-in"
     end
 
-    test "redirects with invalid session when user id in token does not exist",
-         %{
-           conn: conn
-         } do
-      missing_id = Ecto.ULID.generate()
+    test "redirects to login when auto-login token is expired", %{conn: conn} do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      token = Ysc.Accounts.generate_auto_login_token(user)
 
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", missing_id)
+      Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
 
-      conn =
-        get(
-          conn,
-          "/users/log-in/auto?" <> URI.encode_query(%{"token" => token})
-        )
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
 
-      assert redirected_to(conn) == ~p"/users/log-in"
-
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid login session."
+      assert redirected_to(conn) =~ "/users/log-in"
+      assert redirected_to(conn) =~ "reason=expired_link"
     end
 
     test "redirects to internal path when redirect_to is valid", %{conn: conn} do
@@ -302,7 +297,7 @@ defmodule YscWeb.UserSessionControllerTest do
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
 
       token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+        Ysc.Accounts.generate_auto_login_token(user)
 
       conn =
         get(
