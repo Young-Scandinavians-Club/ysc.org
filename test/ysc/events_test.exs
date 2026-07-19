@@ -1963,6 +1963,37 @@ defmodule Ysc.EventsTest do
              ) == false
     end
 
+    test "subscribed_to_event_notification?/3 accepts enriched event maps", %{
+      user: user
+    } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Save the Date Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      enriched_event =
+        event
+        |> Map.from_struct()
+        |> Map.put(:pricing_info, %{display_text: "Tickets Coming Soon"})
+
+      Events.subscribe_to_event_notification(
+        enriched_event,
+        user.id,
+        "save_the_date"
+      )
+
+      assert Events.subscribed_to_event_notification?(
+               enriched_event,
+               user.id,
+               "save_the_date"
+             ) == true
+    end
+
     test "unsubscribe_from_event_notification/3 removes the subscription", %{
       user: user
     } do
@@ -2538,6 +2569,39 @@ defmodule Ysc.EventsTest do
 
       loaded = Events.get_event!(event.id) |> Repo.preload(:ticket_tiers)
       assert Events.event_pricing_display_string(loaded) == "Free"
+    end
+
+    test "accepts enriched event maps from pricing cache", %{user: user} do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Enriched map #{System.unique_integer()}",
+          description: "D",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 20, :day),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, tier} =
+        Events.create_ticket_tier(%{
+          name: "GA",
+          type: :paid,
+          price: Money.new(25, :USD),
+          quantity: 50,
+          event_id: event.id,
+          start_date: DateTime.add(DateTime.utc_now(), 1, :day)
+        })
+
+      enriched =
+        event
+        |> Map.from_struct()
+        |> Map.put(:ticket_tiers, [tier])
+        |> Map.put(:tickets_tbd, false)
+
+      assert Events.event_pricing_display_string(enriched) == "$25.00"
+
+      assert Events.event_earliest_tickets_sale_date(enriched) ==
+               tier.start_date
     end
   end
 

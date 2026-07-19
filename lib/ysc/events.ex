@@ -1204,13 +1204,13 @@ defmodule Ysc.Events do
   Use for newsletters and other places that need a single line. Event can have ticket_tiers preloaded
   or they will be loaded.
   """
-  def event_pricing_display_string(%Event{} = event) do
+  def event_pricing_display_string(%{id: _} = event) do
     event = ensure_ticket_tiers_loaded(event)
 
     if Map.get(event, :tickets_tbd) do
       "Tickets coming soon"
     else
-      tiers = event.ticket_tiers || []
+      tiers = Map.get(event, :ticket_tiers) || []
       pricing = calculate_event_pricing(tiers)
       pricing.display_text
     end
@@ -1220,11 +1220,11 @@ defmodule Ysc.Events do
   Returns the earliest datetime when any ticket tier goes on sale, or nil.
   Use for newsletters (e.g. "Tickets on sale Jan 15"). Event can have ticket_tiers preloaded.
   """
-  def event_earliest_tickets_sale_date(%Event{} = event) do
+  def event_earliest_tickets_sale_date(%{id: _} = event) do
     event = ensure_ticket_tiers_loaded(event)
 
     dates =
-      (event.ticket_tiers || [])
+      (Map.get(event, :ticket_tiers) || [])
       |> Enum.map(& &1.start_date)
       |> Enum.reject(&is_nil/1)
 
@@ -1234,11 +1234,22 @@ defmodule Ysc.Events do
     end
   end
 
+  defp ensure_ticket_tiers_loaded(%{ticket_tiers: tiers} = event)
+       when is_list(tiers),
+       do: event
+
   defp ensure_ticket_tiers_loaded(%Event{} = event) do
     if Ecto.assoc_loaded?(event.ticket_tiers) do
       event
     else
       Repo.preload(event, :ticket_tiers)
+    end
+  end
+
+  defp ensure_ticket_tiers_loaded(%{id: event_id}) do
+    case Repo.get(Event, event_id) do
+      nil -> %{id: event_id, ticket_tiers: []}
+      event -> Repo.preload(event, :ticket_tiers)
     end
   end
 
@@ -2807,13 +2818,13 @@ defmodule Ysc.Events do
   Safe to call multiple times — duplicate subscriptions are silently ignored.
   """
   def subscribe_to_event_notification(
-        %Event{} = event,
+        %{id: event_id},
         user_id,
         notification_type
       ) do
     %EventNotificationSubscription{}
     |> EventNotificationSubscription.changeset(%{
-      event_id: event.id,
+      event_id: event_id,
       user_id: user_id,
       notification_type: notification_type
     })
@@ -2827,12 +2838,12 @@ defmodule Ysc.Events do
   Unsubscribe a user from a notification type for an event.
   """
   def unsubscribe_from_event_notification(
-        %Event{} = event,
+        %{id: event_id},
         user_id,
         notification_type
       ) do
     from(s in EventNotificationSubscription,
-      where: s.event_id == ^event.id,
+      where: s.event_id == ^event_id,
       where: s.user_id == ^user_id,
       where: s.notification_type == ^notification_type
     )
@@ -2849,12 +2860,12 @@ defmodule Ysc.Events do
     do: false
 
   def subscribed_to_event_notification?(
-        %Event{} = event,
+        %{id: event_id},
         user_id,
         notification_type
       ) do
     from(s in EventNotificationSubscription,
-      where: s.event_id == ^event.id,
+      where: s.event_id == ^event_id,
       where: s.user_id == ^user_id,
       where: s.notification_type == ^notification_type
     )
