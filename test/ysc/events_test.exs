@@ -3,7 +3,7 @@ defmodule Ysc.EventsTest do
 
   alias Ysc.Agendas
   alias Ysc.Events
-  alias Ysc.Events.{Event, FaqQuestion, Ticket, TicketTier}
+  alias Ysc.Events.{Event, EventPricingCache, FaqQuestion, Ticket, TicketTier}
   alias Ysc.Repo
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures
@@ -1989,6 +1989,40 @@ defmodule Ysc.EventsTest do
 
       assert Events.subscribed_to_event_notification?(
                enriched_event,
+               user.id,
+               "save_the_date"
+             ) == true
+    end
+
+    @tag process_caches: true
+    test "subscribe_to_event_notification/3 accepts EventPricingCache enriched events",
+         %{
+           user: user
+         } do
+      {:ok, event} =
+        Events.create_event(%{
+          title: "Cached Notification Event",
+          state: :published,
+          organizer_id: user.id,
+          start_date: DateTime.add(DateTime.utc_now(), 30, :day),
+          published_at: DateTime.utc_now(),
+          tickets_tbd: true
+        })
+
+      _tier = ticket_tier_fixture(%{event_id: event.id})
+      EventPricingCache.invalidate()
+
+      enriched = EventPricingCache.enrich_event(event)
+
+      assert {:ok, _sub} =
+               Events.subscribe_to_event_notification(
+                 enriched,
+                 user.id,
+                 "save_the_date"
+               )
+
+      assert Events.subscribed_to_event_notification?(
+               enriched,
                user.id,
                "save_the_date"
              ) == true

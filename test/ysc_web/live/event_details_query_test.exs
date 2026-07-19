@@ -11,6 +11,7 @@ defmodule YscWeb.EventDetailsQueryTest do
 
   import Phoenix.LiveViewTest
   import Ysc.EventsFixtures
+  import Ysc.TestDataFactory, only: [event_with_state: 2]
 
   alias Ysc.Events.EventPricingCache
 
@@ -75,6 +76,39 @@ defmodule YscWeb.EventDetailsQueryTest do
         )
 
       assert query_count == 1
+    end
+
+    test "dead render emits SEO tags from Event struct when pricing cache is primed",
+         %{
+           conn: conn
+         } do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{
+            title: "Cached SEO Event",
+            description: "Tickets and cover image must stay in meta tags."
+          }
+        )
+
+      ticket_tier_fixture(%{event_id: event.id})
+
+      # Prime pricing cache so mount reuses enriched payload instead of Event struct.
+      EventPricingCache.enrich_event(event)
+
+      html =
+        conn
+        |> get(~p"/events/#{event.id}")
+        |> html_response(200)
+
+      assert html =~ ~s(property="og:title")
+      assert html =~ "Cached SEO Event"
+      assert html =~ ~s(property="og:description")
+      assert html =~ "Tickets and cover image must stay in meta tags."
+      assert html =~ ~s(property="og:image")
+      assert html =~ "/uploads/test_image_optimized.jpg"
+      assert html =~ ~s(rel="canonical")
+      assert html =~ "/events/#{event.id}"
     end
   end
 end
