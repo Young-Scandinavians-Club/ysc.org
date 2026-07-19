@@ -1176,7 +1176,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
       assert {:ok, %{expired: 1}} = Entitlements.expire_passed_entitlements()
 
-      expect(StripeMock, :retrieve_payment_intent, fn ^pi_id, _opts ->
+      expect(StripeMock, :retrieve_payment_intent, 2, fn ^pi_id, _opts ->
         {:ok,
          %Stripe.PaymentIntent{
            id: pi_id,
@@ -1188,7 +1188,7 @@ defmodule YscWeb.BookingCheckoutLiveTest do
            },
            customer: nil,
            payment_method: nil,
-           latest_charge: nil
+           latest_charge: "ch_#{pi_id}"
          }}
       end)
 

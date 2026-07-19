@@ -991,6 +991,84 @@ defmodule Ysc.Bookings do
     end
   end
 
+  @refundable_unfulfilled_checkout_errors ~w(
+    entitlement_no_longer_valid
+    entitlement_not_eligible_for_booking
+    payment_amount_mismatch
+    entitlement_consume_failed
+    booking_confirmation_failed
+    inventory_update_failed
+  )a
+
+  @doc """
+  Refunds a captured Stripe payment when checkout fulfillment fails and the
+  booking remains unconfirmed (for example, an entitlement expired after the
+  payment intent was created).
+  """
+  def maybe_refund_unfulfilled_checkout_payment(
+        %Booking{} = booking,
+        %Stripe.PaymentIntent{} = payment_intent,
+        reason
+      ) do
+    require Ysc.Logging
+
+    normalized_reason = normalize_checkout_failure_reason(reason)
+
+    if refund_unfulfilled_checkout_payment?(
+         booking,
+         payment_intent,
+         normalized_reason
+       ) do
+      refund_reason = "unfulfilled_checkout:#{normalized_reason}"
+
+      case create_stripe_refund(
+             payment_intent.id,
+             payment_intent.amount,
+             refund_reason,
+             idempotency_key: "unfulfilled_checkout_#{payment_intent.id}"
+           ) do
+        {:ok, refund} ->
+          Ysc.Logging.info(
+            "Refunded captured checkout payment after fulfillment failure",
+            booking_id: booking.id,
+            payment_intent_id: payment_intent.id,
+            refund_id: refund.id,
+            reason: normalized_reason
+          )
+
+          {:ok, refund}
+
+        {:error, refund_error} ->
+          Ysc.Logging.error(
+            "Failed to refund captured checkout payment after fulfillment failure",
+            booking_id: booking.id,
+            payment_intent_id: payment_intent.id,
+            reason: normalized_reason,
+            refund_error: inspect(refund_error)
+          )
+
+          {:error, refund_error}
+      end
+    else
+      :skipped
+    end
+  end
+
+  defp refund_unfulfilled_checkout_payment?(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent,
+         reason
+       ) do
+    payment_intent.status == "succeeded" and booking.status in [:hold, :canceled] and
+      reason in @refundable_unfulfilled_checkout_errors
+  end
+
+  defp normalize_checkout_failure_reason({:error, reason}),
+    do: normalize_checkout_failure_reason(reason)
+
+  defp normalize_checkout_failure_reason(reason) when is_atom(reason), do: reason
+  defp normalize_checkout_failure_reason(_), do: :unknown
+
   @doc false
   def verify_modification_redirect_payment_intent(
         payment_intent,

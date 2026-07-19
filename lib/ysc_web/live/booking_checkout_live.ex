@@ -2072,17 +2072,29 @@ defmodule YscWeb.BookingCheckoutLive do
                   )
 
                 {:error, reason} ->
+                  Bookings.maybe_refund_unfulfilled_checkout_payment(
+                    synced_booking,
+                    payment_intent,
+                    reason
+                  )
+
                   {:error, reason}
               end
 
-            {:error, reason} = error ->
+            {:error, reason} ->
               Ysc.Logging.warning(
                 "[BookingCheckout] Failed to sync recalculated hold pricing before payment verification",
                 booking_id: booking.id,
                 reason: inspect(reason)
               )
 
-              error
+              Bookings.maybe_refund_unfulfilled_checkout_payment(
+                booking,
+                payment_intent,
+                reason
+              )
+
+              {:error, reason}
           end
         else
           {:error, :payment_not_succeeded}
@@ -2156,6 +2168,12 @@ defmodule YscWeb.BookingCheckoutLive do
               status: final_booking.status
             )
 
+            Bookings.maybe_refund_unfulfilled_checkout_payment(
+              final_booking,
+              payment_intent,
+              :booking_confirmation_failed
+            )
+
             {:error, :booking_confirmation_failed}
           end
 
@@ -2163,6 +2181,12 @@ defmodule YscWeb.BookingCheckoutLive do
           Ysc.Logging.error(
             "Failed to confirm booking: #{inspect(reason)}",
             booking_id: reloaded_booking.id
+          )
+
+          Bookings.maybe_refund_unfulfilled_checkout_payment(
+            reloaded_booking,
+            payment_intent,
+            reason
           )
 
           {:error, :booking_confirmation_failed}
