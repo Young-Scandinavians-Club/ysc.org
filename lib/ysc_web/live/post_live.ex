@@ -232,15 +232,9 @@ defmodule YscWeb.PostLive do
     preloads = [{:author, :current_avatar}, :featured_image]
     viewer = socket.assigns.current_user
 
-    # Load post synchronously - essential for SEO (title, content, image)
-    post =
-      case Ecto.ULID.cast(id) do
-        {:ok, ulid_id} ->
-          Posts.get_post_for_page(ulid_id, viewer, preloads)
-
-        :error ->
-          Posts.get_post_for_page_by_url_name(id, viewer, preloads)
-      end
+    # Load post synchronously - essential for SEO (title, content, image).
+    # Cache briefly so the connected mount reuses the dead-render fetch.
+    post = fetch_post_for_mount(id, viewer, preloads)
 
     case post do
       nil ->
@@ -252,7 +246,6 @@ defmodule YscWeb.PostLive do
          |> redirect(to: ~p"/news")}
 
       post ->
-        # Essential assigns for initial render (SEO-critical)
         new_comment_changeset =
           Posts.Comment.new_comment_changeset(%Posts.Comment{}, %{})
 
@@ -282,6 +275,46 @@ defmodule YscWeb.PostLive do
           {:ok, socket, temporary_assigns: [form: nil]}
         end
     end
+  end
+
+  @post_mount_cache_ttl :timer.seconds(30)
+
+  defp fetch_post_for_mount(id, viewer, preloads) do
+    cache_key = post_mount_cache_key(id, viewer)
+
+    if Ysc.ProcessCache.enabled?() do
+      case Cachex.get(:ysc_cache, cache_key) do
+        {:ok, %Post{} = post} ->
+          post
+
+        _ ->
+          post = load_post_for_page(id, viewer, preloads)
+          Cachex.put(:ysc_cache, cache_key, post, ttl: @post_mount_cache_ttl)
+          post
+      end
+    else
+      load_post_for_page(id, viewer, preloads)
+    end
+  end
+
+  defp load_post_for_page(id, viewer, preloads) do
+    case Ecto.ULID.cast(id) do
+      {:ok, ulid_id} ->
+        Posts.get_post_for_page(ulid_id, viewer, preloads)
+
+      :error ->
+        Posts.get_post_for_page_by_url_name(id, viewer, preloads)
+    end
+  end
+
+  defp post_mount_cache_key(id, viewer) do
+    viewer_key =
+      case viewer do
+        %{id: user_id} -> user_id
+        _ -> "guest"
+      end
+
+    "post:mount:#{id}:#{viewer_key}"
   end
 
   # Load comments asynchronously after WebSocket connection
