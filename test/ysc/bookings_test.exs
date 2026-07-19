@@ -2681,6 +2681,64 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "maybe_refund_unfulfilled_checkout_payment/3" do
+    test "refunds captured hold payments when entitlement pricing is stale" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_unfulfilled_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 12_345,
+        latest_charge: "ch_test_unfulfilled"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 :entitlement_no_longer_valid
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "skips refund for non-refundable verification failures" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_skip_refund_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        latest_charge: "ch_test_skip"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 :payment_metadata_mismatch
+               )
+    end
+
+    test "skips refund when booking is already complete" do
+      booking = booking_fixture(%{status: :complete})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_complete_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        latest_charge: "ch_test_complete"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 :entitlement_no_longer_valid
+               )
+    end
+  end
+
   describe "Bookings coverage: listing, blackouts, availability, check-in, refunds" do
     test "list_bookings/4 skips date filter when only one of start/end is set" do
       booking = booking_fixture()
