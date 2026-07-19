@@ -78,9 +78,10 @@ defmodule YscWeb.EventDetailsQueryTest do
       assert query_count == 1
     end
 
-    test "dead render emits SEO tags from Event struct when pricing cache is primed", %{
-      conn: conn
-    } do
+    test "dead render emits SEO tags from Event struct when pricing cache is primed",
+         %{
+           conn: conn
+         } do
       event =
         event_with_state(:upcoming,
           with_image: true,
