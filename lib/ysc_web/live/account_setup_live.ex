@@ -1099,8 +1099,7 @@ defmodule YscWeb.AccountSetupLive do
       user = Accounts.get_user!(socket.assigns.user.id)
 
       # Payment was already handled in step 1, so skip phone goes straight to pending-review
-      one_time_token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", user.id)
+      one_time_token = Accounts.generate_auto_login_token(user)
 
       {:noreply,
        socket
@@ -1454,8 +1453,7 @@ defmodule YscWeb.AccountSetupLive do
         {:ok, updated_user} = Accounts.mark_phone_verified(user)
 
         # Use a short-lived signed token (same pattern as email verification)
-        token =
-          Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
+        token = Accounts.generate_auto_login_token(updated_user)
 
         {:noreply,
          socket
@@ -1607,8 +1605,7 @@ defmodule YscWeb.AccountSetupLive do
           end
 
         # Short-lived one-time token for auto-login (verified by controller, then session created)
-        one_time_token =
-          Phoenix.Token.sign(YscWeb.Endpoint, "auto_login", updated_user.id)
+        one_time_token = Accounts.generate_auto_login_token(updated_user)
 
         # Redirect to auto-login to establish session, then back to account setup
         {:noreply,

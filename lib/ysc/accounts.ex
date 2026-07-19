@@ -2075,9 +2075,16 @@ defmodule Ysc.Accounts do
   Returns the raw (URL-safe Base64) token. Only the hash is stored in the DB.
   """
   def generate_passkey_login_token(user) do
-    {token, user_token} = UserToken.build_passkey_login_token(user)
-    Repo.insert!(user_token)
-    token
+    generate_one_time_login_token(user, &UserToken.build_passkey_login_token/1)
+  end
+
+  @doc """
+  Generates a short-lived, one-time token for completing an auto-login redirect.
+
+  Returns the raw (URL-safe Base64) token. Only the hash is stored in the DB.
+  """
+  def generate_auto_login_token(user) do
+    generate_one_time_login_token(user, &UserToken.build_auto_login_token/1)
   end
 
   @doc """
@@ -2089,7 +2096,32 @@ defmodule Ysc.Accounts do
   window), ensuring strict one-time-use semantics even under load.
   """
   def verify_and_consume_passkey_login_token(token) do
-    case UserToken.verify_passkey_login_token_query(token) do
+    verify_and_consume_one_time_login_token(
+      token,
+      &UserToken.verify_passkey_login_token_query/1
+    )
+  end
+
+  @doc """
+  Verifies an auto-login token and returns the associated user if valid.
+
+  Uses the same cluster-safe one-time consumption semantics as passkey login.
+  """
+  def verify_and_consume_auto_login_token(token) do
+    verify_and_consume_one_time_login_token(
+      token,
+      &UserToken.verify_auto_login_token_query/1
+    )
+  end
+
+  defp generate_one_time_login_token(user, builder) do
+    {token, user_token} = builder.(user)
+    Repo.insert!(user_token)
+    token
+  end
+
+  defp verify_and_consume_one_time_login_token(token, verify_query) do
+    case verify_query.(token) do
       {:ok, base_query} ->
         result =
           Repo.transaction(fn ->

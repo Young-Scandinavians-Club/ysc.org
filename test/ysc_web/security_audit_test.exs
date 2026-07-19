@@ -23,6 +23,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 23 (MEDIUM)   Kiosk bookings index exported full history without date bounds
   Finding 24 (MEDIUM)   Ticket payment intents did not bind metadata to order/user
   Finding 25 (MEDIUM)   User settings verification lacks attempt rate limits; phone change lacks step-up reauth
+  Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -1805,6 +1806,83 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:error, :payment_metadata_mismatch} =
                Tickets.process_ticket_order_payment(order_b, payment_intent)
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 26 (HIGH): Auto-login token must be one-time (DB-backed, cluster-safe)
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 26: One-time auto-login token" do
+    setup do
+      user = user_fixture()
+      {:ok, user} = Accounts.mark_email_verified(user)
+      %{user: user}
+    end
+
+    test "generate_auto_login_token/1 persists a token record in the DB", %{
+      user: user
+    } do
+      token = Accounts.generate_auto_login_token(user)
+
+      assert is_binary(token)
+
+      hashed =
+        :crypto.hash(:sha256, Base.url_decode64!(token, padding: false))
+
+      assert Repo.get_by(UserToken, token: hashed, context: "auto_login"),
+             "Expected a UserToken record with context 'auto_login' in the DB"
+    end
+
+    test "verify_and_consume_auto_login_token/1 returns the user and deletes the token",
+         %{user: user} do
+      token = Accounts.generate_auto_login_token(user)
+
+      assert {:ok, returned_user} =
+               Accounts.verify_and_consume_auto_login_token(token)
+
+      assert returned_user.id == user.id
+
+      hashed =
+        :crypto.hash(:sha256, Base.url_decode64!(token, padding: false))
+
+      refute Repo.get_by(UserToken, token: hashed, context: "auto_login"),
+             "Token must be deleted after first consumption"
+    end
+
+    test "token cannot be used a second time (replay prevention)", %{user: user} do
+      token = Accounts.generate_auto_login_token(user)
+
+      assert {:ok, _} = Accounts.verify_and_consume_auto_login_token(token)
+
+      assert {:error, :invalid_or_expired} =
+               Accounts.verify_and_consume_auto_login_token(token)
+    end
+
+    test "auto_login endpoint consumes the token and creates a session", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_auto_login_token(user)
+
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+
+      assert get_session(conn, :user_token) != nil,
+             "Expected a session to be created after auto-login"
+    end
+
+    test "auto_login endpoint rejects an already-consumed token", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_auto_login_token(user)
+
+      conn1 = get(build_conn(), ~p"/users/log-in/auto?#{%{token: token}}")
+      assert get_session(conn1, :user_token) != nil
+
+      conn2 = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+      assert redirected_to(conn2) =~ "/users/log-in"
+      assert redirected_to(conn2) =~ "reason=expired_link"
     end
   end
 
