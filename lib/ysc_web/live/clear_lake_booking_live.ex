@@ -1433,7 +1433,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                       class="w-full text-lg py-4"
                       color="amber"
                     >
-                      Update Selection
+                      Change dates or guests
                     </.button>
                   </div>
                 </div>
@@ -1480,7 +1480,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                   end
                 }
               >
-                Book Now
+                Continue to Payment
               </.button>
             </div>
           </div>

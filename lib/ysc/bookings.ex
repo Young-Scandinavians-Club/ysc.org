@@ -373,6 +373,12 @@ defmodule Ysc.Bookings do
   - `start_date`: Optional start date for filtering (inclusive)
   - `end_date`: Optional end date for filtering (inclusive)
 
+  ## Options
+
+    * `:preload` - association preloads (default `[:rooms, :user]`)
+    * `:statuses` - include only bookings with these statuses
+    * `:exclude_statuses` - omit bookings with these statuses
+
   ## Examples
       # Get all bookings for Tahoe
       list_bookings(:tahoe)
@@ -390,9 +396,23 @@ defmodule Ysc.Bookings do
         opts \\ []
       ) do
     preloads = Keyword.get(opts, :preload, [:rooms, :user])
+    statuses = Keyword.get(opts, :statuses)
+    exclude_statuses = Keyword.get(opts, :exclude_statuses)
 
     query =
       from b in Booking, order_by: [asc: b.checkin_date], preload: ^preloads
+
+    query =
+      cond do
+        is_list(statuses) ->
+          from b in query, where: b.status in ^statuses
+
+        is_list(exclude_statuses) ->
+          from b in query, where: b.status not in ^exclude_statuses
+
+        true ->
+          query
+      end
 
     query =
       if property do
@@ -3821,13 +3841,11 @@ defmodule Ysc.Bookings do
 
     all_bookings =
       list_bookings(:clear_lake, expanded_start, expanded_end,
-        preload: [:rooms]
+        preload: [:rooms],
+        statuses: [:complete]
       )
 
-    bookings =
-      Enum.filter(all_bookings, fn booking ->
-        booking.status == :complete
-      end)
+    bookings = all_bookings
 
     # Get all blackouts that overlap with the date range
     blackouts = get_overlapping_blackouts(:clear_lake, start_date, end_date)
@@ -4023,12 +4041,12 @@ defmodule Ysc.Bookings do
     expanded_end = Date.add(end_date, 1)
 
     all_bookings =
-      list_bookings(:tahoe, expanded_start, expanded_end, preload: [:rooms])
+      list_bookings(:tahoe, expanded_start, expanded_end,
+        preload: [:rooms],
+        statuses: [:hold, :complete]
+      )
 
-    bookings =
-      Enum.filter(all_bookings, fn booking ->
-        booking.status in [:hold, :complete]
-      end)
+    bookings = all_bookings
 
     # Get all blackouts that overlap with the date range
     # Expand the range to include blackouts that might affect changeover days

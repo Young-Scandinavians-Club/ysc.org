@@ -175,6 +175,39 @@ defmodule Ysc.BookingsTest do
       assert Enum.any?(bookings, &(&1.id == booking1.id))
     end
 
+    test "list_bookings/4 filters by statuses and exclude_statuses" do
+      active =
+        booking_fixture()
+        |> Ecto.Changeset.change(status: :complete)
+        |> Ysc.Repo.update!()
+
+      canceled =
+        booking_fixture()
+        |> Ecto.Changeset.change(status: :canceled)
+        |> Ysc.Repo.update!()
+
+      refunded =
+        booking_fixture()
+        |> Ecto.Changeset.change(status: :refunded)
+        |> Ysc.Repo.update!()
+
+      complete_only =
+        Bookings.list_bookings(nil, nil, nil, statuses: [:complete])
+
+      assert Enum.any?(complete_only, &(&1.id == active.id))
+      refute Enum.any?(complete_only, &(&1.id == canceled.id))
+      refute Enum.any?(complete_only, &(&1.id == refunded.id))
+
+      without_canceled_refunded =
+        Bookings.list_bookings(nil, nil, nil,
+          exclude_statuses: [:canceled, :refunded]
+        )
+
+      assert Enum.any?(without_canceled_refunded, &(&1.id == active.id))
+      refute Enum.any?(without_canceled_refunded, &(&1.id == canceled.id))
+      refute Enum.any?(without_canceled_refunded, &(&1.id == refunded.id))
+    end
+
     test "get_booking!/1 returns the booking with given id" do
       booking = booking_fixture()
       found = Bookings.get_booking!(booking.id)

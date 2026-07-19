@@ -1217,7 +1217,7 @@ defmodule YscWeb.ExpenseReportLive do
             Ecto.Changeset.add_error(
               changeset,
               :reimbursement_method,
-              "requires a billing address. Please add an address in your user settings."
+              "requires a billing address. Please add an address in your account settings."
             )
 
           is_nil(address_id) ->
@@ -2731,7 +2731,7 @@ defmodule YscWeb.ExpenseReportLive do
                         navigate={~p"/users/settings"}
                         class="text-blue-600 hover:underline"
                       >
-                        user settings
+                        account settings
                       </.link>
                       before submitting.
                     </p>
@@ -2748,7 +2748,7 @@ defmodule YscWeb.ExpenseReportLive do
                           navigate={~p"/users/settings"}
                           class="text-blue-600 hover:underline font-medium"
                         >
-                          user settings
+                          account settings
                         </.link>
                         before submitting.
                       </p>
@@ -3486,7 +3486,7 @@ defmodule YscWeb.ExpenseReportLive do
 
         "check" ->
           if is_nil(billing_address) do
-            "Please add a billing address in your user settings before submitting."
+            "Please add a billing address in your account settings before submitting."
           else
             nil
           end

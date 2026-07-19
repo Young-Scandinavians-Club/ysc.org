@@ -221,7 +221,7 @@ defmodule Ysc.ExpenseReports do
             Ecto.Changeset.add_error(
               changeset,
               :reimbursement_method,
-              "requires a bank account. Please add a bank account in your user settings before submitting."
+              "requires a bank account. Please add a bank account in your account settings before submitting."
             )
           else
             Ecto.Changeset.add_error(
@@ -1012,7 +1012,7 @@ defmodule Ysc.ExpenseReports do
       Ecto.Changeset.add_error(
         changeset,
         :reimbursement_method,
-        "requires a billing address. Please add an address in your user settings before submitting."
+        "requires a billing address. Please add an address in your account settings before submitting."
       )
     else
       # Auto-set the billing address if available
