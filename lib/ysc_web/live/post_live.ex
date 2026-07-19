@@ -11,18 +11,6 @@ defmodule YscWeb.PostLive do
   alias Ysc.Posts.Comment
   alias YscWeb.SEO
 
-  @board_position_to_title_lookup %{
-    president: "President",
-    vice_president: "Vice President",
-    secretary: "Secretary",
-    treasurer: "Treasurer",
-    clear_lake_cabin_master: "Clear Lake Cabin Master",
-    tahoe_cabin_master: "Tahoe Cabin Master",
-    event_director: "Event Director",
-    member_outreach: "Member Outreach & Events",
-    membership_director: "Membership Director"
-  }
-
   @impl true
   def render(assigns) do
     ~H"""
@@ -83,7 +71,7 @@ defmodule YscWeb.PostLive do
                 {Ysc.title_case(@post.author.first_name || "")}
                 {Ysc.title_case(@post.author.last_name || "")}
                 <%= if @post.board_position_at_publish do %>
-                  , YSC {format_board_position(@post.board_position_at_publish)}
+                  , YSC {Ysc.Accounts.format_board_position(@post.board_position_at_publish)}
                 <% end %>
               </p>
             </div>
@@ -415,23 +403,4 @@ defmodule YscWeb.PostLive do
   defp get_reply_to_id(%Comment{comment_id: nil} = comment), do: comment.id
   defp get_reply_to_id(comment), do: comment.comment_id
 
-  # Format board position using the lookup map
-  defp format_board_position(position) when is_atom(position) do
-    Map.get(
-      @board_position_to_title_lookup,
-      position,
-      String.capitalize(to_string(position))
-    )
-  end
-
-  defp format_board_position(position) when is_binary(position) do
-    position
-    |> String.downcase()
-    |> String.to_existing_atom()
-    |> format_board_position()
-  rescue
-    ArgumentError -> String.capitalize(position)
-  end
-
-  defp format_board_position(_), do: ""
 end

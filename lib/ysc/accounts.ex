@@ -3111,20 +3111,42 @@ defmodule Ysc.Accounts do
   @doc """
   Returns a human-readable title for a `BoardMemberPosition` enum value.
 
+  Accepts atoms, valid enum strings, or `nil` (returns `""`).
+
   ## Examples
 
       iex> Ysc.Accounts.format_board_position(:vice_president)
       "Vice President"
 
-      iex> Ysc.Accounts.format_board_position(:member_outreach)
+      iex> Ysc.Accounts.format_board_position("member_outreach")
       "Member Outreach & Events"
 
+      iex> Ysc.Accounts.format_board_position(nil)
+      ""
+
   """
+  def format_board_position(nil), do: ""
+
   def format_board_position(:member_outreach), do: "Member Outreach & Events"
 
-  def format_board_position(position) when not is_nil(position) do
+  def format_board_position(position) when is_binary(position) do
+    case BoardMemberPosition.cast(position) do
+      {:ok, atom} -> format_board_position(atom)
+      :error -> String.capitalize(position)
+    end
+  end
+
+  def format_board_position(position) when is_atom(position) do
     position
     |> to_string()
+    |> board_position_title_from_underscores()
+  end
+
+  defp board_position_title_from_underscores("member_outreach"),
+    do: "Member Outreach & Events"
+
+  defp board_position_title_from_underscores(position) do
+    position
     |> String.split("_")
     |> Enum.map_join(" ", &String.capitalize/1)
   end

@@ -5,22 +5,10 @@ defmodule YscWeb.NewsLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Posts, PublicContentCache}
-  alias YscWeb.PlainText
+  alias Ysc.{Accounts, Posts, PublicContentCache}
+  alias YscWeb.{DateDisplay, PlainText}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
-
-  @board_position_to_title_lookup %{
-    president: "President",
-    vice_president: "Vice President",
-    secretary: "Secretary",
-    treasurer: "Treasurer",
-    clear_lake_cabin_master: "Clear Lake Cabin Master",
-    tahoe_cabin_master: "Tahoe Cabin Master",
-    event_director: "Event Director",
-    member_outreach: "Member Outreach & Events",
-    membership_director: "Membership Director"
-  }
 
   @impl true
   def render(assigns) do
@@ -142,7 +130,7 @@ defmodule YscWeb.NewsLive do
                         :if={@featured.board_position_at_publish}
                         class="text-sm text-zinc-500 sm:text-white/80 font-medium mt-0.5"
                       >
-                        YSC {format_board_position(
+                        YSC {Accounts.format_board_position(
                           @featured.board_position_at_publish
                         )}
                       </p>
@@ -230,7 +218,7 @@ defmodule YscWeb.NewsLive do
             <div class="px-4 pb-4 pt-5 flex flex-col flex-1">
               <div class="flex items-center gap-3 mb-4">
                 <span class="text-sm font-black text-blue-600 uppercase tracking-[0.2em]">
-                  {format_post_date(post.published_on)}
+                  {DateDisplay.format_date_short(post.published_on)}
                 </span>
                 <span class="h-3 w-px bg-zinc-200"></span>
                 <span class="text-sm font-bold text-zinc-500 uppercase tracking-widest">
@@ -264,7 +252,7 @@ defmodule YscWeb.NewsLive do
                       :if={post.board_position_at_publish}
                       class="text-sm text-zinc-500 group-hover:text-zinc-600 font-medium mt-0.5"
                     >
-                      YSC {format_board_position(post.board_position_at_publish)}
+                      YSC {Accounts.format_board_position(post.board_position_at_publish)}
                     </p>
                   </div>
                 </div>
@@ -421,9 +409,6 @@ defmodule YscWeb.NewsLive do
 
   # Calculate reading time based on word count (average 225 words per minute)
   # Uses rendered_body if available, otherwise falls back to raw_body
-  defp format_post_date(nil), do: ""
-  defp format_post_date(dt), do: Timex.format!(dt, "{Mshort} {D}")
-
   defp reading_time(%Post{} = post) do
     cond do
       post.rendered_body && post.rendered_body != "" ->
@@ -473,23 +458,4 @@ defmodule YscWeb.NewsLive do
     Integer.to_string(minutes)
   end
 
-  # Format board position using the lookup map
-  defp format_board_position(position) when is_atom(position) do
-    Map.get(
-      @board_position_to_title_lookup,
-      position,
-      String.capitalize(to_string(position))
-    )
-  end
-
-  defp format_board_position(position) when is_binary(position) do
-    position
-    |> String.downcase()
-    |> String.to_existing_atom()
-    |> format_board_position()
-  rescue
-    ArgumentError -> String.capitalize(position)
-  end
-
-  defp format_board_position(_), do: ""
 end

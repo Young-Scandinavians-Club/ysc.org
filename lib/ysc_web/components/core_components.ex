@@ -1866,18 +1866,6 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
-  @board_position_to_title_lookup %{
-    president: "President",
-    vice_president: "Vice President",
-    secretary: "Secretary",
-    treasurer: "Treasurer",
-    clear_lake_cabin_master: "Clear Lake Cabin Master",
-    tahoe_cabin_master: "Tahoe Cabin Master",
-    event_director: "Event Director",
-    member_outreach: "Member Outreach & Events",
-    membership_director: "Membership Director"
-  }
-
   attr :user, :any,
     default: nil,
     doc:
@@ -1899,9 +1887,7 @@ defmodule YscWeb.CoreComponents do
 
     subtitle =
       if assigns[:title] != nil do
-        "YSC #{Map.get(@board_position_to_title_lookup,
-        assigns[:title],
-        String.capitalize("#{assigns[:title]}"))}"
+        "YSC #{Ysc.Accounts.format_board_position(assigns[:title])}"
       else
         String.downcase(assigns[:email] || "")
       end
