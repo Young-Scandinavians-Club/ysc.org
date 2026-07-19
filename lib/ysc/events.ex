@@ -1051,6 +1051,7 @@ defmodule Ysc.Events do
     |> Map.put(:ticket_tiers, ticket_tiers)
     |> Map.put(:ticket_count, ticket_count)
     |> Map.put(:image, image)
+    |> Map.put(:cover_image, image)
   end
 
   defp get_event_image(event, images_by_id) do

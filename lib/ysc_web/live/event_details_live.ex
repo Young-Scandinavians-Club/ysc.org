@@ -9,7 +9,6 @@ defmodule YscWeb.EventDetailsLive do
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Events
-  alias Ysc.Events.Event
   alias Ysc.Events.EventPricingCache
   alias Ysc.MoneyHelper
   alias Ysc.Repo
@@ -41,7 +40,7 @@ defmodule YscWeb.EventDetailsLive do
               id={"event-cover-#{@event.id}"}
               module={YscWeb.Components.Image}
               image_id={@event.image_id}
-              image={@event.cover_image}
+              image={Map.get(@event, :cover_image) || Map.get(@event, :image)}
               preferred_type={:optimized}
               class="w-full h-[50vh] lg:h-[60vh] object-cover"
               loading="eager"
@@ -6400,9 +6399,9 @@ defmodule YscWeb.EventDetailsLive do
 
   def format_start_date_short(_), do: ""
 
-  defp format_event_when_date_heading(%Event{start_date: nil}), do: "TBD"
+  defp format_event_when_date_heading(%{start_date: nil}), do: "TBD"
 
-  defp format_event_when_date_heading(%Event{} = event) do
+  defp format_event_when_date_heading(event) do
     start = event_calendar_date(event.start_date)
     end_date = event_calendar_date(event.end_date)
 
@@ -6422,9 +6421,9 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp format_event_when_time_subline(%Event{start_time: nil}), do: nil
+  defp format_event_when_time_subline(%{start_time: nil}), do: nil
 
-  defp format_event_when_time_subline(%Event{} = event) do
+  defp format_event_when_time_subline(event) do
     case format_start_end(event.start_time, event.end_time) do
       nil -> nil
       time_label -> time_label
@@ -6455,8 +6454,10 @@ defmodule YscWeb.EventDetailsLive do
   defp event_calendar_date(%Date{} = date), do: date
   defp event_calendar_date(_), do: nil
 
-  defp event_body(%Event{} = event) do
-    html = event.rendered_details || event.raw_details || ""
+  defp event_body(event) do
+    html =
+      Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
+
     Scrubber.scrub(html, Ysc.TrixScrubber)
   end
 
@@ -7731,7 +7732,7 @@ defmodule YscWeb.EventDetailsLive do
     |> Enum.any?(fn {_tier_id, quantity} -> quantity > 0 end)
   end
 
-  defp event_in_past?(%Event{start_date: nil}), do: false
+  defp event_in_past?(%{start_date: nil}), do: false
 
   defp event_in_past?(event) do
     now = DateTime.utc_now()

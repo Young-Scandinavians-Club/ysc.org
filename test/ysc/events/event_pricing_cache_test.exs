@@ -8,6 +8,7 @@ defmodule Ysc.Events.EventPricingCacheTest do
 
   import Ysc.AccountsFixtures
   import Ysc.EventsFixtures, only: [event_fixture: 1, ticket_tier_fixture: 1]
+  import Ysc.TestDataFactory, only: [event_with_state: 2]
 
   setup do
     EventPricingCache.invalidate()
@@ -25,6 +26,27 @@ defmodule Ysc.Events.EventPricingCacheTest do
     assert Map.has_key?(enriched1, :pricing_info)
     assert enriched1.id == enriched2.id
     assert enriched1.pricing_info == enriched2.pricing_info
+  end
+
+  test "enrich_event sets cover_image from image and preserves preloaded cover on cache hit" do
+    event =
+      event_with_state(:upcoming,
+        with_image: true,
+        attrs: %{title: "Cover Image #{System.unique_integer()}"}
+      )
+
+    _tier = ticket_tier_fixture(%{event_id: event.id})
+
+    # Prime cache from a struct without a preloaded cover_image association
+    EventPricingCache.enrich_event(event)
+
+    event_with_cover = Ysc.Repo.preload(event, :cover_image)
+
+    enriched = EventPricingCache.enrich_event(event_with_cover)
+
+    assert enriched.cover_image != nil
+    assert enriched.cover_image.id == event.image_id
+    assert enriched.image.id == event.image_id
   end
 
   test "enrich_event preserves selling_fast from list query on cache hit" do

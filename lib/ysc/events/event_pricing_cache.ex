@@ -27,7 +27,9 @@ defmodule Ysc.Events.EventPricingCache do
         Ysc.Events.enrich_single_event_with_pricing_from_db(event)
       end)
 
-    merge_transient_list_fields(enriched, event)
+    enriched
+    |> merge_transient_list_fields(event)
+    |> ensure_cover_image(event)
   end
 
   def invalidate do
@@ -91,6 +93,24 @@ defmodule Ysc.Events.EventPricingCache do
         :error -> acc
       end
     end)
+  end
+
+  # Enriched events are plain maps with `:image`, not `%Event{}` with `:cover_image`.
+  # Always set `:cover_image` so templates can use dot access without KeyError.
+  defp ensure_cover_image(enriched, source) do
+    cover_image =
+      Map.get(enriched, :cover_image) ||
+        Map.get(enriched, :image) ||
+        source_cover_image(source)
+
+    Map.put(enriched, :cover_image, cover_image)
+  end
+
+  defp source_cover_image(source) do
+    case Map.get(source, :cover_image) do
+      %Ecto.Association.NotLoaded{} -> nil
+      value -> value
+    end
   end
 
   defp cache_with_version(key, value) do
