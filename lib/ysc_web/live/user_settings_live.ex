@@ -833,7 +833,7 @@ defmodule YscWeb.UserSettingsLive do
                 </p>
                 <:actions>
                   <.button phx-disable-with="Opening verification...">
-                    Continue to verify identity
+                    Sign in again to change email
                   </.button>
                 </:actions>
               </.simple_form>

@@ -3180,7 +3180,7 @@ defmodule YscWeb.EventDetailsLive do
                             <span class="text-zinc-400 line-through mr-2 text-sm">
                               {case Money.to_string(ticket.ticket_tier.price) do
                                 {:ok, amount} -> amount
-                                {:error, _} -> "Error"
+                                {:error, _} -> "Price unavailable"
                               end}
                             </span>
                             {case Money.sub(
@@ -3190,19 +3190,19 @@ defmodule YscWeb.EventDetailsLive do
                               {:ok, discounted} ->
                                 case Money.to_string(discounted) do
                                   {:ok, amount} -> amount
-                                  {:error, _} -> "Error"
+                                  {:error, _} -> "Price unavailable"
                                 end
 
                               _ ->
                                 case Money.to_string(ticket.ticket_tier.price) do
                                   {:ok, amount} -> amount
-                                  {:error, _} -> "Error"
+                                  {:error, _} -> "Price unavailable"
                                 end
                             end}
                           <% else %>
                             {case Money.to_string(ticket.ticket_tier.price) do
                               {:ok, amount} -> amount
-                              {:error, _} -> "Error"
+                              {:error, _} -> "Price unavailable"
                             end}
                           <% end %>
                       <% end %>
@@ -3267,7 +3267,7 @@ defmodule YscWeb.EventDetailsLive do
                 <% else %>
                   {case Money.to_string(@ticket_order.total_amount) do
                     {:ok, amount} -> amount
-                    {:error, _} -> "Error"
+                    {:error, _} -> "Price unavailable"
                   end}
                 <% end %>
               </p>
@@ -3294,7 +3294,7 @@ defmodule YscWeb.EventDetailsLive do
             phx-click="close-order-completion"
             class="w-full bg-green-600 hover:bg-green-700"
           >
-            Continue
+            Back to event
           </.button>
           <div class="text-center">
             <p class="text-sm text-zinc-500 mb-2">
