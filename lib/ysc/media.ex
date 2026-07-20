@@ -415,8 +415,11 @@ defmodule Ysc.Media do
                @blur_hash_comp_x,
                @blur_hash_comp_y
              ) do
-          {:ok, hash} -> hash
-          {:error, reason} -> raise "Blurhash generation failed: #{inspect(reason)}"
+          {:ok, hash} ->
+            hash
+
+          {:error, reason} ->
+            raise "Blurhash generation failed: #{inspect(reason)}"
         end
       rescue
         _e ->

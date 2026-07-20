@@ -15,7 +15,11 @@ defmodule Ysc.Media.ImageOpsTest do
 
     test "returns error for a missing file" do
       assert {:error, _} =
-               ImageOps.blur_hash_from_path("/tmp/nonexistent-#{System.unique_integer()}.png", 4, 3)
+               ImageOps.blur_hash_from_path(
+                 "/tmp/nonexistent-#{System.unique_integer()}.png",
+                 4,
+                 3
+               )
     end
   end
 end
