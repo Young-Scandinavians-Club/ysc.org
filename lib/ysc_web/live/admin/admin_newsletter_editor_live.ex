@@ -333,18 +333,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     end)
   end
 
-  def edition_status_badge_type(:draft), do: "yellow"
-  def edition_status_badge_type(:scheduled), do: "sky"
-  def edition_status_badge_type(:sent), do: "green"
-  def edition_status_badge_type(_), do: "dark"
-
-  def edition_status_label(:draft), do: "Draft"
-  def edition_status_label(:scheduled), do: "Scheduled"
-  def edition_status_label(:sent), do: "Sent"
-
-  def edition_status_label(other),
-    do: other |> to_string() |> String.capitalize()
-
   def format_count(n) when is_integer(n) do
     n
     |> Integer.to_string()
@@ -372,8 +360,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         >
           <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to Newsletters
         </.link>
-        <.badge :if={@edition} type={edition_status_badge_type(@edition.status)}>
-          {edition_status_label(@edition.status)}
+        <.badge :if={@edition} type={newsletter_edition_status_badge_type(@edition.status)}>
+          {newsletter_edition_status_label(@edition.status)}
         </.badge>
         <.badge :if={!@edition} type="yellow">Draft</.badge>
         <.admin_help_link
@@ -955,10 +943,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         <div class="flex items-center gap-3 min-w-0">
           <.badge
             :if={@edition}
-            type={edition_status_badge_type(@edition.status)}
+            type={newsletter_edition_status_badge_type(@edition.status)}
             class="hidden sm:inline-block shrink-0"
           >
-            {edition_status_label(@edition.status)}
+            {newsletter_edition_status_label(@edition.status)}
           </.badge>
 
           <%!-- Scheduled time indicator --%>

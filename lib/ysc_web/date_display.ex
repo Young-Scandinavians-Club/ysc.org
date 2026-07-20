@@ -128,6 +128,30 @@ defmodule YscWeb.DateDisplay do
   def format_pacific_date(_, default), do: default
 
   @doc """
+  Formats a UTC datetime as a short Pacific calendar date (e.g. `"Mar 5"`).
+
+  Datetimes are shifted to `America/Los_Angeles` before formatting. Dates use the
+  short month/day format without conversion.
+
+  Returns `default` for nil or other non-date values.
+  """
+  def format_pacific_date_short(value, default \\ "")
+
+  def format_pacific_date_short(nil, default), do: default
+
+  def format_pacific_date_short(%Date{} = date, _default),
+    do: format_date_short(date)
+
+  def format_pacific_date_short(%DateTime{} = datetime, default) do
+    datetime
+    |> DateTime.shift_zone!(@pacific_timezone)
+    |> DateTime.to_date()
+    |> format_date_short(default)
+  end
+
+  def format_pacific_date_short(_, default), do: default
+
+  @doc """
   Formats a datetime as a long date and time label without timezone conversion
   (e.g. `"March 15, 2024 at 3:30 PM"`).
 

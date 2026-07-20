@@ -13,6 +13,7 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReport
   alias Ysc.Repo
+  alias YscWeb.DateDisplay
   import Ecto.Query
 
   require Ysc.Logging
@@ -3260,7 +3261,7 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   defp format_date_boundary(%DateTime{} = dt),
-    do: dt |> DateTime.to_date() |> Calendar.strftime("%B %d, %Y")
+    do: DateDisplay.format_date_long(dt, "—")
 
   defp format_date_boundary(_), do: "—"
 

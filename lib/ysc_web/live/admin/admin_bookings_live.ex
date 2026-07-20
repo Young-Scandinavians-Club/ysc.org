@@ -15,6 +15,7 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Accounts
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
+  alias YscWeb.DateDisplay
   import Ecto.Query
   require Ysc.Logging
 
@@ -685,7 +686,7 @@ defmodule YscWeb.AdminBookingsLive do
                     Check-in
                   </label>
                   <p class="text-sm text-zinc-900">
-                    {Calendar.strftime(@booking.checkin_date, "%B %d, %Y")}
+                    {DateDisplay.format_date_long(@booking.checkin_date)}
                   </p>
                 </div>
 
@@ -694,7 +695,7 @@ defmodule YscWeb.AdminBookingsLive do
                     Check-out
                   </label>
                   <p class="text-sm text-zinc-900">
-                    {Calendar.strftime(@booking.checkout_date, "%B %d, %Y")}
+                    {DateDisplay.format_date_long(@booking.checkout_date)}
                   </p>
                 </div>
 
@@ -1098,7 +1099,7 @@ defmodule YscWeb.AdminBookingsLive do
           <div class="flex flex-col gap-1">
             <span class="font-semibold">
               Guests on {if @day_guests_date,
-                do: Calendar.strftime(@day_guests_date, "%B %d, %Y"),
+                do: DateDisplay.format_date_long(@day_guests_date),
                 else: ""}
             </span>
             <span class="text-sm font-normal text-zinc-500">
@@ -2380,12 +2381,12 @@ defmodule YscWeb.AdminBookingsLive do
                 </:col>
                 <:col :let={{_, booking}} label="Check-in" field={:checkin_date}>
                   <span class="text-sm text-zinc-800">
-                    {Calendar.strftime(booking.checkin_date, "%b %d, %Y")}
+                    {DateDisplay.format_datetime_display(booking.checkin_date)}
                   </span>
                 </:col>
                 <:col :let={{_, booking}} label="Check-out" field={:checkout_date}>
                   <span class="text-sm text-zinc-800">
-                    {Calendar.strftime(booking.checkout_date, "%b %d, %Y")}
+                    {DateDisplay.format_datetime_display(booking.checkout_date)}
                   </span>
                 </:col>
                 <:col :let={{_, booking}} label="Nights">
@@ -2487,7 +2488,8 @@ defmodule YscWeb.AdminBookingsLive do
                     {if booking.inserted_at do
                       booking.inserted_at
                       |> DateTime.shift_zone!(@timezone)
-                      |> Calendar.strftime("%b %d, %Y")
+                      |> DateTime.to_date()
+                      |> DateDisplay.format_datetime_display()
                     else
                       "—"
                     end}
