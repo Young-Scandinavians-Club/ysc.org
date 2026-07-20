@@ -1203,7 +1203,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
         |> change(%{applied_booking_entitlement_id: entitlement.id})
         |> Repo.update!()
 
-      synced = Repo.get!(Booking, booking.id)
+      assert {:ok, synced} = Bookings.maybe_sync_hold_pricing_from_calculation(booking)
       assert Money.cmp(synced.total_price, full_total) == -1
 
       discounted_cents = Ysc.MoneyHelper.money_to_cents(synced.total_price)
@@ -1291,8 +1291,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert reloaded.status == :hold
       assert receipt_ledger_payment_count(booking.id) == 0
 
-      # Payment verification + auto-refund each retrieve the payment intent (#749).
-      assert Agent.get(retrieve_counter, & &1) == 2
+      # Dead render + connected mount each verify and auto-refund (#749): 2 retrieves each.
+      assert Agent.get(retrieve_counter, & &1) == 4
     end
 
     test "records ledger when booking was already confirmed before Stripe redirect",
