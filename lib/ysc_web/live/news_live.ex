@@ -252,7 +252,9 @@ defmodule YscWeb.NewsLive do
                       :if={post.board_position_at_publish}
                       class="text-sm text-zinc-500 group-hover:text-zinc-600 font-medium mt-0.5"
                     >
-                      YSC {Accounts.format_board_position(post.board_position_at_publish)}
+                      YSC {Accounts.format_board_position(
+                        post.board_position_at_publish
+                      )}
                     </p>
                   </div>
                 </div>
@@ -457,5 +459,4 @@ defmodule YscWeb.NewsLive do
     minutes = max(1, round(word_count / 225.0))
     Integer.to_string(minutes)
   end
-
 end

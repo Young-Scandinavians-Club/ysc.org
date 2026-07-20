@@ -206,6 +206,29 @@ defmodule YscWeb.NewsLiveTest do
       # May show author name if featured post loaded
       assert html =~ "Club News"
     end
+
+    test "displays board position for featured post", %{conn: conn} do
+      author = user_fixture(%{first_name: "Jane", last_name: "Doe"})
+
+      {:ok, _post} =
+        %Posts.Post{}
+        |> Posts.Post.new_post_changeset(%{
+          title: "Featured by Jane",
+          raw_body: "<p>Content here.</p>",
+          url_name: "featured-by-jane-#{System.unique_integer()}",
+          state: :published,
+          published_on: DateTime.utc_now(),
+          user_id: author.id,
+          featured_post: true,
+          board_position_at_publish: "president"
+        })
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/news")
+      render_news_async(view)
+
+      assert render(view) =~ "YSC President"
+    end
   end
 
   describe "posts grid display" do

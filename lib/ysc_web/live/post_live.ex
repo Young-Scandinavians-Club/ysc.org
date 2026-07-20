@@ -71,7 +71,9 @@ defmodule YscWeb.PostLive do
                 {Ysc.title_case(@post.author.first_name || "")}
                 {Ysc.title_case(@post.author.last_name || "")}
                 <%= if @post.board_position_at_publish do %>
-                  , YSC {Ysc.Accounts.format_board_position(@post.board_position_at_publish)}
+                  , YSC {Ysc.Accounts.format_board_position(
+                    @post.board_position_at_publish
+                  )}
                 <% end %>
               </p>
             </div>
@@ -402,5 +404,4 @@ defmodule YscWeb.PostLive do
 
   defp get_reply_to_id(%Comment{comment_id: nil} = comment), do: comment.id
   defp get_reply_to_id(comment), do: comment.comment_id
-
 end

@@ -165,5 +165,4 @@ defmodule YscWeb.Components.News.NewsCard do
   end
 
   defp preview_text(post), do: PlainText.from_post(post)
-
 end
