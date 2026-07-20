@@ -7,6 +7,7 @@ defmodule YscWeb.BookingCheckoutLive do
   alias Ysc.Repo
   alias Ysc.Stripe.PaymentIntentHelpers
   alias YscWeb.BookingGuestForm
+  alias YscWeb.BookingUserMessages
   import Ecto.Query
   import YscWeb.Components.BookingGuestInfoForm
   require Ysc.Logging
@@ -145,7 +146,7 @@ defmodule YscWeb.BookingCheckoutLive do
     if booking_expired?(booking) do
       {:error,
        {:redirect, get_property_redirect_path(booking.property),
-        "This booking has expired and is no longer available for payment."}}
+        BookingUserMessages.checkout_hold_expired()}}
     else
       :ok
     end
@@ -250,8 +251,7 @@ defmodule YscWeb.BookingCheckoutLive do
     if is_expired do
       {:ok,
        assign(socket,
-         payment_error:
-           "This booking has expired and is no longer available for payment."
+         payment_error: BookingUserMessages.checkout_hold_expired()
        )}
     else
       create_payment_intent_if_needed(
@@ -552,7 +552,7 @@ defmodule YscWeb.BookingCheckoutLive do
             >
               <p class="text-sm font-semibold text-red-800 mb-2">Booking Expired</p>
               <p class="text-sm text-red-700 mb-4">
-                This booking has expired and is no longer available for payment. Please create a new booking.
+                {BookingUserMessages.checkout_hold_expired()}
               </p>
               <a
                 href={get_property_redirect_path(@booking.property)}
@@ -1499,14 +1499,13 @@ defmodule YscWeb.BookingCheckoutLive do
         {:noreply,
          socket
          |> assign(
-           payment_error:
-             "This booking has expired and is no longer available for payment.",
+           payment_error: BookingUserMessages.checkout_hold_expired(),
            show_payment_form: false,
            stripe_payment_element_ready: false
          )
          |> YscWeb.Flash.put_toast(
            :error,
-           "This booking has expired. Please create a new booking.",
+           BookingUserMessages.checkout_hold_expired_toast(),
            title: "Checkout"
          )}
 
@@ -1626,12 +1625,11 @@ defmodule YscWeb.BookingCheckoutLive do
          is_expired: true,
          show_payment_form: false,
          stripe_payment_element_ready: false,
-         payment_error:
-           "This booking has expired and is no longer available for payment."
+         payment_error: BookingUserMessages.checkout_hold_expired()
        )
        |> YscWeb.Flash.put_toast(
          :error,
-         "This booking has expired. Please create a new booking.",
+         BookingUserMessages.checkout_hold_expired_toast(),
          title: "Checkout"
        )}
     end

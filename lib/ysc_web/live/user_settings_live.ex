@@ -863,7 +863,7 @@ defmodule YscWeb.UserSettingsLive do
                     <p class="text-sm text-blue-700 mt-1">
                       You are a family member. You share membership benefits from <strong><%= if @primary_user,
                         do: "#{@primary_user.first_name} #{@primary_user.last_name}",
-                        else: "your primary account" %></strong>.
+                        else: "your family membership manager" %></strong>.
                       Family members cannot purchase or manage their own membership.
                     </p>
                     <%= if @primary_user do %>
@@ -924,7 +924,7 @@ defmodule YscWeb.UserSettingsLive do
                         </strong>
                         will change to
                       <% else %>
-                        The primary account membership will change to
+                        Your family membership will change to
                       <% end %>
                       <strong>
                         {String.capitalize(
@@ -1146,7 +1146,7 @@ defmodule YscWeb.UserSettingsLive do
                       Account Pending Approval
                     </h3>
                     <p class="text-sm text-yellow-700 mt-1">
-                      Your application is being reviewed by the board. You'll be able to activate your membership and pay annual dues after approval. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
+                      Your application is being reviewed by the board. If you already saved a payment method during setup, your membership will start automatically when you're approved. Otherwise we'll email you a secure link to pay your dues. Reviews usually take up to 14 days — we'll email you when there's a decision. {" "}
                       <.link
                         navigate={~p"/pending-review"}
                         class="font-semibold text-yellow-900 underline underline-offset-2"

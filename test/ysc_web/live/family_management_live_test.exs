@@ -232,7 +232,7 @@ defmodule YscWeb.FamilyManagementLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
-      assert render_loaded(view) =~ "Primary Account Holder"
+      assert render_loaded(view) =~ "Family membership manager"
       assert has_element?(view, "button[phx-click='leave-family-membership']")
     end
 

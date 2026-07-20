@@ -213,7 +213,7 @@ defmodule YscWeb.UserTicketsLive do
                         navigate={~p"/orders/#{ticket_order.id}/confirmation"}
                         class="px-4 py-2.5 bg-white border border-zinc-200 text-zinc-700 text-sm font-semibold rounded hover:bg-zinc-50 transition"
                       >
-                        View Order
+                        View ticket details
                       </.link>
                     </div>
                   </div>
@@ -343,8 +343,8 @@ defmodule YscWeb.UserTicketsLive do
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Order not found",
-           title: "Order"
+         YscWeb.Flash.put_toast(socket, :error, "We couldn't find that ticket purchase.",
+           title: "Tickets"
          )}
 
       ticket_order ->
@@ -383,8 +383,8 @@ defmodule YscWeb.UserTicketsLive do
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Order not found",
-           title: "Order"
+         YscWeb.Flash.put_toast(socket, :error, "We couldn't find that ticket purchase.",
+           title: "Tickets"
          )}
 
       ticket_order ->

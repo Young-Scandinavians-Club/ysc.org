@@ -118,6 +118,12 @@ defmodule YscWeb.BookingUserMessagesTest do
              "after your application is approved"
   end
 
+  test "checkout hold expired messages" do
+    assert BookingUserMessages.checkout_hold_expired() =~ "hold on these dates"
+    assert BookingUserMessages.checkout_hold_expired() =~ "start a new booking"
+    assert BookingUserMessages.checkout_hold_expired_toast() =~ "cabin page"
+  end
+
   test "checkout error messages include contact email" do
     assert BookingUserMessages.checkout_pricing_load_failed() =~ "info@ysc.org"
     assert BookingUserMessages.checkout_payment_setup_failed() =~ "info@ysc.org"

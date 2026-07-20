@@ -915,13 +915,13 @@ defmodule YscWeb.FamilyManagementLive do
         Your Family Group
       </h1>
       <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-        You are part of a family membership. Below you can see the primary account holder and other family members.
+        You are part of a family membership. Below you can see who manages your family membership and the other members on your account.
       </p>
     </header>
 
     <section>
       <h2 class="text-zinc-900 font-semibold text-lg border-b border-zinc-200 pb-2 mb-4">
-        Primary Account Holder
+        Family membership manager
       </h2>
       <%= if @primary_user do %>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -931,12 +931,12 @@ defmodule YscWeb.FamilyManagementLive do
           <p class="text-sm text-blue-700 mt-1">{@primary_user.email}</p>
           <p class="text-xs text-blue-600 mt-2">
             <.icon name="hero-star" class="w-4 h-4 inline-block -mt-0.5 me-1" />
-            Primary account holder — manages family membership
+            Manages your family membership and billing
           </p>
         </div>
       <% else %>
         <p class="text-zinc-500 text-sm italic">
-          Primary account holder information not available.
+          Family membership manager information is not available.
         </p>
       <% end %>
     </section>
