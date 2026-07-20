@@ -2035,27 +2035,66 @@ defmodule Ysc.Events do
 
   ## Options
 
-    * `:row_limit` - max rows from the database (default `100`)
+    * `:row_limit` - max rows from the database (default `100`; ignored when `:event_limit` is set)
+    * `:event_limit` - limit to tickets for the N soonest distinct events (SQL `GROUP BY`)
+    * `:after_now` - when `true`, exclude events whose `start_date` is before now (default uses start of today PST)
   """
   def list_upcoming_confirmed_tickets_for_user(user_id, opts \\ []) do
     row_limit = Keyword.get(opts, :row_limit, 100)
-    start_of_today_pst_utc = start_of_today_in_pst_as_utc()
+    event_limit = Keyword.get(opts, :event_limit)
+    after_now? = Keyword.get(opts, :after_now, false)
 
-    Ticket
-    |> where([t], t.user_id == ^user_id and t.status == :confirmed)
-    |> join(:inner, [t], e in assoc(t, :event), as: :event)
-    |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
-    |> join(:left, [t], to in assoc(t, :ticket_order), as: :ticket_order)
-    |> where([event: e], not is_nil(e.start_date))
-    |> where([event: e], e.start_date >= ^start_of_today_pst_utc)
-    |> preload([event: e, ticket_tier: tt, ticket_order: to],
-      event: e,
-      ticket_tier: tt,
-      ticket_order: to
-    )
-    |> order_by([event: e], asc: e.start_date)
-    |> limit(^row_limit)
-    |> Repo.all()
+    start_boundary =
+      if after_now? do
+        DateTime.utc_now()
+      else
+        start_of_today_in_pst_as_utc()
+      end
+
+    base_query =
+      Ticket
+      |> where([t], t.user_id == ^user_id and t.status == :confirmed)
+      |> join(:inner, [t], e in assoc(t, :event), as: :event)
+      |> where([event: e], not is_nil(e.start_date))
+      |> where([event: e], e.start_date >= ^start_boundary)
+
+    event_ids =
+      if event_limit do
+        base_query
+        |> group_by([event: e], [e.id])
+        |> order_by([event: e], asc: min(e.start_date), asc: min(e.start_time))
+        |> limit(^event_limit)
+        |> select([event: e], e.id)
+        |> Repo.all()
+      end
+
+    query =
+      base_query
+      |> join(:left, [t], tt in assoc(t, :ticket_tier), as: :ticket_tier)
+      |> join(:left, [t], to in assoc(t, :ticket_order), as: :ticket_order)
+      |> maybe_where_event_ids(event_ids)
+      |> preload([event: e, ticket_tier: tt, ticket_order: to],
+        event: e,
+        ticket_tier: tt,
+        ticket_order: to
+      )
+      |> order_by([event: e], asc: e.start_date, asc: e.start_time)
+
+    if event_limit do
+      Repo.all(query)
+    else
+      query
+      |> limit(^row_limit)
+      |> Repo.all()
+    end
+  end
+
+  defp maybe_where_event_ids(query, nil), do: query
+
+  defp maybe_where_event_ids(query, []), do: where(query, false)
+
+  defp maybe_where_event_ids(query, event_ids) do
+    where(query, [event: e], e.id in ^event_ids)
   end
 
   defp start_of_today_in_pst_as_utc do

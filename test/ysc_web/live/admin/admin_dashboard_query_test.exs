@@ -59,4 +59,29 @@ defmodule YscWeb.AdminDashboardQueryTest do
       refute html =~ "Preview Applicant5"
     end
   end
+
+  describe "property stats queries" do
+    setup %{conn: conn} do
+      admin = user_fixture(%{role: "admin"})
+      %{conn: log_in_user(conn, admin), admin: admin}
+    end
+
+    test "dashboard property stats use a single grouped bookings query", %{
+      conn: conn
+    } do
+      bookings_pattern = ~r/FROM "bookings" AS b0.*GROUP BY b0\."property"/i
+
+      {_result, bookings_query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            {:ok, view, _html} = live(conn, ~p"/admin")
+            render_async(view)
+            render(view)
+          end,
+          pattern: bookings_pattern
+        )
+
+      assert bookings_query_count == 1
+    end
+  end
 end

@@ -1204,6 +1204,44 @@ defmodule Ysc.EventsTest do
       assert Enum.all?(tickets, &(&1.status == :confirmed))
     end
 
+    test "list_upcoming_confirmed_tickets_for_user/2 limits distinct events with event_limit" do
+      user = user_fixture()
+
+      event_ids =
+        for idx <- 1..4 do
+          {:ok, event} =
+            Events.create_event(%{
+              title: "Upcoming #{idx}",
+              description: "Soon",
+              state: :published,
+              organizer_id: user.id,
+              start_date:
+                DateTime.add(DateTime.utc_now(), idx, :day)
+                |> DateTime.truncate(:second),
+              published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+            })
+
+          {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+          create_ticket_fixture(%{
+            event_id: event.id,
+            user_id: user.id,
+            ticket_tier_id: tier.id,
+            status: :confirmed
+          })
+
+          event.id
+        end
+
+      tickets =
+        Events.list_upcoming_confirmed_tickets_for_user(user.id, event_limit: 2)
+
+      returned_event_ids = tickets |> Enum.map(& &1.event.id) |> Enum.uniq()
+
+      assert length(returned_event_ids) == 2
+      assert returned_event_ids == Enum.take(event_ids, 2)
+    end
+
     test "list_events_by_ids/2 returns events in id order" do
       user = user_fixture()
       event_a = event_fixture(%{organizer_id: user.id})

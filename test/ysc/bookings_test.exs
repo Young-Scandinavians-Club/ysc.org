@@ -175,6 +175,69 @@ defmodule Ysc.BookingsTest do
       assert Enum.any?(bookings, &(&1.id == booking1.id))
     end
 
+    test "admin_property_dashboard_stats/0 aggregates per-property buckets in one query" do
+      today =
+        "America/Los_Angeles"
+        |> DateTime.now!()
+        |> DateTime.to_date()
+
+      staying =
+        booking_fixture(%{
+          property: :tahoe,
+          checkin_date: Date.add(today, -1),
+          checkout_date: Date.add(today, 2),
+          status: :complete,
+          guests_count: 3
+        })
+
+      checkin_today =
+        booking_fixture(%{
+          property: :clear_lake,
+          checkin_date: today,
+          checkout_date: Date.add(today, 2),
+          status: :complete,
+          guests_count: 2
+        })
+
+      checkout_today =
+        booking_fixture(%{
+          property: :tahoe,
+          checkin_date: Date.add(today, -2),
+          checkout_date: today,
+          status: :complete,
+          guests_count: 4
+        })
+
+      upcoming =
+        booking_fixture(%{
+          property: :clear_lake,
+          checkin_date: Date.add(today, 5),
+          checkout_date: Date.add(today, 7),
+          status: :complete,
+          guests_count: 5
+        })
+
+      _canceled =
+        booking_fixture(%{
+          property: :tahoe,
+          checkin_date: today,
+          checkout_date: Date.add(today, 1),
+          status: :canceled
+        })
+
+      stats = Bookings.admin_property_dashboard_stats()
+
+      assert stats.tahoe.staying >= 1
+      assert stats.tahoe.checkouts_today >= 1
+      assert stats.clear_lake.checkins_today >= 1
+      assert stats.clear_lake.upcoming_bookings >= 1
+      assert stats.clear_lake.upcoming_guests >= upcoming.guests_count
+
+      assert staying.id
+      assert checkin_today.id
+      assert checkout_today.id
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()
