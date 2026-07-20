@@ -1203,7 +1203,9 @@ defmodule YscWeb.BookingReceiptLiveTest do
         |> change(%{applied_booking_entitlement_id: entitlement.id})
         |> Repo.update!()
 
-      assert {:ok, synced} = Bookings.maybe_sync_hold_pricing_from_calculation(booking)
+      assert {:ok, synced} =
+               Bookings.maybe_sync_hold_pricing_from_calculation(booking)
+
       assert Money.cmp(synced.total_price, full_total) == -1
 
       discounted_cents = Ysc.MoneyHelper.money_to_cents(synced.total_price)
