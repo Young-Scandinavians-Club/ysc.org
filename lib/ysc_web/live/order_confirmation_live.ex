@@ -54,7 +54,9 @@ defmodule YscWeb.OrderConfirmationLive do
         socket
         |> YscWeb.Flash.put_toast(
           :error,
-          "We couldn't find that ticket purchase.", title: "Tickets")
+          "We couldn't find that ticket purchase.",
+          title: "Tickets"
+        )
         |> redirect(to: ~p"/events")
 
       ticket_order ->

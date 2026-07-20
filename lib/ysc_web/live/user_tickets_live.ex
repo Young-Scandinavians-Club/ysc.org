@@ -346,7 +346,9 @@ defmodule YscWeb.UserTicketsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "We couldn't find that ticket purchase.", title: "Tickets")}
+           "We couldn't find that ticket purchase.",
+           title: "Tickets"
+         )}
 
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
@@ -387,7 +389,9 @@ defmodule YscWeb.UserTicketsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "We couldn't find that ticket purchase.", title: "Tickets")}
+           "We couldn't find that ticket purchase.",
+           title: "Tickets"
+         )}
 
       ticket_order ->
         # Verify the order status is pending
