@@ -926,9 +926,10 @@ defmodule Ysc.Tickets do
   defp do_process_ticket_order_payment(ticket_order, payment_intent) do
     # Complete the order before recording ledger payment so a concurrent cancel
     # cannot leave a Stripe charge recorded without tickets (see booking checkout).
-    with {:ok, ticket_order} <- sync_pending_order_pricing(ticket_order),
-         :ok <- validate_payment_intent(payment_intent, ticket_order),
+    with {:ok, ticket_order} <-
+           sync_pending_order_pricing_for_fulfillment(ticket_order),
          :ok <- validate_fulfillable_order_status(ticket_order),
+         :ok <- validate_payment_intent(payment_intent, ticket_order),
          :ok <- validate_expired_order_fulfillment_capacity(ticket_order),
          {:ok, completed_order, completion_status} <-
            complete_ticket_order_if_pending(ticket_order, nil),
@@ -949,6 +950,15 @@ defmodule Ysc.Tickets do
       end
 
       {:ok, reloaded_order}
+    else
+      {:error, reason} = error ->
+        maybe_refund_unfulfilled_ticket_payment(
+          ticket_order,
+          payment_intent,
+          reason
+        )
+
+        error
     end
   end
 
@@ -1176,6 +1186,26 @@ defmodule Ysc.Tickets do
   end
 
   def sync_pending_order_pricing(%TicketOrder{} = ticket_order) do
+    {:ok, ensure_ticket_order_for_payment(ticket_order)}
+  end
+
+  @doc """
+  Persists recalculated pricing immediately before ticket fulfillment.
+
+  Unlike `sync_pending_order_pricing/1`, this always reprices even when a
+  payment intent is in flight. Checkout UI uses the guarded variant so 3DS
+  is not interrupted; fulfillment must verify against current tier prices.
+  """
+  def sync_pending_order_pricing_for_fulfillment(
+        %TicketOrder{status: status} = ticket_order
+      )
+      when status in [:pending, :expired] do
+    ticket_order
+    |> ensure_ticket_order_for_payment()
+    |> do_sync_pending_order_pricing()
+  end
+
+  def sync_pending_order_pricing_for_fulfillment(%TicketOrder{} = ticket_order) do
     {:ok, ensure_ticket_order_for_payment(ticket_order)}
   end
 
@@ -1764,7 +1794,7 @@ defmodule Ysc.Tickets do
     metadata_user_id =
       Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
 
-    expected_amount = MoneyHelper.money_to_cents(ticket_order.total_amount)
+    expected_amount = fulfillment_expected_amount_cents(ticket_order)
 
     cond do
       payment_intent.status != "succeeded" ->
@@ -1783,6 +1813,83 @@ defmodule Ysc.Tickets do
         :ok
     end
   end
+
+  defp fulfillment_expected_amount_cents(ticket_order) do
+    {:ok, total, _} = recalculate_pending_order_pricing(ticket_order)
+    MoneyHelper.money_to_cents(total)
+  end
+
+  @refundable_unfulfilled_ticket_errors ~w(amount_mismatch)a
+
+  @doc """
+  Refunds a captured Stripe payment when ticket fulfillment fails and the
+  order remains uncompleted (for example, tier prices changed during checkout).
+  """
+  def maybe_refund_unfulfilled_ticket_payment(
+        %TicketOrder{} = ticket_order,
+        %Stripe.PaymentIntent{} = payment_intent,
+        reason
+      ) do
+    require Ysc.Logging
+
+    normalized_reason = normalize_ticket_fulfillment_failure_reason(reason)
+
+    if refund_unfulfilled_ticket_payment?(
+         ticket_order,
+         payment_intent,
+         normalized_reason
+       ) do
+      refund_reason = "unfulfilled_ticket:#{normalized_reason}"
+
+      case Ysc.Bookings.create_stripe_refund_for_admin(
+             payment_intent.id,
+             payment_intent.amount,
+             refund_reason
+           ) do
+        {:ok, refund} ->
+          Ysc.Logging.info(
+            "Refunded captured ticket payment after fulfillment failure",
+            ticket_order_id: ticket_order.id,
+            payment_intent_id: payment_intent.id,
+            refund_id: refund.id,
+            reason: normalized_reason
+          )
+
+          {:ok, refund}
+
+        {:error, refund_error} ->
+          Ysc.Logging.error(
+            "Failed to refund captured ticket payment after fulfillment failure",
+            ticket_order_id: ticket_order.id,
+            payment_intent_id: payment_intent.id,
+            reason: normalized_reason,
+            refund_error: inspect(refund_error)
+          )
+
+          {:error, refund_error}
+      end
+    else
+      :skipped
+    end
+  end
+
+  defp refund_unfulfilled_ticket_payment?(
+         %TicketOrder{} = ticket_order,
+         %Stripe.PaymentIntent{} = payment_intent,
+         reason
+       ) do
+    payment_intent.status == "succeeded" and
+      ticket_order.status in [:pending, :expired] and
+      reason in @refundable_unfulfilled_ticket_errors
+  end
+
+  defp normalize_ticket_fulfillment_failure_reason({:error, reason}),
+    do: normalize_ticket_fulfillment_failure_reason(reason)
+
+  defp normalize_ticket_fulfillment_failure_reason(reason) when is_atom(reason),
+    do: reason
+
+  defp normalize_ticket_fulfillment_failure_reason(_), do: :unknown
 
   defp process_ledger_payment(ticket_order, payment_intent) do
     # Use consolidated fee extraction from Stripe.WebhookHandler

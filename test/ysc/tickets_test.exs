@@ -1738,4 +1738,44 @@ defmodule Ysc.TicketsTest do
                )
     end
   end
+
+  describe "maybe_refund_unfulfilled_ticket_payment/3" do
+    test "refunds captured payments when fulfillment rejects stale amount" do
+      order = ticket_order_fixture(%{status: :pending})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_unfulfilled_ticket_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 3000,
+        latest_charge: "ch_test_unfulfilled_ticket"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Tickets.maybe_refund_unfulfilled_ticket_payment(
+                 order,
+                 payment_intent,
+                 :amount_mismatch
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "skips refund for non-refundable verification failures" do
+      order = ticket_order_fixture(%{status: :pending})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_skip_ticket_refund_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 3000,
+        latest_charge: "ch_test_skip_ticket"
+      }
+
+      assert :skipped =
+               Tickets.maybe_refund_unfulfilled_ticket_payment(
+                 order,
+                 payment_intent,
+                 :payment_metadata_mismatch
+               )
+    end
+  end
 end
