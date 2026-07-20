@@ -2737,6 +2737,82 @@ defmodule Ysc.BookingsTest do
                  :entitlement_no_longer_valid
                )
     end
+
+    test "refunds hold payments for payment_amount_mismatch" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_amount_mismatch_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 9999,
+        latest_charge: "ch_test_amount_mismatch"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 :payment_amount_mismatch
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "refunds canceled holds for booking_confirmation_failed" do
+      booking = booking_fixture(%{status: :canceled})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_confirm_failed_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        latest_charge: "ch_test_confirm_failed"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 :booking_confirmation_failed
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "skips refund when payment intent is not succeeded" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_processing_#{System.unique_integer([:positive])}",
+        status: "processing",
+        amount: 5000,
+        latest_charge: "ch_test_processing"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 :entitlement_no_longer_valid
+               )
+    end
+
+    test "normalizes {:error, reason} tuples before refunding" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_tuple_reason_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        latest_charge: "ch_test_tuple_reason"
+      }
+
+      assert {:ok, %Stripe.Refund{}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 {:error, :inventory_update_failed}
+               )
+    end
   end
 
   describe "Bookings coverage: listing, blackouts, availability, check-in, refunds" do

@@ -1203,6 +1203,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert reloaded.status == :hold
       assert booking_ledger_payment_count(booking.id) == 0
 
+      # #749: fulfillment failure auto-refunds via create_stripe_refund — the Mox
+      # expect(..., 2, ...) above requires a second retrieve_payment_intent call.
       Mox.verify!(StripeMock)
     end
   end
