@@ -144,7 +144,8 @@ defmodule Ysc.Tickets.StripeService do
   def process_successful_payment(%Stripe.PaymentIntent{} = payment_intent) do
     with {:ok, ticket_order} <-
            get_ticket_order_from_payment_intent(payment_intent),
-         {:ok, ticket_order} <- Tickets.sync_pending_order_pricing(ticket_order),
+         {:ok, ticket_order} <-
+           Tickets.sync_pending_order_pricing_for_fulfillment(ticket_order),
          :ok <- validate_payment_intent(payment_intent, ticket_order) do
       Tickets.process_ticket_order_payment(ticket_order, payment_intent)
     end
@@ -291,7 +292,8 @@ defmodule Ysc.Tickets.StripeService do
     metadata_user_id =
       Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
 
-    expected_amount = MoneyHelper.money_to_cents(ticket_order.total_amount)
+    {:ok, total, _} = Tickets.recalculate_pending_order_pricing(ticket_order)
+    expected_amount = MoneyHelper.money_to_cents(total)
 
     cond do
       payment_intent.status != "succeeded" ->
