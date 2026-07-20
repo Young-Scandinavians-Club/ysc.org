@@ -71,10 +71,12 @@ defmodule YscWeb.UserTicketsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/tickets")
 
-      result =
-        render_click(view, "cancel-order", %{"order-id" => Ecto.ULID.generate()})
+      render_click(view, "cancel-order", %{"order-id" => Ecto.ULID.generate()})
 
-      assert result =~ "Order not found"
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :error) =~
+               "couldn't find that ticket purchase"
     end
 
     test "resume-order event shows error when order not found", %{conn: conn} do
@@ -83,10 +85,12 @@ defmodule YscWeb.UserTicketsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/users/tickets")
 
-      result =
-        render_click(view, "resume-order", %{"order-id" => Ecto.ULID.generate()})
+      render_click(view, "resume-order", %{"order-id" => Ecto.ULID.generate()})
 
-      assert result =~ "Order not found"
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :error) =~
+               "couldn't find that ticket purchase"
     end
 
     test "view-tickets event redirects to confirmation page", %{conn: conn} do

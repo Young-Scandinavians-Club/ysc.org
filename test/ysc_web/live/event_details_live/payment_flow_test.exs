@@ -744,7 +744,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       render_click(view, "confirm-free-tickets")
 
       html = render(view)
-      assert html =~ "This order is no longer available."
+      assert html =~ "This ticket checkout is no longer available."
     end
 
     test "confirm-free-tickets rejects stale zero-dollar order after tier becomes paid",
@@ -823,7 +823,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
         render_click(view, "confirm-free-tickets")
 
         html = render(view)
-        assert html =~ "This order is no longer available."
+        assert html =~ "This ticket checkout is no longer available."
         assert Tickets.get_ticket_order(order.id).status == :completed
       end)
     end

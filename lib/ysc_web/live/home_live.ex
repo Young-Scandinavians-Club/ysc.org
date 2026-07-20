@@ -1506,14 +1506,14 @@ defmodule YscWeb.HomeLive do
                                   }
                                   class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                                 >
-                                  View Order
+                                  View ticket details
                                 </.link>
                               <% else %>
                                 <.link
                                   navigate={~p"/users/tickets"}
                                   class="text-sm font-semibold text-zinc-500 hover:text-zinc-700 transition-colors duration-150 whitespace-nowrap"
                                 >
-                                  View Orders
+                                  View all tickets
                                 </.link>
                               <% end %>
                             </div>
@@ -1973,7 +1973,7 @@ defmodule YscWeb.HomeLive do
     case plan_type do
       :lifetime ->
         if is_sub_account do
-          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the primary account"}. Enjoy full access to all club properties and events forever."
+          "You are a lifetime member through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "your family membership manager"}. Enjoy full access to all club properties and events forever."
         else
           "You are a lifetime member. Enjoy full access to all club properties and events forever."
         end
@@ -1988,7 +1988,7 @@ defmodule YscWeb.HomeLive do
           |> String.capitalize()
 
         if is_sub_account do
-          "You have access to a #{membership_type} membership through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "the primary account"}. Your membership benefits are shared from the primary account."
+          "You have access to a #{membership_type} membership through #{if primary_user, do: "#{primary_user.first_name} #{primary_user.last_name}", else: "your family membership manager"}. Your membership benefits are shared through their family membership."
         else
           cond do
             scheduled_for_cancellation? && renewal_date ->

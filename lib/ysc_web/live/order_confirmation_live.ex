@@ -52,7 +52,11 @@ defmodule YscWeb.OrderConfirmationLive do
     case Tickets.get_user_ticket_order_for_confirmation(user.id, order_id) do
       nil ->
         socket
-        |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't find that ticket purchase.",
+          title: "Tickets"
+        )
         |> redirect(to: ~p"/events")
 
       ticket_order ->

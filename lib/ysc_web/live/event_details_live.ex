@@ -344,7 +344,7 @@ defmodule YscWeb.EventDetailsLive do
                           )
                         ]}
                       >
-                        View Order
+                        View ticket details
                       </.link>
                     </div>
                   <% end %>
@@ -4237,7 +4237,11 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't find that ticket purchase.",
+          title: "Tickets"
+        )
         |> push_patch(to: ~p"/events/#{event_id}")
 
       ticket_order ->
@@ -4276,8 +4280,8 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "This order has expired. Please create a new order.",
-              title: "Order"
+              "Your ticket checkout timed out. Please choose your tickets again.",
+              title: "Tickets"
             )
             |> push_patch(to: ~p"/events/#{event_id}")
           else
@@ -4306,17 +4310,17 @@ defmodule YscWeb.EventDetailsLive do
                 cancelled_order_error_message(ticket_order)
 
               :completed ->
-                "This order has already been completed. Please check your tickets."
+                "You've already completed this purchase. Check your tickets."
 
               :expired ->
-                "This order has expired. Please select your tickets again to create a new order."
+                "Your ticket checkout timed out. Please choose your tickets again."
 
               _ ->
-                "Cannot resume this order. Please select your tickets again."
+                "We couldn't resume your checkout. Please choose your tickets again."
             end
 
           socket
-          |> YscWeb.Flash.put_toast(:error, error_message, title: "Order")
+          |> YscWeb.Flash.put_toast(:error, error_message, title: "Tickets")
           |> push_patch(to: ~p"/events/#{event_id}")
         end
     end
@@ -4340,7 +4344,11 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> YscWeb.Flash.put_toast(:error, "Order not found", title: "Order")
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't find that ticket purchase.",
+          title: "Tickets"
+        )
 
       ticket_order ->
         Ysc.Logging.debug(
@@ -4377,8 +4385,8 @@ defmodule YscWeb.EventDetailsLive do
             socket
             |> YscWeb.Flash.put_toast(
               :error,
-              "This order has expired. Please create a new order.",
-              title: "Order"
+              "Your ticket checkout timed out. Please choose your tickets again.",
+              title: "Tickets"
             )
           else
             checkout_step =
@@ -4411,17 +4419,17 @@ defmodule YscWeb.EventDetailsLive do
                 cancelled_order_error_message(ticket_order)
 
               :completed ->
-                "This order has already been completed. Please check your tickets."
+                "You've already completed this purchase. Check your tickets."
 
               :expired ->
-                "This order has expired. Please select your tickets again to create a new order."
+                "Your ticket checkout timed out. Please choose your tickets again."
 
               _ ->
-                "Cannot resume this order. Please select your tickets again."
+                "We couldn't resume your checkout. Please choose your tickets again."
             end
 
           socket
-          |> YscWeb.Flash.put_toast(:error, error_message, title: "Order")
+          |> YscWeb.Flash.put_toast(:error, error_message, title: "Tickets")
         end
     end
   end
@@ -5611,7 +5619,9 @@ defmodule YscWeb.EventDetailsLive do
       is_nil(ticket_order) ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -6957,7 +6967,7 @@ defmodule YscWeb.EventDetailsLive do
     if payment_failure_cancellation?(ticket_order.cancellation_reason) do
       "Your payment did not go through. Please select your tickets again to try again."
     else
-      "This order was cancelled. Please select your tickets again to create a new order."
+      "This ticket checkout was cancelled. Please choose your tickets again."
     end
   end
 
@@ -7234,7 +7244,9 @@ defmodule YscWeb.EventDetailsLive do
       is_nil(ticket_order) or ticket_order.status != :pending ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7242,7 +7254,9 @@ defmodule YscWeb.EventDetailsLive do
       ticket_order.event_id != socket.assigns.event.id ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7250,7 +7264,7 @@ defmodule YscWeb.EventDetailsLive do
       DateTime.compare(now, ticket_order.expires_at) == :gt ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This order has expired.",
+         |> YscWeb.Flash.put_toast(:error, "Your ticket checkout timed out.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7258,7 +7272,9 @@ defmodule YscWeb.EventDetailsLive do
       not Ysc.Tickets.pending_order_still_complimentary?(ticket_order) ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This order requires payment.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Payment is required to complete this ticket purchase.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7328,7 +7344,9 @@ defmodule YscWeb.EventDetailsLive do
       nil ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This order is no longer available.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7370,13 +7388,13 @@ defmodule YscWeb.EventDetailsLive do
   end
 
   defp free_ticket_confirm_error_message(:payment_required),
-    do: "This order requires payment."
+    do: "Payment is required to complete this ticket purchase."
 
   defp free_ticket_confirm_error_message(:order_expired),
-    do: "This order has expired."
+    do: "Your ticket checkout timed out."
 
   defp free_ticket_confirm_error_message(:order_not_pending),
-    do: "This order is no longer available."
+    do: "This ticket checkout is no longer available."
 
   defp free_ticket_confirm_error_message(_),
     do:

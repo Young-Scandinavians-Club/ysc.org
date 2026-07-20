@@ -142,6 +142,16 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def checkout_hold_expired do
+    trim("""
+    Your hold on these dates has expired and they've been released. Go back to the cabin page and start a new booking.
+    """)
+  end
+
+  def checkout_hold_expired_toast do
+    "Your hold on these dates has expired. Start a new booking from the cabin page."
+  end
+
   def booking_creation_failed do
     trim("""
     We couldn't complete your booking. Your card has not been charged. Please try again, or choose different dates. If the problem continues, email info@ysc.org with your dates and guest count.
