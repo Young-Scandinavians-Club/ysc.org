@@ -11,6 +11,7 @@ defmodule YscWeb.Components.News.NewsCard do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
+  alias Ysc.Accounts
   alias Ysc.Media.Image
   alias YscWeb.PlainText
 
@@ -102,7 +103,7 @@ defmodule YscWeb.Components.News.NewsCard do
                 :if={@post.board_position_at_publish}
                 class="text-sm text-zinc-500 group-hover:text-zinc-600 font-medium mt-0.5"
               >
-                YSC {format_board_position(@post.board_position_at_publish)}
+                YSC {Accounts.format_board_position(@post.board_position_at_publish)}
               </p>
             </div>
           </div>
@@ -164,35 +165,4 @@ defmodule YscWeb.Components.News.NewsCard do
   end
 
   defp preview_text(post), do: PlainText.from_post(post)
-
-  @board_position_to_title_lookup %{
-    president: "President",
-    vice_president: "Vice President",
-    secretary: "Secretary",
-    treasurer: "Treasurer",
-    clear_lake_cabin_master: "Clear Lake Cabin Master",
-    tahoe_cabin_master: "Tahoe Cabin Master",
-    event_director: "Event Director",
-    member_outreach: "Member Outreach & Events",
-    membership_director: "Membership Director"
-  }
-
-  defp format_board_position(position) when is_atom(position) do
-    Map.get(
-      @board_position_to_title_lookup,
-      position,
-      String.capitalize(to_string(position))
-    )
-  end
-
-  defp format_board_position(position) when is_binary(position) do
-    position
-    |> String.downcase()
-    |> String.to_existing_atom()
-    |> format_board_position()
-  rescue
-    ArgumentError -> String.capitalize(position)
-  end
-
-  defp format_board_position(_), do: ""
 end

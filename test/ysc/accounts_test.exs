@@ -3499,4 +3499,30 @@ defmodule Ysc.AccountsTest do
       assert Accounts.create_billing_address_from_signup(user) == {:ok, nil}
     end
   end
+
+  describe "format_board_position/1" do
+    test "formats atom board positions" do
+      assert Accounts.format_board_position(:vice_president) == "Vice President"
+
+      assert Accounts.format_board_position(:clear_lake_cabin_master) ==
+               "Clear Lake Cabin Master"
+    end
+
+    test "formats string board positions stored on published posts" do
+      assert Accounts.format_board_position("vice_president") ==
+               "Vice President"
+
+      assert Accounts.format_board_position("member_outreach") ==
+               "Member Outreach & Events"
+    end
+
+    test "title-cases unknown board position strings" do
+      assert Accounts.format_board_position("zz_unknown_role") ==
+               "Zz_unknown_role"
+    end
+
+    test "returns empty string for nil" do
+      assert Accounts.format_board_position(nil) == ""
+    end
+  end
 end
