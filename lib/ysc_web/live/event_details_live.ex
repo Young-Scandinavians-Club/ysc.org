@@ -4237,9 +4237,9 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> YscWeb.Flash.put_toast(:error, "We couldn't find that ticket purchase.",
-          title: "Tickets"
-        )
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't find that ticket purchase.", title: "Tickets")
         |> push_patch(to: ~p"/events/#{event_id}")
 
       ticket_order ->
@@ -4342,9 +4342,9 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         socket
-        |> YscWeb.Flash.put_toast(:error, "We couldn't find that ticket purchase.",
-          title: "Tickets"
-        )
+        |> YscWeb.Flash.put_toast(
+          :error,
+          "We couldn't find that ticket purchase.", title: "Tickets")
 
       ticket_order ->
         Ysc.Logging.debug(
@@ -5615,9 +5615,9 @@ defmodule YscWeb.EventDetailsLive do
       is_nil(ticket_order) ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This ticket checkout is no longer available.",
-           title: "Tickets"
-         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.", title: "Tickets")
          |> assign(:show_free_ticket_confirmation, false)}
 
       true ->
@@ -7238,17 +7238,17 @@ defmodule YscWeb.EventDetailsLive do
       is_nil(ticket_order) or ticket_order.status != :pending ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This ticket checkout is no longer available.",
-           title: "Tickets"
-         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.", title: "Tickets")
          |> assign(:show_free_ticket_confirmation, false)}
 
       ticket_order.event_id != socket.assigns.event.id ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This ticket checkout is no longer available.",
-           title: "Tickets"
-         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.", title: "Tickets")
          |> assign(:show_free_ticket_confirmation, false)}
 
       DateTime.compare(now, ticket_order.expires_at) == :gt ->
@@ -7262,7 +7262,9 @@ defmodule YscWeb.EventDetailsLive do
       not Ysc.Tickets.pending_order_still_complimentary?(ticket_order) ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "Payment is required to complete this ticket purchase.",
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "Payment is required to complete this ticket purchase.",
            title: "Tickets"
          )
          |> assign(:show_free_ticket_confirmation, false)}
@@ -7332,9 +7334,9 @@ defmodule YscWeb.EventDetailsLive do
       nil ->
         {:noreply,
          socket
-         |> YscWeb.Flash.put_toast(:error, "This ticket checkout is no longer available.",
-           title: "Tickets"
-         )
+         |> YscWeb.Flash.put_toast(
+           :error,
+           "This ticket checkout is no longer available.", title: "Tickets")
          |> assign(:show_free_ticket_confirmation, false)}
 
       order ->

@@ -343,9 +343,10 @@ defmodule YscWeb.UserTicketsLive do
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "We couldn't find that ticket purchase.",
-           title: "Tickets"
-         )}
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "We couldn't find that ticket purchase.", title: "Tickets")}
 
       ticket_order ->
         case Tickets.cancel_ticket_order(ticket_order, "User cancelled") do
@@ -383,9 +384,10 @@ defmodule YscWeb.UserTicketsLive do
     case Tickets.get_user_ticket_order(user.id, order_id) do
       nil ->
         {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "We couldn't find that ticket purchase.",
-           title: "Tickets"
-         )}
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "We couldn't find that ticket purchase.", title: "Tickets")}
 
       ticket_order ->
         # Verify the order status is pending

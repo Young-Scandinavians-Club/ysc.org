@@ -4100,7 +4100,8 @@ defmodule YscWeb.CoreComponents do
             <p class="text-sm text-red-700">
               <%= if @is_sub_account do %>
                 <%= if @primary_user do %>
-                  <strong><%= @primary_user.first_name %> <%= @primary_user.last_name %></strong> does not have an active membership. You need an active family membership to access YSC events and benefits.
+                  <strong>{@primary_user.first_name} {@primary_user.last_name}</strong>
+                  does not have an active membership. You need an active family membership to access YSC events and benefits.
                 <% else %>
                   Your family membership manager does not have an active membership. You need an active family membership to access YSC events and benefits.
                 <% end %>
