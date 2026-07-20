@@ -410,7 +410,14 @@ defmodule Ysc.Media do
     # Downscale to very small and generate blurhash
     blur_hash =
       try do
-        generate_blur_hash_safely(optimized_output_path, path)
+        case ImageOps.blur_hash_from_path(
+               optimized_output_path,
+               @blur_hash_comp_x,
+               @blur_hash_comp_y
+             ) do
+          {:ok, hash} -> hash
+          {:error, reason} -> raise "Blurhash generation failed: #{inspect(reason)}"
+        end
       rescue
         _e ->
           Media.Image.default_blur_hash()
@@ -558,48 +565,6 @@ defmodule Ysc.Media do
       ".png" -> "image/png"
       _ -> "application/octet-stream"
     end
-  end
-
-  # Generate blurhash safely, ensuring we don't create files in source directories
-  # sobelow_skip ["Traversal.FileModule"]
-  defp generate_blur_hash_safely(temp_image_path, original_path) do
-    # Use the temp image file (optimized_output_path) which is already in /tmp
-    # This ensures Blurhash won't create files in the seed directory
-
-    # Generate blurhash from the temp file
-    result =
-      Blurhash.downscale_and_encode(
-        temp_image_path,
-        @blur_hash_comp_x,
-        @blur_hash_comp_y
-      )
-
-    blur_hash =
-      case result do
-        {:ok, hash} ->
-          hash
-
-        {:error, reason} ->
-          raise "Blurhash generation failed: #{inspect(reason)}"
-      end
-
-    # Clean up any PNG file that Blurhash might have created in the original directory
-    # (Blurhash.downscale_and_encode may create a temporary PNG file in the source directory)
-    original_dir = Path.dirname(original_path)
-    original_base = Path.basename(original_path, Path.extname(original_path))
-    potential_png = Path.join(original_dir, "#{original_base}.png")
-
-    # Only clean up if the PNG exists and is in a seed/assets directory (to be safe)
-    if File.exists?(potential_png) and
-         String.contains?(original_path, "seed/assets") do
-      try do
-        File.rm(potential_png)
-      rescue
-        _ -> :ok
-      end
-    end
-
-    blur_hash
   end
 
   @doc false
