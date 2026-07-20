@@ -1157,6 +1157,157 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert receipt_ledger_payment_count(booking_b.id) == 0
     end
 
+    test "stripe redirect refunds captured payment when entitlement expired before confirmation",
+         %{conn: conn} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :stripe_client, original_stripe_client)
+      end)
+
+      ensure_receipt_buyout_base_pricing!()
+
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = tahoe_booking_dates(7)
+
+      assert {:ok, booking} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      full_total = booking.total_price
+
+      {:ok, entitlement} =
+        Entitlements.create_entitlement(
+          %{
+            user_id: user.id,
+            issued_by_user_id: user.id,
+            benefit_kind: :fixed_amount_off,
+            property: :tahoe,
+            amount_off: Money.new(25, :USD),
+            max_guests: 10
+          },
+          send_notification: false
+        )
+
+      booking =
+        booking
+        |> change(%{applied_booking_entitlement_id: entitlement.id})
+        |> Repo.update!()
+
+      synced = Repo.get!(Booking, booking.id)
+      assert Money.cmp(synced.total_price, full_total) == -1
+
+      discounted_cents = Ysc.MoneyHelper.money_to_cents(synced.total_price)
+
+      past =
+        DateTime.add(DateTime.utc_now(), -60, :second)
+        |> DateTime.truncate(:second)
+
+      entitlement
+      |> Ecto.Changeset.change(expires_at: past)
+      |> Repo.update!()
+
+      assert {:ok, %{expired: 1}} = Entitlements.expire_passed_entitlements()
+
+      pi_id =
+        "pi_receipt_expired_entitlement_#{System.unique_integer([:positive])}"
+
+      {:ok, retrieve_counter} = Agent.start_link(fn -> 0 end)
+
+      module_name =
+        :"ReceiptExpiredEntitlementStripe#{System.unique_integer([:positive])}"
+
+      {:module, test_stripe_client, _, _} =
+        Module.create(
+          module_name,
+          quote do
+            @behaviour Ysc.StripeBehaviour
+
+            @pi_amount unquote(discounted_cents)
+            @booking_id unquote(booking.id)
+            @user_id unquote(booking.user_id)
+            @counter unquote(retrieve_counter)
+
+            def create_payment_intent(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def cancel_payment_intent(_id, _opts),
+              do: {:error, :not_implemented}
+
+            def create_customer(_params), do: {:error, :not_implemented}
+            def update_customer(_id, _params), do: {:error, :not_implemented}
+            def retrieve_payment_method(_id), do: {:error, :not_implemented}
+            def list_events(_params, _opts), do: {:error, :not_implemented}
+            def retrieve_charge(_id, _opts), do: {:error, :not_implemented}
+            def retrieve_payout(_id, _opts), do: {:error, :not_implemented}
+
+            def list_balance_transactions(_params, _opts),
+              do: {:error, :not_implemented}
+
+            def retrieve_payment_intent(id, _opts) do
+              Agent.update(@counter, &(&1 + 1))
+
+              {:ok,
+               %Stripe.PaymentIntent{
+                 id: id,
+                 status: "succeeded",
+                 amount: @pi_amount,
+                 metadata: %{
+                   "booking_id" => @booking_id,
+                   "user_id" => @user_id
+                 },
+                 customer: nil,
+                 payment_method: nil,
+                 latest_charge: "ch_#{id}"
+               }}
+            end
+          end,
+          Macro.Env.location(__ENV__)
+        )
+
+      Application.put_env(:ysc, :stripe_client, test_stripe_client)
+
+      assert receipt_ledger_payment_count(booking.id) == 0
+
+      {:ok, _view, html} =
+        live(
+          conn,
+          ~p"/bookings/#{booking.id}/receipt?redirect_status=succeeded&payment_intent=#{pi_id}"
+        )
+
+      assert html =~ "update your reservation"
+      assert html =~ "info@ysc.org"
+
+      reloaded = Repo.get!(Booking, booking.id)
+      assert reloaded.status == :hold
+      assert receipt_ledger_payment_count(booking.id) == 0
+
+      # Payment verification + auto-refund each retrieve the payment intent.
+      assert Agent.get(retrieve_counter, & &1) == 2
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 reloaded,
+                 %Stripe.PaymentIntent{
+                   id: pi_id,
+                   status: "succeeded",
+                   amount: discounted_cents,
+                   latest_charge: "ch_#{pi_id}"
+                 },
+                 :entitlement_no_longer_valid
+               )
+
+      assert refund_id == "re_test_unfulfilled_checkout_#{pi_id}"
+    end
+
     test "records ledger when booking was already confirmed before Stripe redirect",
          %{conn: conn} do
       Ysc.Ledgers.ensure_basic_accounts()
