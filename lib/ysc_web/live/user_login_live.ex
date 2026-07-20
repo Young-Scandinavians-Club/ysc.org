@@ -222,7 +222,13 @@ defmodule YscWeb.UserLoginLive do
       >
         <input type="hidden" name="redirect_to" value={@redirect_to} />
         <div class="space-y-4">
-          <.input field={@form[:email]} type="email" label="Email" required />
+          <.input
+            field={@form[:email]}
+            type="email"
+            label="Email"
+            required
+            autofocus
+          />
           <.input
             field={@form[:password]}
             type="password-toggle"

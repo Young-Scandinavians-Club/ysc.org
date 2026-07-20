@@ -720,8 +720,8 @@ defmodule YscWeb.CoreComponents do
 
   attr :rest, :global,
     include:
-      ~w(accept autocomplete capture cols disabled form list max maxlength min minlength
-                multiple pattern placeholder readonly required rows size step)
+      ~w(accept autocomplete autofocus capture cols disabled form list max maxlength min
+                minlength multiple pattern placeholder readonly required rows size step)
 
   slot :inner_block
 
@@ -2382,6 +2382,13 @@ defmodule YscWeb.CoreComponents do
     end
   end
 
+  @doc """
+  Multi-step progress indicator. Inactive steps are clickable and send `set-step`.
+
+  On mobile, uses a card with the current step title and scrollable step chips so
+  every step name stays visible. On `sm+`, uses segmented progress bars with
+  truncated labels under each segment.
+  """
   attr :active_step, :integer, required: true
   attr :steps, :list, default: []
 
@@ -2389,45 +2396,112 @@ defmodule YscWeb.CoreComponents do
   def stepper(assigns) do
     assigns =
       assigns
-      |> assign(:stepper_max_length, length(assigns.steps))
+      |> assign(:step_count, length(assigns.steps))
+      |> assign(:active_step_label, Enum.at(assigns.steps, assigns.active_step))
 
     ~H"""
-    <ol class="flex items-center justify-between w-full px-2 py-2 text-sm font-medium text-center border rounded text-zinc-400 border-zinc-100 sm:px-4 sm:py-3 sm:text-base">
-      <%= for {val, idx} <- Enum.with_index(@steps) do %>
-        <li :if={idx != @active_step} class="shrink-0">
+    <nav
+      aria-label="Progress"
+      class="rounded-xl border border-zinc-200 bg-white px-4 py-3.5 shadow-sm sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none"
+    >
+      <%!-- Mobile: title + scrollable step chips --%>
+      <div :if={@active_step_label} class="sm:hidden">
+        <p class="text-xs font-medium leading-5 text-zinc-500">
+          Step {@active_step + 1} of {@step_count}
+        </p>
+        <p class="mt-0.5 text-lg font-semibold leading-7 text-zinc-800 line-clamp-2">
+          {@active_step_label}
+        </p>
+        <ol class="mt-3 flex list-none gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <li :for={{label, idx} <- Enum.with_index(@steps)} class="shrink-0">
+            <button
+              type="button"
+              phx-click="set-step"
+              phx-value-step={idx}
+              aria-current={if(idx == @active_step, do: "step")}
+              aria-label={"Step #{idx + 1}: #{label}"}
+              class={[
+                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
+                stepper_chip_class(idx, @active_step)
+              ]}
+            >
+              <span class="flex max-w-[8.5rem] items-center gap-1">
+                <.icon
+                  :if={idx < @active_step}
+                  name="hero-check"
+                  class="h-3 w-3 shrink-0"
+                />
+                <span class="truncate">{label}</span>
+              </span>
+            </button>
+          </li>
+        </ol>
+      </div>
+
+      <%!-- Desktop: segmented bars with labels --%>
+      <ol class="hidden items-stretch gap-2 sm:flex">
+        <li :for={{label, idx} <- Enum.with_index(@steps)} class="min-w-0 flex-1">
           <button
+            type="button"
             phx-click="set-step"
             phx-value-step={idx}
-            class="group flex items-center gap-x-2 leading-6 text-sm hover:text-blue-400 transition-colors duration-150 cursor-pointer"
+            aria-current={if(idx == @active_step, do: "step")}
+            aria-label={"Step #{idx + 1}: #{label}"}
+            title={"Step #{idx + 1}: #{label}"}
+            class="group block w-full cursor-pointer rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
           >
-            <span class="flex items-center text-zinc-400 justify-center w-6 h-6 text-xs font-bold border rounded shrink-0 border-zinc-400 group-hover:bg-blue-50 group-hover:border-blue-300 group-hover:text-blue-400 transition-colors duration-150">
-              {idx + 1}
+            <span class={[
+              "block h-1.5 rounded-full transition-colors duration-200",
+              stepper_segment_class(idx, @active_step)
+            ]} />
+            <span class={[
+              "mt-2 flex items-center gap-1.5 text-xs leading-5",
+              stepper_segment_label_class(idx, @active_step)
+            ]}>
+              <span class="shrink-0 tabular-nums">
+                <%= if idx < @active_step do %>
+                  <.icon name="hero-check" class="h-3.5 w-3.5 -mt-0.5" />
+                <% else %>
+                  {idx + 1}.
+                <% end %>
+              </span>
+              <span class="truncate">{label}</span>
             </span>
-            <span class="hidden sm:inline mx-2">{val}</span>
-            <.icon
-              :if={idx + 1 < assigns[:stepper_max_length]}
-              name="hero-chevron-right"
-              class="w-4 h-4 sm:w-5 sm:h-5"
-            />
           </button>
         </li>
-        <li
-          :if={idx == @active_step}
-          class="flex items-center gap-x-2 leading-6 text-blue-800 text-sm min-w-0"
-        >
-          <span class="flex items-center text-zinc-100 justify-center w-6 h-6 text-xs font-bold bg-blue-600 border border-blue-600 rounded shrink-0">
-            {idx + 1}
-          </span>
-          <span class="truncate mx-2 sm:truncate-none">{val}</span>
-          <.icon
-            :if={idx + 1 < assigns[:stepper_max_length]}
-            name="hero-chevron-right"
-            class="w-4 h-4 shrink-0 sm:w-5 sm:h-5"
-          />
-        </li>
-      <% end %>
-    </ol>
+      </ol>
+    </nav>
     """
+  end
+
+  defp stepper_chip_class(idx, active) do
+    cond do
+      idx == active ->
+        "border-blue-600 bg-blue-600 text-white shadow-sm"
+
+      idx < active ->
+        "border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100"
+
+      true ->
+        "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50"
+    end
+  end
+
+  defp stepper_segment_class(idx, active) do
+    cond do
+      idx == active -> "bg-blue-600"
+      idx < active -> "bg-blue-400 group-hover:bg-blue-500"
+      true -> "bg-zinc-200 group-hover:bg-zinc-300"
+    end
+  end
+
+  defp stepper_segment_label_class(idx, active) do
+    cond do
+      idx == active -> "font-semibold text-blue-800"
+      idx < active -> "text-zinc-600 group-hover:text-blue-700"
+      true -> "text-zinc-400 group-hover:text-zinc-600"
+    end
   end
 
   attr :class, :string, default: nil
