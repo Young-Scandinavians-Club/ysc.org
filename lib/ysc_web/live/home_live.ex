@@ -2022,56 +2022,14 @@ defmodule YscWeb.HomeLive do
   defp membership_scheduled_for_cancellation?(_), do: false
 
   defp get_upcoming_tickets(user_id, event_limit \\ 10) do
-    row_limit = max(event_limit * 20, 50)
-
-    tickets =
-      Events.list_upcoming_confirmed_tickets_for_user(user_id,
-        row_limit: row_limit
-      )
-
-    # Filter for upcoming events only and confirmed tickets
-    # Use PST timezone for comparison
-    now_pst = DateTime.now!("America/Los_Angeles")
-
-    upcoming_tickets =
-      tickets
-      |> Enum.filter(fn ticket ->
-        ticket.status == :confirmed and
-          case ticket.event do
-            %{start_date: start_date} when not is_nil(start_date) ->
-              # Convert event start_date to PST for comparison
-              start_date_pst =
-                case start_date do
-                  %DateTime{} = dt ->
-                    DateTime.shift_zone!(dt, "America/Los_Angeles")
-
-                  %Date{} = d ->
-                    # For Date-only, create DateTime at midnight PST
-                    DateTime.new!(d, ~T[00:00:00], "America/Los_Angeles")
-
-                  _ ->
-                    nil
-                end
-
-              if start_date_pst do
-                DateTime.compare(start_date_pst, now_pst) == :gt
-              else
-                false
-              end
-
-            _ ->
-              false
-          end
-      end)
-
-    # Group by event FIRST to ensure we show all events with tickets
-    # Then limit by number of unique events, not number of tickets
-    upcoming_tickets
+    user_id
+    |> Events.list_upcoming_confirmed_tickets_for_user(
+      after_now: true,
+      event_limit: event_limit
+    )
     |> Enum.group_by(& &1.event.id)
     |> Enum.map(fn {_event_id, event_tickets} ->
-      # Get the event from the first ticket (all tickets in group have same event)
       event = List.first(event_tickets).event
-      # Get combined datetime for proper sorting (date + time)
       event_datetime = get_event_datetime_for_sorting(event)
       {event_datetime, event_tickets}
     end)
@@ -2079,7 +2037,6 @@ defmodule YscWeb.HomeLive do
       fn {event_datetime, _tickets} -> event_datetime end,
       {:asc, DateTime}
     )
-    |> Enum.take(event_limit)
     |> Enum.flat_map(fn {_event_datetime, event_tickets} -> event_tickets end)
   end
 

@@ -2084,89 +2084,12 @@ defmodule YscWeb.AdminDashboardLive do
   defp format_newsletter_stat(count, _sent_count, label),
     do: "#{count} #{label}"
 
-  defp get_property_stats do
-    alias Ysc.Repo
-    import Ecto.Query
-
-    today = pst_today()
-    checkout_time = ~T[11:00:00]
-    now_pst = DateTime.now!("America/Los_Angeles")
-    checkout_cutoff = DateTime.new!(today, checkout_time, "America/Los_Angeles")
-    two_weeks_out = Date.add(today, 14)
-
-    staying_bookings =
-      Repo.all(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where: b.checkin_date <= ^today,
-          where: b.checkout_date >= ^today,
-          select: %{property: b.property, checkout_date: b.checkout_date}
-      )
-      |> Enum.filter(fn b ->
-        if Date.compare(b.checkout_date, today) == :eq do
-          DateTime.compare(now_pst, checkout_cutoff) == :lt
-        else
-          true
-        end
-      end)
-
-    checkins_today =
-      Repo.all(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where: b.checkin_date == ^today,
-          select: %{property: b.property}
-      )
-
-    checkouts_today =
-      Repo.all(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where: b.checkout_date == ^today,
-          select: %{property: b.property}
-      )
-
-    upcoming =
-      Repo.all(
-        from b in Bookings.Booking,
-          where: b.status == :complete,
-          where:
-            fragment(
-              "(? <= ? AND ? >= ?)",
-              b.checkin_date,
-              ^two_weeks_out,
-              b.checkout_date,
-              ^today
-            ),
-          select: %{property: b.property, guests_count: b.guests_count}
-      )
-
-    build_stats = fn property ->
-      prop_upcoming = Enum.filter(upcoming, &(&1.property == property))
-
-      %{
-        staying: Enum.count(staying_bookings, &(&1.property == property)),
-        checkins_today: Enum.count(checkins_today, &(&1.property == property)),
-        checkouts_today:
-          Enum.count(checkouts_today, &(&1.property == property)),
-        upcoming_bookings: length(prop_upcoming),
-        upcoming_guests:
-          Enum.sum(Enum.map(prop_upcoming, &(&1.guests_count || 0)))
-      }
-    end
-
-    %{
-      tahoe: build_stats.(:tahoe),
-      clear_lake: build_stats.(:clear_lake)
-    }
-  end
+  defp get_property_stats, do: Bookings.admin_property_dashboard_stats()
 
   @impl true
   def handle_event("navigate-to-review", %{"user-id" => user_id}, socket) do
     {:noreply, push_navigate(socket, to: build_review_url(user_id))}
   end
-
-  defp pst_today, do: DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
   defp get_renewals_in_30_days do
     alias Ysc.Repo

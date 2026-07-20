@@ -4298,6 +4298,107 @@ defmodule Ysc.Bookings do
     |> Repo.all()
   end
 
+  @checkout_time_pst ~T[11:00:00]
+  @pst_timezone "America/Los_Angeles"
+
+  @doc """
+  Returns per-property booking stats for the admin dashboard in a single query.
+
+  Buckets match the previous four-query implementation:
+
+    * **staying** — checked in, not yet past checkout (11:00 AM PST on checkout day)
+    * **checkins_today** / **checkouts_today** — complete bookings with check-in/out today
+    * **upcoming_bookings** / **upcoming_guests** — complete stays overlapping the next 14 days
+  """
+  def admin_property_dashboard_stats do
+    today = pst_today()
+    now_pst = DateTime.now!(@pst_timezone)
+    checkout_cutoff = DateTime.new!(today, @checkout_time_pst, @pst_timezone)
+    now_before_checkout = DateTime.compare(now_pst, checkout_cutoff) == :lt
+    two_weeks_out = Date.add(today, 14)
+
+    staying_filter =
+      if now_before_checkout do
+        dynamic(
+          [b],
+          b.checkin_date <= ^today and b.checkout_date >= ^today
+        )
+      else
+        dynamic(
+          [b],
+          b.checkin_date <= ^today and b.checkout_date > ^today
+        )
+      end
+
+    upcoming_filter =
+      dynamic(
+        [b],
+        b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
+      )
+
+    rows_filter =
+      dynamic(
+        [b],
+        ^staying_filter or
+          b.checkin_date == ^today or
+          b.checkout_date == ^today or
+          ^upcoming_filter
+      )
+
+    stats_by_property =
+      from(b in Booking,
+        where: b.status == :complete,
+        where: ^rows_filter,
+        group_by: b.property,
+        select: %{
+          property: b.property,
+          staying:
+            count(b.id)
+            |> filter(
+              b.checkin_date <= ^today and
+                (b.checkout_date > ^today or
+                   (^now_before_checkout and b.checkout_date == ^today))
+            ),
+          checkins_today: count(b.id) |> filter(b.checkin_date == ^today),
+          checkouts_today: count(b.id) |> filter(b.checkout_date == ^today),
+          upcoming_bookings:
+            count(b.id)
+            |> filter(
+              b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
+            ),
+          upcoming_guests:
+            coalesce(
+              sum(b.guests_count)
+              |> filter(
+                b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
+              ),
+              0
+            )
+        }
+      )
+      |> Repo.all()
+      |> Map.new(&{&1.property, Map.delete(&1, :property)})
+
+    empty_stats = %{
+      staying: 0,
+      checkins_today: 0,
+      checkouts_today: 0,
+      upcoming_bookings: 0,
+      upcoming_guests: 0
+    }
+
+    %{
+      tahoe: Map.get(stats_by_property, :tahoe, empty_stats),
+      clear_lake: Map.get(stats_by_property, :clear_lake, empty_stats)
+    }
+  end
+
+  defp pst_today do
+    @pst_timezone
+    |> DateTime.now!()
+    |> DateTime.to_date()
+  end
+
   @doc """
   Returns pending refund counts for the admin dashboard: total and per property.
   """
@@ -5255,6 +5356,61 @@ defmodule Ysc.Bookings do
       :tahoe,
       Ysc.Ci.QueryExplain.Fixtures.today(),
       Date.add(Ysc.Ci.QueryExplain.Fixtures.today(), 3)
+    )
+  end
+
+  @doc false
+  def ci_query_explain_admin_property_dashboard_stats_query do
+    today = Ysc.Ci.QueryExplain.Fixtures.today()
+    two_weeks_out = Date.add(today, 14)
+
+    staying =
+      dynamic(
+        [b],
+        b.checkin_date <= ^today and
+          b.checkout_date >= ^today and
+          b.checkout_date > ^today
+      )
+
+    upcoming =
+      dynamic(
+        [b],
+        b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
+      )
+
+    from(b in Booking,
+      where: b.status == :complete,
+      where:
+        ^staying or
+          b.checkin_date == ^today or
+          b.checkout_date == ^today or
+          ^upcoming,
+      group_by: b.property,
+      select: %{
+        property: b.property,
+        staying:
+          count(b.id)
+          |> filter(
+            b.checkin_date <= ^today and
+              b.checkout_date >= ^today and
+              b.checkout_date > ^today
+          ),
+        checkins_today: count(b.id) |> filter(b.checkin_date == ^today),
+        checkouts_today: count(b.id) |> filter(b.checkout_date == ^today),
+        upcoming_bookings:
+          count(b.id)
+          |> filter(
+            b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
+          ),
+        upcoming_guests:
+          coalesce(
+            sum(b.guests_count)
+            |> filter(
+              b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
+            ),
+            0
+          )
+      }
     )
   end
 end
