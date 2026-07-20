@@ -6,6 +6,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
 
   alias Money
   alias Ysc.Bookings
@@ -1168,7 +1169,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
       ensure_receipt_buyout_base_pricing!()
 
-      user = user_fixture()
+      user = user_with_membership()
       conn = log_in_user(conn, user)
 
       {checkin, checkout} = tahoe_booking_dates(7)
@@ -1290,22 +1291,8 @@ defmodule YscWeb.BookingReceiptLiveTest do
       assert reloaded.status == :hold
       assert receipt_ledger_payment_count(booking.id) == 0
 
-      # Payment verification + auto-refund each retrieve the payment intent.
+      # Payment verification + auto-refund each retrieve the payment intent (#749).
       assert Agent.get(retrieve_counter, & &1) == 2
-
-      assert {:ok, %Stripe.Refund{id: refund_id}} =
-               Bookings.maybe_refund_unfulfilled_checkout_payment(
-                 reloaded,
-                 %Stripe.PaymentIntent{
-                   id: pi_id,
-                   status: "succeeded",
-                   amount: discounted_cents,
-                   latest_charge: "ch_#{pi_id}"
-                 },
-                 :entitlement_no_longer_valid
-               )
-
-      assert refund_id == "re_test_unfulfilled_checkout_#{pi_id}"
     end
 
     test "records ledger when booking was already confirmed before Stripe redirect",

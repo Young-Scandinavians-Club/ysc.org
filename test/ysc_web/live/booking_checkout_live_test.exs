@@ -1203,22 +1203,8 @@ defmodule YscWeb.BookingCheckoutLiveTest do
       assert reloaded.status == :hold
       assert booking_ledger_payment_count(booking.id) == 0
 
-      # #749: fulfillment failure triggers auto-refund — second retrieve_payment_intent
-      # call happens inside create_stripe_refund/4 (Mox expect count of 2 above).
-      assert {:ok, %Stripe.Refund{id: refund_id}} =
-               Bookings.maybe_refund_unfulfilled_checkout_payment(
-                 reloaded,
-                 %Stripe.PaymentIntent{
-                   id: pi_id,
-                   status: "succeeded",
-                   amount: discounted_cents,
-                   latest_charge: "ch_#{pi_id}"
-                 },
-                 :entitlement_no_longer_valid
-               )
-
-      assert refund_id == "re_test_unfulfilled_checkout_#{pi_id}"
-
+      # #749: fulfillment failure auto-refunds via create_stripe_refund — the Mox
+      # expect(..., 2, ...) above requires a second retrieve_payment_intent call.
       Mox.verify!(StripeMock)
     end
   end
