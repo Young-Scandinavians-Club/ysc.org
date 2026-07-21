@@ -290,7 +290,7 @@ defmodule YscWeb.HomeLive do
   end
 
   defp list_home_upcoming_events do
-    PublicContentCache.list_upcoming_events(3)
+    PublicContentCache.list_upcoming_events(4)
     |> Enum.reject(&(&1.state == :cancelled))
   end
 
@@ -1567,7 +1567,7 @@ defmodule YscWeb.HomeLive do
                   :if={!@async_data_loaded}
                   class="grid grid-cols-1 md:grid-cols-2 gap-8"
                 >
-                  <%= for _i <- 1..3 do %>
+                  <%= for _i <- 1..4 do %>
                     <div class="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
                       <div class="h-48 bg-zinc-200"></div>
                       <div class="p-6 space-y-3">
@@ -1601,7 +1601,7 @@ defmodule YscWeb.HomeLive do
                   :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
                   class="grid grid-cols-1 md:grid-cols-2 gap-8"
                 >
-                  <%= for event <- Enum.take(@upcoming_events, 3) do %>
+                  <%= for event <- @upcoming_events do %>
                     <.event_card
                       event={event}
                       sold_out={event_sold_out?(event)}
