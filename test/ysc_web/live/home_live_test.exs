@@ -537,12 +537,7 @@ defmodule YscWeb.HomeLiveTest do
 
       # Re-draft and invalidate immediately before mount so parallel suites cannot
       # repopulate upcoming events between setup and the guest home render.
-      from(e in Event,
-        where: e.start_date > ^DateTime.utc_now() and e.state == :published
-      )
-      |> Repo.update_all(set: [state: :draft])
-
-      Ysc.PublicContentCache.invalidate()
+      draft_upcoming_published_events!()
 
       {:ok, view, _html} = live(conn, ~p"/")
       html = render(view)
