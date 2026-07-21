@@ -467,8 +467,8 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                |> log_in_user(user)
                |> live(~p"/payment/success?payment_intent=pi_test")
 
-      assert flash["error"] ==
-               "Payment status is unclear. Please check your booking or order status."
+      assert flash["error"] =~
+               "We couldn't confirm your payment from this link. Check My Bookings & Tickets"
     end
   end
 

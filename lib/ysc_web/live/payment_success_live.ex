@@ -69,7 +69,7 @@ defmodule YscWeb.PaymentSuccessLive do
            socket
            |> YscWeb.Flash.put_toast(
              :error,
-             "Payment status is unclear. Please check your booking or order status.",
+             "We couldn't confirm your payment from this link. Check My Bookings & Tickets (under your account menu) or your email for a confirmation. If you were charged, email #{Ysc.EmailConfig.contact_email()} with the date and amount.",
              title: "Payment"
            )
            |> redirect(to: ~p"/")}
@@ -183,7 +183,7 @@ defmodule YscWeb.PaymentSuccessLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "Payment status is unclear. Please check your booking or order status.",
+           "We couldn't confirm your payment from this link. Check My Bookings & Tickets (under your account menu) or your email for a confirmation. If you were charged, email #{Ysc.EmailConfig.contact_email()} with the date and amount.",
            title: "Payment"
          )
          |> redirect(to: ~p"/")}

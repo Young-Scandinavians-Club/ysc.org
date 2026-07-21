@@ -4294,7 +4294,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :info,
-           "Scheduled downgrade cancelled. Your membership will stay at its current level.",
+           "Plan change cancelled. You'll stay on your current membership.",
            title: "Membership"
          )
          |> push_patch(to: ~p"/users/membership")}

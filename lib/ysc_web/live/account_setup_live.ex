@@ -1405,11 +1405,7 @@ defmodule YscWeb.AccountSetupLive do
           end
 
         {:error, error} ->
-          message =
-            case error do
-              %Stripe.Error{message: msg} -> msg
-              _ -> "Failed to process payment method. Please try again."
-            end
+          message = Ysc.PaymentUserMessages.format_stripe_error(error)
 
           YscWeb.Flash.send_toast(:error, message, title: "Payment")
           {:noreply, socket}
