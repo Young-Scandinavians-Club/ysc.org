@@ -1092,6 +1092,160 @@ defmodule Ysc.Bookings do
 
   defp normalize_checkout_failure_reason(_), do: :unknown
 
+  @refundable_unfulfilled_modification_errors ~w(
+    blackout_conflict
+    entitlement_consume_failed
+    entitlement_no_longer_valid
+    entitlement_not_eligible_for_booking
+    inventory_update_failed
+    modification_hold_expired
+    modification_hold_mismatch
+    payment_amount_mismatch
+    property_buyout_active
+    property_unavailable
+    room_unavailable
+    rooms_already_booked
+  )a
+
+  @doc """
+  Refunds a captured Stripe payment when paid booking modification fulfillment
+  fails and the booking remains unchanged (for example, a modification hold
+  expired and could not be refreshed before apply).
+  """
+  def maybe_refund_unfulfilled_modification_payment(
+        %Booking{} = booking,
+        payment_intent_id,
+        reason
+      )
+      when is_binary(payment_intent_id) do
+    stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
+
+    case stripe_client.retrieve_payment_intent(payment_intent_id, %{
+           expand: ["latest_charge"]
+         }) do
+      {:ok, payment_intent} ->
+        maybe_refund_unfulfilled_modification_payment(
+          booking,
+          payment_intent,
+          reason
+        )
+
+      {:error, retrieve_error} ->
+        require Ysc.Logging
+
+        Ysc.Logging.error(
+          "Failed to retrieve modification payment intent for unfulfilled refund",
+          booking_id: booking.id,
+          payment_intent_id: payment_intent_id,
+          reason: normalize_modification_failure_reason(reason),
+          retrieve_error: inspect(retrieve_error)
+        )
+
+        {:error, retrieve_error}
+    end
+  end
+
+  def maybe_refund_unfulfilled_modification_payment(
+        %Booking{} = booking,
+        %Stripe.PaymentIntent{} = payment_intent,
+        reason
+      ) do
+    require Ysc.Logging
+
+    normalized_reason = normalize_modification_failure_reason(reason)
+
+    if refund_unfulfilled_modification_payment?(
+         booking,
+         payment_intent,
+         normalized_reason
+       ) do
+      refund_reason = "unfulfilled_modification:#{normalized_reason}"
+
+      case create_stripe_refund(
+             payment_intent.id,
+             payment_intent.amount,
+             refund_reason,
+             idempotency_key: "unfulfilled_modification_#{payment_intent.id}"
+           ) do
+        {:ok, refund} ->
+          Ysc.Logging.info(
+            "Refunded captured modification payment after fulfillment failure",
+            booking_id: booking.id,
+            payment_intent_id: payment_intent.id,
+            refund_id: refund.id,
+            reason: normalized_reason
+          )
+
+          {:ok, refund}
+
+        {:error, refund_error} ->
+          Ysc.Logging.error(
+            "Failed to refund captured modification payment after fulfillment failure",
+            booking_id: booking.id,
+            payment_intent_id: payment_intent.id,
+            reason: normalized_reason,
+            refund_error: inspect(refund_error)
+          )
+
+          {:error, refund_error}
+      end
+    else
+      :skipped
+    end
+  end
+
+  defp refund_unfulfilled_modification_payment?(
+         %Booking{} = booking,
+         %Stripe.PaymentIntent{} = payment_intent,
+         reason
+       ) do
+    payment_intent.status == "succeeded" and
+      booking.status == :complete and
+      modification_payment_intent_metadata?(payment_intent) and
+      modification_payment_metadata_matches_booking?(payment_intent, booking) and
+      not modification_ledger_recorded?(booking.id, payment_intent.id) and
+      not modification_applied_pending_ledger?(booking, payment_intent) and
+      reason in @refundable_unfulfilled_modification_errors
+  end
+
+  defp modification_payment_intent_metadata?(payment_intent) do
+    metadata = payment_intent.metadata || %{}
+
+    modification_flag =
+      Map.get(metadata, "modification") || Map.get(metadata, :modification)
+
+    modification_flag in ["true", true]
+  end
+
+  defp modification_payment_metadata_matches_booking?(
+         payment_intent,
+         %Booking{} = booking
+       ) do
+    metadata = payment_intent.metadata || %{}
+
+    metadata_booking_id =
+      Map.get(metadata, "booking_id") || Map.get(metadata, :booking_id)
+
+    metadata_user_id =
+      Map.get(metadata, "user_id") || Map.get(metadata, :user_id)
+
+    to_string(metadata_booking_id || "") == to_string(booking.id) and
+      to_string(metadata_user_id || "") == to_string(booking.user_id)
+  end
+
+  defp modification_applied_pending_ledger?(%Booking{} = booking, payment_intent) do
+    amount = Ysc.MoneyHelper.cents_to_money(payment_intent.amount, :USD)
+    modification_payment_balance_due?(booking, amount)
+  end
+
+  defp normalize_modification_failure_reason({:error, reason}),
+    do: normalize_modification_failure_reason(reason)
+
+  defp normalize_modification_failure_reason(reason) when is_atom(reason),
+    do: reason
+
+  defp normalize_modification_failure_reason(_), do: :unknown
+
   @doc false
   def verify_modification_redirect_payment_intent(
         payment_intent,

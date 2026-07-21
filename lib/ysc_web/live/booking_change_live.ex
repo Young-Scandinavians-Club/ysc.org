@@ -1178,6 +1178,14 @@ defmodule YscWeb.BookingChangeLive do
             payment_intent_id
           )
         else
+          if payment_intent_id do
+            Bookings.maybe_refund_unfulfilled_modification_payment(
+              booking,
+              payment_intent_id,
+              reason
+            )
+          end
+
           error_message =
             if payment_intent_id,
               do: modification_error_message_after_payment(reason),

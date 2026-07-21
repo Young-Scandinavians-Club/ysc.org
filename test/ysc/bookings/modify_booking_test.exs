@@ -1210,6 +1210,176 @@ defmodule Ysc.Bookings.ModifyBookingTest do
         Application.put_env(:ysc, :stripe_client, previous_client)
       end
     end
+
+    test "maybe_refund_unfulfilled_modification_payment refunds when hold refresh fails after payment",
+         %{
+           user: user
+         } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      room = create_test_room!()
+      {checkin, checkout} = tahoe_booking_dates(127)
+      short_checkout = Date.add(checkin, 1)
+      booking = complete_room_booking!(user, room, checkin, short_checkout)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: checkout,
+        guests_count: 2,
+        children_count: 0
+      }
+
+      string_attrs = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2",
+        "children_count" => "0"
+      }
+
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
+      assert Money.positive?(preview.delta)
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, attrs)
+
+      expired_at =
+        DateTime.utc_now()
+        |> DateTime.add(-1, :minute)
+        |> DateTime.truncate(:second)
+
+      held_booking
+      |> Ecto.Changeset.change(modification_hold_expires_at: expired_at)
+      |> Repo.update!()
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :tahoe,
+                 reason: "Blocks modification refresh",
+                 start_date: checkin,
+                 end_date: checkout
+               })
+
+      payment_intent_id =
+        "pi_mod_refund_#{System.unique_integer([:positive])}"
+
+      amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: amount_cents,
+           metadata: %{
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id),
+             "modification" => "true"
+           },
+           latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error, :blackout_conflict} =
+                 Bookings.apply_modification(booking, string_attrs,
+                   payment_intent_id: payment_intent_id
+                 )
+
+        assert {:ok, %Stripe.Refund{id: refund_id}} =
+                 Bookings.maybe_refund_unfulfilled_modification_payment(
+                   booking,
+                   payment_intent_id,
+                   :blackout_conflict
+                 )
+
+        assert String.starts_with?(refund_id, "re_test")
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "maybe_refund_unfulfilled_modification_payment skips when modification was applied",
+         %{
+           user: user
+         } do
+      {checkin, checkout} = tahoe_booking_dates(121)
+      extended_checkout = Date.add(checkout, 1)
+      booking = complete_buyout_booking!(user, checkin, checkout)
+
+      hold_attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Bookings.place_modification_hold(booking, hold_attrs)
+
+      payment_intent_id =
+        "pi_mod_applied_#{System.unique_integer([:positive])}"
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, updated} =
+                 BookingLocker.modify_complete_booking(
+                   held_booking,
+                   hold_attrs,
+                   previous_details: %{
+                     checkin_date: booking.checkin_date,
+                     checkout_date: booking.checkout_date,
+                     guests_count: booking.guests_count,
+                     children_count: booking.children_count || 0,
+                     total_price: booking.total_price
+                   }
+                 )
+
+        {:ok, balance_due} = Money.sub(updated.total_price, booking.total_price)
+        amount_cents = Ysc.MoneyHelper.money_to_cents(balance_due)
+
+        stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                          _opts ->
+          {:ok,
+           %Stripe.PaymentIntent{
+             id: payment_intent_id,
+             status: "succeeded",
+             amount: amount_cents,
+             metadata: %{
+               "booking_id" => to_string(booking.id),
+               "user_id" => to_string(user.id),
+               "modification" => "true"
+             },
+             latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+           }}
+        end)
+
+        assert :skipped =
+                 Bookings.maybe_refund_unfulfilled_modification_payment(
+                   updated,
+                   payment_intent_id,
+                   :blackout_conflict
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
   end
 
   defp first_friday_on_or_after(date) do

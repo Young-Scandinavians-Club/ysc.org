@@ -2878,6 +2878,117 @@ defmodule Ysc.BookingsTest do
     end
   end
 
+  describe "maybe_refund_unfulfilled_modification_payment/3" do
+    test "refunds captured modification payments when fulfillment fails" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_unfulfilled_mod_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_unfulfilled_mod"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :blackout_conflict
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
+
+    test "skips refund when booking is not complete" do
+      user = Ysc.AccountsFixtures.user_fixture()
+      booking = booking_fixture(%{status: :hold, user_id: user.id})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_hold_mod_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_hold_mod"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :blackout_conflict
+               )
+    end
+
+    test "skips refund when payment intent is not a modification" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_not_mod_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_not_mod"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :blackout_conflict
+               )
+    end
+
+    test "skips refund for non-refundable verification failures" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_skip_mod_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_skip_mod"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :payment_metadata_mismatch
+               )
+    end
+  end
+
   describe "Bookings coverage: listing, blackouts, availability, check-in, refunds" do
     test "list_bookings/4 skips date filter when only one of start/end is set" do
       booking = booking_fixture()
