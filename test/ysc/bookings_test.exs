@@ -238,6 +238,34 @@ defmodule Ysc.BookingsTest do
       assert checkout_today.id
     end
 
+    test "admin_property_dashboard_stats counts checkout-today guests as staying only before 11 AM PST" do
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+      before = Bookings.admin_property_dashboard_stats()
+
+      booking_fixture(%{
+        property: :tahoe,
+        checkin_date: Date.add(today, -1),
+        checkout_date: today,
+        status: :complete,
+        guests_count: 1
+      })
+
+      after_stats = Bookings.admin_property_dashboard_stats()
+      staying_delta = after_stats.tahoe.staying - before.tahoe.staying
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      before_cutoff = DateTime.compare(now_pst, checkout_cutoff) == :lt
+
+      assert staying_delta == if(before_cutoff, do: 1, else: 0)
+
+      assert after_stats.tahoe.checkouts_today >=
+               before.tahoe.checkouts_today + 1
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()
