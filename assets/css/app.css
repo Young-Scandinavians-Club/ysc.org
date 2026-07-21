@@ -39,6 +39,41 @@
     background: #a1a1aa;
 }
 
+.thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.thin-scrollbar:hover,
+.thin-scrollbar.is-interacting {
+    scrollbar-color: #d4d4d8 transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+    height: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    margin-inline: 1rem;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 9999px;
+    transition: background 0.2s ease;
+}
+
+.thin-scrollbar:hover::-webkit-scrollbar-thumb,
+.thin-scrollbar.is-interacting::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+}
+
+.thin-scrollbar:hover::-webkit-scrollbar-thumb:hover,
+.thin-scrollbar.is-interacting::-webkit-scrollbar-thumb:hover {
+    background: #a1a1aa;
+}
+
 /* Toast container: always on top (nav, modals, overlays). Explicit here to avoid Tailwind purging. */
 
 #toast-group,
