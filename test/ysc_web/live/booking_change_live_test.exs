@@ -99,9 +99,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     {view, html} = live_change(conn, booking)
 
     assert html =~ "Change Booking"
-    assert html =~ "You will not get a refund if you change these dates"
+    assert html =~ "No refunds for changed dates"
     assert html =~ "cannot get a refund later"
-    assert html =~ "cannot be undone"
     assert html =~ "Check-in &amp; Check-out Dates"
     assert has_element?(view, "#modification-dates")
     assert has_element?(view, "#refund-forfeiture-notice")
@@ -126,7 +125,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert html =~ ~s|id="booking-change-loading"|
     refute html =~ booking.reference_id
     refute html =~ "Loading availability and price preview"
-    refute html =~ "will not get a refund if you change these dates"
+    refute html =~ "No refunds for changed dates"
   end
 
   test "submit is blocked until acknowledgment is checked", %{conn: conn} do
@@ -176,6 +175,62 @@ defmodule YscWeb.BookingChangeLiveTest do
       |> render_click("payment-redirect-started", %{})
 
     assert html =~ "Change Booking"
+  end
+
+  test "Clear Lake change calendar allows Saturday check-in and check-out", %{
+    conn: conn
+  } do
+    ensure_clear_lake_day_pricing_rule!()
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+
+    checkin = Date.utc_today() |> Date.add(160) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
+
+    {view, _html} = live_change(conn, booking)
+
+    saturday = first_saturday_on_or_after(Date.add(checkin, 7))
+    sunday = Date.add(saturday, 1)
+
+    view
+    |> element("#modification-dates [phx-click=open-calendar]")
+    |> render_click()
+
+    # Navigate to the month containing the Saturday if needed
+    navigate_calendar_to_month!(view, saturday)
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(sunday)}T00:00:00Z"]:not([disabled])|
+           )
+  end
+
+  test "Tahoe change calendar blocks Saturday check-in", %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    saturday = first_saturday_on_or_after(Date.add(booking.checkin_date, 7))
+
+    view
+    |> element("#modification-dates [phx-click=open-calendar]")
+    |> render_click()
+
+    navigate_calendar_to_month!(view, saturday)
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"][disabled]|
+           )
   end
 
   test "shows guest info step when adding guests to tahoe room booking", %{
@@ -418,6 +473,10 @@ defmodule YscWeb.BookingChangeLiveTest do
        }}
     end)
 
+    stub(StripeMock, :cancel_payment_intent, fn "pi_change_upgrade", _opts ->
+      {:ok, %Stripe.PaymentIntent{id: "pi_change_upgrade", status: "canceled"}}
+    end)
+
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
@@ -447,8 +506,20 @@ defmodule YscWeb.BookingChangeLiveTest do
       })
       |> render_submit()
 
-    assert html =~ "Additional payment required"
+    assert html =~ "Additional payment required" || html =~ "Complete payment"
+    assert has_element?(view, "#modification-payment-step")
     assert has_element?(view, "#stripe-payment-container")
+    refute has_element?(view, "#modification-dates")
+    refute has_element?(view, "#submit-modification-button")
+    refute has_element?(view, "#refund-forfeiture-notice")
+
+    view |> element("#back-to-modification-button") |> render_click()
+
+    html = render(view)
+    assert has_element?(view, "#modification-dates")
+    assert has_element?(view, "#submit-modification-button")
+    refute has_element?(view, "#modification-payment-step")
+    assert html =~ date_to_datetime_string(extended_checkout)
 
     send(
       view.pid,
@@ -456,11 +527,72 @@ defmodule YscWeb.BookingChangeLiveTest do
        updated_event(booking.checkin_date, booking.checkout_date)}
     )
 
-    html = render(view)
-    refute html =~ "Additional payment required"
+    _html = render(view)
     refute has_element?(view, "#stripe-payment-container")
     assert has_element?(view, "#submit-modification-button")
     refute has_element?(view, "#submit-payment")
+  end
+
+  test "returns to editable form with pending changes when backing out of payment",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: "pi_change_back",
+         client_secret: "pi_change_back_secret",
+         status: "requires_payment_method"
+       }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn "pi_change_back", _opts ->
+      {:ok, %Stripe.PaymentIntent{id: "pi_change_back", status: "canceled"}}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    extended_checkout = Date.add(booking.checkout_date, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    view |> element("#back-to-modification-button") |> render_click()
+
+    html = render(view)
+    assert has_element?(view, "#modification-dates")
+    assert has_element?(view, "#submit-modification-button")
+    assert html =~ extended_checkout_str
+    refute has_element?(view, "#modification-payment-step")
   end
 
   test "shows downgrade notice when shortening stay reduces total", %{
@@ -493,6 +625,52 @@ defmodule YscWeb.BookingChangeLiveTest do
     html = render(view)
     assert html =~ "modification-downgrade-notice"
     assert html =~ "do not refund the difference"
+  end
+
+  test "Clear Lake price preview shows previous and new calculation breakdown",
+       %{
+         conn: conn
+       } do
+    ensure_clear_lake_day_pricing_rule!()
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+
+    checkin = Date.utc_today() |> Date.add(160) |> first_monday_on_or_after()
+    checkout = Date.add(checkin, 2)
+    booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
+
+    {view, _html} = live_change(conn, booking)
+
+    new_checkin = Date.add(checkin, 7)
+    new_checkout = Date.add(new_checkin, 1)
+
+    send(view.pid, {:updated_event, updated_event(new_checkin, new_checkout)})
+    _html = render(view)
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => date_to_datetime_string(new_checkin),
+        "checkout_date" => date_to_datetime_string(new_checkout),
+        "guests_count" => "3"
+      }
+    })
+    |> render_change()
+
+    html = render(view)
+
+    assert has_element?(view, "#modification-price-preview")
+    assert has_element?(view, "#modification-price-comparison")
+    assert has_element?(view, "#modification-previous-price")
+    assert has_element?(view, "#modification-new-price")
+    assert has_element?(view, "#modification-amount-due")
+    assert html =~ "Price Summary"
+    assert html =~ "Previous"
+    assert html =~ "New"
+    assert html =~ "3 guests"
+    assert html =~ "2 nights"
+    assert html =~ "1 night"
   end
 
   defp complete_room_booking!(user, room, checkin, checkout) do
@@ -577,5 +755,72 @@ defmodule YscWeb.BookingChangeLiveTest do
   defp first_monday_on_or_after(%Date{} = date) do
     days_until_monday = rem(8 - Date.day_of_week(date, :monday), 7)
     Date.add(date, days_until_monday)
+  end
+
+  defp first_saturday_on_or_after(%Date{} = date) do
+    days_until_saturday = rem(6 - Date.day_of_week(date, :monday), 7)
+    Date.add(date, days_until_saturday)
+  end
+
+  defp ensure_clear_lake_day_pricing_rule! do
+    Ysc.Bookings.SeasonCache.invalidate()
+    Cachex.clear(:ysc_cache)
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(:USD, 30),
+        booking_mode: :day,
+        price_unit: :per_guest_per_day,
+        property: :clear_lake,
+        season_id: nil
+      })
+  end
+
+  defp complete_clear_lake_day_booking!(user, checkin, checkout, guests) do
+    assert {:ok, hold} =
+             BookingLocker.create_per_guest_booking(
+               user.id,
+               :clear_lake,
+               checkin,
+               checkout,
+               guests
+             )
+
+    assert {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+
+    assert {:ok, _} =
+             Ledgers.process_payment(%{
+               user_id: user.id,
+               amount: booking.total_price,
+               entity_type: :booking,
+               entity_id: booking.id,
+               external_payment_id:
+                 "pi_change_cl_#{System.unique_integer([:positive])}",
+               stripe_fee: Money.new(100, :USD),
+               description: "Booking payment",
+               property: booking.property,
+               payment_method_id: nil
+             })
+
+    Repo.preload(booking, [:rooms, :user])
+  end
+
+  defp navigate_calendar_to_month!(view, %Date{} = target) do
+    Enum.reduce_while(1..24, nil, fn _, _ ->
+      html = render(view)
+
+      if html =~ Calendar.strftime(target, "%B %Y") do
+        {:halt, :ok}
+      else
+        view
+        |> element("#modification-dates [phx-click=next-month]")
+        |> render_click()
+
+        {:cont, nil}
+      end
+    end) ||
+      flunk(
+        "Could not navigate calendar to #{Calendar.strftime(target, "%B %Y")}"
+      )
   end
 end

@@ -259,12 +259,18 @@ defmodule YscWeb.BookingChangeLive do
 
   @impl true
   def handle_event("back-to-modification", _params, socket) do
+    params =
+      socket.assigns.pending_modification_params
+      |> case do
+        nil -> form_params(socket.assigns.form)
+        pending -> pending
+      end
+      |> normalize_modification_params()
+
     {:noreply,
      socket
      |> dismiss_payment_form()
-     |> assign(:step, :edit)
-     |> assign(:guest_info_form, nil)
-     |> assign(:guest_info_errors, %{})}
+     |> restore_modification_edit_form(params)}
   end
 
   @impl true
@@ -419,7 +425,6 @@ defmodule YscWeb.BookingChangeLive do
       <.skeleton_block class="h-4 w-40 rounded mb-6" />
       <.skeleton_block class="h-9 w-72 rounded mb-2" />
       <.skeleton_block class="h-5 w-56 rounded mb-6" />
-      <.skeleton_block class="h-24 w-full rounded-lg mb-6" />
       <div class="bg-white border border-zinc-200 rounded-xl p-6 space-y-4">
         <.skeleton_block :for={_ <- 1..4} class="h-10 w-full rounded" />
       </div>
@@ -444,176 +449,165 @@ defmodule YscWeb.BookingChangeLive do
       </p>
 
       <div
-        id="refund-forfeiture-notice"
-        class="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-950"
-      >
-        <p class="font-semibold mb-2">
-          {YscWeb.BookingUserMessages.modification_forfeiture_title()}
-        </p>
-        <p class="text-sm leading-relaxed">
-          {YscWeb.BookingUserMessages.modification_forfeiture_body()}
-        </p>
-      </div>
-
-      <div
         :if={@step == :edit}
         class="space-y-6 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm"
       >
-        <div
-          :if={!@change_data_loaded?}
-          id="change-data-loading"
-          class="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600"
-          role="status"
-          aria-live="polite"
-        >
-          <.icon
-            name="hero-arrow-path"
-            class="w-4 h-4 shrink-0 text-blue-600 animate-spin"
-            aria-hidden="true"
-          /> Loading availability and price preview…
-        </div>
-
-        <.form
-          for={@form}
-          id="booking-change-form"
-          phx-change="validate"
-          phx-debounce="300"
-          phx-submit="submit-modification"
-          class={[
-            "space-y-6",
-            !@change_data_loaded? && "pointer-events-none opacity-50"
-          ]}
-        >
-          <%= if @booking.rooms != [] do %>
-            <div>
-              <h2 class="text-sm font-semibold text-zinc-700 mb-1">
-                Your rooms
-              </h2>
-              <p class="text-sm text-zinc-500 mb-2">
-                Room assignments cannot be changed here. To change rooms, cancel this reservation and book again.
-              </p>
-              <ul class="text-sm text-zinc-600 list-disc list-inside">
-                <%= for room <- @booking.rooms do %>
-                  <li>{room.name}</li>
-                <% end %>
-              </ul>
-            </div>
-          <% end %>
-
-          <div>
-            <.date_range_picker
-              id="modification-dates"
-              label="Check-in & Check-out Dates"
-              form={@form}
-              start_date_field={@form[:checkin_date]}
-              end_date_field={@form[:checkout_date]}
-              min={@calendar_min_date}
-              max={@calendar_max_date}
-              required
-              property={@booking.property}
-              today={@today}
-              seasons={@seasons}
-              max_nights={@max_nights}
-              date_tooltips={@checkin_date_tooltips}
-              checkout_date_tooltips={@checkout_date_tooltips}
-            />
-            <%= if @checkin_date_tooltips_loading? do %>
-              <p class="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
-                <.icon
-                  name="hero-arrow-path"
-                  class="w-3 h-3 shrink-0 animate-spin"
-                  aria-hidden="true"
-                /> Loading available dates…
-              </p>
-            <% end %>
+        <%= if @show_payment_form && @payment_intent && @payment_delta &&
+                Money.positive?(@payment_delta) do %>
+          <.modification_payment_step
+            preview={@preview}
+            payment_delta={@payment_delta}
+            payment_intent={@payment_intent}
+            payment_error={@payment_error}
+            payment_processing={@payment_processing}
+            stripe_payment_element_ready={@stripe_payment_element_ready}
+            submitting={@submitting}
+            booking={@booking}
+          />
+        <% else %>
+          <div
+            :if={!@change_data_loaded?}
+            id="change-data-loading"
+            class="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-600"
+            role="status"
+            aria-live="polite"
+          >
+            <.icon
+              name="hero-arrow-path"
+              class="w-4 h-4 shrink-0 text-blue-600 animate-spin"
+              aria-hidden="true"
+            /> Loading availability and price preview…
           </div>
 
-          <%= if @booking.booking_mode != :buyout do %>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <.input
-                field={@form[:guests_count]}
-                type="number"
-                label="Number of guests"
-                min="1"
-                max={max_adults_for_modification(@booking, @form)}
-                required
-              />
-              <%= if @booking.booking_mode == :room do %>
-                <.input
-                  field={@form[:children_count]}
-                  type="number"
-                  label="Number of children"
-                  min="0"
-                  max={max_children_for_modification(@booking, @form)}
-                />
-              <% end %>
-            </div>
-          <% end %>
-
-          <%= if @preview_error do %>
-            <div
-              id="modification-preview-error"
-              class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
-            >
-              {@preview_error}
-            </div>
-          <% end %>
-
-          <%= if @preview do %>
-            <div
-              id="modification-price-preview"
-              class="p-4 rounded-lg bg-zinc-50 border border-zinc-200"
-            >
-              <h2 class="text-sm font-semibold text-zinc-800 mb-3">
-                Price preview
-              </h2>
-              <dl class="space-y-2 text-sm">
-                <div class="flex justify-between">
-                  <dt class="text-zinc-600">Previous reservation total</dt>
-                  <dd>{MoneyHelper.format_money!(@preview.previous_total)}</dd>
-                </div>
-                <div class="flex justify-between">
-                  <dt class="text-zinc-600">New reservation total</dt>
-                  <dd class="font-medium">
-                    {MoneyHelper.format_money!(@preview.new_total)}
-                  </dd>
-                </div>
-                <div class="flex justify-between border-t border-zinc-200 pt-2">
-                  <dt class="font-semibold text-zinc-800">Amount due now</dt>
-                  <dd class="font-semibold text-zinc-900">
-                    {MoneyHelper.format_money!(@preview.delta)}
-                  </dd>
-                </div>
-              </dl>
-              <%= if modification_is_downgrade?(@preview) do %>
-                <div
-                  id="modification-downgrade-notice"
-                  class="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm"
-                >
-                  Shortening your stay reduces the reservation total, but we do not refund the difference.
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-        </.form>
-
-        <div class="flex items-start gap-3">
-          <input
-            type="checkbox"
-            id="acknowledge-forfeiture"
-            phx-click="toggle-acknowledgment"
-            checked={@acknowledged}
-            class="mt-1 h-4 w-4 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
-          />
-          <label
-            for="acknowledge-forfeiture"
-            class="text-sm text-zinc-700 leading-relaxed"
+          <.form
+            for={@form}
+            id="booking-change-form"
+            phx-change="validate"
+            phx-debounce="300"
+            phx-submit="submit-modification"
+            class={[
+              "space-y-6",
+              !@change_data_loaded? && "pointer-events-none opacity-50"
+            ]}
           >
-            {YscWeb.BookingUserMessages.modification_forfeiture_acknowledgment()}
-          </label>
-        </div>
+            <%= if @booking.rooms != [] do %>
+              <div>
+                <h2 class="text-sm font-semibold text-zinc-700 mb-1">
+                  Your rooms
+                </h2>
+                <p class="text-sm text-zinc-500 mb-2">
+                  Room assignments cannot be changed here. To change rooms, cancel this reservation and book again.
+                </p>
+                <ul class="text-sm text-zinc-600 list-disc list-inside">
+                  <%= for room <- @booking.rooms do %>
+                    <li>{room.name}</li>
+                  <% end %>
+                </ul>
+              </div>
+            <% end %>
 
-        <%= if not @show_payment_form do %>
+            <div>
+              <.date_range_picker
+                id="modification-dates"
+                label="Check-in & Check-out Dates"
+                form={@form}
+                start_date_field={@form[:checkin_date]}
+                end_date_field={@form[:checkout_date]}
+                min={@calendar_min_date}
+                max={@calendar_max_date}
+                required
+                property={@booking.property}
+                today={@today}
+                seasons={@seasons}
+                max_nights={@max_nights}
+                allow_saturdays={@booking.property == :clear_lake}
+                date_tooltips={@checkin_date_tooltips}
+                checkout_date_tooltips={@checkout_date_tooltips}
+              />
+              <%= if @checkin_date_tooltips_loading? do %>
+                <p class="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
+                  <.icon
+                    name="hero-arrow-path"
+                    class="w-3 h-3 shrink-0 animate-spin"
+                    aria-hidden="true"
+                  /> Loading available dates…
+                </p>
+              <% end %>
+            </div>
+
+            <%= if @booking.booking_mode != :buyout do %>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <.input
+                  field={@form[:guests_count]}
+                  type="number"
+                  label="Number of guests"
+                  min="1"
+                  max={max_adults_for_modification(@booking, @form)}
+                  required
+                />
+                <%= if @booking.booking_mode == :room do %>
+                  <.input
+                    field={@form[:children_count]}
+                    type="number"
+                    label="Number of children"
+                    min="0"
+                    max={max_children_for_modification(@booking, @form)}
+                  />
+                <% end %>
+              </div>
+            <% end %>
+
+            <%= if @preview_error do %>
+              <div
+                id="modification-preview-error"
+                class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
+              >
+                {@preview_error}
+              </div>
+            <% end %>
+
+            <%= if @preview do %>
+              <.modification_price_preview preview={@preview} />
+            <% end %>
+          </.form>
+
+          <div
+            id="refund-forfeiture-notice"
+            class="space-y-4 p-5 rounded-lg border border-amber-300 bg-amber-50"
+          >
+            <div class="flex items-start gap-3">
+              <.icon
+                name="hero-exclamation-triangle"
+                class="w-5 h-5 shrink-0 text-amber-600 mt-0.5"
+                aria-hidden="true"
+              />
+              <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-amber-900 mb-1">
+                  {YscWeb.BookingUserMessages.modification_forfeiture_title()}
+                </h3>
+                <p class="text-sm text-amber-800 leading-relaxed mb-4">
+                  {YscWeb.BookingUserMessages.modification_forfeiture_body()}
+                </p>
+
+                <div class="flex items-start gap-3 bg-white p-3 rounded border border-amber-200">
+                  <input
+                    type="checkbox"
+                    id="acknowledge-forfeiture"
+                    phx-click="toggle-acknowledgment"
+                    checked={@acknowledged}
+                    class="mt-0.5 h-4 w-4 rounded border-amber-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <label
+                    for="acknowledge-forfeiture"
+                    class="text-sm text-amber-950 font-medium cursor-pointer leading-relaxed"
+                  >
+                    {YscWeb.BookingUserMessages.modification_forfeiture_acknowledgment()}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <.button
             id="submit-modification-button"
             type="submit"
@@ -652,67 +646,6 @@ defmodule YscWeb.BookingChangeLive do
               </.button>
             </:actions>
           </.booking_guest_info_form>
-        </div>
-      <% end %>
-
-      <%= if @show_payment_form && @payment_intent && @payment_delta && Money.positive?(@payment_delta) do %>
-        <div class="mt-8 bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
-          <%= if @payment_processing do %>
-            <div
-              id="modification-payment-success"
-              class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-900"
-            >
-              <p class="font-semibold flex items-center gap-2">
-                <.icon name="hero-check-circle" class="w-5 h-5" />
-                Payment successful
-              </p>
-              <p class="text-sm mt-2 text-green-800">
-                We're saving your reservation changes. You'll be redirected to your confirmation shortly.
-              </p>
-            </div>
-          <% else %>
-            <h2 class="text-lg font-semibold text-zinc-900 mb-2">
-              Additional payment required
-            </h2>
-            <p class="text-sm text-zinc-600 mb-4">
-              Pay {MoneyHelper.format_money!(@payment_delta)} to confirm your reservation changes.
-            </p>
-
-            <%= if @payment_error do %>
-              <div
-                id="modification-payment-error"
-                class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
-              >
-                {@payment_error}
-              </div>
-            <% end %>
-
-            <div
-              id="stripe-payment-container"
-              phx-hook="StripeElements"
-              data-client-secret={@payment_intent.client_secret}
-              data-booking-id={@booking.id}
-              data-modification="true"
-            >
-              <.payment_element_loading :if={!@stripe_payment_element_ready} />
-              <div
-                id="payment-element"
-                phx-update="ignore"
-                class="mb-6 min-h-[12rem]"
-              />
-              <div id="payment-message" class="hidden mt-4" />
-            </div>
-
-            <.button
-              id="submit-payment"
-              type="button"
-              class="w-full py-3"
-              disabled={!@stripe_payment_element_ready || @submitting}
-            >
-              <.icon name="hero-lock-closed" class="w-5 h-5" />
-              Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
-            </.button>
-          <% end %>
         </div>
       <% end %>
     </div>
@@ -1111,11 +1044,30 @@ defmodule YscWeb.BookingChangeLive do
     end
   end
 
+  defp restore_modification_edit_form(socket, params) do
+    booking = socket.assigns.booking
+    form = modification_form(booking, params)
+    checkout_tooltips = checkout_tooltips_for_params(socket, params)
+
+    socket
+    |> assign(:step, :edit)
+    |> assign(:guest_info_form, nil)
+    |> assign(:guest_info_errors, %{})
+    |> assign(:pending_guest_params, nil)
+    |> assign(:form, form)
+    |> assign(:checkout_date_tooltips, checkout_tooltips)
+    |> run_preview(params)
+  end
+
   defp dismiss_payment_form(socket) do
     socket =
       if socket.assigns.show_payment_form do
-        Bookings.release_modification_hold(socket.assigns.booking.id)
         socket
+        |> cancel_abandoned_payment_intent()
+        |> then(fn s ->
+          Bookings.release_modification_hold(s.assigns.booking.id)
+          s
+        end)
       else
         socket
       end
@@ -1130,6 +1082,17 @@ defmodule YscWeb.BookingChangeLive do
       )
 
     refresh_availability_snapshot(socket)
+  end
+
+  defp cancel_abandoned_payment_intent(socket) do
+    case socket.assigns.payment_intent do
+      %{id: payment_intent_id} when is_binary(payment_intent_id) ->
+        Ysc.Tickets.StripeService.cancel_payment_intent(payment_intent_id)
+        socket
+
+      _ ->
+        socket
+    end
   end
 
   defp modification_params_for_payment_apply(socket, booking) do
@@ -1542,6 +1505,199 @@ defmodule YscWeb.BookingChangeLive do
 
   defp property_label(property),
     do: property |> to_string() |> String.capitalize()
+
+  attr :preview, :map, default: nil
+  attr :payment_delta, :any, required: true
+  attr :payment_intent, :map, required: true
+  attr :payment_error, :string, default: nil
+  attr :payment_processing, :boolean, default: false
+  attr :stripe_payment_element_ready, :boolean, default: false
+  attr :submitting, :boolean, default: false
+  attr :booking, :map, required: true
+
+  defp modification_payment_step(assigns) do
+    ~H"""
+    <div id="modification-payment-step" class="space-y-6">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-zinc-900">
+            Complete payment
+          </h2>
+          <p class="mt-1 text-sm text-zinc-600">
+            Changed your mind? Go back to adjust dates or guests before you pay.
+          </p>
+        </div>
+        <.button
+          type="button"
+          id="back-to-modification-button"
+          phx-click="back-to-modification"
+          variant="outline"
+          color="zinc"
+          class="shrink-0"
+          disabled={@payment_processing || @submitting}
+        >
+          Edit changes
+        </.button>
+      </div>
+
+      <%= if @payment_processing do %>
+        <div
+          id="modification-payment-success"
+          class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-900"
+        >
+          <p class="font-semibold flex items-center gap-2">
+            <.icon name="hero-check-circle" class="w-5 h-5" /> Payment successful
+          </p>
+          <p class="text-sm mt-2 text-green-800">
+            We're saving your reservation changes. You'll be redirected to your confirmation shortly.
+          </p>
+        </div>
+      <% else %>
+        <%= if @preview do %>
+          <.modification_price_preview preview={@preview} />
+        <% end %>
+
+        <%= if @payment_error do %>
+          <div
+            id="modification-payment-error"
+            class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm"
+          >
+            {@payment_error}
+          </div>
+        <% end %>
+
+        <div
+          id="stripe-payment-container"
+          phx-hook="StripeElements"
+          data-client-secret={@payment_intent.client_secret}
+          data-booking-id={@booking.id}
+          data-modification="true"
+        >
+          <.payment_element_loading :if={!@stripe_payment_element_ready} />
+          <div
+            id="payment-element"
+            phx-update="ignore"
+            class="min-h-[12rem]"
+          />
+          <div id="payment-message" class="hidden mt-4" />
+        </div>
+
+        <.button
+          id="submit-payment"
+          type="button"
+          class="w-full py-3"
+          disabled={!@stripe_payment_element_ready || @submitting}
+        >
+          <.icon name="hero-lock-closed" class="w-5 h-5" />
+          Pay {MoneyHelper.format_money!(@payment_delta)} and save changes
+        </.button>
+      <% end %>
+    </div>
+    """
+  end
+
+  attr :preview, :map, required: true
+
+  defp modification_price_preview(assigns) do
+    ~H"""
+    <div
+      id="modification-price-preview"
+      class="p-6 rounded-xl bg-zinc-50 border border-zinc-200"
+    >
+      <h2 class="text-base font-semibold text-zinc-900 mb-4">
+        Price Summary
+      </h2>
+
+      <div
+        id="modification-price-comparison"
+        class="flex items-center justify-between gap-4 pb-4 border-b border-zinc-200"
+      >
+        <div id="modification-previous-price" class="min-w-0 space-y-1">
+          <p class="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Previous
+          </p>
+          <p class="text-sm text-zinc-600">
+            {modification_stay_delta_label(@preview.previous_stay)}
+          </p>
+          <p class="text-base font-medium text-zinc-700 tabular-nums">
+            {MoneyHelper.format_money!(@preview.previous_total)}
+          </p>
+        </div>
+
+        <div class="shrink-0 text-zinc-300" aria-hidden="true">
+          <.icon name="hero-arrow-right" class="w-6 h-6" />
+        </div>
+
+        <div id="modification-new-price" class="min-w-0 space-y-1 text-right">
+          <p class="text-xs font-medium uppercase tracking-wider text-zinc-500">
+            New
+          </p>
+          <p class="text-sm text-zinc-900 font-medium">
+            {modification_stay_delta_label(@preview.new_stay)}
+          </p>
+          <p class="text-base font-medium text-zinc-900 tabular-nums">
+            {MoneyHelper.format_money!(@preview.new_total)}
+          </p>
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center pt-4">
+        <span class="text-base font-semibold text-zinc-900">Amount due now</span>
+        <span
+          id="modification-amount-due"
+          class="text-2xl font-bold text-blue-700 tabular-nums"
+        >
+          {MoneyHelper.format_money!(@preview.delta)}
+        </span>
+      </div>
+
+      <%= if modification_is_downgrade?(@preview) do %>
+        <p
+          id="modification-downgrade-notice"
+          class="mt-4 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3"
+        >
+          Shortening your stay reduces the reservation total, but we do not refund the difference.
+        </p>
+      <% end %>
+    </div>
+    """
+  end
+
+  defp modification_stay_delta_label(%{booking_mode: :buyout, nights: nights}) do
+    "Entire cabin × #{night_count_label(nights)}"
+  end
+
+  defp modification_stay_delta_label(%{
+         booking_mode: :room,
+         guests_count: guests,
+         children_count: children,
+         nights: nights
+       }) do
+    guests
+    |> guest_count_label()
+    |> maybe_append_children_to_delta_label(children)
+    |> then(&"#{&1} × #{night_count_label(nights)}")
+  end
+
+  defp modification_stay_delta_label(%{guests_count: guests, nights: nights}) do
+    "#{guest_count_label(guests)} × #{night_count_label(nights)}"
+  end
+
+  defp maybe_append_children_to_delta_label(label, children)
+       when is_integer(children) and children > 0 do
+    "#{label}, #{child_count_label(children)}"
+  end
+
+  defp maybe_append_children_to_delta_label(label, _), do: label
+
+  defp night_count_label(1), do: "1 night"
+  defp night_count_label(nights), do: "#{nights} nights"
+
+  defp guest_count_label(1), do: "1 guest"
+  defp guest_count_label(guests), do: "#{guests} guests"
+
+  defp child_count_label(1), do: "1 child"
+  defp child_count_label(children), do: "#{children} children"
 
   defp submit_button_label(%{delta: %Money{} = delta}) do
     if Money.positive?(delta), do: "Continue to payment", else: "Save changes"

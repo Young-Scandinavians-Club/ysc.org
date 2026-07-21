@@ -775,10 +775,9 @@ defmodule Ysc.Bookings do
          {:ok, user} <- fetch_modification_user(booking),
          {:ok, _} <- validate_modification_changeset(booking, parsed, user),
          :ok <- maybe_validate_modification_availability(booking, parsed, opts),
-         {:ok, priced} <-
-           calculate_modification_pricing(
-             build_preview_booking(booking, parsed)
-           ),
+         preview_booking = build_preview_booking(booking, parsed),
+         {:ok, previous_priced} <- previous_pricing_or_fallback(booking),
+         {:ok, priced} <- calculate_modification_pricing(preview_booking),
          {:ok, amount_paid} <- modification_amount_paid(booking, opts) do
       previous_total = booking.total_price || Money.new(0, :USD)
 
@@ -788,10 +787,55 @@ defmodule Ysc.Bookings do
          previous_total: previous_total,
          amount_paid: amount_paid,
          delta: modification_delta(previous_total, priced.total),
-         breakdown: priced.breakdown,
+         previous_breakdown:
+           modification_preview_breakdown(previous_priced, booking),
+         breakdown: modification_preview_breakdown(priced, preview_booking),
+         previous_stay: modification_stay_summary(booking),
+         new_stay: modification_stay_summary(preview_booking),
          attrs: parsed
        }}
     end
+  end
+
+  defp modification_preview_breakdown(priced, %Booking{} = booking) do
+    priced.breakdown
+    |> Map.put(:booking_mode, booking.booking_mode)
+    |> Map.put(:subtotal, priced.subtotal)
+    |> Map.put(:discount, priced.discount)
+    |> Map.put_new(:guests_count, booking.guests_count)
+    |> Map.put_new(:children_count, booking.children_count || 0)
+  end
+
+  defp modification_stay_summary(%Booking{} = booking) do
+    %{
+      checkin_date: booking.checkin_date,
+      checkout_date: booking.checkout_date,
+      guests_count: booking.guests_count,
+      children_count: booking.children_count || 0,
+      nights: Date.diff(booking.checkout_date, booking.checkin_date),
+      booking_mode: booking.booking_mode
+    }
+  end
+
+  defp previous_pricing_or_fallback(%Booking{} = booking) do
+    case calculate_modification_pricing(booking) do
+      {:ok, priced} ->
+        {:ok, priced}
+
+      {:error, _reason} ->
+        {:ok, stored_modification_pricing_fallback(booking)}
+    end
+  end
+
+  defp stored_modification_pricing_fallback(%Booking{} = booking) do
+    total = booking.total_price || Money.new(0, :USD)
+
+    %{
+      total: total,
+      subtotal: booking.subtotal_price || total,
+      discount: booking.discount_total || Money.new(0, :USD),
+      breakdown: %{}
+    }
   end
 
   defp modification_delta(previous_total, new_total) do

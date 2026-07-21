@@ -18,17 +18,17 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def modification_forfeiture_title do
-    "You will not get a refund if you change these dates"
+    "No refunds for changed dates"
   end
 
   def modification_forfeiture_body do
     trim("""
-    If you change this reservation, you cannot get a refund later — even if our usual cancellation rules would have allowed one. You can still cancel, but you won't receive money back. This cannot be undone.
+    If you change this reservation, you cannot get a refund later — even if our usual cancellation rules would have allowed one.
     """)
   end
 
   def modification_forfeiture_acknowledgment do
-    "I understand that if I change this reservation, I will not receive a refund — even if our usual cancellation policy would have allowed one."
+    "I understand and accept that this change makes my booking non-refundable."
   end
 
   def clear_lake_blackout_date(date_str) do
