@@ -5099,7 +5099,7 @@ defmodule YscWeb.TahoeBookingLive do
                  general: error_message
                },
                calculated_price: nil,
-               price_error: "Booking failed",
+               price_error: YscWeb.BookingUserMessages.booking_creation_failed_sidebar(),
                show_confirm_modal: false
              )}
         end

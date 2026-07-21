@@ -158,6 +158,10 @@ defmodule YscWeb.BookingUserMessages do
     """)
   end
 
+  def booking_creation_failed_sidebar do
+    "Couldn't complete booking. Your card wasn't charged — try again."
+  end
+
   def modification_redirect_hold_expired do
     trim("""
     Your payment went through, but we couldn't save your new dates in time. Your original reservation is unchanged. Try changing your dates again from this booking page. If you were charged twice or your dates look wrong, email info@ysc.org with #{booking_reference_support_phrase()}.

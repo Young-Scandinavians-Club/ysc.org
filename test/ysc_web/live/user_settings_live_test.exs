@@ -291,7 +291,7 @@ defmodule YscWeb.UserSettingsLiveTest do
         |> render_click()
 
         assert_patched(view, ~p"/users/membership")
-        assert render(view) =~ "Scheduled downgrade cancelled"
+        assert render(view) =~ "Plan change cancelled"
       after
         Application.delete_env(:ysc, :get_scheduled_downgrade_info_callback)
         Application.delete_env(:ysc, :cancel_scheduled_downgrade_callback)

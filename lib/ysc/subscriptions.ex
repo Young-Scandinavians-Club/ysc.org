@@ -3,6 +3,8 @@ defmodule Ysc.Subscriptions do
   The Subscriptions context for managing subscriptions and subscription items.
   """
 
+  require Ysc.Logging
+
   import Ecto.Query, warn: false
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.UserProfileCache
@@ -570,7 +572,12 @@ defmodule Ysc.Subscriptions do
         end
 
       {:error, error} ->
-        {:error, "Failed to cancel subscription in Stripe: #{inspect(error)}"}
+        Ysc.Logging.error("Failed to cancel subscription in Stripe",
+          error: error
+        )
+
+        {:error,
+         "We couldn't turn off auto-renewal right now. Please try again in a few minutes, or email #{Ysc.EmailConfig.membership_email()} for help."}
     end
   end
 
