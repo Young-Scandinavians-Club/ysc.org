@@ -1855,7 +1855,7 @@ defmodule YscWeb.EventDetailsLive do
                 data-ticket-order-total
                 class={[
                   "font-semibold text-xl truncate",
-                  if @event_sold_out_for_user && !@event.tickets_tbd do
+                  if @event_sold_out_for_user do
                     "line-through text-zinc-500"
                   else
                     "text-zinc-900"

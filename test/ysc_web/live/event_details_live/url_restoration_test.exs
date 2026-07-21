@@ -67,7 +67,8 @@ defmodule YscWeb.EventDetailsLive.UrlRestorationTest do
             |> get(~p"/events/#{event.id}?order_id=#{order.id}")
             |> html_response(200)
           end,
-          pattern: orders_pattern
+          pattern: orders_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 0
