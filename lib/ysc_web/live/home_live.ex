@@ -1175,58 +1175,74 @@ defmodule YscWeb.HomeLive do
       <div class="max-w-screen-xl mx-auto px-4 sm:px-6 -mt-8 pb-20">
         <div class="flex flex-col">
           <%!-- Quick Actions --%>
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12 mt-4 lg:mt-0">
+          <div
+            id="home-quick-actions"
+            phx-hook="InteractScrollbar"
+            class="flex overflow-x-auto snap-x scroll-smooth thin-scrollbar lg:grid lg:grid-cols-4 gap-3 lg:gap-4 pb-2 lg:pb-4 -mx-4 px-4 lg:mx-0 lg:px-0 mb-12 mt-4 lg:mt-0"
+          >
             <.link
               navigate={~p"/bookings/tahoe"}
-              class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-blue-50 rounded-md flex items-center justify-center mb-4">
-                <.icon name="hero-home" class="w-5 h-5 text-blue-600" />
+              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-blue-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                <.icon name="hero-home" class="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
               </div>
-              <p class="font-bold text-zinc-900">Lake Tahoe</p>
-              <p class="text-sm text-zinc-500">Reserve Cabin</p>
+              <p class="font-bold text-sm lg:text-base text-zinc-900">Lake Tahoe</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Reserve Cabin</p>
             </.link>
             <.link
               navigate={~p"/bookings/clear-lake"}
-              class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-4">
-                <.icon name="hero-home" class="w-5 h-5 text-emerald-600" />
+              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-emerald-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                <.icon
+                  name="hero-home"
+                  class="w-4 h-4 lg:w-5 lg:h-5 text-emerald-600"
+                />
               </div>
-              <p class="font-bold text-zinc-900">Clear Lake</p>
-              <p class="text-sm text-zinc-500">Reserve Cabin</p>
+              <p class="font-bold text-sm lg:text-base text-zinc-900">Clear Lake</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Reserve Cabin</p>
             </.link>
             <.link
               navigate={~p"/users/settings"}
-              class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
             >
-              <div class="w-10 h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-4">
-                <.icon name="hero-cog-6-tooth" class="w-5 h-5 text-zinc-600" />
+              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                <.icon
+                  name="hero-cog-6-tooth"
+                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
+                />
               </div>
-              <p class="font-bold text-zinc-900">Settings</p>
-              <p class="text-sm text-zinc-500">Preferences</p>
+              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
             </.link>
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
                 navigate={~p"/expensereport"}
-                class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+                class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
-                <div class="w-10 h-10 bg-orange-50 rounded-md flex items-center justify-center mb-4">
-                  <.icon name="hero-receipt-refund" class="w-5 h-5 text-orange-600" />
+                <div class="w-8 h-8 lg:w-10 lg:h-10 bg-orange-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                  <.icon
+                    name="hero-receipt-refund"
+                    class="w-4 h-4 lg:w-5 lg:h-5 text-orange-600"
+                  />
                 </div>
-                <p class="font-bold text-zinc-900">Expenses</p>
-                <p class="text-sm text-zinc-500">File Report</p>
+                <p class="font-bold text-sm lg:text-base text-zinc-900">Expenses</p>
+                <p class="text-xs lg:text-sm text-zinc-500">File Report</p>
               </.link>
             <% else %>
               <.link
                 navigate={~p"/events"}
-                class="bg-white p-6 rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+                class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
               >
-                <div class="w-10 h-10 bg-purple-50 rounded-md flex items-center justify-center mb-4">
-                  <.icon name="hero-calendar-days" class="w-5 h-5 text-purple-600" />
+                <div class="w-8 h-8 lg:w-10 lg:h-10 bg-purple-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                  <.icon
+                    name="hero-calendar-days"
+                    class="w-4 h-4 lg:w-5 lg:h-5 text-purple-600"
+                  />
                 </div>
-                <p class="font-bold text-zinc-900">Events</p>
-                <p class="text-sm text-zinc-500">Browse Events</p>
+                <p class="font-bold text-sm lg:text-base text-zinc-900">Events</p>
+                <p class="text-xs lg:text-sm text-zinc-500">Browse Events</p>
               </.link>
             <% end %>
           </div>
@@ -1530,13 +1546,77 @@ defmodule YscWeb.HomeLive do
                   <% end %>
                 </div>
               </section>
+
+              <%!-- Upcoming Events --%>
+              <section>
+                <div class="flex items-center justify-between mb-6">
+                  <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                    <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
+                    Upcoming Events
+                  </h2>
+                  <.link
+                    navigate={~p"/events"}
+                    class="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    View All Events
+                  </.link>
+                </div>
+
+                <%!-- Loading skeleton for events --%>
+                <div
+                  :if={!@async_data_loaded}
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8"
+                >
+                  <%= for _i <- 1..3 do %>
+                    <div class="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
+                      <div class="h-48 bg-zinc-200"></div>
+                      <div class="p-6 space-y-3">
+                        <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
+                        <div class="h-6 bg-zinc-200 rounded w-3/4"></div>
+                        <div class="h-4 bg-zinc-200 rounded w-1/2"></div>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+
+                <div
+                  :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
+                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
+                >
+                  <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
+                  </div>
+                  <h3 class="text-base font-bold text-zinc-900 mb-2">
+                    No upcoming events
+                  </h3>
+                  <p class="text-zinc-500 text-sm mb-6">
+                    Check back later for new community events
+                  </p>
+                  <.button navigate={~p"/events"} color="zinc">
+                    Browse Events
+                  </.button>
+                </div>
+
+                <div
+                  :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8"
+                >
+                  <%= for event <- Enum.take(@upcoming_events, 3) do %>
+                    <.event_card
+                      event={event}
+                      sold_out={event_sold_out?(event)}
+                      selling_fast={Map.get(event, :selling_fast, false)}
+                    />
+                  <% end %>
+                </div>
+              </section>
             </div>
 
             <%!-- Sidebar --%>
             <aside class="space-y-10">
               <%!-- Membership Status Card --%>
               <div class={[
-                "relative overflow-hidden rounded-xl p-8 shadow-sm",
+                "relative overflow-hidden rounded-xl p-5 lg:p-8 shadow-sm",
                 cond do
                   @active_membership? ->
                     "bg-gradient-to-br from-blue-50 via-white to-blue-50/80 border border-blue-200 text-zinc-900"
@@ -1595,7 +1675,7 @@ defmodule YscWeb.HomeLive do
                     />
                   </div>
 
-                  <h2 class="text-2xl font-black tracking-tight mb-2">
+                  <h2 class="text-xl lg:text-2xl font-black tracking-tight mb-2">
                     <%= cond do %>
                       <% @current_user.state == :pending_approval -> %>
                         Application Under Review
@@ -1606,7 +1686,7 @@ defmodule YscWeb.HomeLive do
                     <% end %>
                   </h2>
                   <p class={[
-                    "text-base leading-relaxed mb-8",
+                    "text-sm lg:text-base leading-relaxed mb-5 lg:mb-8",
                     cond do
                       @active_membership? -> "text-zinc-600"
                       @current_user.state == :pending_approval -> "text-sky-100"
@@ -1683,7 +1763,7 @@ defmodule YscWeb.HomeLive do
                 </div>
 
                 <div class={[
-                  "absolute right-[-10%] bottom-[-10%] z-0 rotate-12",
+                  "absolute right-[-10%] bottom-[-10%] z-0 rotate-12 hidden sm:block",
                   if(@active_membership?,
                     do: "opacity-20 text-blue-200",
                     else: "opacity-10"
@@ -1833,7 +1913,22 @@ defmodule YscWeb.HomeLive do
                 <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
                   Latest Updates
                 </h2>
-                <div class="space-y-6">
+
+                <%!-- Loading skeleton for news --%>
+                <div :if={!@async_data_loaded} class="space-y-6">
+                  <%= for _i <- 1..3 do %>
+                    <div class="flex gap-4 animate-pulse">
+                      <div class="w-16 h-16 rounded-md bg-zinc-200 flex-shrink-0">
+                      </div>
+                      <div class="flex-1 space-y-2 pt-1">
+                        <div class="h-3 bg-zinc-200 rounded w-1/4"></div>
+                        <div class="h-4 bg-zinc-200 rounded w-3/4"></div>
+                      </div>
+                    </div>
+                  <% end %>
+                </div>
+
+                <div :if={@async_data_loaded} class="space-y-6">
                   <%= for post <- Enum.take(@latest_news, 3) do %>
                     <.link
                       navigate={~p"/posts/#{post.url_name}"}
@@ -1882,73 +1977,6 @@ defmodule YscWeb.HomeLive do
                 </div>
               </section>
             </aside>
-          </div>
-        </div>
-
-        <%!-- Community Events Section --%>
-        <div class="mt-16 space-y-12">
-          <%!-- Upcoming Events --%>
-          <div>
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-lg font-bold text-zinc-900 flex items-center gap-2">
-                <.icon name="hero-calendar-days" class="w-5 h-5 text-blue-600" />
-                Upcoming Events
-              </h2>
-              <.link
-                navigate={~p"/events"}
-                class="text-xs font-bold text-blue-600 hover:underline"
-              >
-                View All Events
-              </.link>
-            </div>
-
-            <%!-- Loading skeleton for events --%>
-            <div
-              :if={!@async_data_loaded}
-              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              <%= for _i <- 1..3 do %>
-                <div class="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
-                  <div class="h-48 bg-zinc-200"></div>
-                  <div class="p-6 space-y-3">
-                    <div class="h-4 bg-zinc-200 rounded w-1/4"></div>
-                    <div class="h-6 bg-zinc-200 rounded w-3/4"></div>
-                    <div class="h-4 bg-zinc-200 rounded w-1/2"></div>
-                  </div>
-                </div>
-              <% end %>
-            </div>
-
-            <div
-              :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
-              class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
-            >
-              <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
-              </div>
-              <h3 class="text-base font-bold text-zinc-900 mb-2">
-                No upcoming events
-              </h3>
-              <p class="text-zinc-500 text-sm mb-6">
-                Check back later for new community events
-              </p>
-              <.button navigate={~p"/events"} color="zinc">
-                Browse Events
-              </.button>
-            </div>
-
-            <div
-              :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
-              class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              <%= for event <- Enum.take(@upcoming_events, 3) do %>
-                <.event_card
-                  event={event}
-                  sold_out={event_sold_out?(event)}
-                  selling_fast={Map.get(event, :selling_fast, false)}
-                />
-              <% end %>
-            </div>
           </div>
         </div>
       </div>
