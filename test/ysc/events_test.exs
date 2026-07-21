@@ -1242,7 +1242,8 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
 
-      {:ok, started_tier} = create_ticket_tier_fixture(%{event_id: started_event.id})
+      {:ok, started_tier} =
+        create_ticket_tier_fixture(%{event_id: started_event.id})
 
       started_ticket =
         create_ticket_fixture(%{
@@ -1261,7 +1262,9 @@ defmodule Ysc.EventsTest do
       assert started_ticket.id in Enum.map(default_tickets, & &1.id)
 
       after_now_tickets =
-        Events.list_upcoming_confirmed_tickets_for_user(user.id, after_now: true)
+        Events.list_upcoming_confirmed_tickets_for_user(user.id,
+          after_now: true
+        )
 
       refute started_ticket.id in Enum.map(after_now_tickets, & &1.id)
     end
@@ -1304,7 +1307,8 @@ defmodule Ysc.EventsTest do
           published_at: DateTime.utc_now() |> DateTime.truncate(:second)
         })
 
-      {:ok, started_tier} = create_ticket_tier_fixture(%{event_id: started_event.id})
+      {:ok, started_tier} =
+        create_ticket_tier_fixture(%{event_id: started_event.id})
 
       create_ticket_fixture(%{
         event_id: started_event.id,

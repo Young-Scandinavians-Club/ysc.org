@@ -254,11 +254,16 @@ defmodule Ysc.BookingsTest do
       staying_delta = after_stats.tahoe.staying - before.tahoe.staying
 
       now_pst = DateTime.now!("America/Los_Angeles")
-      checkout_cutoff = DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
       before_cutoff = DateTime.compare(now_pst, checkout_cutoff) == :lt
 
       assert staying_delta == if(before_cutoff, do: 1, else: 0)
-      assert after_stats.tahoe.checkouts_today >= before.tahoe.checkouts_today + 1
+
+      assert after_stats.tahoe.checkouts_today >=
+               before.tahoe.checkouts_today + 1
     end
 
     test "list_bookings/4 filters by statuses and exclude_statuses" do

@@ -336,7 +336,9 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ data.event.title
     end
 
-    test "hides event tickets for events that already started today", %{conn: conn} do
+    test "hides event tickets for events that already started today", %{
+      conn: conn
+    } do
       started_at =
         DateTime.utc_now()
         |> DateTime.add(-30, :minute)
@@ -372,7 +374,9 @@ defmodule YscWeb.HomeLiveTest do
       order = Repo.preload(order, :tickets)
 
       Enum.each(order.tickets, fn ticket ->
-        ticket |> Ticket.status_changeset(%{status: :confirmed}) |> Repo.update!()
+        ticket
+        |> Ticket.status_changeset(%{status: :confirmed})
+        |> Repo.update!()
       end)
 
       if DateTime.compare(started_at, start_of_today) != :gt do
