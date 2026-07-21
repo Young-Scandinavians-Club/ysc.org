@@ -473,6 +473,10 @@ defmodule YscWeb.BookingChangeLiveTest do
        }}
     end)
 
+    stub(StripeMock, :cancel_payment_intent, fn "pi_change_upgrade", _opts ->
+      {:ok, %Stripe.PaymentIntent{id: "pi_change_upgrade", status: "canceled"}}
+    end)
+
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
@@ -546,6 +550,10 @@ defmodule YscWeb.BookingChangeLiveTest do
          client_secret: "pi_change_back_secret",
          status: "requires_payment_method"
        }}
+    end)
+
+    expect(StripeMock, :cancel_payment_intent, fn "pi_change_back", _opts ->
+      {:ok, %Stripe.PaymentIntent{id: "pi_change_back", status: "canceled"}}
     end)
 
     user = user_fixture() |> active_user(conn)

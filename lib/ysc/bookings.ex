@@ -776,7 +776,7 @@ defmodule Ysc.Bookings do
          {:ok, _} <- validate_modification_changeset(booking, parsed, user),
          :ok <- maybe_validate_modification_availability(booking, parsed, opts),
          preview_booking = build_preview_booking(booking, parsed),
-         {:ok, previous_priced} <- calculate_modification_pricing(booking),
+         {:ok, previous_priced} <- previous_pricing_or_fallback(booking),
          {:ok, priced} <- calculate_modification_pricing(preview_booking),
          {:ok, amount_paid} <- modification_amount_paid(booking, opts) do
       previous_total = booking.total_price || Money.new(0, :USD)
@@ -814,6 +814,27 @@ defmodule Ysc.Bookings do
       children_count: booking.children_count || 0,
       nights: Date.diff(booking.checkout_date, booking.checkin_date),
       booking_mode: booking.booking_mode
+    }
+  end
+
+  defp previous_pricing_or_fallback(%Booking{} = booking) do
+    case calculate_modification_pricing(booking) do
+      {:ok, priced} ->
+        {:ok, priced}
+
+      {:error, _reason} ->
+        {:ok, stored_modification_pricing_fallback(booking)}
+    end
+  end
+
+  defp stored_modification_pricing_fallback(%Booking{} = booking) do
+    total = booking.total_price || Money.new(0, :USD)
+
+    %{
+      total: total,
+      subtotal: booking.subtotal_price || total,
+      discount: booking.discount_total || Money.new(0, :USD),
+      breakdown: %{}
     }
   end
 

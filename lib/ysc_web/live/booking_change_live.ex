@@ -1047,27 +1047,27 @@ defmodule YscWeb.BookingChangeLive do
   defp restore_modification_edit_form(socket, params) do
     booking = socket.assigns.booking
     form = modification_form(booking, params)
+    checkout_tooltips = checkout_tooltips_for_params(socket, params)
 
     socket
     |> assign(:step, :edit)
     |> assign(:guest_info_form, nil)
     |> assign(:guest_info_errors, %{})
+    |> assign(:pending_guest_params, nil)
     |> assign(:form, form)
-    |> then(fn s ->
-      assign(
-        s,
-        :checkout_date_tooltips,
-        checkout_tooltips_for_params(s, params)
-      )
-    end)
+    |> assign(:checkout_date_tooltips, checkout_tooltips)
     |> run_preview(params)
   end
 
   defp dismiss_payment_form(socket) do
     socket =
       if socket.assigns.show_payment_form do
-        Bookings.release_modification_hold(socket.assigns.booking.id)
         socket
+        |> cancel_abandoned_payment_intent()
+        |> then(fn s ->
+          Bookings.release_modification_hold(s.assigns.booking.id)
+          s
+        end)
       else
         socket
       end
@@ -1082,6 +1082,17 @@ defmodule YscWeb.BookingChangeLive do
       )
 
     refresh_availability_snapshot(socket)
+  end
+
+  defp cancel_abandoned_payment_intent(socket) do
+    case socket.assigns.payment_intent do
+      %{id: payment_intent_id} when is_binary(payment_intent_id) ->
+        Ysc.Tickets.StripeService.cancel_payment_intent(payment_intent_id)
+        socket
+
+      _ ->
+        socket
+    end
   end
 
   defp modification_params_for_payment_apply(socket, booking) do
