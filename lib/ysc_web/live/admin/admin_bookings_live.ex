@@ -5792,10 +5792,20 @@ defmodule YscWeb.AdminBookingsLive do
 
     case result do
       {:ok, _pricing_rule} ->
+        pricing_rules =
+          Bookings.list_pricing_rules(socket.assigns.selected_property)
+
         {:noreply,
          socket
          |> YscWeb.Flash.put_toast(:info, "Pricing rule saved successfully",
            title: "Pricing"
+         )
+         |> assign(:pricing_rules, pricing_rules)
+         |> assign_filtered_data(
+           socket.assigns.selected_property,
+           socket.assigns.seasons,
+           pricing_rules,
+           socket.assigns.refund_policies
          )
          |> push_patch(
            to:

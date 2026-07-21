@@ -8,7 +8,7 @@ defmodule Ysc.OpenRouter do
   require Ysc.Logging
 
   @default_api "https://openrouter.ai/api/v1/chat/completions"
-  @default_model "google/gemma-3-27b-it"
+  @default_model "deepseek/deepseek-v4-flash"
 
   @doc """
   Sends a chat completion request.
