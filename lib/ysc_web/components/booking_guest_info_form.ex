@@ -296,11 +296,12 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
         </div>
 
         <div class="pt-6 border-t border-zinc-100 mt-6 space-y-4">
-          <div class="flex flex-col sm:flex-row gap-4">
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-4">
+            {render_slot(@actions)}
             <.button
               type="submit"
               phx-disable-with="Processing..."
-              class="flex-1 w-full py-3"
+              class="w-full sm:w-auto py-3"
               disabled={
                 !BookingGuestForm.all_guests_valid?(@guest_info_form, @booking)
               }
@@ -308,7 +309,6 @@ defmodule YscWeb.Components.BookingGuestInfoForm do
               {@submit_label}
               <.icon name="hero-arrow-right" class="w-5 h-5" />
             </.button>
-            {render_slot(@actions)}
           </div>
         </div>
       </.form>

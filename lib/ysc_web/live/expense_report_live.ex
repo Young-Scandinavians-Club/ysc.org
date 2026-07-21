@@ -2963,7 +2963,7 @@ defmodule YscWeb.ExpenseReportLive do
                             <% :completed -> %>
                               <.icon
                                 name="hero-check-circle"
-                                class="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
+                                class="w-5 h-5 text-green-600 flex-shrink-0"
                               />
                               <span class="text-sm text-green-700 line-through">
                                 {label}
@@ -2971,13 +2971,13 @@ defmodule YscWeb.ExpenseReportLive do
                             <% :error -> %>
                               <.icon
                                 name="hero-exclamation-circle"
-                                class="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
+                                class="w-5 h-5 text-red-600 flex-shrink-0"
                               />
                               <span class="text-sm text-red-600">{label}</span>
                             <% :pending -> %>
                               <.icon
                                 name="hero-minus-circle"
-                                class="w-5 h-5 text-zinc-400 flex-shrink-0 mt-0.5"
+                                class="w-5 h-5 text-zinc-400 flex-shrink-0"
                               />
                               <span class="text-sm text-zinc-600">{label}</span>
                           <% end %>
