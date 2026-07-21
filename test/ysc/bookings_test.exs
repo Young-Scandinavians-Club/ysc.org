@@ -2996,9 +2996,11 @@ defmodule Ysc.BookingsTest do
         |> Ecto.Changeset.change(%{status: :complete})
         |> Ysc.Repo.update!()
 
-      payment_intent_id = "pi_unfulfilled_mod_str_#{System.unique_integer([:positive])}"
+      payment_intent_id =
+        "pi_unfulfilled_mod_str_#{System.unique_integer([:positive])}"
 
-      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
         {:ok,
          %Stripe.PaymentIntent{
            id: payment_intent_id,
@@ -3039,9 +3041,11 @@ defmodule Ysc.BookingsTest do
         |> Ecto.Changeset.change(%{status: :complete})
         |> Ysc.Repo.update!()
 
-      payment_intent_id = "pi_unfulfilled_mod_err_#{System.unique_integer([:positive])}"
+      payment_intent_id =
+        "pi_unfulfilled_mod_err_#{System.unique_integer([:positive])}"
 
-      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id,
+                                                        _opts ->
         {:error,
          %Stripe.Error{
            message: "not found",
