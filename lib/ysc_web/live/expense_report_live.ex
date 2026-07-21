@@ -43,6 +43,7 @@ defmodule YscWeb.ExpenseReportLive do
           income_total: Money.new(0, :USD),
           net_total: Money.new(0, :USD)
         })
+        |> assign(:income_items_empty?, true)
         |> assign(:bank_accounts, [])
         |> assign(:billing_address, nil)
         |> assign(:treasurer, nil)
@@ -197,12 +198,10 @@ defmodule YscWeb.ExpenseReportLive do
     # Validate reimbursement setup
     changeset = validate_reimbursement_setup_in_liveview(changeset, user)
 
-    totals = calculate_totals_from_changeset(changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(changeset)}
   end
 
   # Handle file upload triggers (when files are selected, auto_upload starts)
@@ -255,13 +254,11 @@ defmodule YscWeb.ExpenseReportLive do
       |> validate_reimbursement_setup_in_liveview(user)
       |> Map.put(:action, :validate)
 
-    totals = calculate_totals_from_changeset(changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
      |> assign(:expense_report, expense_report)
-     |> assign(:totals, totals)
+     |> assign_expense_form_state(changeset)
      |> assign(:bank_accounts, ExpenseReports.list_bank_accounts(user))
      |> assign(:billing_address, Accounts.get_billing_address(user))}
   end
@@ -296,12 +293,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("clear_event", _params, socket) do
@@ -367,12 +362,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("add_income_item", _params, socket) do
@@ -386,12 +379,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("remove_income_item", %{"index" => index}, socket) do
@@ -406,12 +397,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("validate-upload", _params, socket) do
@@ -728,12 +717,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("remove-proof", %{"index" => index}, socket) do
@@ -750,12 +737,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("save", params, socket) do
@@ -832,12 +817,10 @@ defmodule YscWeb.ExpenseReportLive do
             "create_expense_report FAILED - errors: #{inspect(changeset.errors, limit: 20)}"
           )
 
-          totals = calculate_totals_from_changeset(changeset)
-
           {:noreply,
            socket
            |> assign(:form, to_form(changeset))
-           |> assign(:totals, totals)
+           |> assign_expense_form_state(changeset)
            |> YscWeb.Flash.error_with_title(
              "Form errors",
              "Please fix the errors before submitting."
@@ -1278,6 +1261,14 @@ defmodule YscWeb.ExpenseReportLive do
       income_total: income_total,
       net_total: net_total
     }
+  end
+
+  defp assign_expense_form_state(socket, changeset) do
+    income_items = Ecto.Changeset.get_field(changeset, :income_items, [])
+
+    socket
+    |> assign(:totals, calculate_totals_from_changeset(changeset))
+    |> assign(:income_items_empty?, Enum.empty?(income_items))
   end
 
   defp get_amount_from_item(%Ecto.Changeset{} = item) do
@@ -2161,10 +2152,10 @@ defmodule YscWeb.ExpenseReportLive do
                         >
                           <!-- Upload zone - always rendered but visually hidden when entries exist -->
                           <label
-                            class={
-                            "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors " <>
-                              if(Enum.empty?(@uploads.receipt.entries), do: "", else: "hidden")
-                          }
+                            class={[
+                              "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                              not Enum.empty?(@uploads.receipt.entries) && "hidden"
+                            ]}
                             phx-drop-target={@uploads.receipt.ref}
                             aria-describedby={"receipt-help-#{expense_f.index}"}
                           >
@@ -2306,7 +2297,7 @@ defmodule YscWeb.ExpenseReportLive do
                   subtitle="If you received any income related to this expense report, add it here to offset your expenses."
                 >
                   <!-- Empty state for income items -->
-                  <%= if Enum.empty?(Ecto.Changeset.get_field(@form.source, :income_items, [])) do %>
+                  <%= if @income_items_empty? do %>
                     <div class="border-2 border-dashed border-slate-200 rounded-lg p-8 text-center bg-slate-100/50 mb-4">
                       <div class="flex flex-col items-center max-w-md mx-auto">
                         <.icon
@@ -2413,11 +2404,14 @@ defmodule YscWeb.ExpenseReportLive do
                         </p>
                       </div>
 
-                      <div>
-                        <label class="block text-sm font-medium text-zinc-700 mb-2">
+                      <fieldset class="min-w-0 border-0 p-0 m-0">
+                        <legend class="block text-sm font-medium text-zinc-700 mb-2">
                           Proof Document
-                        </label>
-                        <p class="text-xs text-zinc-500 mb-3">
+                        </legend>
+                        <p
+                          id={"proof-help-#{income_f.index}"}
+                          class="text-xs text-zinc-500 mb-3"
+                        >
                           Upload proof of income (invoice, payment confirmation, etc.)
                         </p>
                         <!-- Show uploaded proof with inline preview -->
@@ -2515,11 +2509,12 @@ defmodule YscWeb.ExpenseReportLive do
                         <div :if={!income_f[:proof_s3_path].value} class="relative">
                           <!-- Upload zone - always rendered but visually hidden when entries exist -->
                           <label
-                            class={
-                            "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors " <>
-                              if(Enum.empty?(@uploads.proof.entries), do: "", else: "hidden")
-                          }
+                            class={[
+                              "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                              not Enum.empty?(@uploads.proof.entries) && "hidden"
+                            ]}
                             phx-drop-target={@uploads.proof.ref}
+                            aria-describedby={"proof-help-#{income_f.index}"}
                           >
                             <.live_file_input
                               upload={@uploads.proof}
@@ -2641,18 +2636,11 @@ defmodule YscWeb.ExpenseReportLive do
                             <% end %>
                           <% end %>
                         </div>
-                      </div>
+                      </fieldset>
                     </div>
                   </.inputs_for>
 
-                  <div
-                    :if={
-                      not Enum.empty?(
-                        Ecto.Changeset.get_field(@form.source, :income_items, [])
-                      )
-                    }
-                    class="mt-4"
-                  >
+                  <div :if={not @income_items_empty?} class="mt-4">
                     <.button type="button" phx-click="add_income_item">
                       <.icon name="hero-plus" class="w-5 h-5" />Add Income Item
                     </.button>

@@ -46,6 +46,13 @@ defmodule Ysc.MoneyHelperTest do
       assert MoneyHelper.format_money!(money) == "-$123.00"
     end
 
+    test "passes through Money.to_string errors" do
+      money = %Money{amount: Decimal.new("10"), currency: :INVALID}
+
+      assert {:error, {Cldr.UnknownCurrencyError, _}} =
+               MoneyHelper.format_money(money)
+    end
+
     test "returns empty string for invalid input" do
       assert "" == MoneyHelper.format_money(nil)
       assert "" == MoneyHelper.format_money("invalid")
