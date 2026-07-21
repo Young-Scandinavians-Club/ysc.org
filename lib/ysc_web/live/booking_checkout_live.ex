@@ -477,27 +477,27 @@ defmodule YscWeb.BookingCheckoutLive do
                 Click below to confirm your booking and secure these dates.
               </p>
               <div class="pt-2 border-t border-zinc-100 space-y-4">
-                <div class="flex flex-col sm:flex-row gap-4">
-                  <.button
-                    id="confirm-complimentary-booking"
-                    type="button"
-                    phx-click="confirm-complimentary-booking"
-                    phx-disable-with="Confirming..."
-                    class="flex-1 w-full text-lg py-3.5"
-                    disabled={@is_expired}
-                  >
-                    <.icon name="hero-check-circle" class="w-5 h-5" />
-                    <span class="text-lg font-semibold">Confirm booking</span>
-                  </.button>
+                <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-4">
                   <button
                     type="button"
                     phx-click="cancel-booking"
                     phx-disable-with="Cancelling..."
                     phx-confirm={leave_checkout_confirm()}
-                    class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+                    class="w-full sm:w-auto px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
                   >
                     Cancel
                   </button>
+                  <.button
+                    id="confirm-complimentary-booking"
+                    type="button"
+                    phx-click="confirm-complimentary-booking"
+                    phx-disable-with="Confirming..."
+                    class="w-full sm:w-auto text-lg py-3.5"
+                    disabled={@is_expired}
+                  >
+                    <.icon name="hero-check-circle" class="w-5 h-5" />
+                    <span class="text-lg font-semibold">Confirm booking</span>
+                  </.button>
                 </div>
               </div>
             </div>
@@ -521,11 +521,20 @@ defmodule YscWeb.BookingCheckoutLive do
               </div>
 
               <div class="pt-6 border-t border-zinc-100 space-y-4">
-                <div class="flex flex-col sm:flex-row gap-4">
+                <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-4">
+                  <button
+                    type="button"
+                    phx-click="cancel-booking"
+                    phx-disable-with="Cancelling..."
+                    phx-confirm={leave_checkout_confirm()}
+                    class="w-full sm:w-auto px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
                   <.button
                     id="submit-payment"
                     type="button"
-                    class="flex-1 w-full text-lg py-3.5"
+                    class="w-full sm:w-auto text-lg py-3.5"
                     disabled={!@stripe_payment_element_ready}
                   >
                     <.icon name="hero-lock-closed" class="w-5 h-5" />
@@ -533,15 +542,6 @@ defmodule YscWeb.BookingCheckoutLive do
                       Pay {MoneyHelper.format_money!(@total_price)} Securely
                     </span>
                   </.button>
-                  <button
-                    type="button"
-                    phx-click="cancel-booking"
-                    phx-disable-with="Cancelling..."
-                    phx-confirm={leave_checkout_confirm()}
-                    class="px-6 py-3.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 border border-zinc-300 rounded-lg hover:bg-zinc-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
                 </div>
               </div>
             </div>

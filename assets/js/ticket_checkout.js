@@ -11,7 +11,7 @@ function parseJsonAttr(el, name, fallback) {
 }
 
 function cloneSelected(selected) {
-    return { ...selected };
+    return {...selected };
 }
 
 export default {
@@ -174,10 +174,10 @@ export default {
     },
 
     syncProceedButtonFromDOM() {
-        const btn = this.el.querySelector("#ticket-proceed-checkout");
-        if (!btn) return;
-
         const hasSelection = Object.values(this.selected).some((qty) => qty > 0);
-        btn.disabled = !hasSelection;
+
+        for (const btn of this.el.querySelectorAll("[data-ticket-proceed-checkout]")) {
+            btn.disabled = !hasSelection;
+        }
     },
 };

@@ -678,7 +678,10 @@ defmodule YscWeb.EventDetailsLive do
                           class={"w-14 h-14 rounded-full ring-2 #{if is_me, do: "ring-blue-500", else: if(is_host, do: "ring-amber-400", else: "ring-zinc-100")}"}
                         />
                         <%= if ticket_count > 1 do %>
-                          <span class="absolute -bottom-1 -right-1 w-5 h-5 ml-0.5 rounded-full bg-zinc-900 text-white text-[10px] font-black leading-none flex items-center justify-center ring-2 ring-white">
+                          <span
+                            class="absolute -top-0.5 -right-0.5 z-10 w-[30%] min-w-[0.65rem] aspect-square rounded-full bg-zinc-900 text-white text-[8px] font-black leading-none flex items-center justify-center ring-2 ring-white shadow-sm"
+                            aria-label={"#{ticket_count} tickets"}
+                          >
                             {ticket_count}
                           </span>
                         <% end %>
@@ -1263,7 +1266,7 @@ defmodule YscWeb.EventDetailsLive do
         phx-hook="TicketCheckout"
         data-tiers={checkout_tiers_json(@ticket_tiers)}
         data-selected={selected_tickets_json(@selected_tickets)}
-        class="flex flex-col lg:flex-row gap-8 min-h-[600px]"
+        class="flex flex-col lg:flex-row gap-8 min-h-[600px] pb-28 lg:pb-0"
       >
         <!-- Left Panel: Ticket Tiers -->
         <div class="lg:w-2/3 space-y-8">
@@ -1319,6 +1322,23 @@ defmodule YscWeb.EventDetailsLive do
                   if is_donation, do: nil, else: days_until_sale_starts(ticket_tier) %>
                 <% is_pre_sale =
                   if is_donation, do: false, else: not is_on_sale && !is_sale_ended %>
+                <% sale_schedule_message =
+                  cond do
+                    is_donation or is_sale_ended ->
+                      nil
+
+                    is_pre_sale && ticket_tier.start_date && ticket_tier.end_date ->
+                      "On sale #{DateDisplay.format_event_date_range(ticket_tier, with_year: true)}"
+
+                    is_pre_sale && ticket_tier.start_date ->
+                      "Sale starts #{DateDisplay.format_datetime_display(ticket_tier.start_date)}"
+
+                    ticket_tier.end_date ->
+                      "Sale ends #{DateDisplay.format_datetime_display(ticket_tier.end_date)}"
+
+                    true ->
+                      nil
+                  end %>
                 <% has_selected_tickets =
                   get_ticket_quantity(@selected_tickets, ticket_tier.id) > 0 %>
                 <% reserved_quantity =
@@ -1530,6 +1550,7 @@ defmodule YscWeb.EventDetailsLive do
                           type="button"
                           data-ticket-action="decrease"
                           data-tier-id={ticket_tier.id}
+                          aria-label={"Decrease quantity for #{ticket_tier.name}"}
                           data-locked-disabled={
                             is_sold_out or is_sale_ended or is_pre_sale
                           }
@@ -1587,6 +1608,7 @@ defmodule YscWeb.EventDetailsLive do
                           type="button"
                           data-ticket-action="increase"
                           data-tier-id={ticket_tier.id}
+                          aria-label={"Increase quantity for #{ticket_tier.name}"}
                           data-locked-disabled={
                             is_sold_out or is_sale_ended or is_pre_sale or
                               !can_increase
@@ -1614,12 +1636,10 @@ defmodule YscWeb.EventDetailsLive do
                     </div>
                   <% end %>
                   <!-- Show message for different tier states (exclude donation tiers) -->
-                  <div :if={!is_donation && is_pre_sale} class="mt-2">
+                  <div :if={sale_schedule_message} class="mt-2">
                     <p class="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
-                      <.icon name="hero-clock" class="w-4 h-4 inline me-1" />
-                      Sale starts {DateDisplay.format_datetime_display(
-                        ticket_tier.start_date
-                      )}
+                      <.icon name="hero-calendar-days" class="w-4 h-4 inline me-1" />
+                      {sale_schedule_message}
                     </p>
                   </div>
 
@@ -1700,12 +1720,7 @@ defmodule YscWeb.EventDetailsLive do
               />
             </div>
 
-            <div>
-              <h2 class="text-lg font-semibold mb-6 hidden lg:block">
-                {@event.title}
-              </h2>
-              <h3 class="font-semibold mb-2">Order Summary</h3>
-            </div>
+            <h3 class="font-semibold mb-2">Order Summary</h3>
 
             <div
               class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between"
@@ -1811,14 +1826,55 @@ defmodule YscWeb.EventDetailsLive do
             </div>
           </div>
 
-          <div class="mt-8 space-y-4">
+          <div class="mt-8 space-y-4 hidden lg:block">
             <.button
               id="ticket-proceed-checkout"
+              data-ticket-proceed-checkout
               class="w-full text-lg py-3"
               phx-click="proceed-to-checkout"
               disabled={!has_any_tickets_selected?(@selected_tickets)}
             >
               <.icon name="hero-shopping-cart" class="w-5 h-5" />Proceed to Checkout
+            </.button>
+          </div>
+        </div>
+
+        <div
+          :if={!@event.tickets_tbd}
+          id="ticket-mobile-checkout-bar"
+          class="fixed bottom-0 inset-x-0 z-50 border-t border-zinc-200 bg-white p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] lg:hidden"
+        >
+          <div class="flex items-center gap-4">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Total
+              </p>
+              <p
+                data-ticket-order-total
+                class={[
+                  "font-semibold text-xl truncate",
+                  if @event_sold_out_for_user do
+                    "line-through text-zinc-500"
+                  else
+                    "text-zinc-900"
+                  end
+                ]}
+              >
+                <%= if @checkout_pricing do %>
+                  {format_price(@checkout_pricing.total)}
+                <% else %>
+                  $0.00
+                <% end %>
+              </p>
+            </div>
+            <.button
+              id="ticket-proceed-checkout-mobile"
+              data-ticket-proceed-checkout
+              class="shrink-0 px-6 py-3 text-base"
+              phx-click="proceed-to-checkout"
+              disabled={!has_any_tickets_selected?(@selected_tickets)}
+            >
+              <.icon name="hero-shopping-cart" class="w-5 h-5" /> Checkout
             </.button>
           </div>
         </div>
@@ -1848,18 +1904,18 @@ defmodule YscWeb.EventDetailsLive do
             </p>
           </div>
 
-          <div class="flex space-x-4">
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <.button
-              class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
-              phx-click="retry-checkout"
-            >
-              <.icon name="hero-arrow-path" class="w-5 h-5" /> Select tickets again
-            </.button>
-            <.button
-              class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+              class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
               phx-click="close-payment-modal"
             >
               Close
+            </.button>
+            <.button
+              class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+              phx-click="retry-checkout"
+            >
+              <.icon name="hero-arrow-path" class="w-5 h-5" /> Select tickets again
             </.button>
           </div>
         </div>
@@ -1882,19 +1938,19 @@ defmodule YscWeb.EventDetailsLive do
               </p>
             </div>
 
-            <div class="flex space-x-4">
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
               <.button
-                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+                phx-click="close-payment-modal"
+              >
+                Close
+              </.button>
+              <.button
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
                 phx-click="retry-checkout"
               >
                 <.icon name="hero-arrow-path" class="w-5 h-5" />
                 Select tickets again
-              </.button>
-              <.button
-                class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
-                phx-click="close-payment-modal"
-              >
-                Close
               </.button>
             </div>
           </div>
@@ -2495,9 +2551,16 @@ defmodule YscWeb.EventDetailsLive do
                       )}
                     </span>
                   </div>
-                  <div class="flex flex-col sm:flex-row gap-3">
+                  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                     <.button
-                      class="sm:flex-[2] w-full sm:w-auto py-4"
+                      variant="outline"
+                      class="w-full sm:w-auto py-4"
+                      phx-click="close-payment-modal"
+                    >
+                      Cancel
+                    </.button>
+                    <.button
+                      class="w-full sm:w-auto py-4"
                       id="submit-payment"
                       disabled={
                         !all_registrations_complete ||
@@ -2512,13 +2575,6 @@ defmodule YscWeb.EventDetailsLive do
                         @current_user,
                         @user_reservations
                       )}
-                    </.button>
-                    <.button
-                      variant="outline"
-                      class="sm:flex-1 w-full sm:w-auto py-4"
-                      phx-click="close-payment-modal"
-                    >
-                      Cancel
                     </.button>
                   </div>
                   <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
@@ -2758,15 +2814,19 @@ defmodule YscWeb.EventDetailsLive do
             </div>
           <% end %>
 
-          <div class="flex space-x-4 pt-4">
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <.button
               type="button"
-              class="flex-1 bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
+              class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
               phx-click="close-registration-modal"
             >
               Cancel
             </.button>
-            <.button type="submit" phx-disable-with="Processing..." class="flex-1">
+            <.button
+              type="submit"
+              phx-disable-with="Processing..."
+              class="w-full sm:w-auto"
+            >
               <%= if Money.zero?(@ticket_order.total_amount) do %>
                 Continue to Confirmation
               <% else %>
@@ -3086,9 +3146,9 @@ defmodule YscWeb.EventDetailsLive do
           </div>
         <% end %>
         <!-- Action Buttons -->
-        <div class="flex space-x-4 pt-4">
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
           <.button
-            class="flex-1 bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
+            class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
             phx-click="close-free-ticket-confirmation"
           >
             Cancel
@@ -3096,7 +3156,7 @@ defmodule YscWeb.EventDetailsLive do
           <.button
             phx-click="confirm-free-tickets"
             phx-disable-with="Confirming..."
-            class="flex-1 bg-green-600 hover:bg-green-700"
+            class="w-full sm:w-auto bg-green-600 hover:bg-green-700"
           >
             Confirm Free Tickets
           </.button>
