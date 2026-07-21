@@ -1,5 +1,6 @@
 defmodule Ysc.QuickbooksTest do
-  use Ysc.DataCase, async: true
+  # async: false — setup clears :ysc_cache and pins :quickbooks_client globally.
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures

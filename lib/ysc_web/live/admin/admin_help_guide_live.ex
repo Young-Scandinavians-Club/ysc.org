@@ -194,7 +194,7 @@ defmodule YscWeb.AdminHelpGuideLive do
           />
 
           <div :if={@guide_panel == :steps} class="mt-6 mb-6">
-            <.admin_help_stepper
+            <.stepper
               id="admin-help-stepper"
               active_step={@current_step}
               steps={@step_labels}

@@ -2385,12 +2385,16 @@ defmodule YscWeb.CoreComponents do
   @doc """
   Multi-step progress indicator. Inactive steps are clickable and send `set-step`.
 
-  On mobile, uses a card with the current step title and scrollable step chips so
-  every step name stays visible. On `sm+`, uses segmented progress bars with
-  truncated labels under each segment.
+  One control set (segmented bars) is shared across breakpoints:
+  - Mobile: card chrome + current-step title above the bars
+  - `sm+`: truncated labels under each segment
+
+  Used by registration, account setup, onboarding, and admin help guides.
   """
+  attr :id, :string, default: nil
   attr :active_step, :integer, required: true
   attr :steps, :list, default: []
+  attr :class, :string, default: nil
 
   @spec stepper(map()) :: Phoenix.LiveView.Rendered.t()
   def stepper(assigns) do
@@ -2401,46 +2405,23 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <nav
+      id={@id}
       aria-label="Progress"
-      class="rounded-xl border border-zinc-200 bg-white px-4 py-3.5 shadow-sm sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none"
+      class={[
+        "rounded-xl border border-zinc-200 bg-white px-4 py-3.5 shadow-sm sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none",
+        @class
+      ]}
     >
-      <%!-- Mobile: title + scrollable step chips --%>
-      <div :if={@active_step_label} class="sm:hidden">
+      <div :if={@active_step_label} class="mb-3 sm:hidden">
         <p class="text-xs font-medium leading-5 text-zinc-500">
           Step {@active_step + 1} of {@step_count}
         </p>
         <p class="mt-0.5 text-lg font-semibold leading-7 text-zinc-800 line-clamp-2">
           {@active_step_label}
         </p>
-        <ol class="mt-3 flex list-none gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-          <li :for={{label, idx} <- Enum.with_index(@steps)} class="shrink-0">
-            <button
-              type="button"
-              phx-click="set-step"
-              phx-value-step={idx}
-              aria-current={if(idx == @active_step, do: "step")}
-              aria-label={"Step #{idx + 1}: #{label}"}
-              class={[
-                "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2",
-                stepper_chip_class(idx, @active_step)
-              ]}
-            >
-              <span class="flex max-w-[8.5rem] items-center gap-1">
-                <.icon
-                  :if={idx < @active_step}
-                  name="hero-check"
-                  class="h-3 w-3 shrink-0"
-                />
-                <span class="truncate">{label}</span>
-              </span>
-            </button>
-          </li>
-        </ol>
       </div>
 
-      <%!-- Desktop: segmented bars with labels --%>
-      <ol class="hidden items-stretch gap-2 sm:flex">
+      <ol class="flex items-stretch gap-1.5 sm:gap-2">
         <li :for={{label, idx} <- Enum.with_index(@steps)} class="min-w-0 flex-1">
           <button
             type="button"
@@ -2456,7 +2437,7 @@ defmodule YscWeb.CoreComponents do
               stepper_segment_class(idx, @active_step)
             ]} />
             <span class={[
-              "mt-2 flex items-center gap-1.5 text-xs leading-5",
+              "mt-2 hidden items-center gap-1.5 text-xs leading-5 sm:flex",
               stepper_segment_label_class(idx, @active_step)
             ]}>
               <span class="shrink-0 tabular-nums">
@@ -2473,19 +2454,6 @@ defmodule YscWeb.CoreComponents do
       </ol>
     </nav>
     """
-  end
-
-  defp stepper_chip_class(idx, active) do
-    cond do
-      idx == active ->
-        "border-blue-600 bg-blue-600 text-white shadow-sm"
-
-      idx < active ->
-        "border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100"
-
-      true ->
-        "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50"
-    end
   end
 
   defp stepper_segment_class(idx, active) do
