@@ -1782,6 +1782,12 @@ defmodule YscWeb.BookingReceiptLive do
                 )
 
               {:error, reason} ->
+                Bookings.maybe_refund_unfulfilled_modification_payment(
+                  booking,
+                  payment_intent,
+                  reason
+                )
+
                 {:error, reason}
             end
         end
@@ -1823,6 +1829,12 @@ defmodule YscWeb.BookingReceiptLive do
         {:ok, reload_booking_for_receipt(booking.id), payment_intent}
 
       {:error, :modification_not_applied} ->
+        Bookings.maybe_refund_unfulfilled_modification_payment(
+          booking,
+          payment_intent,
+          :modification_hold_expired
+        )
+
         {:error, :modification_hold_expired}
 
       {:error, reason} ->
