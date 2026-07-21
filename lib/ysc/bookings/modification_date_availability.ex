@@ -533,8 +533,10 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
       Enum.any?(MapSet.to_list(new_days), fn day ->
         pi = Map.get(snapshot.property_by_day, day)
 
+        # Missing inventory rows mean the night has never been held/booked —
+        # treat as available, matching buyout modification and new Clear Lake booking.
         if is_nil(pi) do
-          true
+          false
         else
           released_guests =
             if MapSet.member?(snapshot.old_days, day),

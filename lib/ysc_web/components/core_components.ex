@@ -2860,9 +2860,9 @@ defmodule YscWeb.CoreComponents do
   end
 
   @doc """
-  Skeleton placeholder for table/list pages: shimmer rows for the desktop table
-  and shimmer cards for the mobile list, matching the dual layouts used across
-  Flop-backed list pages (admin and account settings alike).
+  Skeleton placeholder for table/list pages: a borderless desktop table (header
+  row + row dividers, matching Flop admin lists) and bordered shimmer cards for
+  the mobile stack.
 
   Pair with `<div :if={@meta}>` (or equivalent) for the loaded table/card content.
 
@@ -2897,18 +2897,32 @@ defmodule YscWeb.CoreComponents do
       aria-live={@announce? && "polite"}
     >
       <span :if={@announce?} class="sr-only">Loading…</span>
-      <div class="hidden md:block overflow-hidden rounded-lg border border-zinc-200 divide-y divide-zinc-100">
-        <div :for={_row <- 1..@rows} class="flex items-center gap-6 px-4 py-3.5">
+      <%!-- Desktop: borderless table with header + row dividers (matches Flop admin lists) --%>
+      <div class="hidden md:block w-full">
+        <div class="flex items-center gap-6 px-6 py-3 bg-zinc-50">
+          <div :for={_col <- 1..@columns} class="flex-1 min-w-0">
+            <.skeleton_block class="h-3 w-16 rounded" />
+          </div>
+        </div>
+        <div
+          :for={_row <- 1..@rows}
+          class="flex items-center gap-6 px-6 py-3 border-b border-zinc-100"
+        >
           <.skeleton_block :for={_col <- 1..@columns} class="h-4 flex-1 rounded" />
         </div>
       </div>
-      <div class="md:hidden space-y-3">
+      <%!-- Mobile: bordered cards matching the stacked list layout --%>
+      <div class="md:hidden space-y-4">
         <div
           :for={_row <- 1..min(@rows, 4)}
-          class="rounded-lg border border-zinc-200 p-4 space-y-2"
+          class="bg-white rounded-lg border border-zinc-200 p-4 space-y-3"
         >
           <.skeleton_block class="h-4 w-2/3 rounded" />
           <.skeleton_block class="h-3 w-1/3 rounded" />
+          <div class="flex items-center gap-2 pt-1">
+            <.skeleton_block class="h-5 w-16 rounded-full" />
+            <.skeleton_block class="h-5 w-20 rounded-full" />
+          </div>
         </div>
       </div>
     </div>

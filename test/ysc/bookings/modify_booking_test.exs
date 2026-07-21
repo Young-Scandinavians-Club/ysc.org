@@ -264,6 +264,11 @@ defmodule Ysc.Bookings.ModifyBookingTest do
       assert preview.new_total
       assert preview.amount_paid
       assert Money.equal?(preview.delta, Money.new(0, :USD))
+      assert preview.previous_stay.nights == Date.diff(checkout, checkin)
+      assert preview.new_stay.checkin_date == Date.add(checkin, 7)
+      assert is_map(preview.previous_breakdown)
+      assert is_map(preview.breakdown)
+      assert preview.breakdown.booking_mode == :buyout
     end
 
     test "accepts ISO8601 datetime strings from date picker params", %{

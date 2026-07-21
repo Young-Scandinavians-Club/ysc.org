@@ -489,6 +489,139 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     assert calendar.max_nights == 365
   end
 
+  describe "Clear Lake day mode" do
+    setup do
+      ensure_clear_lake_day_pricing_rule()
+      :ok
+    end
+
+    test "checkin_date_tooltips allows nights without property_inventory rows",
+         %{
+           user: user
+         } do
+      checkin = Date.utc_today() |> Date.add(160)
+      checkout = Date.add(checkin, 2)
+      booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
+
+      open_checkin = Date.add(checkin, 14)
+      open_checkout = Date.add(open_checkin, 1)
+
+      calendar = ModificationDateAvailability.calendar_context(booking)
+
+      snapshot =
+        ModificationDateAvailability.build_availability_snapshot(
+          booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons
+        )
+
+      refute Map.has_key?(snapshot.property_by_day, open_checkin)
+
+      tooltips =
+        ModificationDateAvailability.checkin_date_tooltips(
+          booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons,
+          snapshot
+        )
+
+      refute Map.get(tooltips, Date.to_iso8601(open_checkin)) ==
+               "The property is not available starting on this date"
+
+      assert :ok =
+               ModificationDateAvailability.validate_modification_dates(
+                 snapshot,
+                 open_checkin,
+                 open_checkout
+               )
+    end
+
+    test "checkin_date_tooltips blocks nights at full capacity", %{user: user} do
+      other_user =
+        user_fixture()
+        |> Ecto.Changeset.change(state: :active)
+        |> Repo.update!()
+
+      checkin = Date.utc_today() |> Date.add(170)
+      checkout = Date.add(checkin, 2)
+      booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
+
+      full_checkin = Date.add(checkin, 10)
+      full_checkout = Date.add(full_checkin, 1)
+
+      _full =
+        complete_clear_lake_day_booking!(
+          other_user,
+          full_checkin,
+          full_checkout,
+          12
+        )
+
+      calendar = ModificationDateAvailability.calendar_context(booking)
+
+      snapshot =
+        ModificationDateAvailability.build_availability_snapshot(
+          booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons
+        )
+
+      tooltips =
+        ModificationDateAvailability.checkin_date_tooltips(
+          booking,
+          calendar.min_date,
+          calendar.max_date,
+          calendar.today,
+          calendar.seasons,
+          snapshot
+        )
+
+      assert Map.get(tooltips, Date.to_iso8601(full_checkin)) ==
+               "The property is not available starting on this date"
+
+      assert {:error, :property_unavailable} =
+               ModificationDateAvailability.validate_modification_dates(
+                 snapshot,
+                 full_checkin,
+                 full_checkout
+               )
+    end
+  end
+
+  defp ensure_clear_lake_day_pricing_rule do
+    Ysc.Bookings.SeasonCache.invalidate()
+    Cachex.clear(:ysc_cache)
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(:USD, 30),
+        booking_mode: :day,
+        price_unit: :per_guest_per_day,
+        property: :clear_lake,
+        season_id: nil
+      })
+  end
+
+  defp complete_clear_lake_day_booking!(user, checkin, checkout, guests) do
+    assert {:ok, hold} =
+             BookingLocker.create_per_guest_booking(
+               user.id,
+               :clear_lake,
+               checkin,
+               checkout,
+               guests
+             )
+
+    assert {:ok, %Booking{} = booking} = BookingLocker.confirm_booking(hold.id)
+    Repo.preload(booking, [:rooms, :user])
+  end
+
   defp first_monday_on_or_after(date) do
     days_until_monday = rem(8 - Date.day_of_week(date, :monday), 7)
     Date.add(date, days_until_monday)
