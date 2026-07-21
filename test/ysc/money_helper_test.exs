@@ -40,6 +40,12 @@ defmodule Ysc.MoneyHelperTest do
       assert {:ok, "$1,000.00"} == MoneyHelper.format_money(money)
     end
 
+    test "places negative sign before currency symbol" do
+      money = Money.new(:USD, "-123.00")
+      assert {:ok, "-$123.00"} == MoneyHelper.format_money(money)
+      assert MoneyHelper.format_money!(money) == "-$123.00"
+    end
+
     test "returns empty string for invalid input" do
       assert "" == MoneyHelper.format_money(nil)
       assert "" == MoneyHelper.format_money("invalid")

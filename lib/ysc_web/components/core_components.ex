@@ -299,7 +299,7 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <.form :let={f} for={@for} as={@as} id={@id} {@rest}>
-      <div class="space-y-8 bg-white">
+      <div class="space-y-8">
         {render_slot(@inner_block, f)}
         <div
           :for={action <- @actions}
@@ -754,7 +754,7 @@ defmodule YscWeb.CoreComponents do
           name={@name}
           value="true"
           checked={@checked}
-          class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-0 w-5 h-5 flex-shrink-0"
+          class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
           {@rest}
         />
         <span class="flex-1">{@label}</span>
@@ -774,7 +774,7 @@ defmodule YscWeb.CoreComponents do
         name={@name}
         value={@value}
         checked={@checked}
-        class="rounded border-zinc-300 text-zinc-900 focus:ring-0"
+        class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0"
         {@rest}
       />
       <.error :for={msg <- @errors}>{msg}</.error>
@@ -824,7 +824,7 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "block w-full h-10 min-w-30 bg-white border rounded shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm",
+          "block w-full h-10 min-w-30 bg-white border rounded shadow-sm border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm",
           if(@label != "", do: "mt-2", else: "")
         ]}
         multiple={@multiple}
@@ -845,7 +845,7 @@ defmodule YscWeb.CoreComponents do
       <select
         id={@id}
         name={@name}
-        class="block w-full mt-2 h-11 bg-white border rounded shadow-sm border-zinc-300 focus:border-zinc-400 focus:ring-0 sm:text-sm text-zinc-800"
+        class="block w-full mt-2 h-11 bg-white border rounded shadow-sm border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 sm:text-sm text-zinc-800"
         multiple={@multiple}
         {@rest}
       >
@@ -873,8 +873,9 @@ defmodule YscWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "mt-2 block w-full rounded text-zinc-800 focus:ring-0 sm:text-sm sm:leading-6 min-h-[6rem]",
-          @errors == [] && "border-zinc-300 focus:border-zinc-400",
+          "mt-2 block w-full rounded text-zinc-800 focus:ring-1 sm:text-sm sm:leading-6 min-h-[6rem]",
+          @errors == [] &&
+            "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         {@rest}
@@ -887,7 +888,7 @@ defmodule YscWeb.CoreComponents do
   def input(%{type: "checkgroup"} = assigns) do
     ~H"""
     <fieldset class="text-sm">
-      <legend class="block text-sm font-semibold leading-6 text-zinc-800">
+      <legend class="block text-sm font-semibold leading-6 text-zinc-700">
         {@label}
       </legend>
       <div class="w-full bg-white rounded text-left cursor-default focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
@@ -930,7 +931,8 @@ defmodule YscWeb.CoreComponents do
         value={@value}
         preferred={["US", "SE", "FI", "NO", "IS", "DK"]}
         class={[
-          @errors == [] && "border-zinc-300 focus:border-zinc-400",
+          @errors == [] &&
+            "border-zinc-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         {@rest}
@@ -951,8 +953,9 @@ defmodule YscWeb.CoreComponents do
           id={@id}
           value={Phoenix.HTML.Form.normalize_value("date", @value)}
           class={[
-            "mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
-            @errors == [] && "border-zinc-300 focus:border-zinc-400",
+            "mt-2 block w-full rounded text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
+            @errors == [] &&
+              "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
           placeholder="YYYY-MM-DD"
@@ -999,8 +1002,9 @@ defmodule YscWeb.CoreComponents do
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            "mt-2 block w-full ps-7 rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
-            @errors == [] && "border-zinc-300 focus:border-zinc-400",
+            "mt-2 block w-full ps-7 rounded text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
+            @errors == [] &&
+              "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
           {@rest}
@@ -1093,9 +1097,10 @@ defmodule YscWeb.CoreComponents do
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           autocomplete={@is_password_toggle && "current-password"}
           class={[
-            "mt-2 block w-full rounded text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
+            "mt-2 block w-full rounded text-zinc-900 focus:ring-1 sm:text-sm sm:leading-6",
             @is_password_toggle && "pr-10",
-            @errors == [] && "border-zinc-300 focus:border-zinc-400",
+            @errors == [] &&
+              "border-zinc-300 focus:border-blue-500 focus:ring-blue-500",
             @errors != [] && "border-rose-400 focus:border-rose-400"
           ]}
           {@rest}
@@ -1188,7 +1193,7 @@ defmodule YscWeb.CoreComponents do
 
   def label(assigns) do
     ~H"""
-    <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-800">
+    <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-700">
       {render_slot(@inner_block)}
     </label>
     """
