@@ -602,6 +602,10 @@ defmodule YscWeb.HomeLiveTest do
         })
         |> Repo.insert()
 
+      # Re-draft and invalidate immediately before mount so parallel suites cannot
+      # repopulate upcoming events between setup and the guest home render.
+      draft_upcoming_published_events!()
+
       {:ok, view, _html} = live(conn, ~p"/")
       html = render(view)
 
