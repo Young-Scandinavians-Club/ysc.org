@@ -8,7 +8,8 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
   - Finding expense report
   - Updating expense report status to paid
   """
-  use Ysc.DataCase, async: true
+  # async: false — setup pins :quickbooks_client for the whole module.
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures

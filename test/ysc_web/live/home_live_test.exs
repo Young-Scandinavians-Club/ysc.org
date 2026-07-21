@@ -516,17 +516,7 @@ defmodule YscWeb.HomeLiveTest do
          %{
            conn: conn
          } do
-      import Ecto.Query
-
-      alias Ysc.Events.Event
-
-      # Isolate from upcoming events left in the shared sandbox by earlier tests in this module.
-      from(e in Event,
-        where: e.start_date > ^DateTime.utc_now() and e.state == :published
-      )
-      |> Repo.update_all(set: [state: :draft])
-
-      Ysc.PublicContentCache.invalidate()
+      draft_upcoming_published_events!()
 
       author = user_fixture()
       title = "News Only Home #{System.unique_integer()}"
@@ -535,7 +525,7 @@ defmodule YscWeb.HomeLiveTest do
         %Posts.Post{}
         |> Posts.Post.new_post_changeset(%{
           title: title,
-          raw_body: "<p>News body for happening soon bar.</p>",
+          raw_body: "<p>News body for the home page latest news block.</p>",
           preview_text: "Preview for the bar.",
           url_name: "news-only-home-#{System.unique_integer()}",
           state: :published,
@@ -888,5 +878,19 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ "Thank you for subscribing" or
                html =~ "Thank you for subscribing!"
     end
+  end
+
+  defp draft_upcoming_published_events! do
+    import Ecto.Query
+
+    alias Ysc.Events.Event
+
+    # Isolate from upcoming events left in the shared sandbox by earlier tests in this module.
+    from(e in Event,
+      where: e.start_date > ^DateTime.utc_now() and e.state == :published
+    )
+    |> Repo.update_all(set: [state: :draft])
+
+    Ysc.PublicContentCache.invalidate()
   end
 end
