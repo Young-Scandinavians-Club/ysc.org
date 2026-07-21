@@ -1233,7 +1233,10 @@ defmodule Ysc.Bookings do
       to_string(metadata_user_id || "") == to_string(booking.user_id)
   end
 
-  defp modification_applied_pending_ledger?(%Booking{} = booking, payment_intent) do
+  defp modification_applied_pending_ledger?(
+         %Booking{} = booking,
+         payment_intent
+       ) do
     amount = Ysc.MoneyHelper.cents_to_money(payment_intent.amount, :USD)
     modification_payment_balance_due?(booking, amount)
   end

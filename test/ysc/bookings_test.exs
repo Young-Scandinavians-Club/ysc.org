@@ -2987,6 +2987,145 @@ defmodule Ysc.BookingsTest do
                  :payment_metadata_mismatch
                )
     end
+
+    test "refunds via payment intent id string" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent_id = "pi_unfulfilled_mod_str_#{System.unique_integer([:positive])}"
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: payment_intent_id,
+           status: "succeeded",
+           amount: 5000,
+           metadata: %{
+             "modification" => "true",
+             "booking_id" => to_string(booking.id),
+             "user_id" => to_string(user.id)
+           },
+           latest_charge: "ch_test_unfulfilled_mod_str"
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:ok, %Stripe.Refund{id: refund_id}} =
+                 Bookings.maybe_refund_unfulfilled_modification_payment(
+                   booking,
+                   payment_intent_id,
+                   {:error, :blackout_conflict}
+                 )
+
+        assert String.starts_with?(refund_id, "re_test")
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "returns error when payment intent retrieval fails" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent_id = "pi_unfulfilled_mod_err_#{System.unique_integer([:positive])}"
+
+      stub(Ysc.StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+        {:error,
+         %Stripe.Error{
+           message: "not found",
+           code: "resource_missing",
+           source: :stripe
+         }}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      try do
+        Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+        assert {:error,
+                %Stripe.Error{
+                  message: "not found",
+                  code: "resource_missing",
+                  source: :stripe
+                }} =
+                 Bookings.maybe_refund_unfulfilled_modification_payment(
+                   booking,
+                   payment_intent_id,
+                   :blackout_conflict
+                 )
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "skips refund when metadata does not match booking" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_metadata_mismatch_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        metadata: %{
+          modification: true,
+          booking_id: "other_booking_id",
+          user_id: to_string(user.id)
+        },
+        latest_charge: "ch_test_metadata_mismatch"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :blackout_conflict
+               )
+    end
+
+    test "skips refund when payment intent is not captured" do
+      user = Ysc.AccountsFixtures.user_fixture()
+
+      booking =
+        booking_fixture(%{user_id: user.id})
+        |> Ecto.Changeset.change(%{status: :complete})
+        |> Ysc.Repo.update!()
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_not_captured_#{System.unique_integer([:positive])}",
+        status: "requires_capture",
+        amount: 5000,
+        metadata: %{
+          "modification" => "true",
+          "booking_id" => to_string(booking.id),
+          "user_id" => to_string(user.id)
+        },
+        latest_charge: "ch_test_not_captured"
+      }
+
+      assert :skipped =
+               Bookings.maybe_refund_unfulfilled_modification_payment(
+                 booking,
+                 payment_intent,
+                 :blackout_conflict
+               )
+    end
   end
 
   describe "Bookings coverage: listing, blackouts, availability, check-in, refunds" do
