@@ -186,7 +186,11 @@ defmodule Ysc.BookingsFixtures do
         checkin
       end
 
-    checkout = Date.add(checkin, 3)
+    checkout =
+      checkin
+      |> Date.add(3)
+      |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+
     {checkin, checkout}
   end
 
