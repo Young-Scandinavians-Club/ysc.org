@@ -6,7 +6,7 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
   with url_restoration_test (which stubs create_payment_intent in setup), that
   stub can overwrite our expect(), causing "invoked 0 times" verification failures.
   """
-  use YscWeb.ConnCase, async: false
+  use YscWeb.ConnCase, async: false, mox_global_first: true
 
   import Phoenix.LiveViewTest
   import Ysc.TestDataFactory
@@ -158,14 +158,22 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
     test "includes donation in total amount", %{conn: conn, user: user} do
       event = event_with_tickets(tier_count: 1, state: :upcoming, user: user)
       event = Repo.preload(event, :ticket_tiers, force: true)
-      tier = hd(event.ticket_tiers)
+      paid_tier = hd(event.ticket_tiers)
 
-      # Just verify that payment intent is created with some amount
-      # Don't try to calculate exact donation logic as it may be complex
+      donation_tier =
+        ticket_tier_fixture(%{
+          event_id: event.id,
+          name: "Donation",
+          type: :donation,
+          price: nil,
+          quantity: nil
+        })
+
+      donation_cents = 5_000
+      ticket_only_cents = money_to_cents(paid_tier.price)
+
       expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
-        # Verify amount is greater than just the ticket price
-        ticket_only_cents = money_to_cents(tier.price)
-        assert params.amount > ticket_only_cents
+        assert params.amount == ticket_only_cents + donation_cents
         assert params.currency == "usd"
         {:ok, build_payment_intent(%{amount: params.amount})}
       end)
@@ -175,13 +183,13 @@ defmodule YscWeb.EventDetailsLive.PaymentFlowTest do
       view =
         wait_for_async(view)
 
-      # Select ticket
-      render_click(view, "increase-ticket-quantity", %{"tier-id" => tier.id})
+      render_click(view, "increase-ticket-quantity", %{
+        "tier-id" => paid_tier.id
+      })
 
-      # Add donation (amount interpretation may vary by implementation)
       render_click(view, "set-donation-amount", %{
-        "tier-id" => tier.id,
-        "amount" => "50"
+        "tier-id" => donation_tier.id,
+        "amount" => Integer.to_string(donation_cents)
       })
 
       render_click(view, "proceed-to-checkout")
