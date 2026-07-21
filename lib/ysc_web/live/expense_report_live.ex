@@ -43,6 +43,7 @@ defmodule YscWeb.ExpenseReportLive do
           income_total: Money.new(0, :USD),
           net_total: Money.new(0, :USD)
         })
+        |> assign(:income_items_empty?, true)
         |> assign(:bank_accounts, [])
         |> assign(:billing_address, nil)
         |> assign(:treasurer, nil)
@@ -197,12 +198,10 @@ defmodule YscWeb.ExpenseReportLive do
     # Validate reimbursement setup
     changeset = validate_reimbursement_setup_in_liveview(changeset, user)
 
-    totals = calculate_totals_from_changeset(changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(changeset)}
   end
 
   # Handle file upload triggers (when files are selected, auto_upload starts)
@@ -255,13 +254,11 @@ defmodule YscWeb.ExpenseReportLive do
       |> validate_reimbursement_setup_in_liveview(user)
       |> Map.put(:action, :validate)
 
-    totals = calculate_totals_from_changeset(changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(changeset))
      |> assign(:expense_report, expense_report)
-     |> assign(:totals, totals)
+     |> assign_expense_form_state(changeset)
      |> assign(:bank_accounts, ExpenseReports.list_bank_accounts(user))
      |> assign(:billing_address, Accounts.get_billing_address(user))}
   end
@@ -296,12 +293,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("clear_event", _params, socket) do
@@ -367,12 +362,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("add_income_item", _params, socket) do
@@ -386,12 +379,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("remove_income_item", %{"index" => index}, socket) do
@@ -406,12 +397,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("validate-upload", _params, socket) do
@@ -728,12 +717,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:expense_items, expense_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("remove-proof", %{"index" => index}, socket) do
@@ -750,12 +737,10 @@ defmodule YscWeb.ExpenseReportLive do
       changeset
       |> Ecto.Changeset.put_assoc(:income_items, income_items)
 
-    totals = calculate_totals_from_changeset(new_changeset)
-
     {:noreply,
      socket
      |> assign(:form, to_form(new_changeset))
-     |> assign(:totals, totals)}
+     |> assign_expense_form_state(new_changeset)}
   end
 
   def handle_event("save", params, socket) do
@@ -832,12 +817,10 @@ defmodule YscWeb.ExpenseReportLive do
             "create_expense_report FAILED - errors: #{inspect(changeset.errors, limit: 20)}"
           )
 
-          totals = calculate_totals_from_changeset(changeset)
-
           {:noreply,
            socket
            |> assign(:form, to_form(changeset))
-           |> assign(:totals, totals)
+           |> assign_expense_form_state(changeset)
            |> YscWeb.Flash.error_with_title(
              "Form errors",
              "Please fix the errors before submitting."
@@ -1280,6 +1263,14 @@ defmodule YscWeb.ExpenseReportLive do
     }
   end
 
+  defp assign_expense_form_state(socket, changeset) do
+    income_items = Ecto.Changeset.get_field(changeset, :income_items, [])
+
+    socket
+    |> assign(:totals, calculate_totals_from_changeset(changeset))
+    |> assign(:income_items_empty?, Enum.empty?(income_items))
+  end
+
   defp get_amount_from_item(%Ecto.Changeset{} = item) do
     Ecto.Changeset.get_field(item, :amount)
   end
@@ -1460,11 +1451,7 @@ defmodule YscWeb.ExpenseReportLive do
                       </div>
                       <div class="text-right ml-4">
                         <p class="font-semibold text-zinc-900">
-                          {case Ysc.MoneyHelper.format_money(item.amount) do
-                            {:ok, amount} -> amount
-                            amount when is_binary(amount) -> amount
-                            _ -> "N/A"
-                          end}
+                          {display_money(item.amount)}
                         </p>
                       </div>
                     </div>
@@ -1525,11 +1512,7 @@ defmodule YscWeb.ExpenseReportLive do
                       </div>
                       <div class="text-right ml-4">
                         <p class="font-semibold text-zinc-900">
-                          {case Ysc.MoneyHelper.format_money(item.amount) do
-                            {:ok, amount} -> amount
-                            amount when is_binary(amount) -> amount
-                            _ -> "N/A"
-                          end}
+                          {display_money(item.amount)}
                         </p>
                       </div>
                     </div>
@@ -1548,33 +1531,21 @@ defmodule YscWeb.ExpenseReportLive do
                 <div class="flex justify-between">
                   <span class="text-zinc-600">Total Expenses</span>
                   <span class="font-medium">
-                    {case Ysc.MoneyHelper.format_money(@totals.expense_total) do
-                      {:ok, amount} -> amount
-                      amount when is_binary(amount) -> amount
-                      _ -> "N/A"
-                    end}
+                    {display_money(@totals.expense_total)}
                   </span>
                 </div>
                 <%= if not Money.zero?(@totals.income_total) do %>
                   <div class="flex justify-between">
                     <span class="text-zinc-600">Total Income</span>
                     <span class="font-medium">
-                      {case Ysc.MoneyHelper.format_money(@totals.income_total) do
-                        {:ok, amount} -> amount
-                        amount when is_binary(amount) -> amount
-                        _ -> "N/A"
-                      end}
+                      {display_money(@totals.income_total)}
                     </span>
                   </div>
                 <% end %>
                 <div class="flex justify-between pt-3 border-t border-zinc-200">
                   <span class="text-lg font-semibold text-zinc-900">Net Total</span>
                   <span class="text-lg font-semibold text-zinc-900">
-                    {case Ysc.MoneyHelper.format_money(@totals.net_total) do
-                      {:ok, amount} -> amount
-                      amount when is_binary(amount) -> amount
-                      _ -> "N/A"
-                    end}
+                    {display_money(@totals.net_total)}
                   </span>
                 </div>
               </div>
@@ -1711,35 +1682,21 @@ defmodule YscWeb.ExpenseReportLive do
                         <div>
                           <span class="text-zinc-500">Total Expenses</span>
                           <p class="font-semibold text-zinc-900 mt-1">
-                            {case Ysc.MoneyHelper.format_money(totals.expense_total) do
-                              {:ok, amount} -> amount
-                              amount when is_binary(amount) -> amount
-                              _ -> "N/A"
-                            end}
+                            {display_money(totals.expense_total)}
                           </p>
                         </div>
                         <%= if not Money.zero?(totals.income_total) do %>
                           <div>
                             <span class="text-zinc-500">Total Income</span>
                             <p class="font-semibold text-zinc-900 mt-1">
-                              {case Ysc.MoneyHelper.format_money(
-                                      totals.income_total
-                                    ) do
-                                {:ok, amount} -> amount
-                                amount when is_binary(amount) -> amount
-                                _ -> "N/A"
-                              end}
+                              {display_money(totals.income_total)}
                             </p>
                           </div>
                         <% end %>
                         <div>
                           <span class="text-zinc-500">Net Total</span>
                           <p class="font-semibold text-lg text-zinc-900 mt-1">
-                            {case Ysc.MoneyHelper.format_money(totals.net_total) do
-                              {:ok, amount} -> amount
-                              amount when is_binary(amount) -> amount
-                              _ -> "N/A"
-                            end}
+                            {display_money(totals.net_total)}
                           </p>
                         </div>
                       </div>
@@ -1799,8 +1756,8 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp render_form(assigns) do
     ~H"""
-    <div class="py-8 lg:py-10">
-      <div class="max-w-screen-xl mx-auto px-4">
+    <div id="expense-report-form-page" class="bg-zinc-50">
+      <div class="max-w-screen-xl mx-auto px-4 py-8 lg:py-10">
         <div
           :if={@loading_expense_form_data}
           id="expense-form-loading"
@@ -1811,18 +1768,18 @@ defmodule YscWeb.ExpenseReportLive do
           <span class="sr-only">Loading expense report form…</span>
           <div class="lg:col-span-2 space-y-6">
             <.skeleton_block class="h-9 w-64 rounded" />
-            <div class="border border-zinc-200 rounded-lg p-6 space-y-3">
+            <div class="bg-white border border-zinc-100 rounded-xl shadow-sm p-6 space-y-3">
               <.skeleton_block class="h-5 w-40 rounded" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
               <.skeleton_block class="h-11 w-full rounded-lg" />
             </div>
-            <div class="border border-zinc-200 rounded-lg p-6 space-y-3">
+            <div class="bg-white border border-zinc-100 rounded-xl shadow-sm p-6 space-y-3">
               <.skeleton_block class="h-5 w-32 rounded" />
               <.skeleton_block class="h-24 w-full rounded-lg" />
             </div>
           </div>
           <aside class="space-y-3">
-            <div class="border border-zinc-200 rounded-lg p-6 space-y-3">
+            <div class="bg-white border border-zinc-100 rounded-xl shadow-sm p-6 space-y-3">
               <.skeleton_block class="h-5 w-28 rounded" />
               <.skeleton_block :for={_ <- 1..3} class="h-4 w-full rounded" />
             </div>
@@ -1831,35 +1788,45 @@ defmodule YscWeb.ExpenseReportLive do
         <div :if={!@loading_expense_form_data}>
           <!-- Header -->
           <div class="mb-8">
-            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4 gap-4">
-              <div class="prose prose-zinc max-w-none flex-1">
-                <h1>Expense Report</h1>
-                <p>
-                  Submit your expenses for reimbursement. Expenses must be submitted
-                  <strong>within 30 days</strong>
-                  of the date of purchase. Once submitted, you will receive an email confirmation and your reimbursement will be processed by the treasurer.
-                </p>
-                <p :if={@treasurer}>
-                  If you have questions, please contact:
-                  <strong>
-                    {@treasurer.first_name} {@treasurer.last_name}
-                  </strong>
-                  (<a
-                    href={"mailto:#{@treasurer.email}"}
-                    class="text-blue-600 hover:underline"
-                  >
-                  <%= @treasurer.email %>
-                </a>).
-                </p>
+            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
+              <div class="flex-1">
+                <h1 class="text-3xl font-bold text-zinc-900">Expense Report</h1>
               </div>
               <.button
                 navigate={~p"/expensereports"}
                 variant="outline"
                 color="zinc"
-                class="flex-shrink-0"
+                class="flex-shrink-0 bg-white hover:bg-zinc-100"
               >
                 <.icon name="hero-document-text" class="w-5 h-5" /> View My Reports
               </.button>
+            </div>
+            <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-5">
+              <div class="flex gap-3">
+                <.icon
+                  name="hero-information-circle"
+                  class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5"
+                />
+                <div class="space-y-2 text-sm text-zinc-700">
+                  <p>
+                    Submit your expenses for reimbursement. Expenses must be submitted
+                    <strong class="font-semibold text-zinc-900">within 30 days</strong>
+                    of the date of purchase. Once submitted, you will receive an email confirmation and your reimbursement will be processed by the treasurer.
+                  </p>
+                  <p :if={@treasurer}>
+                    If you have questions, please contact:
+                    <strong class="font-semibold text-zinc-900">
+                      {@treasurer.first_name} {@treasurer.last_name}
+                    </strong>
+                    (<a
+                      href={"mailto:#{@treasurer.email}"}
+                      class="text-blue-600 hover:underline"
+                    >
+                      {@treasurer.email}
+                    </a>).
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
           <!-- 2-Column Layout: Form on left, Sticky Summary on right -->
@@ -1875,11 +1842,11 @@ defmodule YscWeb.ExpenseReportLive do
                 multipart={true}
               >
                 <!-- Step 1: Basic Information -->
-                <div class="bg-white rounded-lg border border-zinc-200 p-6 mb-6">
-                  <h2 class="text-xl font-semibold text-zinc-900 mb-4">
-                    1. Basic Information
-                  </h2>
-
+                <.expense_form_section
+                  id="expense-section-basic"
+                  step={1}
+                  title="Basic Information"
+                >
                   <.input
                     field={@form[:purpose]}
                     type="textarea"
@@ -1897,7 +1864,7 @@ defmodule YscWeb.ExpenseReportLive do
                   <div class="mt-4">
                     <label
                       for="expense_report_event_id"
-                      class="block text-sm font-semibold leading-6 text-zinc-800"
+                      class="block text-sm font-semibold leading-6 text-zinc-700"
                     >
                       Related Event (Optional)
                     </label>
@@ -1924,22 +1891,18 @@ defmodule YscWeb.ExpenseReportLive do
                       You can select from recent or upcoming events.
                     </p>
                   </div>
-                </div>
+                </.expense_form_section>
                 <!-- Step 2: Expense Items -->
-                <div class="bg-white rounded-lg border border-zinc-200 p-6 mb-6">
-                  <div class="mb-4">
-                    <h2 class="text-xl font-semibold text-zinc-900">
-                      2. Expense Items
-                    </h2>
-                    <p class="text-sm text-zinc-500 mt-1">
-                      Add all expenses you want to be reimbursed for. All items must have a receipt.
-                    </p>
-                  </div>
-
+                <.expense_form_section
+                  id="expense-section-expenses"
+                  step={2}
+                  title="Expense Items"
+                  subtitle="Add all expenses you want to be reimbursed for. All items must have a receipt."
+                >
                   <.inputs_for :let={expense_f} field={@form[:expense_items]}>
-                    <div class="border border-zinc-200 rounded-lg p-4 mb-4 space-y-4">
+                    <div class="bg-zinc-50/70 ring-1 ring-zinc-100 rounded-lg p-4 mb-4 space-y-4">
                       <div class="flex justify-between items-start">
-                        <h4 class="text-md font-medium text-zinc-800">
+                        <h4 class="text-md font-medium text-zinc-700">
                           Expense Item {expense_f.index + 1}
                         </h4>
                         <.button
@@ -2054,7 +2017,7 @@ defmodule YscWeb.ExpenseReportLive do
                             placeholder="0.00"
                             required
                           >
-                            <div class="text-zinc-800">$</div>
+                            <div class="text-zinc-700">$</div>
                           </.input>
                           <p
                             :for={error <- expense_f[:amount].errors}
@@ -2081,17 +2044,20 @@ defmodule YscWeb.ExpenseReportLive do
                         </p>
                       </div>
 
-                      <div>
-                        <label class="block text-sm font-medium text-zinc-700 mb-2">
+                      <fieldset class="min-w-0 border-0 p-0 m-0">
+                        <legend class="block text-sm font-medium text-zinc-700 mb-2">
                           Receipt
-                        </label>
-                        <p class="text-xs text-zinc-500 mb-3">
+                        </legend>
+                        <p
+                          id={"receipt-help-#{expense_f.index}"}
+                          class="text-xs text-zinc-500 mb-3"
+                        >
                           Upload a photo or PDF of your receipt. Accepted formats: PDF, JPG, JPEG, PNG, WEBP (max 10MB)
                         </p>
                         <!-- Show uploaded receipt with inline preview -->
                         <div
                           :if={expense_f[:receipt_s3_path].value}
-                          class="mb-3 p-4 bg-green-50 border-2 border-green-300 rounded-lg"
+                          class="mb-3 p-4 bg-green-50/80 border border-green-200 rounded-lg"
                           phx-hook="ReceiptLightbox"
                           id={"receipt-preview-#{expense_f.index}"}
                         >
@@ -2108,7 +2074,7 @@ defmodule YscWeb.ExpenseReportLive do
                                   rel="noopener noreferrer"
                                   class="block"
                                 >
-                                  <div class="w-24 h-24 bg-red-50 border-2 border-red-300 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
+                                  <div class="w-24 h-24 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
                                     <.icon
                                       name="hero-document-text"
                                       class="w-12 h-12 text-red-600"
@@ -2132,7 +2098,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       )
                                     }
                                     alt="Receipt preview"
-                                    class="w-24 h-24 object-cover rounded-lg border-2 border-green-300 hover:border-blue-400 transition-colors"
+                                    class="w-24 h-24 object-cover rounded-lg border border-green-200 hover:border-blue-400 transition-colors"
                                   />
                                 </a>
                               <% end %>
@@ -2186,11 +2152,12 @@ defmodule YscWeb.ExpenseReportLive do
                         >
                           <!-- Upload zone - always rendered but visually hidden when entries exist -->
                           <label
-                            class={
-                            "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100 hover:border-blue-400 transition-colors " <>
-                              if(Enum.empty?(@uploads.receipt.entries), do: "", else: "hidden")
-                          }
+                            class={[
+                              "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                              not Enum.empty?(@uploads.receipt.entries) && "hidden"
+                            ]}
                             phx-drop-target={@uploads.receipt.ref}
+                            aria-describedby={"receipt-help-#{expense_f.index}"}
                           >
                             <.live_file_input
                               upload={@uploads.receipt}
@@ -2222,18 +2189,18 @@ defmodule YscWeb.ExpenseReportLive do
                           <!-- Upload progress for entries - only show if entry matches this expense item index -->
                           <%= for entry <- @uploads.receipt.entries do %>
                             <%= if entry.client_name do %>
-                              <div class="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                              <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <div class="flex items-start gap-4">
                                   <div class="flex-shrink-0">
                                     <%= if pdf?(entry.client_name) do %>
-                                      <div class="w-20 h-20 bg-red-50 border-2 border-red-300 rounded-lg flex items-center justify-center">
+                                      <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
                                         <.icon
                                           name="hero-document-text"
                                           class="w-10 h-10 text-red-600"
                                         />
                                       </div>
                                     <% else %>
-                                      <div class="w-20 h-20 bg-blue-100 border-2 border-blue-300 rounded-lg flex items-center justify-center">
+                                      <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
                                         <.icon
                                           name="hero-photo"
                                           class="w-10 h-10 text-blue-600"
@@ -2312,7 +2279,7 @@ defmodule YscWeb.ExpenseReportLive do
                             <% end %>
                           <% end %>
                         </div>
-                      </div>
+                      </fieldset>
                     </div>
                   </.inputs_for>
 
@@ -2321,20 +2288,17 @@ defmodule YscWeb.ExpenseReportLive do
                       <.icon name="hero-plus" class="w-5 h-5" />Add Expense Item
                     </.button>
                   </div>
-                </div>
+                </.expense_form_section>
                 <!-- Step 3: Income Items (Optional) -->
-                <div class="bg-white rounded-lg border border-zinc-200 p-6 mb-6">
-                  <div class="mb-4">
-                    <h2 class="text-xl font-semibold text-zinc-900">
-                      3. Income Items (Optional)
-                    </h2>
-                    <p class="text-sm text-zinc-500 mt-1">
-                      If you received any income related to this expense report, add it here to offset your expenses.
-                    </p>
-                  </div>
+                <.expense_form_section
+                  id="expense-section-income"
+                  step={3}
+                  title="Income Items (Optional)"
+                  subtitle="If you received any income related to this expense report, add it here to offset your expenses."
+                >
                   <!-- Empty state for income items -->
-                  <%= if Enum.empty?(Ecto.Changeset.get_field(@form.source, :income_items, [])) do %>
-                    <div class="border-2 border-dashed border-zinc-300 rounded-lg p-8 text-center bg-zinc-50 mb-4">
+                  <%= if @income_items_empty? do %>
+                    <div class="border-2 border-dashed border-slate-200 rounded-lg p-8 text-center bg-slate-100/50 mb-4">
                       <div class="flex flex-col items-center max-w-md mx-auto">
                         <.icon
                           name="hero-currency-dollar"
@@ -2367,9 +2331,9 @@ defmodule YscWeb.ExpenseReportLive do
                   <% end %>
 
                   <.inputs_for :let={income_f} field={@form[:income_items]}>
-                    <div class="border border-zinc-200 rounded-lg p-4 mb-4 space-y-4">
+                    <div class="bg-zinc-50/70 ring-1 ring-zinc-100 rounded-lg p-4 mb-4 space-y-4">
                       <div class="flex justify-between items-start">
-                        <h4 class="text-md font-medium text-zinc-800">
+                        <h4 class="text-md font-medium text-zinc-700">
                           Income Item {income_f.index + 1}
                         </h4>
                         <.button
@@ -2414,7 +2378,7 @@ defmodule YscWeb.ExpenseReportLive do
                             placeholder="0.00"
                             required
                           >
-                            <div class="text-zinc-800">$</div>
+                            <div class="text-zinc-700">$</div>
                           </.input>
                           <p
                             :for={error <- income_f[:amount].errors}
@@ -2440,17 +2404,20 @@ defmodule YscWeb.ExpenseReportLive do
                         </p>
                       </div>
 
-                      <div>
-                        <label class="block text-sm font-medium text-zinc-700 mb-2">
+                      <fieldset class="min-w-0 border-0 p-0 m-0">
+                        <legend class="block text-sm font-medium text-zinc-700 mb-2">
                           Proof Document
-                        </label>
-                        <p class="text-xs text-zinc-500 mb-3">
+                        </legend>
+                        <p
+                          id={"proof-help-#{income_f.index}"}
+                          class="text-xs text-zinc-500 mb-3"
+                        >
                           Upload proof of income (invoice, payment confirmation, etc.)
                         </p>
                         <!-- Show uploaded proof with inline preview -->
                         <div
                           :if={income_f[:proof_s3_path].value}
-                          class="mb-3 p-4 bg-green-50 border-2 border-green-300 rounded-lg"
+                          class="mb-3 p-4 bg-green-50/80 border border-green-200 rounded-lg"
                           phx-hook="ReceiptLightbox"
                           id={"proof-preview-#{income_f.index}"}
                         >
@@ -2467,7 +2434,7 @@ defmodule YscWeb.ExpenseReportLive do
                                   rel="noopener noreferrer"
                                   class="block"
                                 >
-                                  <div class="w-24 h-24 bg-red-50 border-2 border-red-300 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
+                                  <div class="w-24 h-24 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center hover:bg-red-100 transition-colors">
                                     <.icon
                                       name="hero-document-text"
                                       class="w-12 h-12 text-red-600"
@@ -2491,7 +2458,7 @@ defmodule YscWeb.ExpenseReportLive do
                                       )
                                     }
                                     alt="Proof document preview"
-                                    class="w-24 h-24 object-cover rounded-lg border-2 border-green-300 hover:border-blue-400 transition-colors"
+                                    class="w-24 h-24 object-cover rounded-lg border border-green-200 hover:border-blue-400 transition-colors"
                                   />
                                 </a>
                               <% end %>
@@ -2542,11 +2509,12 @@ defmodule YscWeb.ExpenseReportLive do
                         <div :if={!income_f[:proof_s3_path].value} class="relative">
                           <!-- Upload zone - always rendered but visually hidden when entries exist -->
                           <label
-                            class={
-                            "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-zinc-50 hover:bg-zinc-100 hover:border-blue-400 transition-colors " <>
-                              if(Enum.empty?(@uploads.proof.entries), do: "", else: "hidden")
-                          }
+                            class={[
+                              "flex flex-col items-center justify-center w-full min-h-[200px] border-2 border-dashed border-slate-200 rounded-lg cursor-pointer bg-slate-100/50 hover:bg-zinc-100 hover:border-blue-400 transition-colors",
+                              not Enum.empty?(@uploads.proof.entries) && "hidden"
+                            ]}
                             phx-drop-target={@uploads.proof.ref}
+                            aria-describedby={"proof-help-#{income_f.index}"}
                           >
                             <.live_file_input
                               upload={@uploads.proof}
@@ -2578,18 +2546,18 @@ defmodule YscWeb.ExpenseReportLive do
                           <!-- Upload progress for entries - only show if entry matches this income item index -->
                           <%= for entry <- @uploads.proof.entries do %>
                             <%= if entry.client_name do %>
-                              <div class="p-4 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                              <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <div class="flex items-start gap-4">
                                   <div class="flex-shrink-0">
                                     <%= if pdf?(entry.client_name) do %>
-                                      <div class="w-20 h-20 bg-red-50 border-2 border-red-300 rounded-lg flex items-center justify-center">
+                                      <div class="w-20 h-20 bg-red-50 border border-red-200 rounded-lg flex items-center justify-center">
                                         <.icon
                                           name="hero-document-text"
                                           class="w-10 h-10 text-red-600"
                                         />
                                       </div>
                                     <% else %>
-                                      <div class="w-20 h-20 bg-blue-100 border-2 border-blue-300 rounded-lg flex items-center justify-center">
+                                      <div class="w-20 h-20 bg-blue-100 border border-blue-200 rounded-lg flex items-center justify-center">
                                         <.icon
                                           name="hero-photo"
                                           class="w-10 h-10 text-blue-600"
@@ -2668,29 +2636,22 @@ defmodule YscWeb.ExpenseReportLive do
                             <% end %>
                           <% end %>
                         </div>
-                      </div>
+                      </fieldset>
                     </div>
                   </.inputs_for>
 
-                  <div
-                    :if={
-                      not Enum.empty?(
-                        Ecto.Changeset.get_field(@form.source, :income_items, [])
-                      )
-                    }
-                    class="mt-4"
-                  >
+                  <div :if={not @income_items_empty?} class="mt-4">
                     <.button type="button" phx-click="add_income_item">
                       <.icon name="hero-plus" class="w-5 h-5" />Add Income Item
                     </.button>
                   </div>
-                </div>
+                </.expense_form_section>
                 <!-- Step 4: Reimbursement Method -->
-                <div class="bg-white rounded-lg border border-zinc-200 p-6 mb-6">
-                  <h2 class="text-xl font-semibold text-zinc-900 mb-4">
-                    4. Reimbursement Method
-                  </h2>
-
+                <.expense_form_section
+                  id="expense-section-reimbursement"
+                  step={4}
+                  title="Reimbursement Method"
+                >
                   <div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p class="text-sm text-green-800">
                       <strong>Bank Transfer is preferred</strong>
@@ -2815,12 +2776,13 @@ defmodule YscWeb.ExpenseReportLive do
                       {error_to_string(error)}
                     </p>
                   </div>
-                </div>
+                </.expense_form_section>
 
                 <:actions>
-                  <div class="space-y-4 bg-white rounded-lg border border-zinc-200 p-6">
+                  <div class="space-y-4 bg-white rounded-xl border border-zinc-100 shadow-sm p-6">
+                    <p class="text-sm font-medium text-zinc-500">Review & submit</p>
                     <!-- Certification checkbox -->
-                    <div class="p-4 bg-zinc-50 border border-zinc-200 rounded-lg">
+                    <div class="p-4 bg-white ring-1 ring-zinc-100 shadow-sm rounded-lg">
                       <.input
                         field={@form[:certification_accepted]}
                         type="checkbox"
@@ -2871,7 +2833,8 @@ defmodule YscWeb.ExpenseReportLive do
                         <.icon
                           name="hero-paper-airplane"
                           class="w-5 h-5 inline"
-                        /> Submit {Money.to_string!(@totals.net_total)} Report
+                        />
+                        Submit {Ysc.MoneyHelper.format_money!(@totals.net_total)} Report
                       <% else %>
                         Complete checklist to submit
                       <% end %>
@@ -2884,14 +2847,14 @@ defmodule YscWeb.ExpenseReportLive do
             <div class="lg:col-span-1">
               <div class="lg:sticky lg:top-24">
                 <!-- Mobile: Fixed bottom summary -->
-                <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-200 shadow-lg z-40 p-4">
+                <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-zinc-200 shadow-lg z-40 p-4">
                   <div class="max-w-screen-xl mx-auto">
                     <div class="flex items-center justify-between mb-2">
                       <span class="text-sm font-semibold text-zinc-900">
                         Net Total
                       </span>
-                      <span class="text-lg font-bold text-zinc-900">
-                        {Money.to_string!(@totals.net_total)}
+                      <span class="text-lg font-bold text-blue-700">
+                        {Ysc.MoneyHelper.format_money!(@totals.net_total)}
                       </span>
                     </div>
                     <.button
@@ -2915,7 +2878,8 @@ defmodule YscWeb.ExpenseReportLive do
                         <.icon
                           name="hero-paper-airplane"
                           class="w-4 h-4 inline mr-2"
-                        /> Submit {Money.to_string!(@totals.net_total)} Report
+                        />
+                        Submit {Ysc.MoneyHelper.format_money!(@totals.net_total)} Report
                       <% else %>
                         Complete checklist to submit
                       <% end %>
@@ -2923,41 +2887,76 @@ defmodule YscWeb.ExpenseReportLive do
                   </div>
                 </div>
                 <!-- Desktop: Sticky sidebar -->
-                <div class="hidden lg:block bg-white rounded-lg border border-zinc-200 p-6 shadow-sm">
+                <div class="hidden lg:block bg-white rounded-xl border border-zinc-100 p-6 shadow-sm">
                   <h3 class="text-lg font-semibold text-zinc-900 mb-4">Summary</h3>
                   <div class="space-y-3">
                     <div class="flex justify-between items-center">
                       <span class="text-sm text-zinc-600">Total Expenses</span>
                       <span class="text-sm font-semibold text-zinc-900">
-                        {Money.to_string!(@totals.expense_total)}
+                        {Ysc.MoneyHelper.format_money!(@totals.expense_total)}
                       </span>
                     </div>
                     <%= if not Money.zero?(@totals.income_total) do %>
                       <div class="flex justify-between items-center">
                         <span class="text-sm text-zinc-600">Total Income</span>
                         <span class="text-sm font-semibold text-zinc-900">
-                          {Money.to_string!(@totals.income_total)}
+                          {Ysc.MoneyHelper.format_money!(@totals.income_total)}
                         </span>
                       </div>
                     <% end %>
-                    <div class="pt-3 border-t border-zinc-300">
+                    <div class="pt-3 border-t border-zinc-100">
                       <div class="flex justify-between items-center">
                         <span class="text-base font-semibold text-zinc-900">
                           Net Total
                         </span>
-                        <span class="text-lg font-bold text-zinc-900">
-                          {Money.to_string!(@totals.net_total)}
+                        <span class="text-2xl font-bold text-blue-700">
+                          {Ysc.MoneyHelper.format_money!(@totals.net_total)}
                         </span>
                       </div>
                     </div>
                   </div>
                   <!-- Dynamic Readiness Checklist -->
-                  <div class="mt-6 pt-6 border-t border-zinc-200">
-                    <h4 class="text-sm font-semibold text-zinc-900 mb-3">
-                      Readiness Checklist
-                    </h4>
+                  <% checklist =
+                    get_readiness_checklist_with_status(
+                      @form,
+                      @bank_accounts,
+                      @billing_address,
+                      @current_user
+                    ) %>
+                  <% checklist_completed =
+                    Enum.count(checklist, fn {_label, status} ->
+                      status == :completed
+                    end) %>
+                  <% checklist_total = length(checklist) %>
+                  <% checklist_pct =
+                    if checklist_total > 0,
+                      do: round(checklist_completed / checklist_total * 100),
+                      else: 0 %>
+                  <div class="mt-6 pt-6 border-t border-zinc-100">
+                    <div class="flex items-center justify-between mb-2">
+                      <h4 class="text-sm font-semibold text-zinc-900">
+                        Readiness Checklist
+                      </h4>
+                      <span class="text-xs text-zinc-500">
+                        {checklist_completed}/{checklist_total}
+                      </span>
+                    </div>
+                    <div
+                      class="h-1.5 w-full rounded-full bg-zinc-100 mb-4 overflow-hidden"
+                      role="progressbar"
+                      aria-valuenow={checklist_pct}
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      aria-label="Readiness checklist progress"
+                    >
+                      <div
+                        class="h-full rounded-full bg-blue-600 transition-all duration-300"
+                        style={"width: #{checklist_pct}%"}
+                      >
+                      </div>
+                    </div>
                     <div class="space-y-2">
-                      <%= for {label, status} <- get_readiness_checklist_with_status(@form, @bank_accounts, @billing_address, @current_user) do %>
+                      <%= for {label, status} <- checklist do %>
                         <div class="flex items-start gap-2">
                           <%= case status do %>
                             <% :completed -> %>
@@ -2977,7 +2976,7 @@ defmodule YscWeb.ExpenseReportLive do
                             <% :pending -> %>
                               <.icon
                                 name="hero-minus-circle"
-                                class="w-5 h-5 text-zinc-400 flex-shrink-0"
+                                class="w-5 h-5 text-zinc-300 flex-shrink-0"
                               />
                               <span class="text-sm text-zinc-600">{label}</span>
                           <% end %>
@@ -3000,7 +2999,7 @@ defmodule YscWeb.ExpenseReportLive do
         </div>
         <!-- Bank Account Modal -->
         <%= if @bank_account_form do %>
-          <div class="fixed inset-0 z-50 overflow-y-auto" id="modal-backdrop">
+          <div class="fixed inset-0 z-[200] overflow-y-auto" id="modal-backdrop">
             <div
               class="fixed inset-0 transition-opacity bg-zinc-500 bg-opacity-75"
               phx-click="close-bank-account-modal"
@@ -3237,6 +3236,8 @@ defmodule YscWeb.ExpenseReportLive do
           </div>
         <% end %>
       </div>
+      <%!-- Fade from form background to white footer --%>
+      <div class="h-32 bg-gradient-to-b from-transparent to-white"></div>
     </div>
     """
   end
@@ -3525,6 +3526,13 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp error_to_string({msg, _opts}), do: msg
 
+  defp display_money(money) do
+    case Ysc.MoneyHelper.format_money(money) do
+      {:ok, amount} -> amount
+      _ -> "N/A"
+    end
+  end
+
   # Timeline component for expense report status
   defp timeline_section(assigns) do
     ~H"""
@@ -3706,5 +3714,38 @@ defmodule YscWeb.ExpenseReportLive do
 
   defp expense_upload_error_message(reason) do
     YscWeb.UploadErrors.error_to_string(reason, :expense)
+  end
+
+  attr :id, :string, required: true
+  attr :step, :integer, default: nil
+  attr :title, :string, required: true
+  attr :subtitle, :string, default: nil
+  attr :class, :string, default: nil
+  slot :inner_block, required: true
+
+  defp expense_form_section(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      class={[
+        "bg-white rounded-xl border border-zinc-100 shadow-sm p-6 mb-8",
+        @class
+      ]}
+    >
+      <div class="flex items-start gap-3 mb-5">
+        <span
+          :if={@step}
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
+        >
+          {@step}
+        </span>
+        <div class="min-w-0">
+          <h2 class="text-xl font-semibold text-zinc-900">{@title}</h2>
+          <p :if={@subtitle} class="text-sm text-zinc-500 mt-1">{@subtitle}</p>
+        </div>
+      </div>
+      {render_slot(@inner_block)}
+    </div>
+    """
   end
 end

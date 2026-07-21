@@ -50,10 +50,18 @@ defmodule Ysc.MoneyHelper do
     "10.99"
   """
   def format_money(%Money{} = money) do
-    Money.to_string(money, separator: ".", delimiter: ",", fractional_digits: 2)
+    money
+    |> Money.to_string(separator: ".", delimiter: ",", fractional_digits: 2)
+    |> normalize_negative_currency_display()
   end
 
   def format_money(_), do: ""
+
+  defp normalize_negative_currency_display({:ok, "$-" <> rest}),
+    do: {:ok, "-$" <> rest}
+
+  defp normalize_negative_currency_display({:ok, _} = ok), do: ok
+  defp normalize_negative_currency_display({:error, _} = err), do: err
 
   @doc """
   Formats Money for HTML form input values.
