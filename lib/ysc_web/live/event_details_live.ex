@@ -1263,7 +1263,7 @@ defmodule YscWeb.EventDetailsLive do
         phx-hook="TicketCheckout"
         data-tiers={checkout_tiers_json(@ticket_tiers)}
         data-selected={selected_tickets_json(@selected_tickets)}
-        class="flex flex-col lg:flex-row gap-8 min-h-[600px]"
+        class="flex flex-col lg:flex-row gap-8 min-h-[600px] pb-28 lg:pb-0"
       >
         <!-- Left Panel: Ticket Tiers -->
         <div class="lg:w-2/3 space-y-8">
@@ -1319,6 +1319,23 @@ defmodule YscWeb.EventDetailsLive do
                   if is_donation, do: nil, else: days_until_sale_starts(ticket_tier) %>
                 <% is_pre_sale =
                   if is_donation, do: false, else: not is_on_sale && !is_sale_ended %>
+                <% sale_schedule_message =
+                  cond do
+                    is_donation or is_sale_ended ->
+                      nil
+
+                    is_pre_sale && ticket_tier.start_date && ticket_tier.end_date ->
+                      "On sale #{DateDisplay.format_event_date_range(ticket_tier, with_year: true)}"
+
+                    is_pre_sale && ticket_tier.start_date ->
+                      "Sale starts #{DateDisplay.format_datetime_display(ticket_tier.start_date)}"
+
+                    ticket_tier.end_date ->
+                      "Sale ends #{DateDisplay.format_datetime_display(ticket_tier.end_date)}"
+
+                    true ->
+                      nil
+                  end %>
                 <% has_selected_tickets =
                   get_ticket_quantity(@selected_tickets, ticket_tier.id) > 0 %>
                 <% reserved_quantity =
@@ -1530,6 +1547,7 @@ defmodule YscWeb.EventDetailsLive do
                           type="button"
                           data-ticket-action="decrease"
                           data-tier-id={ticket_tier.id}
+                          aria-label={"Decrease quantity for #{ticket_tier.name}"}
                           data-locked-disabled={
                             is_sold_out or is_sale_ended or is_pre_sale
                           }
@@ -1587,6 +1605,7 @@ defmodule YscWeb.EventDetailsLive do
                           type="button"
                           data-ticket-action="increase"
                           data-tier-id={ticket_tier.id}
+                          aria-label={"Increase quantity for #{ticket_tier.name}"}
                           data-locked-disabled={
                             is_sold_out or is_sale_ended or is_pre_sale or
                               !can_increase
@@ -1614,12 +1633,10 @@ defmodule YscWeb.EventDetailsLive do
                     </div>
                   <% end %>
                   <!-- Show message for different tier states (exclude donation tiers) -->
-                  <div :if={!is_donation && is_pre_sale} class="mt-2">
+                  <div :if={sale_schedule_message} class="mt-2">
                     <p class="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded-md border border-blue-200">
-                      <.icon name="hero-clock" class="w-4 h-4 inline me-1" />
-                      Sale starts {DateDisplay.format_datetime_display(
-                        ticket_tier.start_date
-                      )}
+                      <.icon name="hero-calendar-days" class="w-4 h-4 inline me-1" />
+                      {sale_schedule_message}
                     </p>
                   </div>
 
@@ -1811,14 +1828,55 @@ defmodule YscWeb.EventDetailsLive do
             </div>
           </div>
 
-          <div class="mt-8 space-y-4">
+          <div class="mt-8 space-y-4 hidden lg:block">
             <.button
               id="ticket-proceed-checkout"
+              data-ticket-proceed-checkout
               class="w-full text-lg py-3"
               phx-click="proceed-to-checkout"
               disabled={!has_any_tickets_selected?(@selected_tickets)}
             >
               <.icon name="hero-shopping-cart" class="w-5 h-5" />Proceed to Checkout
+            </.button>
+          </div>
+        </div>
+
+        <div
+          :if={!@event.tickets_tbd}
+          id="ticket-mobile-checkout-bar"
+          class="fixed bottom-0 inset-x-0 z-50 border-t border-zinc-200 bg-white p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] lg:hidden"
+        >
+          <div class="flex items-center gap-4">
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Total
+              </p>
+              <p
+                data-ticket-order-total
+                class={[
+                  "font-semibold text-xl truncate",
+                  if @event_sold_out_for_user && !@event.tickets_tbd do
+                    "line-through text-zinc-500"
+                  else
+                    "text-zinc-900"
+                  end
+                ]}
+              >
+                <%= if @checkout_pricing do %>
+                  {format_price(@checkout_pricing.total)}
+                <% else %>
+                  $0.00
+                <% end %>
+              </p>
+            </div>
+            <.button
+              id="ticket-proceed-checkout-mobile"
+              data-ticket-proceed-checkout
+              class="shrink-0 px-6 py-3 text-base"
+              phx-click="proceed-to-checkout"
+              disabled={!has_any_tickets_selected?(@selected_tickets)}
+            >
+              <.icon name="hero-shopping-cart" class="w-5 h-5" /> Checkout
             </.button>
           </div>
         </div>
