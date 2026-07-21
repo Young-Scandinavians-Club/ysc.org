@@ -1,5 +1,9 @@
 defmodule YscWeb.Sms.SmsNotifierTest do
-  use Ysc.DataCase, async: true
+  @moduledoc false
+
+  # async: false — Cachex is shared across processes. Clearing rate-limit keys for
+  # one phone while other async modules run caused intermittent rate-limit failures.
+  use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
   import Mox
@@ -8,6 +12,9 @@ defmodule YscWeb.Sms.SmsNotifierTest do
   alias YscWeb.Workers.SmsNotifier
   alias Ysc.Repo
 
+  @sms_test_phone "14159009001"
+  @sms_rate_limit_key "sms_rate_limit:#{@sms_test_phone}"
+
   # Make sure mocks are verified when the test exits
   setup :verify_on_exit!
 
@@ -15,8 +22,8 @@ defmodule YscWeb.Sms.SmsNotifierTest do
     # Configure FlowRoute for tests
     Application.put_env(:ysc, :flowroute, from_number: "12061231234")
 
-    # Clear SMS rate limit cache to ensure tests don't hit rate limits
-    Cachex.clear(:ysc_cache)
+    # Clear only this module's primary test phone rate-limit entry.
+    Cachex.del(:ysc_cache, @sms_rate_limit_key)
 
     :ok
   end
