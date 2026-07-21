@@ -360,7 +360,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         >
           <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to Newsletters
         </.link>
-        <.badge :if={@edition} type={newsletter_edition_status_badge_type(@edition.status)}>
+        <.badge
+          :if={@edition}
+          type={newsletter_edition_status_badge_type(@edition.status)}
+        >
           {newsletter_edition_status_label(@edition.status)}
         </.badge>
         <.badge :if={!@edition} type="yellow">Draft</.badge>

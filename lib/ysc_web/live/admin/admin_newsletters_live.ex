@@ -370,7 +370,9 @@ defmodule YscWeb.AdminNewslettersLive do
                     <%= if edition.status == :sending do %>
                       <.admin_sending_badge />
                     <% else %>
-                      <.badge type={newsletter_edition_status_badge_type(edition.status)}>
+                      <.badge type={
+                        newsletter_edition_status_badge_type(edition.status)
+                      }>
                         {newsletter_edition_status_label(edition.status)}
                       </.badge>
                     <% end %>
@@ -447,7 +449,9 @@ defmodule YscWeb.AdminNewslettersLive do
                   <%= if edition.status == :sending do %>
                     <.admin_sending_badge />
                   <% else %>
-                    <.badge type={newsletter_edition_status_badge_type(edition.status)}>
+                    <.badge type={
+                      newsletter_edition_status_badge_type(edition.status)
+                    }>
                       {newsletter_edition_status_label(edition.status)}
                     </.badge>
                   <% end %>

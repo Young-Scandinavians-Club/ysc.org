@@ -134,8 +134,11 @@ defmodule YscWeb.DateDisplayTest do
     end
 
     test "shifts DateTime values to Pacific before formatting" do
-      assert DateDisplay.format_pacific_date_short(~U[2024-03-05 06:00:00Z]) == "Mar 4"
-      assert DateDisplay.format_pacific_date_short(~U[2024-03-05 10:00:00Z]) == "Mar 5"
+      assert DateDisplay.format_pacific_date_short(~U[2024-03-05 06:00:00Z]) ==
+               "Mar 4"
+
+      assert DateDisplay.format_pacific_date_short(~U[2024-03-05 10:00:00Z]) ==
+               "Mar 5"
     end
 
     test "returns empty string for nil and invalid values" do

@@ -890,7 +890,9 @@ defmodule YscWeb.HomeLive do
                 />
               </div>
               <time class="text-xs font-semibold text-blue-700 uppercase tracking-widest">
-                {DateDisplay.format_pacific_date_short(post.published_on)} · {reading_time_for_news(post)} min read
+                {DateDisplay.format_pacific_date_short(post.published_on)} · {reading_time_for_news(
+                  post
+                )} min read
               </time>
               <h3 class="text-2xl font-extrabold text-zinc-900 tracking-tight mt-3 group-hover:text-blue-700 transition-colors leading-snug">
                 {post.title}
