@@ -12,7 +12,7 @@ defmodule YscWeb.HomeLive do
   alias Ysc.Media.Image
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
-  alias YscWeb.PlainText
+  alias YscWeb.{DateDisplay, PlainText}
   import Ecto.Query
 
   @impl true
@@ -890,7 +890,9 @@ defmodule YscWeb.HomeLive do
                 />
               </div>
               <time class="text-xs font-semibold text-blue-700 uppercase tracking-widest">
-                {format_post_date(post.published_on)} · {reading_time_for_news(post)} min read
+                {DateDisplay.format_pacific_date_short(post.published_on)} · {reading_time_for_news(
+                  post
+                )} min read
               </time>
               <h3 class="text-2xl font-extrabold text-zinc-900 tracking-tight mt-3 group-hover:text-blue-700 transition-colors leading-snug">
                 {post.title}
@@ -1869,7 +1871,7 @@ defmodule YscWeb.HomeLive do
                       </div>
                       <div>
                         <p class="text-xs font-bold text-blue-600 mb-1">
-                          {format_post_date(post.published_on)}
+                          {DateDisplay.format_pacific_date_short(post.published_on)}
                         </p>
                         <h3 class="text-sm font-bold text-zinc-900 group-hover:text-blue-600 transition-colors">
                           {post.title}
@@ -2637,19 +2639,6 @@ defmodule YscWeb.HomeLive do
   end
 
   defp format_event_date_long(_), do: ""
-
-  defp format_post_date(%Date{} = date) do
-    Timex.format!(date, "{Mshort} {D}")
-  end
-
-  defp format_post_date(%DateTime{} = datetime) do
-    # Convert UTC DateTime to PST, then format
-    datetime_pst = DateTime.shift_zone!(datetime, "America/Los_Angeles")
-    date_only = DateTime.to_date(datetime_pst)
-    Timex.format!(date_only, "{Mshort} {D}")
-  end
-
-  defp format_post_date(_), do: ""
 
   defp format_membership_plan_price(plan_id) when is_atom(plan_id) do
     plans = Application.get_env(:ysc, :membership_plans, [])

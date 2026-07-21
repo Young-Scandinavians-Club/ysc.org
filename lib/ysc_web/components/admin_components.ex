@@ -384,6 +384,28 @@ defmodule YscWeb.AdminComponents do
   defp collapsible_content_classes(:table), do: "overflow-hidden"
 
   # ---------------------------------------------------------------------------
+  # Newsletter edition status (admin newsletters)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Maps a newsletter edition status atom to a `<.badge>` type.
+  """
+  def newsletter_edition_status_badge_type(:draft), do: "yellow"
+  def newsletter_edition_status_badge_type(:scheduled), do: "sky"
+  def newsletter_edition_status_badge_type(:sent), do: "green"
+  def newsletter_edition_status_badge_type(_), do: "dark"
+
+  @doc """
+  Human-readable label for a newsletter edition status atom.
+  """
+  def newsletter_edition_status_label(:draft), do: "Draft"
+  def newsletter_edition_status_label(:scheduled), do: "Scheduled"
+  def newsletter_edition_status_label(:sent), do: "Sent"
+
+  def newsletter_edition_status_label(other),
+    do: other |> to_string() |> String.capitalize()
+
+  # ---------------------------------------------------------------------------
   # QuickBooks sync status (admin money / ledgers)
   # ---------------------------------------------------------------------------
 

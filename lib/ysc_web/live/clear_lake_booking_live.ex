@@ -18,6 +18,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Accounts
   alias Ysc.Subscriptions
   alias Ysc.Repo
+  alias YscWeb.DateDisplay
   import Ecto.Query
 
   @impl true
@@ -1130,13 +1131,13 @@ defmodule YscWeb.ClearLakeBookingLive do
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Check-in</span>
                       <span class="font-semibold text-zinc-900 text-right">
-                        {Calendar.strftime(@checkin_date, "%b %d, %Y")}
+                        {DateDisplay.format_datetime_display(@checkin_date)}
                       </span>
                     </div>
                     <div class="flex justify-between items-start text-sm">
                       <span class="text-zinc-500 font-medium">Check-out</span>
                       <span class="font-semibold text-zinc-900 text-right">
-                        {Calendar.strftime(@checkout_date, "%b %d, %Y")}
+                        {DateDisplay.format_datetime_display(@checkout_date)}
                       </span>
                     </div>
                     <div class="flex justify-between items-start text-sm">

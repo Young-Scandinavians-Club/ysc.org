@@ -128,6 +128,29 @@ defmodule YscWeb.DateDisplayTest do
     end
   end
 
+  describe "format_pacific_date_short/1" do
+    test "formats Date values as short month/day labels" do
+      assert DateDisplay.format_pacific_date_short(~D[2024-03-05]) == "Mar 5"
+    end
+
+    test "shifts DateTime values to Pacific before formatting" do
+      assert DateDisplay.format_pacific_date_short(~U[2024-03-05 06:00:00Z]) ==
+               "Mar 4"
+
+      assert DateDisplay.format_pacific_date_short(~U[2024-03-05 10:00:00Z]) ==
+               "Mar 5"
+    end
+
+    test "returns empty string for nil and invalid values" do
+      assert DateDisplay.format_pacific_date_short(nil) == ""
+      assert DateDisplay.format_pacific_date_short(:atom) == ""
+    end
+
+    test "accepts a custom default" do
+      assert DateDisplay.format_pacific_date_short(nil, "—") == "—"
+    end
+  end
+
   describe "format_datetime_at/1" do
     test "formats DateTime values without timezone conversion" do
       dt = ~U[2024-06-15 15:30:00Z]

@@ -65,6 +65,27 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "newsletter_edition_status_badge_type/1" do
+    test "maps known edition statuses to badge types" do
+      assert newsletter_edition_status_badge_type(:draft) == "yellow"
+      assert newsletter_edition_status_badge_type(:scheduled) == "sky"
+      assert newsletter_edition_status_badge_type(:sent) == "green"
+      assert newsletter_edition_status_badge_type(:archived) == "dark"
+    end
+  end
+
+  describe "newsletter_edition_status_label/1" do
+    test "maps known edition statuses to labels" do
+      assert newsletter_edition_status_label(:draft) == "Draft"
+      assert newsletter_edition_status_label(:scheduled) == "Scheduled"
+      assert newsletter_edition_status_label(:sent) == "Sent"
+    end
+
+    test "capitalizes unknown statuses" do
+      assert newsletter_edition_status_label(:archived) == "Archived"
+    end
+  end
+
   describe "quickbooks_sync_status_badge_type/1" do
     test "maps known sync statuses to badge types" do
       assert quickbooks_sync_status_badge_type("pending") == "yellow"

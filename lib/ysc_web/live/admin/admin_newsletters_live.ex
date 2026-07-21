@@ -3,6 +3,7 @@ defmodule YscWeb.AdminNewslettersLive do
 
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
+  alias YscWeb.DateDisplay
 
   alias Ysc.Newsletter
 
@@ -369,8 +370,10 @@ defmodule YscWeb.AdminNewslettersLive do
                     <%= if edition.status == :sending do %>
                       <.admin_sending_badge />
                     <% else %>
-                      <.badge type={edition_status_badge(edition.status)}>
-                        {format_status(edition.status)}
+                      <.badge type={
+                        newsletter_edition_status_badge_type(edition.status)
+                      }>
+                        {newsletter_edition_status_label(edition.status)}
                       </.badge>
                     <% end %>
                     <span class="text-sm text-zinc-500">
@@ -446,8 +449,10 @@ defmodule YscWeb.AdminNewslettersLive do
                   <%= if edition.status == :sending do %>
                     <.admin_sending_badge />
                   <% else %>
-                    <.badge type={edition_status_badge(edition.status)}>
-                      {format_status(edition.status)}
+                    <.badge type={
+                      newsletter_edition_status_badge_type(edition.status)
+                    }>
+                      {newsletter_edition_status_label(edition.status)}
                     </.badge>
                   <% end %>
                 </:col>
@@ -1066,16 +1071,8 @@ defmodule YscWeb.AdminNewslettersLive do
 
   defp maybe_update_filter(filter), do: filter
 
-  defp edition_status_badge(:draft), do: "yellow"
-  defp edition_status_badge(:scheduled), do: "sky"
-  defp edition_status_badge(:sent), do: "green"
-
-  defp format_status(:draft), do: "Draft"
-  defp format_status(:scheduled), do: "Scheduled"
-  defp format_status(:sent), do: "Sent"
-
   defp format_date(nil), do: ""
-  defp format_date(dt), do: Calendar.strftime(dt, "%b %d, %Y")
+  defp format_date(dt), do: DateDisplay.format_datetime_display(dt)
 
   defp format_datetime(nil), do: ""
 
