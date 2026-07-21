@@ -678,7 +678,10 @@ defmodule YscWeb.EventDetailsLive do
                           class={"w-14 h-14 rounded-full ring-2 #{if is_me, do: "ring-blue-500", else: if(is_host, do: "ring-amber-400", else: "ring-zinc-100")}"}
                         />
                         <%= if ticket_count > 1 do %>
-                          <span class="absolute -bottom-1 -right-1 w-5 h-5 ml-0.5 rounded-full bg-zinc-900 text-white text-[10px] font-black leading-none flex items-center justify-center ring-2 ring-white">
+                          <span
+                            class="absolute -top-0.5 -right-0.5 z-10 w-[30%] min-w-[0.65rem] aspect-square rounded-full bg-zinc-900 text-white text-[8px] font-black leading-none flex items-center justify-center ring-2 ring-white shadow-sm"
+                            aria-label={"#{ticket_count} tickets"}
+                          >
                             {ticket_count}
                           </span>
                         <% end %>
@@ -1717,12 +1720,7 @@ defmodule YscWeb.EventDetailsLive do
               />
             </div>
 
-            <div>
-              <h2 class="text-lg font-semibold mb-6 hidden lg:block">
-                {@event.title}
-              </h2>
-              <h3 class="font-semibold mb-2">Order Summary</h3>
-            </div>
+            <h3 class="font-semibold mb-2">Order Summary</h3>
 
             <div
               class="bg-zinc-50 rounded-xl p-6 space-y-4 flex flex-col justify-between"
@@ -1906,18 +1904,18 @@ defmodule YscWeb.EventDetailsLive do
             </p>
           </div>
 
-          <div class="flex space-x-4">
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
             <.button
-              class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
-              phx-click="retry-checkout"
-            >
-              <.icon name="hero-arrow-path" class="w-5 h-5" /> Select tickets again
-            </.button>
-            <.button
-              class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+              class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
               phx-click="close-payment-modal"
             >
               Close
+            </.button>
+            <.button
+              class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+              phx-click="retry-checkout"
+            >
+              <.icon name="hero-arrow-path" class="w-5 h-5" /> Select tickets again
             </.button>
           </div>
         </div>
@@ -1940,19 +1938,19 @@ defmodule YscWeb.EventDetailsLive do
               </p>
             </div>
 
-            <div class="flex space-x-4">
+            <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
               <.button
-                class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
+                phx-click="close-payment-modal"
+              >
+                Close
+              </.button>
+              <.button
+                class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
                 phx-click="retry-checkout"
               >
                 <.icon name="hero-arrow-path" class="w-5 h-5" />
                 Select tickets again
-              </.button>
-              <.button
-                class="bg-zinc-200 text-zinc-800 hover:bg-zinc-300 px-6 py-3"
-                phx-click="close-payment-modal"
-              >
-                Close
               </.button>
             </div>
           </div>
@@ -2553,9 +2551,16 @@ defmodule YscWeb.EventDetailsLive do
                       )}
                     </span>
                   </div>
-                  <div class="flex flex-col sm:flex-row gap-3">
+                  <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
                     <.button
-                      class="sm:flex-[2] w-full sm:w-auto py-4"
+                      variant="outline"
+                      class="w-full sm:w-auto py-4"
+                      phx-click="close-payment-modal"
+                    >
+                      Cancel
+                    </.button>
+                    <.button
+                      class="w-full sm:w-auto py-4"
                       id="submit-payment"
                       disabled={
                         !all_registrations_complete ||
@@ -2570,13 +2575,6 @@ defmodule YscWeb.EventDetailsLive do
                         @current_user,
                         @user_reservations
                       )}
-                    </.button>
-                    <.button
-                      variant="outline"
-                      class="sm:flex-1 w-full sm:w-auto py-4"
-                      phx-click="close-payment-modal"
-                    >
-                      Cancel
                     </.button>
                   </div>
                   <p class="text-center text-xs text-zinc-400 flex items-center justify-center gap-1">
@@ -2816,15 +2814,19 @@ defmodule YscWeb.EventDetailsLive do
             </div>
           <% end %>
 
-          <div class="flex space-x-4 pt-4">
+          <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
             <.button
               type="button"
-              class="flex-1 bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
+              class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
               phx-click="close-registration-modal"
             >
               Cancel
             </.button>
-            <.button type="submit" phx-disable-with="Processing..." class="flex-1">
+            <.button
+              type="submit"
+              phx-disable-with="Processing..."
+              class="w-full sm:w-auto"
+            >
               <%= if Money.zero?(@ticket_order.total_amount) do %>
                 Continue to Confirmation
               <% else %>
@@ -3144,9 +3146,9 @@ defmodule YscWeb.EventDetailsLive do
           </div>
         <% end %>
         <!-- Action Buttons -->
-        <div class="flex space-x-4 pt-4">
+        <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 pt-4">
           <.button
-            class="flex-1 bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
+            class="w-full sm:w-auto bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
             phx-click="close-free-ticket-confirmation"
           >
             Cancel
@@ -3154,7 +3156,7 @@ defmodule YscWeb.EventDetailsLive do
           <.button
             phx-click="confirm-free-tickets"
             phx-disable-with="Confirming..."
-            class="flex-1 bg-green-600 hover:bg-green-700"
+            class="w-full sm:w-auto bg-green-600 hover:bg-green-700"
           >
             Confirm Free Tickets
           </.button>
