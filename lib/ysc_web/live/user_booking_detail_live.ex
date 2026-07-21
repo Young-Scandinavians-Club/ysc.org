@@ -6,6 +6,7 @@ defmodule YscWeb.UserBookingDetailLive do
   alias Ysc.EmailConfig
   alias Ysc.MoneyHelper
   alias Ysc.Repo
+  alias YscWeb.BookingDisplay
   alias YscWeb.Authorization.Policy
   alias YscWeb.BookingActions
   import Ecto.Query
@@ -257,18 +258,10 @@ defmodule YscWeb.UserBookingDetailLive do
               <div>
                 <div class="text-sm text-zinc-600 mb-0.5">Status</div>
                 <.badge
-                  type={
-                    case @booking.status do
-                      :complete -> "green"
-                      :hold -> "yellow"
-                      :canceled -> "red"
-                      :refunded -> "red"
-                      _ -> "gray"
-                    end
-                  }
+                  type={BookingDisplay.status_badge_type(@booking.status)}
                   class="text-sm"
                 >
-                  {booking_status_label(@booking.status)}
+                  {BookingDisplay.status_label(@booking.status)}
                 </.badge>
                 <%= if @booking.status == :hold do %>
                   <p class="mt-2 text-sm text-zinc-600">
@@ -398,14 +391,7 @@ defmodule YscWeb.UserBookingDetailLive do
                 <div class="flex justify-between text-sm">
                   <span class="text-zinc-600">Payment Status</span>
                   <span class="text-zinc-900">
-                    <.badge type={
-                      case @payment.status do
-                        :completed -> "green"
-                        :pending -> "yellow"
-                        :refunded -> "red"
-                        _ -> "gray"
-                      end
-                    }>
+                    <.badge type={BookingDisplay.payment_status_badge_type(@payment.status)}>
                       {String.capitalize(to_string(@payment.status))}
                     </.badge>
                   </span>
@@ -800,14 +786,6 @@ defmodule YscWeb.UserBookingDetailLive do
   end
 
   defp format_money_from_map(_), do: "N/A"
-
-  defp booking_status_label(:hold), do: "Awaiting payment"
-  defp booking_status_label(:complete), do: "Confirmed"
-  defp booking_status_label(:canceled), do: "Cancelled"
-  defp booking_status_label(:refunded), do: "Refunded"
-
-  defp booking_status_label(status),
-    do: status |> to_string() |> String.capitalize()
 
   defp sync_booking_after_partial_cancel(socket, booking, reason) do
     if partial_cancel_post_booking_error?(reason) do

@@ -16,6 +16,7 @@ defmodule YscWeb.AdminBookingsLive do
   alias Ysc.Ledgers.{Payment, Refund}
   alias Ysc.Repo
   alias YscWeb.DateDisplay
+  alias YscWeb.AdminBadgeHelpers
   import Ecto.Query
   require Ysc.Logging
 
@@ -552,16 +553,7 @@ defmodule YscWeb.AdminBookingsLive do
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span class="font-semibold">Booking Details</span>
-                <% badge_type =
-                  case @booking.status do
-                    :complete -> "green"
-                    :canceled -> "red"
-                    :refunded -> "yellow"
-                    :hold -> "sky"
-                    :draft -> "dark"
-                    _ -> "dark"
-                  end %>
-                <.badge type={badge_type}>
+                <.badge type={AdminBadgeHelpers.booking_status_badge_type(@booking.status)}>
                   {String.upcase(to_string(@booking.status))}
                 </.badge>
               </div>
@@ -741,13 +733,6 @@ defmodule YscWeb.AdminBookingsLive do
             <h3 class="text-sm font-semibold text-zinc-700 mb-3">Payments</h3>
             <div :if={length(@booking_payments) > 0} class="space-y-3">
               <%= for payment <- @booking_payments do %>
-                <% payment_status_type =
-                  case payment.status do
-                    :completed -> "green"
-                    :pending -> "yellow"
-                    :failed -> "red"
-                    _ -> "dark"
-                  end %>
                 <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200 min-w-0">
                   <div class="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start">
                     <div class="flex-1 min-w-0 space-y-2">
@@ -763,7 +748,7 @@ defmodule YscWeb.AdminBookingsLive do
                             title="Copy reference ID"
                             aria_label="Copy reference ID"
                           />
-                          <.badge type={payment_status_type}>
+                          <.badge type={AdminBadgeHelpers.ledger_payment_status_badge_type(payment.status)}>
                             {String.capitalize(to_string(payment.status))}
                           </.badge>
                         </span>
@@ -815,13 +800,6 @@ defmodule YscWeb.AdminBookingsLive do
             <h3 class="text-sm font-semibold text-zinc-700 mb-3">Refunds</h3>
             <div :if={length(@booking_refunds) > 0} class="space-y-3">
               <%= for refund <- @booking_refunds do %>
-                <% refund_status_type =
-                  case refund.status do
-                    :completed -> "green"
-                    :pending -> "yellow"
-                    :failed -> "red"
-                    _ -> "dark"
-                  end %>
                 <div class="bg-zinc-50 rounded-lg p-3 border border-zinc-200 min-w-0">
                   <div class="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-start">
                     <div class="flex-1 min-w-0 space-y-2">
@@ -837,7 +815,7 @@ defmodule YscWeb.AdminBookingsLive do
                             title="Copy reference ID"
                             aria_label="Copy reference ID"
                           />
-                          <.badge type={refund_status_type}>
+                          <.badge type={AdminBadgeHelpers.ledger_payment_status_badge_type(refund.status)}>
                             {String.capitalize(to_string(refund.status))}
                           </.badge>
                         </span>
@@ -1162,16 +1140,7 @@ defmodule YscWeb.AdminBookingsLive do
                     </div>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <% badge_type =
-                      case booking.status do
-                        :complete -> "green"
-                        :canceled -> "red"
-                        :refunded -> "yellow"
-                        :hold -> "sky"
-                        :draft -> "dark"
-                        _ -> "dark"
-                      end %>
-                    <.badge type={badge_type}>
+                    <.badge type={AdminBadgeHelpers.booking_status_badge_type(booking.status)}>
                       {String.upcase(to_string(booking.status))}
                     </.badge>
                     <.button
