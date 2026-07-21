@@ -1204,6 +1204,159 @@ defmodule Ysc.EventsTest do
       assert Enum.all?(tickets, &(&1.status == :confirmed))
     end
 
+    test "list_upcoming_confirmed_tickets_for_user/2 after_now excludes events that already started today" do
+      user = user_fixture()
+
+      started_at =
+        DateTime.utc_now()
+        |> DateTime.add(-30, :minute)
+        |> DateTime.truncate(:second)
+
+      start_of_today =
+        "America/Los_Angeles"
+        |> DateTime.now!()
+        |> DateTime.to_date()
+        |> DateTime.new!(~T[00:00:00], "America/Los_Angeles")
+        |> DateTime.shift_zone!("Etc/UTC")
+
+      if DateTime.compare(started_at, start_of_today) != :gt do
+        assert DateTime.now!("America/Los_Angeles").hour == 0
+      else
+        do_after_now_excludes_started_today_test(user, started_at)
+      end
+    end
+
+    defp do_after_now_excludes_started_today_test(user, started_at) do
+      {:ok, started_event} =
+        Events.create_event(%{
+          title: "Started Earlier Today",
+          description: "Already underway",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 2, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, started_tier} = create_ticket_tier_fixture(%{event_id: started_event.id})
+
+      started_ticket =
+        create_ticket_fixture(%{
+          event_id: started_event.id,
+          user_id: user.id,
+          ticket_tier_id: started_tier.id,
+          status: :confirmed
+        })
+
+      {:ok, _started_event} =
+        started_event
+        |> Ecto.Changeset.change(%{start_date: started_at})
+        |> Repo.update()
+
+      default_tickets = Events.list_upcoming_confirmed_tickets_for_user(user.id)
+      assert started_ticket.id in Enum.map(default_tickets, & &1.id)
+
+      after_now_tickets =
+        Events.list_upcoming_confirmed_tickets_for_user(user.id, after_now: true)
+
+      refute started_ticket.id in Enum.map(after_now_tickets, & &1.id)
+    end
+
+    test "list_upcoming_confirmed_tickets_for_user/2 event_limit with after_now only counts future events" do
+      user = user_fixture()
+
+      started_at =
+        DateTime.utc_now()
+        |> DateTime.add(-30, :minute)
+        |> DateTime.truncate(:second)
+
+      start_of_today =
+        "America/Los_Angeles"
+        |> DateTime.now!()
+        |> DateTime.to_date()
+        |> DateTime.new!(~T[00:00:00], "America/Los_Angeles")
+        |> DateTime.shift_zone!("Etc/UTC")
+
+      if DateTime.compare(started_at, start_of_today) != :gt do
+        assert DateTime.now!("America/Los_Angeles").hour == 0
+      else
+        do_event_limit_after_now_test(user, started_at)
+      end
+    end
+
+    defp do_event_limit_after_now_test(user, started_at) do
+      {:ok, started_event} =
+        Events.create_event(%{
+          title: "Started Earlier Today Limit",
+          description: "Already underway",
+          state: :published,
+          organizer_id: user.id,
+          start_date:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second),
+          end_date:
+            DateTime.add(DateTime.utc_now(), 2, :day)
+            |> DateTime.truncate(:second),
+          published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      {:ok, started_tier} = create_ticket_tier_fixture(%{event_id: started_event.id})
+
+      create_ticket_fixture(%{
+        event_id: started_event.id,
+        user_id: user.id,
+        ticket_tier_id: started_tier.id,
+        status: :confirmed
+      })
+
+      {:ok, started_event} =
+        started_event
+        |> Ecto.Changeset.change(%{start_date: started_at})
+        |> Repo.update()
+
+      future_event_ids =
+        for idx <- 1..2 do
+          {:ok, event} =
+            Events.create_event(%{
+              title: "Future #{idx}",
+              description: "Soon",
+              state: :published,
+              organizer_id: user.id,
+              start_date:
+                DateTime.add(DateTime.utc_now(), idx, :day)
+                |> DateTime.truncate(:second),
+              published_at: DateTime.utc_now() |> DateTime.truncate(:second)
+            })
+
+          {:ok, tier} = create_ticket_tier_fixture(%{event_id: event.id})
+
+          create_ticket_fixture(%{
+            event_id: event.id,
+            user_id: user.id,
+            ticket_tier_id: tier.id,
+            status: :confirmed
+          })
+
+          event.id
+        end
+
+      tickets =
+        Events.list_upcoming_confirmed_tickets_for_user(user.id,
+          after_now: true,
+          event_limit: 2
+        )
+
+      returned_event_ids = tickets |> Enum.map(& &1.event.id) |> Enum.uniq()
+
+      assert length(returned_event_ids) == 2
+      assert started_event.id not in returned_event_ids
+      assert returned_event_ids == future_event_ids
+    end
+
     test "list_upcoming_confirmed_tickets_for_user/2 limits distinct events with event_limit" do
       user = user_fixture()
 

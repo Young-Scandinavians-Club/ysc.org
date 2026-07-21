@@ -336,6 +336,69 @@ defmodule YscWeb.HomeLiveTest do
       assert html =~ data.event.title
     end
 
+    test "hides event tickets for events that already started today", %{conn: conn} do
+      started_at =
+        DateTime.utc_now()
+        |> DateTime.add(-30, :minute)
+        |> DateTime.truncate(:second)
+
+      start_of_today =
+        "America/Los_Angeles"
+        |> DateTime.now!()
+        |> DateTime.to_date()
+        |> DateTime.new!(~T[00:00:00], "America/Los_Angeles")
+        |> DateTime.shift_zone!("Etc/UTC")
+
+      user = Ysc.TestDataFactory.user_with_membership(:lifetime)
+
+      event =
+        Ysc.TestDataFactory.event_with_state(:upcoming,
+          user: user,
+          attrs: %{
+            title: "Started Today #{System.unique_integer([:positive])}"
+          }
+        )
+
+      tier = ticket_tier_fixture(%{event_id: event.id})
+
+      order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      order = Repo.preload(order, :tickets)
+
+      Enum.each(order.tickets, fn ticket ->
+        ticket |> Ticket.status_changeset(%{status: :confirmed}) |> Repo.update!()
+      end)
+
+      if DateTime.compare(started_at, start_of_today) != :gt do
+        assert DateTime.now!("America/Los_Angeles").hour == 0
+      else
+        do_hide_started_today_tickets_test(conn, user, event, started_at)
+      end
+    end
+
+    defp do_hide_started_today_tickets_test(conn, user, event, started_at) do
+      {:ok, event} =
+        event
+        |> Ecto.Changeset.change(%{start_date: started_at})
+        |> Repo.update()
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      render_async(view, 5_000)
+      html = render(view)
+
+      refute html =~ event.title
+      assert html =~ "No upcoming event tickets"
+    end
+
     test "shows upcoming booking on the itinerary", %{conn: conn} do
       user = Ysc.TestDataFactory.user_with_membership(:lifetime)
 
