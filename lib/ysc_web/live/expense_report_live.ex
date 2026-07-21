@@ -1460,11 +1460,7 @@ defmodule YscWeb.ExpenseReportLive do
                       </div>
                       <div class="text-right ml-4">
                         <p class="font-semibold text-zinc-900">
-                          {case Ysc.MoneyHelper.format_money(item.amount) do
-                            {:ok, amount} -> amount
-                            amount when is_binary(amount) -> amount
-                            _ -> "N/A"
-                          end}
+                          {display_money(item.amount)}
                         </p>
                       </div>
                     </div>
@@ -1525,11 +1521,7 @@ defmodule YscWeb.ExpenseReportLive do
                       </div>
                       <div class="text-right ml-4">
                         <p class="font-semibold text-zinc-900">
-                          {case Ysc.MoneyHelper.format_money(item.amount) do
-                            {:ok, amount} -> amount
-                            amount when is_binary(amount) -> amount
-                            _ -> "N/A"
-                          end}
+                          {display_money(item.amount)}
                         </p>
                       </div>
                     </div>
@@ -1548,33 +1540,21 @@ defmodule YscWeb.ExpenseReportLive do
                 <div class="flex justify-between">
                   <span class="text-zinc-600">Total Expenses</span>
                   <span class="font-medium">
-                    {case Ysc.MoneyHelper.format_money(@totals.expense_total) do
-                      {:ok, amount} -> amount
-                      amount when is_binary(amount) -> amount
-                      _ -> "N/A"
-                    end}
+                    {display_money(@totals.expense_total)}
                   </span>
                 </div>
                 <%= if not Money.zero?(@totals.income_total) do %>
                   <div class="flex justify-between">
                     <span class="text-zinc-600">Total Income</span>
                     <span class="font-medium">
-                      {case Ysc.MoneyHelper.format_money(@totals.income_total) do
-                        {:ok, amount} -> amount
-                        amount when is_binary(amount) -> amount
-                        _ -> "N/A"
-                      end}
+                      {display_money(@totals.income_total)}
                     </span>
                   </div>
                 <% end %>
                 <div class="flex justify-between pt-3 border-t border-zinc-200">
                   <span class="text-lg font-semibold text-zinc-900">Net Total</span>
                   <span class="text-lg font-semibold text-zinc-900">
-                    {case Ysc.MoneyHelper.format_money(@totals.net_total) do
-                      {:ok, amount} -> amount
-                      amount when is_binary(amount) -> amount
-                      _ -> "N/A"
-                    end}
+                    {display_money(@totals.net_total)}
                   </span>
                 </div>
               </div>
@@ -1711,35 +1691,21 @@ defmodule YscWeb.ExpenseReportLive do
                         <div>
                           <span class="text-zinc-500">Total Expenses</span>
                           <p class="font-semibold text-zinc-900 mt-1">
-                            {case Ysc.MoneyHelper.format_money(totals.expense_total) do
-                              {:ok, amount} -> amount
-                              amount when is_binary(amount) -> amount
-                              _ -> "N/A"
-                            end}
+                            {display_money(totals.expense_total)}
                           </p>
                         </div>
                         <%= if not Money.zero?(totals.income_total) do %>
                           <div>
                             <span class="text-zinc-500">Total Income</span>
                             <p class="font-semibold text-zinc-900 mt-1">
-                              {case Ysc.MoneyHelper.format_money(
-                                      totals.income_total
-                                    ) do
-                                {:ok, amount} -> amount
-                                amount when is_binary(amount) -> amount
-                                _ -> "N/A"
-                              end}
+                              {display_money(totals.income_total)}
                             </p>
                           </div>
                         <% end %>
                         <div>
                           <span class="text-zinc-500">Net Total</span>
                           <p class="font-semibold text-lg text-zinc-900 mt-1">
-                            {case Ysc.MoneyHelper.format_money(totals.net_total) do
-                              {:ok, amount} -> amount
-                              amount when is_binary(amount) -> amount
-                              _ -> "N/A"
-                            end}
+                            {display_money(totals.net_total)}
                           </p>
                         </div>
                       </div>
@@ -3571,6 +3537,13 @@ defmodule YscWeb.ExpenseReportLive do
   end
 
   defp error_to_string({msg, _opts}), do: msg
+
+  defp display_money(money) do
+    case Ysc.MoneyHelper.format_money(money) do
+      {:ok, amount} -> amount
+      _ -> "N/A"
+    end
+  end
 
   # Timeline component for expense report status
   defp timeline_section(assigns) do

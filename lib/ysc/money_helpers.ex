@@ -62,9 +62,6 @@ defmodule Ysc.MoneyHelper do
 
   defp normalize_negative_currency_display({:ok, _} = ok), do: ok
   defp normalize_negative_currency_display({:error, _} = err), do: err
-  defp normalize_negative_currency_display(""), do: ""
-  defp normalize_negative_currency_display("$-" <> rest), do: "-$" <> rest
-  defp normalize_negative_currency_display(str) when is_binary(str), do: str
 
   @doc """
   Formats Money for HTML form input values.
