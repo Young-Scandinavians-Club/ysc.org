@@ -1211,19 +1211,6 @@ defmodule YscWeb.HomeLive do
               <p class="font-bold text-sm lg:text-base text-zinc-900">Clear Lake</p>
               <p class="text-xs lg:text-sm text-zinc-500">Reserve Cabin</p>
             </.link>
-            <.link
-              navigate={~p"/users/settings"}
-              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon
-                  name="hero-cog-6-tooth"
-                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
-                />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
-            </.link>
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
                 navigate={~p"/expensereport"}
@@ -1253,6 +1240,19 @@ defmodule YscWeb.HomeLive do
                 <p class="text-xs lg:text-sm text-zinc-500">Browse Events</p>
               </.link>
             <% end %>
+            <.link
+              navigate={~p"/users/settings"}
+              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+            >
+              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                <.icon
+                  name="hero-cog-6-tooth"
+                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
+                />
+              </div>
+              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
+            </.link>
           </div>
 
           <%!-- Main Content Grid --%>
