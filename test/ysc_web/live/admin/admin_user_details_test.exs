@@ -224,6 +224,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
+      assert has_element?(view, "details summary", "View Account Activity")
       assert has_element?(view, "#account-activity")
       assert has_element?(view, "#last-login-at", "N/A")
       assert has_element?(view, "#last-activity-at", "N/A")

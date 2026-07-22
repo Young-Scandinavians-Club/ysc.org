@@ -78,42 +78,51 @@ defmodule YscWeb.AdminUserDetailsLive do
         </div>
 
         <div class="w-full py-4 flex flex-row items-center justify-between">
-          <div class="flex items-center gap-6">
+          <div class="flex items-start gap-6">
             <.user_avatar_image
               user={@selected_user}
               class="w-24 h-24 rounded-full shrink-0"
             />
-            <div
-              id="account-activity"
-              class="grid grid-cols-[max-content_1fr] items-start gap-x-4 gap-y-3 text-sm"
-            >
-              <span class="text-zinc-500 pt-[1px]">Last login</span>
-              <div id="last-login-at" class="min-w-0">
-                <%= if @last_login_at do %>
-                  <div class="text-zinc-900 font-medium">
-                    {Timex.from_now(@last_login_at)}
-                  </div>
-                  <div class="text-zinc-500 text-xs mt-0.5">
-                    {format_datetime_for_display(@last_login_at)}
-                  </div>
-                <% else %>
-                  <span class="text-zinc-900 font-medium">N/A</span>
-                <% end %>
+            <details class="group pt-2">
+              <summary class="list-none cursor-pointer flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-800 select-none transition-colors [&::-webkit-details-marker]:hidden">
+                View Account Activity
+                <.icon
+                  name="hero-chevron-down"
+                  class="w-4 h-4 transition-transform duration-200 group-open:-rotate-180"
+                />
+              </summary>
+              <div
+                id="account-activity"
+                class="grid grid-cols-[max-content_1fr] items-start gap-x-4 gap-y-3 text-sm mt-4"
+              >
+                <span class="text-zinc-500 pt-[1px]">Last login</span>
+                <div id="last-login-at" class="min-w-0">
+                  <%= if @last_login_at do %>
+                    <div class="text-zinc-900 font-medium">
+                      {Timex.from_now(@last_login_at)}
+                    </div>
+                    <div class="text-zinc-500 text-xs mt-0.5">
+                      {format_datetime_for_display(@last_login_at)}
+                    </div>
+                  <% else %>
+                    <span class="text-zinc-900 font-medium">N/A</span>
+                  <% end %>
+                </div>
+                <span class="text-zinc-500 pt-[1px]">Last activity</span>
+                <div id="last-activity-at" class="min-w-0">
+                  <%= if @last_activity_at do %>
+                    <div class="text-zinc-900 font-medium">
+                      {Timex.from_now(@last_activity_at)}
+                    </div>
+                    <div class="text-zinc-500 text-xs mt-0.5">
+                      {format_datetime_for_display(@last_activity_at)}
+                    </div>
+                  <% else %>
+                    <span class="text-zinc-900 font-medium">N/A</span>
+                  <% end %>
+                </div>
               </div>
-              <span class="text-zinc-500 pt-[1px]">Last activity</span>
-              <div id="last-activity-at" class="min-w-0">
-                <%= if @last_activity_at do %>
-                  <div class="text-zinc-900 font-medium">
-                    {Timex.from_now(@last_activity_at)}
-                  </div>
-                  <div class="text-zinc-500 text-xs mt-0.5">
-                    {format_datetime_for_display(@last_activity_at)}
-                  </div>
-                <% else %>
-                  <span class="text-zinc-900 font-medium">N/A</span>
-                <% end %>
-              </div>
-            </div>
+            </details>
           </div>
         </div>
 
