@@ -11,8 +11,10 @@ defmodule Ysc.Tickets.TimeoutWorkerTest do
   import Ysc.EventsFixtures
 
   setup do
-    Application.put_env(:ysc, Oban, testing: :manual)
-    on_exit(fn -> Application.put_env(:ysc, Oban, testing: :inline) end)
+    oban_config = Application.get_env(:ysc, Oban, [])
+
+    Application.put_env(:ysc, Oban, Keyword.put(oban_config, :testing, :manual))
+    on_exit(fn -> Application.put_env(:ysc, Oban, oban_config) end)
 
     user = user_fixture()
     event = event_fixture()

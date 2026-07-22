@@ -233,7 +233,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     test "shows last login and activity from auth events", %{conn: conn} do
       user = user_fixture()
 
-      {:ok, auth_event} =
+      {:ok, login_event} =
         AuthEvent.login_success_changeset(user, %{
           ip_address: "127.0.0.1",
           browser: "Chrome",
@@ -241,20 +241,40 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         })
         |> Repo.insert()
 
-      expected_absolute =
-        auth_event.inserted_at
+      logout_inserted_at = DateTime.add(login_event.inserted_at, 3600, :second)
+
+      {:ok, logout_event} =
+        AuthEvent.logout_changeset(user, %{
+          ip_address: "127.0.0.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Ecto.Changeset.put_change(:inserted_at, logout_inserted_at)
+        |> Repo.insert()
+
+      login_absolute =
+        login_event.inserted_at
         |> DateTime.shift_zone!("America/Los_Angeles")
         |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
 
-      expected_relative = Timex.from_now(auth_event.inserted_at)
+      login_relative = Timex.from_now(login_event.inserted_at)
+
+      logout_absolute =
+        logout_event.inserted_at
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
+
+      logout_relative = Timex.from_now(logout_event.inserted_at)
 
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
       assert has_element?(view, "#account-activity")
-      assert has_element?(view, "#last-login-at", expected_relative)
-      assert has_element?(view, "#last-login-at", expected_absolute)
-      assert has_element?(view, "#last-activity-at", expected_relative)
-      assert has_element?(view, "#last-activity-at", expected_absolute)
+      assert has_element?(view, "#last-login-at", login_relative)
+      assert has_element?(view, "#last-login-at", login_absolute)
+      refute has_element?(view, "#last-login-at", logout_relative)
+      assert has_element?(view, "#last-activity-at", logout_relative)
+      assert has_element?(view, "#last-activity-at", logout_absolute)
+      refute has_element?(view, "#last-activity-at", login_relative)
     end
   end
 

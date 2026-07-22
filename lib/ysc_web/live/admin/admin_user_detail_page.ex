@@ -4,6 +4,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   import YscWeb.CoreComponents
+  import YscWeb.Live.AsyncHelpers
   alias Phoenix.LiveView.JS
 
   alias Ysc.Accounts
@@ -4478,23 +4479,16 @@ defmodule YscWeb.AdminUserDetailsLive do
       last_login_at,
       last_activity_at
     ] =
-      Task.await_many(
-        [
-          Task.async(fn -> fetch_subscription_data(selected_user) end),
-          Task.async(fn ->
-            Accounts.has_lifetime_membership?(selected_user)
-          end),
-          Task.async(fn -> fetch_application(id, current_user) end),
-          Task.async(fn -> Accounts.household_board_member(selected_user) end),
-          Task.async(fn ->
-            Accounts.get_last_successful_login_datetime(selected_user)
-          end),
-          Task.async(fn ->
-            Accounts.get_last_login_session_datetime(selected_user)
-          end)
-        ],
-        :infinity
-      )
+      [
+        fn -> fetch_subscription_data(selected_user) end,
+        fn -> Accounts.has_lifetime_membership?(selected_user) end,
+        fn -> fetch_application(id, current_user) end,
+        fn -> Accounts.household_board_member(selected_user) end,
+        fn -> Accounts.get_last_successful_login_datetime(selected_user) end,
+        fn -> Accounts.get_last_login_session_datetime(selected_user) end
+      ]
+      |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
+      |> Enum.map(fn {:ok, result} -> result end)
 
     {active_subscription, subscription_payments} = sub_result
 
