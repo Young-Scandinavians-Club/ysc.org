@@ -308,7 +308,10 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       render_click(view, "resend_code", %{})
 
-      assert render(view) =~ "verification code has been sent"
+      html = render(view)
+
+      assert html =~ "verification code was sent again" or
+               html =~ "verification code has been sent"
     end
 
     test "resend_timer_expired and update_resend_timers events do not crash", %{

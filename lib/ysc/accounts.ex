@@ -1077,29 +1077,23 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
-  Generates a 6-digit verification code for email verification during account setup.
+  Generates a 6-digit verification code.
+
+  Prefer `Ysc.Accounts.VerificationCodes` for issue/resend/verify flows.
   """
   def generate_email_verification_code do
-    # Generate a random 6-digit code
-    :rand.uniform(999_999)
-    |> Integer.to_string()
-    |> String.pad_leading(6, "0")
+    Ysc.Accounts.VerificationCodes.generate_code()
   end
 
   @doc """
   Stores an email verification code for a user with expiration.
 
-  ## Parameters
-  - user: The user struct
-  - code: The verification code
-  - expires_in_seconds: How long until expiration (default: 600 = 10 minutes)
-
-  Returns :ok on success
+  Prefer `Ysc.Accounts.VerificationCodes.store/4`.
   """
   def store_email_verification_code(user, code, expires_in_seconds \\ 600) do
-    Ysc.VerificationCache.store_code(
-      user.id,
-      :email_verification,
+    Ysc.Accounts.VerificationCodes.store(
+      user,
+      :email,
       code,
       expires_in_seconds
     )
@@ -1107,74 +1101,65 @@ defmodule Ysc.Accounts do
 
   @doc """
   Stores a phone verification code for a user.
+
+  Prefer `Ysc.Accounts.VerificationCodes.store/4`.
   """
   def store_phone_verification_code(user, code, expires_in_seconds \\ 600) do
-    Ysc.VerificationCache.store_code(
-      user.id,
-      :phone_verification,
+    Ysc.Accounts.VerificationCodes.store(
+      user,
+      :phone,
       code,
       expires_in_seconds
     )
   end
 
   @doc """
-  Verifies an email verification code for a user.
+  Verifies an email verification code for a user (no attempt rate limit).
 
-  Returns {:ok, :verified} if the code is valid and matches,
-  {:error, :not_found} if no code exists,
-  {:error, :expired} if the code has expired,
-  {:error, :invalid_code} if the code doesn't match.
+  Prefer `Ysc.Accounts.VerificationCodes.verify/3` in LiveViews.
   """
   def verify_email_verification_code(user, provided_code) do
-    # In dev/test environments, accept "000000" as a valid code
-    if dev_or_sandbox?() and provided_code == "000000" do
-      {:ok, :verified}
-    else
-      Ysc.VerificationCache.verify_code(
-        user.id,
-        :email_verification,
-        provided_code
-      )
-    end
+    Ysc.Accounts.VerificationCodes.verify_unchecked(
+      user,
+      :email,
+      provided_code
+    )
   end
 
   @doc """
   Retrieves the current email verification code for a user if it exists and hasn't expired.
-
-  Returns {:ok, code} if found and valid, {:error, reason} otherwise.
   """
   def get_email_verification_code(user) do
-    case Ysc.VerificationCache.get_code(user.id, :email_verification) do
-      {:ok, code} -> code
-      {:error, _} -> nil
-    end
+    Ysc.Accounts.VerificationCodes.get(user, :email)
   end
 
   @doc """
   Removes the email verification code for a user (useful for cleanup).
   """
   def remove_email_verification_code(user) do
-    Ysc.VerificationCache.remove_code(user.id, :email_verification)
+    Ysc.Accounts.VerificationCodes.remove(user, :email)
   end
 
   @doc """
   Generates and stores an email verification code for a user.
 
-  This is a convenience function that generates a code and stores it in the cache.
-
-  Returns the generated code.
+  Prefer `Ysc.Accounts.VerificationCodes.issue/3` when the code should also be sent.
   """
   def generate_and_store_email_verification_code(
         user,
         expires_in_seconds \\ 600
       ) do
-    code = generate_email_verification_code()
-    :ok = store_email_verification_code(user, code, expires_in_seconds)
-    code
+    Ysc.Accounts.VerificationCodes.generate_and_store(
+      user,
+      :email,
+      expires_in_seconds
+    )
   end
 
   @doc """
   Sends an email verification code to the user.
+
+  Prefer `Ysc.Accounts.VerificationCodes.issue/3` or `resend/3`.
   """
   def send_email_verification_code(
         user,
@@ -1182,74 +1167,32 @@ defmodule Ysc.Accounts do
         resend_key_suffix \\ nil,
         target_email \\ nil
       ) do
-    # Use target_email if provided, otherwise use user's email
-    email_address = target_email || user.email
-
-    # Include resend suffix in idempotency key to allow multiple sends
-    suffix = if resend_key_suffix, do: "_#{resend_key_suffix}", else: ""
-    idempotency_key = "account_setup_verification_#{user.id}#{suffix}"
-
-    YscWeb.Emails.Notifier.schedule_email(
-      email_address,
-      idempotency_key,
-      "Verify Your Email Address - YSC",
-      "account_setup_verification",
-      %{
-        first_name: user.first_name,
-        verification_code: code
-      },
-      """
-      ==============================
-
-      Hi #{Ysc.title_case(user.first_name)},
-
-      Your verification code is: #{code}
-
-      This code will expire in 10 minutes.
-
-      ==============================
-      """,
-      user.id
+    Ysc.Accounts.VerificationCodes.deliver(user, :email, code,
+      to: target_email,
+      suffix: resend_key_suffix
     )
-  end
-
-  @doc """
-  Verifies an email verification code for account setup.
-  For now, this is a simple implementation - in production you'd want to store
-  codes with expiration times in a more secure way.
-  """
-  def verify_email_code(user, code) do
-    # For now, we'll just accept any 6-digit code as valid
-    # In production, you'd store the code with expiration and validate it properly
-    if String.length(code) == 6 && String.match?(code, ~r/^\d{6}$/) do
-      {:ok, user}
-    else
-      {:error, :invalid_code}
-    end
   end
 
   @doc """
   Generates and stores a phone verification code for a user.
 
-  This is a convenience function that generates a code and stores it in the cache.
-
-  Returns the generated code.
+  Prefer `Ysc.Accounts.VerificationCodes.issue/3` when the code should also be sent.
   """
   def generate_and_store_phone_verification_code(
         user,
         expires_in_seconds \\ 600
       ) do
-    # Reuse the same code generation
-    code = generate_email_verification_code()
-    :ok = store_phone_verification_code(user, code, expires_in_seconds)
-    code
+    Ysc.Accounts.VerificationCodes.generate_and_store(
+      user,
+      :phone,
+      expires_in_seconds
+    )
   end
 
   @doc """
   Sends a phone verification code via SMS.
 
-  When changing phone number in settings, pass the new phone as `to_phone` so
-  the code is sent to the new number instead of the current user.phone_number.
+  Prefer `Ysc.Accounts.VerificationCodes.issue/3` or `resend/3`.
   """
   def send_phone_verification_code(
         user,
@@ -1257,40 +1200,23 @@ defmodule Ysc.Accounts do
         resend_key_suffix \\ nil,
         to_phone \\ nil
       ) do
-    # Include resend suffix in idempotency key to allow multiple sends
-    suffix = if resend_key_suffix, do: "_#{resend_key_suffix}", else: ""
-    idempotency_key = "phone_verification_#{user.id}#{suffix}"
-
-    destination = to_phone || user.phone_number
-
-    YscWeb.Sms.Notifier.schedule_sms(
-      destination,
-      idempotency_key,
-      "phone_verification",
-      YscWeb.Sms.PhoneVerification.prepare_sms_data(user, code),
-      user.id
+    Ysc.Accounts.VerificationCodes.deliver(user, :phone, code,
+      to: to_phone,
+      suffix: resend_key_suffix
     )
   end
 
   @doc """
-  Verifies a phone verification code for a user.
+  Verifies a phone verification code for a user (no attempt rate limit).
 
-  Returns {:ok, :verified} if the code is valid and matches,
-  {:error, :not_found} if no code exists,
-  {:error, :expired} if the code has expired,
-  {:error, :invalid_code} if the code doesn't match.
+  Prefer `Ysc.Accounts.VerificationCodes.verify/3` in LiveViews.
   """
   def verify_phone_verification_code(user, provided_code) do
-    # In dev/test environments, accept "000000" as a valid code
-    if dev_or_sandbox?() and provided_code == "000000" do
-      {:ok, :verified}
-    else
-      Ysc.VerificationCache.verify_code(
-        user.id,
-        :phone_verification,
-        provided_code
-      )
-    end
+    Ysc.Accounts.VerificationCodes.verify_unchecked(
+      user,
+      :phone,
+      provided_code
+    )
   end
 
   ## Settings
@@ -2495,8 +2421,15 @@ defmodule Ysc.Accounts do
         multi_with_invite
         |> Repo.transaction()
         |> case do
-          {:ok, _} -> {:ok, application}
-          {:error, _, changeset, _} -> {:error, changeset}
+          {:ok, _} ->
+            if invite do
+              Ysc.Accounts.FamilyInvites.notify_invite_accepted(invite, user)
+            end
+
+            {:ok, application}
+
+          {:error, _, changeset, _} ->
+            {:error, changeset}
         end
       end
     end
@@ -3875,11 +3808,6 @@ defmodule Ysc.Accounts do
       preload: [:created_by]
     )
     |> Repo.all()
-  end
-
-  # Helper function to check if we're in dev/sandbox mode
-  defp dev_or_sandbox? do
-    Ysc.Env.non_prod?()
   end
 
   ## Post-migration onboarding

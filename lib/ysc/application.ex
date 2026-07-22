@@ -64,8 +64,6 @@ defmodule Ysc.Application do
         {Ysc.MobileAPIRateLimit, [clean_period: :timer.minutes(1)]},
         # Admin help LLM (guide finder + step clarifier)
         {Ysc.AdminHelpRateLimit, [clean_period: :timer.minutes(1)]},
-        # Start verification code cache
-        Ysc.VerificationCache,
         # Start Apple Wallet certificate manager
         Ysc.AppleWallet.CertManager,
         # Start Google Wallet credentials manager

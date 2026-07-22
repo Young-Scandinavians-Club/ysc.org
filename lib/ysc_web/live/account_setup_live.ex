@@ -4,6 +4,7 @@ defmodule YscWeb.AccountSetupLive do
   require Ysc.Logging
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.VerificationCodes
   alias Ysc.Customers
   alias YscWeb.AccountSetupAccess
   alias Ysc.Payments
@@ -541,14 +542,8 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   defp ensure_verification_email_sent(user) do
-    case Ysc.VerificationCache.get_code(user.id, :email_verification) do
-      {:ok, _existing_code} ->
-        :ok
-
-      {:error, _} ->
-        code = Accounts.generate_and_store_email_verification_code(user)
-        _job = Accounts.send_email_verification_code(user, code, "initial")
-    end
+    _ = VerificationCodes.ensure(user, :email, suffix: "initial")
+    :ok
   end
 
   defp maybe_adjust_step_after_payment_refine(socket, user_needs) do
@@ -821,31 +816,10 @@ defmodule YscWeb.AccountSetupLive do
           if (connected?(socket) && allowed_step == 4 &&
                 not is_nil(fresh_user.phone_number)) and
                is_nil(fresh_user.phone_verified_at) do
-            # Check if code already exists in cache
-            case Ysc.VerificationCache.get_code(
-                   fresh_user.id,
-                   :phone_verification
-                 ) do
-              {:ok, _existing_code} ->
-                # Code already exists, don't send new one
-                socket
+            _ =
+              VerificationCodes.ensure(fresh_user, :phone, suffix: "auto_step4")
 
-              {:error, _} ->
-                # Generate and send new verification code
-                phone_code =
-                  Accounts.generate_and_store_phone_verification_code(
-                    fresh_user
-                  )
-
-                _job =
-                  Accounts.send_phone_verification_code(
-                    fresh_user,
-                    phone_code,
-                    "auto_step4"
-                  )
-
-                socket
-            end
+            socket
           else
             socket
           end
@@ -894,14 +868,13 @@ defmodule YscWeb.AccountSetupLive do
       )
 
     normalized_code = normalize_verification_code(merged_code)
-    # Basic validation - ensure it's 6 digits
-    is_valid =
-      String.length(normalized_code) == 6 &&
-        String.match?(normalized_code, ~r/^\d{6}$/)
 
     {:noreply,
      socket
-     |> assign(:code_valid, is_valid)
+     |> assign(
+       :code_valid,
+       VerificationCodes.valid_otp_format?(normalized_code)
+     )
      |> assign(:email_verification_code_state, merged_code)}
   end
 
@@ -1057,16 +1030,8 @@ defmodule YscWeb.AccountSetupLive do
 
       case Accounts.update_user_phone_and_sms(user, user_params) do
         {:ok, updated_user} ->
-          # Generate and send phone verification code
-          phone_code =
-            Accounts.generate_and_store_phone_verification_code(updated_user)
-
-          _job =
-            Accounts.send_phone_verification_code(
-              updated_user,
-              phone_code,
-              "initial"
-            )
+          {:ok, _} =
+            VerificationCodes.issue(updated_user, :phone, suffix: "initial")
 
           updated_user_needs = compute_user_needs(updated_user)
 
@@ -1188,14 +1153,13 @@ defmodule YscWeb.AccountSetupLive do
         )
 
       normalized_code = normalize_verification_code(merged_code)
-      # Basic validation - ensure it's 6 digits
-      is_valid =
-        String.length(normalized_code) == 6 &&
-          String.match?(normalized_code, ~r/^\d{6}$/)
 
       {:noreply,
        socket
-       |> assign(:phone_code_valid, is_valid)
+       |> assign(
+         :phone_code_valid,
+         VerificationCodes.valid_otp_format?(normalized_code)
+       )
        |> assign(:phone_verification_code_state, merged_code)}
     else
       {:noreply, socket}
@@ -1228,16 +1192,23 @@ defmodule YscWeb.AccountSetupLive do
         )
         |> normalize_verification_code()
 
-      user_id = user.id
+      case VerificationCodes.verify(user, :phone, code) do
+        {:ok, :verified} ->
+          do_verify_phone_code_success(socket, user)
 
-      case Ysc.EmailVerificationRateLimit.check(user_id, :phone) do
-        :ok ->
-          do_verify_phone_code(socket, user, code)
-
-        :rate_limited ->
+        {:error, :rate_limited} ->
           YscWeb.Flash.send_toast(
             :error,
             "Too many verification attempts. Please wait a minute and try again.",
+            title: "Phone verification"
+          )
+
+          {:noreply, socket}
+
+        {:error, reason} ->
+          YscWeb.Flash.send_toast(
+            :error,
+            verification_error_message(reason),
             title: "Phone verification"
           )
 
@@ -1257,36 +1228,10 @@ defmodule YscWeb.AccountSetupLive do
 
       {:noreply, socket}
     else
-      # Re-fetch user to get latest data
       user = Accounts.get_user!(socket.assigns.user.id)
-      user_id = user.id
 
-      case Ysc.ResendRateLimiter.check_and_record_resend(user_id, :sms) do
-        {:ok, :allowed} ->
-          # Resend allowed, proceed with sending SMS
-          {code, is_existing} =
-            case Ysc.VerificationCache.get_code(user_id, :phone_verification) do
-              {:ok, existing_code} ->
-                {existing_code, true}
-
-              {:error, _} ->
-                # Generate new code if none exists
-                new_code =
-                  Accounts.generate_and_store_phone_verification_code(user)
-
-                {new_code, false}
-            end
-
-          # Send the code via SMS
-          timestamp = DateTime.utc_now() |> DateTime.to_unix()
-
-          suffix =
-            if is_existing,
-              do: "resend_existing_#{timestamp}",
-              else: "resend_new_#{timestamp}"
-
-          _job = Accounts.send_phone_verification_code(user, code, suffix)
-
+      case VerificationCodes.resend(user, :phone) do
+        {:ok, %{disabled_until: disabled_until}} ->
           YscWeb.Flash.send_toast(
             :info,
             "Verification code sent to your phone.",
@@ -1294,12 +1239,7 @@ defmodule YscWeb.AccountSetupLive do
             icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
           )
 
-          {:noreply,
-           assign(
-             socket,
-             :sms_resend_disabled_until,
-             Ysc.ResendRateLimiter.disabled_until(60)
-           )}
+          {:noreply, assign(socket, :sms_resend_disabled_until, disabled_until)}
 
         {:error, :rate_limited, _remaining} ->
           YscWeb.Flash.send_toast(
@@ -1442,49 +1382,16 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  defp do_verify_phone_code(socket, user, code) do
-    case Accounts.verify_phone_verification_code(user, code) do
-      {:ok, :verified} ->
-        # Mark phone as verified in database
-        {:ok, updated_user} = Accounts.mark_phone_verified(user)
+  defp do_verify_phone_code_success(socket, user) do
+    {:ok, updated_user} = Accounts.mark_phone_verified(user)
+    token = Accounts.generate_auto_login_token(updated_user)
 
-        # Use a short-lived signed token (same pattern as email verification)
-        token = Accounts.generate_auto_login_token(updated_user)
-
-        {:noreply,
-         socket
-         |> Phoenix.LiveView.redirect(
-           to:
-             ~p"/users/log-in/auto?#{%{token: token, redirect_to: "/account/setup/#{updated_user.id}?step=5"}}"
-         )}
-
-      {:error, :not_found} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "No verification code found. Please request a new one.",
-          title: "Phone verification"
-        )
-
-        {:noreply, socket}
-
-      {:error, :expired} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Verification code has expired. Please request a new one.",
-          title: "Phone verification"
-        )
-
-        {:noreply, socket}
-
-      {:error, :invalid_code} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Invalid verification code. Please try again.",
-          title: "Phone verification"
-        )
-
-        {:noreply, socket}
-    end
+    {:noreply,
+     socket
+     |> Phoenix.LiveView.redirect(
+       to:
+         ~p"/users/log-in/auto?#{%{token: token, redirect_to: "/account/setup/#{updated_user.id}?step=5"}}"
+     )}
   end
 
   defp do_handle_verify_code(socket, entered_code) do
@@ -1496,16 +1403,23 @@ defmodule YscWeb.AccountSetupLive do
       )
       |> normalize_verification_code()
 
-    user_id = socket.assigns.user.id
+    case VerificationCodes.verify(socket.assigns.user, :email, code) do
+      {:ok, :verified} ->
+        do_verify_email_code_success(socket)
 
-    case Ysc.EmailVerificationRateLimit.check(user_id) do
-      :ok ->
-        do_verify_email_code(socket, code)
-
-      :rate_limited ->
+      {:error, :rate_limited} ->
         YscWeb.Flash.send_toast(
           :error,
           "Too many verification attempts. Please wait a minute and try again.",
+          title: "Email verification"
+        )
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          verification_error_message(reason),
           title: "Email verification"
         )
 
@@ -1514,54 +1428,23 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   defp do_handle_resend_code(socket) do
-    user_id = socket.assigns.user.id
-
-    case Ysc.ResendRateLimiter.check_and_record_resend(user_id, :email) do
-      {:ok, :allowed} ->
-        # Resend allowed, proceed with sending email
-        {code, is_existing} =
-          case Ysc.VerificationCache.get_code(user_id, :email_verification) do
-            {:ok, existing_code} ->
-              {existing_code, true}
-
-            {:error, _} ->
-              # Generate new code if none exists
-              new_code =
-                Accounts.generate_and_store_email_verification_code(
-                  socket.assigns.user
-                )
-
-              {new_code, false}
+    case VerificationCodes.resend(socket.assigns.user, :email) do
+      {:ok, %{disabled_until: disabled_until, reused?: reused?}} ->
+        message =
+          if reused? do
+            "Your verification code was sent again to your email."
+          else
+            "A new verification code has been sent to your email."
           end
-
-        # Use timestamp to make idempotency key unique for resend attempts
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-
-        suffix =
-          if is_existing,
-            do: "resend_existing_#{timestamp}",
-            else: "resend_new_#{timestamp}"
-
-        _job =
-          Accounts.send_email_verification_code(
-            socket.assigns.user,
-            code,
-            suffix
-          )
 
         YscWeb.Flash.send_toast(
           :info,
-          "A new verification code has been sent to your email.",
+          message,
           title: "Email verification",
           icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
         )
 
-        {:noreply,
-         assign(
-           socket,
-           :email_resend_disabled_until,
-           Ysc.ResendRateLimiter.disabled_until(60)
-         )}
+        {:noreply, assign(socket, :email_resend_disabled_until, disabled_until)}
 
       {:error, :rate_limited, _remaining} ->
         YscWeb.Flash.send_toast(
@@ -1574,71 +1457,37 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  defp do_verify_email_code(socket, code) do
-    # In dev/sandbox, always accept 000000 as valid code
-    verification_result =
-      if dev_or_sandbox?() and code == "000000" do
-        {:ok, :verified}
-      else
-        Accounts.verify_email_verification_code(socket.assigns.user, code)
+  defp do_verify_email_code_success(socket) do
+    {:ok, updated_user} = Accounts.mark_email_verified(socket.assigns.user)
+    updated_user_needs = compute_user_needs(updated_user)
+
+    next_step =
+      cond do
+        updated_user_needs.payment_method_setup -> 1
+        updated_user_needs.password_setup -> 2
+        updated_user_needs.phone_setup -> 3
+        updated_user_needs.phone_verification -> 4
+        true -> 5
       end
 
-    case verification_result do
-      {:ok, :verified} ->
-        # Mark email as verified in database
-        {:ok, updated_user} = Accounts.mark_email_verified(socket.assigns.user)
-        updated_user_needs = compute_user_needs(updated_user)
+    one_time_token = Accounts.generate_auto_login_token(updated_user)
 
-        # Determine next step based on what still needs to be completed
-        # New order: 1=payment, 2=password, 3=phone setup, 4=phone verify
-        next_step =
-          cond do
-            updated_user_needs.payment_method_setup -> 1
-            updated_user_needs.password_setup -> 2
-            updated_user_needs.phone_setup -> 3
-            updated_user_needs.phone_verification -> 4
-            true -> 5
-          end
-
-        # Short-lived one-time token for auto-login (verified by controller, then session created)
-        one_time_token = Accounts.generate_auto_login_token(updated_user)
-
-        # Redirect to auto-login to establish session, then back to account setup
-        {:noreply,
-         socket
-         |> Phoenix.LiveView.redirect(
-           to:
-             ~p"/users/log-in/auto?#{%{token: one_time_token, redirect_to: "/account/setup/#{updated_user.id}?step=#{next_step}"}}"
-         )}
-
-      {:error, :not_found} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "No verification code found. Please request a new one.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-
-      {:error, :expired} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Verification code has expired. Please request a new one.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-
-      {:error, :invalid_code} ->
-        YscWeb.Flash.send_toast(
-          :error,
-          "Invalid verification code. Please try again.",
-          title: "Email verification"
-        )
-
-        {:noreply, socket}
-    end
+    {:noreply,
+     socket
+     |> Phoenix.LiveView.redirect(
+       to:
+         ~p"/users/log-in/auto?#{%{token: one_time_token, redirect_to: "/account/setup/#{updated_user.id}?step=#{next_step}"}}"
+     )}
   end
+
+  defp verification_error_message(:not_found),
+    do: "No verification code found. Please request a new one."
+
+  defp verification_error_message(:expired),
+    do: "Verification code has expired. Please request a new one."
+
+  defp verification_error_message(_),
+    do: "Invalid verification code. Please try again."
 
   # phx-change may send one digit or a paste map; phx-submit can omit unchanged fields.
   # Merge with the accumulated assign so verify uses the full code the user entered.
@@ -1653,35 +1502,8 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  # Helper function to normalize verification code from OTP array/map or string format
-  defp normalize_verification_code(code) when is_map(code) do
-    # Handle map format: %{"0" => "1", "1" => "2", ...}
-    # Form may include non-integer keys (e.g. "_unused_1"); keep only integer keys
-    code
-    |> Enum.filter(fn {k, _v} ->
-      case Integer.parse(k) do
-        {_int, ""} -> true
-        _ -> false
-      end
-    end)
-    |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
-    |> Enum.map(fn {_k, v} -> v end)
-    |> Enum.reject(&(&1 == "" || &1 == nil))
-    |> Enum.join("")
-  end
-
-  defp normalize_verification_code(code) when is_list(code) do
-    # Join array elements and filter out empty values
-    code
-    |> Enum.reject(&(&1 == "" || &1 == nil))
-    |> Enum.join("")
-  end
-
-  defp normalize_verification_code(code) when is_binary(code) do
-    code
-  end
-
-  defp normalize_verification_code(_), do: ""
+  defp normalize_verification_code(code),
+    do: VerificationCodes.normalize_otp_input(code)
 
   # LiveView events are not gated by handle_params; require the session user to
   # match the account in the URL before any post-verification setup action.

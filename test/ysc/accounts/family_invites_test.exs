@@ -316,6 +316,36 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert user_event.updated_by_user_id == primary_user.id
     end
 
+    test "schedules accepted notification email to inviter" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      user_attrs = %{
+        email: email,
+        password: "password1234",
+        first_name: "Sub",
+        last_name: "User",
+        phone_number: "+14159098268",
+        date_of_birth: ~D[1990-01-01]
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _user} =
+                 FamilyInvites.accept_invite(invite.token, user_attrs)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "recipient" => primary_user.email,
+            "idempotency_key" => "family_invite_accepted_#{invite.id}",
+            "template" => "family_invite_accepted"
+          }
+        )
+      end)
+    end
+
     test "returns error when invite not found" do
       assert {:error, :invite_not_found} =
                FamilyInvites.accept_invite("invalid_token", %{

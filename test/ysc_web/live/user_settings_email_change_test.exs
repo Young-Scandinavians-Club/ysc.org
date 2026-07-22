@@ -356,4 +356,91 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
       assert updated_user.email_verified_at != nil
     end
   end
+
+  describe "email change - OAuth reauth resume" do
+    test "continues email change after OAuth return with resume token", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      new_email = "oauth-resume@example.com"
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "purpose" => "email_change",
+          "email" => new_email
+        })
+
+      conn =
+        conn
+        |> log_in_user(user)
+        |> Plug.Conn.put_session(
+          :reauth_verified_at,
+          DateTime.utc_now() |> DateTime.to_unix()
+        )
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      assert has_element?(view, "#email-verification-modal")
+      assert render(view) =~ new_email
+      assert Accounts.get_email_verification_code(user)
+    end
+
+    test "reopens reauth modal when resume token present but not verified", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      new_email = "oauth-resume-fail@example.com"
+
+      resume_path =
+        YscWeb.ReauthResume.append_to_path(~p"/users/settings", %{
+          "purpose" => "email_change",
+          "email" => new_email
+        })
+
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, resume_path)
+
+      assert has_element?(view, "#reauth-modal")
+      refute has_element?(view, "#email-verification-modal")
+    end
+
+    test "OAuth reauth buttons include signed resume intent in return_to", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+
+      render_submit(view, "request_email_change", %{
+        user: %{email: "oauth-intent@example.com"}
+      })
+
+      assert has_element?(view, "#reauth-modal")
+
+      # Clicking OAuth redirects; capture the redirect target.
+      assert {:error, {:redirect, %{to: to}}} =
+               view
+               |> element("button[phx-click='reauth_with_google']")
+               |> render_click()
+
+      uri = URI.parse(to)
+      assert uri.path == "/auth/google"
+      query = URI.decode_query(uri.query || "")
+      assert query["reauth"] == "true"
+
+      return_to = query["return_to"]
+      assert is_binary(return_to)
+
+      resume_query =
+        return_to |> URI.parse() |> Map.fetch!(:query) |> URI.decode_query()
+
+      assert {:ok, intent} =
+               YscWeb.ReauthResume.verify(resume_query["reauth_resume"])
+
+      assert intent["purpose"] == "email_change"
+      assert intent["email"] == "oauth-intent@example.com"
+    end
+  end
 end

@@ -14,6 +14,7 @@ defmodule Ysc.Accounts.EmailCategories do
                                    "application_rejected",
                                    "application_submitted",
                                    "family_invite",
+                                   "family_invite_accepted",
                                    "family_invite_cancelled",
                                    "family_member_removed",
                                    "membership_payment_confirmation",
@@ -70,6 +71,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "booking_refund_pending" => :account,
     "account_setup_verification" => :account,
     "family_invite" => :account,
+    "family_invite_accepted" => :account,
     "family_invite_cancelled" => :account,
     "family_member_removed" => :account,
     # Newsletter (preference checked via newsletter_subscribers when sent through EmailNotifier)
