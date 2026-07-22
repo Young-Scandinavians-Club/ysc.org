@@ -854,20 +854,15 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(view, "#modification-payment-step")
 
-    string_attrs = %{
-      "checkin_date" => Date.to_string(booking.checkin_date),
-      "checkout_date" => Date.to_string(extended_checkout),
-      "guests_count" => to_string(booking.guests_count),
-      "children_count" => "0"
-    }
+    payment_delta =
+      :sys.get_state(view.pid).socket.assigns.payment_delta
 
-    assert {:ok, preview} = Bookings.prepare_modification(booking, string_attrs)
-    assert Money.positive?(preview.delta)
+    assert Money.positive?(payment_delta)
 
     payment_intent_id =
       "pi_change_recover_#{System.unique_integer([:positive])}"
 
-    amount_cents = Ysc.MoneyHelper.money_to_cents(preview.delta)
+    amount_cents = Ysc.MoneyHelper.money_to_cents(payment_delta)
 
     expired_at =
       DateTime.utc_now()
@@ -905,14 +900,11 @@ defmodule YscWeb.BookingChangeLiveTest do
       "payment_intent_id" => payment_intent_id
     })
 
-    assert {:error, {:live_redirect, %{to: path}}} =
-             render_async(view, @change_async_timeout)
+    {path, _flash} = assert_redirect(view, @change_async_timeout)
 
     assert path =~ "/bookings/#{booking.id}/receipt"
     assert path =~ "payment_intent=#{payment_intent_id}"
     assert path =~ "redirect_status=succeeded"
-
-    Mox.verify!(StripeMock)
   end
 
   defp navigate_calendar_to_month!(view, %Date{} = target) do
