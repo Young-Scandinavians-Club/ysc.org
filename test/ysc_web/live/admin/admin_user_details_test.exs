@@ -233,15 +233,24 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     test "shows last login and activity from auth events", %{conn: conn} do
       user = user_fixture()
 
+      # Use fixed past timestamps so Timex.from_now/1 strings stay stable between
+      # insert, LiveView mount, and assertions (avoids flaky "now" vs "1 second ago").
+      login_inserted_at =
+        DateTime.utc_now()
+        |> DateTime.add(-2, :hour)
+        |> DateTime.truncate(:second)
+
+      logout_inserted_at = DateTime.add(login_inserted_at, 3600, :second)
+
       {:ok, login_event} =
         AuthEvent.login_success_changeset(user, %{
           ip_address: "127.0.0.1",
           browser: "Chrome",
           operating_system: "macOS"
         })
+        |> Ecto.Changeset.put_change(:inserted_at, login_inserted_at)
+        |> Ecto.Changeset.put_change(:updated_at, login_inserted_at)
         |> Repo.insert()
-
-      logout_inserted_at = DateTime.add(login_event.inserted_at, 3600, :second)
 
       {:ok, logout_event} =
         AuthEvent.logout_changeset(user, %{
@@ -250,6 +259,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
           operating_system: "macOS"
         })
         |> Ecto.Changeset.put_change(:inserted_at, logout_inserted_at)
+        |> Ecto.Changeset.put_change(:updated_at, logout_inserted_at)
         |> Repo.insert()
 
       login_absolute =
@@ -257,16 +267,15 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         |> DateTime.shift_zone!("America/Los_Angeles")
         |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
 
-      login_relative = Timex.from_now(login_event.inserted_at)
-
       logout_absolute =
         logout_event.inserted_at
         |> DateTime.shift_zone!("America/Los_Angeles")
         |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
 
-      logout_relative = Timex.from_now(logout_event.inserted_at)
-
       {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      login_relative = Timex.from_now(login_event.inserted_at)
+      logout_relative = Timex.from_now(logout_event.inserted_at)
 
       assert has_element?(view, "#account-activity")
       assert has_element?(view, "#last-login-at", login_relative)
