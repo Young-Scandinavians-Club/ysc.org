@@ -7,7 +7,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
-  alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent}
+  alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent, UserProfileCache}
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
@@ -208,6 +208,11 @@ defmodule Ysc.Accounts.FamilyInvites do
                 end
               end)
 
+              invalidate_family_link_profile_caches(
+                final_user.id,
+                invite.primary_user_id
+              )
+
               final_user
 
             {:error, changeset} ->
@@ -271,9 +276,19 @@ defmodule Ysc.Accounts.FamilyInvites do
 
           Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
 
+          invalidate_family_link_profile_caches(
+            updated_user.id,
+            invite.primary_user_id
+          )
+
           updated_user
         end)
     end
+  end
+
+  defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
+    UserProfileCache.invalidate_user(user_id)
+    UserProfileCache.invalidate_user(primary_user_id)
   end
 
   defp emails_match?(user_email, invite_email)
