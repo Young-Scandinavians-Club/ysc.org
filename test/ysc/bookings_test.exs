@@ -271,28 +271,15 @@ defmodule Ysc.BookingsTest do
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
       active =
-        booking_fixture(%{
-          user_id: user.id,
-          checkin_date: Date.add(today, 3),
-          checkout_date: Date.add(today, 5),
-          status: :complete
-        })
+        insert_complete_booking(user, Date.add(today, 3), Date.add(today, 5))
 
       _checkout_today =
-        booking_fixture(%{
-          user_id: user.id,
-          checkin_date: Date.add(today, -2),
-          checkout_date: today,
-          status: :complete
-        })
+        insert_complete_booking(user, Date.add(today, -2), today)
 
       _canceled =
-        booking_fixture(%{
-          user_id: user.id,
-          checkin_date: Date.add(today, 10),
-          checkout_date: Date.add(today, 12),
-          status: :canceled
-        })
+        insert_complete_booking(user, Date.add(today, 10), Date.add(today, 12))
+        |> Ecto.Changeset.change(status: :canceled)
+        |> Ysc.Repo.update!()
 
       now_pst = DateTime.now!("America/Los_Angeles")
 
@@ -317,20 +304,10 @@ defmodule Ysc.BookingsTest do
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
       _stale_checkout_today =
-        booking_fixture(%{
-          user_id: user.id,
-          checkin_date: Date.add(today, -1),
-          checkout_date: today,
-          status: :complete
-        })
+        insert_complete_booking(user, Date.add(today, -1), today)
 
       future =
-        booking_fixture(%{
-          user_id: user.id,
-          checkin_date: Date.add(today, 7),
-          checkout_date: Date.add(today, 9),
-          status: :complete
-        })
+        insert_complete_booking(user, Date.add(today, 7), Date.add(today, 9))
 
       now_pst = DateTime.now!("America/Los_Angeles")
 
@@ -4728,5 +4705,21 @@ defmodule Ysc.BookingsTest do
                  booking_b
                )
     end
+  end
+
+  defp insert_complete_booking(user, checkin_date, checkout_date) do
+    %Booking{
+      user_id: user.id,
+      property: :clear_lake,
+      booking_mode: :day,
+      checkin_date: checkin_date,
+      checkout_date: checkout_date,
+      guests_count: 2,
+      status: :complete,
+      total_price: Money.new(100, :USD),
+      reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
+    }
+    |> Ysc.Repo.insert!()
+    |> Ysc.Repo.preload(:rooms)
   end
 end
