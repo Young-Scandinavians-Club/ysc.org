@@ -132,6 +132,8 @@ config :ysc, Oban,
        {"*/5 * * * *", Ysc.Events.EventPublishWorker},
        {"*/5 * * * *", YscWeb.Workers.NewsletterScheduleChecker},
        {"*/15 * * * *", Ysc.Subscriptions.ExpirationWorker},
+       # Unused OTP codes expire after ~10 minutes; sweep leftover rows regularly.
+       {"*/15 * * * *", Ysc.VerificationCodeCleanupWorker},
        {"0 2 * * *", YscWeb.Workers.ImageReprocessor},
        {"0 2 * * *", Ysc.Stripe.WebhookReconciliationWorker},
        {"0 0 * * *", Ysc.Ledgers.BalanceCheckWorker},

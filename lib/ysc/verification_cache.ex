@@ -1,214 +1,165 @@
 defmodule Ysc.VerificationCache do
   @moduledoc """
-  A simple cache for storing verification codes (email/SMS) with expiration.
+  Stores short-lived verification codes (email/SMS) with expiration.
 
-  Uses a GenServer to store codes in memory with automatic cleanup.
-  Codes are stored as {user_id, code_type} => {code, expires_at} tuples.
+  Backed by Postgres so codes are available on every node in a multi-node
+  deployment. Codes are encrypted at rest via `Ysc.Encrypted.Binary`.
   """
 
-  use GenServer
+  import Ecto.Query
 
-  # Client API
-
-  @doc """
-  Starts the verification cache.
-  """
-  def start_link(opts \\ []) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
-  end
+  alias Ysc.Repo
+  alias Ysc.VerificationCode
+  alias Ysc.Ci.QueryExplain.Fixtures
 
   @doc """
   Stores a verification code for a user with the given type and expiration time.
 
+  Replaces any existing code for the same user and type.
+
   ## Parameters
   - user_id: The user ID (typically ULID string)
-  - code_type: Atom like :email_verification, :sms_verification, etc.
+  - code_type: Atom like `:email_verification`, `:phone_verification`, etc.
   - code: The verification code string
   - expires_in_seconds: How long until the code expires (default: 600 = 10 minutes)
   """
   def store_code(user_id, code_type, code, expires_in_seconds \\ 600) do
-    expires_at = DateTime.add(DateTime.utc_now(), expires_in_seconds, :second)
-    GenServer.call(__MODULE__, {:store, user_id, code_type, code, expires_at})
+    user_id = to_string(user_id)
+    type = normalize_type(code_type)
+
+    expires_at =
+      DateTime.add(DateTime.utc_now(), expires_in_seconds, :second)
+      |> DateTime.truncate(:second)
+
+    %VerificationCode{user_id: user_id}
+    |> VerificationCode.changeset(%{
+      code_type: type,
+      code: code,
+      expires_at: expires_at
+    })
+    |> Repo.insert!(
+      on_conflict: {:replace, [:code, :expires_at, :inserted_at]},
+      conflict_target: [:user_id, :code_type]
+    )
+
+    :ok
   end
 
   @doc """
   Retrieves a verification code for a user if it exists and hasn't expired.
 
-  Returns {:ok, code} if found and valid, {:error, :not_found} if not found,
-  or {:error, :expired} if found but expired.
+  Returns `{:ok, code}` if found and valid, `{:error, :not_found}` if not found,
+  or `{:error, :expired}` if found but expired.
   """
   def get_code(user_id, code_type) do
-    GenServer.call(__MODULE__, {:get, user_id, code_type})
+    user_id = to_string(user_id)
+    type = normalize_type(code_type)
+
+    case Repo.get_by(VerificationCode, user_id: user_id, code_type: type) do
+      nil ->
+        {:error, :not_found}
+
+      %VerificationCode{} = record ->
+        if DateTime.compare(record.expires_at, DateTime.utc_now()) == :gt do
+          {:ok, record.code}
+        else
+          delete_record(record)
+          {:error, :expired}
+        end
+    end
   end
 
   @doc """
-  Verifies a code for a user. If the code matches and is valid, removes it from cache.
+  Verifies a code for a user. If the code matches and is valid, removes it.
 
-  Returns {:ok, :verified} if successful, {:error, reason} otherwise.
+  Returns `{:ok, :verified}` if successful, `{:error, reason}` otherwise.
   """
   def verify_code(user_id, code_type, provided_code) do
-    GenServer.call(__MODULE__, {:verify, user_id, code_type, provided_code})
+    user_id = to_string(user_id)
+    type = normalize_type(code_type)
+    provided_code = to_string(provided_code)
+
+    case Repo.get_by(VerificationCode, user_id: user_id, code_type: type) do
+      nil ->
+        {:error, :not_found}
+
+      %VerificationCode{} = record ->
+        cond do
+          DateTime.compare(record.expires_at, DateTime.utc_now()) != :gt ->
+            delete_record(record)
+            {:error, :expired}
+
+          codes_match?(provided_code, to_string(record.code)) ->
+            case delete_record(record) do
+              # Another node/process already consumed the code.
+              0 -> {:error, :not_found}
+              _ -> {:ok, :verified}
+            end
+
+          true ->
+            {:error, :invalid_code}
+        end
+    end
   end
 
   @doc """
-  Removes a code from the cache (useful for cleanup after successful verification).
+  Removes a code from storage (useful for cleanup after successful verification).
   """
   def remove_code(user_id, code_type) do
-    GenServer.call(__MODULE__, {:remove, user_id, code_type})
+    user_id = to_string(user_id)
+    type = normalize_type(code_type)
+
+    from(c in VerificationCode,
+      where: c.user_id == ^user_id and c.code_type == ^type
+    )
+    |> Repo.delete_all()
+
+    :ok
   end
 
   @doc """
-  Cleans up expired codes manually (called periodically by cleanup timer).
+  Deletes expired verification codes.
+
+  Returns `{:ok, deleted_count}`.
   """
   def cleanup_expired do
-    GenServer.call(__MODULE__, :cleanup)
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    {count, _} =
+      from(c in VerificationCode, where: c.expires_at <= ^now)
+      |> Repo.delete_all()
+
+    {:ok, count}
   end
 
-  # Server callbacks
+  @doc false
+  def ci_query_explain_query do
+    user_id = Fixtures.ulid()
+    type = "email_verification"
 
-  @impl true
-  def init(_opts) do
-    # Schedule cleanup every 5 minutes
-    schedule_cleanup()
-    {:ok, %{codes: %{}, timers: %{}}}
+    from(c in VerificationCode,
+      where: c.user_id == ^user_id and c.code_type == ^type
+    )
   end
 
-  @impl true
-  def handle_call({:store, user_id, code_type, code, expires_at}, _from, state) do
-    key = {user_id, code_type}
-    codes = Map.put(state.codes, key, {code, expires_at})
+  defp normalize_type(type) when is_atom(type), do: Atom.to_string(type)
+  defp normalize_type(type) when is_binary(type), do: type
 
-    # Cancel existing timer for this key if any
-    timers = cancel_timer(state.timers, key)
-
-    # Schedule cleanup for this specific code
-    timer_ref = schedule_individual_cleanup(expires_at)
-    timers = Map.put(timers, key, timer_ref)
-
-    {:reply, :ok, %{state | codes: codes, timers: timers}}
+  # secure_compare raises when lengths differ; treat that as a mismatch.
+  defp codes_match?(provided, stored)
+       when byte_size(provided) == byte_size(stored) do
+    Plug.Crypto.secure_compare(provided, stored)
   end
 
-  @impl true
-  def handle_call({:get, user_id, code_type}, _from, state) do
-    key = {user_id, code_type}
+  defp codes_match?(_, _), do: false
 
-    case Map.get(state.codes, key) do
-      {code, expires_at} ->
-        if DateTime.compare(expires_at, DateTime.utc_now()) == :gt do
-          {:reply, {:ok, code}, state}
-        else
-          # Code expired, remove it
-          {_removed, codes} = Map.pop(state.codes, key)
-          timers = cancel_timer(state.timers, key)
-          {:reply, {:error, :expired}, %{state | codes: codes, timers: timers}}
-        end
+  # Prefer delete_all by primary key so concurrent verifiers do not raise
+  # Ecto.StaleEntryError when another process already deleted the row.
+  defp delete_record(%VerificationCode{id: id}) do
+    {count, _} =
+      from(c in VerificationCode, where: c.id == ^id)
+      |> Repo.delete_all()
 
-      nil ->
-        {:reply, {:error, :not_found}, state}
-    end
-  end
-
-  @impl true
-  def handle_call({:verify, user_id, code_type, provided_code}, _from, state) do
-    key = {user_id, code_type}
-
-    case Map.get(state.codes, key) do
-      {stored_code, expires_at} ->
-        if DateTime.compare(expires_at, DateTime.utc_now()) == :gt do
-          if Plug.Crypto.secure_compare(provided_code, stored_code) do
-            # Code matches, remove it and return success
-            {_removed, codes} = Map.pop(state.codes, key)
-            timers = cancel_timer(state.timers, key)
-            {:reply, {:ok, :verified}, %{state | codes: codes, timers: timers}}
-          else
-            {:reply, {:error, :invalid_code}, state}
-          end
-        else
-          # Code expired, remove it
-          {_removed, codes} = Map.pop(state.codes, key)
-          timers = cancel_timer(state.timers, key)
-          {:reply, {:error, :expired}, %{state | codes: codes, timers: timers}}
-        end
-
-      nil ->
-        {:reply, {:error, :not_found}, state}
-    end
-  end
-
-  @impl true
-  def handle_call({:remove, user_id, code_type}, _from, state) do
-    key = {user_id, code_type}
-    {_removed, codes} = Map.pop(state.codes, key)
-    timers = cancel_timer(state.timers, key)
-    {:reply, :ok, %{state | codes: codes, timers: timers}}
-  end
-
-  @impl true
-  def handle_call(:cleanup, _from, state) do
-    {codes, timers} = cleanup_expired_codes(state.codes, state.timers)
-    {:reply, :ok, %{state | codes: codes, timers: timers}}
-  end
-
-  @impl true
-  def handle_info(:cleanup, state) do
-    {codes, timers} = cleanup_expired_codes(state.codes, state.timers)
-    # Schedule next cleanup
-    schedule_cleanup()
-    {:noreply, %{state | codes: codes, timers: timers}}
-  end
-
-  @impl true
-  def handle_info({:cleanup_individual, key}, state) do
-    # Remove expired individual code
-    {_removed, codes} = Map.pop(state.codes, key)
-    {_timer_ref, timers} = Map.pop(state.timers, key)
-    {:noreply, %{state | codes: codes, timers: timers}}
-  end
-
-  # Helper functions
-
-  defp schedule_cleanup do
-    # Clean up every 5 minutes
-    Process.send_after(self(), :cleanup, 5 * 60 * 1000)
-  end
-
-  defp schedule_individual_cleanup(expires_at) do
-    # Calculate milliseconds until expiration
-    now = DateTime.utc_now()
-    ms_until_expiry = DateTime.diff(expires_at, now, :millisecond)
-
-    # Add some buffer to ensure cleanup happens after expiration
-    # 1 second buffer
-    buffer_ms = 1000
-    delay_ms = max(ms_until_expiry + buffer_ms, 0)
-
-    Process.send_after(self(), {:cleanup_individual, nil}, delay_ms)
-  end
-
-  defp cleanup_expired_codes(codes, timers) do
-    now = DateTime.utc_now()
-
-    {valid_codes, expired_keys} =
-      Enum.split_with(codes, fn {_key, {_code, expires_at}} ->
-        DateTime.compare(expires_at, now) == :gt
-      end)
-
-    expired_keys = Enum.map(expired_keys, fn {key, _value} -> key end)
-
-    # Cancel timers for expired keys
-    timers = Enum.reduce(expired_keys, timers, &cancel_timer(&2, &1))
-
-    {Map.new(valid_codes), timers}
-  end
-
-  defp cancel_timer(timers, key) do
-    case Map.get(timers, key) do
-      nil ->
-        timers
-
-      timer_ref ->
-        Process.cancel_timer(timer_ref)
-        Map.delete(timers, key)
-    end
+    count
   end
 end

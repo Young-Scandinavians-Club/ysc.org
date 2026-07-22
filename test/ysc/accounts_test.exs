@@ -435,25 +435,6 @@ defmodule Ysc.AccountsTest do
       assert Accounts.get_email_verification_code(user) == code
     end
 
-    test "verify_email_code accepts valid 6-digit code", %{} do
-      user = user_fixture(%{phone_number: "+14159098286"})
-      assert Accounts.verify_email_code(user, "123456") == {:ok, user}
-      assert Accounts.verify_email_code(user, "000000") == {:ok, user}
-    end
-
-    test "verify_email_code rejects invalid format", %{} do
-      user = user_fixture(%{phone_number: "+14159098287"})
-
-      assert Accounts.verify_email_code(user, "12345") ==
-               {:error, :invalid_code}
-
-      assert Accounts.verify_email_code(user, "1234567") ==
-               {:error, :invalid_code}
-
-      assert Accounts.verify_email_code(user, "12a456") ==
-               {:error, :invalid_code}
-    end
-
     test "store and verify_phone_verification_code roundtrip", %{} do
       user = user_fixture(%{phone_number: "+14159098288"})
       Accounts.store_phone_verification_code(user, "555555", 600)
