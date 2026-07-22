@@ -26,7 +26,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     user = socket.assigns.current_user
 
     timezone = get_timezone_from_socket(socket)
-    today = today_in_timezone(timezone)
+    today = today_in_timezone(default_timezone())
     seasons = SeasonCache.get_all_for_property(:clear_lake)
 
     {current_season, season_start_date, season_end_date} =
@@ -288,8 +288,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         {today, max_booking_date, current_season, season_start_date,
          season_end_date} =
           if dates_changed do
-            timezone = socket.assigns[:timezone] || "America/Los_Angeles"
-            today = today_in_timezone(timezone)
+            today = today_in_timezone(default_timezone())
 
             seasons = socket.assigns.seasons
 

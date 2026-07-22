@@ -68,7 +68,7 @@ Guide finder and step clarifier require:
 
 ```bash
 OPENROUTER_API_KEY=sk-or-...
-OPENROUTER_MODEL=google/gemma-3-27b-it   # optional
+OPENROUTER_MODEL=deepseek/deepseek-v4-flash   # optional
 ```
 
 Without `OPENROUTER_API_KEY`, wizards work normally; LLM panels are hidden.

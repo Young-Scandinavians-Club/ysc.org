@@ -568,6 +568,43 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
 
       assert html =~ "150"
     end
+
+    test "updates pricing rule list after saving from edit modal", %{conn: conn} do
+      rule =
+        insert_pricing_rule!(%{
+          property: :tahoe,
+          amount: Money.new(100, :USD),
+          booking_mode: :room,
+          price_unit: :per_person_per_night
+        })
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/pricing-rules/#{rule.id}/edit?property=tahoe&section=config"
+        )
+
+      view
+      |> form("#pricing-rule-form", %{
+        "pricing_rule" => %{
+          "booking_mode" => "room",
+          "price_unit" => "per_person_per_night",
+          "amount" => "275.00",
+          "property" => "tahoe"
+        }
+      })
+      |> render_submit()
+
+      assert_patch(
+        view,
+        "/admin/bookings?property=tahoe&section=config"
+      )
+
+      html = render(view)
+      assert html =~ "$275.00"
+      refute html =~ "$100.00"
+      refute has_element?(view, "#pricing-rule-modal")
+    end
   end
 
   describe "reservations" do
