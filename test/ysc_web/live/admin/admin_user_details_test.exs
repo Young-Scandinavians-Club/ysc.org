@@ -233,15 +233,19 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
     test "shows last login and activity from auth events", %{conn: conn} do
       user = user_fixture()
 
+      # Use fixed past timestamps so Timex.from_now/1 is stable between setup and render.
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      login_inserted_at = DateTime.add(now, -7200, :second)
+      logout_inserted_at = DateTime.add(now, -3600, :second)
+
       {:ok, login_event} =
         AuthEvent.login_success_changeset(user, %{
           ip_address: "127.0.0.1",
           browser: "Chrome",
           operating_system: "macOS"
         })
+        |> Ecto.Changeset.put_change(:inserted_at, login_inserted_at)
         |> Repo.insert()
-
-      logout_inserted_at = DateTime.add(login_event.inserted_at, 3600, :second)
 
       {:ok, logout_event} =
         AuthEvent.logout_changeset(user, %{
@@ -251,6 +255,8 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         })
         |> Ecto.Changeset.put_change(:inserted_at, logout_inserted_at)
         |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
       login_absolute =
         login_event.inserted_at
@@ -265,8 +271,6 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
         |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
 
       logout_relative = Timex.from_now(logout_event.inserted_at)
-
-      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
       assert has_element?(view, "#account-activity")
       assert has_element?(view, "#last-login-at", login_relative)
