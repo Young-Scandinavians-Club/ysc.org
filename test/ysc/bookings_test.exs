@@ -266,6 +266,92 @@ defmodule Ysc.BookingsTest do
                before.tahoe.checkouts_today + 1
     end
 
+    test "list_upcoming_active_bookings_for_user/2 excludes canceled and past checkouts" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      active =
+        booking_fixture(%{
+          user_id: user.id,
+          checkin_date: Date.add(today, 3),
+          checkout_date: Date.add(today, 5),
+          status: :complete
+        })
+
+      _checkout_today =
+        booking_fixture(%{
+          user_id: user.id,
+          checkin_date: Date.add(today, -2),
+          checkout_date: today,
+          status: :complete
+        })
+
+      _canceled =
+        booking_fixture(%{
+          user_id: user.id,
+          checkin_date: Date.add(today, 10),
+          checkout_date: Date.add(today, 12),
+          status: :canceled
+        })
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      before_cutoff = DateTime.compare(now_pst, checkout_cutoff) == :lt
+
+      bookings = Bookings.list_upcoming_active_bookings_for_user(user.id)
+
+      assert Enum.any?(bookings, &(&1.id == active.id))
+      refute Enum.any?(bookings, &(&1.status == :canceled))
+
+      checkout_today_included? =
+        Enum.any?(bookings, &(&1.checkout_date == today))
+
+      assert checkout_today_included? == before_cutoff
+    end
+
+    test "list_upcoming_active_bookings_for_user/2 applies checkout cutoff before limit" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      _stale_checkout_today =
+        booking_fixture(%{
+          user_id: user.id,
+          checkin_date: Date.add(today, -1),
+          checkout_date: today,
+          status: :complete
+        })
+
+      future =
+        booking_fixture(%{
+          user_id: user.id,
+          checkin_date: Date.add(today, 7),
+          checkout_date: Date.add(today, 9),
+          status: :complete
+        })
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      if DateTime.compare(now_pst, checkout_cutoff) == :gt do
+        bookings =
+          Bookings.list_upcoming_active_bookings_for_user(user.id, limit: 1)
+
+        assert length(bookings) == 1
+        assert hd(bookings).id == future.id
+      else
+        bookings =
+          Bookings.list_upcoming_active_bookings_for_user(user.id, limit: 2)
+
+        assert length(bookings) == 2
+        assert future.id in Enum.map(bookings, & &1.id)
+      end
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()

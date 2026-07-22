@@ -4601,6 +4601,41 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Lists upcoming active bookings for a user's home dashboard itinerary.
+
+  Includes complete bookings whose checkout has not yet passed (11:00 AM PST on
+  checkout day), ordered by check-in date.
+
+  ## Options
+
+    * `:limit` - max rows (default `10`)
+  """
+  def list_upcoming_active_bookings_for_user(user_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 10)
+    today = pst_today()
+    now_pst = DateTime.now!(@pst_timezone)
+    checkout_cutoff = DateTime.new!(today, @checkout_time_pst, @pst_timezone)
+    now_before_checkout = DateTime.compare(now_pst, checkout_cutoff) == :lt
+
+    checkout_filter =
+      if now_before_checkout do
+        dynamic([b], b.checkout_date >= ^today)
+      else
+        dynamic([b], b.checkout_date > ^today)
+      end
+
+    from(b in Booking,
+      where: b.user_id == ^user_id,
+      where: b.status == :complete,
+      where: ^checkout_filter,
+      order_by: [asc: b.checkin_date],
+      limit: ^limit,
+      preload: [:rooms]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns pending refund counts for the admin dashboard: total and per property.
   """
   def pending_refunds_dashboard_summary do
@@ -5612,6 +5647,21 @@ defmodule Ysc.Bookings do
             0
           )
       }
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_upcoming_active_bookings_for_user_query do
+    today = Ysc.Ci.QueryExplain.Fixtures.today()
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in Booking,
+      where: b.user_id == ^user_id,
+      where: b.status == :complete,
+      where: b.checkout_date > ^today,
+      order_by: [asc: b.checkin_date],
+      limit: 10,
+      preload: [:rooms]
     )
   end
 end
