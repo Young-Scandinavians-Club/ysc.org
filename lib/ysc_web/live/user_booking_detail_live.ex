@@ -391,7 +391,9 @@ defmodule YscWeb.UserBookingDetailLive do
                 <div class="flex justify-between text-sm">
                   <span class="text-zinc-600">Payment Status</span>
                   <span class="text-zinc-900">
-                    <.badge type={BookingDisplay.payment_status_badge_type(@payment.status)}>
+                    <.badge type={
+                      BookingDisplay.payment_status_badge_type(@payment.status)
+                    }>
                       {String.capitalize(to_string(@payment.status))}
                     </.badge>
                   </span>

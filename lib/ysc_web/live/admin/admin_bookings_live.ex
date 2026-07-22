@@ -553,7 +553,9 @@ defmodule YscWeb.AdminBookingsLive do
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                 <span class="font-semibold">Booking Details</span>
-                <.badge type={AdminBadgeHelpers.booking_status_badge_type(@booking.status)}>
+                <.badge type={
+                  AdminBadgeHelpers.booking_status_badge_type(@booking.status)
+                }>
                   {String.upcase(to_string(@booking.status))}
                 </.badge>
               </div>
@@ -748,7 +750,11 @@ defmodule YscWeb.AdminBookingsLive do
                             title="Copy reference ID"
                             aria_label="Copy reference ID"
                           />
-                          <.badge type={AdminBadgeHelpers.ledger_payment_status_badge_type(payment.status)}>
+                          <.badge type={
+                            AdminBadgeHelpers.ledger_payment_status_badge_type(
+                              payment.status
+                            )
+                          }>
                             {String.capitalize(to_string(payment.status))}
                           </.badge>
                         </span>
@@ -815,7 +821,11 @@ defmodule YscWeb.AdminBookingsLive do
                             title="Copy reference ID"
                             aria_label="Copy reference ID"
                           />
-                          <.badge type={AdminBadgeHelpers.ledger_payment_status_badge_type(refund.status)}>
+                          <.badge type={
+                            AdminBadgeHelpers.ledger_payment_status_badge_type(
+                              refund.status
+                            )
+                          }>
                             {String.capitalize(to_string(refund.status))}
                           </.badge>
                         </span>
@@ -1140,7 +1150,9 @@ defmodule YscWeb.AdminBookingsLive do
                     </div>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <.badge type={AdminBadgeHelpers.booking_status_badge_type(booking.status)}>
+                    <.badge type={
+                      AdminBadgeHelpers.booking_status_badge_type(booking.status)
+                    }>
                       {String.upcase(to_string(booking.status))}
                     </.badge>
                     <.button
