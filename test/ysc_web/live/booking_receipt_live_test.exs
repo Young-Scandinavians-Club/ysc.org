@@ -1936,7 +1936,9 @@ defmodule YscWeb.BookingReceiptLiveTest do
         children_count: 0
       }
 
-      assert {:ok, preview} = Bookings.prepare_modification(booking, string_attrs)
+      assert {:ok, preview} =
+               Bookings.prepare_modification(booking, string_attrs)
+
       assert Money.positive?(preview.delta)
       assert {:ok, _} = Bookings.place_modification_hold(booking, attrs)
 
