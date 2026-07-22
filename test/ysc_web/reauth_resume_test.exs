@@ -10,6 +10,18 @@ defmodule YscWeb.ReauthResumeTest do
     assert {:ok, ^intent} = ReauthResume.verify(token)
   end
 
+  test "encrypts intent so sensitive fields are not readable from the token" do
+    secret_email =
+      "secret-resume-#{System.unique_integer([:positive])}@example.com"
+
+    intent = %{"purpose" => "email_change", "email" => secret_email}
+    token = ReauthResume.sign(intent)
+
+    refute String.contains?(token, secret_email)
+    refute String.contains?(token, "email_change")
+    assert {:ok, ^intent} = ReauthResume.verify(token)
+  end
+
   test "verify/1 rejects invalid tokens" do
     assert :error = ReauthResume.verify("not-a-valid-token")
     assert :error = ReauthResume.verify(nil)

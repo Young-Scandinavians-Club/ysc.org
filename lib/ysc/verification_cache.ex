@@ -31,21 +31,16 @@ defmodule Ysc.VerificationCache do
       DateTime.add(DateTime.utc_now(), expires_in_seconds, :second)
       |> DateTime.truncate(:second)
 
-    Repo.transaction(fn ->
-      from(c in VerificationCode,
-        where: c.user_id == ^user_id and c.code_type == ^type
-      )
-      |> Repo.delete_all()
-
-      %VerificationCode{}
-      |> VerificationCode.changeset(%{
-        user_id: user_id,
-        code_type: type,
-        code: code,
-        expires_at: expires_at
-      })
-      |> Repo.insert!()
-    end)
+    %VerificationCode{user_id: user_id}
+    |> VerificationCode.changeset(%{
+      code_type: type,
+      code: code,
+      expires_at: expires_at
+    })
+    |> Repo.insert!(
+      on_conflict: {:replace, [:code, :expires_at, :inserted_at]},
+      conflict_target: [:user_id, :code_type]
+    )
 
     :ok
   end

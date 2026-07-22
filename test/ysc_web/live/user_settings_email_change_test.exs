@@ -380,8 +380,7 @@ defmodule YscWeb.UserSettingsEmailChangeTest do
 
       {:ok, view, _html} = live(conn, resume_path)
 
-      assert has_element?(view, "#email-verification-modal")
-      assert render(view) =~ new_email
+      assert has_element?(view, "#email-verification-modal", new_email)
       assert Accounts.get_email_verification_code(user)
     end
 

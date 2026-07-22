@@ -174,7 +174,9 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.get_code("user-mix-b", :email_verification)
   end
 
-  test "codes are readable across process boundaries (shared DB)" do
+  test "codes are readable across process boundaries (shared DB)", %{
+    sandbox_owner: owner
+  } do
     assert :ok =
              VerificationCache.store_code(
                "user-shared",
@@ -185,6 +187,7 @@ defmodule Ysc.VerificationCacheTest do
 
     task =
       Task.async(fn ->
+        allow_sandbox(self(), owner)
         VerificationCache.get_code("user-shared", :phone_verification)
       end)
 
@@ -243,7 +246,9 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.get_code("user-type", "email_verification")
   end
 
-  test "concurrent verify of the same code succeeds once" do
+  test "concurrent verify of the same code succeeds once", %{
+    sandbox_owner: owner
+  } do
     assert :ok =
              VerificationCache.store_code(
                "user-race",
@@ -256,6 +261,8 @@ defmodule Ysc.VerificationCacheTest do
       1..8
       |> Task.async_stream(
         fn _ ->
+          allow_sandbox(self(), owner)
+
           VerificationCache.verify_code(
             "user-race",
             :phone_verification,
@@ -277,5 +284,34 @@ defmodule Ysc.VerificationCacheTest do
 
     assert {:error, :not_found} =
              VerificationCache.get_code("user-race", :phone_verification)
+  end
+
+  test "concurrent store_code/4 for the same user/type replaces without raising",
+       %{sandbox_owner: owner} do
+    results =
+      1..8
+      |> Task.async_stream(
+        fn i ->
+          allow_sandbox(self(), owner)
+
+          code = i |> Integer.to_string() |> String.pad_leading(6, "0")
+
+          VerificationCache.store_code(
+            "user-upsert",
+            :email_verification,
+            code,
+            60
+          )
+        end,
+        timeout: 5_000
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    assert Enum.all?(results, &(&1 == :ok))
+
+    assert {:ok, code} =
+             VerificationCache.get_code("user-upsert", :email_verification)
+
+    assert String.match?(code, ~r/^\d{6}$/)
   end
 end

@@ -1,26 +1,26 @@
 defmodule YscWeb.ReauthResume do
   @moduledoc """
-  Signed resume tokens for sensitive settings flows that require re-authentication.
+  Encrypted resume tokens for sensitive settings flows that require re-authentication.
 
   OAuth reauth leaves the LiveView process, so pending email/phone/password intents
-  must travel in the `return_to` URL as a signed token and be restored on return.
+  must travel in the `return_to` URL as an encrypted token and be restored on return.
   """
 
   @salt "reauth resume intent"
   @max_age 600
 
   @doc """
-  Signs a reauth intent map for embedding in an OAuth `return_to` URL.
+  Encrypts a reauth intent map for embedding in an OAuth `return_to` URL.
   """
   def sign(intent) when is_map(intent) do
-    Phoenix.Token.sign(YscWeb.Endpoint, @salt, intent, max_age: @max_age)
+    Phoenix.Token.encrypt(YscWeb.Endpoint, @salt, intent, max_age: @max_age)
   end
 
   @doc """
-  Verifies a resume token. Returns `{:ok, intent}` or `:error`.
+  Decrypts and verifies a resume token. Returns `{:ok, intent}` or `:error`.
   """
   def verify(token) when is_binary(token) do
-    case Phoenix.Token.verify(YscWeb.Endpoint, @salt, token, max_age: @max_age) do
+    case Phoenix.Token.decrypt(YscWeb.Endpoint, @salt, token, max_age: @max_age) do
       {:ok, intent} when is_map(intent) -> {:ok, intent}
       _ -> :error
     end
@@ -29,7 +29,7 @@ defmodule YscWeb.ReauthResume do
   def verify(_), do: :error
 
   @doc """
-  Appends a signed `reauth_resume` query param to an internal path.
+  Appends an encrypted `reauth_resume` query param to an internal path.
   """
   def append_to_path(path, intent) when is_binary(path) and is_map(intent) do
     token = sign(intent)

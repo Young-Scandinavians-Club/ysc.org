@@ -14,7 +14,7 @@ defmodule Ysc.VerificationCode do
   schema "verification_codes" do
     field :user_id, :string
     field :code_type, :string
-    field :code, Ysc.Encrypted.Binary
+    field :code, Ysc.Encrypted.Binary, redact: true
     field :expires_at, :utc_datetime
 
     timestamps(updated_at: false)
@@ -22,7 +22,7 @@ defmodule Ysc.VerificationCode do
 
   def changeset(verification_code, attrs) do
     verification_code
-    |> cast(attrs, [:user_id, :code_type, :code, :expires_at])
+    |> cast(attrs, [:code_type, :code, :expires_at])
     |> validate_required([:user_id, :code_type, :code, :expires_at])
     |> unique_constraint([:user_id, :code_type])
   end

@@ -126,12 +126,12 @@ defmodule Ysc.Accounts.VerificationCodes do
   ## Options
   - `:to` — destination override (`target_email` or `to_phone`)
   - `:ttl` — expiry in seconds (default #{@default_ttl_seconds})
-  - `:suffix` — idempotency key suffix (default `issue_<unix>`)
+  - `:suffix` — idempotency key suffix (default `issue_<unique>`)
   """
   def issue(user, channel, opts \\ []) when channel in [:email, :phone] do
     ttl = Keyword.get(opts, :ttl, @default_ttl_seconds)
     to = Keyword.get(opts, :to)
-    suffix = Keyword.get(opts, :suffix) || "issue_#{unix_now()}"
+    suffix = Keyword.get(opts, :suffix) || unique_delivery_suffix("issue")
 
     code = generate_and_store(user, channel, ttl)
     _job = deliver(user, channel, code, to: to, suffix: suffix)
@@ -203,12 +203,10 @@ defmodule Ysc.Accounts.VerificationCodes do
               {generate_and_store(user, channel, ttl), false}
           end
 
-        timestamp = unix_now()
-
         suffix =
           if reused?,
-            do: "resend_existing_#{timestamp}",
-            else: "resend_new_#{timestamp}"
+            do: unique_delivery_suffix("resend_existing"),
+            else: unique_delivery_suffix("resend_new")
 
         _job = deliver(user, channel, code, to: to, suffix: suffix)
 
@@ -329,7 +327,11 @@ defmodule Ysc.Accounts.VerificationCodes do
   defp attempt_type(:email), do: :email
   defp attempt_type(:phone), do: :phone
 
-  defp unix_now, do: DateTime.utc_now() |> DateTime.to_unix()
+  # Oban email/SMS notifiers dedupe on idempotency_key while incomplete
+  # (period: :infinity). Seconds-resolution suffixes can collide and skip delivery.
+  defp unique_delivery_suffix(prefix) when is_binary(prefix) do
+    "#{prefix}_#{System.unique_integer([:positive])}"
+  end
 
   @doc false
   def ci_query_explain_query do

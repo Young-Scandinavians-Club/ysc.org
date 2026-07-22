@@ -385,6 +385,26 @@ defmodule Ysc.Accounts.VerificationCodesTest do
       assert VerificationCodes.get(user, :email) == second
     end
 
+    test "default delivery suffixes are unique across rapid successive issues",
+         %{
+           user: user
+         } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _} = VerificationCodes.issue(user, :email)
+        assert {:ok, _} = VerificationCodes.issue(user, :email)
+
+        jobs =
+          all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+          |> Enum.filter(&(&1.args["template"] == "account_setup_verification"))
+
+        assert length(jobs) == 2
+
+        keys = Enum.map(jobs, & &1.args["idempotency_key"])
+        assert Enum.uniq(keys) == keys
+        assert Enum.all?(keys, &String.contains?(&1, "issue_"))
+      end)
+    end
+
     test "honors custom ttl", %{user: user} do
       assert {:ok, %{code: code}} =
                VerificationCodes.issue(user, :email, ttl: -1, suffix: "expired")

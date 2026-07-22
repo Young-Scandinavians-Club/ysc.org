@@ -27,7 +27,7 @@ defmodule Ysc.VerificationCodeCleanupWorkerTest do
     assert :ok = VerificationCache.store_code(user_id, type, code, -1)
   end
 
-  defp insert_valid(user_id, type, code \\ "222222") do
+  defp insert_valid(user_id, type, code) do
     assert :ok = VerificationCache.store_code(user_id, type, code, 600)
   end
 
@@ -121,9 +121,8 @@ defmodule Ysc.VerificationCodeCleanupWorkerTest do
     test "deletes codes whose expires_at is exactly now" do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-      %VerificationCode{}
+      %VerificationCode{user_id: "boundary-now"}
       |> VerificationCode.changeset(%{
-        user_id: "boundary-now",
         code_type: "email_verification",
         code: "555555",
         expires_at: now
@@ -141,9 +140,8 @@ defmodule Ysc.VerificationCodeCleanupWorkerTest do
         |> DateTime.add(60, :second)
         |> DateTime.truncate(:second)
 
-      %VerificationCode{}
+      %VerificationCode{user_id: "boundary-future"}
       |> VerificationCode.changeset(%{
-        user_id: "boundary-future",
         code_type: "phone_verification",
         code: "666666",
         expires_at: expires_at

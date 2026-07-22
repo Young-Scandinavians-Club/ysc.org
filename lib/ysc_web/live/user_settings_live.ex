@@ -4376,6 +4376,7 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:user, updated_user)
+         |> assign(:current_user, updated_user)
          |> assign(:pending_phone_number, nil)
          |> assign(:phone_verification_code_state, %{})
          |> push_patch(to: ~p"/users/settings")
@@ -4426,6 +4427,7 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:user, updated_user)
+         |> assign(:current_user, updated_user)
          |> assign(:pending_email, nil)
          |> assign(:pending_email_token, nil)
          |> assign(:email_verification_code_state, %{})
