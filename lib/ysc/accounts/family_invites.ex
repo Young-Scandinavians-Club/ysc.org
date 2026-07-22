@@ -208,17 +208,24 @@ defmodule Ysc.Accounts.FamilyInvites do
                 end
               end)
 
-              invalidate_family_link_profile_caches(
-                final_user.id,
-                invite.primary_user_id
-              )
-
               final_user
 
             {:error, changeset} ->
               Repo.rollback(changeset)
           end
         end)
+        |> case do
+          {:ok, final_user} = ok ->
+            invalidate_family_link_profile_caches(
+              final_user.id,
+              invite.primary_user_id
+            )
+
+            ok
+
+          error ->
+            error
+        end
     end
   end
 
@@ -274,15 +281,22 @@ defmodule Ysc.Accounts.FamilyInvites do
           })
           |> Repo.insert!()
 
-          Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
-
-          invalidate_family_link_profile_caches(
-            updated_user.id,
-            invite.primary_user_id
-          )
-
           updated_user
         end)
+        |> case do
+          {:ok, updated_user} = ok ->
+            Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
+
+            invalidate_family_link_profile_caches(
+              updated_user.id,
+              invite.primary_user_id
+            )
+
+            ok
+
+          error ->
+            error
+        end
     end
   end
 

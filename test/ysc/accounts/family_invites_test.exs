@@ -881,7 +881,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
   end
 
   describe "family invite acceptance invalidates UserProfileCache" do
-    @tag process_caches: true
+    @describetag process_caches: true
 
     setup do
       Cachex.clear(:ysc_cache)
