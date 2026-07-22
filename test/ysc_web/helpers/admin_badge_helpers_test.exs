@@ -64,4 +64,34 @@ defmodule YscWeb.AdminBadgeHelpersTest do
                nil
     end
   end
+
+  describe "booking_status_badge_type/1" do
+    test "maps known booking statuses for admin views" do
+      assert AdminBadgeHelpers.booking_status_badge_type(:complete) == "green"
+      assert AdminBadgeHelpers.booking_status_badge_type(:canceled) == "red"
+      assert AdminBadgeHelpers.booking_status_badge_type(:refunded) == "yellow"
+      assert AdminBadgeHelpers.booking_status_badge_type(:hold) == "sky"
+      assert AdminBadgeHelpers.booking_status_badge_type(:draft) == "dark"
+    end
+
+    test "defaults unknown statuses" do
+      assert AdminBadgeHelpers.booking_status_badge_type(:unknown) == "dark"
+    end
+  end
+
+  describe "ledger_payment_status_badge_type/1" do
+    test "maps known ledger payment and refund statuses" do
+      assert AdminBadgeHelpers.ledger_payment_status_badge_type(:completed) ==
+               "green"
+
+      assert AdminBadgeHelpers.ledger_payment_status_badge_type(:pending) ==
+               "yellow"
+
+      assert AdminBadgeHelpers.ledger_payment_status_badge_type(:failed) ==
+               "red"
+
+      assert AdminBadgeHelpers.ledger_payment_status_badge_type(:refunded) ==
+               "dark"
+    end
+  end
 end
