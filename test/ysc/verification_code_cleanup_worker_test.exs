@@ -12,6 +12,8 @@ defmodule Ysc.VerificationCodeCleanupWorkerTest do
   alias Ysc.VerificationCode
   alias Ysc.VerificationCodeCleanupWorker
 
+  @oban_config Application.compile_env!(:ysc, Oban)
+
   defp count_codes do
     Repo.aggregate(VerificationCode, :count)
   end
@@ -43,8 +45,9 @@ defmodule Ysc.VerificationCodeCleanupWorkerTest do
     end
 
     test "is registered in the Oban cron plugin every 15 minutes" do
-      oban_config = Application.get_env(:ysc, Oban)
-      plugins = Keyword.fetch!(oban_config, :plugins)
+      # Use compile-time config so parallel tests that temporarily override
+      # Application env (e.g. Oban testing mode) cannot clobber :plugins.
+      plugins = Keyword.fetch!(@oban_config, :plugins)
 
       cron_plugin =
         Enum.find(plugins, fn
