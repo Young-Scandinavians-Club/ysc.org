@@ -962,9 +962,9 @@ defmodule YscWeb.EventDetailsLive do
                             <% @current_user.state == :pending_approval -> %>
                               Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
                             <% @had_membership? -> %>
-                              Member tickets require an active paid membership. Your membership has expired — renew on your membership page.
+                              Member tickets require an active paid membership. Your membership has expired — open Manage Membership in your account menu to renew.
                             <% true -> %>
-                              Member tickets require an active paid membership. Visit your membership page to pay dues or activate your membership.
+                              Member tickets require an active paid membership. Open Manage Membership in your account menu to pay dues or activate your membership.
                           <% end %>
                         </p>
                         <.link

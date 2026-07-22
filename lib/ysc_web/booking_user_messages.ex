@@ -74,7 +74,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def membership_required_link_text do
-    "Membership page"
+    "Manage Membership"
   end
 
   def membership_required_message_html(membership_path) do
@@ -85,7 +85,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def membership_required_plain_message do
-    "You need an active YSC membership to book the cabin. Visit your membership page to pay or renew."
+    "You need an active YSC membership to book the cabin. Open Manage Membership in your account menu to pay or renew."
   end
 
   def application_pending_approval_message do

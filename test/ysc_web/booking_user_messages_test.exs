@@ -99,12 +99,12 @@ defmodule YscWeb.BookingUserMessagesTest do
              "Cabin unavailable"
 
     assert BookingUserMessages.membership_required_link_text() ==
-             "Membership page"
+             "Manage Membership"
 
     assert BookingUserMessages.membership_required_message_html(
              "/users/membership"
            ) =~
-             "Membership page"
+             "Manage Membership"
 
     assert BookingUserMessages.membership_required_plain_message() =~
              "active YSC membership"
