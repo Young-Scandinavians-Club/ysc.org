@@ -1340,9 +1340,21 @@ defmodule YscWeb.AdminUserDetailsLive do
                   </p>
                   <p>
                     <span class="font-semibold">Stripe Subscription ID:</span>
-                    <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
-                      {@active_subscription.stripe_id}
-                    </code>
+                    <%= if real_stripe_subscription_id?(@active_subscription.stripe_id) do %>
+                      <a
+                        href={"https://dashboard.stripe.com/subscriptions/#{@active_subscription.stripe_id}"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-xs bg-zinc-100 px-2 py-1 rounded font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
+                        title="View in Stripe Dashboard"
+                      >
+                        {@active_subscription.stripe_id}
+                      </a>
+                    <% else %>
+                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
+                        {@active_subscription.stripe_id}
+                      </code>
+                    <% end %>
                   </p>
                 </div>
               </div>
@@ -3841,6 +3853,13 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> DateTime.shift_zone!("America/Los_Angeles")
     |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
   end
+
+  defp real_stripe_subscription_id?(stripe_id)
+       when is_binary(stripe_id) and stripe_id != "" do
+    not String.starts_with?(stripe_id, "migrated_")
+  end
+
+  defp real_stripe_subscription_id?(_), do: false
 
   defp format_datetime_local(%DateTime{} = datetime) do
     # Convert UTC datetime to America/Los_Angeles for datetime-local input
