@@ -545,23 +545,6 @@ defmodule Ysc.Accounts.VerificationCodesTest do
       end)
     end
 
-    test "rate limits a second resend on the same channel", %{user: user} do
-      assert {:ok, _} = VerificationCodes.resend(user, :email)
-
-      assert {:error, :rate_limited, remaining} =
-               VerificationCodes.resend(user, :email)
-
-      assert is_integer(remaining)
-      assert remaining > 0
-    end
-
-    test "email and phone resend rate limits are independent", %{user: user} do
-      assert {:ok, _} = VerificationCodes.resend(user, :email)
-      assert {:ok, _} = VerificationCodes.resend(user, :phone)
-      assert {:error, :rate_limited, _} = VerificationCodes.resend(user, :email)
-      assert {:error, :rate_limited, _} = VerificationCodes.resend(user, :phone)
-    end
-
     test "honors destination override on resend", %{user: user} do
       other = unique_user_email()
 
@@ -844,5 +827,51 @@ defmodule Ysc.Accounts.VerificationCodesTest do
         )
       end)
     end
+  end
+end
+
+defmodule Ysc.Accounts.VerificationCodesResendRateLimitTest do
+  @moduledoc false
+
+  # Resend throttling uses the shared :ysc_cache. Other async tests call
+  # Cachex.clear/1 and can wipe rate-limit keys between resend calls.
+  use Ysc.DataCase, async: false
+
+  import Ysc.AccountsFixtures
+
+  alias Ysc.Accounts.VerificationCodes
+  alias Ysc.ResendRateLimiter
+
+  setup do
+    user = user_fixture(%{phone_number: unique_user_phone()})
+
+    for type <- [:email, :sms] do
+      Cachex.del(:ysc_cache, ResendRateLimiter.cache_key(user.id, type))
+    end
+
+    on_exit(fn ->
+      for type <- [:email, :sms] do
+        Cachex.del(:ysc_cache, ResendRateLimiter.cache_key(user.id, type))
+      end
+    end)
+
+    {:ok, user: user}
+  end
+
+  test "rate limits a second resend on the same channel", %{user: user} do
+    assert {:ok, _} = VerificationCodes.resend(user, :email)
+
+    assert {:error, :rate_limited, remaining} =
+             VerificationCodes.resend(user, :email)
+
+    assert is_integer(remaining)
+    assert remaining > 0
+  end
+
+  test "email and phone resend rate limits are independent", %{user: user} do
+    assert {:ok, _} = VerificationCodes.resend(user, :email)
+    assert {:ok, _} = VerificationCodes.resend(user, :phone)
+    assert {:error, :rate_limited, _} = VerificationCodes.resend(user, :email)
+    assert {:error, :rate_limited, _} = VerificationCodes.resend(user, :phone)
   end
 end

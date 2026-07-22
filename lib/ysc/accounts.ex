@@ -1342,10 +1342,10 @@ defmodule Ysc.Accounts do
     result
   end
 
+  # Sync synchronously so a rapid remove+reassign cannot leave a stale
+  # grace-period `resumes_at` from an earlier async Task finishing last.
   defp enqueue_board_volunteer_stripe_sync({:ok, %User{} = user}) do
-    Task.start(fn ->
-      Ysc.Subscriptions.BoardVolunteerBilling.sync_for_user(user)
-    end)
+    Ysc.Subscriptions.BoardVolunteerBilling.sync_for_user(user)
   end
 
   defp enqueue_board_volunteer_stripe_sync(_), do: :ok

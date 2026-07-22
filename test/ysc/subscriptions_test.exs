@@ -676,6 +676,7 @@ defmodule Ysc.SubscriptionsTest do
         Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan)
 
       assert params.pause_collection == %{behavior: :void}
+      assert params.cancel_at_period_end == false
       assert params.customer == user.stripe_id
 
       assert params.items == [

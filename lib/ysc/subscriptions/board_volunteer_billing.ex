@@ -6,17 +6,20 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   require Ysc.Logging
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.User
   alias Ysc.Repo
   alias Ysc.Subscriptions.Subscription
 
   @doc """
-  Syncs Stripe `pause_collection` for the primary account holder's membership
+  Syncs Stripe billing state for the primary account holder's membership
   subscription(s) based on whether anyone in the user's family group holds a
   board position.
 
   - While volunteering: `pause_collection` with `behavior: :void` and no `resumes_at`
-    so a prior grace-period `resumes_at` does not linger on Stripe.
+    so a prior grace-period `resumes_at` does not linger on Stripe; also clears
+    `cancel_at_period_end` and local `ends_at` so membership cannot expire while
+    on the board.
   - When the last volunteer leaves: same pause with `resumes_at` six calendar months ahead.
   - No-op in test environment (no Stripe calls).
   """
@@ -25,6 +28,33 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
       :ok
     else
       do_sync(user)
+    end
+  end
+
+  @doc """
+  Syncs every household that currently has at least one board member.
+
+  Useful after deploy or for one-shot repair of Stripe pause/cancel state.
+  """
+  def sync_all_board_households do
+    if Ysc.Env.test?() do
+      :ok
+    else
+      board_users =
+        Repo.all(from u in User, where: not is_nil(u.board_position))
+
+      board_users
+      |> Enum.map(fn user ->
+        [primary | _] = Accounts.get_family_group(user)
+        primary.id
+      end)
+      |> Enum.uniq()
+      |> Enum.each(fn primary_id ->
+        primary = Accounts.get_user!(primary_id)
+        sync_for_user(primary)
+      end)
+
+      :ok
     end
   end
 
@@ -64,7 +94,7 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   """
   def maybe_pause_collection_params(%User{} = user) do
     if household_on_board?(user) do
-      stripe_pause_collection_params(true)
+      stripe_sync_params(true)
     else
       %{}
     end
@@ -78,14 +108,17 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
     else
       on_board? = household_on_board?(user)
       subs = list_membership_subscriptions_for_pause(primary)
-
-      params = stripe_pause_collection_params(on_board?)
+      params = stripe_sync_params(on_board?)
 
       Enum.each(subs, fn sub ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
                Stripe.Subscription.update(sub.stripe_id, params)
              end) do
           {:ok, _} ->
+            if on_board? do
+              clear_scheduled_cancellation(sub)
+            end
+
             :ok
 
           {:error, error} ->
@@ -104,17 +137,54 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
     end
   end
 
+  defp clear_scheduled_cancellation(%Subscription{} = sub) do
+    if is_nil(sub.ends_at) do
+      :ok
+    else
+      case sub
+           |> Ecto.Changeset.change(%{ends_at: nil})
+           |> Repo.update() do
+        {:ok, _} ->
+          if is_binary(sub.user_id) do
+            MembershipCache.invalidate_user(sub.user_id)
+          end
+
+          :ok
+
+        {:error, changeset} ->
+          Ysc.Logging.error(
+            "Board volunteer failed to clear local ends_at after Stripe sync",
+            subscription_id: sub.id,
+            subscription_stripe_id: sub.stripe_id,
+            error: inspect(changeset)
+          )
+      end
+    end
+  end
+
   # Stripe merges subscription updates: if we only sent `behavior: :void` while
   # on the board, a prior grace-period `resumes_at` could remain. Omit `resumes_at`
   # so Stripe drops the prior scheduled resume (see `Stripe.Subscription` pause_collection types).
+  # Also clear cancel_at_period_end so a prior "cancel at period end" cannot expire
+  # membership while the household is still volunteering.
   @doc false
-  def stripe_pause_collection_params(true) do
-    %{pause_collection: %{behavior: :void}}
+  def stripe_sync_params(true) do
+    %{
+      pause_collection: %{behavior: :void},
+      cancel_at_period_end: false
+    }
   end
 
-  def stripe_pause_collection_params(false) do
+  def stripe_sync_params(false) do
     unix = grace_resume_at_unix_from(DateTime.utc_now())
     %{pause_collection: %{behavior: :void, resumes_at: unix}}
+  end
+
+  # Kept for callers/tests that only care about pause_collection shape.
+  @doc false
+  def stripe_pause_collection_params(on_board?) do
+    stripe_sync_params(on_board?)
+    |> Map.take([:pause_collection])
   end
 
   defp list_membership_subscriptions_for_pause(%User{} = primary) do
