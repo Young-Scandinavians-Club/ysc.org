@@ -5,15 +5,22 @@ defmodule YscWeb.HomeLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
+  alias Ysc.{
+    Accounts,
+    Bookings,
+    Events,
+    Newsletter,
+    PublicContentCache,
+    Tickets
+  }
+
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
-  alias Ysc.Bookings.{Booking, PropertyDisplay, Season}
+  alias Ysc.Bookings.{PropertyDisplay, Season}
   alias Ysc.Posts.Post
   alias Ysc.Media.Image
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.{DateDisplay, PlainText}
-  import Ecto.Query
 
   @impl true
   def mount(_params, session, socket) do
@@ -171,7 +178,8 @@ defmodule YscWeb.HomeLive do
       {:user_data,
        fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
-      {:bookings, fn -> get_future_active_bookings(user_id) end}
+      {:bookings,
+       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end}
     ]
 
     tasks
@@ -2147,39 +2155,6 @@ defmodule YscWeb.HomeLive do
       end,
       {:asc, DateTime}
     )
-  end
-
-  defp get_future_active_bookings(user_id, limit \\ 10) do
-    # Get today's date in PST timezone
-    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-    checkout_time = ~T[11:00:00]
-
-    query =
-      from b in Booking,
-        where: b.user_id == ^user_id,
-        where: b.status == :complete,
-        where: b.checkout_date >= ^today_pst,
-        order_by: [asc: b.checkin_date],
-        limit: ^limit,
-        preload: [:rooms]
-
-    bookings = Ysc.Repo.all(query)
-
-    # Filter out bookings that are past checkout time today (in PST)
-    bookings
-    |> Enum.filter(fn booking ->
-      if Date.compare(booking.checkout_date, today_pst) == :eq do
-        now_pst = DateTime.now!("America/Los_Angeles")
-
-        checkout_datetime_pst =
-          DateTime.new!(today_pst, checkout_time, "America/Los_Angeles")
-
-        DateTime.compare(now_pst, checkout_datetime_pst) == :lt
-      else
-        true
-      end
-    end)
-    |> Enum.take(limit)
   end
 
   defp days_until_booking(booking) do
