@@ -3,6 +3,7 @@ defmodule YscWeb.AdminNewslettersLive do
 
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
+  alias YscWeb.Admin.DateTimeDisplay
   alias YscWeb.DateDisplay
 
   alias Ysc.Newsletter
@@ -379,11 +380,11 @@ defmodule YscWeb.AdminNewslettersLive do
                     <span class="text-sm text-zinc-500">
                       <%= cond do %>
                         <% edition.sent_at -> %>
-                          Sent {format_datetime(edition.sent_at)}
+                          Sent {DateTimeDisplay.format_datetime_compact(edition.sent_at)}
                         <% edition.scheduled_at -> %>
-                          Scheduled {format_datetime(edition.scheduled_at)}
+                          Scheduled {DateTimeDisplay.format_datetime_compact(edition.scheduled_at)}
                         <% true -> %>
-                          Created {format_datetime(edition.inserted_at)}
+                          Created {DateTimeDisplay.format_datetime_compact(edition.inserted_at)}
                       <% end %>
                     </span>
                     <span
@@ -476,7 +477,7 @@ defmodule YscWeb.AdminNewslettersLive do
                     <% edition.scheduled_at -> %>
                       <div class="text-zinc-500 text-xs font-medium">Scheduled</div>
                       <div class="text-zinc-600 text-xs">
-                        {format_datetime(edition.scheduled_at)}
+                        {DateTimeDisplay.format_datetime_compact(edition.scheduled_at)}
                       </div>
                     <% true -> %>
                       <span class="text-zinc-400">—</span>
@@ -618,8 +619,8 @@ defmodule YscWeb.AdminNewslettersLive do
                     {subscriber_name(subscriber)}
                   </p>
                   <div class="flex items-center gap-3 mt-2 flex-wrap">
-                    <.badge type={subscriber_status_badge(subscriber.subscribed)}>
-                      {if subscriber.subscribed, do: "Active", else: "Inactive"}
+                    <.badge type={newsletter_subscriber_status_badge_type(subscriber.subscribed)}>
+                      {newsletter_subscriber_status_label(subscriber.subscribed)}
                     </.badge>
                     <span :if={subscriber.source} class="text-xs text-zinc-400">
                       {subscriber.source}
@@ -680,8 +681,8 @@ defmodule YscWeb.AdminNewslettersLive do
                   <span class="text-zinc-600">{subscriber_name(sub)}</span>
                 </:col>
                 <:col :let={{_, sub}} label="Status" field={:subscribed}>
-                  <.badge type={subscriber_status_badge(sub.subscribed)}>
-                    {if sub.subscribed, do: "Active", else: "Inactive"}
+                  <.badge type={newsletter_subscriber_status_badge_type(sub.subscribed)}>
+                    {newsletter_subscriber_status_label(sub.subscribed)}
                   </.badge>
                 </:col>
                 <:col :let={{_, sub}} label="Source" field={:source}>
@@ -1074,12 +1075,6 @@ defmodule YscWeb.AdminNewslettersLive do
   defp format_date(nil), do: ""
   defp format_date(dt), do: DateDisplay.format_datetime_display(dt)
 
-  defp format_datetime(nil), do: ""
-
-  defp format_datetime(dt) do
-    Calendar.strftime(dt, "%b %d, %Y %H:%M")
-  end
-
   defp creator_name(creator) do
     [creator.first_name, creator.last_name]
     |> Enum.filter(&is_binary/1)
@@ -1097,9 +1092,6 @@ defmodule YscWeb.AdminNewslettersLive do
     |> Enum.filter(&is_binary/1)
     |> Enum.join(" ")
   end
-
-  defp subscriber_status_badge(true), do: "green"
-  defp subscriber_status_badge(false), do: "zinc"
 
   defp subscribers_list_path(params) do
     ~p"/admin/newsletters?#{Map.put(params || %{}, "tab", "subscribers")}"

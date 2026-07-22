@@ -30,4 +30,14 @@ defmodule YscWeb.BookingDisplay do
   def payment_status_badge_type(:pending), do: "yellow"
   def payment_status_badge_type(:refunded), do: "red"
   def payment_status_badge_type(_), do: "gray"
+
+  @doc """
+  Member-friendly label for a ledger payment status atom.
+  """
+  def payment_status_label(:completed), do: "Completed"
+  def payment_status_label(:pending), do: "Pending"
+  def payment_status_label(:refunded), do: "Refunded"
+
+  def payment_status_label(status),
+    do: status |> to_string() |> String.capitalize()
 end

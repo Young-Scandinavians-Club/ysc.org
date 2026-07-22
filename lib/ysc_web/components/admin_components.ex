@@ -405,6 +405,18 @@ defmodule YscWeb.AdminComponents do
   def newsletter_edition_status_label(other),
     do: other |> to_string() |> String.capitalize()
 
+  @doc """
+  Maps a newsletter subscriber subscribed flag to a `<.badge>` type.
+  """
+  def newsletter_subscriber_status_badge_type(true), do: "green"
+  def newsletter_subscriber_status_badge_type(false), do: "zinc"
+
+  @doc """
+  Human-readable label for a newsletter subscriber subscribed flag.
+  """
+  def newsletter_subscriber_status_label(true), do: "Active"
+  def newsletter_subscriber_status_label(false), do: "Inactive"
+
   # ---------------------------------------------------------------------------
   # QuickBooks sync status (admin money / ledgers)
   # ---------------------------------------------------------------------------
