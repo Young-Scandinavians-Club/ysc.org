@@ -369,7 +369,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
   @impl true
   def handle_event("today", _, socket) do
-    today = Date.utc_today()
+    today = socket.assigns.today
     socket = socket |> assign(:current, format_date(today))
     socket = reload_availability_if_needed(socket, today)
     {:noreply, socket}
@@ -587,7 +587,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             end
 
           # Add Today border
-          if today?(day) do
+          if today?(day, assigns.today) do
             "#{base} #{classes} font-bold border-2 border-zinc-400"
           else
             "#{base} #{classes}"
@@ -1012,7 +1012,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
   defp next_month_date(date), do: date |> Date.end_of_month() |> Date.add(1)
 
-  defp today?(day), do: day == Date.utc_today()
+  defp today?(day, today), do: today && day == today
 
   defp other_month?(day, current),
     do: Date.beginning_of_month(day) != Date.beginning_of_month(current)

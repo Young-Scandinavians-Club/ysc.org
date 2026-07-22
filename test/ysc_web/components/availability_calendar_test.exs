@@ -105,6 +105,24 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       assert html =~ current_month
       assert html =~ "Today"
     end
+
+    test "highlights the today assign, not UTC today" do
+      today = ~D[2026-07-21]
+      tomorrow = Date.add(today, 1)
+
+      html =
+        render_clear_lake_calendar(
+          today: today,
+          min: today,
+          max: Date.add(today, 90)
+        )
+
+      today_cell = extract_day_cell(html, Date.to_iso8601(today))
+      tomorrow_cell = extract_day_cell(html, Date.to_iso8601(tomorrow))
+
+      assert today_cell =~ "border-2 border-zinc-400"
+      refute tomorrow_cell =~ "border-2 border-zinc-400"
+    end
   end
 
   describe "availability display — Clear Lake day mode (no bookings)" do
