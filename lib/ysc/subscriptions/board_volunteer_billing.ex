@@ -43,16 +43,43 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
       subscription_items_match_membership_plans?(subscription)
   end
 
+  @doc """
+  Returns true when anyone in the user's family group currently holds a
+  board position.
+  """
+  def household_on_board?(%User{} = user) do
+    family_ids = Accounts.get_family_group_user_ids(user)
+
+    Repo.exists?(
+      from u in User,
+        where: u.id in ^family_ids,
+        where: not is_nil(u.board_position)
+    )
+  end
+
+  @doc """
+  Stripe create/update params that pause collection while the household is on
+  the board. Returns an empty map when not on the board (callers merge this
+  into Subscription create params so new memberships are born paused).
+  """
+  def maybe_pause_collection_params(%User{} = user) do
+    if household_on_board?(user) do
+      stripe_pause_collection_params(true)
+    else
+      %{}
+    end
+  end
+
   defp do_sync(%User{} = user) do
     [primary | _] = Accounts.get_family_group(user)
 
     if is_nil(primary.stripe_id) or primary.stripe_id == "" do
       :ok
     else
-      household_on_board? = any_family_board_member?(user)
+      on_board? = household_on_board?(user)
       subs = list_membership_subscriptions_for_pause(primary)
 
-      params = stripe_pause_collection_params(household_on_board?)
+      params = stripe_pause_collection_params(on_board?)
 
       Enum.each(subs, fn sub ->
         case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
@@ -67,7 +94,7 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
               user_id: user.id,
               primary_user_id: primary.id,
               subscription_stripe_id: sub.stripe_id,
-              household_on_board: household_on_board?,
+              household_on_board: on_board?,
               error: inspect(error)
             )
         end
@@ -88,16 +115,6 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   def stripe_pause_collection_params(false) do
     unix = grace_resume_at_unix_from(DateTime.utc_now())
     %{pause_collection: %{behavior: :void, resumes_at: unix}}
-  end
-
-  defp any_family_board_member?(%User{} = user) do
-    family_ids = Accounts.get_family_group_user_ids(user)
-
-    Repo.exists?(
-      from u in User,
-        where: u.id in ^family_ids,
-        where: not is_nil(u.board_position)
-    )
   end
 
   defp list_membership_subscriptions_for_pause(%User{} = primary) do

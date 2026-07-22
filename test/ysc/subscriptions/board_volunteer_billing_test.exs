@@ -102,6 +102,61 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
     end
   end
 
+  describe "household_on_board?/1" do
+    test "returns true when user has a board position" do
+      user = user_fixture()
+      {:ok, user} = Ysc.Accounts.assign_board_position(user, :treasurer)
+
+      assert BoardVolunteerBilling.household_on_board?(user)
+    end
+
+    test "returns true when a family member has a board position" do
+      primary = user_fixture()
+
+      sub_account =
+        %Ysc.Accounts.User{}
+        |> Ysc.Accounts.User.sub_account_registration_changeset(
+          %{
+            email: "sub-#{System.unique_integer()}@example.com",
+            password: valid_user_password(),
+            first_name: "Sub",
+            last_name: "User",
+            phone_number: unique_user_phone(),
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Ysc.Repo.insert!()
+
+      {:ok, _} = Ysc.Accounts.assign_board_position(sub_account, :secretary)
+
+      assert BoardVolunteerBilling.household_on_board?(primary)
+    end
+
+    test "returns false when nobody in the household is on the board" do
+      user = user_fixture()
+      refute BoardVolunteerBilling.household_on_board?(user)
+    end
+  end
+
+  describe "maybe_pause_collection_params/1" do
+    test "returns void pause_collection when household is on the board" do
+      user = user_fixture()
+      {:ok, user} = Ysc.Accounts.assign_board_position(user, :president)
+
+      assert %{pause_collection: %{behavior: :void}} ==
+               BoardVolunteerBilling.maybe_pause_collection_params(user)
+    end
+
+    test "returns empty map when household is not on the board" do
+      user = user_fixture()
+
+      assert %{} == BoardVolunteerBilling.maybe_pause_collection_params(user)
+    end
+  end
+
   describe "sync_for_user/1" do
     test "returns :ok without calling Stripe in test mode" do
       user = user_fixture()

@@ -233,5 +233,109 @@ defmodule Ysc.SubscriptionsPlanChangeTest do
         )
       end
     end
+
+    test "uses proration_behavior none when upgrading a board household membership" do
+      user = user_fixture()
+      {:ok, user} = Ysc.Accounts.assign_board_position(user, :president)
+
+      plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(plans, &(&1.id == :single))
+      family_plan = Enum.find(plans, &(&1.id == :family))
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_board_upgrade_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Membership",
+          current_period_start: DateTime.utc_now(),
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_board_#{System.unique_integer()}",
+          stripe_product_id: "prod_single",
+          stripe_price_id: single_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      subscription = Repo.preload(subscription, [:subscription_items, :user])
+
+      stripe_sub_initial =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          items: %Stripe.List{
+            data: [
+              %{
+                id: "si_board",
+                price: single_plan.stripe_price_id,
+                quantity: 1
+              }
+            ],
+            has_more: false,
+            object: "list",
+            url: "/v1/subscription_items"
+          },
+          schedule: nil
+        )
+
+      ts = System.os_time(:second)
+
+      stripe_sub_active =
+        Ysc.Stripe.SubscriptionFixtures.subscription(
+          id: subscription.stripe_id,
+          status: "active",
+          current_period_start: ts,
+          current_period_end: ts + 30 * 24 * 60 * 60
+        )
+
+      try do
+        Application.put_env(
+          :ysc,
+          :subscription_retrieve_initial_plan_change_callback,
+          fn _sid, _opts ->
+            {:ok, stripe_sub_initial}
+          end
+        )
+
+        Application.put_env(
+          :ysc,
+          :subscription_update_plan_change_callback,
+          fn _sid, params ->
+            assert params.proration_behavior == "none"
+            {:ok, %Stripe.Subscription{}}
+          end
+        )
+
+        Application.put_env(
+          :ysc,
+          :subscription_retrieve_after_plan_change_callback,
+          fn _sid ->
+            {:ok, stripe_sub_active}
+          end
+        )
+
+        assert {:ok, _returned_sub} =
+                 Subscriptions.change_membership_plan(
+                   subscription,
+                   family_plan.stripe_price_id,
+                   :upgrade
+                 )
+      after
+        Application.delete_env(
+          :ysc,
+          :subscription_retrieve_initial_plan_change_callback
+        )
+
+        Application.delete_env(:ysc, :subscription_update_plan_change_callback)
+
+        Application.delete_env(
+          :ysc,
+          :subscription_retrieve_after_plan_change_callback
+        )
+      end
+    end
   end
 end

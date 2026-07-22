@@ -9,6 +9,7 @@ defmodule Ysc.Subscriptions do
   alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.UserProfileCache
   alias Ysc.Repo
+  alias Ysc.Subscriptions.BoardVolunteerBilling
   alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
   alias Ysc.Stripe.SubscriptionHelpers
 
@@ -565,7 +566,9 @@ defmodule Ysc.Subscriptions do
               invalidate_membership_caches(updated_subscription.user_id)
             end
 
-            {:ok, Repo.preload(updated_subscription, :subscription_items)}
+            updated_subscription
+            |> Repo.preload(:subscription_items)
+            |> then(&sync_board_pause_after({:ok, &1}))
 
           {:error, changeset} ->
             {:error, changeset}
@@ -624,7 +627,8 @@ defmodule Ysc.Subscriptions do
            })
          end) do
       {:ok, stripe_subscription} ->
-        update_subscription(subscription, %{
+        subscription
+        |> update_subscription(%{
           stripe_status: stripe_subscription.status,
           current_period_end:
             SubscriptionHelpers.current_period_end(stripe_subscription)
@@ -632,6 +636,7 @@ defmodule Ysc.Subscriptions do
             |> DateTime.truncate(:second),
           ends_at: nil
         })
+        |> sync_board_pause_after()
 
       {:error, _error} ->
         {:error, "Failed to resume subscription in Stripe"}
@@ -719,7 +724,8 @@ defmodule Ysc.Subscriptions do
         {:ok, updated_stripe_subscription} ->
           # Update local subscription with new period dates
           # The schedule will control the actual period end
-          update_subscription(subscription, %{
+          subscription
+          |> update_subscription(%{
             stripe_status: updated_stripe_subscription.status,
             current_period_start:
               case SubscriptionHelpers.current_period_start(
@@ -731,6 +737,7 @@ defmodule Ysc.Subscriptions do
             # Use the schedule's end date or the subscription's current_period_end
             current_period_end: DateTime.from_unix!(end_timestamp)
           })
+          |> sync_board_pause_after()
 
         {:error, error} ->
           {:error, error}
@@ -907,13 +914,20 @@ defmodule Ysc.Subscriptions do
          new_price_id,
          direction
        ) do
-    case Application.get_env(:ysc, :change_membership_plan_stripe_callback) do
-      callback when is_function(callback, 3) ->
-        callback.(subscription, new_price_id, direction)
+    result =
+      case Application.get_env(:ysc, :change_membership_plan_stripe_callback) do
+        callback when is_function(callback, 3) ->
+          callback.(subscription, new_price_id, direction)
 
-      _ ->
-        do_change_membership_plan_stripe(subscription, new_price_id, direction)
-    end
+        _ ->
+          do_change_membership_plan_stripe(
+            subscription,
+            new_price_id,
+            direction
+          )
+      end
+
+    sync_board_pause_after(result)
   end
 
   @dialyzer {:nowarn_function, do_change_membership_plan_stripe: 3}
@@ -969,14 +983,22 @@ defmodule Ysc.Subscriptions do
               # Stripe; the user settings flow requires a payment method before allowing
               # upgrade. Without one, Stripe would create an unpaid invoice and the
               # subscription would go incomplete.
-              # Use proration_behavior: "always_invoice" to ensure immediate charge
+              # Board households use proration_behavior: "none" (billing is paused /
+              # voided while on the board). Otherwise always_invoice for immediate charge.
               update_items = [
                 %{id: stripe_item_id, price: new_price_id, quantity: 1}
               ]
 
+              proration_behavior =
+                if board_household_for_subscription?(subscription) do
+                  "none"
+                else
+                  "always_invoice"
+                end
+
               update_params = %{
                 items: update_items,
-                proration_behavior: "always_invoice",
+                proration_behavior: proration_behavior,
                 billing_cycle_anchor: "unchanged"
               }
 
@@ -1285,16 +1307,32 @@ defmodule Ysc.Subscriptions do
           stripe_params
         end
 
-      if idempotency_key do
-        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          stripe_subscription_module().create(stripe_params,
-            headers: %{"Idempotency-Key" => idempotency_key}
-          )
-        end)
-      else
-        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-          stripe_subscription_module().create(stripe_params)
-        end)
+      stripe_params =
+        Map.merge(
+          stripe_params,
+          BoardVolunteerBilling.maybe_pause_collection_params(user)
+        )
+
+      result =
+        if idempotency_key do
+          Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+            stripe_subscription_module().create(stripe_params,
+              headers: %{"Idempotency-Key" => idempotency_key}
+            )
+          end)
+        else
+          Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+            stripe_subscription_module().create(stripe_params)
+          end)
+        end
+
+      case result do
+        {:ok, _} = ok ->
+          BoardVolunteerBilling.sync_for_user(user)
+          ok
+
+        error ->
+          error
       end
     end
   end
@@ -1387,6 +1425,7 @@ defmodule Ysc.Subscriptions do
                   plan
                 )
 
+                BoardVolunteerBilling.sync_for_user(user)
                 {:ok, subscription}
 
               err ->
@@ -1399,18 +1438,24 @@ defmodule Ysc.Subscriptions do
     end
   end
 
-  @dialyzer {:nowarn_function,
-             do_create_subscription_paid_out_of_band_stripe: 2}
-  defp do_create_subscription_paid_out_of_band_stripe(user, plan) do
-    require Ysc.Logging
-
-    stripe_params = %{
+  @doc false
+  def paid_out_of_band_stripe_create_params(user, plan) do
+    %{
       customer: user.stripe_id,
       items: [%{price: plan.stripe_price_id, quantity: 1}],
       payment_behavior: "default_incomplete",
       expand: ["latest_invoice"],
       metadata: %{user_id: user.id}
     }
+    |> Map.merge(BoardVolunteerBilling.maybe_pause_collection_params(user))
+  end
+
+  @dialyzer {:nowarn_function,
+             do_create_subscription_paid_out_of_band_stripe: 2}
+  defp do_create_subscription_paid_out_of_band_stripe(user, plan) do
+    require Ysc.Logging
+
+    stripe_params = paid_out_of_band_stripe_create_params(user, plan)
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
            Stripe.Subscription.create(stripe_params)
@@ -1442,6 +1487,7 @@ defmodule Ysc.Subscriptions do
                   plan
                 )
 
+                BoardVolunteerBilling.sync_for_user(user)
                 {:ok, subscription}
 
               err ->
@@ -1782,6 +1828,45 @@ defmodule Ysc.Subscriptions do
     MembershipCache.invalidate_user(user_id)
     UserProfileCache.invalidate_user(user_id)
     :ok
+  end
+
+  defp sync_board_pause_after({:ok, %Subscription{} = subscription} = result) do
+    sync_board_pause_for_subscription(subscription)
+    result
+  end
+
+  defp sync_board_pause_after(
+         {:scheduled, %Subscription{} = subscription} = result
+       ) do
+    sync_board_pause_for_subscription(subscription)
+    result
+  end
+
+  defp sync_board_pause_after(other), do: other
+
+  defp sync_board_pause_for_subscription(%Subscription{user_id: nil}), do: :ok
+
+  defp sync_board_pause_for_subscription(%Subscription{} = subscription) do
+    user =
+      case subscription.user do
+        %Ysc.Accounts.User{} = loaded -> loaded
+        _ -> Ysc.Accounts.get_user!(subscription.user_id)
+      end
+
+    BoardVolunteerBilling.sync_for_user(user)
+    :ok
+  end
+
+  defp board_household_for_subscription?(%Subscription{user_id: nil}), do: false
+
+  defp board_household_for_subscription?(%Subscription{} = subscription) do
+    user =
+      case subscription.user do
+        %Ysc.Accounts.User{} = loaded -> loaded
+        _ -> Ysc.Accounts.get_user!(subscription.user_id)
+      end
+
+    BoardVolunteerBilling.household_on_board?(user)
   end
 
   @doc false
