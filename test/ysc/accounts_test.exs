@@ -5,7 +5,7 @@ defmodule Ysc.AccountsTest do
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
-  alias Ysc.Accounts.{User, UserPasskey, UserToken}
+  alias Ysc.Accounts.{User, UserPasskey, UserToken, UserProfileCache}
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Subscriptions
   alias Ysc.Newsletter
@@ -575,6 +575,37 @@ defmodule Ysc.AccountsTest do
 
       assert {:error, :unauthorized} =
                Accounts.remove_sub_account(sub, primary2)
+    end
+
+    @tag process_caches: true
+    test "remove_sub_account busts cached profile so membership access is revoked" do
+      Cachex.clear(:ysc_cache)
+
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098303"})
+      sub = user_fixture(%{phone_number: "+14159098304"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      UserProfileCache.get_user!(sub.id, [])
+      UserProfileCache.get_user!(primary.id, [:sub_accounts])
+
+      cached_sub = Accounts.get_user!(sub.id, [])
+      assert Accounts.has_active_membership?(cached_sub)
+
+      assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
+
+      refreshed_sub = Accounts.get_user!(sub.id, [])
+      assert is_nil(refreshed_sub.primary_user_id)
+      refute Accounts.has_active_membership?(refreshed_sub)
+
+      refreshed_primary = Accounts.get_user!(primary.id, [:sub_accounts])
+      assert refreshed_primary.sub_accounts == []
     end
   end
 
@@ -1967,6 +1998,34 @@ defmodule Ysc.AccountsTest do
 
       assert Accounts.leave_family_membership(primary) ==
                {:error, :not_sub_account}
+    end
+
+    @tag process_caches: true
+    test "leave_family_membership busts cached profile so membership access is revoked" do
+      Cachex.clear(:ysc_cache)
+
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098318"})
+      sub = user_fixture(%{phone_number: "+14159098319"})
+
+      {:ok, sub} =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update()
+
+      UserProfileCache.get_user!(sub.id, [])
+
+      cached_sub = Accounts.get_user!(sub.id, [])
+      assert Accounts.has_active_membership?(cached_sub)
+
+      assert {:ok, left} = Accounts.leave_family_membership(sub)
+      assert is_nil(left.primary_user_id)
+
+      refreshed_sub = Accounts.get_user!(sub.id, [])
+      assert is_nil(refreshed_sub.primary_user_id)
+      refute Accounts.has_active_membership?(refreshed_sub)
     end
   end
 

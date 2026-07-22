@@ -228,7 +228,7 @@ defmodule Ysc.MixProject do
       {:goth, "~> 1.4"},
       {:hammer, "~> 7.3"},
       {:html_sanitize_ex, "~> 1.5"},
-      {:image, "~> 0.71"},
+      {:image, "~> 0.72"},
       {:iso, "~> 1.4"},
       {:jason, "~> 1.4"},
       # Pin exact version: jose is pulled by joken (~> 1.11.10) and goth (~> 1.11).

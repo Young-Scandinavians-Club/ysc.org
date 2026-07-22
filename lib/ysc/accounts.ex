@@ -3333,6 +3333,12 @@ defmodule Ysc.Accounts do
       |> Repo.insert!()
 
       MembershipCache.invalidate_user(updated_user.id)
+
+      invalidate_family_link_profile_caches(
+        updated_user.id,
+        primary_user.id
+      )
+
       updated_user
     end)
   end
@@ -3376,6 +3382,11 @@ defmodule Ysc.Accounts do
       case result do
         {:ok, %{sub_account: updated_sub_account}} ->
           MembershipCache.invalidate_user(updated_sub_account.id)
+
+          invalidate_family_link_profile_caches(
+            updated_sub_account.id,
+            primary_user_id
+          )
 
           if primary_user do
             send_family_member_removed_email(updated_sub_account, primary_user)
@@ -3425,6 +3436,12 @@ defmodule Ysc.Accounts do
       case result do
         {:ok, %{sub_account: updated_sub_account}} ->
           MembershipCache.invalidate_user(updated_sub_account.id)
+
+          invalidate_family_link_profile_caches(
+            updated_sub_account.id,
+            primary_user.id
+          )
+
           send_family_member_removed_email(updated_sub_account, primary_user)
           {:ok, updated_sub_account}
 
@@ -3434,6 +3451,11 @@ defmodule Ysc.Accounts do
     else
       {:error, :unauthorized}
     end
+  end
+
+  defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
+    invalidate_user_profile_cache(user_id)
+    invalidate_user_profile_cache(primary_user_id)
   end
 
   defp send_family_member_removed_email(removed_user, primary_user) do

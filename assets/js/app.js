@@ -65,6 +65,7 @@ import AvatarCropper from "./avatar_cropper";
 import { createLiveToastHook } from "../vendor/live_toast.esm.js";
 import { ToastFlashBridge } from "./toast_flash_bridge";
 import InteractScrollbar from "./interact_scrollbar";
+import OtpInput from "./otp_input";
 
 // Duration (ms) and max toasts per LiveToast docs: https://hexdocs.pm/live_toast/readme.html
 const TOAST_DURATION_MS = 6000;
@@ -106,6 +107,7 @@ let Hooks = {
     WalletPlatform,
     AvatarCropper,
     InteractScrollbar,
+    OtpInput,
     LiveToast: createLiveToastHook(TOAST_DURATION_MS, MAX_TOAST_ITEMS),
     ToastFlashBridge,
 };
@@ -334,82 +336,6 @@ document.addEventListener("click", (event) => {
                 icon.classList.add("hero-eye-solid");
                 button.setAttribute("aria-label", "Show password");
                 button.setAttribute("aria-pressed", "false");
-            }
-        }
-    }
-});
-
-// Handle OTP input functionality
-document.addEventListener("input", (event) => {
-    if (event.target.matches("[data-otp-input-item]")) {
-        const input = event.target;
-        const container = input.closest("[data-otp-input]");
-        const inputs = container.querySelectorAll("[data-otp-input-item]");
-        const index = Array.from(inputs).indexOf(input);
-
-        // If a character was entered and it's not the last input, move to next
-        if (input.value && index < inputs.length - 1) {
-            inputs[index + 1].focus();
-        }
-    }
-});
-
-document.addEventListener("keydown", (event) => {
-    if (event.target.matches("[data-otp-input-item]")) {
-        const input = event.target;
-        const container = input.closest("[data-otp-input]");
-        const inputs = container.querySelectorAll("[data-otp-input-item]");
-        const index = Array.from(inputs).indexOf(input);
-
-        // Handle backspace
-        if (event.key === "Backspace" && !input.value && index > 0) {
-            inputs[index - 1].focus();
-        }
-
-        // Handle left arrow
-        if (event.key === "ArrowLeft" && index > 0) {
-            inputs[index - 1].focus();
-        }
-
-        // Handle right arrow
-        if (event.key === "ArrowRight" && index < inputs.length - 1) {
-            inputs[index + 1].focus();
-        }
-    }
-});
-
-document.addEventListener("paste", (event) => {
-    if (event.target.matches("[data-otp-input-item]")) {
-        event.preventDefault();
-        const paste = event.clipboardData.getData("text").replace(/\s/g, ""); // Remove whitespace
-        const container = event.target.closest("[data-otp-input]");
-        const inputs = container.querySelectorAll("[data-otp-input-item]");
-
-        // Always start filling from the first input when pasting
-        // This ensures the full OTP code is entered correctly regardless of which box has focus
-        const filledCount = Math.min(paste.length, inputs.length);
-
-        for (let i = 0; i < filledCount; i++) {
-            inputs[i].value = paste[i];
-            // Trigger input event on each filled input to ensure LiveView picks up the change
-            inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        for (let i = filledCount; i < inputs.length; i++) {
-            inputs[i].value = "";
-            inputs[i].dispatchEvent(new Event("input", { bubbles: true }));
-        }
-
-        // Trigger change on the last filled input so phx-change validates the code.
-        // Do not dispatch change on the form element itself — LiveView pushInput
-        // requires a form control (input.form), and HTMLFormElement has no .form.
-        if (filledCount > 0) {
-            inputs[filledCount - 1].dispatchEvent(new Event("change", { bubbles: true }));
-
-            if (filledCount < inputs.length) {
-                inputs[filledCount].focus(); // Focus next empty input
-            } else {
-                inputs[filledCount - 1].focus(); // Focus last input if all filled
             }
         }
     }
