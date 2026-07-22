@@ -1237,7 +1237,6 @@ defmodule YscWeb.BookingReceiptLiveTest do
             @pi_amount unquote(discounted_cents)
             @booking_id unquote(booking.id)
             @user_id unquote(booking.user_id)
-            @counter unquote(retrieve_counter)
 
             def create_payment_intent(_params, _opts),
               do: {:error, :not_implemented}
@@ -1256,7 +1255,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
               do: {:error, :not_implemented}
 
             def retrieve_payment_intent(id, _opts) do
-              Agent.update(@counter, &(&1 + 1))
+              Agent.update(unquote(retrieve_counter), &(&1 + 1))
 
               {:ok,
                %Stripe.PaymentIntent{
@@ -1983,7 +1982,6 @@ defmodule YscWeb.BookingReceiptLiveTest do
 
             @amount unquote(amount_cents)
             @metadata unquote(Macro.escape(stripe_metadata))
-            @counter unquote(retrieve_counter)
 
             def create_payment_intent(_params, _opts),
               do: {:error, :not_implemented}
@@ -2002,7 +2000,7 @@ defmodule YscWeb.BookingReceiptLiveTest do
               do: {:error, :not_implemented}
 
             def retrieve_payment_intent(id, _opts) do
-              Agent.update(@counter, &(&1 + 1))
+              Agent.update(unquote(retrieve_counter), &(&1 + 1))
 
               {:ok,
                %Stripe.PaymentIntent{
