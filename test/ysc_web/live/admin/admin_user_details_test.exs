@@ -5,6 +5,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.AuthEvent
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -214,6 +215,45 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
       assert html =~ "w-24 h-24"
+    end
+  end
+
+  describe "account activity" do
+    test "shows N/A when user has no auth events", %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert has_element?(view, "#account-activity")
+      assert has_element?(view, "#last-login-at", "N/A")
+      assert has_element?(view, "#last-activity-at", "N/A")
+    end
+
+    test "shows last login and activity from auth events", %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, auth_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "127.0.0.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Repo.insert()
+
+      expected_absolute =
+        auth_event.inserted_at
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
+
+      expected_relative = Timex.from_now(auth_event.inserted_at)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert has_element?(view, "#account-activity")
+      assert has_element?(view, "#last-login-at", expected_relative)
+      assert has_element?(view, "#last-login-at", expected_absolute)
+      assert has_element?(view, "#last-activity-at", expected_relative)
+      assert has_element?(view, "#last-activity-at", expected_absolute)
     end
   end
 

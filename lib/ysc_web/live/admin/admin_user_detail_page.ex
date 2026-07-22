@@ -77,12 +77,43 @@ defmodule YscWeb.AdminUserDetailsLive do
           </form>
         </div>
 
-        <div class="w-full py-4">
-          <div class="h-24">
+        <div class="w-full py-4 flex flex-row items-center justify-between">
+          <div class="flex items-center gap-6">
             <.user_avatar_image
               user={@selected_user}
-              class="w-24 h-24 rounded-full"
+              class="w-24 h-24 rounded-full shrink-0"
             />
+            <div
+              id="account-activity"
+              class="grid grid-cols-[max-content_1fr] items-start gap-x-4 gap-y-3 text-sm"
+            >
+              <span class="text-zinc-500 pt-[1px]">Last login</span>
+              <div id="last-login-at" class="min-w-0">
+                <%= if @last_login_at do %>
+                  <div class="text-zinc-900 font-medium">
+                    {Timex.from_now(@last_login_at)}
+                  </div>
+                  <div class="text-zinc-500 text-xs mt-0.5">
+                    {format_datetime_for_display(@last_login_at)}
+                  </div>
+                <% else %>
+                  <span class="text-zinc-900 font-medium">N/A</span>
+                <% end %>
+              </div>
+              <span class="text-zinc-500 pt-[1px]">Last activity</span>
+              <div id="last-activity-at" class="min-w-0">
+                <%= if @last_activity_at do %>
+                  <div class="text-zinc-900 font-medium">
+                    {Timex.from_now(@last_activity_at)}
+                  </div>
+                  <div class="text-zinc-500 text-xs mt-0.5">
+                    {format_datetime_for_display(@last_activity_at)}
+                  </div>
+                <% else %>
+                  <span class="text-zinc-900 font-medium">N/A</span>
+                <% end %>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -4400,6 +4431,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:show_booking_benefits?, false)
     |> assign(:entitlement_form, entitlement_form_defaults())
     |> assign(:form, to_form(%{}, as: "user"))
+    |> assign(:last_login_at, nil)
+    |> assign(:last_activity_at, nil)
   end
 
   defp load_user_detail(socket, id, current_user) do
@@ -4428,7 +4461,14 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:original_form_data, original_form_data)
       |> assign(:form, user_form)
 
-    [sub_result, has_lifetime, application, board_member] =
+    [
+      sub_result,
+      has_lifetime,
+      application,
+      board_member,
+      last_login_at,
+      last_activity_at
+    ] =
       Task.await_many(
         [
           Task.async(fn -> fetch_subscription_data(selected_user) end),
@@ -4436,7 +4476,13 @@ defmodule YscWeb.AdminUserDetailsLive do
             Accounts.has_lifetime_membership?(selected_user)
           end),
           Task.async(fn -> fetch_application(id, current_user) end),
-          Task.async(fn -> Accounts.household_board_member(selected_user) end)
+          Task.async(fn -> Accounts.household_board_member(selected_user) end),
+          Task.async(fn ->
+            Accounts.get_last_successful_login_datetime(selected_user)
+          end),
+          Task.async(fn ->
+            Accounts.get_last_login_session_datetime(selected_user)
+          end)
         ],
         :infinity
       )
@@ -4478,6 +4524,8 @@ defmodule YscWeb.AdminUserDetailsLive do
         to_form(membership_type_cs, as: "membership_type")
       )
       |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
+      |> assign(:last_login_at, last_login_at)
+      |> assign(:last_activity_at, last_activity_at)
 
     if active_subscription do
       start_async(socket, :load_downgrade_info, fn ->
