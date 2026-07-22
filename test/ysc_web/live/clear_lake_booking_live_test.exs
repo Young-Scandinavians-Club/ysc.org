@@ -112,7 +112,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert has_element?(
                view,
                "#clear-lake-booking-eligibility-banner a[href=\"/users/membership\"]",
-               "Membership page"
+               "Manage Membership"
              )
     end
   end

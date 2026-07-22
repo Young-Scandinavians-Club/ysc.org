@@ -4392,7 +4392,7 @@ defmodule YscWeb.TahoeBookingLive do
                   end
                 }
               >
-                Book Now
+                Confirm Booking
               </.button>
             </div>
           </div>
