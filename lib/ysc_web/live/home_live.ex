@@ -5,7 +5,15 @@ defmodule YscWeb.HomeLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Accounts, Bookings, Events, Newsletter, PublicContentCache, Tickets}
+  alias Ysc.{
+    Accounts,
+    Bookings,
+    Events,
+    Newsletter,
+    PublicContentCache,
+    Tickets
+  }
+
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{PropertyDisplay, Season}
   alias Ysc.Posts.Post
@@ -170,7 +178,8 @@ defmodule YscWeb.HomeLive do
       {:user_data,
        fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
-      {:bookings, fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end}
+      {:bookings,
+       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end}
     ]
 
     tasks
