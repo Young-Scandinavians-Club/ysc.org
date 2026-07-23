@@ -182,10 +182,8 @@ defmodule Ysc.BookingsTest do
         |> DateTime.to_date()
 
       staying =
-        booking_fixture(%{
+        active_check_in_booking_fixture(%{
           property: :tahoe,
-          checkin_date: Date.add(today, -1),
-          checkout_date: Date.add(today, 2),
           status: :complete,
           guests_count: 3
         })
@@ -202,7 +200,8 @@ defmodule Ysc.BookingsTest do
       checkout_today =
         booking_fixture(%{
           property: :tahoe,
-          checkin_date: Date.add(today, -2),
+          checkin_date:
+            tahoe_checkin_for_fixed_checkout(today, Date.add(today, -2)),
           checkout_date: today,
           status: :complete,
           guests_count: 4
@@ -221,7 +220,8 @@ defmodule Ysc.BookingsTest do
         booking_fixture(%{
           property: :tahoe,
           checkin_date: today,
-          checkout_date: Date.add(today, 1),
+          checkout_date:
+            ensure_sunday_when_saturday_included(today, Date.add(today, 1)),
           status: :canceled
         })
 

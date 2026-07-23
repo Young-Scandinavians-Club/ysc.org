@@ -122,6 +122,27 @@ defmodule Ysc.BookingsFixtures do
     end
   end
 
+  @doc """
+  Adjusts check-in when checkout is fixed so Tahoe's Saturday/Sunday weekend rule holds.
+
+  When the preferred check-in produces a span that includes Saturday but not Sunday
+  (typically checkout on Saturday), moves check-in to the preceding Sunday.
+  """
+  def tahoe_checkin_for_fixed_checkout(checkout, preferred_checkin) do
+    if tahoe_weekend_range_valid?(preferred_checkin, checkout) do
+      preferred_checkin
+    else
+      Date.add(checkout, -6)
+    end
+  end
+
+  defp tahoe_weekend_range_valid?(checkin, checkout) do
+    dates = Date.range(checkin, checkout) |> Enum.to_list()
+    has_saturday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 6))
+    has_sunday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 7))
+    not has_saturday? or has_sunday?
+  end
+
   def booking_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
