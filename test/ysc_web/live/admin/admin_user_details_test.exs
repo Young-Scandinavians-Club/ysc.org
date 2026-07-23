@@ -375,6 +375,81 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~ "Current Membership"
     end
 
+    test "links real Stripe subscription IDs to the Stripe dashboard", %{conn: conn} do
+      user = user_fixture()
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      stripe_id = "sub_#{System.unique_integer()}"
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: stripe_id,
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      if single_plan do
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_1",
+          stripe_id: "si_#{System.unique_integer()}",
+          quantity: 1
+        })
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      html =
+        view
+        |> element("a[href$='/details/membership']")
+        |> render_click()
+
+      assert html =~
+               ~s|href="https://dashboard.stripe.com/subscriptions/#{stripe_id}"|
+
+      assert html =~ stripe_id
+    end
+
+    test "shows migrated Stripe subscription IDs as plain text without dashboard link",
+         %{conn: conn} do
+      user = user_fixture()
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+      migrated_id = "migrated_#{Ecto.ULID.generate()}"
+
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: migrated_id,
+          stripe_status: "active",
+          name: "Membership",
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      if single_plan do
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_price_id: single_plan.stripe_price_id,
+          stripe_product_id: "prod_1",
+          stripe_id: "si_#{System.unique_integer()}",
+          quantity: 1
+        })
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      html =
+        view
+        |> element("a[href$='/details/membership']")
+        |> render_click()
+
+      assert html =~ migrated_id
+      refute html =~ "dashboard.stripe.com/subscriptions/#{migrated_id}"
+    end
+
     test "does not show create paid membership form when user has lifetime membership",
          %{conn: conn} do
       user =

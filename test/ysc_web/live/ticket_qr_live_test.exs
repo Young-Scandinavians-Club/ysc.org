@@ -71,6 +71,23 @@ defmodule YscWeb.TicketQrLiveTest do
 
       assert_redirect(view, "/users/tickets")
     end
+
+    test "redirects with helpful flash when ticket order is not found", %{
+      conn: conn
+    } do
+      user = user_fixture()
+      conn = log_in_user(conn, user)
+      bogus_id = Ecto.ULID.generate()
+
+      {:ok, view, _html} = live(conn, ~p"/tickets/#{bogus_id}/qr")
+      render_async(view)
+
+      flash = Phoenix.Flash.get(:sys.get_state(view.pid).socket.assigns.flash, :error)
+
+      assert flash =~ "couldn't find those tickets"
+      assert flash =~ "My Bookings & Tickets"
+      assert_redirect(view, "/users/tickets")
+    end
   end
 
   describe "page rendering" do

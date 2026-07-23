@@ -4,6 +4,8 @@ defmodule Ysc.SubscriptionsTest do
   """
   use Ysc.DataCase, async: true
 
+  import Mox
+
   alias Ysc.Accounts
   alias Ysc.Accounts.User
   alias Ysc.Repo
@@ -849,6 +851,36 @@ defmodule Ysc.SubscriptionsTest do
       result = Subscriptions.create_stripe_subscription(user, params)
 
       refute result == {:error, :user_already_has_active_subscription}
+    end
+
+    @tag :async false
+    test "merges pause_collection into Stripe create params for board households" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_board_create_#{System.unique_integer()}"
+        })
+
+      {:ok, user} = Accounts.assign_board_position(user, :president)
+
+      params = %{
+        prices: [%{price: "price_board_test", quantity: 1}]
+      }
+
+      expect(Stripe.SubscriptionMock, :create, fn stripe_params ->
+        assert stripe_params.pause_collection == %{behavior: :void}
+        assert stripe_params.cancel_at_period_end == false
+        assert stripe_params.customer == user.stripe_id
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: "sub_board_#{System.unique_integer()}"
+         )}
+      end)
+
+      assert {:ok, %Stripe.Subscription{}} =
+               Subscriptions.create_stripe_subscription(user, params)
+
+      verify!()
     end
 
     test "allows creating subscription when user has no active subscription" do
