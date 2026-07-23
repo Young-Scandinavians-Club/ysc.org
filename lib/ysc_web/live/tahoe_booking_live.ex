@@ -2756,9 +2756,9 @@ defmodule YscWeb.TahoeBookingLive do
                     </button>
                   </div>
                   <!-- Payment Notice -->
-                  <div class="mt-4 mb-4 p-3 bg-red-50 border-2 border-red-300 rounded-xl">
-                    <p class="text-sm font-semibold text-red-900">
-                      All guests(adults & children) must be paid for in advance of showing up at the cabin.
+                  <div class="mt-4 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p class="text-sm font-medium text-amber-900">
+                      All guests (adults and children) must be paid for before arrival.
                     </p>
                   </div>
                   <div class="mt-4 max-h-[70vh] overflow-y-auto pr-2 space-y-6 text-sm text-zinc-700">

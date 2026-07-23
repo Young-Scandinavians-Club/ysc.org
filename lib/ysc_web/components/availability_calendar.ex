@@ -158,21 +158,21 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           </div>
           <div class="flex items-center gap-2">
             <div class="w-4 h-4 bg-red-800 border border-red-900 rounded"></div>
-            <span>Not available for booking</span>
+            <span>Already booked</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-4 h-4 bg-red-200 border border-red-300 rounded"></div>
-            <span>Unavailable</span>
+            <span>Closed (maintenance or club event)</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-4 h-4 bg-gradient-to-r from-red-200 to-green-50 border border-zinc-300 rounded">
             </div>
-            <span>Check-in allowed</span>
+            <span>Valid check-in day</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-4 h-4 bg-gradient-to-r from-green-50 to-red-200 border border-zinc-300 rounded">
             </div>
-            <span>Check-out allowed</span>
+            <span>Valid check-out day</span>
           </div>
         </div>
       </div>

@@ -502,6 +502,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert html =~ "50% refund"
       assert html =~ "14 days before for no refund"
       assert html =~ "7 days before for no refund"
+      assert html =~ "All guests (adults and children) must be paid for before arrival."
+      refute html =~ "guests(adults"
     end
   end
 
