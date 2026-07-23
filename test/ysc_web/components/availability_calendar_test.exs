@@ -39,6 +39,50 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     if days_left == 0, do: today, else: Date.add(today, min(days_left, 4))
   end
 
+  # Floki helpers for querying nested calendar markup without brittle string matching.
+  defp calendar_document(html) do
+    {:ok, document} = Floki.parse_fragment(html)
+    document
+  end
+
+  defp calendar_role_present?(document, role) do
+    document
+    |> Floki.find(~s|[role="#{role}"]|)
+    |> Enum.any?()
+  end
+
+  defp calendar_day_button(document, day_str) do
+    case Floki.find(
+           document,
+           ~s|[data-day="#{day_str}"] button[data-calendar-day]|
+         ) do
+      [button | _] -> button
+      _ -> flunk("missing day button for #{day_str}")
+    end
+  end
+
+  defp calendar_element_attr(element, name) do
+    case Floki.attribute(element, name) do
+      [value | _] -> value
+      _ -> nil
+    end
+  end
+
+  defp calendar_element_attr_contains?(element, name, token) do
+    case calendar_element_attr(element, name) do
+      nil -> false
+      value -> String.contains?(value, token)
+    end
+  end
+
+  defp calendar_day_ok_badge?(document, day_str) do
+    document
+    |> Floki.find(
+      ~s|[data-day="#{day_str}"] span.text-green-800[aria-hidden="true"]|
+    )
+    |> Enum.any?()
+  end
+
   # Extracts the HTML content of a single day cell identified by its data-day value.
   # LazyHTML.filter only searches top-level nodes of a fragment, so it cannot reach
   # the deeply-nested day divs. Instead we split the rendered string on data-day markers.
@@ -102,14 +146,26 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           today: today
         )
 
+      document = calendar_document(html)
+
       assert html =~ current_month
+      assert Floki.find(document, "#calendar-go-to-today") != []
+      assert calendar_role_present?(document, "grid")
+      assert calendar_role_present?(document, "row")
+      assert calendar_role_present?(document, "columnheader")
+      assert calendar_role_present?(document, "gridcell")
+
+      [today_button] = Floki.find(document, "#calendar-go-to-today")
+
+      assert calendar_element_attr_contains?(
+               today_button,
+               "class",
+               "inline-flex"
+             )
+
       assert html =~ "Today"
-      assert html =~ ~s|id="calendar-go-to-today"|
-      assert html =~ "aria-label=\"Calendar legend\""
-      assert html =~ ~s|role="grid"|
-      assert html =~ ~s|role="row"|
-      assert html =~ ~s|role="columnheader"|
-      assert html =~ ~s|role="gridcell"|
+
+      assert Floki.find(document, ~s|[aria-label="Calendar legend"]|) != []
     end
 
     test "disables the Today button when already showing the current month" do
@@ -122,9 +178,15 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           max: Date.add(today, 90)
         )
 
-      assert html =~ ~s|id="calendar-go-to-today" type="button"|
-      assert html =~ ~s|phx-click="today" disabled|
-      assert html =~ "Already showing July 2026"
+      document = calendar_document(html)
+      today_button = List.first(Floki.find(document, "#calendar-go-to-today"))
+
+      assert today_button
+      assert calendar_element_attr(today_button, "phx-click") == "today"
+      assert calendar_element_attr(today_button, "disabled") in ["", "disabled"]
+
+      assert calendar_element_attr(today_button, "aria-label") ==
+               "Already showing July 2026"
     end
 
     test "renders descriptive aria labels and status text on day cells" do
@@ -173,10 +235,18 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           max: Date.add(today, 90)
         )
 
-      bookable_cell = extract_day_cell(html, Date.to_iso8601(bookable))
+      document = calendar_document(html)
+      bookable_iso = Date.to_iso8601(bookable)
+      bookable_button = calendar_day_button(document, bookable_iso)
 
-      assert bookable_cell =~ "text-green-800"
-      assert bookable_cell =~ "\n        OK\n"
+      assert calendar_day_ok_badge?(document, bookable_iso)
+      refute calendar_element_attr(bookable_button, "aria-disabled") == "true"
+
+      assert calendar_element_attr_contains?(
+               bookable_button,
+               "class",
+               "bg-green-50"
+             )
     end
   end
 
@@ -344,13 +414,47 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       restricted_cell =
         extract_day_cell(html, Date.to_iso8601(restricted_checkout))
 
-      assert valid_cell =~ "bg-green-50"
-      refute valid_cell =~ "aria-disabled"
+      valid_button =
+        calendar_day_button(
+          calendar_document(html),
+          Date.to_iso8601(valid_checkout)
+        )
 
-      refute restricted_cell =~ "bg-green-50"
+      restricted_button =
+        calendar_day_button(
+          calendar_document(html),
+          Date.to_iso8601(restricted_checkout)
+        )
+
+      assert calendar_element_attr_contains?(
+               valid_button,
+               "class",
+               "bg-green-50"
+             )
+
+      refute calendar_element_attr(valid_button, "aria-disabled") == "true"
+
+      refute calendar_element_attr_contains?(
+               restricted_button,
+               "class",
+               "bg-green-50"
+             )
+
+      assert calendar_element_attr_contains?(
+               restricted_button,
+               "class",
+               "bg-zinc-100"
+             )
+
+      assert calendar_element_attr(restricted_button, "aria-disabled") == "true"
+
+      refute calendar_element_attr(restricted_button, "disabled") in [
+               "",
+               "disabled"
+             ]
+
+      assert valid_cell =~ "bg-green-50"
       assert restricted_cell =~ "bg-zinc-100"
-      assert restricted_cell =~ ~s|aria-disabled="true"|
-      refute restricted_cell =~ " disabled"
     end
 
     test "shows Saturday checkout restriction when selecting end date on Tahoe" do
@@ -393,12 +497,19 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
       saturday_cell = extract_day_cell(html, Date.to_iso8601(saturday))
 
+      saturday_button =
+        calendar_day_button(calendar_document(html), Date.to_iso8601(saturday))
+
       assert saturday_cell =~ "No check-in"
       assert saturday_cell =~ "Check-ins are not permitted on Saturdays"
-      assert saturday_cell =~ ~s|aria-describedby="calendar-tooltip-2026-07-25"|
 
-      refute saturday_cell =~
-               ~s|aria-label="Saturday, July 25, 2026, No check-in, Check-ins are not permitted on Saturdays"|
+      assert calendar_element_attr(saturday_button, "aria-describedby") ==
+               "calendar-tooltip-2026-07-25"
+
+      refute String.contains?(
+               calendar_element_attr(saturday_button, "aria-label") || "",
+               "Check-ins are not permitted on Saturdays"
+             )
     end
 
     test "does not apply Saturday booking restrictions on Clear Lake" do

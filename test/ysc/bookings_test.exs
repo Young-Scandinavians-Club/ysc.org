@@ -228,6 +228,7 @@ defmodule Ysc.BookingsTest do
       stats = Bookings.admin_property_dashboard_stats()
 
       assert stats.tahoe.staying >= 1
+      assert checkout_today.checkout_date == today
       assert stats.tahoe.checkouts_today >= 1
       assert stats.clear_lake.checkins_today >= 1
       assert stats.clear_lake.upcoming_bookings >= 1
@@ -244,7 +245,8 @@ defmodule Ysc.BookingsTest do
 
       booking_fixture(%{
         property: :tahoe,
-        checkin_date: Date.add(today, -1),
+        checkin_date:
+          tahoe_checkin_for_fixed_checkout(today, Date.add(today, -1)),
         checkout_date: today,
         status: :complete,
         guests_count: 1

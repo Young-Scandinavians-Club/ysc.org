@@ -591,11 +591,15 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp calendar_focus_day(assigns) do
+    visible_month = assigns.current.date
+
     cond do
-      assigns.checkout_date ->
+      assigns.checkout_date &&
+          !other_month?(assigns.checkout_date, visible_month) ->
         assigns.checkout_date
 
-      assigns.checkin_date ->
+      assigns.checkin_date &&
+          !other_month?(assigns.checkin_date, visible_month) ->
         assigns.checkin_date
 
       today_in_visible_month?(assigns) ->
@@ -604,7 +608,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
       true ->
         assigns.current.week_rows
         |> Enum.flat_map(& &1)
-        |> Enum.find(fn day -> !other_month?(day, assigns.current.date) end)
+        |> Enum.find(fn day -> !other_month?(day, visible_month) end)
     end
   end
 

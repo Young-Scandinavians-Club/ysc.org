@@ -3,7 +3,7 @@ defmodule Ysc.GeoIP do
   IP geolocation lookups using the locus library with MaxMind GeoLite2.
 
   The loader is only started in deployed environments (sandbox or production)
-  when a valid MaxMind license key is configured. Local dev and test never
+  when a non-empty MaxMind license key is configured. Local dev and test never
   download the database. All functions degrade gracefully when the database
   is unavailable.
   """
