@@ -29,7 +29,9 @@ defmodule Ysc.PassbookNestedFilterTest do
     refute has_value_anywhere?(decoded, nil)
     refute has_empty_map_anywhere?(decoded)
     assert decoded["description"] == "Test pass"
-    assert get_in(decoded, ["generic", "primaryFields", Access.at(0), "value"]) == "Ada"
+
+    assert get_in(decoded, ["generic", "primaryFields", Access.at(0), "value"]) ==
+             "Ada"
   end
 
   defp has_key_anywhere?(term, key) when is_map(term) do
@@ -59,7 +61,8 @@ defmodule Ysc.PassbookNestedFilterTest do
   defp has_value_anywhere?(_term, _value), do: false
 
   defp has_empty_map_anywhere?(term) when is_map(term) do
-    term == %{} or Enum.any?(term, fn {_, value} -> has_empty_map_anywhere?(value) end)
+    term == %{} or
+      Enum.any?(term, fn {_, value} -> has_empty_map_anywhere?(value) end)
   end
 
   defp has_empty_map_anywhere?(term) when is_list(term) do
