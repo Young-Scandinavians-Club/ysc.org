@@ -49,7 +49,22 @@ defmodule YscWeb.AccountSetupLive do
 
       <div class="px-2 py-8">
         <div
-          :if={@current_step === 0}
+          :if={@loading_account_setup?}
+          id="account-setup-loading"
+          class="space-y-6"
+          role="status"
+          aria-live="polite"
+        >
+          <span class="sr-only">Loading account setup…</span>
+          <.skeleton_block class="h-8 w-2/3 rounded" />
+          <.skeleton_block class="h-4 w-full rounded" />
+          <.skeleton_block class="h-4 w-5/6 rounded" />
+          <.skeleton_block class="h-12 w-full rounded-lg" />
+          <.skeleton_block class="h-11 w-1/3 rounded-lg" />
+        </div>
+
+        <div
+          :if={!@loading_account_setup? and @current_step === 0}
           id="email-verification-step"
           phx-hook="ResendTimer"
         >
@@ -124,7 +139,7 @@ defmodule YscWeb.AccountSetupLive do
           </.simple_form>
         </div>
 
-        <div :if={@current_step === 1 and @user_needs.payment_method_setup}>
+        <div :if={!@loading_account_setup? and @current_step === 1 and @user_needs.payment_method_setup}>
           <.header class="text-left">
             Save Your Payment Method
             <:subtitle>
@@ -202,7 +217,7 @@ defmodule YscWeb.AccountSetupLive do
           <% end %>
         </div>
 
-        <div :if={@current_step === 2 and @user_needs.password_setup}>
+        <div :if={!@loading_account_setup? and @current_step === 2 and @user_needs.password_setup}>
           <.header class="text-left">
             Set Your Password
             <:subtitle>
@@ -241,7 +256,7 @@ defmodule YscWeb.AccountSetupLive do
           </.simple_form>
         </div>
 
-        <div :if={@current_step === 3}>
+        <div :if={!@loading_account_setup? and @current_step === 3}>
           <.header class="text-left">
             Add Your Phone Number (Optional)
             <:subtitle>
@@ -291,7 +306,7 @@ defmodule YscWeb.AccountSetupLive do
         </div>
 
         <div
-          :if={@current_step === 4 and @user_needs.phone_verification}
+          :if={!@loading_account_setup? and @current_step === 4 and @user_needs.phone_verification}
           id="phone-verification-step"
           phx-hook="ResendTimer"
         >
@@ -377,7 +392,7 @@ defmodule YscWeb.AccountSetupLive do
           </.simple_form>
         </div>
 
-        <div :if={@current_step === 5 && !@trigger_login}>
+        <div :if={!@loading_account_setup? and @current_step === 5 && !@trigger_login}>
           <.header class="text-left">
             Account Setup Complete!
             <:subtitle>
@@ -594,11 +609,74 @@ defmodule YscWeb.AccountSetupLive do
 
   @impl true
   def mount(%{"user_id" => user_id}, _session, socket) do
+    connected_remount? =
+      connected?(socket) &&
+        socket.assigns[:user_id] == user_id &&
+        socket.assigns[:loading_account_setup?] == false &&
+        not is_nil(socket.assigns[:user])
+
+    cond do
+      connected_remount? ->
+        {:ok, socket}
+
+      connected?(socket) ->
+        load_account_setup(socket, user_id)
+
+      true ->
+        {:ok, assign_account_setup_loading_shell(socket, user_id)}
+    end
+  end
+
+  defp assign_account_setup_loading_shell(socket, user_id) do
+    empty_user_needs = %{
+      email_verification: false,
+      password_setup: false,
+      phone_setup: false,
+      phone_verification: false,
+      payment_method_setup: false
+    }
+
+    socket
+    |> assign(:loading_account_setup?, true)
+    |> assign(:user_id, user_id)
+    |> assign(:page_title, "Complete Your Account Setup")
+    |> assign(
+      :meta_description,
+      "Complete your Young Scandinavians Club membership account setup."
+    )
+    |> assign(:user, nil)
+    |> assign(:is_owner, false)
+    |> assign(:display_email, "")
+    |> assign(:current_step, 0)
+    |> assign(:email_verified, false)
+    |> assign(:from_signup, false)
+    |> assign(:user_needs, empty_user_needs)
+    |> assign(:stepper_needs, empty_user_needs)
+    |> assign(:trigger_login, false)
+    |> assign(:email_form, to_form(%{"verification_code" => ""}))
+    |> assign(:password_form, to_form(%{"password" => "", "password_confirmation" => ""}))
+    |> assign(
+      :phone_form,
+      to_form(%{"phone_number" => "", "sms_opt_in" => "false"}, as: "user")
+    )
+    |> assign(:phone_verification_form, to_form(%{"verification_code" => ""}))
+    |> assign(:code_valid, false)
+    |> assign(:phone_code_valid, false)
+    |> assign(:email_verification_code_state, %{})
+    |> assign(:phone_verification_code_state, %{})
+    |> assign(:email_resend_disabled_until, nil)
+    |> assign(:sms_resend_disabled_until, nil)
+    |> assign(:payment_intent_secret, nil)
+    |> assign(:signup_plan, nil)
+    |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
+  end
+
+  defp load_account_setup(socket, user_id) do
     user = Accounts.get_user!(user_id, [:registration_form])
     current_user = socket.assigns.current_user
     is_owner = !!(current_user && current_user.id == user.id)
 
-    user_needs = compute_user_needs(user, check_payment?: connected?(socket))
+    user_needs = compute_user_needs(user, check_payment?: true)
     needs_any_setup = user_needs_needs_setup?(user_needs)
 
     can_access = needs_any_setup
@@ -632,6 +710,8 @@ defmodule YscWeb.AccountSetupLive do
 
       socket =
         socket
+        |> assign(:loading_account_setup?, false)
+        |> assign(:user_id, user_id)
         |> assign(:page_title, "Complete Your Account Setup")
         |> assign(
           :meta_description,
@@ -659,25 +739,17 @@ defmodule YscWeb.AccountSetupLive do
         |> assign(:payment_intent_secret, nil)
         |> assign(:signup_plan, signup_plan)
         |> assign(:public_key, public_key)
+        |> refine_setup_needs_assigns(user)
+        |> then(fn s ->
+          if s.assigns.user_needs.email_verification and
+               email_verification_authorized?(s) do
+            ensure_verification_email_sent(user)
+          end
 
-      socket =
-        if connected?(socket) do
-          socket
-          |> refine_setup_needs_assigns(user)
-          |> then(fn s ->
-            if s.assigns.user_needs.email_verification and
-                 email_verification_authorized?(s) do
-              ensure_verification_email_sent(user)
-            end
+          s
+        end)
 
-            s
-          end)
-        else
-          socket
-        end
-
-      if connected?(socket) and
-           not user_needs_needs_setup?(socket.assigns.user_needs) do
+      if not user_needs_needs_setup?(socket.assigns.user_needs) do
         {:ok, redirect(socket, to: ~p"/")}
       else
         {:ok, socket}
@@ -706,6 +778,14 @@ defmodule YscWeb.AccountSetupLive do
 
   @impl true
   def handle_params(params, _uri, socket) do
+    if socket.assigns.loading_account_setup? do
+      {:noreply, assign(socket, :from_signup, params["from_signup"] == "true")}
+    else
+      handle_loaded_params(params, socket)
+    end
+  end
+
+  defp handle_loaded_params(params, socket) do
     # Clear any stale flash from previous steps so old toasts don't replay on re-renders
     socket = Phoenix.LiveView.clear_flash(socket)
 
