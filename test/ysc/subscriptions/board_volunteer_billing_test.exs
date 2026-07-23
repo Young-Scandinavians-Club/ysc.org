@@ -175,7 +175,9 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
       end)
 
       assert :ok == BoardVolunteerBilling.sync_for_user(user)
-      assert_receive {:board_volunteer_sync, ^user.id}
+
+      user_id = user.id
+      assert_receive {:board_volunteer_sync, ^user_id}
     end
   end
 
