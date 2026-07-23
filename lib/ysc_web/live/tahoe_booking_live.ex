@@ -4,7 +4,6 @@ defmodule YscWeb.TahoeBookingLive do
   @dialyzer {:nowarn_function, determine_room_availability_status: 7}
   @dialyzer {:nowarn_function, calculate_room_availability_status: 7}
   @dialyzer {:nowarn_function, max_rooms_for_user: 1}
-  @dialyzer {:nowarn_function, get_room_image_url: 1}
   @dialyzer {:nowarn_function, validate_and_create_booking: 1}
   # Elixir compiles `cond do ... true -> end` catch-alls into synthesised
   # `case true do true -> ...; false -> throw end` BEAM code with no source-line
@@ -1804,25 +1803,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </div>
                             </div>
                             <%= if room.image && room.image.id do %>
-                              <!-- Render image with blur hash -->
-                              <canvas
-                                id={"blur-hash-room-#{room.id}"}
-                                src={
-                                  Ysc.Media.Image.blur_hash_for_display(room.image)
-                                }
-                                class="absolute inset-0 z-0 w-full h-full object-cover"
-                                phx-hook="BlurHashCanvas"
-                              ></canvas>
-                              <img
-                                src={get_room_image_url(room.image)}
-                                id={"image-room-#{room.id}"}
-                                loading="lazy"
-                                phx-hook="BlurHashImage"
-                                class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover"
-                                alt={
-                                  room.image.alt_text || room.image.title ||
-                                    "#{room.name} image"
-                                }
+                              <.live_component
+                                id={"room-image-#{room.id}"}
+                                module={YscWeb.Components.Image}
+                                image={room.image}
+                                aspect_class="h-full"
+                                preferred_type={:thumbnail}
                               />
                             <% else %>
                               <!-- Placeholder when no image -->
@@ -2007,25 +1993,12 @@ defmodule YscWeb.TahoeBookingLive do
                               </div>
                             </div>
                             <%= if room.image && room.image.id do %>
-                              <!-- Render image with blur hash -->
-                              <canvas
-                                id={"blur-hash-room-disabled-#{room.id}"}
-                                src={
-                                  Ysc.Media.Image.blur_hash_for_display(room.image)
-                                }
-                                class="absolute inset-0 z-0 w-full h-full object-cover"
-                                phx-hook="BlurHashCanvas"
-                              ></canvas>
-                              <img
-                                src={get_room_image_url(room.image)}
-                                id={"image-room-disabled-#{room.id}"}
-                                loading="lazy"
-                                phx-hook="BlurHashImage"
-                                class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover"
-                                alt={
-                                  room.image.alt_text || room.image.title ||
-                                    "#{room.name} image"
-                                }
+                              <.live_component
+                                id={"room-image-disabled-#{room.id}"}
+                                module={YscWeb.Components.Image}
+                                image={room.image}
+                                aspect_class="h-full"
+                                preferred_type={:thumbnail}
                               />
                             <% else %>
                               <!-- Placeholder when no image -->
@@ -7190,16 +7163,6 @@ defmodule YscWeb.TahoeBookingLive do
       <rect x="11.75" y="10.25" width="6" height="2.5" rx="1" />
     </svg>
     """
-  end
-
-  defp get_room_image_url(%Ysc.Media.Image{} = image) do
-    # Prefer thumbnail for room cards (smaller, faster loading)
-    cond do
-      not is_nil(image.thumbnail_path) -> image.thumbnail_path
-      not is_nil(image.optimized_image_path) -> image.optimized_image_path
-      not is_nil(image.raw_image_path) -> image.raw_image_path
-      true -> "/images/ysc_logo.webp"
-    end
   end
 
   # Helper to get default adult price from pricing rules (property-level fallback)

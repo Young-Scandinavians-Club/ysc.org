@@ -12,7 +12,6 @@ defmodule YscWeb.Components.News.NewsCard do
     statics: YscWeb.static_paths()
 
   alias Ysc.Accounts
-  alias Ysc.Media.Image
   alias YscWeb.PlainText
 
   attr :post, :any, required: true
@@ -35,29 +34,13 @@ defmodule YscWeb.Components.News.NewsCard do
     ]}>
       <.link navigate={~p"/posts/#{@post.url_name}"} class="block">
         <div class="relative aspect-[16/10] overflow-hidden rounded-xl mb-8">
-          <canvas
-            id={"blur-hash-image-#{@post.id}"}
-            src={Image.blur_hash_for_display(@post.featured_image)}
-            class="absolute inset-0 z-0 w-full h-full object-cover"
-            phx-hook="BlurHashCanvas"
-          ></canvas>
-          <img
-            src={Image.display_path_with_fallback(@post.featured_image)}
-            srcset={Image.responsive_srcset(@post.featured_image)}
+          <.live_component
+            id={"news-card-image-#{@post.id}"}
+            module={YscWeb.Components.Image}
+            image={@post.featured_image}
+            aspect_class="h-full"
+            preferred_type={:optimized}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            id={"image-#{@post.id}"}
-            loading="lazy"
-            decoding="async"
-            phx-hook="BlurHashImage"
-            class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-500 group-hover:scale-[1.03]"
-            alt={
-              if @post.featured_image,
-                do:
-                  @post.featured_image.alt_text || @post.featured_image.title ||
-                    @post.title ||
-                    "News article image",
-                else: "News article image"
-            }
           />
         </div>
       </.link>

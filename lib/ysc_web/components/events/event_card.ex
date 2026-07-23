@@ -11,7 +11,6 @@ defmodule YscWeb.Components.Events.EventCard do
     router: YscWeb.Router,
     statics: YscWeb.static_paths()
 
-  alias Ysc.Media.Image
   alias YscWeb.DateDisplay
   alias YscWeb.PlainText
 
@@ -54,28 +53,13 @@ defmodule YscWeb.Components.Events.EventCard do
           "relative aspect-video overflow-hidden rounded-lg",
           @event.state == :cancelled && "grayscale"
         ]}>
-          <canvas
-            id={"blur-hash-card-#{@event.id}"}
-            src={Image.blur_hash_for_display(@event.image)}
-            class="absolute inset-0 z-0 w-full h-full object-cover"
-            phx-hook="BlurHashCanvas"
-          ></canvas>
-          <img
-            src={Image.display_path_with_fallback(@event.image)}
-            srcset={Image.responsive_srcset(@event.image)}
+          <.live_component
+            id={"event-card-image-#{@event.id}"}
+            module={YscWeb.Components.Image}
+            image={@event.image}
+            aspect_class="h-full"
+            preferred_type={:optimized}
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-            id={"image-card-#{@event.id}"}
-            phx-hook="BlurHashImage"
-            class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
-            loading="lazy"
-            decoding="async"
-            alt={
-              if @event.image,
-                do:
-                  @event.image.alt_text || @event.image.title || @event.title ||
-                    "Event image",
-                else: "Event image"
-            }
           />
         </div>
         <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap pointer-events-none">

@@ -59,13 +59,15 @@ defmodule YscWeb.Components.Image do
       |> assign(:sizes, sizes)
 
     # Use preloaded image if available (from batch loading), otherwise fetch
+    image_id = Map.get(assigns, :image_id)
+
     image =
       case Map.get(assigns, :image) do
         nil ->
-          if assigns.image_id == nil || assigns.image_id == "" do
+          if image_id == nil || image_id == "" do
             nil
           else
-            Media.get_image!(assigns.image_id)
+            Media.get_image!(image_id)
           end
 
         preloaded_image ->
