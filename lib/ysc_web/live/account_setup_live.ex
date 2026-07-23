@@ -495,9 +495,6 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   # Compute user_needs map from a user struct.
-  #
-  # On the dead (static) render, `check_payment?: false` avoids a payment-method
-  # lookup; pending users are treated as needing payment until connect refines.
   defp compute_user_needs(user, opts \\ []) do
     check_payment? = Keyword.get(opts, :check_payment?, true)
 
