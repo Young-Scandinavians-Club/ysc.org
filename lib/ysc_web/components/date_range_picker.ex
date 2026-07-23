@@ -133,12 +133,11 @@ defmodule YscWeb.Components.DateRangePicker do
               class={[
                 "relative overflow-visible",
                 if(
-                  date_disabled?(
+                  date_picker_show_tooltip?(
                     day,
                     @date_disable_ctx,
                     active_date_tooltips(@date_disable_ctx)
-                  ) &&
-                    get_date_tooltip(day, active_date_tooltips(@date_disable_ctx)),
+                  ),
                   do: "group",
                   else: ""
                 )
@@ -188,16 +187,27 @@ defmodule YscWeb.Components.DateRangePicker do
                   )
                 }
                 aria-current={if(today?(day, @today), do: "date", else: false)}
+                aria-describedby={
+                  if(
+                    date_picker_show_tooltip?(
+                      day,
+                      @date_disable_ctx,
+                      active_date_tooltips(@date_disable_ctx)
+                    ),
+                    do: date_picker_tooltip_id(@id, day),
+                    else: nil
+                  )
+                }
               >
-                <time
+                <span
                   class="mx-auto flex h-6 w-6 items-center justify-center rounded-full"
-                  datetime={Calendar.strftime(day, "%Y-%m-%d")}
+                  aria-hidden="true"
                 >
                   {Calendar.strftime(day, "%d")}
-                </time>
+                </span>
                 <span
                   :if={
-                    date_range_day_status_label(
+                    date_range_day_visible_label(
                       day,
                       @range_start,
                       @range_end,
@@ -207,8 +217,9 @@ defmodule YscWeb.Components.DateRangePicker do
                     ) != ""
                   }
                   class="text-[10px] font-semibold leading-tight"
+                  aria-hidden="true"
                 >
-                  {date_range_day_status_label(
+                  {date_range_day_visible_label(
                     day,
                     @range_start,
                     @range_end,
@@ -220,21 +231,25 @@ defmodule YscWeb.Components.DateRangePicker do
               </button>
               <span
                 :if={
-                  date_disabled?(
+                  date_picker_show_tooltip?(
                     day,
                     @date_disable_ctx,
                     active_date_tooltips(@date_disable_ctx)
-                  ) &&
-                    get_date_tooltip(day, active_date_tooltips(@date_disable_ctx))
+                  )
                 }
+                id={date_picker_tooltip_id(@id, day)}
                 role="tooltip"
                 class={[
-                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 whitespace-normal pointer-events-none",
+                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
                   "max-w-[400px]",
                   "text-left"
                 ]}
               >
-                {get_date_tooltip(day, active_date_tooltips(@date_disable_ctx))}
+                {date_picker_tooltip_text(
+                  day,
+                  @date_disable_ctx,
+                  active_date_tooltips(@date_disable_ctx)
+                )}
               </span>
             </div>
           </div>
@@ -493,7 +508,6 @@ defmodule YscWeb.Components.DateRangePicker do
     {
       :noreply,
       socket
-      |> assign(:calendar?, false)
       |> assign(:range_start, nil)
       |> assign(:range_end, nil)
       |> assign(:hover_range_end, nil)
@@ -860,16 +874,14 @@ defmodule YscWeb.Components.DateRangePicker do
     end
   end
 
-  defp date_range_day_status_label(
+  defp date_range_day_visible_label(
          day,
          range_start,
          range_end,
          hover_range_end,
          today,
-         date_disable_ctx
+         _date_disable_ctx
        ) do
-    tooltips = active_date_tooltips(date_disable_ctx)
-
     cond do
       range_endpoint?(day, range_start) && range_endpoint?(day, range_end) ->
         "Selected"
@@ -885,9 +897,6 @@ defmodule YscWeb.Components.DateRangePicker do
 
       today?(day, today) ->
         "Today"
-
-      date_disabled?(day, date_disable_ctx, tooltips) ->
-        get_date_tooltip(day, tooltips) || "Unavailable"
 
       true ->
         ""
@@ -905,7 +914,7 @@ defmodule YscWeb.Components.DateRangePicker do
     date_label = Calendar.strftime(day, "%A, %B %d, %Y")
 
     status =
-      date_range_day_status_label(
+      date_range_day_visible_label(
         day,
         range_start,
         range_end,
@@ -914,10 +923,42 @@ defmodule YscWeb.Components.DateRangePicker do
         date_disable_ctx
       )
 
-    if status in [nil, ""] do
-      date_label
-    else
-      "#{date_label}, #{status}"
+    parts =
+      [date_label, status]
+      |> Enum.reject(&(&1 in [nil, ""]))
+
+    Enum.join(parts, ", ")
+  end
+
+  defp date_picker_tooltip_id(id, day) do
+    "#{id}-tooltip-#{Date.to_iso8601(day)}"
+  end
+
+  defp date_picker_show_tooltip?(day, ctx, tooltips) do
+    date_disabled?(day, ctx, tooltips) &&
+      date_picker_tooltip_text(day, ctx, tooltips) not in [nil, ""]
+  end
+
+  defp date_picker_tooltip_text(day, ctx, tooltips) do
+    get_date_tooltip(day, tooltips) || date_picker_rule_tooltip(day, ctx)
+  end
+
+  defp date_picker_rule_tooltip(day, ctx) do
+    cond do
+      before_min_date?(day, ctx.min) ->
+        "Past dates cannot be booked"
+
+      after_max_date?(day, ctx.max) ->
+        "Reservations are not open for this date yet"
+
+      saturday?(day) && !ctx.allow_saturdays && ctx.state != :set_end ->
+        "Check-ins are not permitted on Saturdays"
+
+      saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_end ->
+        "Check-outs are not permitted on Saturdays"
+
+      true ->
+        nil
     end
   end
 
