@@ -375,7 +375,9 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~ "Current Membership"
     end
 
-    test "links real Stripe subscription IDs to the Stripe dashboard", %{conn: conn} do
+    test "links real Stripe subscription IDs to the Stripe dashboard", %{
+      conn: conn
+    } do
       user = user_fixture()
       membership_plans = Application.get_env(:ysc, :membership_plans, [])
       single_plan = Enum.find(membership_plans, &(&1.id == :single))

@@ -345,7 +345,9 @@ defmodule Ysc.SubscriptionsPlanChangeTest do
   describe "create_stripe_subscription/2 board billing" do
     test "merges pause_collection into Stripe create params for board households" do
       user =
-        user_fixture(%{stripe_id: "cus_board_create_#{System.unique_integer()}"})
+        user_fixture(%{
+          stripe_id: "cus_board_create_#{System.unique_integer()}"
+        })
 
       {:ok, user} = Accounts.assign_board_position(user, :president)
 
