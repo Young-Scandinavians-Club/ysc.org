@@ -595,6 +595,8 @@ end
 # Set MAXMIND_LICENSE_KEY to enable IP geolocation for auth events.
 # When not set, geolocation is silently disabled and auth events will
 # be stored without location data.
+# The database is only downloaded in deployed environments (sandbox/production);
+# see Ysc.Application.maybe_start_geo_ip_loader/0.
 if license_key = System.get_env("MAXMIND_LICENSE_KEY") do
   config :locus,
     license_key: license_key

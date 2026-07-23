@@ -18,6 +18,10 @@ defmodule Ysc.Env do
       if Ysc.Env.sandbox?() do
         # Sandbox-specific behavior
       end
+
+      if Ysc.Env.deployed?() do
+        # Sandbox or production deployment behavior
+      end
   """
 
   @doc """
@@ -63,7 +67,7 @@ defmodule Ysc.Env do
   """
   @spec prod?() :: boolean()
   def prod? do
-    current() == :prod
+    current() in [:prod, :production]
   end
 
   @doc """
@@ -72,6 +76,17 @@ defmodule Ysc.Env do
   @spec sandbox?() :: boolean()
   def sandbox? do
     current() == :sandbox
+  end
+
+  @doc """
+  Returns true if running in a deployed environment (sandbox or production).
+
+  Used to gate behaviors that should only run on Fly deployments, such as
+  downloading the MaxMind GeoIP database.
+  """
+  @spec deployed?() :: boolean()
+  def deployed? do
+    sandbox?() or prod?()
   end
 
   @doc """
