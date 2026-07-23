@@ -12,15 +12,6 @@ defmodule Ysc.Customers do
   alias Ysc.Payments
 
   @doc """
-  Creates a Stripe customer for the given user.
-
-  ## Examples
-
-      iex> create_stripe_customer(user)
-      {:ok, %Stripe.Customer{}}
-
-  """
-  @doc """
   Builds parameters for the Stripe Customer create/update APIs from a user.
 
   ## Options
@@ -34,6 +25,15 @@ defmodule Ysc.Customers do
     |> maybe_put_stripe_customer_address(user, opts)
   end
 
+  @doc """
+  Creates a Stripe customer for the given user.
+
+  ## Examples
+
+      iex> create_stripe_customer(user)
+      {:ok, %Stripe.Customer{}}
+
+  """
   @dialyzer {:nowarn_function, create_stripe_customer: 1}
   def create_stripe_customer(%User{} = user) do
     customer_params = stripe_customer_params(user)
