@@ -471,6 +471,13 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert html =~ "Weekly"
       assert html =~ "Hi"
       assert html =~ "Newsletter,"
+      assert html =~ "/images/viking_on_bike.png"
+      assert html =~ ~s(alt="Viking on a bike")
+
+      # Viking sits in the shared footer below the social divider, above the org name.
+      viking_idx = :binary.match(html, "/images/viking_on_bike.png") |> elem(0)
+      org_idx = :binary.match(html, "Young Scandinavians Club") |> elem(0)
+      assert viking_idx < org_idx
     end
   end
 

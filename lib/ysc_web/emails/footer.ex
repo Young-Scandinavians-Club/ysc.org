@@ -16,7 +16,12 @@ defmodule YscWeb.Emails.FooterBlock do
 
     """
     #{social_section}
-    <mj-section padding="48px">
+    <mj-section padding="16px 48px 0 48px">
+      <mj-column padding="0">
+        <mj-image src="#{viking_on_bike_url()}" alt="Viking on a bike" width="180px" padding="0" align="center"></mj-image>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="12px 48px 32px 48px">
       <mj-column padding="0">
         <mj-text align="center" font-size="16px" font-weight="400" color="#71717b">#{Organization.name()}</mj-text>
         <mj-text align="center" font-size="12px" color="#71717b" line-height="1.5">
@@ -26,6 +31,16 @@ defmodule YscWeb.Emails.FooterBlock do
       </mj-column>
     </mj-section>
     """
+  end
+
+  @doc """
+  Absolute URL for the viking-on-bike illustration in the email footer.
+
+  Email clients have poor SVG support, so this points at the transparent PNG export
+  of `priv/static/images/viking_on_bike.svg`.
+  """
+  def viking_on_bike_url do
+    absolute_url("/images/viking_on_bike.png")
   end
 
   def social_footer_section do
@@ -53,7 +68,7 @@ defmodule YscWeb.Emails.FooterBlock do
         inner = Enum.join(els, "\n          ")
 
         """
-        <mj-section background-color="transparent" border-bottom="1px solid #e0e0e0" border-left="none" border-right="none" border-top="none" padding-bottom="32px" padding-left="48px" padding-right="48px" padding-top="32px" padding="12px">
+        <mj-section background-color="transparent" border-bottom="1px solid #e0e0e0" border-left="none" border-right="none" border-top="none" padding-bottom="16px" padding-left="48px" padding-right="48px" padding-top="16px" padding="12px">
           <mj-column background-color="transparent" padding="0" background-color="transparent">
             <mj-social font-size="15px" icon-padding="0px" icon-size="40px" mode="horizontal" padding="0px">
               #{inner}
