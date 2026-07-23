@@ -492,6 +492,48 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute saturday_cell =~ "Restricted (e.g. min/max stay)"
     end
 
+    test "valid checkout before blackout shows check-out only, not not available" do
+      today = ~D[2026-07-21]
+      checkin = ~D[2026-07-24]
+      checkout_candidate = ~D[2026-07-26]
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :tahoe,
+          start_date: checkout_candidate,
+          end_date: ~D[2026-07-29],
+          reason: "Test blackout"
+        })
+
+      AvailabilityCache.invalidate()
+      BlackoutListCache.invalidate()
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: nil
+        )
+
+      checkout_cell =
+        extract_day_cell(html, Date.to_iso8601(checkout_candidate))
+
+      checkout_button =
+        calendar_day_button(
+          calendar_document(html),
+          Date.to_iso8601(checkout_candidate)
+        )
+
+      assert checkout_cell =~ "Check-out only"
+      refute checkout_cell =~ ">Not available<"
+      refute calendar_element_attr(checkout_button, "aria-disabled") == "true"
+    end
+
     test "shows Saturday check-in restriction when picking start date on Tahoe" do
       today = ~D[2026-07-21]
       saturday = ~D[2026-07-25]

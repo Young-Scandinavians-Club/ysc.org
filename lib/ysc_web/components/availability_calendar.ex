@@ -1512,41 +1512,26 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     info = Map.get(availability, day)
 
     if info do
-      # Check if this is a valid checkout date in the current context
-      is_valid_checkout =
-        if assigns && assigns.state == :set_end && assigns.checkin_date do
-          # If we are selecting an end date, and this date is after start date
-          # And the previous night was available (meaning we can stay until this morning)
-          Date.compare(day, assigns.checkin_date) == :gt &&
-            !date_unavailable_for_stay?(Date.add(day, -1), assigns)
-        else
-          false
-        end
+      is_valid_checkout = valid_checkout_date?(day, assigns)
 
       cond do
+        is_valid_checkout && checkout_partially_blocked?(mode, info) ->
+          "Check-out only"
+
+        is_valid_checkout ->
+          ""
+
         info.is_blacked_out ->
           "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
-          if is_valid_checkout do
-            "Check-out only"
-          else
-            "Busy"
-          end
+          "Busy"
 
         mode == :day && !info.can_book_day ->
-          if is_valid_checkout do
-            "Check-out only"
-          else
-            "Unavailable"
-          end
+          "Unavailable"
 
         mode == :room && !info.can_book_room ->
-          if is_valid_checkout do
-            "Check-out only"
-          else
-            "Unavailable"
-          end
+          "Unavailable"
 
         mode == :day ->
           if info.day_bookings_count > 0,
@@ -1565,6 +1550,19 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     else
       ""
     end
+  end
+
+  defp valid_checkout_date?(day, assigns) do
+    assigns.state == :set_end && assigns.checkin_date &&
+      Date.compare(day, assigns.checkin_date) == :gt &&
+      !date_unavailable_for_stay?(Date.add(day, -1), assigns)
+  end
+
+  defp checkout_partially_blocked?(mode, info) do
+    info.is_blacked_out ||
+      (mode == :buyout && !info.can_book_buyout) ||
+      (mode == :day && !info.can_book_day) ||
+      (mode == :room && !info.can_book_room)
   end
 
   defp format_date(date) do
