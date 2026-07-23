@@ -21,6 +21,7 @@ defmodule Ysc.AppleWallet do
   require Ysc.Logging
 
   alias Ysc.Repo
+  alias Ysc.Events.EventDateTime
   alias Ysc.Events.Ticket
   alias Ysc.Scanning.QrToken
   alias Ysc.AppleWallet.CertManager
@@ -160,7 +161,7 @@ defmodule Ysc.AppleWallet do
           nil
       end
 
-    event_date = format_event_date_for_pass(event.start_date, event.start_time)
+    event_date = EventDateTime.format_pass_datetime(event.start_date, event.start_time)
 
     secondary_fields =
       [
@@ -411,18 +412,6 @@ defmodule Ysc.AppleWallet do
 
       _ ->
         :error
-    end
-  end
-
-  defp format_event_date_for_pass(nil, _time), do: "TBD"
-
-  defp format_event_date_for_pass(start_date, start_time) do
-    date_str = Calendar.strftime(start_date, "%a, %b %-d, %Y")
-
-    if start_time do
-      "#{date_str} at #{Calendar.strftime(start_time, "%-I:%M %p")}"
-    else
-      date_str
     end
   end
 

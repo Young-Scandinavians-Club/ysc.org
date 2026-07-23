@@ -99,4 +99,20 @@ defmodule Ysc.Events.EventDateTimeTest do
       assert EventDateTime.in_past?(future_event) == false
     end
   end
+
+  describe "format_pass_datetime/2" do
+    test "returns TBD when start date is nil" do
+      assert EventDateTime.format_pass_datetime(nil, ~T[15:30:00]) == "TBD"
+    end
+
+    test "formats date without time" do
+      assert EventDateTime.format_pass_datetime(~D[2024-03-15], nil) ==
+               "Fri, Mar 15, 2024"
+    end
+
+    test "formats date with time" do
+      assert EventDateTime.format_pass_datetime(~D[2024-03-15], ~T[15:30:00]) ==
+               "Fri, Mar 15, 2024 at 3:30 PM"
+    end
+  end
 end

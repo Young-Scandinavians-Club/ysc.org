@@ -24,6 +24,7 @@ defmodule Ysc.GoogleWallet do
 
   alias Ysc.Ci.QueryExplain.Fixtures
   alias Ysc.Repo
+  alias Ysc.Events.EventDateTime
   alias Ysc.Events.Ticket
   alias Ysc.Scanning.QrToken
   alias Ysc.GoogleWallet.Credentials
@@ -326,7 +327,7 @@ defmodule Ysc.GoogleWallet do
         if(event.start_date,
           do: %{
             "header" => "Date",
-            "body" => format_event_date(event.start_date, event.start_time),
+            "body" => EventDateTime.format_pass_datetime(event.start_date, event.start_time),
             "id" => "date"
           }
         )
@@ -495,16 +496,6 @@ defmodule Ysc.GoogleWallet do
         "value" => value
       }
     }
-  end
-
-  defp format_event_date(start_date, start_time) do
-    date_str = Calendar.strftime(start_date, "%a, %b %-d, %Y")
-
-    if start_time do
-      "#{date_str} at #{Calendar.strftime(start_time, "%-I:%M %p")}"
-    else
-      date_str
-    end
   end
 
   defp compact(map) when is_map(map) do
