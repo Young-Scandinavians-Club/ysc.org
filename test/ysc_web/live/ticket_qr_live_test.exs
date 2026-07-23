@@ -80,13 +80,11 @@ defmodule YscWeb.TicketQrLiveTest do
       bogus_id = Ecto.ULID.generate()
 
       {:ok, view, _html} = live(conn, ~p"/tickets/#{bogus_id}/qr")
-      render_async(view)
 
-      flash = Phoenix.Flash.get(:sys.get_state(view.pid).socket.assigns.flash, :error)
+      flash = assert_redirect(view, "/users/tickets")
 
-      assert flash =~ "couldn't find those tickets"
-      assert flash =~ "My Bookings & Tickets"
-      assert_redirect(view, "/users/tickets")
+      assert flash["error"] =~ "couldn't find those tickets"
+      assert flash["error"] =~ "My Bookings & Tickets"
     end
   end
 
