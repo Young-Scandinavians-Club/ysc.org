@@ -222,7 +222,9 @@ defmodule Ysc.Accounts.FamilyInvites do
               invite.primary_user_id
             )
 
-            sync_board_volunteer_billing_after_family_change(invite.primary_user_id)
+            sync_board_volunteer_billing_after_family_change(
+              invite.primary_user_id
+            )
 
             notify_invite_accepted(invite, final_user)
             ok
@@ -296,7 +298,9 @@ defmodule Ysc.Accounts.FamilyInvites do
               invite.primary_user_id
             )
 
-            sync_board_volunteer_billing_after_family_change(invite.primary_user_id)
+            sync_board_volunteer_billing_after_family_change(
+              invite.primary_user_id
+            )
 
             notify_invite_accepted(invite, updated_user)
             ok

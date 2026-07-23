@@ -555,7 +555,10 @@ defmodule Ysc.AccountsTest do
         |> Repo.update!()
 
       {:ok, sub} = Accounts.assign_board_position(sub, :secretary)
-      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(primary)
+
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
 
       Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
 
@@ -565,8 +568,12 @@ defmodule Ysc.AccountsTest do
 
       assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
 
-      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(primary)
-      assert_receive {:board_volunteer_sync, primary_id} when primary_id == primary.id
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      assert_receive {:board_volunteer_sync, primary_id}
+                     when primary_id == primary.id
     end
 
     test "remove_sub_account returns error when sub does not belong to primary",
