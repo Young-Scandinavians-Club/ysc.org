@@ -202,7 +202,7 @@ defmodule Ysc.BookingsFixtures do
       rooms != nil ->
         attrs
         |> Map.put(:rooms, List.wrap(rooms))
-        |> Map.put_new(:booking_mode, :room)
+        |> Map.put(:booking_mode, :room)
 
       Map.get(attrs, :property) == :tahoe &&
         Map.get(attrs, :booking_mode, :buyout) == :buyout &&

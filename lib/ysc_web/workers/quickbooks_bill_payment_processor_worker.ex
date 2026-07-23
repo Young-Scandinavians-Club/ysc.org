@@ -146,10 +146,8 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
           error: inspect(reason)
         )
 
-        # Mark webhook event as failed
-        Webhooks.update_webhook_state(webhook_event, :failed)
-
         if reason != :not_found do
+          Webhooks.update_webhook_state(webhook_event, :failed)
         end
 
         {:error, :fetch_failed}
