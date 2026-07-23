@@ -349,4 +349,63 @@ defmodule Ysc.NewsletterEditionsTest do
       assert elem(found, 0) =~ "Zara"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # duplicate_edition/2
+  # ---------------------------------------------------------------------------
+
+  describe "duplicate_edition/2" do
+    test "creates a draft copy of editorial fields" do
+      user = admin_fixture()
+      other = admin_fixture()
+
+      {:ok, source} =
+        Newsletter.create_edition(
+          %{
+            "title" => "Spring Update",
+            "subject" => "Hello spring",
+            "intro_text" => "<p>Welcome back</p>",
+            "post_ids" => ["post-1"],
+            "event_ids" => ["event-1"]
+          },
+          created_by_id: user.id
+        )
+
+      {:ok, source} =
+        Newsletter.update_edition(source, %{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          sent_count: 42,
+          archived_html: "<html>archived</html>"
+        })
+
+      assert {:ok, copy} =
+               Newsletter.duplicate_edition(source, created_by_id: other.id)
+
+      assert copy.id != source.id
+      assert copy.title == "Spring Update (copy)"
+      assert copy.subject == "Hello spring"
+      assert copy.intro_text == "<p>Welcome back</p>"
+      assert copy.post_ids == ["post-1"]
+      assert copy.event_ids == ["event-1"]
+      assert copy.status == :draft
+      assert copy.sent_count == 0
+      assert copy.sent_at == nil
+      assert copy.scheduled_at == nil
+      assert copy.archived_html == nil
+      assert copy.creator_id == other.id
+    end
+
+    test "truncates long titles when appending (copy)" do
+      user = admin_fixture()
+      long_title = String.duplicate("A", 250)
+      edition = edition_fixture(user, %{"title" => long_title})
+
+      assert {:ok, copy} =
+               Newsletter.duplicate_edition(edition, created_by_id: user.id)
+
+      assert String.ends_with?(copy.title, " (copy)")
+      assert String.length(copy.title) <= 255
+    end
+  end
 end

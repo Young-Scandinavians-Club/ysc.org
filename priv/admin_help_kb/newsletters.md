@@ -5,13 +5,14 @@ summary: Edition statuses, the compose editor and autosave, subject line rules, 
 
 # Newsletters
 
-Admin pages: `/admin/newsletters` (list with Editions and Subscribers tabs), `/admin/newsletters/new`, `/admin/newsletters/:id/edit`. Public archive: `/newsletters` and `/newsletters/:id`.
+Admin pages: `/admin/newsletters` (list with Editions, Subscribers, and Saved notices tabs), `/admin/newsletters/new`, `/admin/newsletters/:id/edit`. Public archive: `/newsletters` and `/newsletters/:id`.
 
 ## Edition statuses
 
 - An edition is **Draft**, **Scheduled**, **Sending**, or **Sent**.
 - Sent editions are **read-only** — the editor shows the banner "Newsletter sent — editing is disabled". There is no unsend.
 - Draft and scheduled editions can be deleted (confirmation: "Delete this newsletter? This cannot be undone."). Sent editions cannot be deleted ("Sent newsletters cannot be deleted.").
+- **Duplicate** (list row actions, and on sent editions in the editor) creates a new draft with the same title (plus " (copy)"), subject, intro, cover, posts, and events. Schedule/send/archive data is not copied.
 
 ## Compose editor
 
@@ -19,6 +20,13 @@ Admin pages: `/admin/newsletters` (list with Editions and Subscribers tabs), `/a
 - Pieces of an edition: **cover photo** (from the media library), **headline/title** (max 255 chars), **email subject** (max 255 chars), **intro** (rich-text, up to 50,000 chars), and selected **posts** and **events**.
 - New editions auto-create with placeholder title "Untitled" and subject "Newsletter".
 - Autosave: 2 seconds after changes (form fields, picker toggles, cover image, intro). The sticky bar shows "Saving…" then "Saved {time}". Title/subject debounce at 600 ms, intro at 800 ms.
+- **Insert saved notice** (bookmark button in the intro Trix toolbar) opens a picker. Pick an existing notice to insert at the cursor, or use **New notice** to create one and insert it immediately. Notices are also managed on the Saved notices tab.
+- **Save selection as notice** (document button next to it): select text in the intro, click the button, name the notice, and save. The selection is copied into the library (the intro text itself is unchanged).
+
+## Saved notices
+
+- Tab on `/admin/newsletters?tab=notices`: create, edit, and delete named rich-text snippets.
+- Inserting a notice copies its HTML into the current intro; later edits to the library do not change editions that already inserted it.
 
 ## Subject line
 
