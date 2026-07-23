@@ -139,7 +139,10 @@ defmodule YscWeb.AccountSetupLive do
           </.simple_form>
         </div>
 
-        <div :if={!@loading_account_setup? and @current_step === 1 and @user_needs.payment_method_setup}>
+        <div :if={
+          !@loading_account_setup? and @current_step === 1 and
+            @user_needs.payment_method_setup
+        }>
           <.header class="text-left">
             Save Your Payment Method
             <:subtitle>
@@ -217,7 +220,10 @@ defmodule YscWeb.AccountSetupLive do
           <% end %>
         </div>
 
-        <div :if={!@loading_account_setup? and @current_step === 2 and @user_needs.password_setup}>
+        <div :if={
+          !@loading_account_setup? and @current_step === 2 and
+            @user_needs.password_setup
+        }>
           <.header class="text-left">
             Set Your Password
             <:subtitle>
@@ -306,7 +312,10 @@ defmodule YscWeb.AccountSetupLive do
         </div>
 
         <div
-          :if={!@loading_account_setup? and @current_step === 4 and @user_needs.phone_verification}
+          :if={
+            !@loading_account_setup? and @current_step === 4 and
+              @user_needs.phone_verification
+          }
           id="phone-verification-step"
           phx-hook="ResendTimer"
         >
@@ -392,7 +401,9 @@ defmodule YscWeb.AccountSetupLive do
           </.simple_form>
         </div>
 
-        <div :if={!@loading_account_setup? and @current_step === 5 && !@trigger_login}>
+        <div :if={
+          (!@loading_account_setup? and @current_step === 5) && !@trigger_login
+        }>
           <.header class="text-left">
             Account Setup Complete!
             <:subtitle>
@@ -651,7 +662,10 @@ defmodule YscWeb.AccountSetupLive do
     |> assign(:stepper_needs, empty_user_needs)
     |> assign(:trigger_login, false)
     |> assign(:email_form, to_form(%{"verification_code" => ""}))
-    |> assign(:password_form, to_form(%{"password" => "", "password_confirmation" => ""}))
+    |> assign(
+      :password_form,
+      to_form(%{"password" => "", "password_confirmation" => ""})
+    )
     |> assign(
       :phone_form,
       to_form(%{"phone_number" => "", "sms_opt_in" => "false"}, as: "user")
@@ -746,10 +760,10 @@ defmodule YscWeb.AccountSetupLive do
           s
         end)
 
-      if not user_needs_needs_setup?(socket.assigns.user_needs) do
-        {:ok, redirect(socket, to: ~p"/")}
-      else
+      if user_needs_needs_setup?(socket.assigns.user_needs) do
         {:ok, socket}
+      else
+        {:ok, redirect(socket, to: ~p"/")}
       end
     else
       {:ok, redirect(socket, to: ~p"/")}
