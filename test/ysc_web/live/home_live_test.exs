@@ -104,7 +104,7 @@ defmodule YscWeb.HomeLiveTest do
       html = render(view)
 
       assert html =~ event.title
-      assert html =~ "blur-hash-event-#{event.id}"
+      assert html =~ "blur-hash-image-home-event-image-#{event.id}"
     end
 
     test "subscribes to newsletter with valid email", %{conn: conn} do

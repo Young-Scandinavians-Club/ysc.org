@@ -7,7 +7,6 @@ defmodule YscWeb.EventsLive do
 
   alias Ysc.Events
   alias Ysc.Events.EventListCache
-  alias Ysc.Media.Image
   alias YscWeb.DateDisplay
 
   @impl true
@@ -176,28 +175,13 @@ defmodule YscWeb.EventsLive do
                   class="block w-full h-full"
                 >
                   <div class="w-full h-full overflow-hidden rounded-xl relative">
-                    <canvas
-                      id={"blur-hash-past-#{event.id}"}
-                      src={Image.blur_hash_for_display(event.image)}
-                      class="absolute inset-0 z-0 w-full h-full object-cover"
-                      phx-hook="BlurHashCanvas"
-                    ></canvas>
-                    <img
-                      src={Image.display_path_with_fallback(event.image)}
-                      srcset={Image.responsive_srcset(event.image)}
+                    <.live_component
+                      id={"past-event-image-#{event.id}"}
+                      module={YscWeb.Components.Image}
+                      image={event.image}
+                      aspect_class="h-full"
+                      preferred_type={:optimized}
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      id={"image-past-#{event.id}"}
-                      phx-hook="BlurHashImage"
-                      class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500"
-                      loading="lazy"
-                      decoding="async"
-                      alt={
-                        if event.image,
-                          do:
-                            event.image.alt_text || event.image.title || event.title ||
-                              "Past event",
-                          else: "Past event"
-                      }
                     />
                     <%!-- Title overlay — always visible --%>
                     <div class="absolute inset-0 z-[2] bg-gradient-to-t from-zinc-900/70 via-zinc-900/20 to-transparent">
