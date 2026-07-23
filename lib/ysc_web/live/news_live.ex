@@ -369,6 +369,9 @@ defmodule YscWeb.NewsLive do
     |> stream(:posts, posts, reset: true)
   end
 
+  defp paginate_posts(%{assigns: %{end_of_timeline?: true}} = socket),
+    do: socket
+
   defp paginate_posts(socket) do
     %{per_page: per_page, cursor: cursor} = socket.assigns
     new_posts = Posts.list_posts(cursor, per_page)
