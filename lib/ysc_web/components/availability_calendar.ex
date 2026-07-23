@@ -139,7 +139,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             >
               X
             </div>
-            <span>Not available for booking</span>
+            <span>Already booked</span>
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
@@ -148,7 +148,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             >
               --
             </div>
-            <span>Unavailable</span>
+            <span>Closed (maintenance or club event)</span>
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
@@ -157,7 +157,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             >
               In
             </div>
-            <span>Check-in allowed</span>
+            <span>Valid check-in day</span>
           </div>
           <div class="flex items-center gap-2" role="listitem">
             <div
@@ -166,7 +166,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             >
               Out
             </div>
-            <span>Check-out allowed</span>
+            <span>Valid check-out day</span>
           </div>
         </div>
       </div>

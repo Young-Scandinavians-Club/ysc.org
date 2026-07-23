@@ -27,6 +27,7 @@ defmodule Ysc.Accounts do
   }
 
   alias Ysc.Newsletter
+  alias Ysc.Subscriptions.BoardVolunteerBilling
   alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
 
   @blocked_session_states [:suspended, :rejected, :deleted]
@@ -3272,6 +3273,8 @@ defmodule Ysc.Accounts do
         primary_user.id
       )
 
+      sync_board_volunteer_billing_after_family_change(primary_user)
+
       updated_user
     end)
   end
@@ -3322,6 +3325,7 @@ defmodule Ysc.Accounts do
           )
 
           if primary_user do
+            sync_board_volunteer_billing_after_family_change(primary_user)
             send_family_member_removed_email(updated_sub_account, primary_user)
           end
 
@@ -3375,6 +3379,7 @@ defmodule Ysc.Accounts do
             primary_user.id
           )
 
+          sync_board_volunteer_billing_after_family_change(primary_user)
           send_family_member_removed_email(updated_sub_account, primary_user)
           {:ok, updated_sub_account}
 
@@ -3389,6 +3394,12 @@ defmodule Ysc.Accounts do
   defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
     invalidate_user_profile_cache(user_id)
     invalidate_user_profile_cache(primary_user_id)
+  end
+
+  # Family link/unlink changes household_on_board? without touching board_position.
+  defp sync_board_volunteer_billing_after_family_change(%User{} = user) do
+    BoardVolunteerBilling.sync_for_user(user)
+    :ok
   end
 
   defp send_family_member_removed_email(removed_user, primary_user) do

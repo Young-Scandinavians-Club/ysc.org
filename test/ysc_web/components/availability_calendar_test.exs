@@ -259,6 +259,17 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute html =~ " spot"
     end
 
+    test "renders clear availability legend labels" do
+      html = render_clear_lake_calendar()
+
+      assert html =~ "Already booked"
+      assert html =~ "Closed (maintenance or club event)"
+      assert html =~ "Valid check-in day"
+      assert html =~ "Valid check-out day"
+      refute html =~ "Not available for booking"
+      refute html =~ ">Unavailable<"
+    end
+
     test "does not render old dot indicators" do
       html = render_clear_lake_calendar()
 

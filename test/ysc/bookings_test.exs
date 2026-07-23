@@ -181,9 +181,14 @@ defmodule Ysc.BookingsTest do
         |> DateTime.now!()
         |> DateTime.to_date()
 
+      two_day_checkout =
+        ensure_sunday_when_saturday_included(today, Date.add(today, 2))
+
       staying =
         active_check_in_booking_fixture(%{
           property: :tahoe,
+          checkin_date: Date.add(today, -1),
+          checkout_date: two_day_checkout,
           status: :complete,
           guests_count: 3
         })
@@ -192,7 +197,7 @@ defmodule Ysc.BookingsTest do
         booking_fixture(%{
           property: :clear_lake,
           checkin_date: today,
-          checkout_date: Date.add(today, 2),
+          checkout_date: two_day_checkout,
           status: :complete,
           guests_count: 2
         })

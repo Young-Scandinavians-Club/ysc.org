@@ -5,6 +5,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   alias Ysc.Newsletter
   alias Ysc.Newsletter.Edition
+  alias Ysc.Newsletter.Notice
   alias Ysc.Posts
   alias Ysc.Events
   alias Ysc.Media
@@ -40,7 +41,19 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:readonly?, false)
      |> assign(:email_stats, nil)
      |> assign(:click_stats, nil)
-     |> assign(:loading_edition?, false)}
+     |> assign(:loading_edition?, false)
+     |> assign(:saved_notices, [])
+     |> assign(:show_notice_picker?, false)
+     |> assign(:notice_picker_view, :list)
+     |> assign(
+       :new_notice_form,
+       to_form(Notice.changeset(%Notice{}, %{}), as: :new_notice)
+     )
+     |> assign(:show_save_notice_modal?, false)
+     |> assign(
+       :save_notice_form,
+       to_form(Notice.changeset(%Notice{}, %{}), as: :save_notice)
+     )}
   end
 
   @impl true
@@ -59,6 +72,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     |> assign(:picker_data_loaded?, false)
     |> assign(:picker_load_started?, false)
     |> maybe_start_async_load_picker()
+    |> maybe_load_saved_notices()
     |> assign_preview_data()
   end
 
@@ -78,6 +92,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       |> assign_form_from_edition(build_placeholder_edition())
       |> start_async(:load_edition, fn -> Newsletter.get_edition!(id) end)
       |> maybe_start_async_load_picker()
+      |> maybe_load_saved_notices()
     else
       socket
       |> assign(:loading_edition?, true)
@@ -91,6 +106,16 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       |> assign(:picker_data_loaded?, false)
       |> assign(:picker_load_started?, false)
       |> assign_form_from_edition(build_placeholder_edition())
+    end
+  end
+
+  defp maybe_load_saved_notices(socket) do
+    if connected?(socket) do
+      start_async(socket, :load_saved_notices, fn ->
+        Newsletter.list_notices()
+      end)
+    else
+      socket
     end
   end
 
@@ -682,6 +707,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                   </h2>
                   <p class="text-sm text-zinc-500">
                     Opening section. Use the toolbar for bold, links, lists, and more.
+                    Insert a saved notice from the bookmark button, or select text and
+                    save it as a notice with the document button.
                   </p>
                 </div>
                 <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
@@ -691,7 +718,18 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     field={@form[:intro_text]}
                     phx-hook="TrixHook"
                     phx-debounce="800"
+                    data-newsletter-notices={to_string(!@readonly?)}
                   />
+                  <button
+                    :if={!@readonly?}
+                    type="button"
+                    id="open-notice-picker-btn"
+                    phx-click="open-notice-picker"
+                    data-trix-notices-trigger="edition_intro_text"
+                    class="hidden"
+                  >
+                    Insert saved notice
+                  </button>
                   <.live_component
                     module={YscWeb.TrixImagePickerComponent}
                     id={:newsletter_intro_image_picker}
@@ -991,12 +1029,23 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           </span>
         </div>
 
-        <%!-- Right: action buttons (hidden when readonly or loading) --%>
+        <%!-- Right: action buttons --%>
         <div
-          :if={!@readonly? && !@loading_edition?}
+          :if={!@loading_edition?}
           class="flex items-center gap-2 shrink-0"
         >
           <.button
+            :if={@readonly? && @edition}
+            type="button"
+            variant="outline"
+            color="zinc"
+            id="duplicate-edition-btn"
+            phx-click="duplicate-edition"
+          >
+            <.icon name="hero-document-duplicate" class="w-4 h-4" /> Duplicate
+          </.button>
+          <.button
+            :if={!@readonly?}
             type="button"
             variant="outline"
             color="zinc"
@@ -1004,7 +1053,12 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           >
             <.icon name="hero-paper-airplane" class="w-4 h-4" /> Send now
           </.button>
-          <.button type="button" color="blue" phx-click="open-schedule-modal">
+          <.button
+            :if={!@readonly?}
+            type="button"
+            color="blue"
+            phx-click="open-schedule-modal"
+          >
             <.icon name="hero-clock" class="w-4 h-4 opacity-80" /> Schedule
           </.button>
         </div>
@@ -1037,6 +1091,174 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             Send now
           </button>
         </div>
+      </.modal>
+
+      <.modal
+        :if={@show_notice_picker?}
+        id="insert-notice-picker-modal"
+        show
+        on_cancel={JS.push("close-notice-picker")}
+      >
+        <%= if @notice_picker_view == :new do %>
+          <.header>New saved notice</.header>
+          <p class="mt-2 text-sm text-zinc-500">
+            Create a reusable notice, then insert it into the intro.
+          </p>
+          <.form
+            for={@new_notice_form}
+            id="new-notice-from-picker-form"
+            phx-change="validate-new-notice"
+            phx-submit="create-and-insert-notice"
+            class="mt-4 space-y-4"
+          >
+            <.input
+              field={@new_notice_form[:name]}
+              type="text"
+              label="Name"
+              placeholder="e.g. Parking reminder"
+              id="new-notice-picker-name"
+            />
+            <.input
+              field={@new_notice_form[:body]}
+              type="textarea"
+              label="Body"
+              placeholder="Write the notice…"
+              id="new-notice-picker-body"
+              rows="5"
+            />
+            <div class="flex justify-end gap-2 mt-6">
+              <button
+                type="button"
+                id="new-notice-picker-back"
+                class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+                phx-click="notice-picker-show-list"
+              >
+                Back
+              </button>
+              <.button
+                type="submit"
+                id="create-and-insert-notice-btn"
+                phx-disable-with="Saving..."
+              >
+                Save & insert
+              </.button>
+            </div>
+          </.form>
+        <% else %>
+          <.header>Insert saved notice</.header>
+          <p class="mt-2 text-sm text-zinc-500">
+            Choose a notice to insert at the cursor, or create a new one.
+          </p>
+
+          <div class="mt-4 flex justify-end">
+            <.button
+              type="button"
+              id="notice-picker-new-btn"
+              variant="outline"
+              color="zinc"
+              phx-click="notice-picker-show-new"
+            >
+              <.icon name="hero-document-plus" class="w-4 h-4" /> New notice
+            </.button>
+          </div>
+
+          <div
+            :if={@saved_notices == []}
+            id="notice-picker-empty"
+            class="mt-4 rounded-lg border border-dashed border-zinc-200 px-4 py-8 text-center"
+          >
+            <p class="text-sm text-zinc-600">No saved notices yet.</p>
+            <p class="mt-1 text-sm text-zinc-500">
+              Create one here, or manage them under Newsletters → Saved notices.
+            </p>
+          </div>
+
+          <ul
+            :if={@saved_notices != []}
+            id="notice-picker-list"
+            class="mt-4 divide-y divide-zinc-100 rounded-lg border border-zinc-200 max-h-80 overflow-y-auto"
+          >
+            <li :for={notice <- @saved_notices}>
+              <button
+                type="button"
+                id={"insert-notice-#{notice.id}"}
+                phx-click="insert-notice"
+                phx-value-notice_id={notice.id}
+                class="flex w-full flex-col items-start gap-1 px-4 py-3 text-left hover:bg-zinc-50 transition"
+              >
+                <span class="text-sm font-semibold text-zinc-900">{notice.name}</span>
+                <span class="text-xs text-zinc-500 line-clamp-2">
+                  {notice_preview_text(notice.body)}
+                </span>
+              </button>
+            </li>
+          </ul>
+
+          <div class="mt-6 flex justify-end">
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+              phx-click="close-notice-picker"
+            >
+              Cancel
+            </button>
+          </div>
+        <% end %>
+      </.modal>
+
+      <.modal
+        :if={@show_save_notice_modal?}
+        id="save-notice-modal"
+        show
+        on_cancel={JS.push("close-save-notice-modal")}
+      >
+        <.header>Save selection as notice</.header>
+        <p class="mt-2 text-sm text-zinc-500">
+          Name this notice so you can reuse it in future newsletters.
+        </p>
+        <.form
+          for={@save_notice_form}
+          id="save-notice-form"
+          phx-change="validate-save-notice"
+          phx-submit="confirm-save-notice"
+          class="mt-4 space-y-4"
+        >
+          <.input
+            field={@save_notice_form[:name]}
+            type="text"
+            label="Name"
+            placeholder="e.g. Parking reminder"
+            id="save-notice-name"
+          />
+          <.input type="hidden" field={@save_notice_form[:body]} />
+          <div>
+            <p class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
+              Preview
+            </p>
+            <div
+              id="save-notice-preview"
+              class="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 max-h-40 overflow-y-auto prose prose-sm prose-zinc max-w-none"
+            >
+              {scrub_intro_for_preview(@save_notice_form[:body].value || "")}
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 mt-6">
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+              phx-click="close-save-notice-modal"
+            >
+              Cancel
+            </button>
+            <.button
+              type="submit"
+              id="confirm-save-notice-btn"
+              phx-disable-with="Saving..."
+            >
+              Save notice
+            </.button>
+          </div>
+        </.form>
       </.modal>
 
       <%!-- Schedule modal --%>
@@ -1299,6 +1521,223 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   def handle_event("open-send-modal", _params, socket) do
     {:noreply, assign(socket, :show_send_modal, true)}
+  end
+
+  def handle_event(
+        "open-notice-picker",
+        _params,
+        %{assigns: %{readonly?: true}} = socket
+      ),
+      do: {:noreply, socket}
+
+  def handle_event("open-notice-picker", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_notice_picker?, true)
+     |> assign(:notice_picker_view, :list)}
+  end
+
+  def handle_event("close-notice-picker", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_notice_picker?, false)
+     |> assign(:notice_picker_view, :list)
+     |> reset_new_notice_form()}
+  end
+
+  def handle_event("notice-picker-show-new", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:notice_picker_view, :new)
+     |> reset_new_notice_form()}
+  end
+
+  def handle_event("notice-picker-show-list", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:notice_picker_view, :list)
+     |> reset_new_notice_form()}
+  end
+
+  def handle_event("validate-new-notice", %{"new_notice" => params}, socket) do
+    changeset =
+      %Notice{}
+      |> Notice.changeset(params)
+      |> Map.put(:action, :validate)
+
+    {:noreply,
+     assign(socket, :new_notice_form, to_form(changeset, as: :new_notice))}
+  end
+
+  def handle_event(
+        "create-and-insert-notice",
+        _params,
+        %{assigns: %{readonly?: true}} = socket
+      ),
+      do: {:noreply, socket}
+
+  def handle_event(
+        "create-and-insert-notice",
+        %{"new_notice" => params},
+        socket
+      ) do
+    params = Map.update(params, "body", "", &wrap_plain_notice_body/1)
+
+    case Newsletter.create_notice(params,
+           created_by_id: socket.assigns.current_user.id
+         ) do
+      {:ok, notice} ->
+        {:noreply,
+         socket
+         |> assign(:show_notice_picker?, false)
+         |> assign(:notice_picker_view, :list)
+         |> assign(:saved_notices, [notice | socket.assigns.saved_notices])
+         |> reset_new_notice_form()
+         |> push_event("insert-trix-html", %{
+           html: notice.body,
+           target_input_id: "edition_intro_text"
+         })
+         |> YscWeb.Flash.put_toast(:info, "Notice \"#{notice.name}\" saved.",
+           title: "Newsletter"
+         )}
+
+      {:error, changeset} ->
+        {:noreply,
+         assign(socket, :new_notice_form, to_form(changeset, as: :new_notice))}
+    end
+  end
+
+  def handle_event(
+        "save-selection-as-notice",
+        _params,
+        %{assigns: %{readonly?: true}} = socket
+      ),
+      do: {:noreply, socket}
+
+  def handle_event("save-selection-as-notice", %{"html" => html}, socket)
+      when is_binary(html) do
+    html = String.trim(html)
+
+    if html == "" do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "Select some text first, then save it as a notice."
+       )}
+    else
+      changeset = Notice.changeset(%Notice{}, %{"body" => html, "name" => ""})
+
+      {:noreply,
+       socket
+       |> assign(:show_save_notice_modal?, true)
+       |> assign(:save_notice_form, to_form(changeset, as: :save_notice))}
+    end
+  end
+
+  def handle_event("close-save-notice-modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_save_notice_modal?, false)
+     |> assign(
+       :save_notice_form,
+       to_form(Notice.changeset(%Notice{}, %{}), as: :save_notice)
+     )}
+  end
+
+  def handle_event("validate-save-notice", %{"save_notice" => params}, socket) do
+    changeset =
+      %Notice{}
+      |> Notice.changeset(params)
+      |> Map.put(:action, :validate)
+
+    {:noreply,
+     assign(socket, :save_notice_form, to_form(changeset, as: :save_notice))}
+  end
+
+  def handle_event(
+        "confirm-save-notice",
+        _params,
+        %{assigns: %{readonly?: true}} = socket
+      ),
+      do: {:noreply, socket}
+
+  def handle_event("confirm-save-notice", %{"save_notice" => params}, socket) do
+    case Newsletter.create_notice(params,
+           created_by_id: socket.assigns.current_user.id
+         ) do
+      {:ok, notice} ->
+        {:noreply,
+         socket
+         |> assign(:show_save_notice_modal?, false)
+         |> assign(:saved_notices, [notice | socket.assigns.saved_notices])
+         |> assign(
+           :save_notice_form,
+           to_form(Notice.changeset(%Notice{}, %{}), as: :save_notice)
+         )
+         |> YscWeb.Flash.put_toast(:info, "Notice \"#{notice.name}\" saved.",
+           title: "Newsletter"
+         )}
+
+      {:error, changeset} ->
+        {:noreply,
+         assign(socket, :save_notice_form, to_form(changeset, as: :save_notice))}
+    end
+  end
+
+  def handle_event(
+        "insert-notice",
+        _params,
+        %{assigns: %{readonly?: true}} = socket
+      ),
+      do: {:noreply, socket}
+
+  def handle_event("insert-notice", %{"notice_id" => notice_id}, socket)
+      when is_binary(notice_id) and notice_id != "" do
+    notice =
+      Enum.find(socket.assigns.saved_notices, &(to_string(&1.id) == notice_id))
+
+    socket =
+      if notice do
+        socket
+        |> assign(:show_notice_picker?, false)
+        |> push_event("insert-trix-html", %{
+          html: notice.body,
+          target_input_id: "edition_intro_text"
+        })
+      else
+        assign(socket, :show_notice_picker?, false)
+      end
+
+    {:noreply, socket}
+  end
+
+  def handle_event("duplicate-edition", _params, socket) do
+    case socket.assigns.edition do
+      %Edition{} = edition ->
+        case Newsletter.duplicate_edition(edition,
+               created_by_id: socket.assigns.current_user.id
+             ) do
+          {:ok, new_edition} ->
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:info, "Newsletter duplicated.",
+               title: "Newsletter"
+             )
+             |> push_navigate(to: ~p"/admin/newsletters/#{new_edition.id}/edit")}
+
+          {:error, _} ->
+            {:noreply,
+             YscWeb.Flash.put_toast(
+               socket,
+               :error,
+               "Could not duplicate newsletter."
+             )}
+        end
+
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   def handle_event("close-send-modal", _params, socket) do
@@ -1566,8 +2005,55 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:click_stats, :error)}
   end
 
+  def handle_async(:load_saved_notices, {:ok, notices}, socket) do
+    {:noreply, assign(socket, :saved_notices, notices)}
+  end
+
+  def handle_async(:load_saved_notices, {:exit, _reason}, socket) do
+    {:noreply, assign(socket, :saved_notices, [])}
+  end
+
   defp normalize_upload_payload({:ok, id}) when is_binary(id), do: id
   defp normalize_upload_payload(id) when is_binary(id), do: id
+
+  defp notice_preview_text(nil), do: ""
+
+  defp notice_preview_text(body) when is_binary(body) do
+    body
+    |> HtmlSanitizeEx.strip_tags()
+    |> String.trim()
+    |> String.slice(0, 140)
+  end
+
+  defp reset_new_notice_form(socket) do
+    assign(
+      socket,
+      :new_notice_form,
+      to_form(Notice.changeset(%Notice{}, %{}), as: :new_notice)
+    )
+  end
+
+  defp wrap_plain_notice_body(body) when is_binary(body) do
+    trimmed = String.trim(body)
+
+    cond do
+      trimmed == "" ->
+        trimmed
+
+      String.contains?(trimmed, "<") ->
+        trimmed
+
+      true ->
+        escaped =
+          trimmed
+          |> Phoenix.HTML.html_escape()
+          |> Phoenix.HTML.safe_to_string()
+
+        "<div>#{escaped}</div>"
+    end
+  end
+
+  defp wrap_plain_notice_body(_), do: ""
 
   @impl true
   def handle_info(:auto_save, %{assigns: %{readonly?: true}} = socket),
