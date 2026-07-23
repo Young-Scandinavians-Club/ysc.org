@@ -164,6 +164,19 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
       user = user_fixture()
       assert :ok == BoardVolunteerBilling.sync_for_user(user)
     end
+
+    test "records sync target in test when recorder pid is configured" do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok == BoardVolunteerBilling.sync_for_user(user)
+      assert_receive {:board_volunteer_sync, ^user.id}
+    end
   end
 
   describe "sync_all_board_households/0" do

@@ -542,6 +542,33 @@ defmodule Ysc.AccountsTest do
       assert hd(group).id == primary.id
     end
 
+    test "remove_sub_account syncs board volunteer billing for primary household" do
+      primary = user_fixture(%{phone_number: "+14159098350"})
+      sub = user_fixture(%{phone_number: "+14159098351"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      {:ok, sub} = Accounts.assign_board_position(sub, :secretary)
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(primary)
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(primary)
+      assert_receive {:board_volunteer_sync, primary_id} when primary_id == primary.id
+    end
+
     test "remove_sub_account returns error when sub does not belong to primary",
          %{} do
       primary1 = user_fixture(%{phone_number: "+14159098300"})

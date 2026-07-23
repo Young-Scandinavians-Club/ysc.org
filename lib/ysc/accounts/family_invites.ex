@@ -8,6 +8,7 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   alias Ysc.Repo
   alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent, UserProfileCache}
+  alias Ysc.Subscriptions.BoardVolunteerBilling
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
@@ -221,6 +222,8 @@ defmodule Ysc.Accounts.FamilyInvites do
               invite.primary_user_id
             )
 
+            sync_board_volunteer_billing_after_family_change(invite.primary_user_id)
+
             notify_invite_accepted(invite, final_user)
             ok
 
@@ -293,6 +296,8 @@ defmodule Ysc.Accounts.FamilyInvites do
               invite.primary_user_id
             )
 
+            sync_board_volunteer_billing_after_family_change(invite.primary_user_id)
+
             notify_invite_accepted(invite, updated_user)
             ok
 
@@ -305,6 +310,13 @@ defmodule Ysc.Accounts.FamilyInvites do
   defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
     UserProfileCache.invalidate_user(user_id)
     UserProfileCache.invalidate_user(primary_user_id)
+  end
+
+  defp sync_board_volunteer_billing_after_family_change(primary_user_id) do
+    case Ysc.Accounts.get_user(primary_user_id) do
+      nil -> :ok
+      primary -> BoardVolunteerBilling.sync_for_user(primary)
+    end
   end
 
   @doc """
