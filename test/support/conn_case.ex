@@ -61,7 +61,7 @@ defmodule YscWeb.ConnCase do
 
         Ysc.DataCase.setup_sandbox(tags)
 
-        unless tags[:skip_settings_setup] do
+        if !tags[:skip_settings_setup] do
           if Ysc.Repo.aggregate(Ysc.SiteSettings.SiteSetting, :count) == 0 do
             Ysc.Settings.ensure_settings_exist()
           end

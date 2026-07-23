@@ -238,7 +238,7 @@ defmodule Ysc.Newsletter.EmailValidator do
         @ets_table
         |> :ets.tab2list()
         |> Enum.each(fn {domain, _} ->
-          unless MapSet.member?(new_domain_set, domain) do
+          if !MapSet.member?(new_domain_set, domain) do
             :ets.delete(@ets_table, domain)
           end
         end)
@@ -270,7 +270,7 @@ defmodule Ysc.Newsletter.EmailValidator do
   end
 
   defp ensure_ets_table do
-    unless ets_table_exists?() do
+    if !ets_table_exists?() do
       try do
         :ets.new(@ets_table, [
           :set,

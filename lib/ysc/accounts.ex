@@ -607,7 +607,7 @@ defmodule Ysc.Accounts do
 
         # In tests, avoid spawning background tasks that touch the DB inside the SQL sandbox,
         # as they can produce noisy DBConnection ownership/disconnect logs.
-        unless is_test do
+        if !is_test do
           Task.start(fn ->
             try do
               Ysc.Customers.create_stripe_customer(user)

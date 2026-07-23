@@ -19,7 +19,7 @@ end
 # Set STRIPE_PROCESS_PAYOUT_WEBHOOKS to false, 0, no, or off (case-insensitive) while another
 # system handles the same Stripe account (e.g. legacy site); unset means enabled.
 # Not applied in :test so `mix test` stays stable when the shell or .env disables payouts.
-unless config_env() == :test do
+if config_env() != :test do
   process_stripe_payout_webhooks =
     case System.get_env("STRIPE_PROCESS_PAYOUT_WEBHOOKS") do
       nil -> true
@@ -153,7 +153,7 @@ if config_env() == :prod do
 
   database_url =
     System.get_env("DATABASE_URL") ||
-      unless fly_release_command?,
+      if !fly_release_command?,
         do:
           raise("""
           environment variable DATABASE_URL is missing.
@@ -183,7 +183,7 @@ if config_env() == :prod do
   # variable instead.
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
-      unless fly_release_command?,
+      if !fly_release_command?,
         do:
           raise("""
           environment variable SECRET_KEY_BASE is missing.
@@ -522,7 +522,7 @@ if config_env() == :prod do
     # to read from the CLOAK_ENCRYPTION_KEY environment variable.
     _cloak_key =
       System.get_env("CLOAK_ENCRYPTION_KEY") ||
-        unless fly_release_command?,
+        if !fly_release_command?,
           do:
             raise("""
             Missing CLOAK_ENCRYPTION_KEY environment variable.

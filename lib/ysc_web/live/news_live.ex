@@ -424,7 +424,7 @@ defmodule YscWeb.NewsLive do
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/&[a-z]+;/i, " ")
     |> String.replace(~r/&#\d+;/, " ")
-    |> count_words_in_text
+    |> count_words_in_text()
   end
 
   # Count words in plain text
