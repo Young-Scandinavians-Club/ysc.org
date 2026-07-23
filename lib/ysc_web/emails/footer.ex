@@ -68,7 +68,7 @@ defmodule YscWeb.Emails.FooterBlock do
         inner = Enum.join(els, "\n          ")
 
         """
-        <mj-section background-color="transparent" border-bottom="1px solid #e0e0e0" border-left="none" border-right="none" border-top="none" padding-bottom="16px" padding-left="48px" padding-right="48px" padding-top="16px" padding="12px">
+        <mj-section background-color="transparent" border-bottom="1px solid #e0e0e0" border-left="none" border-right="none" border-top="none" padding-bottom="16px" padding-left="48px" padding-right="48px" padding-top="16px">
           <mj-column background-color="transparent" padding="0" background-color="transparent">
             <mj-social font-size="15px" icon-padding="0px" icon-size="40px" mode="horizontal" padding="0px">
               #{inner}

@@ -471,13 +471,39 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert html =~ "Weekly"
       assert html =~ "Hi"
       assert html =~ "Newsletter,"
-      assert html =~ "/images/viking_on_bike.png"
-      assert html =~ ~s(alt="Viking on a bike")
+      assert html =~ "16px 48px 8px"
+      assert html =~ "Unsubscribe from newsletters"
 
-      # Viking sits in the shared footer below the social divider, above the org name.
-      viking_idx = :binary.match(html, "/images/viking_on_bike.png") |> elem(0)
-      org_idx = :binary.match(html, "Young Scandinavians Club") |> elem(0)
-      assert viking_idx < org_idx
+      {:ok, doc} = Floki.parse_document(html)
+
+      viking_img =
+        doc
+        |> Floki.find("img")
+        |> Enum.find(fn node ->
+          node
+          |> Floki.attribute("src")
+          |> List.first("")
+          |> String.contains?("viking_on_bike")
+        end)
+
+      refute is_nil(viking_img)
+      assert Floki.attribute(viking_img, "alt") == ["Viking on a bike"]
+      [viking_src] = Floki.attribute(viking_img, "src")
+      assert viking_src =~ "/images/viking_on_bike.png"
+
+      all_elements = Floki.find(doc, "*")
+      viking_idx = Enum.find_index(all_elements, &(&1 == viking_img))
+
+      org_idxs =
+        all_elements
+        |> Enum.with_index()
+        |> Enum.filter(fn {node, _idx} ->
+          Floki.text(node) == "Young Scandinavians Club"
+        end)
+        |> Enum.map(&elem(&1, 1))
+
+      footer_org_idx = org_idxs |> Enum.filter(&(&1 > viking_idx)) |> Enum.min()
+      assert viking_idx < footer_org_idx
     end
   end
 

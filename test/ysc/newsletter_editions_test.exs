@@ -404,8 +404,7 @@ defmodule Ysc.NewsletterEditionsTest do
       assert {:ok, copy} =
                Newsletter.duplicate_edition(edition, created_by_id: user.id)
 
-      assert String.ends_with?(copy.title, " (copy)")
-      assert String.length(copy.title) <= 255
+      assert copy.title == String.slice(long_title, 0, 248) <> " (copy)"
     end
   end
 end
