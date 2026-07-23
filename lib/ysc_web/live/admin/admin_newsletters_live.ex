@@ -380,11 +380,17 @@ defmodule YscWeb.AdminNewslettersLive do
                     <span class="text-sm text-zinc-500">
                       <%= cond do %>
                         <% edition.sent_at -> %>
-                          Sent {DateTimeDisplay.format_datetime_compact(edition.sent_at)}
+                          Sent {DateTimeDisplay.format_datetime_compact(
+                            edition.sent_at
+                          )}
                         <% edition.scheduled_at -> %>
-                          Scheduled {DateTimeDisplay.format_datetime_compact(edition.scheduled_at)}
+                          Scheduled {DateTimeDisplay.format_datetime_compact(
+                            edition.scheduled_at
+                          )}
                         <% true -> %>
-                          Created {DateTimeDisplay.format_datetime_compact(edition.inserted_at)}
+                          Created {DateTimeDisplay.format_datetime_compact(
+                            edition.inserted_at
+                          )}
                       <% end %>
                     </span>
                     <span
@@ -477,7 +483,9 @@ defmodule YscWeb.AdminNewslettersLive do
                     <% edition.scheduled_at -> %>
                       <div class="text-zinc-500 text-xs font-medium">Scheduled</div>
                       <div class="text-zinc-600 text-xs">
-                        {DateTimeDisplay.format_datetime_compact(edition.scheduled_at)}
+                        {DateTimeDisplay.format_datetime_compact(
+                          edition.scheduled_at
+                        )}
                       </div>
                     <% true -> %>
                       <span class="text-zinc-400">—</span>
@@ -619,7 +627,9 @@ defmodule YscWeb.AdminNewslettersLive do
                     {subscriber_name(subscriber)}
                   </p>
                   <div class="flex items-center gap-3 mt-2 flex-wrap">
-                    <.badge type={newsletter_subscriber_status_badge_type(subscriber.subscribed)}>
+                    <.badge type={
+                      newsletter_subscriber_status_badge_type(subscriber.subscribed)
+                    }>
                       {newsletter_subscriber_status_label(subscriber.subscribed)}
                     </.badge>
                     <span :if={subscriber.source} class="text-xs text-zinc-400">
@@ -681,7 +691,9 @@ defmodule YscWeb.AdminNewslettersLive do
                   <span class="text-zinc-600">{subscriber_name(sub)}</span>
                 </:col>
                 <:col :let={{_, sub}} label="Status" field={:subscribed}>
-                  <.badge type={newsletter_subscriber_status_badge_type(sub.subscribed)}>
+                  <.badge type={
+                    newsletter_subscriber_status_badge_type(sub.subscribed)
+                  }>
                     {newsletter_subscriber_status_label(sub.subscribed)}
                   </.badge>
                 </:col>
