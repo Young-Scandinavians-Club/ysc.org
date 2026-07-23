@@ -84,7 +84,8 @@ function uploadFile(file, postID, progressCallback, successCallback, errorCallba
   xhr.send(formData);
 }
 
-function addCustomToolbarButtons(editorEl, hookEl) {
+function addCustomToolbarButtons(editorEl, hook) {
+  const hookEl = hook.el;
   const toolbarId = editorEl.getAttribute("toolbar");
   const toolbar = document.getElementById(toolbarId);
   if (!toolbar) return;
@@ -102,6 +103,7 @@ function addCustomToolbarButtons(editorEl, hookEl) {
     libraryBtn.title = "Insert from library";
     libraryBtn.tabIndex = -1;
     libraryBtn.textContent = "Library";
+    libraryBtn.addEventListener("mousedown", (e) => e.preventDefault());
     libraryBtn.addEventListener("click", (e) => {
       e.preventDefault();
       const trigger = document.querySelector(
@@ -120,6 +122,7 @@ function addCustomToolbarButtons(editorEl, hookEl) {
     hrBtn.title = "Divider";
     hrBtn.tabIndex = -1;
     hrBtn.textContent = "Divider";
+    hrBtn.addEventListener("mousedown", (e) => e.preventDefault());
     hrBtn.addEventListener("click", (e) => {
       e.preventDefault();
       const attachment = new Trix.Attachment({
@@ -130,6 +133,88 @@ function addCustomToolbarButtons(editorEl, hookEl) {
     });
     fileTools.appendChild(hrBtn);
   }
+
+  if (
+    hookEl.getAttribute("data-newsletter-notices") === "true" &&
+    !fileTools.querySelector(".trix-button--icon-saved-notice")
+  ) {
+    const noticeBtn = document.createElement("button");
+    noticeBtn.type = "button";
+    noticeBtn.className =
+      "trix-button trix-button--icon trix-button--icon-saved-notice";
+    noticeBtn.title = "Insert saved notice";
+    noticeBtn.tabIndex = -1;
+    noticeBtn.textContent = "Notice";
+    noticeBtn.addEventListener("mousedown", (e) => e.preventDefault());
+    noticeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const trigger = document.querySelector(
+        `[data-trix-notices-trigger="${hookEl.id}"]`,
+      );
+      if (trigger) trigger.click();
+    });
+    fileTools.appendChild(noticeBtn);
+  }
+
+  if (
+    hookEl.getAttribute("data-newsletter-notices") === "true" &&
+    !fileTools.querySelector(".trix-button--icon-save-notice")
+  ) {
+    const saveNoticeBtn = document.createElement("button");
+    saveNoticeBtn.type = "button";
+    saveNoticeBtn.className =
+      "trix-button trix-button--icon trix-button--icon-save-notice";
+    saveNoticeBtn.title = "Save selection as notice";
+    saveNoticeBtn.tabIndex = -1;
+    saveNoticeBtn.textContent = "Save notice";
+    saveNoticeBtn.addEventListener("mousedown", (e) => e.preventDefault());
+    saveNoticeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const html = getTrixSelectedHTML(editorEl);
+      if (!html) {
+        alert("Select some text in the intro first, then save it as a notice.");
+        return;
+      }
+      hook.pushEvent("save-selection-as-notice", { html });
+    });
+    fileTools.appendChild(saveNoticeBtn);
+  }
+}
+
+function getTrixSelectedHTML(editorEl) {
+  const editor = editorEl && editorEl.editor;
+  if (!editor) return null;
+
+  const range = editor.getSelectedRange();
+  if (!range || range[0] === range[1]) return null;
+
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0) {
+    const anchor = selection.anchorNode;
+    if (anchor && editorEl.contains(anchor)) {
+      const container = document.createElement("div");
+      for (let i = 0; i < selection.rangeCount; i++) {
+        container.appendChild(selection.getRangeAt(i).cloneContents());
+      }
+      const html = container.innerHTML.trim();
+      if (html) return html;
+    }
+  }
+
+  const text = editor.getDocument().getStringAtRange(range).trim();
+  if (!text) return null;
+  return text
+    .split(/\n+/)
+    .map((line) => `<div>${escapeHtml(line)}</div>`)
+    .join("");
+}
+
+function escapeHtml(text) {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 module.exports = {
@@ -153,7 +238,7 @@ module.exports = {
     };
     this.onTrixInitialize = (event) => {
       if (event.target.getAttribute("input") === this.el.id) {
-        addCustomToolbarButtons(event.target, this.el);
+        addCustomToolbarButtons(event.target, this);
       }
     };
 
@@ -176,11 +261,21 @@ module.exports = {
       editorEl.editor.insertAttachment(attachment);
     });
 
+    this.handleEvent("insert-trix-html", ({ html, target_input_id }) => {
+      if (this.el.id !== target_input_id) return;
+      if (!html) return;
+      const editorEl = document.querySelector(
+        `trix-editor[input="${target_input_id}"]`,
+      );
+      if (!editorEl || !editorEl.editor) return;
+      editorEl.editor.insertHTML(html);
+    });
+
     const editorEl = document.querySelector(
       `trix-editor[input="${this.el.id}"]`,
     );
     if (editorEl && editorEl.editor) {
-      addCustomToolbarButtons(editorEl, this.el);
+      addCustomToolbarButtons(editorEl, this);
     }
 
     document.addEventListener("trix-initialize", this.onTrixInitialize);

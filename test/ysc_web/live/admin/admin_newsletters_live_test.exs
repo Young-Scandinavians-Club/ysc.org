@@ -236,6 +236,108 @@ defmodule YscWeb.AdminNewslettersLiveTest do
     end
   end
 
+  describe "saved notices tab" do
+    setup [:create_admin]
+
+    test "lists saved notices and opens create modal", %{
+      conn: conn,
+      admin: admin
+    } do
+      admin =
+        admin
+        |> Ecto.Changeset.change(%{first_name: "Ada", last_name: "Admin"})
+        |> Ysc.Repo.update!()
+
+      {:ok, _notice} =
+        Newsletter.create_notice(
+          %{"name" => "Parking reminder", "body" => "<p>Lot B</p>"},
+          created_by_id: admin.id
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=notices")
+      html = render_async(view, 5000)
+
+      assert html =~ "Saved notices"
+      assert html =~ "Parking reminder"
+      assert html =~ "Ada Admin"
+      assert has_element?(view, "#new-notice-btn")
+
+      view |> element("#new-notice-btn") |> render_click()
+      assert has_element?(view, "#notice-form")
+      assert has_element?(view, "#notice-name")
+    end
+
+    test "deletes a notice", %{conn: conn, admin: admin} do
+      {:ok, notice} =
+        Newsletter.create_notice(
+          %{"name" => "Delete me", "body" => "<p>bye</p>"},
+          created_by_id: admin.id
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=notices")
+      render_async(view, 5000)
+
+      view
+      |> element("#notice-actions-dt-#{notice.id}-delete")
+      |> render_click()
+
+      refute has_element?(view, "#notice-#{notice.id}")
+    end
+
+    test "clicking a table row opens the edit modal", %{
+      conn: conn,
+      admin: admin
+    } do
+      {:ok, notice} =
+        Newsletter.create_notice(
+          %{"name" => "Row click notice", "body" => "<p>Hello</p>"},
+          created_by_id: admin.id
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters?tab=notices")
+      render_async(view, 5000)
+
+      view |> element("#notice-#{notice.id}") |> render_click()
+
+      assert has_element?(view, "#notice-modal")
+      assert has_element?(view, "#notice-form")
+      assert render(view) =~ "Edit notice"
+      assert has_element?(view, "#notice-name[value='Row click notice']")
+    end
+  end
+
+  describe "duplicate edition" do
+    setup [:create_admin]
+
+    test "duplicates from the list and navigates to the new draft", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin, %{"title" => "Original Edition"})
+      {view, _html} = live_newsletters(conn)
+
+      {:ok, editor_view, _html} =
+        view
+        |> element("#newsletter-actions-dt-#{edition.id}-duplicate")
+        |> render_click()
+        |> follow_redirect(conn)
+
+      render_async(editor_view, 5000)
+
+      assert editor_view
+             |> element("input[name='edition[title]']")
+             |> render() =~ "Original Edition (copy)"
+
+      copy =
+        Newsletter.list_editions()
+        |> Enum.find(&(&1.title == "Original Edition (copy)"))
+
+      assert copy
+      assert copy.status == :draft
+      assert copy.id != edition.id
+    end
+  end
+
   describe "edition broadcast" do
     setup [:create_admin]
 
