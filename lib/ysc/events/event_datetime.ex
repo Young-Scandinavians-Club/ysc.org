@@ -80,6 +80,12 @@ defmodule Ysc.Events.EventDateTime do
   """
   def format_pass_datetime(nil, _start_time), do: "TBD"
 
+  def format_pass_datetime(%DateTime{} = start_date, start_time) do
+    start_date
+    |> DateTime.to_date()
+    |> format_pass_datetime(start_time)
+  end
+
   def format_pass_datetime(%Date{} = start_date, start_time) do
     date_str = Calendar.strftime(start_date, @pass_date_format)
 

@@ -110,6 +110,11 @@ defmodule Ysc.Events.EventDateTimeTest do
                "Fri, Mar 15, 2024"
     end
 
+    test "formats DateTime start date without time" do
+      assert EventDateTime.format_pass_datetime(~U[2024-03-15 12:00:00Z], nil) ==
+               "Fri, Mar 15, 2024"
+    end
+
     test "formats date with time" do
       assert EventDateTime.format_pass_datetime(~D[2024-03-15], ~T[15:30:00]) ==
                "Fri, Mar 15, 2024 at 3:30 PM"

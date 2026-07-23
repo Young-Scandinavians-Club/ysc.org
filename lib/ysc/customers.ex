@@ -36,10 +36,10 @@ defmodule Ysc.Customers do
 
   @dialyzer {:nowarn_function, create_stripe_customer: 1}
   def create_stripe_customer(%User{} = user) do
+    customer_params = stripe_customer_params(user)
+
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           user
-           |> stripe_customer_params()
-           |> then(&stripe_customer_module().create/1)
+           stripe_customer_module().create(customer_params)
          end) do
       {:ok, stripe_customer} ->
         persist_user_stripe_id(user.id, stripe_customer.id)

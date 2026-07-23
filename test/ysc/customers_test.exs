@@ -322,13 +322,13 @@ defmodule Ysc.CustomersTest do
         user_fixture_unique(%{
           first_name: "jane",
           last_name: "doe",
-          phone_number: "555-0100"
+          phone_number: "+14159098268"
         })
 
       assert Customers.stripe_customer_params(user) == %{
                email: user.email,
                name: "Jane Doe",
-               phone: "555-0100",
+               phone: "+14159098268",
                description: "User ID: #{user.id}",
                metadata: %{user_id: user.id}
              }
