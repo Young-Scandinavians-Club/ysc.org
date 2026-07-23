@@ -24,6 +24,8 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   - No-op in test environment (no Stripe calls).
   """
   def sync_for_user(%User{} = user) do
+    maybe_record_test_sync(user.id)
+
     if Ysc.Env.test?() do
       :ok
     else
@@ -209,6 +211,13 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
     Enum.any?(subscription.subscription_items, fn item ->
       MapSet.member?(price_ids, item.stripe_price_id)
     end)
+  end
+
+  defp maybe_record_test_sync(user_id) do
+    case Application.get_env(:ysc, :board_volunteer_billing_sync_recorder) do
+      pid when is_pid(pid) -> send(pid, {:board_volunteer_sync, user_id})
+      _ -> :ok
+    end
   end
 
   defp membership_price_ids_set do
