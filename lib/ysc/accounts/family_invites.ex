@@ -184,7 +184,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                 rescue
                   e ->
                     # In test mode, silently ignore errors to keep test output clean
-                    unless is_test do
+                    if !is_test do
                       require Ysc.Logging
 
                       Ysc.Logging.error(
@@ -196,7 +196,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                 catch
                   kind, reason ->
                     # Catch all other errors (throws, exits, etc.)
-                    unless is_test do
+                    if !is_test do
                       require Ysc.Logging
 
                       Ysc.Logging.error(

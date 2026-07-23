@@ -38,7 +38,7 @@ defmodule Ysc.DataCase do
     owner = Ysc.DataCase.setup_sandbox(tags)
     # Ensure basic site settings exist, unless the test explicitly opts out.
     # Skip the DB round-trip when settings already exist (e.g. same sandbox process).
-    unless tags[:skip_settings_setup] do
+    if !tags[:skip_settings_setup] do
       if Ysc.Repo.aggregate(Ysc.SiteSettings.SiteSetting, :count) == 0 do
         Ysc.Settings.ensure_settings_exist()
       end

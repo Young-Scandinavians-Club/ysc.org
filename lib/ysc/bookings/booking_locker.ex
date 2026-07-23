@@ -1367,7 +1367,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
       # Allow :canceled so a succeeded Stripe payment can still confirm when
       # HoldExpiryWorker wins the race against payment_intent.succeeded / redirect.
-      unless booking.status in [:hold, :canceled] do
+      if booking.status not in [:hold, :canceled] do
         Repo.rollback({:error, :invalid_status})
       end
 
@@ -1593,12 +1593,12 @@ defmodule Ysc.Bookings.BookingLocker do
     |> case do
       {:ok, booking} ->
         # Send confirmation email (outside transaction)
-        unless skip_email do
+        if !skip_email do
           send_booking_confirmation_email(booking)
         end
 
         # Schedule reminders (outside transaction)
-        unless skip_reminders do
+        if !skip_reminders do
           schedule_checkin_reminder(booking)
           schedule_checkout_reminder(booking)
         end

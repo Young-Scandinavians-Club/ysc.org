@@ -185,7 +185,7 @@ defmodule Ysc.BookingsTest do
         ensure_sunday_when_saturday_included(today, Date.add(today, 2))
 
       staying =
-        booking_fixture(%{
+        active_check_in_booking_fixture(%{
           property: :tahoe,
           checkin_date: Date.add(today, -1),
           checkout_date: two_day_checkout,
@@ -205,7 +205,8 @@ defmodule Ysc.BookingsTest do
       checkout_today =
         booking_fixture(%{
           property: :tahoe,
-          checkin_date: Date.add(today, -2),
+          checkin_date:
+            tahoe_checkin_for_fixed_checkout(today, Date.add(today, -2)),
           checkout_date: today,
           status: :complete,
           guests_count: 4
@@ -224,13 +225,15 @@ defmodule Ysc.BookingsTest do
         booking_fixture(%{
           property: :tahoe,
           checkin_date: today,
-          checkout_date: Date.add(today, 1),
+          checkout_date:
+            ensure_sunday_when_saturday_included(today, Date.add(today, 1)),
           status: :canceled
         })
 
       stats = Bookings.admin_property_dashboard_stats()
 
       assert stats.tahoe.staying >= 1
+      assert checkout_today.checkout_date == today
       assert stats.tahoe.checkouts_today >= 1
       assert stats.clear_lake.checkins_today >= 1
       assert stats.clear_lake.upcoming_bookings >= 1
@@ -247,7 +250,8 @@ defmodule Ysc.BookingsTest do
 
       booking_fixture(%{
         property: :tahoe,
-        checkin_date: Date.add(today, -1),
+        checkin_date:
+          tahoe_checkin_for_fixed_checkout(today, Date.add(today, -1)),
         checkout_date: today,
         status: :complete,
         guests_count: 1

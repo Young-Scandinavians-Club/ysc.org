@@ -58,42 +58,58 @@ defmodule YscWeb.Components.DateRangePicker do
           id="calendar_background"
           class="w-full bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none p-3"
         >
-          <div id="calendar_header" class="flex justify-between">
-            <div id="button_left">
-              <button
-                type="button"
-                phx-target={@myself}
-                phx-click="prev-month"
-                class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-              >
-                <.icon name="hero-arrow-left" />
-              </button>
-            </div>
-
-            <div id="current_month_year" class="self-center font-semibold">
-              {@current.month}
-            </div>
-
-            <div id="button_right">
-              <button
-                type="button"
-                phx-target={@myself}
-                phx-click="next-month"
-                class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-              >
-                <.icon name="hero-arrow-right" />
-              </button>
-            </div>
-          </div>
-
-          <div id="click_today" class="text-sm text-center">
-            <.link
-              phx-click="today"
+          <div id="calendar_header" class="flex justify-between items-center">
+            <button
+              type="button"
               phx-target={@myself}
-              class="text-zinc-700 hover:text-zinc-500"
+              phx-click="prev-month"
+              class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
+              aria-label="Previous month"
             >
-              Today
-            </.link>
+              <.icon name="hero-arrow-left" />
+            </button>
+
+            <div class="flex flex-col items-center gap-1">
+              <div id="current_month_year" class="font-semibold">
+                {@current.month}
+              </div>
+              <button
+                id={"#{@id}-go-to-today"}
+                type="button"
+                phx-target={@myself}
+                phx-click="today"
+                disabled={showing_current_month?(@current.date, @today)}
+                class={[
+                  "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                  if(showing_current_month?(@current.date, @today),
+                    do:
+                      "text-zinc-400 bg-zinc-50 border-zinc-200 cursor-not-allowed opacity-60",
+                    else:
+                      "text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border-zinc-300"
+                  )
+                ]}
+                aria-label={
+                  if showing_current_month?(@current.date, @today) do
+                    "Already showing #{Calendar.strftime(@today, "%B %Y")}"
+                  else
+                    "Go to current month, #{Calendar.strftime(@today, "%B %Y")}"
+                  end
+                }
+              >
+                <.icon name="hero-calendar-days" class="w-4 h-4" aria-hidden="true" />
+                Today
+              </button>
+            </div>
+
+            <button
+              type="button"
+              phx-target={@myself}
+              phx-click="next-month"
+              class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
+              aria-label="Next month"
+            >
+              <.icon name="hero-arrow-right" />
+            </button>
           </div>
 
           <div
@@ -117,12 +133,11 @@ defmodule YscWeb.Components.DateRangePicker do
               class={[
                 "relative overflow-visible",
                 if(
-                  date_disabled?(
+                  date_picker_show_tooltip?(
                     day,
                     @date_disable_ctx,
                     active_date_tooltips(@date_disable_ctx)
-                  ) &&
-                    get_date_tooltip(day, active_date_tooltips(@date_disable_ctx)),
+                  ),
                   do: "group",
                   else: ""
                 )
@@ -141,8 +156,9 @@ defmodule YscWeb.Components.DateRangePicker do
                   )
                 }
                 class={[
-                  "calendar-day overflow-hidden py-1.5 h-10 rounded w-auto focus:z-10 w-full transition duration-300",
-                  today?(day, @today) && "font-bold border border-zinc-400 rounded",
+                  "calendar-day overflow-hidden py-1.5 h-12 rounded w-auto focus:z-10 w-full transition duration-300 flex flex-col items-center justify-center",
+                  today?(day, @today) &&
+                    "font-bold border-2 border-zinc-500 rounded",
                   date_disabled?(
                     day,
                     @date_disable_ctx,
@@ -158,33 +174,82 @@ defmodule YscWeb.Components.DateRangePicker do
                     "hover:bg-blue-300 hover:border hover:border-blue-500",
                   other_month?(day, @current.date) && "text-zinc-500",
                   selected_range?(day, @range_start, @hover_range_end || @range_end) &&
-                    "hover:bg-blue-500 bg-blue-500 text-zinc-100"
+                    "hover:bg-blue-500 bg-blue-500 text-zinc-100 ring-2 ring-blue-200"
                 ]}
+                aria-label={
+                  date_range_day_aria_label(
+                    day,
+                    @range_start,
+                    @range_end,
+                    @hover_range_end,
+                    @today,
+                    @date_disable_ctx
+                  )
+                }
+                aria-current={if(today?(day, @today), do: "date", else: false)}
+                aria-describedby={
+                  if(
+                    date_picker_show_tooltip?(
+                      day,
+                      @date_disable_ctx,
+                      active_date_tooltips(@date_disable_ctx)
+                    ),
+                    do: date_picker_tooltip_id(@id, day),
+                    else: nil
+                  )
+                }
               >
-                <time
+                <span
                   class="mx-auto flex h-6 w-6 items-center justify-center rounded-full"
-                  datetime={Calendar.strftime(day, "%Y-%m-%d")}
+                  aria-hidden="true"
                 >
                   {Calendar.strftime(day, "%d")}
-                </time>
+                </span>
+                <span
+                  :if={
+                    date_range_day_visible_label(
+                      day,
+                      @range_start,
+                      @range_end,
+                      @hover_range_end,
+                      @today,
+                      @date_disable_ctx
+                    ) != ""
+                  }
+                  class="text-[10px] font-semibold leading-tight"
+                  aria-hidden="true"
+                >
+                  {date_range_day_visible_label(
+                    day,
+                    @range_start,
+                    @range_end,
+                    @hover_range_end,
+                    @today,
+                    @date_disable_ctx
+                  )}
+                </span>
               </button>
               <span
                 :if={
-                  date_disabled?(
+                  date_picker_show_tooltip?(
                     day,
                     @date_disable_ctx,
                     active_date_tooltips(@date_disable_ctx)
-                  ) &&
-                    get_date_tooltip(day, active_date_tooltips(@date_disable_ctx))
+                  )
                 }
+                id={date_picker_tooltip_id(@id, day)}
                 role="tooltip"
                 class={[
-                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 whitespace-normal pointer-events-none",
+                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
                   "max-w-[400px]",
                   "text-left"
                 ]}
               >
-                {get_date_tooltip(day, active_date_tooltips(@date_disable_ctx))}
+                {date_picker_tooltip_text(
+                  day,
+                  @date_disable_ctx,
+                  active_date_tooltips(@date_disable_ctx)
+                )}
               </span>
             </div>
           </div>
@@ -443,7 +508,6 @@ defmodule YscWeb.Components.DateRangePicker do
     {
       :noreply,
       socket
-      |> assign(:calendar?, false)
       |> assign(:range_start, nil)
       |> assign(:range_end, nil)
       |> assign(:hover_range_end, nil)
@@ -810,7 +874,102 @@ defmodule YscWeb.Components.DateRangePicker do
     end
   end
 
+  defp date_range_day_visible_label(
+         day,
+         range_start,
+         range_end,
+         hover_range_end,
+         today,
+         _date_disable_ctx
+       ) do
+    cond do
+      range_endpoint?(day, range_start) && range_endpoint?(day, range_end) ->
+        "Selected"
+
+      range_endpoint?(day, range_start) ->
+        "Start"
+
+      range_endpoint?(day, range_end) ->
+        "End"
+
+      selected_range?(day, range_start, hover_range_end || range_end) ->
+        "Selected"
+
+      today?(day, today) ->
+        "Today"
+
+      true ->
+        ""
+    end
+  end
+
+  defp date_range_day_aria_label(
+         day,
+         range_start,
+         range_end,
+         hover_range_end,
+         today,
+         date_disable_ctx
+       ) do
+    date_label = Calendar.strftime(day, "%A, %B %d, %Y")
+
+    status =
+      date_range_day_visible_label(
+        day,
+        range_start,
+        range_end,
+        hover_range_end,
+        today,
+        date_disable_ctx
+      )
+
+    parts =
+      [date_label, status]
+      |> Enum.reject(&(&1 in [nil, ""]))
+
+    Enum.join(parts, ", ")
+  end
+
+  defp date_picker_tooltip_id(id, day) do
+    "#{id}-tooltip-#{Date.to_iso8601(day)}"
+  end
+
+  defp date_picker_show_tooltip?(day, ctx, tooltips) do
+    date_disabled?(day, ctx, tooltips) &&
+      date_picker_tooltip_text(day, ctx, tooltips) not in [nil, ""]
+  end
+
+  defp date_picker_tooltip_text(day, ctx, tooltips) do
+    get_date_tooltip(day, tooltips) || date_picker_rule_tooltip(day, ctx)
+  end
+
+  defp date_picker_rule_tooltip(day, ctx) do
+    cond do
+      before_min_date?(day, ctx.min) ->
+        "Past dates cannot be booked"
+
+      after_max_date?(day, ctx.max) ->
+        "Reservations are not open for this date yet"
+
+      saturday?(day) && !ctx.allow_saturdays && ctx.state != :set_end ->
+        "Check-ins are not permitted on Saturdays"
+
+      saturday?(day) && !ctx.allow_saturdays && ctx.state == :set_end ->
+        "Check-outs are not permitted on Saturdays"
+
+      true ->
+        nil
+    end
+  end
+
+  defp range_endpoint?(_day, nil), do: false
+  defp range_endpoint?(day, range_dt), do: DateTime.to_date(range_dt) == day
   defp today?(day, today), do: today && day == today
+
+  defp showing_current_month?(current_date, today) do
+    today &&
+      Date.beginning_of_month(current_date) == Date.beginning_of_month(today)
+  end
 
   defp other_month?(day, current_date) do
     Date.beginning_of_month(day) != Date.beginning_of_month(current_date)

@@ -45,11 +45,47 @@ defmodule Ysc.EnvTest do
     test "returns false in test environment" do
       assert Ysc.Env.prod?() == false
     end
+
+    test "returns true for production environment string" do
+      Ysc.Test.EnvHelper.with_environment("production", fn ->
+        assert Ysc.Env.prod?() == true
+      end)
+    end
   end
 
   describe "sandbox?/0" do
     test "returns false in test environment" do
       assert Ysc.Env.sandbox?() == false
+    end
+
+    test "returns true for sandbox environment string" do
+      Ysc.Test.EnvHelper.with_environment("sandbox", fn ->
+        assert Ysc.Env.sandbox?() == true
+      end)
+    end
+  end
+
+  describe "deployed?/0" do
+    test "returns false in test environment" do
+      assert Ysc.Env.deployed?() == false
+    end
+
+    test "returns false in dev environment" do
+      Ysc.Test.EnvHelper.with_environment("dev", fn ->
+        assert Ysc.Env.deployed?() == false
+      end)
+    end
+
+    test "returns true in sandbox environment" do
+      Ysc.Test.EnvHelper.with_environment("sandbox", fn ->
+        assert Ysc.Env.deployed?() == true
+      end)
+    end
+
+    test "returns true in production environment" do
+      Ysc.Test.EnvHelper.with_environment("production", fn ->
+        assert Ysc.Env.deployed?() == true
+      end)
     end
   end
 

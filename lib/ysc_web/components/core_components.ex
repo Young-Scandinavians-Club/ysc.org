@@ -72,7 +72,7 @@ defmodule YscWeb.CoreComponents do
         <div class="flex items-center justify-center min-h-full">
           <div class={[
             "w-full sm:p-4 sm:py-6 lg:py-8",
-            unless(@fullscreen == true, do: @max_width, else: "")
+            if(@fullscreen != true, do: @max_width, else: "")
           ]}>
             <.focus_wrap
               id={"#{@id}-container"}

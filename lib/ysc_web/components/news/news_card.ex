@@ -129,7 +129,7 @@ defmodule YscWeb.Components.News.NewsCard do
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/&[a-z]+;/i, " ")
     |> String.replace(~r/&#\d+;/, " ")
-    |> count_words_in_text
+    |> count_words_in_text()
   end
 
   defp count_words_in_text(text) do

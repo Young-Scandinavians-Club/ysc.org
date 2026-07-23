@@ -5,7 +5,9 @@ defmodule Ysc.BookingsFixtures do
   """
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.{Booking, Room, Season}
   alias Ysc.Bookings.SeasonHelpers
+  alias Ysc.Repo
 
   # Tahoe winter is Nov 1 - Apr 30 (month in 1..4 or 11..12)
   defp tahoe_winter_month?(month), do: month in [1, 2, 3, 4, 11, 12]
@@ -122,14 +124,41 @@ defmodule Ysc.BookingsFixtures do
     end
   end
 
+  @doc """
+  Adjusts check-in when checkout is fixed so Tahoe's Saturday/Sunday weekend rule holds.
+
+  When the preferred check-in produces a span that includes Saturday but not Sunday
+  (typically checkout on Saturday), moves check-in to the preceding Sunday.
+  """
+  def tahoe_checkin_for_fixed_checkout(checkout, preferred_checkin) do
+    cond do
+      tahoe_weekend_range_valid?(preferred_checkin, checkout) ->
+        preferred_checkin
+
+      Date.day_of_week(checkout, :monday) == 6 ->
+        Date.add(checkout, -6)
+
+      true ->
+        preferred_checkin
+    end
+  end
+
+  defp tahoe_weekend_range_valid?(checkin, checkout) do
+    dates = Date.range(checkin, checkout) |> Enum.to_list()
+    has_saturday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 6))
+    has_sunday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 7))
+    not has_saturday? or has_sunday?
+  end
+
   def booking_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
     {checkin, checkout} = tahoe_booking_dates(7)
 
     {refund_forfeited_at, attrs} = Map.pop(attrs, :refund_forfeited_at)
+    {rooms, attrs} = Map.pop(attrs, :rooms)
 
-    {:ok, booking} =
+    merged =
       attrs
       |> Enum.into(%{
         checkin_date: checkin,
@@ -141,14 +170,76 @@ defmodule Ysc.BookingsFixtures do
         status: :draft,
         total_price: Money.new(200, :USD)
       })
-      |> Bookings.create_booking()
+      |> ensure_tahoe_winter_room_booking(rooms)
 
-    if refund_forfeited_at do
-      booking
-      |> Ecto.Changeset.change(refund_forfeited_at: refund_forfeited_at)
-      |> Ysc.Repo.update!()
-    else
-      booking
+    {rooms, merged} =
+      case Map.pop(merged, :rooms) do
+        {nil, attrs} -> {rooms, attrs}
+        {fixture_rooms, attrs} -> {fixture_rooms, attrs}
+      end
+
+    changeset_opts = if rooms, do: [rooms: List.wrap(rooms)], else: []
+
+    {:ok, booking} =
+      %Booking{}
+      |> Booking.changeset(merged, changeset_opts)
+      |> Repo.insert()
+
+    booking =
+      if refund_forfeited_at do
+        booking
+        |> Ecto.Changeset.change(refund_forfeited_at: refund_forfeited_at)
+        |> Repo.update!()
+      else
+        booking
+      end
+
+    booking
+  end
+
+  defp ensure_tahoe_winter_room_booking(attrs, rooms) do
+    cond do
+      rooms != nil ->
+        attrs
+        |> Map.put(:rooms, List.wrap(rooms))
+        |> Map.put(:booking_mode, :room)
+
+      Map.get(attrs, :property) == :tahoe &&
+        Map.get(attrs, :booking_mode, :buyout) == :buyout &&
+          tahoe_winter_checkin?(attrs.checkin_date) ->
+        attrs
+        |> Map.put(:booking_mode, :room)
+        |> Map.put(:rooms, [tahoe_room_for_fixture!()])
+
+      true ->
+        attrs
+    end
+  end
+
+  defp tahoe_winter_checkin?(checkin) do
+    case Season.for_date(:tahoe, checkin) do
+      %{name: "Winter"} -> true
+      _ -> false
+    end
+  end
+
+  defp tahoe_room_for_fixture! do
+    case Bookings.list_rooms(:tahoe) do
+      [room | _] ->
+        room
+
+      _ ->
+        {:ok, room} =
+          %Room{}
+          |> Room.changeset(%{
+            name: "Fixture Tahoe Room",
+            property: :tahoe,
+            capacity_max: 4,
+            is_active: true
+          })
+          |> Repo.insert()
+
+        room
     end
   end
 

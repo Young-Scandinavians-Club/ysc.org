@@ -110,11 +110,11 @@ const DaterangeHover = {
             }
         }
 
-        this.el.addEventListener("mouseover", (e) => {
-            // Find the closest button element (event target might be a child like <time>)
+        this.onMouseOver = (e) => {
+            // Find the closest button element (event target might be a child like <span>)
             const button = e.target.closest("button[phx-value-date]");
 
-            if (button && button.hasAttribute("phx-value-date") && !button.disabled) {
+            if (button && button.hasAttribute("phx-value-date") && !this.isDayDisabled(button)) {
                 const date = button.getAttribute("phx-value-date");
 
                 // Try multiple methods to push the event
@@ -145,10 +145,9 @@ const DaterangeHover = {
                     this.pushEvent("cursor-move", date);
                 }
             }
-        });
+        };
 
-        // Handle mouse leave to clear hover
-        this.el.addEventListener("mouseleave", () => {
+        this.onMouseLeave = () => {
             let eventPushed = false;
 
             if (this.componentEl) {
@@ -172,7 +171,56 @@ const DaterangeHover = {
             if (!eventPushed) {
                 this.pushEvent("cursor-leave", {});
             }
-        });
+        };
+
+        this.onKeyDown = (e) => {
+            const button = e.target.closest("button[data-calendar-day]");
+            if (!button || !this.el.contains(button)) return;
+
+            const directions = {
+                ArrowLeft: -1,
+                ArrowRight: 1,
+                ArrowUp: -7,
+                ArrowDown: 7,
+            };
+
+            const delta = directions[e.key];
+            if (!delta) return;
+
+            e.preventDefault();
+
+            const days = Array.from(this.el.querySelectorAll("button[data-calendar-day]"));
+            const index = days.indexOf(button);
+            if (index === -1) return;
+
+            const nextIndex = index + delta;
+            if (nextIndex < 0 || nextIndex >= days.length) return;
+
+            days.forEach((day) => day.setAttribute("tabindex", "-1"));
+            const next = days[nextIndex];
+            next.setAttribute("tabindex", "0");
+            next.focus();
+        };
+
+        this.el.addEventListener("mouseover", this.onMouseOver);
+        this.el.addEventListener("mouseleave", this.onMouseLeave);
+        this.el.addEventListener("keydown", this.onKeyDown);
+    },
+
+    destroyed() {
+        if (this.onMouseOver) {
+            this.el.removeEventListener("mouseover", this.onMouseOver);
+        }
+        if (this.onMouseLeave) {
+            this.el.removeEventListener("mouseleave", this.onMouseLeave);
+        }
+        if (this.onKeyDown) {
+            this.el.removeEventListener("keydown", this.onKeyDown);
+        }
+    },
+
+    isDayDisabled(button) {
+        return button.getAttribute("aria-disabled") === "true";
     },
 };
 
