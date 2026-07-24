@@ -1328,7 +1328,10 @@ defmodule Ysc.Subscriptions do
 
       case result do
         {:ok, _} = ok ->
-          BoardVolunteerBilling.sync_for_user(user)
+          if BoardVolunteerBilling.household_on_board?(user) do
+            BoardVolunteerBilling.sync_for_user(user)
+          end
+
           ok
 
         error ->
@@ -1425,7 +1428,10 @@ defmodule Ysc.Subscriptions do
                   plan
                 )
 
-                BoardVolunteerBilling.sync_for_user(user)
+                if BoardVolunteerBilling.household_on_board?(user) do
+                  BoardVolunteerBilling.sync_for_user(user)
+                end
+
                 {:ok, subscription}
 
               err ->
@@ -1487,7 +1493,10 @@ defmodule Ysc.Subscriptions do
                   plan
                 )
 
-                BoardVolunteerBilling.sync_for_user(user)
+                if BoardVolunteerBilling.household_on_board?(user) do
+                  BoardVolunteerBilling.sync_for_user(user)
+                end
+
                 {:ok, subscription}
 
               err ->
@@ -1853,7 +1862,10 @@ defmodule Ysc.Subscriptions do
         _ -> Ysc.Accounts.get_user!(subscription.user_id)
       end
 
-    BoardVolunteerBilling.sync_for_user(user)
+    if BoardVolunteerBilling.household_on_board?(user) do
+      BoardVolunteerBilling.sync_for_user(user)
+    end
+
     :ok
   end
 
