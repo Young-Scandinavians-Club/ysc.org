@@ -687,7 +687,9 @@ defmodule Ysc.Accounts.FamilyInvites do
       end
 
     invite_url =
-      YscWeb.Emails.Helpers.absolute_url("/family-invite/#{invite.token}/accept")
+      YscWeb.Emails.Helpers.absolute_url(
+        "/family-invite/#{invite.token}/accept"
+      )
 
     idempotency_key = "family_invite_#{invite.id}"
 
