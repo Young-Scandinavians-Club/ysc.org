@@ -25,7 +25,7 @@ defmodule Mix.Tasks.Ysc.WpSample do
     db_path = Path.expand(opts[:db] || "wp_backup/wp.duckdb")
     limit = opts[:limit] || 5
 
-    unless File.exists?(db_path) do
+    if !File.exists?(db_path) do
       Mix.raise(
         "DuckDB file not found: #{db_path}\nRun: mix ysc.wp_to_duckdb --sql wp_backup/backup.sql"
       )

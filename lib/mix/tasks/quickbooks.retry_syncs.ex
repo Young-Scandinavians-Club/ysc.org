@@ -152,7 +152,7 @@ defmodule Mix.Tasks.Quickbooks.RetrySyncs do
         Ysc.Logging.info("  ... and #{count - 5} more")
       end
 
-      unless dry_run do
+      if !dry_run do
         Ysc.Logging.info("Enqueuing sync jobs for payments...")
 
         Enum.each(unsynced_payments, fn payment ->
@@ -212,7 +212,7 @@ defmodule Mix.Tasks.Quickbooks.RetrySyncs do
         Ysc.Logging.info("  ... and #{count - 5} more")
       end
 
-      unless dry_run do
+      if !dry_run do
         Ysc.Logging.info("Enqueuing sync jobs for refunds...")
 
         Enum.each(unsynced_refunds, fn refund ->
@@ -274,7 +274,7 @@ defmodule Mix.Tasks.Quickbooks.RetrySyncs do
         Ysc.Logging.info("  ... and #{count - 5} more")
       end
 
-      unless dry_run do
+      if !dry_run do
         Ysc.Logging.info("Enqueuing sync jobs for payouts...")
 
         Enum.each(unsynced_payouts, fn payout ->

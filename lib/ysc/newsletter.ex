@@ -16,6 +16,7 @@ defmodule Ysc.Newsletter do
   alias Ysc.Accounts.Email
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.EmailEvent
+  alias Ysc.Newsletter.Notice
   alias Ysc.Events.Event
   alias Ysc.Posts.Post
 
@@ -586,6 +587,104 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
+  Duplicates an edition into a new draft.
+
+  Copies editorial fields (`title`, `subject`, `intro_text`, `cover_image_id`,
+  `post_ids`, `event_ids`). Appends `" (copy)"` to the title (truncated to 255).
+  Lifecycle fields are reset: status `:draft`, no schedule/send/archive data.
+
+  Options:
+  - `:created_by_id` — user id recorded as the new draft's creator
+  """
+  def duplicate_edition(%Edition{} = edition, opts \\ []) do
+    creator_id = Keyword.get(opts, :created_by_id)
+    title = duplicate_edition_title(edition.title)
+
+    attrs = %{
+      "title" => title,
+      "subject" => edition.subject || "",
+      "intro_text" => edition.intro_text,
+      "cover_image_id" => edition.cover_image_id,
+      "post_ids" => edition.post_ids || [],
+      "event_ids" => edition.event_ids || []
+    }
+
+    create_edition_draft(attrs, created_by_id: creator_id)
+  end
+
+  defp duplicate_edition_title(title) when is_binary(title) do
+    suffix = " (copy)"
+    max_base = 255 - String.length(suffix)
+
+    title
+    |> String.trim()
+    |> then(fn t -> if t == "", do: "Untitled", else: t end)
+    |> String.slice(0, max_base)
+    |> Kernel.<>(suffix)
+  end
+
+  defp duplicate_edition_title(_), do: "Untitled (copy)"
+
+  # ---------------------------------------------------------------------------
+  # Saved notices
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Lists all saved notices, newest first.
+  """
+  def list_notices do
+    from(n in Notice, order_by: [desc: n.updated_at], preload: [:creator])
+    |> Repo.all()
+  end
+
+  @doc false
+  def list_notices_query do
+    from(n in Notice, order_by: [desc: n.updated_at], preload: [:creator])
+  end
+
+  @doc """
+  Gets a single notice by id. Raises if not found.
+  """
+  def get_notice!(id),
+    do: Repo.get!(Notice, id) |> Repo.preload(:creator)
+
+  @doc """
+  Creates a saved notice.
+
+  Options:
+  - `:created_by_id` — user id recorded as creator
+  """
+  def create_notice(attrs \\ %{}, opts \\ []) do
+    creator_id = Keyword.get(opts, :created_by_id)
+
+    %Notice{}
+    |> Notice.changeset(attrs)
+    |> maybe_put_notice_creator(creator_id)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a saved notice.
+  """
+  def update_notice(%Notice{} = notice, attrs) do
+    notice
+    |> Notice.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a saved notice.
+  """
+  def delete_notice(%Notice{} = notice) do
+    Repo.delete(notice)
+  end
+
+  defp maybe_put_notice_creator(changeset, nil), do: changeset
+
+  defp maybe_put_notice_creator(changeset, creator_id),
+    do: Ecto.Changeset.put_change(changeset, :creator_id, creator_id)
+
+  @doc """
   Enqueues sending of the newsletter to all subscribed subscribers.
 
   Works for both `:draft` and `:scheduled` editions. Sending a scheduled edition
@@ -1011,4 +1110,7 @@ defmodule Ysc.Newsletter do
 
   @doc false
   def ci_query_explain_query, do: recent_sent_editions_query()
+
+  @doc false
+  def ci_query_explain_notices_query, do: list_notices_query()
 end

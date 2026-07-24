@@ -188,29 +188,13 @@ defmodule YscWeb.NewsLive do
           >
             <.link navigate={~p"/posts/#{post.url_name}"} class="block">
               <div class="relative aspect-[16/10] overflow-hidden rounded-lg">
-                <canvas
-                  id={"blur-hash-image-#{post.id}"}
-                  src={Image.blur_hash_for_display(post.featured_image)}
-                  class="absolute inset-0 z-0 w-full h-full object-cover"
-                  phx-hook="BlurHashCanvas"
-                ></canvas>
-                <img
-                  src={Image.display_path_with_fallback(post.featured_image)}
-                  srcset={Image.responsive_srcset(post.featured_image)}
+                <.live_component
+                  id={"news-image-#{post.id}"}
+                  module={YscWeb.Components.Image}
+                  image={post.featured_image}
+                  aspect_class="h-full"
+                  preferred_type={:optimized}
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  id={"image-#{post.id}"}
-                  loading="lazy"
-                  decoding="async"
-                  phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-500 group-hover:scale-[1.03]"
-                  alt={
-                    if post.featured_image,
-                      do:
-                        post.featured_image.alt_text || post.featured_image.title ||
-                          post.title ||
-                          "News article image",
-                      else: "News article image"
-                  }
                 />
               </div>
             </.link>
@@ -385,6 +369,9 @@ defmodule YscWeb.NewsLive do
     |> stream(:posts, posts, reset: true)
   end
 
+  defp paginate_posts(%{assigns: %{end_of_timeline?: true}} = socket),
+    do: socket
+
   defp paginate_posts(socket) do
     %{per_page: per_page, cursor: cursor} = socket.assigns
     new_posts = Posts.list_posts(cursor, per_page)
@@ -440,7 +427,7 @@ defmodule YscWeb.NewsLive do
     |> String.replace(~r/<[^>]*>/, " ")
     |> String.replace(~r/&[a-z]+;/i, " ")
     |> String.replace(~r/&#\d+;/, " ")
-    |> count_words_in_text
+    |> count_words_in_text()
   end
 
   # Count words in plain text

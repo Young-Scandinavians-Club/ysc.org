@@ -646,7 +646,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
         |> Enum.map(&to_uuid/1)
 
       # Delete refund transactions first (they reference refunds)
-      unless Enum.empty?(refund_ids) do
+      if !Enum.empty?(refund_ids) do
         Ecto.Adapters.SQL.query!(
           Repo,
           "DELETE FROM ledger_transactions WHERE refund_id = ANY($1)",
@@ -655,7 +655,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       end
 
       # Delete refund entries (disable trigger for this test scenario)
-      unless Enum.empty?(refund_ids) do
+      if !Enum.empty?(refund_ids) do
         with_trigger_disabled(fn ->
           Ecto.Adapters.SQL.query!(
             Repo,

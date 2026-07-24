@@ -518,7 +518,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Choose Your Membership Type
         <:subtitle>
-          We couldn't find a membership type on record. Please confirm whether you have a single or family membership so we can set up billing and family access correctly.
+          Please confirm your membership type so we can set up billing and family access correctly. Choose the plan that matches your current YSC membership.
         </:subtitle>
       </.header>
 

@@ -380,7 +380,7 @@ defmodule YscWeb.PostLiveTest do
       {:ok, _view, html} = live(conn, ~p"/posts/#{post.id}")
 
       assert html =~ "post-featured-image"
-      assert html =~ "blur-hash-image-#{post.image_id}"
+      assert html =~ "blur-hash-image-post-featured-image-#{post.image_id}"
       assert html =~ "LEHV6nWB2yk8pyo0adR*.7kCMdnj"
     end
   end

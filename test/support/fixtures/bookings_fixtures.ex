@@ -5,10 +5,9 @@ defmodule Ysc.BookingsFixtures do
   """
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.{Booking, Room, Season}
   alias Ysc.Bookings.SeasonHelpers
-
-  # Tahoe winter is Nov 1 - Apr 30 (month in 1..4 or 11..12)
-  defp tahoe_winter_month?(month), do: month in [1, 2, 3, 4, 11, 12]
+  alias Ysc.Repo
 
   defp first_monday_on_or_after(date) do
     case Date.day_of_week(date, :monday) do
@@ -35,11 +34,11 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
-  Returns `{checkin, checkout}` for a Tahoe stay that satisfies weekend and summer rules.
+  Returns `{checkin, checkout}` for a Tahoe stay that satisfies weekend and buyout rules.
 
   Used by tests that call `Bookings.create_booking/1` directly. `offset_days` is added to
-  today's date before snapping to the first Monday on or after that day (then summer
-  adjustment when the month is Tahoe winter).
+  today's date before snapping to the first Monday on or after that day (then adjusted
+  onto nights where the configured seasons allow buyout).
 
   Dates are clamped to the property's advance-booking window so tests stay valid when
   seasons enforce a limit (and when another test temporarily changes season settings).
@@ -70,29 +69,49 @@ defmodule Ysc.BookingsFixtures do
         end
       end)
 
-    # Buyout is only allowed in summer; ensure default checkin is in summer (May–Oct).
-    checkin =
-      if tahoe_winter_month?(checkin.month) do
-        year =
-          if checkin.month in [1, 2, 3, 4],
-            do: checkin.year,
-            else: checkin.year + 1
-
-        may_first = Date.new!(year, 5, 1)
-        first_monday_on_or_after(may_first)
-      else
-        checkin
-      end
-
-    checkin = clamp_date(checkin, earliest_checkin, latest_checkin)
-
     checkout = Date.add(checkin, 3)
 
-    if Date.compare(checkout, max_booking_date) == :gt do
-      {Date.add(max_booking_date, -3), max_booking_date}
-    else
-      {checkin, checkout}
+    cond do
+      Season.buyout_allowed_for_stay?(:tahoe, checkin, checkout) and
+          Date.compare(checkout, max_booking_date) != :gt ->
+        {checkin, checkout}
+
+      next =
+          next_buyout_allowed_monday_stay(
+            earliest_checkin,
+            latest_checkin,
+            max_booking_date
+          ) ->
+        next
+
+      Date.compare(checkout, max_booking_date) == :gt ->
+        {Date.add(max_booking_date, -3), max_booking_date}
+
+      true ->
+        {checkin, checkout}
     end
+  end
+
+  defp next_buyout_allowed_monday_stay(
+         earliest_checkin,
+         latest_checkin,
+         max_booking_date
+       ) do
+    Enum.find_value(0..520, fn offset ->
+      candidate =
+        earliest_checkin
+        |> Date.add(offset)
+        |> first_monday_on_or_after()
+
+      if Date.compare(candidate, latest_checkin) != :gt do
+        checkout = Date.add(candidate, 3)
+
+        if Date.compare(checkout, max_booking_date) != :gt and
+             Season.buyout_allowed_for_stay?(:tahoe, candidate, checkout) do
+          {candidate, checkout}
+        end
+      end
+    end)
   end
 
   @doc """
@@ -122,14 +141,41 @@ defmodule Ysc.BookingsFixtures do
     end
   end
 
+  @doc """
+  Adjusts check-in when checkout is fixed so Tahoe's Saturday/Sunday weekend rule holds.
+
+  When the preferred check-in produces a span that includes Saturday but not Sunday
+  (typically checkout on Saturday), moves check-in to the preceding Sunday.
+  """
+  def tahoe_checkin_for_fixed_checkout(checkout, preferred_checkin) do
+    cond do
+      tahoe_weekend_range_valid?(preferred_checkin, checkout) ->
+        preferred_checkin
+
+      Date.day_of_week(checkout, :monday) == 6 ->
+        Date.add(checkout, -6)
+
+      true ->
+        preferred_checkin
+    end
+  end
+
+  defp tahoe_weekend_range_valid?(checkin, checkout) do
+    dates = Date.range(checkin, checkout) |> Enum.to_list()
+    has_saturday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 6))
+    has_sunday? = Enum.any?(dates, &(Date.day_of_week(&1, :monday) == 7))
+    not has_saturday? or has_sunday?
+  end
+
   def booking_fixture(attrs \\ %{}) do
     attrs = Map.new(attrs)
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
     {checkin, checkout} = tahoe_booking_dates(7)
 
     {refund_forfeited_at, attrs} = Map.pop(attrs, :refund_forfeited_at)
+    {rooms, attrs} = Map.pop(attrs, :rooms)
 
-    {:ok, booking} =
+    merged =
       attrs
       |> Enum.into(%{
         checkin_date: checkin,
@@ -141,14 +187,75 @@ defmodule Ysc.BookingsFixtures do
         status: :draft,
         total_price: Money.new(200, :USD)
       })
-      |> Bookings.create_booking()
+      |> ensure_tahoe_winter_room_booking(rooms)
 
-    if refund_forfeited_at do
-      booking
-      |> Ecto.Changeset.change(refund_forfeited_at: refund_forfeited_at)
-      |> Ysc.Repo.update!()
-    else
-      booking
+    {rooms, merged} =
+      case Map.pop(merged, :rooms) do
+        {nil, attrs} -> {rooms, attrs}
+        {fixture_rooms, attrs} -> {fixture_rooms, attrs}
+      end
+
+    changeset_opts =
+      [skip_validation: true] ++
+        if(rooms, do: [rooms: List.wrap(rooms)], else: [])
+
+    {:ok, booking} =
+      %Booking{}
+      |> Booking.changeset(merged, changeset_opts)
+      |> Repo.insert()
+
+    booking =
+      if refund_forfeited_at do
+        booking
+        |> Ecto.Changeset.change(refund_forfeited_at: refund_forfeited_at)
+        |> Repo.update!()
+      else
+        booking
+      end
+
+    booking
+  end
+
+  defp ensure_tahoe_winter_room_booking(attrs, rooms) do
+    cond do
+      rooms != nil ->
+        attrs
+        |> Map.put(:rooms, List.wrap(rooms))
+        |> Map.put(:booking_mode, :room)
+
+      Map.get(attrs, :property) == :tahoe &&
+        Map.get(attrs, :booking_mode, :buyout) == :buyout &&
+          not Season.buyout_allowed_for_stay?(
+            :tahoe,
+            attrs.checkin_date,
+            attrs.checkout_date
+          ) ->
+        attrs
+        |> Map.put(:booking_mode, :room)
+        |> Map.put(:rooms, [tahoe_room_for_fixture!()])
+
+      true ->
+        attrs
+    end
+  end
+
+  defp tahoe_room_for_fixture! do
+    case Bookings.list_rooms(:tahoe) do
+      [room | _] ->
+        room
+
+      _ ->
+        {:ok, room} =
+          %Room{}
+          |> Room.changeset(%{
+            name: "Fixture Tahoe Room",
+            property: :tahoe,
+            capacity_max: 4,
+            is_active: true
+          })
+          |> Repo.insert()
+
+        room
     end
   end
 
@@ -173,18 +280,16 @@ defmodule Ysc.BookingsFixtures do
       |> Date.add(-past_days)
       |> first_monday_on_or_before()
 
-    # Buyout is only allowed in summer at Tahoe.
+    # Prefer past dates where configured seasons still allow buyout.
     checkin =
-      if tahoe_winter_month?(checkin.month) do
-        year =
-          if checkin.month in [1, 2, 3, 4],
-            do: checkin.year - 1,
-            else: checkin.year
+      Enum.find_value(0..400, fn offset ->
+        candidate = Date.add(checkin, -offset) |> first_monday_on_or_before()
+        checkout = Date.add(candidate, 3)
 
-        first_monday_on_or_after(Date.new!(year, 6, 1))
-      else
-        checkin
-      end
+        if Season.buyout_allowed_for_stay?(:tahoe, candidate, checkout) do
+          candidate
+        end
+      end) || checkin
 
     checkout =
       checkin

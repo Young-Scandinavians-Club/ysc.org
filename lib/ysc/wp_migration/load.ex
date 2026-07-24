@@ -715,7 +715,7 @@ defmodule Ysc.WpMigration.Load do
     postal_code =
       row["zip"] || row["postal_code"] || row["Zip code"] || row["postal"]
 
-    unless nil_or_empty?(address_str) or nil_or_empty?(country) do
+    if !(nil_or_empty?(address_str) or nil_or_empty?(country)) do
       attrs = %{
         user_id: user_id,
         address: address_str,
