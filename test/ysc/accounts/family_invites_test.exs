@@ -877,6 +877,44 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert Repo.get!(FamilyInvite, invite.id).accepted_at != nil
     end
 
+    test "link_existing_user/2 syncs board volunteer billing when invitee has board position" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Board",
+          last_name: "Invitee"
+        })
+
+      {:ok, invitee} = Accounts.assign_board_position(invitee, :secretary)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary_user
+             )
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert linked.primary_user_id == primary_user.id
+
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary_user
+             )
+
+      primary_id = primary_user.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
+    end
+
     test "links existing account when Gmail address is a plus/dot alias of invite target" do
       primary_user = create_user_with_lifetime_membership()
 
