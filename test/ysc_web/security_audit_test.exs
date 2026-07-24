@@ -1619,6 +1619,12 @@ defmodule YscWeb.SecurityAuditTest do
 
       render_async(view, 5_000)
 
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "active YSC membership"
+             )
+
       hold_count_before =
         Repo.aggregate(
           from(b in Booking,
@@ -1626,6 +1632,19 @@ defmodule YscWeb.SecurityAuditTest do
           ),
           :count
         )
+
+      # Tahoe requires booking confirmations before create-booking reaches the
+      # server-side membership gate. Avoid render/1 after the click: TahoeBookingLive
+      # keeps a date-tooltip async in flight and render blocks until it finishes,
+      # which can exceed the per-test timeout under CI load.
+      for event <- [
+            "toggle-terms-agreement",
+            "toggle-linens-confirmation",
+            "toggle-chores-confirmation",
+            "toggle-party-size-confirmation"
+          ] do
+        render_click(view, event, %{})
+      end
 
       render_click(view, "create-booking", %{})
 
@@ -1638,7 +1657,9 @@ defmodule YscWeb.SecurityAuditTest do
         )
 
       assert hold_count_before == hold_count_after
-      assert render(view) =~ "active YSC membership"
+
+      %{socket: %{assigns: %{form_errors: form_errors}}} = :sys.get_state(view.pid)
+      assert form_errors.general =~ "active YSC membership"
     end
 
     test "checkout redirects pending_approval users to pending-review", %{
