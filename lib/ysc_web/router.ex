@@ -140,6 +140,21 @@ defmodule YscWeb.Router do
   scope "/", YscWeb do
     pipe_through [:browser]
 
+    get "/lake-tahoe-cabin", LegacyRedirectController, :tahoe_booking
+
+    get "/lake-tahoe-cabin/tahoe-cabin-booking",
+        LegacyRedirectController,
+        :tahoe_booking
+
+    get "/clear-lake-cabin", LegacyRedirectController, :clear_lake_booking
+
+    get "/clear-lake-cabin/clear-lake-booking-calendar",
+        LegacyRedirectController,
+        :clear_lake_booking
+
+    get "/login-2", LegacyRedirectController, :login
+    get "/register", LegacyRedirectController, :register
+
     get "/history", PageController, :history
     get "/board", PageController, :board
     get "/bylaws", PageController, :bylaws
@@ -223,8 +238,6 @@ defmodule YscWeb.Router do
       :redirect_if_user_is_authenticated,
       :auth_rate_limit
     ]
-
-    get "/register", LegacyRedirectController, :register
 
     live_session :redirect_if_user_is_authenticated,
       on_mount: [

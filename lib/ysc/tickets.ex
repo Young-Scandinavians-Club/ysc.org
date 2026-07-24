@@ -145,7 +145,7 @@ defmodule Ysc.Tickets do
       {:ok, ticket_order} ->
         broadcast_ticket_availability_update(event_id)
 
-        unless skip_email? do
+        if !skip_email? do
           ticket_order.id
           |> get_ticket_order()
           |> send_ticket_confirmation_email()

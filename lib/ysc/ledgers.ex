@@ -594,13 +594,13 @@ defmodule Ysc.Ledgers do
 
     revenue_account = get_account_by_name(revenue_account_name)
 
-    unless revenue_account do
+    if !revenue_account do
       raise "Revenue account '#{revenue_account_name}' not found"
     end
 
     stripe_receivable_account = get_account_by_name("stripe_account")
 
-    unless stripe_receivable_account do
+    if !stripe_receivable_account do
       raise "Stripe account not found"
     end
 
@@ -633,13 +633,13 @@ defmodule Ysc.Ledgers do
       if stripe_fee && Money.positive?(stripe_fee) do
         stripe_fee_account = get_account_by_name("stripe_fees")
 
-        unless stripe_fee_account do
+        if !stripe_fee_account do
           raise "Stripe fees account not found"
         end
 
         stripe_account = get_account_by_name("stripe_account")
 
-        unless stripe_account do
+        if !stripe_account do
           raise "Stripe account not found"
         end
 
@@ -706,19 +706,19 @@ defmodule Ysc.Ledgers do
 
     stripe_receivable_account = get_account_by_name("stripe_account")
 
-    unless stripe_receivable_account do
+    if !stripe_receivable_account do
       raise "Stripe account not found"
     end
 
     event_revenue_account = get_account_by_name("event_revenue")
 
-    unless event_revenue_account do
+    if !event_revenue_account do
       raise "Event revenue account not found"
     end
 
     donation_revenue_account = get_account_by_name("donation_revenue")
 
-    unless donation_revenue_account do
+    if !donation_revenue_account do
       raise "Donation revenue account not found"
     end
 
@@ -780,13 +780,13 @@ defmodule Ysc.Ledgers do
       if stripe_fee && Money.positive?(stripe_fee) do
         stripe_fee_account = get_account_by_name("stripe_fees")
 
-        unless stripe_fee_account do
+        if !stripe_fee_account do
           raise "Stripe fees account not found"
         end
 
         stripe_account = get_account_by_name("stripe_account")
 
-        unless stripe_account do
+        if !stripe_account do
           raise "Stripe account not found"
         end
 
@@ -841,25 +841,25 @@ defmodule Ysc.Ledgers do
 
     stripe_receivable_account = get_account_by_name("stripe_account")
 
-    unless stripe_receivable_account do
+    if !stripe_receivable_account do
       raise "Stripe account not found"
     end
 
     event_revenue_account = get_account_by_name("event_revenue")
 
-    unless event_revenue_account do
+    if !event_revenue_account do
       raise "Event revenue account not found"
     end
 
     donation_revenue_account = get_account_by_name("donation_revenue")
 
-    unless donation_revenue_account do
+    if !donation_revenue_account do
       raise "Donation revenue account not found"
     end
 
     discount_expense_account = get_account_by_name("discount_expense")
 
-    unless discount_expense_account do
+    if !discount_expense_account do
       raise "Discount expense account not found"
     end
 
@@ -960,13 +960,13 @@ defmodule Ysc.Ledgers do
       if stripe_fee && Money.positive?(stripe_fee) do
         stripe_fee_account = get_account_by_name("stripe_fees")
 
-        unless stripe_fee_account do
+        if !stripe_fee_account do
           raise "Stripe fees account not found"
         end
 
         stripe_account = get_account_by_name("stripe_account")
 
-        unless stripe_account do
+        if !stripe_account do
           raise "Stripe account not found"
         end
 
@@ -1436,13 +1436,13 @@ defmodule Ysc.Ledgers do
           to_string(entry.debit_credit) == "credit"
       end)
 
-    unless revenue_entry do
+    if !revenue_entry do
       raise "Cannot process refund: no revenue entry found for payment #{payment.id}"
     end
 
     stripe_account = get_account_by_name("stripe_account")
 
-    unless stripe_account do
+    if !stripe_account do
       raise "Cannot process refund: stripe_account not found"
     end
 

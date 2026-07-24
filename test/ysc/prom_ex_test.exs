@@ -34,6 +34,11 @@ defmodule Ysc.PromExTest do
 
       assert [:ysc, :tickets, :order_created, :total] in metric_names
       assert [:ysc, :bookings, :booking_created, :total] in metric_names
+
+      assert [:ysc, :bookings, :config_cache, :invalidated, :total] in metric_names
+
+      assert [:ysc, :bookings, :config_cache, :live_rebuild, :total] in metric_names
+
       assert [:ysc, :payments, :stripe_webhook_received, :total] in metric_names
       assert [:ysc, :ledgers, :reconciliation_completed, :total] in metric_names
     end

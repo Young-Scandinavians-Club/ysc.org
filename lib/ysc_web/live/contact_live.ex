@@ -36,7 +36,7 @@ defmodule YscWeb.ContactLive do
               <div class="flex items-center gap-3">
                 <.user_avatar_image
                   user={@current_user}
-                  class="w-10 h-10 shrink-0 ring-2 ring-blue-200"
+                  class="w-10 h-10 shrink-0"
                 />
                 <div>
                   <p class="text-sm font-semibold text-blue-900">Submitting as</p>

@@ -20,159 +20,153 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     >
       <div class="bg-white rounded-lg border border-zinc-200 p-6 overflow-visible">
         <div class="flex justify-between items-center mb-4">
-          <div>
-            <button
-              type="button"
-              phx-target={@myself}
-              phx-click="prev-month"
-              class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-            >
-              <.icon name="hero-arrow-left" />
-            </button>
-          </div>
-
-          <div class="font-semibold text-lg">
-            {@current.month}
-          </div>
-
-          <div>
-            <button
-              type="button"
-              phx-target={@myself}
-              phx-click="next-month"
-              class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
-            >
-              <.icon name="hero-arrow-right" />
-            </button>
-          </div>
-        </div>
-
-        <div class="text-sm text-center mb-2">
-          <.link
-            phx-click="today"
+          <button
+            type="button"
             phx-target={@myself}
-            class="text-zinc-700 hover:text-zinc-500"
+            phx-click="prev-month"
+            class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
+            aria-label="Previous month"
           >
-            Today
-          </.link>
-        </div>
+            <.icon name="hero-arrow-left" />
+          </button>
 
-        <div class="text-center grid grid-cols-7 text-xs leading-6 text-zinc-800 font-semibold mb-2">
-          <div :for={week_day <- List.first(@current.week_rows)}>
-            {Calendar.strftime(week_day, "%a")}
+          <div class="flex flex-col items-center gap-1">
+            <div class="font-semibold text-lg" id={"#{@id}-month-label"}>
+              {@current.month}
+            </div>
+            <button
+              id={"#{@id}-go-to-today"}
+              type="button"
+              phx-target={@myself}
+              phx-click="today"
+              disabled={showing_current_month?(@current.date, @today)}
+              class={[
+                "inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                if(showing_current_month?(@current.date, @today),
+                  do:
+                    "text-zinc-400 bg-zinc-50 border-zinc-200 cursor-not-allowed opacity-60",
+                  else:
+                    "text-zinc-700 bg-zinc-100 hover:bg-zinc-200 border-zinc-300"
+                )
+              ]}
+              aria-label={
+                if showing_current_month?(@current.date, @today) do
+                  "Already showing #{Calendar.strftime(@today, "%B %Y")}"
+                else
+                  "Go to current month, #{Calendar.strftime(@today, "%B %Y")}"
+                end
+              }
+            >
+              <.icon name="hero-calendar-days" class="w-4 h-4" aria-hidden="true" />
+              Today
+            </button>
           </div>
+
+          <button
+            type="button"
+            phx-target={@myself}
+            phx-click="next-month"
+            class="p-1.5 text-zinc-400 hover:text-zinc-500 transition duration-300"
+            aria-label="Next month"
+          >
+            <.icon name="hero-arrow-right" />
+          </button>
         </div>
 
         <div
           id={"#{@id}_calendar_days"}
-          class="isolate grid grid-cols-7 gap-1 text-sm overflow-visible relative"
+          class="isolate text-sm overflow-visible relative"
           phx-hook="DaterangeHover"
           phx-target={@myself}
           data-component-id={@id}
+          role="grid"
+          aria-labelledby={"#{@id}-month-label"}
         >
           <div
-            :for={day <- Enum.flat_map(@current.week_rows, & &1)}
-            class="relative overflow-visible"
-            data-day={Calendar.strftime(day, "%Y-%m-%d")}
+            role="row"
+            class="grid grid-cols-7 text-xs leading-6 text-zinc-800 font-semibold mb-2"
           >
             <div
-              :if={
-                date_disabled?(day, assigns) && !other_month?(day, @current.date) &&
-                  !selected_start?(day, @checkin_date)
-              }
-              class="group relative overflow-visible"
+              :for={label <- week_day_header_labels(@current.week_rows)}
+              role="columnheader"
+              class="text-center font-semibold"
             >
-              <button
-                type="button"
-                phx-target={@myself}
-                phx-click="pick-date"
-                phx-value-date={Calendar.strftime(day, "%Y-%m-%d")}
-                disabled={true}
-                class={day_classes(day, assigns)}
-              >
-                <time
-                  class="text-sm font-medium"
-                  datetime={Calendar.strftime(day, "%Y-%m-%d")}
-                >
-                  {Calendar.strftime(day, "%d")}
-                </time>
-              </button>
-              <span
-                role="tooltip"
-                class={[
-                  "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 whitespace-normal pointer-events-none",
-                  "min-w-[200px] max-w-[400px]",
-                  "text-left"
-                ]}
-              >
-                {unavailability_reason(day, assigns)}
-              </span>
+              {label}
             </div>
-            <button
-              :if={
-                !date_disabled?(day, assigns) || other_month?(day, @current.date) ||
-                  selected_start?(day, @checkin_date)
-              }
-              type="button"
-              phx-target={@myself}
-              phx-click="pick-date"
-              phx-value-date={Calendar.strftime(day, "%Y-%m-%d")}
-              disabled={
-                date_disabled?(day, assigns) && !selected_start?(day, @checkin_date)
-              }
-              class={day_classes(day, assigns)}
-            >
-              <time
-                class="text-sm font-medium"
-                datetime={Calendar.strftime(day, "%Y-%m-%d")}
-              >
-                {Calendar.strftime(day, "%d")}
-              </time>
-              <div
-                :if={
-                  (!date_disabled?(day, assigns) ||
-                     selected_start?(day, @checkin_date)) &&
-                    !other_month?(day, @current.date)
-                }
-                class="text-xs mt-1"
-              >
-                {availability_display(
-                  day,
-                  @selected_booking_mode,
-                  @availability,
-                  assigns
-                )}
-              </div>
-            </button>
+          </div>
+          <div
+            :for={week <- @current.week_rows}
+            role="row"
+            class="grid grid-cols-7 gap-1 mb-1"
+          >
+            <.day_cell
+              :for={day <- week}
+              day={day}
+              id={@id}
+              myself={@myself}
+              calendar={assigns}
+            />
           </div>
         </div>
 
-        <div class="mt-8 flex flex-wrap gap-4 text-xs text-zinc-600">
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
+        <div
+          class="mt-8 flex flex-wrap gap-4 text-xs text-zinc-600"
+          role="list"
+          aria-label="Calendar legend"
+        >
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-green-50 border border-dashed border-green-700 rounded flex items-center justify-center text-[9px] font-bold text-green-900"
+              aria-hidden="true"
+            >
+              OK
+            </div>
             <span>Available</span>
           </div>
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 bg-blue-500 rounded"></div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-blue-500 rounded ring-2 ring-blue-200 flex items-center justify-center text-[9px] font-bold text-white"
+              aria-hidden="true"
+            >
+              Sel
+            </div>
             <span>Selected dates</span>
           </div>
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 bg-red-800 border border-red-900 rounded"></div>
-            <span>Not available for booking</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 bg-red-200 border border-red-300 rounded"></div>
-            <span>Unavailable</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 bg-gradient-to-r from-red-200 to-green-50 border border-zinc-300 rounded">
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-red-800 border border-red-900 rounded flex items-center justify-center text-[9px] font-bold text-red-100"
+              aria-hidden="true"
+            >
+              X
             </div>
-            <span>Check-in allowed</span>
+            <span>Already booked</span>
           </div>
-          <div class="flex items-center gap-2">
-            <div class="w-4 h-4 bg-gradient-to-r from-green-50 to-red-200 border border-zinc-300 rounded">
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-red-200 border border-red-400 rounded flex items-center justify-center text-[9px] font-bold text-red-900 line-through"
+              aria-hidden="true"
+            >
+              --
             </div>
-            <span>Check-out allowed</span>
+            <span>Closed (maintenance or club event)</span>
+          </div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-gradient-to-r from-red-200 to-green-50 border border-zinc-400 rounded flex items-center justify-center text-[8px] font-bold text-zinc-800"
+              aria-hidden="true"
+            >
+              In
+            </div>
+            <span>Valid check-in day</span>
+          </div>
+          <div class="flex items-center gap-2" role="listitem">
+            <div
+              class="w-8 h-5 bg-gradient-to-r from-green-50 to-red-200 border border-zinc-400 rounded flex items-center justify-center text-[8px] font-bold text-zinc-800"
+              aria-hidden="true"
+            >
+              Out
+            </div>
+            <span>Valid check-out day</span>
           </div>
         </div>
       </div>
@@ -317,11 +311,18 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         socket.assigns[:availability]
       end
 
+    # Prefer fresh seasons from the parent LiveView (after SeasonCache bust).
+    # Fall back to prior assigns / DB only when the parent did not pass seasons.
     seasons =
-      if socket.assigns[:seasons] && socket.assigns[:property] == property do
-        socket.assigns[:seasons]
-      else
-        Bookings.list_seasons(property)
+      cond do
+        Map.has_key?(assigns, :seasons) and is_list(assigns.seasons) ->
+          assigns.seasons
+
+        socket.assigns[:seasons] && socket.assigns[:property] == property ->
+          socket.assigns[:seasons]
+
+        true ->
+          Bookings.list_seasons(property)
       end
 
     new_state =
@@ -469,7 +470,382 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     {:noreply, socket |> assign(:hover_checkout_date, nil)}
   end
 
+  # --- Render helpers ---
+
+  defp day_cell(assigns) do
+    calendar = assigns.calendar
+    day = assigns.day
+    date_str = Calendar.strftime(day, "%Y-%m-%d")
+    tooltip? = show_day_tooltip?(day, calendar)
+    tooltip_text = unavailability_reason(day, calendar)
+    interactive_disabled? = day_interactive_disabled?(day, calendar)
+    status_label = day_status_label(day, calendar)
+
+    assigns =
+      assigns
+      |> assign(:date_str, date_str)
+      |> assign(:tooltip?, tooltip?)
+      |> assign(:interactive_disabled?, interactive_disabled?)
+      |> assign(:day_classes, day_classes(day, calendar))
+      |> assign(:aria_label, day_aria_label(day, calendar, tooltip?))
+      |> assign(:tabindex, day_tabindex(day, calendar))
+      |> assign(:show_status?, !other_month?(day, calendar.current.date))
+      |> assign(:status_label, status_label)
+      |> assign(:has_detail?, day_has_detail?(day, calendar))
+      |> assign(:detail_label, day_detail_label(day, calendar))
+      |> assign(:tooltip_text, tooltip_text)
+      |> assign(:is_today?, today?(day, calendar.today))
+      |> assign(:tooltip_id, day_tooltip_id(assigns.id, day))
+      |> assign(:day_number, Calendar.strftime(day, "%d"))
+      |> assign(:show_ok_badge?, day_shows_ok_badge?(day, calendar))
+      |> assign(
+        :show_unavailable_icon?,
+        day_shows_unavailable_icon?(day, calendar)
+      )
+      |> assign(:unavailable_icon_class, unavailable_icon_class(day, calendar))
+
+    ~H"""
+    <div
+      role="gridcell"
+      class="relative overflow-visible"
+      data-day={@date_str}
+    >
+      <div class={["relative overflow-visible", @tooltip? && "group"]}>
+        <button
+          type="button"
+          id={"#{@id}-day-#{@date_str}"}
+          data-calendar-day
+          phx-target={@myself}
+          phx-click="pick-date"
+          phx-value-date={@date_str}
+          tabindex={@tabindex}
+          class={@day_classes}
+          aria-label={@aria_label}
+          aria-disabled={if(@interactive_disabled?, do: "true")}
+          aria-current={if(@is_today?, do: "date", else: false)}
+          aria-describedby={if(@tooltip?, do: @tooltip_id, else: nil)}
+        >
+          <span
+            :if={@show_ok_badge?}
+            class="absolute top-0.5 right-0.5 text-[8px] font-bold text-green-800 leading-none pointer-events-none"
+            aria-hidden="true"
+          >
+            OK
+          </span>
+          <.icon
+            :if={@show_unavailable_icon?}
+            name="hero-x-mark"
+            class={[
+              "absolute top-0.5 right-0.5 w-3 h-3 pointer-events-none",
+              @unavailable_icon_class
+            ]}
+            aria-hidden="true"
+          />
+          <span class="text-sm font-medium" aria-hidden="true">
+            {@day_number}
+          </span>
+          <div
+            :if={@show_status? && (@status_label != "" || @has_detail?)}
+            class="text-xs mt-1 leading-tight"
+            aria-hidden="true"
+          >
+            <span :if={@status_label != ""} class="block text-[10px] font-semibold">
+              {@status_label}
+            </span>
+            <span :if={@has_detail?}>
+              {@detail_label}
+            </span>
+          </div>
+        </button>
+        <span
+          :if={@tooltip?}
+          id={@tooltip_id}
+          role="tooltip"
+          class={[
+            "absolute transition-opacity mt-2 top-full left-1/2 transform -translate-x-1/2 duration-200 opacity-0 z-[100] text-xs font-medium text-zinc-100 bg-zinc-900 rounded-lg shadow-lg px-4 py-2 block rounded tooltip group-hover:opacity-100 group-focus-within:opacity-100 whitespace-normal pointer-events-none",
+            "min-w-[200px] max-w-[400px]",
+            "text-left"
+          ]}
+        >
+          {@tooltip_text}
+        </span>
+      </div>
+    </div>
+    """
+  end
+
+  defp week_day_header_labels(week_rows) do
+    week_rows
+    |> List.first()
+    |> Enum.map(&Calendar.strftime(&1, "%a"))
+  end
+
+  defp day_tooltip_id(calendar_id, day) do
+    "#{calendar_id}-tooltip-#{Calendar.strftime(day, "%Y-%m-%d")}"
+  end
+
+  defp show_day_tooltip?(day, assigns) do
+    !other_month?(day, assigns.current.date) &&
+      day_interactive_disabled?(day, assigns)
+  end
+
+  defp day_interactive_disabled?(day, assigns) do
+    date_disabled?(day, assigns) && !selected_start?(day, assigns.checkin_date)
+  end
+
+  defp day_tabindex(day, assigns) do
+    if Date.compare(day, calendar_focus_day(assigns)) == :eq, do: 0, else: -1
+  end
+
+  defp calendar_focus_day(assigns) do
+    visible_month = assigns.current.date
+
+    cond do
+      assigns.checkout_date &&
+          !other_month?(assigns.checkout_date, visible_month) ->
+        assigns.checkout_date
+
+      assigns.checkin_date &&
+          !other_month?(assigns.checkin_date, visible_month) ->
+        assigns.checkin_date
+
+      today_in_visible_month?(assigns) ->
+        assigns.today
+
+      true ->
+        assigns.current.week_rows
+        |> Enum.flat_map(& &1)
+        |> Enum.find(fn day -> !other_month?(day, visible_month) end)
+    end
+  end
+
+  defp today_in_visible_month?(assigns) do
+    assigns.today &&
+      Date.beginning_of_month(assigns.today) ==
+        Date.beginning_of_month(assigns.current.date)
+  end
+
+  defp day_shows_ok_badge?(day, assigns) do
+    !other_month?(day, assigns.current.date) &&
+      !selection_restricted?(day, assigns) &&
+      day_visual_state(day, assigns) in [
+        :available,
+        :check_in_allowed,
+        :check_out_allowed
+      ]
+  end
+
+  defp day_shows_unavailable_icon?(day, assigns) do
+    !other_month?(day, assigns.current.date) &&
+      day_visual_state(day, assigns) in [
+        :fully_blocked_blackout,
+        :fully_blocked_booked,
+        :fully_blocked_gray
+      ]
+  end
+
+  defp unavailable_icon_class(day, assigns) do
+    case day_visual_state(day, assigns) do
+      :fully_blocked_blackout -> "text-red-100"
+      :fully_blocked_booked -> "text-red-900"
+      _ -> "text-zinc-500"
+    end
+  end
+
   # --- Helpers ---
+
+  defp day_visual_state(day, assigns) do
+    cond do
+      other_month?(day, assigns.current.date) ->
+        :other_month
+
+      selected_start?(day, assigns.checkin_date) ->
+        :selected_start
+
+      selected_end?(day, assigns.checkout_date) ->
+        :selected_end
+
+      assigns.state == :set_end && assigns.hover_checkout_date &&
+          day == assigns.hover_checkout_date ->
+        :selected_end
+
+      selected_range?(day, assigns.checkin_date, assigns.checkout_date) ->
+        :in_range
+
+      assigns.state == :set_end &&
+          in_hover_range?(
+            day,
+            assigns.checkin_date,
+            assigns.hover_checkout_date
+          ) ->
+        :in_range
+
+      true ->
+        day_availability_state(day, assigns)
+    end
+  end
+
+  defp day_availability_state(day, assigns) do
+    yesterday = Date.add(day, -1)
+    morning_blocked = date_unavailable_for_stay?(yesterday, assigns)
+    afternoon_blocked = date_unavailable_for_stay?(day, assigns)
+
+    cond do
+      morning_blocked && afternoon_blocked ->
+        case get_unavailable_style(day, assigns) do
+          :blackout -> :fully_blocked_blackout
+          :booked -> :fully_blocked_booked
+          _ -> :fully_blocked_gray
+        end
+
+      !morning_blocked && !afternoon_blocked ->
+        :available
+
+      morning_blocked && !afternoon_blocked ->
+        :check_out_allowed
+
+      !morning_blocked && afternoon_blocked ->
+        :check_in_allowed
+    end
+  end
+
+  defp day_status_label(day, assigns) do
+    case day_visual_state(day, assigns) do
+      :selected_start ->
+        "Start"
+
+      :selected_end ->
+        "End"
+
+      :in_range ->
+        "Selected"
+
+      :fully_blocked_blackout ->
+        "Closed"
+
+      :fully_blocked_booked ->
+        "Booked"
+
+      :fully_blocked_gray ->
+        "Unavailable"
+
+      :check_in_allowed ->
+        ""
+
+      :check_out_allowed ->
+        ""
+
+      :available ->
+        saturday_rule_status_label(day, assigns) ||
+          if(today?(day, assigns.today), do: "Today", else: "")
+
+      _ ->
+        saturday_rule_status_label(day, assigns) || ""
+    end
+  end
+
+  defp saturday_rule_status_label(day, assigns) do
+    property = assigns[:property]
+
+    cond do
+      assigns.state == :set_end && saturday_checkout?(day, property) ->
+        "No check-out"
+
+      assigns.state == :set_end &&
+          saturday_checkin_requires_sunday_checkout?(day, assigns) ->
+        "Sun only"
+
+      true ->
+        nil
+    end
+  end
+
+  defp saturday_checkin_requires_sunday_checkout?(day, assigns) do
+    checkin = assigns.checkin_date
+    property = assigns[:property]
+
+    checkin &&
+      property == :tahoe &&
+      Date.day_of_week(checkin) == 6 &&
+      Date.compare(day, checkin) == :gt &&
+      not (Date.diff(day, checkin) == 1 && Date.day_of_week(day) == 7)
+  end
+
+  defp day_detail_label(day, assigns) do
+    availability_display(
+      day,
+      assigns.selected_booking_mode,
+      assigns.availability,
+      assigns
+    )
+  end
+
+  defp day_has_detail?(day, assigns) do
+    availability_display_text(
+      day,
+      assigns.selected_booking_mode,
+      assigns.availability,
+      assigns
+    ) != ""
+  end
+
+  defp day_aria_label(day, assigns, has_tooltip?) do
+    date_label = Calendar.strftime(day, "%A, %B %d, %Y")
+    status = day_aria_status(day, assigns)
+
+    parts =
+      [date_label, status]
+      |> Enum.reject(&(&1 in [nil, ""]))
+
+    if date_disabled?(day, assigns) && !other_month?(day, assigns.current.date) &&
+         !has_tooltip? do
+      parts ++ [unavailability_reason(day, assigns)]
+    else
+      parts
+    end
+    |> Enum.join(", ")
+  end
+
+  defp day_aria_status(day, assigns) do
+    status = day_status_label(day, assigns)
+
+    detail =
+      availability_display_text(
+        day,
+        assigns.selected_booking_mode,
+        assigns.availability,
+        assigns
+      )
+
+    cond do
+      status != "" && detail != "" && status != detail ->
+        "#{status}, #{detail}"
+
+      status != "" ->
+        status
+
+      detail != "" ->
+        detail
+
+      other_month?(day, assigns.current.date) ->
+        ""
+
+      true ->
+        day_aria_availability_summary(day, assigns)
+    end
+  end
+
+  defp day_aria_availability_summary(day, assigns) do
+    case day_visual_state(day, assigns) do
+      :available -> "Available"
+      :fully_blocked_blackout -> "Not available for booking"
+      :fully_blocked_booked -> "Booked"
+      :fully_blocked_gray -> "Unavailable"
+      :check_in_allowed -> "Check-in allowed"
+      :check_out_allowed -> "Check-out allowed"
+      _ -> ""
+    end
+  end
 
   defp day_classes(day, assigns) do
     base =
@@ -532,58 +908,62 @@ defmodule YscWeb.Components.AvailabilityCalendar do
               else: :available
 
           classes =
-            cond do
-              morning_blocked && afternoon_blocked ->
-                # Fully blocked. Use the style of the afternoon (current day).
-                case afternoon_style do
-                  :gray ->
-                    "bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed opacity-60"
+            if selection_restricted?(day, assigns) do
+              selection_restricted_classes()
+            else
+              cond do
+                morning_blocked && afternoon_blocked ->
+                  # Fully blocked. Use the style of the afternoon (current day).
+                  case afternoon_style do
+                    :gray ->
+                      "bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed opacity-60"
 
-                  :blackout ->
-                    "bg-red-800 text-red-100 border border-red-900 cursor-not-allowed"
+                    :blackout ->
+                      "bg-red-800 text-red-100 border border-red-900 cursor-not-allowed"
 
-                  :booked ->
-                    "bg-red-200 text-red-900 border border-red-300 cursor-not-allowed"
+                    :booked ->
+                      "bg-red-200 text-red-900 border border-red-300 cursor-not-allowed"
 
-                  _ ->
-                    "bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed opacity-60"
-                end
+                    _ ->
+                      "bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed opacity-60"
+                  end
 
-              !morning_blocked && !afternoon_blocked ->
-                # Fully available
-                "bg-green-50 text-zinc-900 border border-green-200 hover:bg-green-100"
+                !morning_blocked && !afternoon_blocked ->
+                  # Fully available
+                  "bg-green-50 text-zinc-900 border border-green-200 hover:bg-green-100"
 
-              morning_blocked && !afternoon_blocked ->
-                # Check-out day (Blocked -> Available)
-                case morning_style do
-                  :gray ->
-                    "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
+                morning_blocked && !afternoon_blocked ->
+                  # Check-out day (Blocked -> Available)
+                  case morning_style do
+                    :gray ->
+                      "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
 
-                  :blackout ->
-                    "bg-gradient-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
+                    :blackout ->
+                      "bg-gradient-to-r from-red-800 to-green-50 text-zinc-900 border border-zinc-300"
 
-                  :booked ->
-                    "bg-gradient-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
+                    :booked ->
+                      "bg-gradient-to-r from-red-200 to-green-50 text-zinc-900 border border-zinc-300"
 
-                  _ ->
-                    "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
-                end
+                    _ ->
+                      "bg-green-50 text-zinc-900 border border-green-200 hover:opacity-80"
+                  end
 
-              !morning_blocked && afternoon_blocked ->
-                # Check-in day (Available -> Blocked)
-                case afternoon_style do
-                  :gray ->
-                    "bg-gradient-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
+                !morning_blocked && afternoon_blocked ->
+                  # Check-in day (Available -> Blocked)
+                  case afternoon_style do
+                    :gray ->
+                      "bg-gradient-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
 
-                  :blackout ->
-                    "bg-gradient-to-r from-green-50 to-red-800 text-zinc-900 border border-zinc-300"
+                    :blackout ->
+                      "bg-gradient-to-r from-green-50 to-red-800 text-zinc-900 border border-zinc-300"
 
-                  :booked ->
-                    "bg-gradient-to-r from-green-50 to-red-200 text-zinc-900 border border-zinc-300"
+                    :booked ->
+                      "bg-gradient-to-r from-green-50 to-red-200 text-zinc-900 border border-zinc-300"
 
-                  _ ->
-                    "bg-gradient-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
-                end
+                    _ ->
+                      "bg-gradient-to-r from-green-50 to-zinc-100 text-zinc-900 border border-zinc-300"
+                  end
+              end
             end
 
           # Add Today border
@@ -594,6 +974,47 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           end
       end
     end
+  end
+
+  defp selection_restricted_classes do
+    "bg-zinc-100 text-zinc-400 border border-zinc-200 cursor-not-allowed opacity-60"
+  end
+
+  defp selection_restricted?(day, assigns) do
+    assigns.state == :set_end &&
+      assigns.checkin_date &&
+      !selected_start?(day, assigns.checkin_date) &&
+      !fully_blocked_for_stay?(day, assigns) &&
+      !partial_availability_day?(day, assigns) &&
+      checkout_selection_blocked?(day, assigns)
+  end
+
+  defp partial_availability_day?(day, assigns) do
+    yesterday = Date.add(day, -1)
+    morning_blocked = date_unavailable_for_stay?(yesterday, assigns)
+    afternoon_blocked = date_unavailable_for_stay?(day, assigns)
+    morning_blocked != afternoon_blocked
+  end
+
+  defp checkout_selection_blocked?(day, assigns) do
+    check_other_rules(
+      day,
+      assigns.checkin_date,
+      assigns.state,
+      assigns[:property],
+      assigns[:availability],
+      assigns[:selected_booking_mode],
+      assigns[:seasons]
+    ) ||
+      (Date.compare(day, assigns.checkin_date) == :gt &&
+         !valid_date_range?(assigns.checkin_date, day, assigns))
+  end
+
+  defp fully_blocked_for_stay?(day, assigns) do
+    yesterday = Date.add(day, -1)
+
+    date_unavailable_for_stay?(yesterday, assigns) &&
+      date_unavailable_for_stay?(day, assigns)
   end
 
   defp get_unavailable_style(day, assigns) do
@@ -724,21 +1145,21 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             end
 
           :set_end ->
-            # Picking check-out date.
-            # We leave in morning. Morning must be free (from *other* bookings).
-            # Actually, if we are booking, we occupy the previous night.
-            # So the day *we click* is the checkout day.
-            # The night *before* this day must be available for us to book.
-            # This is validated by valid_date_range?.
-            # For the *click* itself, is the date disabled?
-            # If I click Jan 3 as checkout, I am not staying Jan 3 night.
-            # So Jan 3 afternoon availability doesn't matter.
-            # Jan 3 morning availability matters?
-            # If Jan 3 morning is "occupied" by someone else... I can't check out?
-            # No, if someone else is there, I can't have stayed the night Jan 2-3.
-            # valid_date_range? checks the *span*.
-            # So for the click target, we mainly check if it's a valid date in general.
-            false
+            checkin = assigns.checkin_date
+
+            cond do
+              is_nil(checkin) ->
+                false
+
+              Date.compare(day, checkin) != :gt ->
+                false
+
+              !valid_date_range?(checkin, day, assigns) ->
+                true
+
+              true ->
+                false
+            end
         end
       end
     end
@@ -834,23 +1255,68 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     end
   end
 
-  defp get_bookings_reason(_day, _assigns) do
-    "Booking already exists"
+  defp get_bookings_reason(day, assigns) do
+    if winter_buyout_blocked?(day, assigns) do
+      "Entire cabin is not available in winter"
+    else
+      "Booking already exists"
+    end
   end
 
   defp get_other_reason(day, assigns) do
-    if check_other_rules(
-         day,
-         assigns.checkin_date,
-         assigns.state,
-         assigns[:property],
-         assigns[:availability],
-         assigns[:selected_booking_mode],
-         assigns[:seasons]
-       ) do
-      "Restricted (e.g. min/max stay)"
-    else
-      "Unavailable"
+    selection_rule_reason(day, assigns) ||
+      cond do
+        winter_buyout_blocked?(day, assigns) ->
+          "Entire cabin is not available in winter"
+
+        check_other_rules(
+          day,
+          assigns.checkin_date,
+          assigns.state,
+          assigns[:property],
+          assigns[:availability],
+          assigns[:selected_booking_mode],
+          assigns[:seasons]
+        ) ->
+          "Restricted (e.g. min/max stay)"
+
+        true ->
+          "Unavailable"
+      end
+  end
+
+  defp winter_buyout_blocked?(day, assigns) do
+    assigns[:property] == :tahoe &&
+      assigns[:selected_booking_mode] == :buyout &&
+      is_list(assigns[:seasons]) &&
+      not Ysc.Bookings.Season.buyout_allowed_on_date?(assigns.seasons, day)
+  end
+
+  defp selection_rule_reason(day, assigns) do
+    property = assigns[:property]
+    state = assigns.state
+    checkin_date = assigns.checkin_date
+    seasons = assigns[:seasons]
+
+    cond do
+      state == :set_end && saturday_checkout?(day, property) ->
+        "Check-outs are not permitted on Saturdays"
+
+      state == :set_end &&
+          saturday_checkin_requires_sunday_checkout?(day, assigns) ->
+        "Saturday check-ins must check out on Sunday"
+
+      state == :set_end && checkin_date &&
+          Date.compare(day, checkin_date) == :gt ->
+        nights = Date.diff(day, checkin_date)
+        max_nights = get_max_nights(property, checkin_date, seasons)
+
+        if nights > max_nights do
+          "Maximum #{max_nights} nights allowed per booking"
+        end
+
+      true ->
+        nil
     end
   end
 
@@ -891,16 +1357,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
          _mode,
          seasons
        ) do
-    # Saturday check-in rule (Tahoe only)
-    if saturday_checkin?(day, property, state) do
-      true
-    else
-      check_end_date_rules(day, checkin_date, state, property, seasons)
-    end
-  end
-
-  defp saturday_checkin?(day, property, state) do
-    Date.day_of_week(day) == 6 && property == :tahoe && state != :set_end
+    # Saturday check-in is allowed; checkout rules enforce Sat→Sun / weekend span
+    check_end_date_rules(day, checkin_date, state, property, seasons)
   end
 
   defp check_end_date_rules(day, checkin_date, state, property, seasons) do
@@ -918,11 +1376,32 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     max_nights = get_max_nights(property, checkin_date, seasons)
 
     cond do
-      nights < 1 -> true
-      nights > max_nights -> true
-      saturday_checkout?(day, property) -> true
-      true -> false
+      nights < 1 ->
+        true
+
+      nights > max_nights ->
+        true
+
+      saturday_checkout?(day, property) ->
+        true
+
+      property == :tahoe && Date.day_of_week(checkin_date) == 6 &&
+          not (nights == 1 && Date.day_of_week(day) == 7) ->
+        true
+
+      property == :tahoe && saturday_without_sunday?(checkin_date, day) ->
+        true
+
+      true ->
+        false
     end
+  end
+
+  defp saturday_without_sunday?(checkin_date, checkout_date) do
+    days =
+      Date.range(checkin_date, checkout_date) |> Enum.map(&Date.day_of_week/1)
+
+    6 in days and 7 not in days
   end
 
   defp saturday_checkout?(day, property) do
@@ -1014,6 +1493,11 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
   defp today?(day, today), do: today && day == today
 
+  defp showing_current_month?(current_date, today) do
+    today &&
+      Date.beginning_of_month(current_date) == Date.beginning_of_month(today)
+  end
+
   defp other_month?(day, current),
     do: Date.beginning_of_month(day) != Date.beginning_of_month(current)
 
@@ -1077,41 +1561,26 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     info = Map.get(availability, day)
 
     if info do
-      # Check if this is a valid checkout date in the current context
-      is_valid_checkout =
-        if assigns && assigns.state == :set_end && assigns.checkin_date do
-          # If we are selecting an end date, and this date is after start date
-          # And the previous night was available (meaning we can stay until this morning)
-          Date.compare(day, assigns.checkin_date) == :gt &&
-            !date_unavailable_for_stay?(Date.add(day, -1), assigns)
-        else
-          false
-        end
+      is_valid_checkout = valid_checkout_date?(day, assigns)
 
       cond do
+        is_valid_checkout && checkout_partially_blocked?(mode, info) ->
+          "Check-out only"
+
+        is_valid_checkout ->
+          ""
+
         info.is_blacked_out ->
           "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
-          if is_valid_checkout do
-            "Check-out only"
-          else
-            "Busy"
-          end
+          "Busy"
 
         mode == :day && !info.can_book_day ->
-          if is_valid_checkout do
-            "Check-out only"
-          else
-            "Unavailable"
-          end
+          "Unavailable"
 
         mode == :room && !info.can_book_room ->
-          if is_valid_checkout do
-            "Check-out only"
-          else
-            "Unavailable"
-          end
+          "Unavailable"
 
         mode == :day ->
           if info.day_bookings_count > 0,
@@ -1119,10 +1588,10 @@ defmodule YscWeb.Components.AvailabilityCalendar do
             else: ""
 
         mode == :buyout ->
-          "Available"
+          ""
 
         mode == :room ->
-          "Available"
+          ""
 
         true ->
           ""
@@ -1130,6 +1599,19 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     else
       ""
     end
+  end
+
+  defp valid_checkout_date?(day, assigns) do
+    assigns.state == :set_end && assigns.checkin_date &&
+      Date.compare(day, assigns.checkin_date) == :gt &&
+      !date_unavailable_for_stay?(Date.add(day, -1), assigns)
+  end
+
+  defp checkout_partially_blocked?(mode, info) do
+    info.is_blacked_out ||
+      (mode == :buyout && !info.can_book_buyout) ||
+      (mode == :day && !info.can_book_day) ||
+      (mode == :room && !info.can_book_room)
   end
 
   defp format_date(date) do

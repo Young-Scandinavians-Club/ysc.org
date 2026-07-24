@@ -8,6 +8,7 @@ defmodule Ysc.Accounts.FamilyInvites do
 
   alias Ysc.Repo
   alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent, UserProfileCache}
+  alias Ysc.Subscriptions.BoardVolunteerBilling
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
@@ -183,7 +184,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                 rescue
                   e ->
                     # In test mode, silently ignore errors to keep test output clean
-                    unless is_test do
+                    if !is_test do
                       require Ysc.Logging
 
                       Ysc.Logging.error(
@@ -195,7 +196,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                 catch
                   kind, reason ->
                     # Catch all other errors (throws, exits, etc.)
-                    unless is_test do
+                    if !is_test do
                       require Ysc.Logging
 
                       Ysc.Logging.error(
@@ -218,6 +219,10 @@ defmodule Ysc.Accounts.FamilyInvites do
           {:ok, final_user} = ok ->
             invalidate_family_link_profile_caches(
               final_user.id,
+              invite.primary_user_id
+            )
+
+            sync_board_volunteer_billing_after_family_change(
               invite.primary_user_id
             )
 
@@ -293,6 +298,10 @@ defmodule Ysc.Accounts.FamilyInvites do
               invite.primary_user_id
             )
 
+            sync_board_volunteer_billing_after_family_change(
+              invite.primary_user_id
+            )
+
             notify_invite_accepted(invite, updated_user)
             ok
 
@@ -305,6 +314,13 @@ defmodule Ysc.Accounts.FamilyInvites do
   defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
     UserProfileCache.invalidate_user(user_id)
     UserProfileCache.invalidate_user(primary_user_id)
+  end
+
+  defp sync_board_volunteer_billing_after_family_change(primary_user_id) do
+    case Ysc.Accounts.get_user(primary_user_id) do
+      nil -> :ok
+      primary -> BoardVolunteerBilling.sync_for_user(primary)
+    end
   end
 
   @doc """
@@ -326,8 +342,8 @@ defmodule Ysc.Accounts.FamilyInvites do
     invitee_email = accepted_user.email || invite.email
     relationship_label = relationship_label(invite.relationship)
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    family_management_url = "#{base_url}/users/settings/family"
+    family_management_url =
+      YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
 
     email_vars = %{
       inviter_first_name: inviter_first_name,
@@ -670,8 +686,10 @@ defmodule Ysc.Accounts.FamilyInvites do
         nil
       end
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    invite_url = "#{base_url}/family-invite/#{invite.token}/accept"
+    invite_url =
+      YscWeb.Emails.Helpers.absolute_url(
+        "/family-invite/#{invite.token}/accept"
+      )
 
     idempotency_key = "family_invite_#{invite.id}"
 

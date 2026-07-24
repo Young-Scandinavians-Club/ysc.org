@@ -143,6 +143,25 @@ defmodule YscWeb.AccountSetupLiveTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Mount / dead render
+  # ---------------------------------------------------------------------------
+
+  describe "mount" do
+    test "static HTML shows loading shell before websocket connects", %{
+      conn: conn
+    } do
+      user = unverified_pending_user(%{email: "deferred-setup@example.com"})
+
+      conn = get(conn, account_setup_path(user))
+      html = html_response(conn, 200)
+
+      assert html =~ ~s|id="account-setup-loading"|
+      refute html =~ "deferred-setup@example.com"
+      refute html =~ ~s|id="email_form"|
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Step 0 — Email verification
   # ---------------------------------------------------------------------------
 

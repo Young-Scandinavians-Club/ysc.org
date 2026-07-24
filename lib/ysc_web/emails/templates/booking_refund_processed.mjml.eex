@@ -17,7 +17,7 @@
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold;"><%= @refund_amount %></span>
+      <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @refund_amount %></span>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
       <strong>Refund Date:</strong> <%= @refund_date %>

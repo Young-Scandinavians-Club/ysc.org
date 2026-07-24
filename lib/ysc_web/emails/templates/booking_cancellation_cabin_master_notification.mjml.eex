@@ -96,7 +96,7 @@
     <mj-text align="center" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="center" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Policy Refund Amount:</strong> <span style="color: #059669; font-weight: bold;"><%= @pending_refund.policy_refund_amount %></span>
+      <strong>Policy Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @pending_refund.policy_refund_amount %></span>
       <%= if @pending_refund.applied_rule_refund_percentage do %>
         <span style="color: #6B7280; font-size: 16px;">(<%= @pending_refund.applied_rule_refund_percentage %>% refund)</span>
       <% end %>

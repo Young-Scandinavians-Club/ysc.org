@@ -221,7 +221,7 @@ defmodule Ysc.MixProject do
       {:file_type, "~> 0.1.0"},
       {:finch, "~> 0.21"},
       {:floki, "~> 0.38"},
-      {:flop, "~> 0.26.4"},
+      {:flop, "~> 0.26.5"},
       {:flop_phoenix, "~> 0.26"},
       {:gen_smtp, "~> 1.3"},
       {:gettext, "~> 0.26"},
@@ -238,6 +238,8 @@ defmodule Ysc.MixProject do
       {:live_toast, "~> 0.8"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.
+      {:nested_filter, "~> 2.1", override: true},
       {:mjml_eex, "~> 0.13"},
       {:mox, "~> 1.2", only: :test},
       {:oban, "~> 2.23"},
