@@ -8,13 +8,21 @@ defmodule Ysc.Bookings.SeasonCache do
   """
 
   require Ysc.Logging
-  alias Ysc.Bookings.Season
+  alias Ysc.Bookings.{ConfigCacheTelemetry, Season}
 
   @cache_name :ysc_cache
   @cache_prefix "season:"
   @cache_version_key "season:version"
+  @pubsub_topic "season_cache:invalidate"
   # 10 minutes in milliseconds
   @default_ttl 10 * 60 * 1000
+
+  @doc """
+  Subscribes the current process to season cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   @doc """
   Gets a season for a property/date from cache or fetches from database and caches it.
@@ -38,13 +46,16 @@ defmodule Ysc.Bookings.SeasonCache do
     Cachex.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
-    Phoenix.PubSub.broadcast(
-      Ysc.PubSub,
-      "season_cache:invalidate",
-      {:season_cache_invalidated, new_version}
-    )
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        {:season_cache_invalidated, new_version}
+      )
+    end
 
     Ysc.Logging.debug("Season cache invalidated", version: new_version)
+    ConfigCacheTelemetry.invalidated(:season)
     :ok
   end
 

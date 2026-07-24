@@ -404,7 +404,8 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
 
     test "styles checkout dates beyond max stay as restricted when selecting end date" do
       today = ~D[2026-07-21]
-      checkin = ~D[2026-07-25]
+      # Use a weekday check-in so Saturday arrival rules do not interfere
+      checkin = ~D[2026-07-22]
       valid_checkout = Date.add(checkin, 2)
       restricted_checkout = Date.add(checkin, 5)
 
@@ -534,7 +535,7 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute calendar_element_attr(checkout_button, "aria-disabled") == "true"
     end
 
-    test "shows Saturday check-in restriction when picking start date on Tahoe" do
+    test "allows Saturday check-in when picking start date on Tahoe" do
       today = ~D[2026-07-21]
       saturday = ~D[2026-07-25]
 
@@ -553,16 +554,40 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       saturday_button =
         calendar_day_button(calendar_document(html), Date.to_iso8601(saturday))
 
-      assert saturday_cell =~ "No check-in"
-      assert saturday_cell =~ "Check-ins are not permitted on Saturdays"
+      refute saturday_cell =~ "No check-in"
+      refute saturday_cell =~ "Check-ins are not permitted on Saturdays"
+      refute calendar_element_attr(saturday_button, "aria-disabled") == "true"
+    end
 
-      assert calendar_element_attr(saturday_button, "aria-describedby") ==
-               "calendar-tooltip-2026-07-25"
+    test "requires Sunday checkout after Saturday check-in on Tahoe" do
+      today = ~D[2026-07-21]
+      saturday = ~D[2026-07-25]
+      monday = ~D[2026-07-27]
 
-      refute String.contains?(
-               calendar_element_attr(saturday_button, "aria-label") || "",
-               "Check-ins are not permitted on Saturdays"
-             )
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          checkin_date: saturday,
+          state: :set_end
+        )
+
+      monday_cell = extract_day_cell(html, Date.to_iso8601(monday))
+
+      monday_button =
+        calendar_day_button(calendar_document(html), Date.to_iso8601(monday))
+
+      assert String.contains?(monday_cell, "Sun only") or
+               String.contains?(
+                 monday_cell,
+                 "Saturday check-ins must check out on Sunday"
+               )
+
+      assert calendar_element_attr(monday_button, "aria-disabled") == "true"
     end
 
     test "does not apply Saturday booking restrictions on Clear Lake" do

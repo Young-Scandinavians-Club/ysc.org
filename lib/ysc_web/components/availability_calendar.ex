@@ -311,11 +311,18 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         socket.assigns[:availability]
       end
 
+    # Prefer fresh seasons from the parent LiveView (after SeasonCache bust).
+    # Fall back to prior assigns / DB only when the parent did not pass seasons.
     seasons =
-      if socket.assigns[:seasons] && socket.assigns[:property] == property do
-        socket.assigns[:seasons]
-      else
-        Bookings.list_seasons(property)
+      cond do
+        Map.has_key?(assigns, :seasons) and is_list(assigns.seasons) ->
+          assigns.seasons
+
+        socket.assigns[:seasons] && socket.assigns[:property] == property ->
+          socket.assigns[:seasons]
+
+        true ->
+          Bookings.list_seasons(property)
       end
 
     new_state =
@@ -741,15 +748,27 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     property = assigns[:property]
 
     cond do
-      saturday_checkin?(day, property, assigns.state) ->
-        "No check-in"
-
       assigns.state == :set_end && saturday_checkout?(day, property) ->
         "No check-out"
+
+      assigns.state == :set_end &&
+          saturday_checkin_requires_sunday_checkout?(day, assigns) ->
+        "Sun only"
 
       true ->
         nil
     end
+  end
+
+  defp saturday_checkin_requires_sunday_checkout?(day, assigns) do
+    checkin = assigns.checkin_date
+    property = assigns[:property]
+
+    checkin &&
+      property == :tahoe &&
+      Date.day_of_week(checkin) == 6 &&
+      Date.compare(day, checkin) == :gt &&
+      not (Date.diff(day, checkin) == 1 && Date.day_of_week(day) == 7)
   end
 
   defp day_detail_label(day, assigns) do
@@ -1236,25 +1255,41 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     end
   end
 
-  defp get_bookings_reason(_day, _assigns) do
-    "Booking already exists"
+  defp get_bookings_reason(day, assigns) do
+    if winter_buyout_blocked?(day, assigns) do
+      "Entire cabin is not available in winter"
+    else
+      "Booking already exists"
+    end
   end
 
   defp get_other_reason(day, assigns) do
     selection_rule_reason(day, assigns) ||
-      if check_other_rules(
-           day,
-           assigns.checkin_date,
-           assigns.state,
-           assigns[:property],
-           assigns[:availability],
-           assigns[:selected_booking_mode],
-           assigns[:seasons]
-         ) do
-        "Restricted (e.g. min/max stay)"
-      else
-        "Unavailable"
+      cond do
+        winter_buyout_blocked?(day, assigns) ->
+          "Entire cabin is not available in winter"
+
+        check_other_rules(
+          day,
+          assigns.checkin_date,
+          assigns.state,
+          assigns[:property],
+          assigns[:availability],
+          assigns[:selected_booking_mode],
+          assigns[:seasons]
+        ) ->
+          "Restricted (e.g. min/max stay)"
+
+        true ->
+          "Unavailable"
       end
+  end
+
+  defp winter_buyout_blocked?(day, assigns) do
+    assigns[:property] == :tahoe &&
+      assigns[:selected_booking_mode] == :buyout &&
+      is_list(assigns[:seasons]) &&
+      not Ysc.Bookings.Season.buyout_allowed_on_date?(assigns.seasons, day)
   end
 
   defp selection_rule_reason(day, assigns) do
@@ -1264,11 +1299,12 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     seasons = assigns[:seasons]
 
     cond do
-      saturday_checkin?(day, property, state) ->
-        "Check-ins are not permitted on Saturdays"
-
       state == :set_end && saturday_checkout?(day, property) ->
         "Check-outs are not permitted on Saturdays"
+
+      state == :set_end &&
+          saturday_checkin_requires_sunday_checkout?(day, assigns) ->
+        "Saturday check-ins must check out on Sunday"
 
       state == :set_end && checkin_date &&
           Date.compare(day, checkin_date) == :gt ->
@@ -1321,16 +1357,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
          _mode,
          seasons
        ) do
-    # Saturday check-in rule (Tahoe only)
-    if saturday_checkin?(day, property, state) do
-      true
-    else
-      check_end_date_rules(day, checkin_date, state, property, seasons)
-    end
-  end
-
-  defp saturday_checkin?(day, property, state) do
-    Date.day_of_week(day) == 6 && property == :tahoe && state != :set_end
+    # Saturday check-in is allowed; checkout rules enforce Sat→Sun / weekend span
+    check_end_date_rules(day, checkin_date, state, property, seasons)
   end
 
   defp check_end_date_rules(day, checkin_date, state, property, seasons) do
@@ -1348,11 +1376,32 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     max_nights = get_max_nights(property, checkin_date, seasons)
 
     cond do
-      nights < 1 -> true
-      nights > max_nights -> true
-      saturday_checkout?(day, property) -> true
-      true -> false
+      nights < 1 ->
+        true
+
+      nights > max_nights ->
+        true
+
+      saturday_checkout?(day, property) ->
+        true
+
+      property == :tahoe && Date.day_of_week(checkin_date) == 6 &&
+          not (nights == 1 && Date.day_of_week(day) == 7) ->
+        true
+
+      property == :tahoe && saturday_without_sunday?(checkin_date, day) ->
+        true
+
+      true ->
+        false
     end
+  end
+
+  defp saturday_without_sunday?(checkin_date, checkout_date) do
+    days =
+      Date.range(checkin_date, checkout_date) |> Enum.map(&Date.day_of_week/1)
+
+    6 in days and 7 not in days
   end
 
   defp saturday_checkout?(day, property) do

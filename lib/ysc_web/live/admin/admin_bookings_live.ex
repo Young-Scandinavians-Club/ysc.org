@@ -5532,6 +5532,14 @@ defmodule YscWeb.AdminBookingsLive do
         {:noreply,
          assign(socket, :booking_form, to_form(changeset, as: "booking"))}
 
+      {:error, :blackout_conflict} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Cannot create booking: selected dates overlap a blackout period."
+         )}
+
       {:error, reason} ->
         {:noreply,
          YscWeb.Flash.put_toast(

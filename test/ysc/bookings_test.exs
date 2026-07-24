@@ -1509,6 +1509,72 @@ defmodule Ysc.BookingsTest do
              ) == false
     end
 
+    test "has_blackout?/3 treats single-day blackout as blocking that night" do
+      night = Date.utc_today() |> Date.add(35)
+
+      _blackout =
+        create_blackout_fixture(%{
+          property: :tahoe,
+          start_date: night,
+          end_date: night
+        })
+
+      # Overnight on the blackout night conflicts
+      assert Bookings.has_blackout?(:tahoe, night, Date.add(night, 1)) == true
+
+      # Checkout on the blackout day is allowed (leave by 11am)
+      assert Bookings.has_blackout?(:tahoe, Date.add(night, -1), night) == false
+
+      # Check-in on the day after a single-day blackout is allowed
+      assert Bookings.has_blackout?(
+               :tahoe,
+               Date.add(night, 1),
+               Date.add(night, 2)
+             ) == false
+    end
+
+    test "has_blackout?/3 allows check-in on multi-day blackout end date" do
+      start_date = Date.utc_today() |> Date.add(40)
+      end_date = Date.add(start_date, 3)
+
+      _blackout =
+        create_blackout_fixture(%{
+          property: :tahoe,
+          start_date: start_date,
+          end_date: end_date
+        })
+
+      assert Bookings.has_blackout?(:tahoe, end_date, Date.add(end_date, 1)) ==
+               false
+
+      assert Bookings.has_blackout?(
+               :tahoe,
+               Date.add(end_date, -1),
+               Date.add(end_date, 1)
+             ) == true
+    end
+
+    test "blackout_occupied_nights/1 and stay_occupied_nights/2 match turnaround model" do
+      assert Bookings.stay_occupied_nights(~D[2026-07-24], ~D[2026-07-26]) == [
+               ~D[2026-07-24],
+               ~D[2026-07-25]
+             ]
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: ~D[2026-07-26],
+               end_date: ~D[2026-07-29]
+             }) == [
+               ~D[2026-07-26],
+               ~D[2026-07-27],
+               ~D[2026-07-28]
+             ]
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: ~D[2026-07-26],
+               end_date: ~D[2026-07-26]
+             }) == [~D[2026-07-26]]
+    end
+
     test "get_overlapping_blackouts/3 returns overlapping blackouts" do
       checkin = Date.utc_today() |> Date.add(30)
       checkout = Date.add(checkin, 2)
@@ -3926,19 +3992,20 @@ defmodule Ysc.BookingsTest do
     test "returns true when a complete booking overlaps the requested range" do
       user = user_fixture()
 
+      # Monday–Thursday stay (avoid Saturday check-in weekend rule)
       booking =
         booking_fixture(%{
           user_id: user.id,
           property: :tahoe,
           status: :complete,
-          checkin_date: ~D[2026-08-01],
-          checkout_date: ~D[2026-08-05]
+          checkin_date: ~D[2026-08-03],
+          checkout_date: ~D[2026-08-06]
         })
 
       assert Bookings.has_conflicting_bookings?(
                :tahoe,
-               ~D[2026-08-03],
-               ~D[2026-08-07]
+               ~D[2026-08-04],
+               ~D[2026-08-08]
              )
 
       refute Bookings.has_conflicting_bookings?(
@@ -4022,6 +4089,50 @@ defmodule Ysc.BookingsTest do
       for date <- occupied_nights do
         assert availability[date].has_buyout == true
       end
+    end
+
+    test "disallows buyout on Winter season nights (including Aug–Sep when Winter starts Aug 1)" do
+      previous = Application.get_env(:ysc, :season_cache_enabled)
+      Application.put_env(:ysc, :season_cache_enabled, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :season_cache_enabled, previous)
+      end)
+
+      Repo.delete_all(from(s in Season, where: s.property == :tahoe))
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Summer",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-07-31],
+          is_default: true
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2025-04-30],
+          is_default: false,
+          advance_booking_days: 45,
+          max_nights: 4
+        })
+        |> Repo.insert()
+
+      availability =
+        Bookings.get_tahoe_daily_availability(~D[2026-07-28], ~D[2026-09-05])
+
+      assert availability[~D[2026-07-28]].can_book_buyout == true
+      assert availability[~D[2026-07-31]].can_book_buyout == true
+      assert availability[~D[2026-08-01]].can_book_buyout == false
+      assert availability[~D[2026-08-15]].can_book_buyout == false
+      assert availability[~D[2026-09-01]].can_book_buyout == false
     end
   end
 
