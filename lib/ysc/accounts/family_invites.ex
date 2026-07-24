@@ -342,8 +342,8 @@ defmodule Ysc.Accounts.FamilyInvites do
     invitee_email = accepted_user.email || invite.email
     relationship_label = relationship_label(invite.relationship)
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    family_management_url = "#{base_url}/users/settings/family"
+    family_management_url =
+      YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
 
     email_vars = %{
       inviter_first_name: inviter_first_name,
@@ -686,8 +686,8 @@ defmodule Ysc.Accounts.FamilyInvites do
         nil
       end
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    invite_url = "#{base_url}/family-invite/#{invite.token}/accept"
+    invite_url =
+      YscWeb.Emails.Helpers.absolute_url("/family-invite/#{invite.token}/accept")
 
     idempotency_key = "family_invite_#{invite.id}"
 
