@@ -387,8 +387,12 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
       ) ->
         "Bookings for this season are not yet open"
 
-      weekend_invalid?(booking.property, checkin, checkout) ->
-        "Bookings containing Saturday must also include Sunday (full weekend required)"
+      weekend_message =
+          weekend_unavailability_message(booking.property, checkin, checkout) ->
+        weekend_message
+
+      buyout_winter_blocked?(booking, checkin, checkout, seasons) ->
+        "Entire-cabin rentals are not available for winter nights in this stay"
 
       true ->
         case modification_availability_error(snapshot, checkin, checkout) do
@@ -408,7 +412,10 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
       false
     else
       Enum.any?(Date.range(first_checkout, latest_checkout), fn checkout ->
-        not weekend_invalid?(booking.property, checkin, checkout) and
+        is_nil(
+          weekend_unavailability_message(booking.property, checkin, checkout)
+        ) and
+          not buyout_winter_blocked?(booking, checkin, checkout, seasons) and
           is_nil(modification_availability_error(snapshot, checkin, checkout)) and
           SeasonHelpers.date_selectable?(
             booking.property,
@@ -419,6 +426,19 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
       end)
     end
   end
+
+  defp buyout_winter_blocked?(
+         %{booking_mode: :buyout, property: :tahoe},
+         checkin,
+         checkout,
+         seasons
+       )
+       when is_list(seasons) do
+    not Season.buyout_allowed_for_stay?(seasons, checkin, checkout)
+  end
+
+  defp buyout_winter_blocked?(_booking, _checkin, _checkout, _seasons),
+    do: false
 
   defp modification_availability_error(
          %Snapshot{} = snapshot,
@@ -712,23 +732,43 @@ defmodule Ysc.Bookings.ModificationDateAvailability do
     |> Enum.max(fn -> 4 end)
   end
 
-  defp weekend_invalid?(:tahoe, checkin, checkout) do
+  # Matches BookingValidator: Sat check-in must be one night to Sunday;
+  # any other stay that includes Saturday must also include Sunday.
+  defp weekend_unavailability_message(:tahoe, checkin, checkout) do
     if Date.compare(checkout, checkin) == :lt do
-      false
+      nil
     else
-      reservation_dates = Date.range(checkin, checkout) |> Enum.to_list()
+      cond do
+        Date.day_of_week(checkin, :monday) == 6 ->
+          one_night_to_sunday? =
+            Date.diff(checkout, checkin) == 1 &&
+              Date.day_of_week(checkout, :monday) == 7
 
-      has_saturday? =
-        Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 6))
+          if one_night_to_sunday? do
+            nil
+          else
+            "Check-ins on Saturday must check out on Sunday (one-night stay only)"
+          end
 
-      has_sunday? =
-        Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
+        true ->
+          reservation_dates = Date.range(checkin, checkout) |> Enum.to_list()
 
-      has_saturday? and not has_sunday?
+          has_saturday? =
+            Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 6))
+
+          has_sunday? =
+            Enum.any?(reservation_dates, &(Date.day_of_week(&1, :monday) == 7))
+
+          if has_saturday? and not has_sunday? do
+            "Bookings containing Saturday must also include Sunday (full weekend required)"
+          else
+            nil
+          end
+      end
     end
   end
 
-  defp weekend_invalid?(_property, _checkin, _checkout), do: false
+  defp weekend_unavailability_message(_property, _checkin, _checkout), do: nil
 
   defp availability_message(%{booking_mode: :room}),
     do: "Your room is not available starting on this date"

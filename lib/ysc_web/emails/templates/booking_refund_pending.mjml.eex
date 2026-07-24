@@ -17,7 +17,7 @@
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Refund Request Details</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Estimated Refund Amount:</strong> <span style="color: #059669; font-weight: bold;"><%= @policy_refund_amount %></span>
+      <strong>Estimated Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @policy_refund_amount %></span>
       <%= if @pending_refund.refund_percentage do %>
         <span style="color: #6B7280; font-size: 16px;">(<%= @pending_refund.refund_percentage %>% of original payment)</span>
       <% end %>

@@ -3,12 +3,13 @@ defmodule Ysc.Bookings.BookingValidator do
   Validates bookings according to property-specific rules.
 
   ## Tahoe Rules:
-  - Winter: Only individual rooms
-  - Summer: Individual rooms OR full buyout
-  - If any day in the inclusive reservation span falls on Saturday, the reservation must include Sunday (full weekend)
+  - Winter nights: individual rooms only (buyout cannot occupy any Winter night)
+  - Non-winter nights: individual rooms OR full buyout
+  - Saturday check-in must be a one-night stay checking out Sunday; any other stay
+    that includes Saturday must also include Sunday
   - Only one active booking per user at a time (all seasons)
-  - Exception: Family/Lifetime members can have up to 2 bookings in the same time period (overlapping dates)
-  - Maximum 4 nights per booking
+  - Exception: Family/Couple members can have up to 2 bookings in the same time period (overlapping dates)
+  - Max nights come from the check-in season configuration (Tahoe default 4)
   - Family membership: Up to 2 rooms in same time period (same or overlapping dates)
   - Single membership: Only 1 room per booking
 
@@ -51,33 +52,38 @@ defmodule Ysc.Bookings.BookingValidator do
     end
   end
 
-  # Tahoe: During winter, only individual rooms; during summer, rooms or buyout
+  # Tahoe: Winter nights are rooms-only; buyout must not occupy any winter night
   defp validate_booking_mode(changeset, :tahoe) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
+    checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
     booking_mode = Ecto.Changeset.get_field(changeset, :booking_mode)
     rooms = Ecto.Changeset.get_field(changeset, :rooms) || []
     has_rooms = is_list(rooms) && rooms != []
 
-    if checkin_date do
-      season = Season.for_date(:tahoe, checkin_date)
+    cond do
+      is_nil(checkin_date) ->
+        changeset
 
-      cond do
-        is_nil(season) ->
+      booking_mode == :buyout or not has_rooms ->
+        buyout_ok? =
+          if checkout_date do
+            Season.buyout_allowed_for_stay?(
+              :tahoe,
+              checkin_date,
+              checkout_date
+            )
+          else
+            Season.buyout_allowed_on_date?(:tahoe, checkin_date)
+          end
+
+        if buyout_ok? do
           changeset
-
-        season.name == "Winter" ->
-          # Winter: only rooms allowed (no buyouts)
+        else
           validate_winter_booking_mode(changeset, has_rooms, booking_mode)
+        end
 
-        season.name == "Summer" ->
-          # Summer: rooms or buyout allowed - validation passes if either rooms are set or booking_mode is buyout
-          changeset
-
-        true ->
-          changeset
-      end
-    else
-      changeset
+      true ->
+        changeset
     end
   end
 
@@ -116,7 +122,9 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp validate_advance_booking_limit(changeset, _property), do: changeset
 
-  # If any day in the inclusive reservation span is Saturday, Sunday must be included
+  # Tahoe weekend rules:
+  # - Saturday check-in must be a one-night stay checking out Sunday
+  # - Any other stay that includes Saturday must also include Sunday
   defp validate_weekend_requirement(changeset) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
@@ -124,21 +132,49 @@ defmodule Ysc.Bookings.BookingValidator do
 
     if checkin_date && checkout_date && property == :tahoe &&
          Date.compare(checkout_date, checkin_date) != :lt do
-      reservation_dates =
-        Date.range(checkin_date, checkout_date) |> Enum.to_list()
-
-      has_saturday =
-        Enum.any?(reservation_dates, fn date ->
-          day_of_week(date) == 6
-        end)
-
-      if has_saturday do
-        validate_sunday_included(changeset, reservation_dates)
+      if day_of_week(checkin_date) == 6 do
+        validate_saturday_checkin_one_night(
+          changeset,
+          checkin_date,
+          checkout_date
+        )
       else
-        changeset
+        reservation_dates =
+          Date.range(checkin_date, checkout_date) |> Enum.to_list()
+
+        has_saturday =
+          Enum.any?(reservation_dates, fn date ->
+            day_of_week(date) == 6
+          end)
+
+        if has_saturday do
+          validate_sunday_included(changeset, reservation_dates)
+        else
+          changeset
+        end
       end
     else
       changeset
+    end
+  end
+
+  defp validate_saturday_checkin_one_night(
+         changeset,
+         checkin_date,
+         checkout_date
+       ) do
+    one_night_to_sunday? =
+      Date.diff(checkout_date, checkin_date) == 1 &&
+        day_of_week(checkout_date) == 7
+
+    if one_night_to_sunday? do
+      changeset
+    else
+      Ecto.Changeset.add_error(
+        changeset,
+        :checkout_date,
+        "Check-ins on Saturday must check out on Sunday (one-night stay only)"
+      )
     end
   end
 
@@ -227,7 +263,7 @@ defmodule Ysc.Bookings.BookingValidator do
         end
       else
         # For single members: Check for ANY active/future bookings, max 1 total
-        today = Date.utc_today()
+        today = Ysc.Bookings.SeasonHelpers.cabin_today()
 
         active_bookings_query =
           from b in Booking,
@@ -276,7 +312,7 @@ defmodule Ysc.Bookings.BookingValidator do
       # Get primary user for family group check
       primary_user = get_primary_user_for_booking(user)
       family_user_ids = Ysc.Accounts.get_family_group_user_ids(primary_user)
-      today = Date.utc_today()
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
 
       active_bookings_query =
         from b in Booking,
@@ -541,7 +577,7 @@ defmodule Ysc.Bookings.BookingValidator do
       Ecto.Changeset.add_error(
         changeset,
         :booking_mode,
-        "Winter season only allows individual room bookings, not buyouts"
+        "Entire-cabin rentals are not available for winter nights in this stay"
       )
     else
       changeset

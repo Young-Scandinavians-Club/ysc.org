@@ -3,6 +3,8 @@ defmodule Ysc.Bookings.AvailabilityCache do
   Short-TTL cache for Clear Lake daily availability maps.
   """
 
+  alias Ysc.Bookings.ConfigCacheTelemetry
+
   @cache_name :ysc_cache
   @pubsub_topic "availability_cache:invalidate"
   @default_ttl 2 * 60 * 1000
@@ -81,16 +83,18 @@ defmodule Ysc.Bookings.AvailabilityCache do
         _ ->
           :ok
       end
-
-      if Process.whereis(Ysc.PubSub) do
-        Phoenix.PubSub.broadcast(
-          Ysc.PubSub,
-          @pubsub_topic,
-          :availability_cache_invalidated
-        )
-      end
     end
 
+    # Always notify LiveViews so open booking sessions rebuild after admin changes.
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        :availability_cache_invalidated
+      )
+    end
+
+    ConfigCacheTelemetry.invalidated(:availability)
     :ok
   end
 

@@ -23,6 +23,7 @@ defmodule YscWeb.AdminTabsTest do
       assert html =~ "overflow-x-auto"
       assert html =~ "admin-tabs-nav"
       assert html =~ "overflow-y-hidden"
+      assert html =~ "pt-2 pe-2"
       assert html =~ "min-w-0"
       assert html =~ "flex-nowrap"
       assert html =~ "shrink-0"

@@ -3,8 +3,18 @@ defmodule Ysc.Bookings.BlackoutListCache do
   Cache for blackout lists used in availability calculations.
   """
 
+  alias Ysc.Bookings.ConfigCacheTelemetry
+
   @cache_name :ysc_cache
   @cache_version_key "blackout_list:version"
+  @pubsub_topic "blackout_list_cache:invalidate"
+
+  @doc """
+  Subscribes the current process to blackout-list cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   def list(property, start_date, end_date) do
     cache_key =
@@ -20,12 +30,24 @@ defmodule Ysc.Bookings.BlackoutListCache do
   end
 
   def invalidate do
+    new_version = System.unique_integer([:monotonic, :positive])
+
     if Ysc.ProcessCache.enabled?() do
-      new_version = System.unique_integer([:monotonic, :positive])
       Cachex.put(@cache_name, @cache_version_key, new_version)
-      Ysc.Bookings.AvailabilityCache.invalidate()
     end
 
+    # Clear Lake availability maps depend on blackouts.
+    Ysc.Bookings.AvailabilityCache.invalidate()
+
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        {:blackout_list_cache_invalidated, new_version}
+      )
+    end
+
+    ConfigCacheTelemetry.invalidated(:blackout)
     :ok
   end
 

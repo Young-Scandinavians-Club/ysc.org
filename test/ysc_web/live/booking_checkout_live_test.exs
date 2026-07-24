@@ -1122,10 +1122,13 @@ defmodule YscWeb.BookingCheckoutLiveTest do
 
     test "payment-success rejects stale discounted price when entitlement expired before payment",
          %{
-           conn: conn,
-           user: user
+           conn: conn
          } do
       Ysc.TestHelpers.setup_quickbooks_mocks()
+
+      # Fresh user: describe setup already has active bookings for `user`.
+      user = user_with_membership()
+      conn = log_in_user(conn, user)
 
       {checkin, checkout} = tahoe_booking_dates(7)
 
