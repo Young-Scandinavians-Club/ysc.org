@@ -9,6 +9,7 @@ defmodule YscWeb.Admin.DateTimeDisplay do
   @admin_timezone "America/Los_Angeles"
   @short_date_format "%b %d, %Y"
   @long_date_format "%B %d, %Y"
+  @compact_datetime_format "%b %d, %Y %H:%M"
   @nil_label "—"
 
   @doc """
@@ -51,4 +52,17 @@ defmodule YscWeb.Admin.DateTimeDisplay do
   end
 
   def format_event_date(_), do: @nil_label
+
+  @doc """
+  Formats a stored UTC datetime as a compact date and time label
+  (e.g. `"Mar 15, 2024 14:30"`) without timezone conversion.
+
+  Returns `""` for nil or other non-datetime values.
+  """
+  def format_datetime_compact(%DateTime{} = dt) do
+    Calendar.strftime(dt, @compact_datetime_format)
+  end
+
+  def format_datetime_compact(nil), do: ""
+  def format_datetime_compact(_), do: ""
 end
