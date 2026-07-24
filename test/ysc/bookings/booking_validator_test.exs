@@ -23,6 +23,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
   # Helper to create seasons for testing
   defp create_test_seasons do
+    Repo.delete_all(Season)
+    Ysc.Bookings.SeasonCache.invalidate()
+
     # Create Winter season (Oct 1 - Apr 30) - rooms only
     {:ok, _winter} =
       %Season{}
@@ -226,7 +229,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       changeset = Booking.changeset(%Booking{}, attrs, user: user)
 
       refute changeset.valid?
-      assert Keyword.has_key?(changeset.errors, :booking_mode)
+
+      assert elem(Keyword.get(changeset.errors, :booking_mode), 0) ==
+               "Entire-cabin rentals are not available for winter nights in this stay"
     end
 
     test "Summer: allows room bookings", %{user: user, rooms: rooms} do
@@ -265,6 +270,88 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       changeset = Booking.changeset(%Booking{}, attrs, user: user)
 
       assert changeset.valid?
+    end
+
+    test "rejects buyout when any stay night falls in Winter", %{user: user} do
+      # create_test_seasons: Winter starts Oct 1. Fri→Sun includes winter nights.
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2024-10-31],
+        checkout_date: ~D[2024-11-02],
+        booking_mode: :buyout,
+        guests_count: 10,
+        total_price: Money.new(1000, :USD)
+      }
+
+      changeset = Booking.changeset(%Booking{}, attrs, user: user)
+
+      refute changeset.valid?
+
+      assert elem(Keyword.get(changeset.errors, :booking_mode), 0) ==
+               "Entire-cabin rentals are not available for winter nights in this stay"
+    end
+
+    test "rejects buyout spanning Summer into Winter when Summer ends Jul 31",
+         %{
+           user: user
+         } do
+      Repo.delete_all(Season)
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Summer",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-07-31],
+          is_default: true
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2025-04-30],
+          advance_booking_days: 45,
+          max_nights: 4
+        })
+        |> Repo.insert()
+
+      Ysc.Bookings.SeasonCache.invalidate()
+
+      # Thu Jul 30 → Sat Aug 1: includes Jul 31 (summer) and Aug nights (winter)
+      # Use Mon→Thu entirely in July first to confirm buyout ok, then span.
+      ok_attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2026-07-27],
+        checkout_date: ~D[2026-07-30],
+        booking_mode: :buyout,
+        guests_count: 10,
+        total_price: Money.new(1000, :USD)
+      }
+
+      assert Booking.changeset(%Booking{}, ok_attrs, user: user).valid?
+
+      span_attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2026-07-30],
+        checkout_date: ~D[2026-08-02],
+        booking_mode: :buyout,
+        guests_count: 10,
+        total_price: Money.new(1000, :USD)
+      }
+
+      changeset = Booking.changeset(%Booking{}, span_attrs, user: user)
+      refute changeset.valid?
+
+      assert elem(Keyword.get(changeset.errors, :booking_mode), 0) ==
+               "Entire-cabin rentals are not available for winter nights in this stay"
     end
   end
 

@@ -927,6 +927,28 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert path =~ "redirect_status=succeeded"
   end
 
+  test "reloads change data after pricing rule cache invalidation", %{
+    conn: conn
+  } do
+    user = user_fixture()
+    booking = complete_booking!(user)
+    conn = log_in_user(conn, user)
+
+    {view, _html} = live_change(conn, booking)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+
+    send(
+      view.pid,
+      {:pricing_rule_cache_invalidated, System.unique_integer([:positive])}
+    )
+
+    _ = render_async(view, @change_async_timeout)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+    assert is_list(:sys.get_state(view.pid).socket.assigns.seasons)
+  end
+
   defp navigate_calendar_to_month!(view, %Date{} = target) do
     Enum.reduce_while(1..24, nil, fn _, _ ->
       html = render(view)

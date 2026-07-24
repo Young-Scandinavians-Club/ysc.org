@@ -311,11 +311,18 @@ defmodule YscWeb.Components.AvailabilityCalendar do
         socket.assigns[:availability]
       end
 
+    # Prefer fresh seasons from the parent LiveView (after SeasonCache bust).
+    # Fall back to prior assigns / DB only when the parent did not pass seasons.
     seasons =
-      if socket.assigns[:seasons] && socket.assigns[:property] == property do
-        socket.assigns[:seasons]
-      else
-        Bookings.list_seasons(property)
+      cond do
+        Map.has_key?(assigns, :seasons) and is_list(assigns.seasons) ->
+          assigns.seasons
+
+        socket.assigns[:seasons] && socket.assigns[:property] == property ->
+          socket.assigns[:seasons]
+
+        true ->
+          Bookings.list_seasons(property)
       end
 
     new_state =
@@ -1247,25 +1254,41 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     end
   end
 
-  defp get_bookings_reason(_day, _assigns) do
-    "Booking already exists"
+  defp get_bookings_reason(day, assigns) do
+    if winter_buyout_blocked?(day, assigns) do
+      "Entire cabin is not available in winter"
+    else
+      "Booking already exists"
+    end
   end
 
   defp get_other_reason(day, assigns) do
     selection_rule_reason(day, assigns) ||
-      if check_other_rules(
-           day,
-           assigns.checkin_date,
-           assigns.state,
-           assigns[:property],
-           assigns[:availability],
-           assigns[:selected_booking_mode],
-           assigns[:seasons]
-         ) do
-        "Restricted (e.g. min/max stay)"
-      else
-        "Unavailable"
+      cond do
+        winter_buyout_blocked?(day, assigns) ->
+          "Entire cabin is not available in winter"
+
+        check_other_rules(
+          day,
+          assigns.checkin_date,
+          assigns.state,
+          assigns[:property],
+          assigns[:availability],
+          assigns[:selected_booking_mode],
+          assigns[:seasons]
+        ) ->
+          "Restricted (e.g. min/max stay)"
+
+        true ->
+          "Unavailable"
       end
+  end
+
+  defp winter_buyout_blocked?(day, assigns) do
+    assigns[:property] == :tahoe &&
+      assigns[:selected_booking_mode] == :buyout &&
+      is_list(assigns[:seasons]) &&
+      not Ysc.Bookings.Season.buyout_allowed_on_date?(assigns.seasons, day)
   end
 
   defp selection_rule_reason(day, assigns) do

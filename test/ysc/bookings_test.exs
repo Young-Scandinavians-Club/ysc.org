@@ -4089,6 +4089,50 @@ defmodule Ysc.BookingsTest do
         assert availability[date].has_buyout == true
       end
     end
+
+    test "disallows buyout on Winter season nights (including Aug–Sep when Winter starts Aug 1)" do
+      previous = Application.get_env(:ysc, :season_cache_enabled)
+      Application.put_env(:ysc, :season_cache_enabled, false)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :season_cache_enabled, previous)
+      end)
+
+      Repo.delete_all(from(s in Season, where: s.property == :tahoe))
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Summer",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-07-31],
+          is_default: true
+        })
+        |> Repo.insert()
+
+      {:ok, _} =
+        %Season{}
+        |> Season.changeset(%{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2025-04-30],
+          is_default: false,
+          advance_booking_days: 45,
+          max_nights: 4
+        })
+        |> Repo.insert()
+
+      availability =
+        Bookings.get_tahoe_daily_availability(~D[2026-07-28], ~D[2026-09-05])
+
+      assert availability[~D[2026-07-28]].can_book_buyout == true
+      assert availability[~D[2026-07-31]].can_book_buyout == true
+      assert availability[~D[2026-08-01]].can_book_buyout == false
+      assert availability[~D[2026-08-15]].can_book_buyout == false
+      assert availability[~D[2026-09-01]].can_book_buyout == false
+    end
   end
 
   describe "calculate_refund/2 empty matching rules" do

@@ -28,6 +28,7 @@ defmodule Ysc.Bookings do
   alias Ysc.Bookings.{
     Season,
     SeasonCache,
+    AvailabilityCache,
     PricingRule,
     Room,
     RoomCategory,
@@ -112,8 +113,7 @@ defmodule Ysc.Bookings do
 
     case result do
       {:ok, _season} ->
-        # Invalidate season cache
-        Ysc.Bookings.SeasonCache.invalidate()
+        invalidate_season_dependent_caches()
         result
 
       _ ->
@@ -132,8 +132,7 @@ defmodule Ysc.Bookings do
 
     case result do
       {:ok, _season} ->
-        # Invalidate season cache
-        Ysc.Bookings.SeasonCache.invalidate()
+        invalidate_season_dependent_caches()
         result
 
       _ ->
@@ -149,13 +148,18 @@ defmodule Ysc.Bookings do
 
     case result do
       {:ok, _season} ->
-        # Invalidate season cache
-        Ysc.Bookings.SeasonCache.invalidate()
+        invalidate_season_dependent_caches()
         result
 
       _ ->
         result
     end
+  end
+
+  defp invalidate_season_dependent_caches do
+    SeasonCache.invalidate()
+    # Buyout availability depends on season windows
+    AvailabilityCache.invalidate()
   end
 
   ## Pricing Rules
@@ -4353,6 +4357,13 @@ defmodule Ysc.Bookings do
   def get_tahoe_daily_availability(start_date, end_date) do
     date_range = Date.range(start_date, end_date) |> Enum.to_list()
 
+    seasons =
+      if Application.get_env(:ysc, :season_cache_enabled, true) do
+        SeasonCache.get_all_for_property(:tahoe)
+      else
+        Season.list_all_for_property_db(:tahoe)
+      end
+
     # Get all bookings that overlap with the date range
     # Expand the date range by 1 day on each side to capture all relevant checkouts and checkins
     expanded_start = Date.add(start_date, -1)
@@ -4503,9 +4514,11 @@ defmodule Ysc.Bookings do
       # - Not blacked out
       # - No buyout already on that day (confirmed or held)
       # - No room bookings (confirmed or held) on that day
+      # - Season allows buyout (Tahoe winter is rooms-only)
       can_book_buyout =
         not is_blacked_out and not info.has_buyout and not buyout_held and
-          not info.has_room_booking and not has_held_room_booking
+          not info.has_room_booking and not has_held_room_booking and
+          Season.buyout_allowed_on_date?(seasons, date)
 
       {
         date,

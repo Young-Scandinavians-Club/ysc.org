@@ -2,7 +2,18 @@ defmodule YscWeb.BookingChangeLive do
   use YscWeb, :live_view
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, ModificationDateAvailability}
+
+  alias Ysc.Bookings.{
+    AvailabilityCache,
+    BlackoutListCache,
+    Booking,
+    ConfigCacheTelemetry,
+    ModificationDateAvailability,
+    PricingRuleCache,
+    RoomsListCache,
+    SeasonCache
+  }
+
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias YscWeb.BookingActions
@@ -29,6 +40,7 @@ defmodule YscWeb.BookingChangeLive do
       socket = assign_change_loading_shell(socket, booking_id)
 
       if connected?(socket) do
+        subscribe_booking_config_caches()
         {:ok, load_booking_for_change(socket, booking_id, user)}
       else
         {:ok, socket}
@@ -36,7 +48,35 @@ defmodule YscWeb.BookingChangeLive do
     end
   end
 
+  defp subscribe_booking_config_caches do
+    SeasonCache.subscribe()
+    BlackoutListCache.subscribe()
+    AvailabilityCache.subscribe()
+    PricingRuleCache.subscribe()
+    RoomsListCache.subscribe()
+  end
+
   @impl true
+  def handle_info({:season_cache_invalidated, _version}, socket) do
+    {:noreply, refresh_after_config_cache_change(socket, :season)}
+  end
+
+  def handle_info({:blackout_list_cache_invalidated, _version}, socket) do
+    {:noreply, refresh_after_config_cache_change(socket, :blackout)}
+  end
+
+  def handle_info(:availability_cache_invalidated, socket) do
+    {:noreply, refresh_after_config_cache_change(socket, :availability)}
+  end
+
+  def handle_info({:pricing_rule_cache_invalidated, _version}, socket) do
+    {:noreply, refresh_after_config_cache_change(socket, :pricing_rule)}
+  end
+
+  def handle_info({:rooms_list_cache_invalidated, _version}, socket) do
+    {:noreply, refresh_after_config_cache_change(socket, :rooms)}
+  end
+
   def handle_info({:updated_event, attrs}, socket) do
     if Map.get(attrs, :id) == "modification-dates" and
          socket.assigns.change_data_loaded? do
@@ -754,6 +794,18 @@ defmodule YscWeb.BookingChangeLive do
     |> assign(:amount_paid, nil)
     |> assign(:selected_family_members_for_guests, %{})
     |> assign(:other_family_members, [])
+  end
+
+  defp refresh_after_config_cache_change(socket, cache) do
+    booking = socket.assigns[:booking]
+    form = socket.assigns[:form]
+
+    if booking && form && socket.assigns[:change_data_loaded?] do
+      ConfigCacheTelemetry.live_rebuild(:booking_change, cache)
+      load_change_data_async(socket, booking, form)
+    else
+      socket
+    end
   end
 
   defp load_change_data_async(socket, booking, form) do

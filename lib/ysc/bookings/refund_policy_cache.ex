@@ -10,11 +10,19 @@ defmodule Ysc.Bookings.RefundPolicyCache do
 
   require Ysc.Logging
   import Ecto.Query
-  alias Ysc.Bookings.{RefundPolicy}
+  alias Ysc.Bookings.{ConfigCacheTelemetry, RefundPolicy}
 
   @cache_name :ysc_cache
   @cache_prefix "refund_policy:"
   @cache_version_key "refund_policy:version"
+  @pubsub_topic "refund_policy_cache:invalidate"
+
+  @doc """
+  Subscribes the current process to refund-policy cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   @doc """
   Gets an active refund policy from cache or fetches from database and caches it.
@@ -76,7 +84,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
         if Process.whereis(Ysc.PubSub) do
           Phoenix.PubSub.broadcast(
             Ysc.PubSub,
-            "refund_policy_cache:invalidate",
+            @pubsub_topic,
             {:refund_policy_cache_invalidated, new_version}
           )
         end
@@ -85,6 +93,7 @@ defmodule Ysc.Bookings.RefundPolicyCache do
           version: new_version
         )
 
+        ConfigCacheTelemetry.invalidated(:refund_policy)
         :ok
 
       {:error, _reason} ->

@@ -627,4 +627,43 @@ defmodule Ysc.Bookings.SeasonTest do
       assert Season.get_max_nights(nil, :clear_lake) == 30
     end
   end
+
+  describe "buyout_allowed_on_date?/2 and buyout_allowed_for_stay?/3" do
+    test "blocks buyout only on Winter nights" do
+      seasons = [
+        %Season{
+          name: "Summer",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-07-31]
+        },
+        %Season{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2025-04-30]
+        }
+      ]
+
+      assert Season.buyout_allowed_on_date?(seasons, ~D[2026-07-31])
+      refute Season.buyout_allowed_on_date?(seasons, ~D[2026-08-01])
+      refute Season.buyout_allowed_on_date?(seasons, ~D[2026-09-15])
+
+      assert Season.buyout_allowed_for_stay?(
+               seasons,
+               ~D[2026-07-28],
+               ~D[2026-07-31]
+             )
+
+      refute Season.buyout_allowed_for_stay?(
+               seasons,
+               ~D[2026-07-30],
+               ~D[2026-08-02]
+             )
+    end
+
+    test "allows buyout when no season matches" do
+      assert Season.buyout_allowed_on_date?([], ~D[2026-08-15])
+    end
+  end
 end

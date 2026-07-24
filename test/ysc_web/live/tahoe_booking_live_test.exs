@@ -1295,4 +1295,79 @@ defmodule YscWeb.TahoeBookingLiveTest do
     RoomsListCache.invalidate()
     room
   end
+
+  describe "admin config cache rebuild" do
+    test "rebuilds season-derived assigns after season cache invalidation", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      seasons_before = :sys.get_state(view.pid).socket.assigns.seasons
+
+      send(
+        view.pid,
+        {:season_cache_invalidated, System.unique_integer([:positive])}
+      )
+
+      _ = render(view)
+
+      seasons_after = :sys.get_state(view.pid).socket.assigns.seasons
+      assert is_list(seasons_after)
+      assert length(seasons_after) == length(seasons_before)
+    end
+
+    test "rebuilds room snapshot after rooms list cache invalidation", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      room = create_tahoe_room!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      send(
+        view.pid,
+        {:rooms_list_cache_invalidated, System.unique_integer([:positive])}
+      )
+
+      _ = render(view)
+
+      snapshot = :sys.get_state(view.pid).socket.assigns.property_rooms_snapshot
+      assert Enum.any?(snapshot, &(&1.id == room.id))
+    end
+
+    test "bumps availability_cache_version after rooms or availability invalidation",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      version_before =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      send(
+        view.pid,
+        {:rooms_list_cache_invalidated, System.unique_integer([:positive])}
+      )
+
+      _ = render(view)
+
+      version_after_rooms =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      assert version_after_rooms != version_before
+
+      send(view.pid, :availability_cache_invalidated)
+      _ = render(view)
+
+      version_after_availability =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      assert version_after_availability != version_after_rooms
+    end
+  end
 end
