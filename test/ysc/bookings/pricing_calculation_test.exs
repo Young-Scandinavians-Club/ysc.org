@@ -19,7 +19,7 @@ defmodule Ysc.Bookings.PricingCalculationTest do
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingLocker, Booking, RoomCategory}
 
-  import Ysc.AccountsFixtures
+  import Ysc.TestDataFactory
 
   # Fixed summer dates. No seasons are created in these tests, so the
   # `season_id: nil` rules always apply.
@@ -41,7 +41,9 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       })
       |> Ysc.Repo.insert()
 
-    user = user_fixture()
+    # Lifetime membership is required for multi-room Tahoe bookings under
+    # BookingValidator membership room limits.
+    user = user_with_membership(:lifetime)
     %{category: category, user: user}
   end
 

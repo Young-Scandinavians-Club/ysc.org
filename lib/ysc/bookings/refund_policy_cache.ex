@@ -80,35 +80,45 @@ defmodule Ysc.Bookings.RefundPolicyCache do
     # Try to update cache version, but don't fail if cache isn't initialized
     case Cachex.put(@cache_name, @cache_version_key, new_version) do
       {:ok, _} ->
-        # Cache is available - broadcast invalidation event via PubSub
-        if Process.whereis(Ysc.PubSub) do
-          Phoenix.PubSub.broadcast(
-            Ysc.PubSub,
-            @pubsub_topic,
-            {:refund_policy_cache_invalidated, new_version}
-          )
-        end
-
         Ysc.Logging.debug("Refund policy cache invalidated",
           version: new_version
         )
 
-        ConfigCacheTelemetry.invalidated(:refund_policy)
-        :ok
-
       {:error, _reason} ->
-        # Cache not available (e.g., in seed scripts) - silently ignore
+        # Cache not available (e.g., in seed scripts) - still notify LiveViews.
         Ysc.Logging.debug(
-          "Refund policy cache not available, skipping invalidation"
+          "Refund policy cache not available, broadcasting invalidation only"
         )
-
-        :ok
     end
+
+    # Always notify open booking sessions when PubSub is up, even if Cachex failed.
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        {:refund_policy_cache_invalidated, new_version}
+      )
+    end
+
+    ConfigCacheTelemetry.invalidated(:refund_policy)
+    :ok
   rescue
     ArgumentError ->
-      # Cache table doesn't exist (e.g., in seed scripts) - silently ignore
+      # Cache table doesn't exist (e.g., in seed scripts) - still try PubSub.
+      if Process.whereis(Ysc.PubSub) do
+        new_version = System.unique_integer([:monotonic, :positive])
+
+        Phoenix.PubSub.broadcast(
+          Ysc.PubSub,
+          @pubsub_topic,
+          {:refund_policy_cache_invalidated, new_version}
+        )
+      end
+
+      ConfigCacheTelemetry.invalidated(:refund_policy)
+
       Ysc.Logging.debug(
-        "Refund policy cache not initialized, skipping invalidation"
+        "Refund policy cache not initialized, broadcast invalidation only"
       )
 
       :ok

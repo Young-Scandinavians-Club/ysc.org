@@ -5156,6 +5156,20 @@ defmodule YscWeb.TahoeBookingLive do
                show_confirm_modal: false
              )}
 
+          {:error, {:error, %Ecto.Changeset{} = changeset}} ->
+            # Nested error from Repo.rollback({:error, changeset}) in BookingLocker
+            {:noreply,
+             socket
+             |> YscWeb.Flash.put_toast(:error, "Please fix the errors above.",
+               title: "Booking"
+             )
+             |> assign(
+               form_errors: format_errors(changeset),
+               calculated_price: nil,
+               price_error: "Please fix the errors above",
+               show_confirm_modal: false
+             )}
+
           {:error, :membership_required} ->
             message =
               YscWeb.BookingUserMessages.membership_required_plain_message()

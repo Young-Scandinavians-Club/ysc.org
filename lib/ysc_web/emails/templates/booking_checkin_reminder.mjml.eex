@@ -112,7 +112,8 @@
     <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
       <div class="red-alert-box">
         <strong class="strong-block">BEARS ARE ACTIVE ALL YEAR.</strong> They will get in your car. Lock your car doors ALWAYS.<br/><br/>
-        <strong class="strong-block">No Pets Allowed. No Exceptions.</strong>
+        <strong class="strong-block">No Pets Allowed. No Exceptions.</strong><br/>
+        <strong class="strong-block">Guests &amp; Reservations</strong>
         Ensure your reservation for the number of adults staying is accurate. Guests must be accompanied by a Member. Members are responsible for ensuring guests know the cabin policies.<br/><br/>
         <strong class="strong-block">The Bear Wire</strong>
         <strong>Check Status:</strong> The box to the right of the front door should be clicking. If not, reset it in the fuse box in the laundry room (marked "BW").<br/>
@@ -181,7 +182,7 @@
     <mj-text align="left" font-size="18px" line-height="1.6" padding="0px">
       <div class="red-alert-box">
         <ul class="email-list">
-          <li class="email-list-item"><strong>MANDATORY:</strong> Please watch the Clearlake Training Videos (8 short videos) before arrival.</li>
+          <li class="email-list-item"><strong>MANDATORY:</strong> Please watch the <a href="<%= @clear_lake_info_url %>" class="email-link">Clear Lake training videos</a> (8 short videos) before arrival.</li>
           <li class="email-list-item-last"><strong>No Pets:</strong> No dogs, cats, or other pets allowed.</li>
         </ul>
       </div>

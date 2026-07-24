@@ -767,7 +767,8 @@ defmodule YscWeb.Components.AvailabilityCalendar do
     checkin &&
       property == :tahoe &&
       Date.day_of_week(checkin) == 6 &&
-      Date.day_of_week(day) != 7
+      Date.compare(day, checkin) == :gt &&
+      not (Date.diff(day, checkin) == 1 && Date.day_of_week(day) == 7)
   end
 
   defp day_detail_label(day, assigns) do

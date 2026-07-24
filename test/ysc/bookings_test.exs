@@ -3992,19 +3992,20 @@ defmodule Ysc.BookingsTest do
     test "returns true when a complete booking overlaps the requested range" do
       user = user_fixture()
 
+      # Monday–Thursday stay (avoid Saturday check-in weekend rule)
       booking =
         booking_fixture(%{
           user_id: user.id,
           property: :tahoe,
           status: :complete,
-          checkin_date: ~D[2026-08-01],
-          checkout_date: ~D[2026-08-05]
+          checkin_date: ~D[2026-08-03],
+          checkout_date: ~D[2026-08-06]
         })
 
       assert Bookings.has_conflicting_bookings?(
                :tahoe,
-               ~D[2026-08-03],
-               ~D[2026-08-07]
+               ~D[2026-08-04],
+               ~D[2026-08-08]
              )
 
       refute Bookings.has_conflicting_bookings?(

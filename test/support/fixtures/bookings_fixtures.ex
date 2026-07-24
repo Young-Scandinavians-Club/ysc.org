@@ -195,7 +195,9 @@ defmodule Ysc.BookingsFixtures do
         {fixture_rooms, attrs} -> {fixture_rooms, attrs}
       end
 
-    changeset_opts = if rooms, do: [rooms: List.wrap(rooms)], else: []
+    changeset_opts =
+      [skip_validation: true] ++
+        if(rooms, do: [rooms: List.wrap(rooms)], else: [])
 
     {:ok, booking} =
       %Booking{}

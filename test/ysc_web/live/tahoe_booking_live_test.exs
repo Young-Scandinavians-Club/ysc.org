@@ -1,5 +1,7 @@
 defmodule YscWeb.TahoeBookingLiveTest do
-  use YscWeb.ConnCase, async: true
+  # Config caches (:ysc_cache) are process-wide; invalidating them from a
+  # sandboxed test would leak into concurrently running tests.
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.BookingsFixtures

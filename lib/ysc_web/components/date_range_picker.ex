@@ -1045,7 +1045,8 @@ defmodule YscWeb.Components.DateRangePicker do
         "Check-outs are not permitted on Saturdays"
 
       ctx.state == :set_end && start_date && saturday?(start_date) &&
-        !ctx.allow_saturdays && not sunday?(day) ->
+        !ctx.allow_saturdays && Date.compare(day, start_date) == :gt &&
+          not (Date.diff(day, start_date) == 1 && sunday?(day)) ->
         "Saturday check-ins must check out on Sunday"
 
       true ->
