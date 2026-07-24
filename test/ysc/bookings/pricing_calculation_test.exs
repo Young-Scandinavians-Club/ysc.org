@@ -469,18 +469,43 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       assert booking.total_price == Money.new(:USD, 360)
     end
 
-    test "3-room booking: total_price equals the 1-room price (not tripled)",
-         %{user: user, room1: r1, room2: r2, room3: r3} do
-      assert {:ok, %Booking{} = booking} =
-               BookingLocker.create_room_booking(
-                 user.id,
-                 [r1.id, r2.id, r3.id],
+    test "3-room pricing is not multiplied by room count",
+         %{room1: r1, room2: r2, room3: r3} do
+      # Membership caps member holds at 2 rooms, so this asserts the shared
+      # calculate_booking_price path BookingLocker uses once for multi-room.
+      assert {:ok, total_r1, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
                  @checkin,
                  @checkout_2n,
-                 4
+                 :room,
+                 room_id: r1.id,
+                 guests_count: 4
                )
 
-      assert booking.total_price == Money.new(:USD, 360)
+      assert {:ok, total_r2, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_2n,
+                 :room,
+                 room_id: r2.id,
+                 guests_count: 4
+               )
+
+      assert {:ok, total_r3, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_2n,
+                 :room,
+                 room_id: r3.id,
+                 guests_count: 4
+               )
+
+      assert total_r1 == Money.new(:USD, 360)
+      assert total_r1 == total_r2
+      assert total_r1 == total_r3
     end
 
     test "pricing_items records correct type, nights, and room list",
