@@ -234,6 +234,7 @@ defmodule YscWeb.TahoeBookingLive do
         buyout_refund_policy: buyout_refund_policy,
         room_refund_policy: room_refund_policy,
         date_tooltips: %{},
+        blocked_stay_dates: %{},
         date_tooltips_loading?: false,
         max_cabin_capacity: @max_cabin_capacity,
         load_radar: true,
@@ -576,7 +577,7 @@ defmodule YscWeb.TahoeBookingLive do
           seasons
         )
 
-      tooltips =
+      {tooltips, blocked_stay_dates} =
         generate_date_tooltips(
           restricted_min_date,
           restricted_max_date,
@@ -586,7 +587,7 @@ defmodule YscWeb.TahoeBookingLive do
           property_rooms_snapshot
         )
 
-      {request_key, tooltips}
+      {request_key, tooltips, blocked_stay_dates}
     end)
   end
 
@@ -665,7 +666,7 @@ defmodule YscWeb.TahoeBookingLive do
   @impl true
   def handle_async(
         :load_date_tooltips,
-        {:ok, {request_key, date_tooltips}},
+        {:ok, {request_key, date_tooltips, blocked_stay_dates}},
         socket
       ) do
     current_key =
@@ -681,7 +682,9 @@ defmodule YscWeb.TahoeBookingLive do
       |> assign(:date_tooltips_loading?, false)
       |> then(fn s ->
         if request_key == current_key do
-          assign(s, :date_tooltips, date_tooltips)
+          s
+          |> assign(:date_tooltips, date_tooltips)
+          |> assign(:blocked_stay_dates, blocked_stay_dates)
         else
           s
         end
@@ -713,10 +716,8 @@ defmodule YscWeb.TahoeBookingLive do
       "Failed to load date tooltips async: #{inspect(reason)}"
     )
 
-    socket =
-      socket
-      |> assign(:date_tooltips, %{})
-      |> assign(:date_tooltips_loading?, false)
+    # Keep prior tooltips/blocked nights so an empty map is never treated as "fully open"
+    socket = assign(socket, :date_tooltips_loading?, false)
 
     socket =
       case socket.assigns[:date_tooltips_pending_range] do
@@ -819,7 +820,7 @@ defmodule YscWeb.TahoeBookingLive do
       )
 
     # Only regenerate date tooltips if the date range actually changed
-    date_tooltips =
+    {date_tooltips, blocked_stay_dates} =
       if restricted_min_date != socket.assigns[:restricted_min_date] ||
            restricted_max_date != socket.assigns[:restricted_max_date] ||
            !socket.assigns[:date_tooltips] do
@@ -832,7 +833,8 @@ defmodule YscWeb.TahoeBookingLive do
           socket.assigns.property_rooms_snapshot
         )
       else
-        socket.assigns[:date_tooltips] || %{}
+        {socket.assigns[:date_tooltips] || %{},
+         socket.assigns[:blocked_stay_dates] || %{}}
       end
 
     socket =
@@ -851,7 +853,8 @@ defmodule YscWeb.TahoeBookingLive do
         form_errors: %{},
         date_form: date_form,
         date_validation_errors: %{},
-        date_tooltips: date_tooltips
+        date_tooltips: date_tooltips,
+        blocked_stay_dates: blocked_stay_dates
       )
       |> enforce_season_booking_mode()
       |> validate_dates()
@@ -1138,10 +1141,6 @@ defmodule YscWeb.TahoeBookingLive do
                           do: "border-blue-600 bg-blue-50 shadow-sm",
                           else:
                             "border-zinc-300 hover:border-blue-400 hover:bg-zinc-50"
-                        ),
-                        if(not can_select_booking_mode?(@seasons, @today),
-                          do: "opacity-50 cursor-not-allowed",
-                          else: ""
                         )
                       ]}>
                         <input
@@ -1150,7 +1149,6 @@ defmodule YscWeb.TahoeBookingLive do
                           name="booking_mode"
                           value="buyout"
                           checked={@selected_booking_mode == :buyout}
-                          disabled={not can_select_booking_mode?(@seasons, @today)}
                           class="sr-only"
                         />
                         <div class="flex items-center gap-3 mb-2">
@@ -1181,11 +1179,8 @@ defmodule YscWeb.TahoeBookingLive do
                         <p class="text-sm text-zinc-600 ml-9">
                           Reserve the entire cabin exclusively for your group. Includes all 7 bedrooms, 3 bathrooms, and the sauna.
                         </p>
-                        <p
-                          :if={not can_select_booking_mode?(@seasons, @today)}
-                          class="text-xs text-amber-600 mt-2 ml-9 font-medium"
-                        >
-                          Renting the entire cabin is only available May–November.
+                        <p class="text-xs text-amber-600 mt-2 ml-9 font-medium">
+                          Available for summer check-in dates (May–October). Not available in winter (November–April).
                         </p>
                       </label>
                     </div>
@@ -1226,9 +1221,9 @@ defmodule YscWeb.TahoeBookingLive do
                   <p class="text-xs text-blue-900">
                     <%= if can_select_booking_mode?(@seasons, @checkin_date) do %>
                       <strong>Booking options for your dates:</strong>
-                      You can rent the entire cabin or book individual rooms (May–November only).
+                      You can rent the entire cabin or book individual rooms (May–October).
                     <% else %>
-                      <strong>Winter booking (Dec–Apr):</strong>
+                      <strong>Winter booking (November–April):</strong>
                       Individual rooms only. Renting the entire cabin is not available in winter.
                     <% end %>
                   </p>
@@ -1303,9 +1298,12 @@ defmodule YscWeb.TahoeBookingLive do
                         min={@restricted_min_date}
                         max={@restricted_max_date}
                         date_tooltips={@date_tooltips}
+                        blocked_stay_dates={@blocked_stay_dates}
                         property={@property}
                         today={@today}
                         seasons={@seasons}
+                        max_nights={room_picker_max_nights(@seasons, @checkin_date)}
+                        disabled={@date_tooltips_loading?}
                       />
                     </div>
                     <!-- Guests and Children Selection (Dropdown) -->
@@ -1611,9 +1609,10 @@ defmodule YscWeb.TahoeBookingLive do
                     checkout_date={@checkout_date}
                     selected_booking_mode={:buyout}
                     min={@restricted_min_date}
-                    max={@max_booking_date}
+                    max={@restricted_max_date}
                     property={:tahoe}
                     today={@today}
+                    seasons={@seasons}
                   />
                   <!-- Error Messages -->
                   <div class="mt-4 space-y-1">
@@ -2452,18 +2451,7 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                   <!-- Missing Info List (Smart Sidebar) -->
                   <div
-                    :if={
-                      !can_submit_booking?(
-                        @selected_booking_mode,
-                        @checkin_date,
-                        @checkout_date,
-                        get_selected_rooms_for_submit(assigns),
-                        @capacity_error,
-                        @price_error,
-                        @form_errors,
-                        @date_validation_errors
-                      )
-                    }
+                    :if={!can_submit_booking?(assigns)}
                     class="p-3 bg-amber-50 border border-amber-200 rounded"
                   >
                     <p class="text-xs font-semibold text-amber-900 mb-2">
@@ -2502,18 +2490,7 @@ defmodule YscWeb.TahoeBookingLive do
                   </div>
                   <!-- Agreement Checkbox -->
                   <div
-                    :if={
-                      can_submit_booking?(
-                        @selected_booking_mode,
-                        @checkin_date,
-                        @checkout_date,
-                        get_selected_rooms_for_submit(assigns),
-                        @capacity_error,
-                        @price_error,
-                        @form_errors,
-                        @date_validation_errors
-                      )
-                    }
+                    :if={can_submit_booking?(assigns)}
                     class="pt-2"
                   >
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -2541,28 +2518,11 @@ defmodule YscWeb.TahoeBookingLive do
                       phx-click="show-confirm-modal"
                       phx-disable-with="Loading..."
                       disabled={
-                        !can_submit_booking?(
-                          @selected_booking_mode,
-                          @checkin_date,
-                          @checkout_date,
-                          get_selected_rooms_for_submit(assigns),
-                          @capacity_error,
-                          @price_error,
-                          @form_errors,
-                          @date_validation_errors
-                        ) || !Map.get(assigns, :terms_agreed, false)
+                        !can_submit_booking?(assigns) ||
+                          !Map.get(assigns, :terms_agreed, false)
                       }
                       class={
-                        if can_submit_booking?(
-                             @selected_booking_mode,
-                             @checkin_date,
-                             @checkout_date,
-                             get_selected_rooms_for_submit(assigns),
-                             @capacity_error,
-                             @price_error,
-                             @form_errors,
-                             @date_validation_errors
-                           ) &&
+                        if can_submit_booking?(assigns) &&
                              Map.get(assigns, :terms_agreed, false) do
                           "w-full text-lg py-4"
                         else
@@ -2791,14 +2751,16 @@ defmodule YscWeb.TahoeBookingLive do
                           Only one active reservation is allowed per membership. You may book your next stay once your current one is completed.
                         </p>
                         <div>
-                          <p class="font-semibold mb-1">Winter Limits (Dec–Apr):</p>
+                          <p class="font-semibold mb-1">
+                            Winter Limits (November–April):
+                          </p>
                           <ul class="list-disc list-inside ml-2 space-y-1">
                             <li>Single Members: Max 1 room.</li>
                             <li>
                               Family Members: Max 2 rooms (must be same dates).
                             </li>
                             <li>
-                              You cannot rent the entire cabin during winter (December–April).
+                              You cannot rent the entire cabin during winter (November–April).
                             </li>
                           </ul>
                         </div>
@@ -4336,28 +4298,11 @@ defmodule YscWeb.TahoeBookingLive do
                 :if={@can_book}
                 phx-click="create-booking"
                 disabled={
-                  !can_submit_booking?(
-                    @selected_booking_mode,
-                    @checkin_date,
-                    @checkout_date,
-                    get_selected_rooms_for_submit(assigns),
-                    @capacity_error,
-                    @price_error,
-                    @form_errors,
-                    @date_validation_errors
-                  ) || !Map.get(assigns, :terms_agreed, false)
+                  !can_submit_booking?(assigns) ||
+                    !Map.get(assigns, :terms_agreed, false)
                 }
                 class={
-                  if can_submit_booking?(
-                       @selected_booking_mode,
-                       @checkin_date,
-                       @checkout_date,
-                       get_selected_rooms_for_submit(assigns),
-                       @capacity_error,
-                       @price_error,
-                       @form_errors,
-                       @date_validation_errors
-                     ) &&
+                  if can_submit_booking?(assigns) &&
                        Map.get(assigns, :terms_agreed, false) do
                     "px-6 py-3"
                   else
@@ -5747,57 +5692,51 @@ defmodule YscWeb.TahoeBookingLive do
     )
   end
 
-  # Helper function that works with seasons and checkin_date (for template usage)
+  # Buyout is allowed for non-winter check-in dates (matches BookingValidator).
+  # When check-in is not chosen yet, mode selection is allowed; dates are validated later.
   defp can_select_booking_mode?(seasons, checkin_date) when is_list(seasons) do
-    # Check if pricing rules allow buyout mode for the selected date's season
-    if checkin_date do
-      season = Season.find_season_for_date(seasons, checkin_date)
-      season_id = if season, do: season.id, else: nil
-
-      pricing_rule =
-        PricingRule.find_most_specific(
-          :tahoe,
-          season_id,
-          nil,
-          nil,
-          :buyout,
-          :buyout_fixed
-        )
-
-      !is_nil(pricing_rule)
-    else
-      false
-    end
+    buyout_allowed_for_date?(seasons, checkin_date)
   end
 
-  # Helper function that works with socket (for code usage)
   defp can_select_booking_mode?(socket, checkin_date) when is_struct(socket) do
     can_select_booking_mode?(socket.assigns.seasons, checkin_date)
   end
 
-  defp can_submit_booking?(
-         booking_mode,
-         checkin_date,
-         checkout_date,
-         room_ids_or_id,
-         capacity_error,
-         price_error,
-         form_errors,
-         date_validation_errors
-       ) do
-    dates_present? = checkin_date && checkout_date
-    rooms_selected? = has_rooms_selected?(room_ids_or_id)
-    booking_mode_valid? = booking_mode_valid?(booking_mode, rooms_selected?)
+  defp buyout_allowed_for_date?(_seasons, nil), do: true
+
+  defp buyout_allowed_for_date?(seasons, checkin_date) when is_list(seasons) do
+    case Season.find_season_for_date(seasons, checkin_date) do
+      %{name: "Winter"} -> false
+      nil -> false
+      _season -> true
+    end
+  end
+
+  defp room_picker_max_nights(seasons, checkin_date) when is_list(seasons) do
+    date = checkin_date || SeasonHelpers.cabin_today()
+    season = Season.find_season_for_date(seasons, date)
+    Season.get_max_nights(season, :tahoe)
+  end
+
+  defp can_submit_booking?(assigns) when is_map(assigns) do
+    dates_present? = assigns[:checkin_date] && assigns[:checkout_date]
+
+    rooms_selected? =
+      has_rooms_selected?(get_selected_rooms_for_submit(assigns))
+
+    booking_mode_valid? =
+      booking_mode_valid?(assigns[:selected_booking_mode], rooms_selected?)
 
     no_errors? =
       !has_any_errors?(
-        capacity_error,
-        price_error,
-        form_errors,
-        date_validation_errors
+        assigns[:capacity_error],
+        assigns[:price_error],
+        assigns[:form_errors],
+        assigns[:date_validation_errors]
       )
 
-    dates_present? && booking_mode_valid? && no_errors?
+    dates_present? && booking_mode_valid? && no_errors? &&
+      !assigns[:date_tooltips_loading?]
   end
 
   defp has_rooms_selected?(room_ids_or_id) do
@@ -7342,11 +7281,11 @@ defmodule YscWeb.TahoeBookingLive do
     blackouts =
       Bookings.get_overlapping_blackouts(property, start_range, end_range)
 
+    # Check-in blocked = blackout occupied nights (not inclusive end for multi-day;
+    # check-in on blackout end is allowed turnaround).
     blackout_dates =
       blackouts
-      |> Enum.flat_map(fn blackout ->
-        Date.range(blackout.start_date, blackout.end_date) |> Enum.to_list()
-      end)
+      |> Enum.flat_map(&Bookings.blackout_checkin_blocked_dates/1)
       |> MapSet.new()
 
     # Get buyout dates from property inventory
@@ -7360,30 +7299,90 @@ defmodule YscWeb.TahoeBookingLive do
       |> Repo.all()
       |> MapSet.new()
 
-    # Build tooltip map
-    date_range
-    |> Enum.reduce(%{}, fn date, acc ->
-      availability_context = %{
-        date: date,
-        min_date: min_date,
-        max_date: max_date,
-        today: today,
-        property: property,
-        seasons: seasons,
-        all_rooms: all_rooms,
-        bookings: bookings,
-        blackout_dates: blackout_dates,
-        buyout_dates: buyout_dates
-      }
+    # Nights that cannot be stayed (check-in date of each night). Checkout on a
+    # blackout/buyout start date is still allowed via stay-range validation.
+    blocked_stay_dates =
+      build_blocked_stay_dates(
+        date_range,
+        blackouts,
+        buyout_dates,
+        all_rooms,
+        bookings
+      )
 
-      tooltip = get_date_unavailability_reason(availability_context)
+    # Build check-in tooltip map
+    date_tooltips =
+      date_range
+      |> Enum.reduce(%{}, fn date, acc ->
+        availability_context = %{
+          date: date,
+          min_date: min_date,
+          max_date: max_date,
+          today: today,
+          property: property,
+          seasons: seasons,
+          all_rooms: all_rooms,
+          bookings: bookings,
+          blackout_dates: blackout_dates,
+          buyout_dates: buyout_dates
+        }
 
-      if tooltip do
-        Map.put(acc, Date.to_iso8601(date), tooltip)
-      else
-        acc
-      end
-    end)
+        tooltip = get_date_unavailability_reason(availability_context)
+
+        if tooltip do
+          Map.put(acc, Date.to_iso8601(date), tooltip)
+        else
+          acc
+        end
+      end)
+
+    {date_tooltips, blocked_stay_dates}
+  end
+
+  defp build_blocked_stay_dates(
+         date_range,
+         blackouts,
+         buyout_dates,
+         all_rooms,
+         bookings
+       ) do
+    blackout_nights =
+      blackouts
+      |> Enum.reduce(%{}, fn blackout, acc ->
+        blackout
+        |> Bookings.blackout_occupied_nights()
+        |> Enum.reduce(acc, fn night, night_acc ->
+          Map.put_new(
+            night_acc,
+            Date.to_iso8601(night),
+            "This date is unavailable"
+          )
+        end)
+      end)
+
+    buyout_nights =
+      buyout_dates
+      |> Enum.reduce(%{}, fn day, acc ->
+        Map.put(
+          acc,
+          Date.to_iso8601(day),
+          "The entire cabin is already reserved on this date"
+        )
+      end)
+
+    fully_booked_nights =
+      date_range
+      |> Enum.reduce(%{}, fn date, acc ->
+        if check_date_availability_for_rooms(date, all_rooms, bookings) do
+          acc
+        else
+          Map.put(acc, Date.to_iso8601(date), "All rooms are booked")
+        end
+      end)
+
+    blackout_nights
+    |> Map.merge(buyout_nights)
+    |> Map.merge(fully_booked_nights)
   end
 
   # Get the reason why a date is unavailable (returns nil if available)
@@ -7406,11 +7405,7 @@ defmodule YscWeb.TahoeBookingLive do
       ) ->
         "Bookings for this season are not yet open"
 
-      # Saturday check-in (Tahoe rule)
-      Date.day_of_week(context.date) == 6 && context.property == :tahoe ->
-        "Check-ins are not permitted on Saturdays"
-
-      # Blackout
+      # Blackout occupied night (cannot check in for overnight on this date)
       MapSet.member?(context.blackout_dates, context.date) ->
         "This date is unavailable"
 

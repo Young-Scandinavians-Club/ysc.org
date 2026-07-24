@@ -456,7 +456,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     changeset =
       %Booking{}
-      |> Booking.changeset(attrs, skip_validation: true)
+      |> Booking.changeset(attrs)
       |> put_change(:subtotal_price, a[:subtotal_price])
       |> put_change(:discount_total, a[:discount_total])
       |> put_change(
@@ -594,7 +594,11 @@ defmodule Ysc.Bookings.BookingLocker do
         prop_inv =
           fetch_property_inventory(property, checkin_date, checkout_date)
 
-        # Validate availability
+        # Validate blackouts and inventory availability
+        if Bookings.has_blackout?(property, checkin_date, checkout_date) do
+          Repo.rollback({:error, :blackout_conflict})
+        end
+
         validate_room_booking_availability(prop_inv, room_inv)
 
         # Update all room_inventory rows using optimistic locking
@@ -959,7 +963,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     changeset =
       %Booking{}
-      |> Booking.changeset(attrs, rooms: params.rooms, skip_validation: true)
+      |> Booking.changeset(attrs, rooms: params.rooms)
       |> put_change(:subtotal_price, extras[:subtotal_price])
       |> put_change(:discount_total, extras[:discount_total])
       |> put_change(
@@ -1322,7 +1326,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
     changeset =
       %Booking{}
-      |> Booking.changeset(attrs, skip_validation: true)
+      |> Booking.changeset(attrs)
       |> put_change(:subtotal_price, a[:subtotal_price])
       |> put_change(:discount_total, a[:discount_total])
       |> put_change(
@@ -1570,8 +1574,25 @@ defmodule Ysc.Bookings.BookingLocker do
     # Ensure status is :complete for admin bookings
     attrs = Map.put(attrs, :status, :complete)
 
+    property = Map.get(attrs, :property) || Map.get(attrs, "property")
+
+    checkin_date =
+      Map.get(attrs, :checkin_date) || Map.get(attrs, "checkin_date")
+
+    checkout_date =
+      Map.get(attrs, :checkout_date) || Map.get(attrs, "checkout_date")
+
+    if property && checkin_date && checkout_date &&
+         Bookings.has_blackout?(property, checkin_date, checkout_date) do
+      {:error, :blackout_conflict}
+    else
+      do_create_admin_booking(attrs, rooms, skip_email, skip_reminders)
+    end
+  end
+
+  defp do_create_admin_booking(attrs, rooms, skip_email, skip_reminders) do
     Repo.transaction(fn ->
-      # Create the booking
+      # Create the booking (admin skips season/weekend rules, but blackouts are checked above)
       changeset =
         %Booking{}
         |> Booking.changeset(attrs, rooms: rooms, skip_validation: true)

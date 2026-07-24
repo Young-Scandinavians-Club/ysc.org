@@ -7,6 +7,15 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
   alias Ysc.Bookings
 
+  alias Ysc.Bookings.{
+    AvailabilityCache,
+    BlackoutListCache,
+    RoomCategory,
+    RoomsListCache
+  }
+
+  alias Ysc.Repo
+
   describe "deferred room availability" do
     test "populates room cards after connect when booking dates are in the URL",
          %{
@@ -347,6 +356,113 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       # Check for calendar or date picker elements
       assert html =~ "Tahoe"
+    end
+
+    test "room mode allows checkout on blackout start date", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      # Dedicated unbooked room so date tooltips are not "All rooms are booked"
+      create_tahoe_room!()
+
+      {checkin, _} = tahoe_booking_dates(21)
+      # Blackout begins on checkout day (valid leave-by-11am checkout)
+      checkout = Date.add(checkin, 2)
+      blackout_end = Date.add(checkout, 3)
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :tahoe,
+          start_date: checkout,
+          end_date: blackout_end,
+          reason: "Test blackout"
+        })
+
+      AvailabilityCache.invalidate()
+      BlackoutListCache.invalidate()
+      RoomsListCache.invalidate()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?booking_mode=room")
+      render_async(view, 5_000)
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+      checkout_iso = "#{Date.to_iso8601(checkout)}T00:00:00Z"
+
+      blocked_checkout_iso =
+        "#{Date.to_iso8601(Date.add(checkout, 1))}T00:00:00Z"
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+
+      view
+      |> element(~s|#1_calendar button[phx-value-date="#{checkin_iso}"]|)
+      |> render_click()
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkout_iso}"]:not([disabled])|
+             )
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{blocked_checkout_iso}"][disabled]|
+             )
+    end
+
+    test "room mode allows check-in on blackout end date", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      create_tahoe_room!()
+
+      {checkin, _} = tahoe_booking_dates(28)
+      blackout_start = Date.add(checkin, -3)
+      # Check-in on blackout end is valid turnaround
+      blackout_end = checkin
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :tahoe,
+          start_date: blackout_start,
+          end_date: blackout_end,
+          reason: "Ends on check-in day"
+        })
+
+      AvailabilityCache.invalidate()
+      BlackoutListCache.invalidate()
+      RoomsListCache.invalidate()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?booking_mode=room")
+      render_async(view, 5_000)
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+
+      blocked_night_iso =
+        "#{Date.to_iso8601(Date.add(blackout_end, -1))}T00:00:00Z"
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{blocked_night_iso}"][disabled]|
+             )
     end
   end
 
@@ -1141,5 +1257,42 @@ defmodule YscWeb.TahoeBookingLiveTest do
       end
 
     Date.add(date, days_ahead)
+  end
+
+  defp navigate_room_calendar_to_month!(view, %Date{} = target) do
+    Enum.reduce_while(1..24, nil, fn _, _ ->
+      html = render(view)
+
+      if html =~ Calendar.strftime(target, "%B %Y") do
+        {:halt, :ok}
+      else
+        view
+        |> element("#1_calendar [phx-click=next-month]")
+        |> render_click()
+
+        {:cont, nil}
+      end
+    end) ||
+      flunk(
+        "Could not navigate calendar to #{Calendar.strftime(target, "%B %Y")}"
+      )
+  end
+
+  defp create_tahoe_room! do
+    {:ok, category} =
+      %RoomCategory{}
+      |> RoomCategory.changeset(%{name: "Tahoe calendar test category"})
+      |> Repo.insert()
+
+    {:ok, room} =
+      Bookings.create_room(%{
+        name: "Tahoe calendar test room #{System.unique_integer([:positive])}",
+        property: :tahoe,
+        room_category_id: category.id,
+        capacity_max: 4
+      })
+
+    RoomsListCache.invalidate()
+    room
   end
 end

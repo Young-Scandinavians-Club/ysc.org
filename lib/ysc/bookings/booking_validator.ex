@@ -116,7 +116,9 @@ defmodule Ysc.Bookings.BookingValidator do
 
   defp validate_advance_booking_limit(changeset, _property), do: changeset
 
-  # If any day in the inclusive reservation span is Saturday, Sunday must be included
+  # Tahoe weekend rules:
+  # - Saturday check-in must be a one-night stay checking out Sunday
+  # - Any other stay that includes Saturday must also include Sunday
   defp validate_weekend_requirement(changeset) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
@@ -124,21 +126,49 @@ defmodule Ysc.Bookings.BookingValidator do
 
     if checkin_date && checkout_date && property == :tahoe &&
          Date.compare(checkout_date, checkin_date) != :lt do
-      reservation_dates =
-        Date.range(checkin_date, checkout_date) |> Enum.to_list()
-
-      has_saturday =
-        Enum.any?(reservation_dates, fn date ->
-          day_of_week(date) == 6
-        end)
-
-      if has_saturday do
-        validate_sunday_included(changeset, reservation_dates)
+      if day_of_week(checkin_date) == 6 do
+        validate_saturday_checkin_one_night(
+          changeset,
+          checkin_date,
+          checkout_date
+        )
       else
-        changeset
+        reservation_dates =
+          Date.range(checkin_date, checkout_date) |> Enum.to_list()
+
+        has_saturday =
+          Enum.any?(reservation_dates, fn date ->
+            day_of_week(date) == 6
+          end)
+
+        if has_saturday do
+          validate_sunday_included(changeset, reservation_dates)
+        else
+          changeset
+        end
       end
     else
       changeset
+    end
+  end
+
+  defp validate_saturday_checkin_one_night(
+         changeset,
+         checkin_date,
+         checkout_date
+       ) do
+    one_night_to_sunday? =
+      Date.diff(checkout_date, checkin_date) == 1 &&
+        day_of_week(checkout_date) == 7
+
+    if one_night_to_sunday? do
+      changeset
+    else
+      Ecto.Changeset.add_error(
+        changeset,
+        :checkout_date,
+        "Check-ins on Saturday must check out on Sunday (one-night stay only)"
+      )
     end
   end
 
@@ -227,7 +257,7 @@ defmodule Ysc.Bookings.BookingValidator do
         end
       else
         # For single members: Check for ANY active/future bookings, max 1 total
-        today = Date.utc_today()
+        today = Ysc.Bookings.SeasonHelpers.cabin_today()
 
         active_bookings_query =
           from b in Booking,
@@ -276,7 +306,7 @@ defmodule Ysc.Bookings.BookingValidator do
       # Get primary user for family group check
       primary_user = get_primary_user_for_booking(user)
       family_user_ids = Ysc.Accounts.get_family_group_user_ids(primary_user)
-      today = Date.utc_today()
+      today = Ysc.Bookings.SeasonHelpers.cabin_today()
 
       active_bookings_query =
         from b in Booking,

@@ -212,7 +212,9 @@ defmodule YscWeb.BookingChangeLiveTest do
            )
   end
 
-  test "Tahoe change calendar blocks Saturday check-in", %{conn: conn} do
+  test "Tahoe change calendar allows Saturday check-in for Sat→Sun stays", %{
+    conn: conn
+  } do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
@@ -220,6 +222,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     {view, _html} = live_change(conn, booking)
 
     saturday = first_saturday_on_or_after(Date.add(booking.checkin_date, 7))
+    sunday = Date.add(saturday, 1)
+    monday = Date.add(saturday, 2)
 
     view
     |> element("#modification-dates [phx-click=open-calendar]")
@@ -229,7 +233,23 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(
              view,
-             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"][disabled]|
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    view
+    |> element(
+      ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]|
+    )
+    |> render_click()
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(sunday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(monday)}T00:00:00Z"][disabled]|
            )
   end
 

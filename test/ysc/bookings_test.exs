@@ -1509,6 +1509,72 @@ defmodule Ysc.BookingsTest do
              ) == false
     end
 
+    test "has_blackout?/3 treats single-day blackout as blocking that night" do
+      night = Date.utc_today() |> Date.add(35)
+
+      _blackout =
+        create_blackout_fixture(%{
+          property: :tahoe,
+          start_date: night,
+          end_date: night
+        })
+
+      # Overnight on the blackout night conflicts
+      assert Bookings.has_blackout?(:tahoe, night, Date.add(night, 1)) == true
+
+      # Checkout on the blackout day is allowed (leave by 11am)
+      assert Bookings.has_blackout?(:tahoe, Date.add(night, -1), night) == false
+
+      # Check-in on the day after a single-day blackout is allowed
+      assert Bookings.has_blackout?(
+               :tahoe,
+               Date.add(night, 1),
+               Date.add(night, 2)
+             ) == false
+    end
+
+    test "has_blackout?/3 allows check-in on multi-day blackout end date" do
+      start_date = Date.utc_today() |> Date.add(40)
+      end_date = Date.add(start_date, 3)
+
+      _blackout =
+        create_blackout_fixture(%{
+          property: :tahoe,
+          start_date: start_date,
+          end_date: end_date
+        })
+
+      assert Bookings.has_blackout?(:tahoe, end_date, Date.add(end_date, 1)) ==
+               false
+
+      assert Bookings.has_blackout?(
+               :tahoe,
+               Date.add(end_date, -1),
+               Date.add(end_date, 1)
+             ) == true
+    end
+
+    test "blackout_occupied_nights/1 and stay_occupied_nights/2 match turnaround model" do
+      assert Bookings.stay_occupied_nights(~D[2026-07-24], ~D[2026-07-26]) == [
+               ~D[2026-07-24],
+               ~D[2026-07-25]
+             ]
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: ~D[2026-07-26],
+               end_date: ~D[2026-07-29]
+             }) == [
+               ~D[2026-07-26],
+               ~D[2026-07-27],
+               ~D[2026-07-28]
+             ]
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: ~D[2026-07-26],
+               end_date: ~D[2026-07-26]
+             }) == [~D[2026-07-26]]
+    end
+
     test "get_overlapping_blackouts/3 returns overlapping blackouts" do
       checkin = Date.utc_today() |> Date.add(30)
       checkout = Date.add(checkin, 2)

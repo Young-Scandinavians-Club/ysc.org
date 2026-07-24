@@ -2383,10 +2383,60 @@ defmodule Ysc.Bookings do
   defp invalidate_blackout_caches(_), do: :ok
 
   @doc """
+  Occupied overnight dates for a stay `[checkin_date, checkout_date)`.
+
+  A one-night stay check-in D / check-out D+1 occupies night D only.
+  """
+  def stay_occupied_nights(checkin_date, checkout_date)
+      when not is_nil(checkin_date) and not is_nil(checkout_date) do
+    if Date.compare(checkout_date, checkin_date) == :gt do
+      Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
+    else
+      []
+    end
+  end
+
+  def stay_occupied_nights(_, _), do: []
+
+  @doc """
+  Calendar nights a blackout occupies.
+
+  Multi-day blackouts (`start < end`) occupy `start..end-1` so:
+  - checkout on blackout start is allowed (leave by 11 AM before blackout)
+  - check-in on blackout end is allowed (arrive after blackout ends at 11 AM)
+
+  Single-day blackouts (`start == end`) occupy that night only, so overnight
+  stays on that date conflict; checkout on that date is still allowed.
+  """
+  def blackout_occupied_nights(%{start_date: start_date, end_date: end_date})
+      when not is_nil(start_date) and not is_nil(end_date) do
+    case Date.compare(start_date, end_date) do
+      :lt ->
+        Date.range(start_date, Date.add(end_date, -1)) |> Enum.to_list()
+
+      :eq ->
+        [start_date]
+
+      :gt ->
+        []
+    end
+  end
+
+  def blackout_occupied_nights(_), do: []
+
+  @doc """
+  Dates that cannot be used as check-in because the first overnight would fall
+  on a blackout-occupied night. Same set as `blackout_occupied_nights/1`.
+  """
+  def blackout_checkin_blocked_dates(blackout),
+    do: blackout_occupied_nights(blackout)
+
+  @doc """
   Checks if a blackout overlaps with a booking date range, accounting for check-in/check-out times.
 
-  Since check-out is at 11 AM and check-in is at 3 PM, a blackout and booking can share the
-  same date if one ends and the other starts on that date.
+  Conflict is defined as overlap between stay occupied nights
+  (`checkin..checkout-1`) and blackout occupied nights
+  (`start..end-1`, or `[start]` when `start == end`).
 
   ## Parameters
   - `property`: The property to check
@@ -2408,36 +2458,22 @@ defmodule Ysc.Bookings do
   """
   def has_blackout?(property, checkin_date, checkout_date)
       when is_atom(property) do
-    # Get all blackouts that might overlap
-    blackouts = get_overlapping_blackouts(property, checkin_date, checkout_date)
+    stay_nights =
+      stay_occupied_nights(checkin_date, checkout_date) |> MapSet.new()
 
-    # Check if any blackout actually conflicts, accounting for check-in/checkout times
-    Enum.any?(blackouts, fn blackout ->
-      # A blackout conflicts with a booking if:
-      # 1. The booking's check-in date is before the blackout's end date
-      #    AND the booking's checkout date is after the blackout's start date
-      # 2. BUT we need to account for same-day turnarounds:
-      #    - If booking checkout is on blackout start date: No conflict (11 AM checkout vs 3 PM blackout start)
-      #    - If booking checkin is on blackout end date: No conflict (3 PM checkin vs 11 AM blackout end)
-
-      cond do
-        # Same-day turnarounds: no conflict
-        checkout_date == blackout.start_date ->
-          false
-
-        checkin_date == blackout.end_date ->
-          false
-
-        # Otherwise, check for standard overlap
-        # Conflict occurs if: checkin < blackout_end AND checkout > blackout_start
-        Date.compare(checkin_date, blackout.end_date) == :lt &&
-            Date.compare(checkout_date, blackout.start_date) == :gt ->
-          true
-
-        true ->
-          false
-      end
-    end)
+    if MapSet.size(stay_nights) == 0 do
+      false
+    else
+      property
+      |> get_overlapping_blackouts(checkin_date, checkout_date)
+      |> Enum.any?(fn blackout ->
+        blackout
+        |> blackout_occupied_nights()
+        |> MapSet.new()
+        |> MapSet.disjoint?(stay_nights)
+        |> Kernel.not()
+      end)
+    end
   end
 
   @doc """

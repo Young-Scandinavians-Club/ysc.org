@@ -66,7 +66,7 @@
     <mj-text align="left" font-size="24px" line-height="1.4" padding="0px" font-weight="bold">Payment</mj-text>
     <mj-spacer height="12px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Updated Total:</strong> <span style="color: #059669; font-weight: bold;"><%= @booking.total_amount %></span>
+      <strong>Updated Total:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @booking.total_amount %></span>
     </mj-text>
     <%= if @additional_payment do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
