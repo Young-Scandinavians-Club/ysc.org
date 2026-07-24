@@ -319,6 +319,90 @@ defmodule Ysc.Bookings.BookingLockerTest do
                  2
                )
     end
+
+    test "returns blackout_conflict when room stay overlaps a blackout", %{
+      user: user
+    } do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Room blackout conflict",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(55))
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :tahoe,
+                 start_date: checkin,
+                 end_date: checkout,
+                 reason: "Room blackout"
+               })
+
+      assert {:error, {:error, :blackout_conflict}} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+    end
+
+    test "allows room booking that checks out on blackout start", %{user: user} do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 100),
+          booking_mode: :room,
+          price_unit: :per_person_per_night,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      category = create_room_category()
+
+      {:ok, room} =
+        Bookings.create_room(%{
+          name: "Room blackout turnaround",
+          property: :tahoe,
+          room_category_id: category.id,
+          capacity_max: 4
+        })
+
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(58))
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :tahoe,
+                 start_date: checkout,
+                 end_date: Date.add(checkout, 3),
+                 reason: "Starts at checkout"
+               })
+
+      assert {:ok, %Booking{}} =
+               BookingLocker.create_room_booking(
+                 user.id,
+                 room.id,
+                 checkin,
+                 checkout,
+                 2
+               )
+    end
   end
 
   describe "create_room_booking/6 buyout overlap" do
@@ -403,7 +487,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(209)
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(14))
       checkout = Date.add(checkin, 2)
 
       result =
@@ -508,7 +592,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 6
         })
 
-      checkin = Date.utc_today() |> Date.add(204)
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(16))
       checkout = Date.add(checkin, 2)
 
       result =
@@ -533,7 +617,10 @@ defmodule Ysc.Bookings.BookingLockerTest do
       end
     end
 
-    test "multi-room booking combines pricing for multiple rooms", %{user: user} do
+    test "multi-room booking combines pricing for multiple rooms" do
+      # Family/lifetime required — BookingValidator enforces max rooms on create
+      user = Ysc.TestDataFactory.user_with_membership(:lifetime)
+
       {:ok, _} =
         Ysc.Bookings.create_pricing_rule(%{
           amount: Money.new(:USD, 100),
@@ -561,7 +648,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(14)
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(14))
       checkout = Date.add(checkin, 2)
       guests = 2
       nights = Date.diff(checkout, checkin)
@@ -654,6 +741,37 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "create_admin_booking/2" do
+    test "returns blackout_conflict when dates overlap a blackout", %{
+      user: user
+    } do
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(420))
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :tahoe,
+                 start_date: checkin,
+                 end_date: checkout,
+                 reason: "Admin blackout block"
+               })
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      assert {:error, :blackout_conflict} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+    end
+
     test "enqueues booking confirmation email when skip_email is false", %{
       user: user
     } do
@@ -1667,7 +1785,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "confirms canceled hold when inventory is still available", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(120)
+      # Summer weekday — buyout + weekend rules now enforced on create
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(21))
       checkout = Date.add(checkin, 2)
 
       assert {:ok, booking} =
@@ -1692,7 +1811,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
            user: user
          } do
       other_user = user_fixture(%{phone_number: "+14159098312"})
-      checkin = Date.utc_today() |> Date.add(121)
+      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(28))
       checkout = Date.add(checkin, 2)
 
       assert {:ok, booking} =
@@ -2201,5 +2320,15 @@ defmodule Ysc.Bookings.BookingLockerTest do
       |> Ysc.Repo.insert()
 
     category
+  end
+
+  # Prefer Mon–Thu so Tahoe weekend rules do not interfere with blackout tests.
+  defp weekday_on_or_after(%Date{} = date) do
+    case Date.day_of_week(date, :monday) do
+      day when day in 1..4 -> date
+      5 -> Date.add(date, 3)
+      6 -> Date.add(date, 2)
+      7 -> Date.add(date, 1)
+    end
   end
 end

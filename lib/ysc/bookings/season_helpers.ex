@@ -11,6 +11,18 @@ defmodule Ysc.Bookings.SeasonHelpers do
   import Ecto.Query, warn: false
   alias Ysc.Bookings.Season
 
+  @cabin_timezone "America/Los_Angeles"
+
+  @doc """
+  Today's calendar date in the cabin timezone (`America/Los_Angeles`).
+
+  Use this for advance-booking cutoffs and other cabin-local date rules so
+  behavior matches the booking calendars.
+  """
+  def cabin_today do
+    DateTime.now!(@cabin_timezone) |> DateTime.to_date()
+  end
+
   @doc """
   Gets the current season and its actual date range for a property.
 
@@ -20,7 +32,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
   """
   def get_current_season_info(
         property,
-        today \\ Date.utc_today(),
+        today \\ cabin_today(),
         seasons \\ nil
       )
 
@@ -69,7 +81,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
   """
   def calculate_max_booking_date(
         property,
-        today \\ Date.utc_today(),
+        today \\ cabin_today(),
         seasons \\ nil
       )
 
@@ -135,7 +147,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
   def date_selectable?(
         property,
         date,
-        today \\ Date.utc_today(),
+        today \\ cabin_today(),
         seasons \\ nil
       )
 
@@ -170,7 +182,7 @@ defmodule Ysc.Bookings.SeasonHelpers do
         _property,
         _checkin_date,
         _checkout_date,
-        _today \\ Date.utc_today()
+        _today \\ cabin_today()
       ) do
     # Allow bookings across seasons - no restriction
     %{}
@@ -180,12 +192,15 @@ defmodule Ysc.Bookings.SeasonHelpers do
   Validates advance booking limit using rules from the season(s) that the booking dates fall into.
 
   If a booking extends into a season with a limit, that limit applies to the booking.
+
+  `today` defaults to the cabin timezone (`America/Los_Angeles`). Checkout day
+  must also fall within the advance window.
   """
   def validate_advance_booking_limit(
         property,
         checkin_date,
         checkout_date,
-        today \\ Date.utc_today()
+        today \\ cabin_today()
       ) do
     # Check the season for the checkin_date
     checkin_season = Season.for_date(property, checkin_date)

@@ -153,7 +153,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       cabin_master_name: cabin_master_name,
       cabin_master_email: cabin_master_email,
       cabin_master_phone: cabin_master_phone,
-      booking_url: booking_url(booking.id)
+      booking_url: booking_url(booking.id),
+      clear_lake_info_url: absolute_url("/bookings/clear-lake?tab=information")
     }
   end
 end

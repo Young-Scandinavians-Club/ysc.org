@@ -3,8 +3,18 @@ defmodule Ysc.Bookings.RoomsListCache do
   Cache for property room lists (preloaded categories and images).
   """
 
+  alias Ysc.Bookings.ConfigCacheTelemetry
+
   @cache_name :ysc_cache
   @cache_version_key "rooms_list:version"
+  @pubsub_topic "rooms_list_cache:invalidate"
+
+  @doc """
+  Subscribes the current process to rooms-list cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   def list(property) when is_atom(property) do
     cache_key = "rooms:list:#{property}"
@@ -15,19 +25,22 @@ defmodule Ysc.Bookings.RoomsListCache do
   end
 
   def invalidate do
-    if Ysc.ProcessCache.enabled?() do
-      new_version = System.unique_integer([:monotonic, :positive])
-      Cachex.put(@cache_name, @cache_version_key, new_version)
+    new_version = System.unique_integer([:monotonic, :positive])
 
-      if Process.whereis(Ysc.PubSub) do
-        Phoenix.PubSub.broadcast(
-          Ysc.PubSub,
-          "rooms_list_cache:invalidate",
-          {:rooms_list_cache_invalidated, new_version}
-        )
-      end
+    if Ysc.ProcessCache.enabled?() do
+      Cachex.put(@cache_name, @cache_version_key, new_version)
     end
 
+    # Always notify LiveViews so in-memory assigns rebuild even when Cachex is off.
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        {:rooms_list_cache_invalidated, new_version}
+      )
+    end
+
+    ConfigCacheTelemetry.invalidated(:rooms)
     :ok
   end
 

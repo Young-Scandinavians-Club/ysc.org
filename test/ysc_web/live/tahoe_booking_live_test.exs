@@ -1,11 +1,22 @@
 defmodule YscWeb.TahoeBookingLiveTest do
-  use YscWeb.ConnCase, async: true
+  # Config caches (:ysc_cache) are process-wide; invalidating them from a
+  # sandboxed test would leak into concurrently running tests.
+  use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.BookingsFixtures
   import Ysc.TestDataFactory
 
   alias Ysc.Bookings
+
+  alias Ysc.Bookings.{
+    AvailabilityCache,
+    BlackoutListCache,
+    RoomCategory,
+    RoomsListCache
+  }
+
+  alias Ysc.Repo
 
   describe "deferred room availability" do
     test "populates room cards after connect when booking dates are in the URL",
@@ -347,6 +358,113 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       # Check for calendar or date picker elements
       assert html =~ "Tahoe"
+    end
+
+    test "room mode allows checkout on blackout start date", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      # Dedicated unbooked room so date tooltips are not "All rooms are booked"
+      create_tahoe_room!()
+
+      {checkin, _} = tahoe_booking_dates(21)
+      # Blackout begins on checkout day (valid leave-by-11am checkout)
+      checkout = Date.add(checkin, 2)
+      blackout_end = Date.add(checkout, 3)
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :tahoe,
+          start_date: checkout,
+          end_date: blackout_end,
+          reason: "Test blackout"
+        })
+
+      AvailabilityCache.invalidate()
+      BlackoutListCache.invalidate()
+      RoomsListCache.invalidate()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?booking_mode=room")
+      render_async(view, 5_000)
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+      checkout_iso = "#{Date.to_iso8601(checkout)}T00:00:00Z"
+
+      blocked_checkout_iso =
+        "#{Date.to_iso8601(Date.add(checkout, 1))}T00:00:00Z"
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+
+      view
+      |> element(~s|#1_calendar button[phx-value-date="#{checkin_iso}"]|)
+      |> render_click()
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkout_iso}"]:not([disabled])|
+             )
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{blocked_checkout_iso}"][disabled]|
+             )
+    end
+
+    test "room mode allows check-in on blackout end date", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      create_tahoe_room!()
+
+      {checkin, _} = tahoe_booking_dates(28)
+      blackout_start = Date.add(checkin, -3)
+      # Check-in on blackout end is valid turnaround
+      blackout_end = checkin
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :tahoe,
+          start_date: blackout_start,
+          end_date: blackout_end,
+          reason: "Ends on check-in day"
+        })
+
+      AvailabilityCache.invalidate()
+      BlackoutListCache.invalidate()
+      RoomsListCache.invalidate()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe?booking_mode=room")
+      render_async(view, 5_000)
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+
+      blocked_night_iso =
+        "#{Date.to_iso8601(Date.add(blackout_end, -1))}T00:00:00Z"
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{blocked_night_iso}"][disabled]|
+             )
     end
   end
 
@@ -1141,5 +1259,117 @@ defmodule YscWeb.TahoeBookingLiveTest do
       end
 
     Date.add(date, days_ahead)
+  end
+
+  defp navigate_room_calendar_to_month!(view, %Date{} = target) do
+    Enum.reduce_while(1..24, nil, fn _, _ ->
+      html = render(view)
+
+      if html =~ Calendar.strftime(target, "%B %Y") do
+        {:halt, :ok}
+      else
+        view
+        |> element("#1_calendar [phx-click=next-month]")
+        |> render_click()
+
+        {:cont, nil}
+      end
+    end) ||
+      flunk(
+        "Could not navigate calendar to #{Calendar.strftime(target, "%B %Y")}"
+      )
+  end
+
+  defp create_tahoe_room! do
+    {:ok, category} =
+      %RoomCategory{}
+      |> RoomCategory.changeset(%{name: "Tahoe calendar test category"})
+      |> Repo.insert()
+
+    {:ok, room} =
+      Bookings.create_room(%{
+        name: "Tahoe calendar test room #{System.unique_integer([:positive])}",
+        property: :tahoe,
+        room_category_id: category.id,
+        capacity_max: 4
+      })
+
+    RoomsListCache.invalidate()
+    room
+  end
+
+  describe "admin config cache rebuild" do
+    test "rebuilds season-derived assigns after season cache invalidation", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      seasons_before = :sys.get_state(view.pid).socket.assigns.seasons
+
+      send(
+        view.pid,
+        {:season_cache_invalidated, System.unique_integer([:positive])}
+      )
+
+      _ = render(view)
+
+      seasons_after = :sys.get_state(view.pid).socket.assigns.seasons
+      assert is_list(seasons_after)
+      assert length(seasons_after) == length(seasons_before)
+    end
+
+    test "rebuilds room snapshot after rooms list cache invalidation", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      room = create_tahoe_room!()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      send(
+        view.pid,
+        {:rooms_list_cache_invalidated, System.unique_integer([:positive])}
+      )
+
+      _ = render(view)
+
+      snapshot = :sys.get_state(view.pid).socket.assigns.property_rooms_snapshot
+      assert Enum.any?(snapshot, &(&1.id == room.id))
+    end
+
+    test "bumps availability_cache_version after rooms or availability invalidation",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      version_before =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      send(
+        view.pid,
+        {:rooms_list_cache_invalidated, System.unique_integer([:positive])}
+      )
+
+      _ = render(view)
+
+      version_after_rooms =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      assert version_after_rooms != version_before
+
+      send(view.pid, :availability_cache_invalidated)
+      _ = render(view)
+
+      version_after_availability =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      assert version_after_availability != version_after_rooms
+    end
   end
 end

@@ -49,7 +49,7 @@
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">You will receive a separate email notification once your refund has been approved and processed.</mj-text>
     <% else %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold;"><%= @refund.amount %></span>
+      <strong>Refund Amount:</strong> <span style="color: #059669; font-weight: bold; margin-left: 8px;"><%= @refund.amount %></span>
     </mj-text>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your refund will be processed and credited to your original payment method within 5-10 business days.</mj-text>
     <% end %>
