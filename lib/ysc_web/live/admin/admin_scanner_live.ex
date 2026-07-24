@@ -8,6 +8,7 @@ defmodule YscWeb.AdminScannerLive do
   alias Ysc.Events
   alias Ysc.Scanning
   alias Ysc.Scanning.QrToken
+  alias YscWeb.Admin.DateTimeDisplay
 
   # --- Render ---
 
@@ -144,7 +145,7 @@ defmodule YscWeb.AdminScannerLive do
                   phx-hook="LocalTime"
                   data-utc-time={DateTime.to_iso8601(session.inserted_at)}
                 >
-                  {Calendar.strftime(session.inserted_at, "%b %d, %Y %H:%M UTC")}
+                  {DateTimeDisplay.format_utc_datetime(session.inserted_at)}
                 </span>
               </span>
             </div>
@@ -227,10 +228,7 @@ defmodule YscWeb.AdminScannerLive do
                 data-utc-time={DateTime.to_iso8601(@detail_session.inserted_at)}
                 class="whitespace-nowrap"
               >
-                {Calendar.strftime(
-                  @detail_session.inserted_at,
-                  "%b %d, %Y at %H:%M UTC"
-                )}
+                {DateTimeDisplay.format_utc_datetime_at(@detail_session.inserted_at)}
               </span>
             </div>
             <.button
@@ -281,7 +279,7 @@ defmodule YscWeb.AdminScannerLive do
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(record.inserted_at)}
                     >
-                      {Calendar.strftime(record.inserted_at, "%H:%M:%S UTC")}
+                      {DateTimeDisplay.format_utc_time(record.inserted_at)}
                     </span>
                   </span>
                   <span
@@ -367,7 +365,7 @@ defmodule YscWeb.AdminScannerLive do
                         phx-hook="LocalTime"
                         data-utc-time={DateTime.to_iso8601(record.inserted_at)}
                       >
-                        {Calendar.strftime(record.inserted_at, "%H:%M:%S UTC")}
+                        {DateTimeDisplay.format_utc_time(record.inserted_at)}
                       </span>
                     </td>
                     <td
@@ -479,7 +477,7 @@ defmodule YscWeb.AdminScannerLive do
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(session.inserted_at)}
                     >
-                      {Calendar.strftime(session.inserted_at, "%b %d at %H:%M UTC")}
+                      {DateTimeDisplay.format_utc_datetime_short(session.inserted_at)}
                     </span>
                   </div>
                 </div>
@@ -539,7 +537,7 @@ defmodule YscWeb.AdminScannerLive do
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(session.inserted_at)}
                     >
-                      {Calendar.strftime(session.inserted_at, "%b %d at %H:%M UTC")}
+                      {DateTimeDisplay.format_utc_datetime_short(session.inserted_at)}
                     </span>
                   </div>
                 </div>
@@ -1083,13 +1081,13 @@ defmodule YscWeb.AdminScannerLive do
         <div :if={@scan_result.member_since} class="flex justify-between">
           <span class="text-emerald-100">Member since</span>
           <span class="font-semibold">
-            {Calendar.strftime(@scan_result.member_since, "%B %Y")}
+            {DateTimeDisplay.format_date_month_year(@scan_result.member_since)}
           </span>
         </div>
         <div :if={@scan_result.renewal_date} class="flex justify-between">
           <span class="text-emerald-100">Renews</span>
           <span class="font-semibold">
-            {Calendar.strftime(@scan_result.renewal_date, "%B %d, %Y")}
+            {DateTimeDisplay.format_calendar_date_long(@scan_result.renewal_date)}
           </span>
         </div>
         <div
@@ -1223,7 +1221,7 @@ defmodule YscWeb.AdminScannerLive do
           phx-hook="LocalTime"
           data-utc-time={DateTime.to_iso8601(@scan_result.checked_in_at)}
         >
-          {Calendar.strftime(@scan_result.checked_in_at, "%B %d, %Y %H:%M:%S UTC")}
+          {DateTimeDisplay.format_utc_datetime_long(@scan_result.checked_in_at)}
         </span>
       </p>
       <div class="flex gap-3 mb-0">
@@ -1762,7 +1760,7 @@ defmodule YscWeb.AdminScannerLive do
 
     options =
       Enum.map(events, fn event ->
-        date_str = Calendar.strftime(event.start_date, "%b %d")
+        date_str = DateTimeDisplay.format_month_day(event.start_date)
         {"#{event.title} (#{date_str})", event.id}
       end)
 
