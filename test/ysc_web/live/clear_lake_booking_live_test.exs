@@ -595,7 +595,21 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?guests_count=15")
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "day",
+        "guests_count" => "15"
+      }
+
+      {:ok, view, _html} =
+        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
+
+      :ok = Sandbox.allow(Repo, self(), view.pid)
 
       render_click(view, "increase-guests", %{})
 
