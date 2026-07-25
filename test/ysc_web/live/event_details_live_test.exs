@@ -415,7 +415,10 @@ defmodule YscWeb.EventDetailsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
 
       assert html =~ event.title
-      assert html =~ "Sign in to buy tickets. An active YSC membership is required."
+
+      assert html =~
+               "Sign in to buy tickets. An active YSC membership is required."
+
       assert html =~ "Sign In to Continue"
     end
 
