@@ -1,12 +1,15 @@
 defmodule Ysc.Bookings.SeasonHelpersTest do
   use Ysc.DataCase, async: false
 
+  import Ysc.BookingsFixtures
+
   alias Ysc.Bookings.{Season, SeasonHelpers}
   alias Ysc.Repo
 
   setup do
-    Ysc.Bookings.SeasonCache.invalidate()
-    Cachex.clear(:ysc_cache)
+    # These tests insert narrow fixtures and assert exact matches; leftover
+    # committed seasons (e.g. year-spanning Winter) would shadow them.
+    clear_seasons!()
     :ok
   end
 

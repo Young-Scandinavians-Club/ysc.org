@@ -12,15 +12,95 @@ defmodule Ysc.BookingsFixtures do
   alias Ysc.Repo
 
   @doc """
-  Widens season advance-booking limits so locker/integration tests can use
+  Deletes all seasons in the current SQL sandbox and invalidates SeasonCache.
+
+  Committed seasons in the shared test DB are visible inside sandboxed tests;
+  never assume an empty seasons table without calling this (or `seed_canonical_seasons!/0`).
+  """
+  def clear_seasons! do
+    Repo.delete_all(Season)
+    Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
+  @doc """
+  Replaces all seasons with the canonical Tahoe/Clear Lake calendar used in seeds.
+
+  Winter: Nov 1 – Apr 30 (rooms-only buyout rule). Summer: May 1 – Oct 31
+  (default, unlimited advance for Tahoe summer). Prefer this over assuming
+  leftover seasons in `ysc_test` match production.
+  """
+  def seed_canonical_seasons! do
+    clear_seasons!()
+
+    base_year = 2024
+    winter_start = Date.new!(base_year, 11, 1)
+    winter_end = Date.new!(base_year + 1, 4, 30)
+    summer_start = Date.new!(base_year, 5, 1)
+    summer_end = Date.new!(base_year, 10, 31)
+
+    for attrs <- [
+          %{
+            name: "Winter",
+            property: :tahoe,
+            start_date: winter_start,
+            end_date: winter_end,
+            is_default: false,
+            advance_booking_days: 45,
+            max_nights: 4
+          },
+          %{
+            name: "Summer",
+            property: :tahoe,
+            start_date: summer_start,
+            end_date: summer_end,
+            is_default: true,
+            advance_booking_days: nil,
+            max_nights: 4
+          },
+          %{
+            name: "Winter",
+            property: :clear_lake,
+            start_date: winter_start,
+            end_date: winter_end,
+            is_default: false,
+            advance_booking_days: nil,
+            max_nights: 30
+          },
+          %{
+            name: "Summer",
+            property: :clear_lake,
+            start_date: summer_start,
+            end_date: summer_end,
+            is_default: true,
+            advance_booking_days: nil,
+            max_nights: 30
+          }
+        ] do
+      %Season{}
+      |> Season.changeset(attrs)
+      |> Repo.insert!()
+    end
+
+    Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
+  @doc """
+  Widens season advance-booking windows so locker/integration tests can use
   far-future dates for isolation without tripping validation.
+
+  Uses a large day count (not `nil`): `nil` means “no per-date cap” but
+  `SeasonHelpers.calculate_max_booking_date/2` still clamps to the end of the
+  current season when the next season also has no limit. Prefer ~2 years over
+  365 so year+2 isolation dates remain valid.
   """
   def allow_far_future_booking_dates do
     from(s in Season)
-    |> Repo.update_all(set: [advance_booking_days: 365])
+    |> Repo.update_all(set: [advance_booking_days: 800])
 
     Ysc.Bookings.SeasonCache.invalidate()
-    Cachex.clear(:ysc_cache)
+    :ok
   end
 
   @doc """

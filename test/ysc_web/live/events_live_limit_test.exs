@@ -90,15 +90,32 @@ defmodule YscWeb.EventsLiveLimitTest do
   end
 
   test "limits maximum past events to 50", %{conn: conn} do
-    organizer = user_fixture()
+    organizer = user_fixture_fast()
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    for i <- 1..52 do
-      create_past_event(%{
-        title: "Past Limit #{i}",
-        organizer: organizer
-      })
-    end
+    # Bulk insert — N× changeset/insert was ~1s of fixture tax for this test.
+    rows =
+      for i <- 1..52 do
+        %{
+          id: Ecto.ULID.generate(),
+          title: "Past Limit #{i}",
+          description: "A test event description",
+          start_date: DateTime.add(now, -30 - i, :day),
+          end_date: DateTime.add(now, -29 - i, :day),
+          state: :published,
+          location_name: "Test Location",
+          max_attendees: 100,
+          organizer_id: organizer.id,
+          reference_id: "EVT-LIMIT-#{System.unique_integer([:positive])}-#{i}",
+          lock_version: 1,
+          show_participants: false,
+          tickets_tbd: false,
+          inserted_at: now,
+          updated_at: now
+        }
+      end
 
+    Repo.insert_all(Events.Event, rows)
     Ysc.Events.EventListCache.invalidate()
 
     {:ok, view, _html} = live(conn, ~p"/events")

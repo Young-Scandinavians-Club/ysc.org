@@ -566,6 +566,8 @@ defmodule Ysc.AccountsTest do
         Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
       end)
 
+      primary = Repo.preload(primary, :sub_accounts)
+
       assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
 
       refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
@@ -2523,6 +2525,8 @@ defmodule Ysc.AccountsTest do
       on_exit(fn ->
         Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
       end)
+
+      primary = Repo.preload(primary, :sub_accounts)
 
       assert {:ok, linked} = Accounts.admin_link_user_to_family(primary, victim)
       assert linked.primary_user_id == primary.id
