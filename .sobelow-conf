@@ -19,6 +19,8 @@
         "lib/ysc/wp_migration/validate.ex",
         "lib/ysc/wp_migration/sql_to_duckdb.ex",
         "lib/ysc/wp_migration/php_deserialize.ex",
-        "lib/ysc/wp_migration/wp_repo.ex"
+        "lib/ysc/wp_migration/wp_repo.ex",
+        "lib/ysc/wp_migration/newsletter_csv_import.ex",
+        "lib/ysc/wp_migration/reconcile_csvs.ex"
     ]
 ]
