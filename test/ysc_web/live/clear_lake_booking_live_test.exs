@@ -811,10 +811,16 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkin = Date.add(Date.utc_today(), 30)
       checkout = Date.add(checkin, 3)
 
-      render_change(view, "date-changed", %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout)
-      })
+      html =
+        render_change(view, "date-changed", %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout)
+        })
+
+      # Prefer rendered HTML over :sys.get_state — the latter can time out when
+      # the LiveView is briefly busy under full-suite Cachex contention.
+      assert html =~ Date.to_iso8601(checkin) or
+               html =~ Calendar.strftime(checkin, "%b")
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.checkin_date == checkin

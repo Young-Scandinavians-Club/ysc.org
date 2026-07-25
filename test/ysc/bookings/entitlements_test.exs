@@ -552,19 +552,7 @@ defmodule Ysc.Bookings.EntitlementsTest do
         end
       end
 
-      {checkin, checkout} =
-        Date.utc_today()
-        |> then(fn today ->
-          base = Date.add(today, 40)
-
-          checkin =
-            case Date.day_of_week(base, :monday) do
-              1 -> base
-              n -> Date.add(base, 8 - n)
-            end
-
-          {checkin, Date.add(checkin, 3)}
-        end)
+      {checkin, checkout} = locker_buyout_dates(5)
 
       assert {:ok, booking} =
                BookingLocker.create_buyout_booking(

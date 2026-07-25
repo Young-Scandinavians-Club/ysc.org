@@ -542,7 +542,9 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
          %{
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(160)
+      # Keep within Clear Lake summer; calendar max clamps to season end when
+      # advance_booking_days is nil.
+      checkin = Date.utc_today() |> Date.add(21)
       checkout = Date.add(checkin, 2)
       booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -589,7 +591,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
         |> Ecto.Changeset.change(state: :active)
         |> Repo.update!()
 
-      checkin = Date.utc_today() |> Date.add(170)
+      checkin = Date.utc_today() |> Date.add(21)
       checkout = Date.add(checkin, 2)
       booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -639,7 +641,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
   defp ensure_clear_lake_day_pricing_rule do
     Ysc.Bookings.SeasonCache.invalidate()
-    Cachex.clear(:ysc_cache)
+    Ysc.Bookings.PricingRuleCache.invalidate()
 
     {:ok, _} =
       Bookings.create_pricing_rule(%{

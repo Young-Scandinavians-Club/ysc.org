@@ -185,7 +185,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
 
-    checkin = Date.utc_today() |> Date.add(160) |> first_monday_on_or_after()
+    # Stay inside Clear Lake summer (calendar max is season end when advance is nil).
+    checkin = Date.utc_today() |> Date.add(21) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)
     booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -384,12 +385,14 @@ defmodule YscWeb.BookingChangeLiveTest do
       })
 
     room = create_test_room!()
-    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    # Mon–Wed room stay, then a Wed–Fri buyout (weekday nights only) so the
+    # one-night extension collides without hitting winter/weekend rules.
+    {checkin, _} = locker_buyout_dates(8)
     checkout = Date.add(checkin, 2)
     booking = complete_room_booking!(user, room, checkin, checkout)
 
     overlapping_checkin = checkout
-    overlapping_checkout = Date.add(checkout, 4)
+    overlapping_checkout = Date.add(checkout, 2)
 
     assert {:ok, _} =
              BookingLocker.create_buyout_booking(
@@ -656,7 +659,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
 
-    checkin = Date.utc_today() |> Date.add(160) |> first_monday_on_or_after()
+    checkin = Date.utc_today() |> Date.add(21) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)
     booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 

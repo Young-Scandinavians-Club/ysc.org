@@ -32,6 +32,9 @@ defmodule Ysc.Tzdata.HttpClient do
     |> Keyword.take([:follow_redirect])
     |> Keyword.put(:headers, headers)
     |> Keyword.put(:compressed, false)
+    # Transport errors must fail fast; Req's default retry/backoff turns a
+    # refused connection into multi-second delays (seen as ~7s in tests).
+    |> Keyword.put(:retry, false)
     |> Keyword.put_new(:redirect, false)
     |> maybe_enable_redirect()
   end

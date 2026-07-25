@@ -3,8 +3,8 @@ defmodule Ysc.GooglePhotos.Limits do
   Google Photos Library API size and length limits.
   """
 
-  @max_photo_bytes 200 * 1024 * 1024
-  @max_video_bytes 20 * 1024 * 1024 * 1024
+  @default_max_photo_bytes 200 * 1024 * 1024
+  @default_max_video_bytes 20 * 1024 * 1024 * 1024
   @max_album_title_length 500
   @max_filename_length 255
 
@@ -12,13 +12,25 @@ defmodule Ysc.GooglePhotos.Limits do
   @photo_extensions ~w(.jpg .jpeg .png .heic .webp .gif)
 
   @doc "Maximum photo upload size in bytes (200 MB)."
-  def max_photo_bytes, do: @max_photo_bytes
+  def max_photo_bytes do
+    Application.get_env(
+      :ysc,
+      :google_photos_max_photo_bytes,
+      @default_max_photo_bytes
+    )
+  end
 
   @doc "Maximum video upload size in bytes (20 GB)."
-  def max_video_bytes, do: @max_video_bytes
+  def max_video_bytes do
+    Application.get_env(
+      :ysc,
+      :google_photos_max_video_bytes,
+      @default_max_video_bytes
+    )
+  end
 
   @doc "Largest allowed upload size (used for LiveView `max_file_size`)."
-  def max_upload_bytes, do: @max_video_bytes
+  def max_upload_bytes, do: max_video_bytes()
 
   @doc "File extensions accepted for uploads (including leading dot)."
   def accepted_extensions, do: @photo_extensions ++ @video_extensions
@@ -45,7 +57,7 @@ defmodule Ysc.GooglePhotos.Limits do
 
   @doc "Maximum byte size allowed for the given filename."
   def max_bytes_for_filename(filename) do
-    if video?(filename), do: @max_video_bytes, else: @max_photo_bytes
+    if video?(filename), do: max_video_bytes(), else: max_photo_bytes()
   end
 
   @doc "Maximum album title length in characters."
@@ -102,10 +114,10 @@ defmodule Ysc.GooglePhotos.Limits do
       not photo?(normalized) and not video?(normalized) ->
         {:error, :unsupported_type}
 
-      video?(normalized) and size_bytes > @max_video_bytes ->
+      video?(normalized) and size_bytes > max_video_bytes() ->
         {:error, :video_too_large}
 
-      photo?(normalized) and size_bytes > @max_photo_bytes ->
+      photo?(normalized) and size_bytes > max_photo_bytes() ->
         {:error, :photo_too_large}
 
       size_bytes < 0 ->

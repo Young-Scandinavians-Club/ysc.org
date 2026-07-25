@@ -15,6 +15,7 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
 
   import Mox
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
 
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, BookingLocker, PendingRefund}
@@ -25,6 +26,8 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
   setup :verify_on_exit!
 
   setup do
+    # Tahoe buyout stays must land on summer nights; keep seasons + cache coherent.
+    seed_canonical_seasons!()
     Ysc.Bookings.RefundPolicyCache.invalidate()
 
     Ledgers.ensure_basic_accounts()
@@ -213,11 +216,9 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
          %{
            user: user
          } do
-      # Create booking with payment
-      checkin_date = ~D[2025-12-15]
-      checkout_date = ~D[2025-12-18]
-      # 45 days before check-in
-      cancellation_date = ~D[2025-11-01]
+      {checkin_date, checkout_date} = locker_buyout_dates(0)
+      # Far enough before check-in that no policy rule applies
+      cancellation_date = Date.add(checkin_date, -45)
 
       {booking, payment} =
         create_booking_with_payment(
@@ -512,25 +513,25 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
           {7, "0.0"}
         ])
 
-      # Test 30+ days (should get 100% but still pending because policy rule applies)
-      checkin_date = ~D[2025-12-15]
-      checkout_date = ~D[2025-12-18]
-      # 30 days before
-      cancellation_date_30 = ~D[2025-11-15]
+      # Distinct buyout slots so concurrent holds do not collide
+      {checkin1, checkout1} = locker_buyout_dates(1)
+      {checkin2, checkout2} = locker_buyout_dates(2)
+      {checkin3, checkout3} = locker_buyout_dates(3)
 
+      # 30+ days (100% but still pending because policy rule applies)
       {booking1, payment1} =
         create_booking_with_payment(
           user,
           :tahoe,
           :buyout,
-          checkin_date,
-          checkout_date
+          checkin1,
+          checkout1
         )
 
       result1 =
         Bookings.cancel_booking(
           booking1,
-          cancellation_date_30,
+          Date.add(checkin1, -30),
           "User requested"
         )
 
@@ -542,23 +543,20 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
       assert pending_refund1.applied_rule_days_before_checkin == 30
       assert pending_refund1.status == :pending
 
-      # Test 14 days (should get 50% and pending)
-      # 14 days before
-      cancellation_date_14 = ~D[2025-12-01]
-
+      # 14 days (50% and pending)
       {booking2, _payment2} =
         create_booking_with_payment(
           user,
           :tahoe,
           :buyout,
-          checkin_date,
-          checkout_date
+          checkin2,
+          checkout2
         )
 
       result2 =
         Bookings.cancel_booking(
           booking2,
-          cancellation_date_14,
+          Date.add(checkin2, -14),
           "User requested"
         )
 
@@ -567,21 +565,22 @@ defmodule Ysc.Bookings.CancelBookingRefundTest do
       assert %PendingRefund{} = pending_refund2
       assert pending_refund2.applied_rule_days_before_checkin == 14
 
-      # Test 5 days (should get 0% and pending)
-      # 5 days before
-      cancellation_date_5 = ~D[2025-12-10]
-
+      # 5 days (0% and pending)
       {booking3, _payment3} =
         create_booking_with_payment(
           user,
           :tahoe,
           :buyout,
-          checkin_date,
-          checkout_date
+          checkin3,
+          checkout3
         )
 
       result3 =
-        Bookings.cancel_booking(booking3, cancellation_date_5, "User requested")
+        Bookings.cancel_booking(
+          booking3,
+          Date.add(checkin3, -5),
+          "User requested"
+        )
 
       assert {:ok, _, refund_amount3, pending_refund3} = result3
       assert Money.equal?(refund_amount3, Money.new(0, :USD))
