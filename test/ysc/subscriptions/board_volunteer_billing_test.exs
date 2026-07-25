@@ -145,7 +145,7 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
       sub = user_fixture()
       {:ok, sub} = Ysc.Accounts.assign_board_position(sub, :treasurer)
 
-      sub =
+      _sub =
         sub
         |> Ecto.Changeset.change(%{
           primary_user_id: primary.id,
@@ -175,7 +175,10 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
       primary = Ysc.Repo.preload(primary, :sub_accounts)
 
       sub
-      |> Ecto.Changeset.change(%{primary_user_id: nil, family_relationship: nil})
+      |> Ecto.Changeset.change(%{
+        primary_user_id: nil,
+        family_relationship: nil
+      })
       |> Ysc.Repo.update!()
 
       refute BoardVolunteerBilling.household_on_board?(primary)
