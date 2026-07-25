@@ -966,7 +966,10 @@ defmodule YscWeb.AdminScannerLiveTest do
       assert_push_event(view, "stop-camera", %{})
     end
 
-    test "scan_result is rate limited after many scans", %{conn: conn, admin: admin} do
+    test "scan_result is rate limited after many scans", %{
+      conn: conn,
+      admin: admin
+    } do
       # Hammer ETS state is shared across async tests; reset this admin's bucket.
       _ = Ysc.ScanRateLimit.set("scan:#{admin.id}", :timer.minutes(1), 0)
 
