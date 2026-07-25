@@ -858,6 +858,30 @@ defmodule Ysc.Accounts.AuthServiceTest do
     end
   end
 
+  describe "get_user_login_activity_datetimes/1" do
+    test "returns both last login and last activity in one query" do
+      user = user_fixture()
+      conn = mock_conn()
+
+      {:ok, login_event} = AuthService.log_login_success(user, conn)
+      {:ok, logout_event} = AuthService.log_logout(user, conn)
+
+      assert {last_login_at, last_activity_at} =
+               AuthService.get_user_login_activity_datetimes(user)
+
+      assert DateTime.diff(last_login_at, login_event.inserted_at, :second) == 0
+
+      assert DateTime.diff(last_activity_at, logout_event.inserted_at, :second) ==
+               0
+    end
+
+    test "returns nil tuple when no session events exist" do
+      user = user_fixture()
+
+      assert AuthService.get_user_login_activity_datetimes(user) == {nil, nil}
+    end
+  end
+
   describe "get_last_login_session_datetime/1" do
     test "returns datetime of last login or logout" do
       user = user_fixture()

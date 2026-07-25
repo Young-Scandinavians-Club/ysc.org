@@ -2538,6 +2538,14 @@ defmodule Ysc.Accounts do
   end
 
   @doc """
+  Returns the last successful login and last login/logout activity timestamps
+  for a user in a single database round trip.
+  """
+  def get_user_login_activity_datetimes(user) do
+    AuthService.get_user_login_activity_datetimes(user)
+  end
+
+  @doc """
   Gets the last login session event for a user (either login or logout).
   This helps determine when the user was last active on the site.
   Returns nil if no login/logout events are found.
