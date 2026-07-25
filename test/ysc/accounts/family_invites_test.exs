@@ -242,6 +242,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         assert job.args["recipient"] == email
 
         invite_url = job.args["params"]["invite_url"]
+
         expected_url =
           YscWeb.Emails.Helpers.absolute_url(
             "/family-invite/#{invite.token}/accept"
@@ -392,7 +393,9 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
         assert job.args["template"] == "family_invite_accepted"
 
         family_management_url = job.args["params"]["family_management_url"]
-        expected_url = YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
+
+        expected_url =
+          YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
 
         assert family_management_url == expected_url
         assert String.starts_with?(family_management_url, "http")
