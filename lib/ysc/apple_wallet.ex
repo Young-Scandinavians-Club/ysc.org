@@ -161,7 +161,8 @@ defmodule Ysc.AppleWallet do
           nil
       end
 
-    event_date = EventDateTime.format_pass_datetime(event.start_date, event.start_time)
+    event_date =
+      EventDateTime.format_pass_datetime(event.start_date, event.start_time)
 
     secondary_fields =
       [

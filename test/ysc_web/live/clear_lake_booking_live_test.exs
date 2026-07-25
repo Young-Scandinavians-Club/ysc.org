@@ -2288,6 +2288,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       )
 
       _html = render(view)
+      render_async(view, 10_000)
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.checkin_date == checkin
@@ -2307,6 +2308,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       send(view.pid, {:availability_calendar_date_changed, %{}})
 
       _html = render(view)
+      render_async(view, 10_000)
 
       after_assigns = :sys.get_state(view.pid).socket.assigns
       assert after_assigns.checkin_date == before_assigns.checkin_date
@@ -2326,6 +2328,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       send(view.pid, {:availability_calendar_date_changed, :not_a_map})
 
       _html = render(view)
+      render_async(view, 10_000)
 
       after_assigns = :sys.get_state(view.pid).socket.assigns
       assert after_assigns.checkin_date == before_assigns.checkin_date

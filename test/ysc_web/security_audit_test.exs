@@ -1586,7 +1586,9 @@ defmodule YscWeb.SecurityAuditTest do
           :count
         )
 
-      render_click(view, "create-booking", %{})
+      # Use render_click/3 HTML instead of render/1: ClearLakeBookingLive can keep
+      # availability async work in flight and a follow-up render blocks under CI load.
+      html = render_click(view, "create-booking", %{})
 
       hold_count_after =
         Repo.aggregate(
@@ -1597,7 +1599,7 @@ defmodule YscWeb.SecurityAuditTest do
         )
 
       assert hold_count_before == hold_count_after
-      assert render(view) =~ "active YSC membership"
+      assert html =~ "active YSC membership"
     end
 
     test "tahoe create-booking LiveView event does not create a hold without membership",
@@ -1614,8 +1616,11 @@ defmodule YscWeb.SecurityAuditTest do
         "booking_mode" => "day"
       }
 
-      {:ok, view, _html} =
+      {:ok, view, html} =
         live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      assert html =~ ~s|id="tahoe-booking-eligibility-banner-public"|
+      assert html =~ "active YSC membership"
 
       render_async(view, 5_000)
 
@@ -1627,7 +1632,20 @@ defmodule YscWeb.SecurityAuditTest do
           :count
         )
 
-      render_click(view, "create-booking", %{})
+      # Tahoe requires booking confirmations before create-booking reaches the
+      # server-side membership gate. Avoid render/1 after the click: TahoeBookingLive
+      # keeps a date-tooltip async in flight and render blocks until it finishes,
+      # which can exceed the per-test timeout under CI load.
+      for event <- [
+            "toggle-terms-agreement",
+            "toggle-linens-confirmation",
+            "toggle-chores-confirmation",
+            "toggle-party-size-confirmation"
+          ] do
+        render_click(view, event, %{})
+      end
+
+      html = render_click(view, "create-booking", %{})
 
       hold_count_after =
         Repo.aggregate(
@@ -1638,7 +1656,7 @@ defmodule YscWeb.SecurityAuditTest do
         )
 
       assert hold_count_before == hold_count_after
-      assert render(view) =~ "active YSC membership"
+      assert html =~ "active YSC membership"
     end
 
     test "checkout redirects pending_approval users to pending-review", %{

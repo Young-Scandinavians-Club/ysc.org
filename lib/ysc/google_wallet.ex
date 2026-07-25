@@ -327,7 +327,11 @@ defmodule Ysc.GoogleWallet do
         if(event.start_date,
           do: %{
             "header" => "Date",
-            "body" => EventDateTime.format_pass_datetime(event.start_date, event.start_time),
+            "body" =>
+              EventDateTime.format_pass_datetime(
+                event.start_date,
+                event.start_time
+              ),
             "id" => "date"
           }
         )
