@@ -781,7 +781,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkout = Date.add(checkin, 3)
 
       {:ok, view, _html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
         )
@@ -1199,7 +1199,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=invalid&checkout_date=bad&guests=xyz"
         )
@@ -1214,7 +1214,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkin = Date.add(Date.utc_today(), 30)
 
       {:ok, _view, html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=invalid&guests=abc"
         )
@@ -1227,7 +1227,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?tab=information&info_tab=getting-there"
         )
@@ -1240,7 +1240,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=&checkout_date=&guests="
         )
@@ -1359,8 +1359,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      :ok = Sandbox.allow(Repo, self(), view.pid)
-
       for i <- 1..2 do
         date = Date.add(Date.utc_today(), 30 + i)
 
@@ -1455,7 +1453,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?tab=information&info_tab=getting-there"
         )
@@ -1468,7 +1466,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, _view, html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?tab=information&info_tab=house-rules"
         )
@@ -1803,7 +1801,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkout = Date.add(checkin, 3)
 
       {:ok, view, _html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
         )
@@ -2191,7 +2189,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkout = Date.add(checkin, -5)
 
       {:ok, view, _html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
         )
@@ -2208,7 +2206,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkout = Date.add(checkin, 3)
 
       {:ok, view, _html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}&guests=4"
         )
@@ -2394,7 +2392,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
         |> Repo.insert()
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
-      :ok = Sandbox.allow(Repo, self(), view.pid)
 
       html = render(view)
 
@@ -2424,8 +2421,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
           conn,
           "/bookings/clear-lake?" <> URI.encode_query(params)
         )
-
-      :ok = Sandbox.allow(Repo, self(), view.pid)
 
       html = render(view)
 
@@ -2584,12 +2579,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkout = Date.add(checkin, 3)
 
       {:ok, view, _html} =
-        live(
+        live_clear_lake(
           conn,
           ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
         )
-
-      :ok = Sandbox.allow(Repo, self(), view.pid)
 
       render_click(view, "reset-dates", %{})
 
