@@ -117,6 +117,34 @@ defmodule Ysc.Tickets.StripeServiceTest do
                )
     end
 
+    test "attaches customer and receipt_email from user option", %{
+      ticket_order: ticket_order
+    } do
+      user = Ysc.Accounts.get_user!(ticket_order.user_id)
+
+      user =
+        user
+        |> Ysc.Accounts.User.update_user_changeset(%{
+          stripe_id: "cus_from_user"
+        })
+        |> Ysc.Repo.update!()
+
+      expect(Ysc.StripeMock, :create_payment_intent, fn params, _opts ->
+        assert params.customer == "cus_from_user"
+        assert params.receipt_email == user.email
+
+        {:ok,
+         %Stripe.PaymentIntent{
+           id: "pi_user_opts",
+           status: "requires_payment_method",
+           amount: params.amount
+         }}
+      end)
+
+      assert {:ok, _} =
+               StripeService.create_payment_intent(ticket_order, user: user)
+    end
+
     test "handles Stripe errors gracefully", %{ticket_order: ticket_order} do
       expect(Ysc.StripeMock, :create_payment_intent, fn _params, _opts ->
         {:error,

@@ -67,6 +67,10 @@ defmodule YscWeb.BookingCheckoutLive do
       selected_family_members_for_guests: %{},
       show_price_details: false,
       stripe_payment_element_ready: false,
+      stripe_billing_details:
+        Ysc.Customers.payment_element_default_values_json(
+          socket.assigns.current_user
+        ),
       page_title: "Booking Checkout",
       meta_description:
         "Complete your cabin booking with Young Scandinavians Club."
@@ -508,6 +512,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 phx-hook="StripeElements"
                 data-client-secret={@payment_intent.client_secret}
                 data-booking-id={@booking.id}
+                data-billing-details={@stripe_billing_details}
               >
                 <.payment_element_loading :if={!@stripe_payment_element_ready} />
                 <%!-- phx-update="ignore" keeps LiveView from re-applying hidden on each assign --%>
@@ -1930,13 +1935,11 @@ defmodule YscWeb.BookingCheckoutLive do
       }
     }
 
-    # Add customer if user has Stripe ID
-    payment_intent_params =
-      if user.stripe_id do
-        Map.put(payment_intent_params, :customer, user.stripe_id)
-      else
-        payment_intent_params
-      end
+    {payment_intent_params, _user} =
+      Ysc.Customers.attach_customer_to_payment_intent_params(
+        payment_intent_params,
+        user
+      )
 
     # Include amount in the idempotency key so repriced holds get a fresh PI.
     # A reference-only key caused Stripe to return a stale PI after checkout

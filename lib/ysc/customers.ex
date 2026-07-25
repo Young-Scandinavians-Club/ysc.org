@@ -28,6 +28,8 @@ defmodule Ysc.Customers do
   @doc """
   Creates a Stripe customer for the given user.
 
+  Includes billing address when present.
+
   ## Examples
 
       iex> create_stripe_customer(user)
@@ -36,7 +38,8 @@ defmodule Ysc.Customers do
   """
   @dialyzer {:nowarn_function, create_stripe_customer: 1}
   def create_stripe_customer(%User{} = user) do
-    customer_params = stripe_customer_params(user)
+    user = Repo.preload(user, :billing_address)
+    customer_params = stripe_customer_params(user, include_address: true)
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
            stripe_customer_module().create(customer_params)
@@ -48,6 +51,78 @@ defmodule Ysc.Customers do
       {:error, error} ->
         {:error, error}
     end
+  end
+
+  @doc """
+  Ensures the user has a Stripe customer ID, creating one if needed.
+
+  Returns the user (reloaded when a customer was created). On Stripe failure,
+  returns the original user unchanged.
+  """
+  @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
+  def ensure_stripe_customer(%User{stripe_id: nil} = user) do
+    case create_stripe_customer(user) do
+      {:ok, _stripe_customer} ->
+        Ysc.Accounts.get_user!(user.id)
+
+      {:error, _error} ->
+        user
+    end
+  end
+
+  def ensure_stripe_customer(%User{} = user), do: user
+
+  @doc """
+  Builds Stripe Payment Element `defaultValues.billingDetails` from a user.
+
+  Prefills email, name, phone, and billing address when present. Blank fields
+  are omitted. Returns a map with string keys suitable for Jason encoding into
+  a `data-billing-details` HTML attribute.
+  """
+  def payment_element_default_values(%User{} = user) do
+    user = Repo.preload(user, :billing_address)
+
+    %{}
+    |> maybe_put_billing_detail("email", user.email)
+    |> maybe_put_billing_detail("name", customer_display_name(user))
+    |> maybe_put_billing_detail("phone", user.phone_number)
+    |> maybe_put_billing_address(user.billing_address)
+  end
+
+  @doc """
+  JSON-encoded billing details for the Payment Element `data-billing-details` attr.
+  """
+  def payment_element_default_values_json(%User{} = user) do
+    Jason.encode!(payment_element_default_values(user))
+  end
+
+  def payment_element_default_values_json(nil), do: "{}"
+
+  @doc """
+  Attaches Stripe `customer` and `receipt_email` to PaymentIntent params when available.
+
+  Ensures a Stripe customer exists first. Returns `{params, user}` with the
+  (possibly updated) user.
+  """
+  def attach_customer_to_payment_intent_params(params, %User{} = user)
+      when is_map(params) do
+    user = ensure_stripe_customer(user)
+
+    params =
+      if present_string?(user.stripe_id) do
+        Map.put(params, :customer, user.stripe_id)
+      else
+        params
+      end
+
+    params =
+      if present_string?(user.email) do
+        Map.put(params, :receipt_email, user.email)
+      else
+        params
+      end
+
+    {params, user}
   end
 
   @doc """
@@ -368,31 +443,23 @@ defmodule Ysc.Customers do
     Application.get_env(:ysc, :stripe_invoice_module, Stripe.Invoice)
   end
 
-  @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
-  defp ensure_stripe_customer(%User{stripe_id: nil} = user) do
-    case create_stripe_customer(user) do
-      {:ok, _stripe_customer} ->
-        # Reload user to get updated stripe_id
-        Ysc.Accounts.get_user!(user.id)
-
-      {:error, _error} ->
-        user
-    end
-  end
-
-  defp ensure_stripe_customer(%User{} = user), do: user
-
   defp build_stripe_customer_params(%User{} = user) do
     %{
       email: user.email,
-      name:
-        "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
+      name: customer_display_name(user),
       phone: user.phone_number,
       description: "User ID: #{user.id}",
       metadata: %{
         user_id: user.id
       }
     }
+  end
+
+  defp customer_display_name(%User{} = user) do
+    [user.first_name, user.last_name]
+    |> Enum.map(&Ysc.title_case/1)
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.join(" ")
   end
 
   defp maybe_put_stripe_customer_address(params, %User{} = user, opts) do
@@ -404,6 +471,9 @@ defmodule Ysc.Customers do
   end
 
   defp maybe_put_stripe_customer_address(params, nil), do: params
+
+  defp maybe_put_stripe_customer_address(params, %Ecto.Association.NotLoaded{}),
+    do: params
 
   defp maybe_put_stripe_customer_address(params, billing_address) do
     Map.put(params, :address, build_customer_address(billing_address))
@@ -424,4 +494,36 @@ defmodule Ysc.Customers do
       address
     end
   end
+
+  defp maybe_put_billing_detail(details, _key, value)
+       when is_nil(value) or value == "",
+       do: details
+
+  defp maybe_put_billing_detail(details, key, value) when is_binary(value) do
+    Map.put(details, key, value)
+  end
+
+  defp maybe_put_billing_address(details, nil), do: details
+
+  defp maybe_put_billing_address(details, %Ecto.Association.NotLoaded{}),
+    do: details
+
+  defp maybe_put_billing_address(details, billing_address) do
+    address =
+      %{}
+      |> maybe_put_billing_detail("line1", billing_address.address)
+      |> maybe_put_billing_detail("city", billing_address.city)
+      |> maybe_put_billing_detail("state", billing_address.region)
+      |> maybe_put_billing_detail("postal_code", billing_address.postal_code)
+      |> maybe_put_billing_detail("country", billing_address.country)
+
+    if address == %{} do
+      details
+    else
+      Map.put(details, "address", address)
+    end
+  end
+
+  defp present_string?(value) when is_binary(value), do: value != ""
+  defp present_string?(_), do: false
 end
