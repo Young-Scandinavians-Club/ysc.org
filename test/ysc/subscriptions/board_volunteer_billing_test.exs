@@ -139,6 +139,50 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
       user = user_fixture()
       refute BoardVolunteerBilling.household_on_board?(user)
     end
+
+    test "returns true when a newly linked board member is missing from a stale sub_accounts preload" do
+      primary = user_fixture()
+      sub = user_fixture()
+      {:ok, sub} = Ysc.Accounts.assign_board_position(sub, :treasurer)
+
+      _sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "spouse"
+        })
+        |> Ysc.Repo.update!()
+
+      primary = Ysc.Repo.preload(primary, :sub_accounts)
+
+      assert BoardVolunteerBilling.household_on_board?(primary)
+    end
+
+    test "returns false when a removed board member is still in a stale sub_accounts preload" do
+      primary = user_fixture()
+      sub = user_fixture()
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, sub} = Ysc.Accounts.assign_board_position(sub, :secretary)
+
+      primary = Ysc.Repo.preload(primary, :sub_accounts)
+
+      sub
+      |> Ecto.Changeset.change(%{
+        primary_user_id: nil,
+        family_relationship: nil
+      })
+      |> Ysc.Repo.update!()
+
+      refute BoardVolunteerBilling.household_on_board?(primary)
+    end
   end
 
   describe "maybe_pause_collection_params/1" do
