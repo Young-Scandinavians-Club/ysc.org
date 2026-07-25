@@ -245,8 +245,9 @@ defmodule Ysc.Bookings.Season do
   Whether a buyout stay is allowed for every occupied night in
   `[checkin_date, checkout_date)`.
   """
-  def buyout_allowed_for_stay?(seasons_or_property, checkin_date, checkout_date)
-      when not is_nil(checkin_date) and not is_nil(checkout_date) do
+  def buyout_allowed_for_stay?(seasons, checkin_date, checkout_date)
+      when is_list(seasons) and not is_nil(checkin_date) and
+             not is_nil(checkout_date) do
     nights =
       if Date.compare(checkout_date, checkin_date) == :gt do
         Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
@@ -254,8 +255,22 @@ defmodule Ysc.Bookings.Season do
         []
       end
 
-    nights != [] and
-      Enum.all?(nights, &buyout_allowed_on_date?(seasons_or_property, &1))
+    nights != [] and Enum.all?(nights, &buyout_allowed_on_date?(seasons, &1))
+  end
+
+  def buyout_allowed_for_stay?(property, checkin_date, checkout_date)
+      when is_atom(property) and not is_nil(checkin_date) and
+             not is_nil(checkout_date) do
+    alias Ysc.Bookings.SeasonCache
+
+    seasons =
+      if Application.get_env(:ysc, :season_cache_enabled, true) do
+        SeasonCache.get_all_for_property(property)
+      else
+        list_all_for_property_db(property)
+      end
+
+    buyout_allowed_for_stay?(seasons, checkin_date, checkout_date)
   end
 
   def buyout_allowed_for_stay?(_, _, _), do: false

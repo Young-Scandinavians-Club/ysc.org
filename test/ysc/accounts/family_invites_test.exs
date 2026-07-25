@@ -812,6 +812,31 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       assert FamilyInvites.can_send_family_invite?(user) == false
     end
+
+    test "uses preloaded sub_accounts instead of counting in the database" do
+      user = create_user_with_lifetime_membership()
+
+      %User{}
+      |> User.sub_account_registration_changeset(
+        %{
+          email: unique_user_email(),
+          password: "password1234",
+          first_name: "Sub",
+          last_name: "User",
+          phone_number: "+14159098268",
+          date_of_birth: ~D[1990-01-01]
+        },
+        user.id,
+        hash_password: true,
+        validate_email: true
+      )
+      |> Repo.insert!()
+
+      user_with_sub_accounts = Repo.preload(user, :sub_accounts)
+
+      assert FamilyInvites.can_send_family_invite?(user_with_sub_accounts) ==
+               true
+    end
   end
 
   describe "list_pending_invites_for_email/1" do
