@@ -1179,7 +1179,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
       # Try February 29 if it's a leap year
       render_change(view, "date-changed", %{"checkin_date" => "2028-02-29"})
@@ -1192,7 +1192,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
       render_change(view, "date-changed", %{"checkin_date" => "2026-12-31"})
       render_change(view, "date-changed", %{"checkout_date" => "2027-01-02"})
@@ -1205,7 +1205,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
       render_change(view, "date-changed", %{"checkin_date" => "2026-06-30"})
       render_change(view, "date-changed", %{"checkout_date" => "2026-07-03"})
