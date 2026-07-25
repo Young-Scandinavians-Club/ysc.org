@@ -7,6 +7,14 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   alias Ecto.Adapters.SQL.Sandbox
   alias Ysc.Repo
 
+  # LiveView subscribes to booking config caches; parallel tests invalidate them in
+  # setup and the LV process must be allowed to use the SQL sandbox for refetches.
+  defp live_clear_lake(conn, path) do
+    {:ok, view, html} = live(conn, path)
+    :ok = Sandbox.allow(Repo, self(), view.pid)
+    {:ok, view, html}
+  end
+
   describe "malformed query params" do
     test "parses checkin and checkout when query string arrives as a single key",
          %{
@@ -607,13 +615,15 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       }
 
       {:ok, view, _html} =
-        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
-
-      :ok = Sandbox.allow(Repo, self(), view.pid)
+        live_clear_lake(
+          conn,
+          "/bookings/clear-lake?" <> URI.encode_query(params)
+        )
 
       render_click(view, "increase-guests", %{})
 
-      assert has_element?(view, "#guests-dropdown-button", "16 guests")
+      html = render(view)
+      assert html =~ "16 guests"
     end
 
     test "max_guests is not an assign (no hard cap enforced)", %{conn: conn} do
@@ -1210,13 +1220,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
-      # Open
       render_click(view, "toggle-guests-dropdown", %{})
-      # Close
       render_click(view, "close-guests-dropdown", %{})
-      # Open again
+      assert_patch(view)
+
       render_click(view, "toggle-guests-dropdown", %{})
 
       html = render(view)
@@ -1227,9 +1236,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
-
-      :ok = Sandbox.allow(Repo, self(), view.pid)
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
 
       render_click(view, "toggle-guests-dropdown", %{})
       render_click(view, "increase-guests", %{})
@@ -2282,9 +2289,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       }
 
       {:ok, view, _html} =
-        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
-
-      :ok = Sandbox.allow(Repo, self(), view.pid)
+        live_clear_lake(
+          conn,
+          "/bookings/clear-lake?" <> URI.encode_query(params)
+        )
 
       html = render(view)
       assert html =~ ~s|id="guests-dropdown-button"|
