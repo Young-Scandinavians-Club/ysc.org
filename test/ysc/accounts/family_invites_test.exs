@@ -230,6 +230,29 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
                FamilyInvites.create_invite(primary_user, email)
     end
 
+    test "schedules invite email with absolute invite_url" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+        assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.args["template"] == "family_invite"
+        assert job.args["recipient"] == email
+
+        invite_url = job.args["params"]["invite_url"]
+        expected_url =
+          YscWeb.Emails.Helpers.absolute_url(
+            "/family-invite/#{invite.token}/accept"
+          )
+
+        assert invite_url == expected_url
+        assert String.starts_with?(invite_url, "http")
+        refute String.starts_with?(invite_url, "/")
+      end)
+    end
+
     test "includes family_member_id option when provided" do
       primary_user = create_user_with_lifetime_membership()
 
@@ -343,6 +366,37 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
             "template" => "family_invite_accepted"
           }
         )
+      end)
+    end
+
+    test "schedules accepted notification with absolute family_management_url" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      user_attrs = %{
+        email: email,
+        password: "password1234",
+        first_name: "Sub",
+        last_name: "User",
+        phone_number: "+14159098268",
+        date_of_birth: ~D[1990-01-01]
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _user} =
+                 FamilyInvites.accept_invite(invite.token, user_attrs)
+
+        assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.args["template"] == "family_invite_accepted"
+
+        family_management_url = job.args["params"]["family_management_url"]
+        expected_url = YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
+
+        assert family_management_url == expected_url
+        assert String.starts_with?(family_management_url, "http")
+        refute String.starts_with?(family_management_url, "/")
       end)
     end
 
