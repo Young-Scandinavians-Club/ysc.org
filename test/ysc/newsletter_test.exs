@@ -117,6 +117,20 @@ defmodule Ysc.NewsletterTest do
       assert updated.unsubscribed_at == nil
     end
 
+    test "force_source overrides an existing subscribed source" do
+      {:ok, _} =
+        Newsletter.subscribe("force-source@example.com", source: "public_signup")
+
+      assert {:ok, updated} =
+               Newsletter.subscribe("force-source@example.com",
+                 source: "wp_migration",
+                 force_source: true
+               )
+
+      assert updated.subscribed == true
+      assert updated.source == "wp_migration"
+    end
+
     test "links existing anonymous subscription when user registers (same email)" do
       {:ok, anon} =
         Newsletter.subscribe("link@example.com", source: "public_signup")
