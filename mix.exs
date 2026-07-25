@@ -235,7 +235,7 @@ defmodule Ysc.MixProject do
       {:jose, "1.11.12", override: true},
       {:joken, "~> 2.6"},
       {:let_me, "~> 3.0"},
-      {:live_toast, "~> 0.8"},
+      {:live_toast, "~> 0.9"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.

@@ -140,8 +140,9 @@ function getEasingFunction(definition) {
     return definition;
   if (isCubicBezier(definition))
     return cubicBezier(...definition);
-  if (namedEasings[definition])
-    return namedEasings[definition];
+  const namedEasing = namedEasings[definition];
+  if (namedEasing)
+    return namedEasing;
   if (definition.startsWith("steps")) {
     const args = functionArgsRegex.exec(definition);
     if (args) {
@@ -181,6 +182,7 @@ var Animation = class {
     const interpolate$1 = interpolate(keyframes, offset, isEasingList(easing) ? easing.map(getEasingFunction) : noopReturn);
     this.tick = (timestamp) => {
       var _a;
+      delay = delay;
       let t = 0;
       if (this.pauseTime !== void 0) {
         t = this.pauseTime;
@@ -278,8 +280,10 @@ var Animation = class {
 };
 
 // node_modules/hey-listen/dist/hey-listen.es.js
-var warning;
-var invariant;
+var warning = function() {
+};
+var invariant = function() {
+};
 if (true) {
   warning = function(check, message) {
     if (!check && typeof console !== "undefined") {
@@ -626,9 +630,7 @@ function resolveElements(elements, selectorCache) {
   var _a;
   if (typeof elements === "string") {
     if (selectorCache) {
-      if (((_a = selectorCache[elements]) === null || _a === void 0)) {
-        selectorCache[elements] = document.querySelectorAll(elements);
-      }
+      (_a = selectorCache[elements]) !== null && _a !== void 0 ? _a : selectorCache[elements] = document.querySelectorAll(elements);
       elements = selectorCache[elements];
     } else {
       elements = document.querySelectorAll(elements);
@@ -747,6 +749,16 @@ function isHidden(el) {
 function isFlash(el) {
   return el.dataset.component === "flash";
 }
+function parseDuration(value, fallback) {
+  if (value === void 0) {
+    return fallback;
+  }
+  if (value === "Infinity") {
+    return Number.POSITIVE_INFINITY;
+  }
+  const parsed = Number.parseInt(value);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
 function flashCount() {
   let num = 0;
   if (!isHidden(document.getElementById("server-error"))) {
@@ -767,15 +779,23 @@ var removalTime = 5;
 var animationTime = 550;
 var maxItemsIgnoresFlashes = true;
 var gap = 15;
+var dismissEvent = "live-toast-dismiss";
+var clientToastEvent = "live-toast:add";
+var remainingSelector = "[data-live-toast-remaining]";
 var lastTS = [];
-function doAnimations(delayTime, maxItems, elToRemove) {
+var dismissTimers = new WeakMap();
+function addToast(kind, message, options = {}) {
+  document.getElementById("toast-group")?.dispatchEvent(new CustomEvent(clientToastEvent, {
+    detail: { kind, message, options }
+  }));
+}
+function doAnimations(animationDelayTime, maxItems, elToRemove) {
   const ts = [];
   let toasts = Array.from(document.querySelectorAll('#toast-group [phx-hook="LiveToast"]')).map((t) => {
     if (isHidden(t)) {
       return null;
-    } else {
-      return t;
     }
+    return t;
   }).filter(Boolean).reverse();
   if (elToRemove) {
     toasts = toasts.filter((t) => t !== elToRemove);
@@ -792,7 +812,7 @@ function doAnimations(delayTime, maxItems, elToRemove) {
     const max = maxItemsIgnoresFlashes ? maxItems + flashCount() : maxItems;
     const toast = ts[i];
     let direction = "";
-    if (toast.dataset.corner === "bottom_left" || toast.dataset.corner === "bottom_right") {
+    if (toast.dataset.corner === "bottom_left" || toast.dataset.corner === "bottom_center" || toast.dataset.corner === "bottom_right") {
       direction = "-";
     }
     let val = 0;
@@ -814,34 +834,31 @@ function doAnimations(delayTime, maxItems, elToRemove) {
     }
     toast.targetDestination = `${direction}${val}px`;
     const duration = animationTime / 1e3;
+    const delayTime = Number.parseInt(this.el.dataset.delay || "0") / 1e3;
     animate2(toast, keyframes, {
       duration,
-      easing: [0.22, 1, 0.36, 1]
+      easing: [0.22, 1, 0.36, 1],
+      delay: delayTime
     });
     toast.order += 1;
     toast.style.zIndex = (50 - toast.order).toString();
     window.setTimeout(() => {
       if (toast.order > max) {
-        try {
-          const view = this.__view();
-          if (!view.isConnected()) return;
-          const toastHook = view.getHook(toast);
-          const pushOwner =
-            toastHook && toastHook.el && toastHook.el.isConnected
-              ? toastHook
-              : this;
-          if (!pushOwner.el || !pushOwner.el.isConnected) return;
-          pushOwner.pushEventTo("#toast-group", "clear", { id: toast.id });
-        } catch (_) {}
+        this.pushEventTo(toastGroupTarget(toast), "clear", { id: toast.id });
       }
-    }, delayTime + removalTime);
+    }, animationDelayTime + removalTime);
     lastTS = ts;
   }
+}
+function toastGroupTarget(el) {
+  const streamContainer = el.closest('[phx-update="stream"]');
+  const toastGroup = streamContainer?.parentElement;
+  return toastGroup || "#toast-group";
 }
 async function animateOut() {
   const val = (this.el.order - 2) * 100 + (this.el.order - 2) * gap;
   let direction = "";
-  if (this.el.dataset.corner === "bottom_left" || this.el.dataset.corner === "bottom_right") {
+  if (this.el.dataset.corner === "bottom_left" || this.el.dataset.corner === "bottom_center" || this.el.dataset.corner === "bottom_right") {
     direction = "-";
   }
   const animation = animate2(this.el, { y: `${direction}${val}%`, opacity: 0 }, {
@@ -854,72 +871,186 @@ async function animateOut() {
   });
   await animation.finished;
 }
+async function dismissToast(animationDelayTime, maxItems) {
+  if (this.el.dataset.liveToastDismissing === "true") {
+    return;
+  }
+  this.el.dataset.liveToastDismissing = "true";
+  dismissTimers.get(this)?.cancel();
+  dismissTimers.delete(this);
+  doAnimations.bind(this, animationDelayTime, maxItems, this.el)();
+  await animateOut.bind(this)();
+  this.pushEventTo(toastGroupTarget(this.el), "clear", { id: this.el.id });
+}
+function isInteracting(el) {
+  return el.matches(":hover") || el.matches(":focus-within");
+}
+function renderRemaining(el, remaining, paused) {
+  const output = el.querySelector(remainingSelector);
+  if (!output) {
+    return;
+  }
+  output.textContent = Math.ceil(remaining / 1e3).toString();
+  output.dataset.paused = paused.toString();
+}
+function startDismissTimer(duration, animationDelayTime, maxItems) {
+  let remaining = duration;
+  let startedAt;
+  let timer;
+  let displayTimer;
+  const currentRemaining = () => {
+    if (startedAt === void 0) {
+      return remaining;
+    }
+    return Math.max(0, remaining - (performance.now() - startedAt));
+  };
+  const clearTimers = () => {
+    if (timer !== void 0) {
+      window.clearTimeout(timer);
+      timer = void 0;
+    }
+    if (displayTimer !== void 0) {
+      window.clearInterval(displayTimer);
+      displayTimer = void 0;
+    }
+  };
+  const pause = () => {
+    if (startedAt === void 0) {
+      return;
+    }
+    remaining = currentRemaining();
+    startedAt = void 0;
+    clearTimers();
+    renderRemaining(this.el, remaining, true);
+  };
+  const resume = () => {
+    if (timer || isInteracting(this.el)) {
+      return;
+    }
+    startedAt = performance.now();
+    renderRemaining(this.el, remaining, false);
+    if (this.el.querySelector(remainingSelector)) {
+      displayTimer = window.setInterval(() => {
+        renderRemaining(this.el, currentRemaining(), false);
+      }, 100);
+    }
+    timer = window.setTimeout(async () => {
+      clearTimers();
+      remaining = 0;
+      startedAt = void 0;
+      renderRemaining(this.el, remaining, false);
+      await dismissToast.bind(this)(animationDelayTime, maxItems);
+    }, remaining + removalTime);
+  };
+  const cancel = () => {
+    clearTimers();
+    this.el.removeEventListener("mouseenter", pause);
+    this.el.removeEventListener("focusin", pause);
+    this.el.removeEventListener("mouseleave", resume);
+    this.el.removeEventListener("focusout", resume);
+  };
+  this.el.addEventListener("mouseenter", pause);
+  this.el.addEventListener("focusin", pause);
+  this.el.addEventListener("mouseleave", resume);
+  this.el.addEventListener("focusout", resume);
+  dismissTimers.set(this, { cancel });
+  resume();
+}
 function createLiveToastHook(duration = 6e3, maxItems = 3) {
   return {
     destroyed() {
-      if (this.__liveToastOnClearFlash) {
-        window.removeEventListener("phx:clear-flash", this.__liveToastOnClearFlash);
-        this.__liveToastOnClearFlash = void 0;
+      if (this.el.dataset.liveToastGroup === "true") {
+        return;
       }
-      if (this.__liveToastOnFlashLeave) {
-        window.removeEventListener("flash-leave", this.__liveToastOnFlashLeave);
-        this.__liveToastOnFlashLeave = void 0;
-      }
-      if (this.__liveToastDismissTimer) {
-        clearTimeout(this.__liveToastDismissTimer);
-        this.__liveToastDismissTimer = void 0;
-      }
+      dismissTimers.get(this)?.cancel();
+      dismissTimers.delete(this);
       doAnimations.bind(this)(duration, maxItems);
     },
     updated() {
+      if (this.el.dataset.liveToastGroup === "true") {
+        return;
+      }
       const keyframes = { y: [this.el.targetDestination] };
       animate2(this.el, keyframes, { duration: 0 });
     },
     mounted() {
+      if (this.el.dataset.liveToastGroup === "true") {
+        const clientToastListener = (event) => {
+          const request = event.detail;
+          if (!request) {
+            return;
+          }
+          this.pushEventTo(this.el, "add_toast", {
+            kind: request.kind,
+            message: request.message,
+            options: request.options
+          });
+        };
+        this.el.addEventListener(clientToastEvent, clientToastListener);
+        return;
+      }
+      this.el.addEventListener("show-error", async (_event) => {
+        const delayTime = Number.parseInt(this.el.dataset.delay || "0");
+        await new Promise((resolve) => setTimeout(resolve, delayTime));
+        this.el.style.display = "flex";
+      });
+      this.el.addEventListener("hide-error", async (_event) => {
+        this.el.style.display = "none";
+      });
       if (["server-error", "client-error"].includes(this.el.id)) {
         if (isHidden(document.getElementById(this.el.id))) {
           return;
         }
       }
-      if (isFlash(this.el)) {
-        this.__liveToastOnClearFlash = (e) => {
-          if (!this.el.isConnected) return;
-          try {
-            this.pushEvent("lv:clear-flash", {
-              key: e.detail.key
-            });
-          } catch (_) {}
-        };
-        window.addEventListener("phx:clear-flash", this.__liveToastOnClearFlash);
-      }
-      this.__liveToastOnFlashLeave = async (event) => {
+      window.addEventListener("phx:clear-flash", (e) => {
+        this.pushEvent("lv:clear-flash", {
+          key: e.detail.key
+        });
+      });
+      window.addEventListener("flash-leave", async (event) => {
         if (event.target === this.el) {
           doAnimations.bind(this, duration, maxItems, this.el)();
           await animateOut.bind(this)();
         }
-      };
-      window.addEventListener("flash-leave", this.__liveToastOnFlashLeave);
+      });
+      this.el.addEventListener(dismissEvent, async (event) => {
+        event.stopPropagation();
+        await dismissToast.bind(this)(duration, maxItems);
+      });
+      window.addEventListener(`phx:${dismissEvent}`, async (event) => {
+        const detail = event.detail;
+        const id = detail.id || `toast-${detail.uuid}`;
+        if (id === this.el.id) {
+          await dismissToast.bind(this)(duration, maxItems);
+        }
+      });
       doAnimations.bind(this)(duration, maxItems);
-      if (isFlash(this.el)) {
+      const durationOverride = parseDuration(this.el.dataset.duration, duration);
+      let flashDuration = void 0;
+      if (this.el.dataset.flashDuration !== void 0) {
+        flashDuration = Number.parseInt(this.el.dataset.flashDuration);
+      }
+      if (isFlash(this.el) && !flashDuration) {
         return;
       }
-      let durationOverride = duration;
-      if (this.el.dataset.duration !== void 0) {
-        const parsed = Number.parseInt(this.el.dataset.duration, 10);
-        if (Number.isFinite(parsed)) {
-          durationOverride = parsed;
+      if (flashDuration) {
+        window.setTimeout(async () => {
+          await animateOut.bind(this)();
+          const kind = this.el.dataset.kind;
+          if (kind) {
+            this.pushEvent("lv:clear-flash", { key: kind });
+          }
+        }, flashDuration + removalTime);
+      } else {
+        if (Number.isFinite(durationOverride) && durationOverride > 0) {
+          startDismissTimer.bind(this)(durationOverride, duration, maxItems);
         }
       }
-      this.__liveToastDismissTimer = window.setTimeout(async () => {
-        await animateOut.bind(this)();
-        if (!this.el.isConnected) return;
-        try {
-          this.pushEventTo("#toast-group", "clear", { id: this.el.id });
-        } catch (_) {}
-      }, durationOverride + removalTime);
     }
   };
 }
 export {
+  addToast,
   createLiveToastHook
 };
+//# sourceMappingURL=live_toast.esm.js.map
