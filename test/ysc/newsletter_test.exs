@@ -119,7 +119,9 @@ defmodule Ysc.NewsletterTest do
 
     test "force_source overrides an existing subscribed source" do
       {:ok, _} =
-        Newsletter.subscribe("force-source@example.com", source: "public_signup")
+        Newsletter.subscribe("force-source@example.com",
+          source: "public_signup"
+        )
 
       assert {:ok, updated} =
                Newsletter.subscribe("force-source@example.com",
