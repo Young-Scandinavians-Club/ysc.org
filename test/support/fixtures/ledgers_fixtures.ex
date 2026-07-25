@@ -34,6 +34,10 @@ defmodule Ysc.LedgersFixtures do
 
   Use for UI/list/pagination tests that only need `payments` rows visible to a
   user. Prefer `payment_fixture/1` when ledger integrity matters.
+
+  Must only be called inside the SQL sandbox (ExUnit DataCase/ConnCase). Rows
+  have no ledger transaction; if committed outside the sandbox they break
+  reconciliation tests until deleted.
   """
   def payment_rows!(user_id, count) when is_integer(count) and count > 0 do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
