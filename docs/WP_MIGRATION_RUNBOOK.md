@@ -84,12 +84,19 @@ Run the **entire** pipeline against sandbox before production. Record timings.
 mix ysc.wp_to_duckdb --sql wp_backup/backup.sql --db wp_backup/wp.duckdb
 mix ysc.wp_validate --db wp_backup/wp.duckdb
 
+# Lean cutover (users/memberships/bookings only — skip news + media):
 mix ysc.wp_extract \
   --db wp_backup/wp.duckdb \
   --export-dir wp_migration_export \
-  --wp-files wp_backup/files
+  --wp-files wp_backup/files \
+  --no-posts \
+  --no-media
+
+# Full extract (includes news + media):
+# mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export --wp-files wp_backup/files
 
 mix ysc.wp_validate --db wp_backup/wp.duckdb --export-dir wp_migration_export
+mix ysc.wp_reconcile_csvs --export-dir wp_migration_export --csv-dir wp_export_csvs
 ```
 
 Optional spot checks:
@@ -173,8 +180,9 @@ Same commands as sandbox dry run, using the **final** backup only:
 
 ```bash
 mix ysc.wp_to_duckdb --sql wp_backup/backup.sql --db wp_backup/wp.duckdb --force
-mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export --wp-files wp_backup/files
+mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export --wp-files wp_backup/files --no-posts --no-media
 mix ysc.wp_validate --db wp_backup/wp.duckdb --export-dir wp_migration_export
+mix ysc.wp_reconcile_csvs --export-dir wp_migration_export --csv-dir wp_export_csvs
 ```
 
 - [ ] Validation report: all counts match
@@ -276,15 +284,15 @@ ls wp_migration_export   # users.json, applications.json, posts.json, media/, ..
 ### 3.6 Real load
 
 ```bash
-/app/bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export")'
+/app/bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false, skip_posts: true, create_stripe_subscriptions: true)'
 ```
 
 Phases logged in order: Users → Applications → Media → Posts → Stripe customers → Subscriptions → Bookings.
 
-**Production flags:**
+**Production flags (users/memberships/bookings cutover):**
 
-- Do **not** pass `create_stripe_subscriptions: true` (sandbox/dev only)
-- Use `upload_media: false` only if you intentionally defer media (requires a second pass)
+- `upload_media: false` and `skip_posts: true` — skip news articles and media
+- `create_stripe_subscriptions: true` — import existing Stripe subs first, then create Stripe trials for remaining active members (strategy A). Payment methods are synced to the Stripe customer default; auto-renew WP subscribers get `cancel_at_period_end: false` and PM on the subscription when available.
 
 **Targeted retry** (single user):
 
@@ -406,7 +414,8 @@ Decision point: if load is not complete within planned window + buffer, stop and
 |------|---------|
 | Dry run | `bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", dry_run: true)'` |
 | Load | `bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export")'` |
-| Skip media | `bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false)'` |
+| Skip media + posts; create Stripe subs | `bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false, skip_posts: true, create_stripe_subscriptions: true)'` |
+| Reconcile vs admin CSVs (local) | `mix ysc.wp_reconcile_csvs --export-dir wp_migration_export --csv-dir wp_export_csvs` |
 | Unlock comms | `bin/ysc eval "Ysc.Release.wp_migration_unlock()"` |
 | Remote console | `make shell-prod` |
 

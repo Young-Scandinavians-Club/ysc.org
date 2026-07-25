@@ -49,11 +49,13 @@ defmodule Ysc.Release do
 
       bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", dry_run: true)'
       bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export")'
-      bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false)'
+      bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false, skip_posts: true)'
+      bin/ysc eval 'Ysc.Release.wp_load("/data/wp_migration_export", upload_media: false, skip_posts: true, create_stripe_subscriptions: true)'
 
   Options (keyword list as second argument):
   - `:dry_run` — log only, no DB or S3 writes (default: false)
   - `:upload_media` — upload media/ to Tigris and create Image records (default: true)
+  - `:skip_posts` — skip loading news posts (default: false)
   - `:create_stripe_subscriptions` — create Stripe subs in the connected account (default: false)
   - `:only_emails` — load a single email or list of emails for targeted runs
   """
@@ -63,6 +65,7 @@ defmodule Ysc.Release do
 
     dry_run = Keyword.get(opts, :dry_run, false)
     upload_media = Keyword.get(opts, :upload_media, true)
+    skip_posts = Keyword.get(opts, :skip_posts, false)
 
     create_stripe_subscriptions =
       Keyword.get(opts, :create_stripe_subscriptions, false)
@@ -75,6 +78,7 @@ defmodule Ysc.Release do
       export_dir: export_dir,
       dry_run: dry_run,
       upload_media: upload_media,
+      skip_posts: skip_posts,
       create_stripe_subscriptions: create_stripe_subscriptions,
       only_emails: only_emails
     )
@@ -83,6 +87,7 @@ defmodule Ysc.Release do
       export_dir: export_dir,
       dry_run: dry_run,
       upload_media: upload_media,
+      skip_posts: skip_posts,
       create_stripe_subscriptions: create_stripe_subscriptions
     ]
 
@@ -280,6 +285,40 @@ defmodule Ysc.Release do
     )
 
     {:ok, result}
+  end
+
+  @doc """
+  Imports Mailchimp/Emailable newsletter CSV subscribers into production.
+
+  Imports rows with List status `subscribed` and Global status `subscribed`.
+  Idempotent for emails already present.
+
+  Usage in production:
+
+      bin/ysc rpc 'Ysc.Release.wp_import_newsletter_csv("/tmp/newsletter_emails.csv")'
+      bin/ysc rpc 'Ysc.Release.wp_import_newsletter_csv("/tmp/newsletter_emails.csv", dry_run: true)'
+  """
+  def wp_import_newsletter_csv(csv_path, opts \\ []) when is_binary(csv_path) do
+    load_app()
+    {:ok, _} = Application.ensure_all_started(@app)
+    require Ysc.Logging
+
+    dry_run = Keyword.get(opts, :dry_run, false)
+
+    Ysc.Logging.info("Newsletter CSV import starting",
+      csv_path: csv_path,
+      dry_run: dry_run
+    )
+
+    case Ysc.WpMigration.NewsletterCsvImport.run(csv_path, dry_run: dry_run) do
+      {:ok, stats} = ok ->
+        Ysc.Logging.info("Newsletter CSV import finished", stats)
+        ok
+
+      {:error, reason} = error ->
+        Ysc.Logging.error("Newsletter CSV import failed", error: reason)
+        error
+    end
   end
 
   @doc """

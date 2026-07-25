@@ -74,6 +74,8 @@ defmodule Ysc.Newsletter do
   - :first_name, :last_name - Optional names
   - :source - Source of subscription (e.g. "public_signup", "user_registration")
   - :metadata - Map of extra data
+  - :subscribed_at - Optional historical subscription time (new subscribers only)
+  - :skip_email_validation - When true, skip MX/disposable checks (trusted imports)
 
   Returns `{:ok, subscriber}` or `{:error, changeset}` or `{:error, atom}`.
 
@@ -94,9 +96,13 @@ defmodule Ysc.Newsletter do
   def subscribe(_email, _opts), do: {:error, :invalid_email}
 
   defp subscribe_normalized(email, opts) when is_binary(email) do
-    case Ysc.Newsletter.EmailValidator.validate_email(email) do
-      :ok -> do_subscribe(email, opts)
-      {:error, reason} -> {:error, reason}
+    if Keyword.get(opts, :skip_email_validation, false) do
+      do_subscribe(email, opts)
+    else
+      case Ysc.Newsletter.EmailValidator.validate_email(email) do
+        :ok -> do_subscribe(email, opts)
+        {:error, reason} -> {:error, reason}
+      end
     end
   end
 
@@ -107,12 +113,13 @@ defmodule Ysc.Newsletter do
     last_name = Keyword.get(opts, :last_name)
     source = Keyword.get(opts, :source, "public_signup")
     metadata = Keyword.get(opts, :metadata, %{})
+    subscribed_at = Keyword.get(opts, :subscribed_at) || now
 
     case get_subscriber_by_email(email) do
       nil ->
         create_subscriber(
           email,
-          now,
+          subscribed_at,
           user_id,
           first_name,
           last_name,
@@ -123,7 +130,7 @@ defmodule Ysc.Newsletter do
       existing ->
         update_existing_subscriber(
           existing,
-          now,
+          subscribed_at,
           user_id,
           first_name,
           last_name,
@@ -136,7 +143,7 @@ defmodule Ysc.Newsletter do
 
   defp create_subscriber(
          email,
-         now,
+         subscribed_at,
          user_id,
          first_name,
          last_name,
@@ -155,7 +162,7 @@ defmodule Ysc.Newsletter do
       subscription_token: token,
       source: source,
       metadata: metadata,
-      subscribed_at: now,
+      subscribed_at: subscribed_at,
       unsubscribed_at: nil
     })
     |> Repo.insert()
@@ -163,7 +170,7 @@ defmodule Ysc.Newsletter do
 
   defp update_existing_subscriber(
          existing,
-         now,
+         subscribed_at,
          user_id,
          first_name,
          last_name,
@@ -173,7 +180,13 @@ defmodule Ysc.Newsletter do
        ) do
     # If we now have a user_id but existing record doesn't, link them
     link_user = user_id && is_nil(existing.user_id)
-    new_source = if link_user, do: "user_registration_linked", else: source
+
+    new_source =
+      cond do
+        link_user -> "user_registration_linked"
+        existing.subscribed -> existing.source || source
+        true -> source
+      end
 
     attrs = %{
       email: email,
@@ -189,11 +202,12 @@ defmodule Ysc.Newsletter do
       |> maybe_put(:first_name, first_name || existing.first_name)
       |> maybe_put(:last_name, last_name || existing.last_name)
 
-    # Preserve original subscribed_at when re-subscribing
+    # Preserve original subscribed_at when already subscribed; otherwise use
+    # the provided time (CSV historical date or "now" from the caller).
     attrs =
       if existing.subscribed,
         do: attrs,
-        else: Map.put(attrs, :subscribed_at, now)
+        else: Map.put(attrs, :subscribed_at, subscribed_at)
 
     existing
     |> Subscriber.update_changeset(attrs)

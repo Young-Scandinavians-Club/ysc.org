@@ -4,11 +4,13 @@ defmodule Mix.Tasks.Ysc.WpExtract do
 
   Reads the DuckDB file (from mix ysc.wp_to_duckdb) and wp_backup/files,
   writes users.json, applications.json, posts.json, stripe_customer_lookup.json,
-  and an iterable media/ folder (one subfolder per image with file + meta.json).
+  bookings.json, and an iterable media/ folder (one subfolder per image with
+  file + meta.json).
 
   Usage:
     mix ysc.wp_extract --db wp_backup/wp.duckdb
     mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export [--wp-files wp_backup/files] [--dry-run]
+    mix ysc.wp_extract --db wp_backup/wp.duckdb --no-posts --no-media
   """
 
   use Mix.Task
@@ -20,7 +22,9 @@ defmodule Mix.Tasks.Ysc.WpExtract do
     db: :string,
     export_dir: :string,
     wp_files: :string,
-    dry_run: :boolean
+    dry_run: :boolean,
+    no_posts: :boolean,
+    no_media: :boolean
   ]
 
   def run(args) do
@@ -36,6 +40,8 @@ defmodule Mix.Tasks.Ysc.WpExtract do
     export_dir = opts[:export_dir] || "wp_migration_export"
     wp_files = opts[:wp_files] || "wp_backup/files"
     dry_run = opts[:dry_run] || false
+    no_posts = opts[:no_posts] || false
+    no_media = opts[:no_media] || false
 
     if is_nil(db) or db == "" do
       Mix.raise("""
@@ -44,20 +50,25 @@ defmodule Mix.Tasks.Ysc.WpExtract do
       Example:
         mix ysc.wp_extract --db wp_backup/wp.duckdb
         mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export
+        mix ysc.wp_extract --db wp_backup/wp.duckdb --no-posts --no-media
       """)
     end
 
     Ysc.Logging.info("Starting WP extract",
       db: db,
       export_dir: export_dir,
-      dry_run: dry_run
+      dry_run: dry_run,
+      no_posts: no_posts,
+      no_media: no_media
     )
 
     case Ysc.WpMigration.Extract.run(
            db: db,
            export_dir: export_dir,
            wp_files: wp_files,
-           dry_run: dry_run
+           dry_run: dry_run,
+           no_posts: no_posts,
+           no_media: no_media
          ) do
       {:ok, out} ->
         if dry_run,
