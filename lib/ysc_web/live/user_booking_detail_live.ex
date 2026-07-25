@@ -394,7 +394,7 @@ defmodule YscWeb.UserBookingDetailLive do
                     <.badge type={
                       BookingDisplay.payment_status_badge_type(@payment.status)
                     }>
-                      {String.capitalize(to_string(@payment.status))}
+                      {BookingDisplay.payment_status_label(@payment.status)}
                     </.badge>
                   </span>
                 </div>

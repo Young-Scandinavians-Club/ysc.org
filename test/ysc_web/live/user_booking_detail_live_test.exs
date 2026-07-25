@@ -462,19 +462,16 @@ defmodule YscWeb.UserBookingDetailLiveTest do
     end
 
     test "partial cancel without payment reloads cancelled booking in UI", %{
-      conn: conn,
-      user: user
+      conn: conn
     } do
-      year = Date.utc_today().year + 2
-      july_first = Date.new!(year, 7, 1)
+      # Fresh user: describe setup already confirmed a buyout for `user`.
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{state: :active})
+        |> Repo.update!()
 
-      checkin_date =
-        case Date.day_of_week(july_first, :monday) do
-          1 -> july_first
-          n -> Date.add(july_first, 8 - n)
-        end
-
-      checkout_date = Date.add(checkin_date, 3)
+      # Stay inside advance/buyout windows; year+2 July trips season limits.
+      {checkin_date, checkout_date} = locker_buyout_dates(12)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -486,6 +483,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         )
 
       {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+      conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_booking_detail(conn, confirmed.id)
 

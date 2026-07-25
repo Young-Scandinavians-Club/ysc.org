@@ -1346,7 +1346,11 @@ defmodule Ysc.Accounts do
   # Sync synchronously so a rapid remove+reassign cannot leave a stale
   # grace-period `resumes_at` from an earlier async Task finishing last.
   defp enqueue_board_volunteer_stripe_sync({:ok, %User{} = user}) do
-    Ysc.Subscriptions.BoardVolunteerBilling.sync_for_user(user)
+    if BoardVolunteerBilling.household_on_board?(user) do
+      BoardVolunteerBilling.sync_for_user(user)
+    else
+      BoardVolunteerBilling.sync_for_user(user, apply_off_board_grace?: true)
+    end
   end
 
   defp enqueue_board_volunteer_stripe_sync(_), do: :ok
@@ -3273,7 +3277,10 @@ defmodule Ysc.Accounts do
         primary_user.id
       )
 
-      sync_board_volunteer_billing_after_family_change(primary_user)
+      sync_board_volunteer_billing_after_family_change(
+        primary_user,
+        updated_user
+      )
 
       updated_user
     end)
@@ -3325,7 +3332,11 @@ defmodule Ysc.Accounts do
           )
 
           if primary_user do
-            sync_board_volunteer_billing_after_family_change(primary_user)
+            sync_board_volunteer_billing_after_family_change(
+              primary_user,
+              updated_sub_account
+            )
+
             send_family_member_removed_email(updated_sub_account, primary_user)
           end
 
@@ -3379,7 +3390,11 @@ defmodule Ysc.Accounts do
             primary_user.id
           )
 
-          sync_board_volunteer_billing_after_family_change(primary_user)
+          sync_board_volunteer_billing_after_family_change(
+            primary_user,
+            updated_sub_account
+          )
+
           send_family_member_removed_email(updated_sub_account, primary_user)
           {:ok, updated_sub_account}
 
@@ -3397,9 +3412,14 @@ defmodule Ysc.Accounts do
   end
 
   # Family link/unlink changes household_on_board? without touching board_position.
-  defp sync_board_volunteer_billing_after_family_change(%User{} = user) do
-    BoardVolunteerBilling.sync_for_user(user)
-    :ok
+  defp sync_board_volunteer_billing_after_family_change(
+         %User{} = primary_user,
+         %User{} = affected_user
+       ) do
+    BoardVolunteerBilling.sync_after_family_membership_change(
+      primary_user,
+      affected_user
+    )
   end
 
   defp send_family_member_removed_email(removed_user, primary_user) do

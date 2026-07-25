@@ -8,7 +8,7 @@ defmodule Ysc.PromEx do
   - Ecto (database queries)
   - BEAM VM (memory, processes, etc.)
   - Oban (background jobs)
-  - Custom application metrics (tickets, bookings, payments, ledger)
+  - Custom application metrics (tickets, bookings, booking config caches, payments, ledger)
   """
 
   use PromEx, otp_app: :ysc
@@ -116,6 +116,24 @@ defmodule Ysc.PromEx do
         measurement: :count
       ),
 
+      # Booking config-cache metrics (admin settings → open booking sessions)
+      counter("ysc.bookings.config_cache.invalidated.total",
+        event_name: [:ysc, :bookings, :config_cache, :invalidated],
+        description:
+          "Total booking config cache invalidations (season, rooms, pricing, etc.)",
+        tags: [:cache],
+        tag_values: &extract_config_cache_tags/1,
+        measurement: :count
+      ),
+      counter("ysc.bookings.config_cache.live_rebuild.total",
+        event_name: [:ysc, :bookings, :config_cache, :live_rebuild],
+        description:
+          "Total LiveView rebuilds after booking config cache invalidation",
+        tags: [:live_view, :cache],
+        tag_values: &extract_config_cache_live_rebuild_tags/1,
+        measurement: :count
+      ),
+
       # Payment Metrics
       counter("ysc.payments.stripe_webhook_received.total",
         event_name: [:ysc, :payments, :stripe_webhook_received],
@@ -216,6 +234,22 @@ defmodule Ysc.PromEx do
 
   defp extract_booking_payment_tags(_),
     do: %{property: "unknown", booking_mode: "unknown", status: "unknown"}
+
+  defp extract_config_cache_tags(%{cache: cache}) do
+    %{cache: to_string(cache)}
+  end
+
+  defp extract_config_cache_tags(_), do: %{cache: "unknown"}
+
+  defp extract_config_cache_live_rebuild_tags(%{
+         live_view: live_view,
+         cache: cache
+       }) do
+    %{live_view: to_string(live_view), cache: to_string(cache)}
+  end
+
+  defp extract_config_cache_live_rebuild_tags(_),
+    do: %{live_view: "unknown", cache: "unknown"}
 
   defp extract_webhook_tags(%{event_type: event_type}) do
     %{event_type: to_string(event_type)}

@@ -1564,7 +1564,7 @@ defmodule YscWeb.SecurityAuditTest do
       user = user_with_membership(:none)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = tahoe_booking_dates(60)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -1586,7 +1586,7 @@ defmodule YscWeb.SecurityAuditTest do
           :count
         )
 
-      render_click(view, "create-booking", %{})
+      html = render_click(view, "create-booking", %{})
 
       hold_count_after =
         Repo.aggregate(
@@ -1597,48 +1597,7 @@ defmodule YscWeb.SecurityAuditTest do
         )
 
       assert hold_count_before == hold_count_after
-      assert render(view) =~ "active YSC membership"
-    end
-
-    test "tahoe create-booking LiveView event does not create a hold without membership",
-         %{conn: conn} do
-      user = user_with_membership(:none)
-      conn = log_in_user(conn, user)
-
-      {checkin, checkout} = tahoe_booking_dates(60)
-
-      params = %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout),
-        "guests" => "4",
-        "booking_mode" => "day"
-      }
-
-      {:ok, view, _html} =
-        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
-
-      render_async(view, 5_000)
-
-      hold_count_before =
-        Repo.aggregate(
-          from(b in Booking,
-            where: b.user_id == ^user.id and b.status == :hold
-          ),
-          :count
-        )
-
-      render_click(view, "create-booking", %{})
-
-      hold_count_after =
-        Repo.aggregate(
-          from(b in Booking,
-            where: b.user_id == ^user.id and b.status == :hold
-          ),
-          :count
-        )
-
-      assert hold_count_before == hold_count_after
-      assert render(view) =~ "active YSC membership"
+      assert html =~ "active YSC membership"
     end
 
     test "checkout redirects pending_approval users to pending-review", %{

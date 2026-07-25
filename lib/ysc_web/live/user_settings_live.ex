@@ -26,6 +26,7 @@ defmodule YscWeb.UserSettingsLive do
   alias Ysc.Subscriptions
   alias Ysc.Payments.PaymentDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
+  alias YscWeb.BookingDisplay
   alias YscWeb.PaymentMethodFormatter
   alias YscWeb.PaymentMethodLogo
 
@@ -5958,30 +5959,18 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp render_payment_status_badge(payment_info) do
-    if is_nil(payment_info.payment) do
-      assigns = %{}
+    status = payment_status_for_badge(payment_info)
+    assigns = %{status: status}
 
-      ~H"""
-      <.badge type="green" class="text-xs">Completed</.badge>
-      """
-    else
-      assigns = %{payment: payment_info.payment}
-
-      ~H"""
-      <%= if @payment.status == :completed do %>
-        <.badge type="green" class="text-xs">Completed</.badge>
-      <% else %>
-        <%= if @payment.status == :pending do %>
-          <.badge type="yellow" class="text-xs">Pending</.badge>
-        <% else %>
-          <%= if @payment.status == :refunded do %>
-            <.badge type="red" class="text-xs">Refunded</.badge>
-          <% end %>
-        <% end %>
-      <% end %>
-      """
-    end
+    ~H"""
+    <.badge type={BookingDisplay.payment_status_badge_type(@status)} class="text-xs">
+      {BookingDisplay.payment_status_label(@status)}
+    </.badge>
+    """
   end
+
+  defp payment_status_for_badge(%{payment: nil}), do: :completed
+  defp payment_status_for_badge(%{payment: payment}), do: payment.status
 
   # Helper function to handle retry invoice payment
   defp handle_retry_invoice_payment(socket, invoice_id)

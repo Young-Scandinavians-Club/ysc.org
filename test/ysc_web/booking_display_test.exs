@@ -34,4 +34,16 @@ defmodule YscWeb.BookingDisplayTest do
       assert BookingDisplay.payment_status_badge_type(:failed) == "gray"
     end
   end
+
+  describe "payment_status_label/1" do
+    test "maps known payment statuses to member-friendly labels" do
+      assert BookingDisplay.payment_status_label(:completed) == "Completed"
+      assert BookingDisplay.payment_status_label(:pending) == "Pending"
+      assert BookingDisplay.payment_status_label(:refunded) == "Refunded"
+    end
+
+    test "title-cases unknown statuses" do
+      assert BookingDisplay.payment_status_label(:failed) == "Failed"
+    end
+  end
 end

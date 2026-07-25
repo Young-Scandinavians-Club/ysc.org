@@ -223,7 +223,8 @@ defmodule Ysc.Accounts.FamilyInvites do
             )
 
             sync_board_volunteer_billing_after_family_change(
-              invite.primary_user_id
+              invite.primary_user_id,
+              final_user.id
             )
 
             notify_invite_accepted(invite, final_user)
@@ -299,7 +300,8 @@ defmodule Ysc.Accounts.FamilyInvites do
             )
 
             sync_board_volunteer_billing_after_family_change(
-              invite.primary_user_id
+              invite.primary_user_id,
+              updated_user.id
             )
 
             notify_invite_accepted(invite, updated_user)
@@ -316,10 +318,18 @@ defmodule Ysc.Accounts.FamilyInvites do
     UserProfileCache.invalidate_user(primary_user_id)
   end
 
-  defp sync_board_volunteer_billing_after_family_change(primary_user_id) do
-    case Ysc.Accounts.get_user(primary_user_id) do
-      nil -> :ok
-      primary -> BoardVolunteerBilling.sync_for_user(primary)
+  defp sync_board_volunteer_billing_after_family_change(
+         primary_user_id,
+         affected_user_id
+       ) do
+    with %User{} = primary <- Ysc.Accounts.get_user(primary_user_id),
+         %User{} = affected_user <- Ysc.Accounts.get_user(affected_user_id) do
+      BoardVolunteerBilling.sync_after_family_membership_change(
+        primary,
+        affected_user
+      )
+    else
+      _ -> :ok
     end
   end
 
@@ -342,8 +352,8 @@ defmodule Ysc.Accounts.FamilyInvites do
     invitee_email = accepted_user.email || invite.email
     relationship_label = relationship_label(invite.relationship)
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    family_management_url = "#{base_url}/users/settings/family"
+    family_management_url =
+      YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
 
     email_vars = %{
       inviter_first_name: inviter_first_name,
@@ -686,8 +696,10 @@ defmodule Ysc.Accounts.FamilyInvites do
         nil
       end
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    invite_url = "#{base_url}/family-invite/#{invite.token}/accept"
+    invite_url =
+      YscWeb.Emails.Helpers.absolute_url(
+        "/family-invite/#{invite.token}/accept"
+      )
 
     idempotency_key = "family_invite_#{invite.id}"
 

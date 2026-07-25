@@ -1,6 +1,7 @@
 defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
   use Ysc.DataCase, async: false
 
+  import Ecto.Query
   import Ysc.AccountsFixtures
 
   alias Ysc.Bookings
@@ -9,7 +10,8 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     Booking,
     BookingLocker,
     ModificationDateAvailability,
-    RoomCategory
+    RoomCategory,
+    Season
   }
 
   alias Ysc.Ledgers
@@ -17,6 +19,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
   setup do
     Ledgers.ensure_basic_accounts()
+    seed_permissive_tahoe_seasons!()
 
     user =
       user_fixture()
@@ -33,6 +36,39 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
       })
 
     %{user: user}
+  end
+
+  # Wide advance windows so these tests are not coupled to admin-tuned seasons
+  # lingering in the shared test database.
+  defp seed_permissive_tahoe_seasons! do
+    Repo.delete_all(from(s in Season, where: s.property == :tahoe))
+
+    {:ok, _} =
+      %Season{}
+      |> Season.changeset(%{
+        name: "Summer",
+        property: :tahoe,
+        start_date: ~D[2024-05-01],
+        end_date: ~D[2024-10-31],
+        is_default: true,
+        advance_booking_days: 365,
+        max_nights: 4
+      })
+      |> Repo.insert()
+
+    {:ok, _} =
+      %Season{}
+      |> Season.changeset(%{
+        name: "Winter",
+        property: :tahoe,
+        start_date: ~D[2024-11-01],
+        end_date: ~D[2025-04-30],
+        advance_booking_days: 365,
+        max_nights: 4
+      })
+      |> Repo.insert()
+
+    Ysc.Bookings.SeasonCache.invalidate()
   end
 
   defp create_room! do
@@ -147,16 +183,23 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
     checkout = Date.add(checkin, 2)
     booking = complete_room_booking!(user, room, checkin, checkout)
 
+    # Start at room checkout (same-day turnaround); end on Sunday so Sat⇒Sun holds.
     overlapping_checkin = checkout
-    overlapping_checkout = Date.add(checkout, 3)
+    overlapping_checkout = Date.add(checkout, 4)
 
     assert {:ok, _} =
-             BookingLocker.create_buyout_booking(
-               other_user.id,
-               :tahoe,
-               overlapping_checkin,
-               overlapping_checkout,
-               4
+             BookingLocker.create_admin_booking(
+               %{
+                 user_id: other_user.id,
+                 property: :tahoe,
+                 checkin_date: overlapping_checkin,
+                 checkout_date: overlapping_checkout,
+                 booking_mode: :buyout,
+                 guests_count: 4,
+                 total_price: Money.new(500, :USD)
+               },
+               skip_email: true,
+               skip_reminders: true
              )
 
     parsed = %{
@@ -499,7 +542,9 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
          %{
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(160)
+      # Keep within Clear Lake summer; calendar max clamps to season end when
+      # advance_booking_days is nil.
+      checkin = Date.utc_today() |> Date.add(21)
       checkout = Date.add(checkin, 2)
       booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -546,7 +591,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
         |> Ecto.Changeset.change(state: :active)
         |> Repo.update!()
 
-      checkin = Date.utc_today() |> Date.add(170)
+      checkin = Date.utc_today() |> Date.add(21)
       checkout = Date.add(checkin, 2)
       booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -596,7 +641,7 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
   defp ensure_clear_lake_day_pricing_rule do
     Ysc.Bookings.SeasonCache.invalidate()
-    Cachex.clear(:ysc_cache)
+    Ysc.Bookings.PricingRuleCache.invalidate()
 
     {:ok, _} =
       Bookings.create_pricing_rule(%{
@@ -625,5 +670,142 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
   defp first_monday_on_or_after(date) do
     days_until_monday = rem(8 - Date.day_of_week(date, :monday), 7)
     Date.add(date, days_until_monday)
+  end
+
+  defp first_saturday_on_or_after(date) do
+    days_until_saturday = rem(13 - Date.day_of_week(date, :monday), 7)
+    Date.add(date, days_until_saturday)
+  end
+
+  defp seed_tahoe_summer_winter_seasons! do
+    Repo.delete_all(from(s in Season, where: s.property == :tahoe))
+
+    {:ok, _} =
+      %Season{}
+      |> Season.changeset(%{
+        name: "Summer",
+        property: :tahoe,
+        start_date: ~D[2024-05-01],
+        end_date: ~D[2024-07-31],
+        is_default: true,
+        advance_booking_days: 365,
+        max_nights: 4
+      })
+      |> Repo.insert()
+
+    {:ok, _} =
+      %Season{}
+      |> Season.changeset(%{
+        name: "Winter",
+        property: :tahoe,
+        start_date: ~D[2024-08-01],
+        end_date: ~D[2025-04-30],
+        advance_booking_days: 365,
+        max_nights: 4
+      })
+      |> Repo.insert()
+
+    Ysc.Bookings.SeasonCache.invalidate()
+  end
+
+  defp complete_buyout_booking!(user, checkin, checkout) do
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(500, :USD),
+        booking_mode: :buyout,
+        price_unit: :buyout_fixed,
+        property: :tahoe,
+        season_id: nil
+      })
+
+    assert {:ok, %Booking{} = booking} =
+             BookingLocker.create_admin_booking(
+               %{
+                 user_id: user.id,
+                 property: :tahoe,
+                 checkin_date: checkin,
+                 checkout_date: checkout,
+                 booking_mode: :buyout,
+                 guests_count: 8,
+                 total_price: Money.new(1500, :USD)
+               },
+               skip_email: true,
+               skip_reminders: true
+             )
+
+    Repo.preload(booking, [:rooms, :user])
+  end
+
+  test "checkout tooltips block buyout ranges that enter Winter nights", %{
+    user: user
+  } do
+    seed_tahoe_summer_winter_seasons!()
+
+    # Wed–Fri in Summer; extending to Sun Aug 2 adds Aug 1 winter night
+    # while staying within the 4-night Summer max.
+    checkin = ~D[2026-07-29]
+    checkout = ~D[2026-07-31]
+    booking = complete_buyout_booking!(user, checkin, checkout)
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    tooltips =
+      ModificationDateAvailability.checkout_date_tooltips(
+        booking,
+        checkin,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    winter_checkout = ~D[2026-08-02]
+
+    assert tooltips[Date.to_iso8601(winter_checkout)] =~
+             "winter nights"
+  end
+
+  test "checkout tooltips block Saturday check-in except Sunday one-night", %{
+    user: user
+  } do
+    room = create_room!()
+    saturday = Date.utc_today() |> Date.add(21) |> first_saturday_on_or_after()
+    sunday = Date.add(saturday, 1)
+    booking = complete_room_booking!(user, room, saturday, sunday)
+    calendar = ModificationDateAvailability.calendar_context(booking)
+
+    snapshot =
+      ModificationDateAvailability.build_availability_snapshot(
+        booking,
+        calendar.min_date,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons
+      )
+
+    tooltips =
+      ModificationDateAvailability.checkout_date_tooltips(
+        booking,
+        saturday,
+        calendar.max_date,
+        calendar.today,
+        calendar.seasons,
+        snapshot
+      )
+
+    monday = Date.add(saturday, 2)
+
+    assert tooltips[Date.to_iso8601(monday)] =~
+             "Saturday must check out on Sunday"
+
+    refute Map.has_key?(tooltips, Date.to_iso8601(sunday))
   end
 end

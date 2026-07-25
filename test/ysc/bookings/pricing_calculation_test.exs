@@ -9,17 +9,16 @@ defmodule Ysc.Bookings.PricingCalculationTest do
     hierarchy in `find_pricing_rule_for_room/4` can find them. Property-wide
     room rules (no room_id, no room_category_id) are unreachable via that
     hierarchy and are therefore never used.
-  - `Cachex.clear(:ysc_cache)` is called in setup to prevent stale cached `nil`
-    entries (which arise when `System.system_time(:second)` returns the same
-    version for multiple tests within the same wall-clock second) from masking
-    freshly-created pricing rules.
+  - Season/pricing caches are invalidated in setup (monotonic versions) so
+    stale `nil` entries cannot mask freshly-created pricing rules.
   """
   use Ysc.DataCase, async: false
 
+  import Ysc.BookingsFixtures
+  import Ysc.TestDataFactory
+
   alias Ysc.Bookings
   alias Ysc.Bookings.{BookingLocker, Booking, RoomCategory}
-
-  import Ysc.AccountsFixtures
 
   # Fixed summer dates. No seasons are created in these tests, so the
   # `season_id: nil` rules always apply.
@@ -30,9 +29,7 @@ defmodule Ysc.Bookings.PricingCalculationTest do
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
     Ysc.Bookings.SeasonCache.invalidate()
-    # Wipe the Cachex cache to prevent stale `nil` entries from a prior test
-    # (within the same wall-clock second) from being served as valid cache hits.
-    Cachex.clear(:ysc_cache)
+    Ysc.Bookings.PricingRuleCache.invalidate()
 
     {:ok, category} =
       %RoomCategory{}
@@ -41,7 +38,9 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       })
       |> Ysc.Repo.insert()
 
-    user = user_fixture()
+    # Lifetime membership is required for multi-room Tahoe bookings under
+    # BookingValidator membership room limits.
+    user = user_with_membership(:lifetime)
     %{category: category, user: user}
   end
 
@@ -353,6 +352,10 @@ defmodule Ysc.Bookings.PricingCalculationTest do
 
   describe "season-specific room pricing" do
     setup %{category: cat} do
+      # Canonical seeded Summer also covers Jul; isolate so for_date/2 hits
+      # only this season and its season-scoped pricing rule.
+      clear_seasons!()
+
       {:ok, summer} =
         Bookings.create_season(%{
           name: "Test Summer #{System.unique_integer()}",
@@ -467,18 +470,43 @@ defmodule Ysc.Bookings.PricingCalculationTest do
       assert booking.total_price == Money.new(:USD, 360)
     end
 
-    test "3-room booking: total_price equals the 1-room price (not tripled)",
-         %{user: user, room1: r1, room2: r2, room3: r3} do
-      assert {:ok, %Booking{} = booking} =
-               BookingLocker.create_room_booking(
-                 user.id,
-                 [r1.id, r2.id, r3.id],
+    test "3-room pricing is not multiplied by room count",
+         %{room1: r1, room2: r2, room3: r3} do
+      # Membership caps member holds at 2 rooms, so this asserts the shared
+      # calculate_booking_price path BookingLocker uses once for multi-room.
+      assert {:ok, total_r1, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
                  @checkin,
                  @checkout_2n,
-                 4
+                 :room,
+                 room_id: r1.id,
+                 guests_count: 4
                )
 
-      assert booking.total_price == Money.new(:USD, 360)
+      assert {:ok, total_r2, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_2n,
+                 :room,
+                 room_id: r2.id,
+                 guests_count: 4
+               )
+
+      assert {:ok, total_r3, _} =
+               Bookings.calculate_booking_price(
+                 :tahoe,
+                 @checkin,
+                 @checkout_2n,
+                 :room,
+                 room_id: r3.id,
+                 guests_count: 4
+               )
+
+      assert total_r1 == Money.new(:USD, 360)
+      assert total_r1 == total_r2
+      assert total_r1 == total_r3
     end
 
     test "pricing_items records correct type, nights, and room list",

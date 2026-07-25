@@ -274,10 +274,9 @@ defmodule Ysc.Bookings.ModifyBookingTest do
     test "accepts ISO8601 datetime strings from date picker params", %{
       user: user
     } do
-      {checkin, checkout} = tahoe_booking_dates(65)
+      {checkin, checkout} = locker_buyout_dates(6)
       booking = complete_buyout_booking!(user, checkin, checkout)
-      new_checkin = Date.add(checkin, 7)
-      new_checkout = Date.add(checkout, 7)
+      {new_checkin, new_checkout} = locker_buyout_dates_after(checkout, 7)
 
       assert {:ok, preview} =
                Bookings.prepare_modification(booking, %{

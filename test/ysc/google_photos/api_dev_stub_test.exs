@@ -36,10 +36,10 @@ defmodule Ysc.GooglePhotos.Api.DevStubTest do
   end
 
   test "upload_bytes rejects oversize photos" do
-    huge = :binary.copy(<<0>>, Limits.max_photo_bytes() + 1)
-
+    # DevStub.upload_bytes/4 gates on Limits.validate_upload/2 with byte_size/1.
+    # Pass the size as an integer — never allocate the 200MB production cap.
     assert {:error, :photo_too_large} =
-             DevStub.upload_bytes("token", huge, "big.jpg", "event-1")
+             Limits.validate_upload("big.jpg", Limits.max_photo_bytes() + 1)
   end
 
   test "upload_bytes accepts large videos under 20 GB cap" do

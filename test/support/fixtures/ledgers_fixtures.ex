@@ -5,6 +5,8 @@ defmodule Ysc.LedgersFixtures do
   """
 
   alias Ysc.Ledgers
+  alias Ysc.Ledgers.Payment
+  alias Ysc.Repo
 
   def payment_fixture(attrs \\ %{}) do
     user_id = attrs[:user_id] || Ysc.AccountsFixtures.user_fixture().id
@@ -25,6 +27,30 @@ defmodule Ysc.LedgersFixtures do
       |> Ledgers.process_payment()
 
     payment
+  end
+
+  @doc """
+  Inserts Payment rows without ledger `process_payment/1` work.
+
+  Use for UI/list/pagination tests that only need `payments` rows visible to a
+  user. Prefer `payment_fixture/1` when ledger integrity matters.
+  """
+  def payment_rows!(user_id, count) when is_integer(count) and count > 0 do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    Enum.map(1..count, fn i ->
+      %Payment{}
+      |> Payment.changeset(%{
+        user_id: user_id,
+        amount: Money.new(100, :USD),
+        status: :completed,
+        external_provider: :stripe,
+        external_payment_id:
+          "pi_row_#{System.unique_integer([:positive])}_#{i}",
+        payment_date: now
+      })
+      |> Repo.insert!()
+    end)
   end
 
   def refund_fixture(attrs \\ %{}) do

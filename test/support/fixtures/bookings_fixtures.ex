@@ -4,13 +4,146 @@ defmodule Ysc.BookingsFixtures do
   entities via the `Ysc.Bookings` context.
   """
 
+  import Ecto.Query
+
   alias Ysc.Bookings
   alias Ysc.Bookings.{Booking, Room, Season}
   alias Ysc.Bookings.SeasonHelpers
   alias Ysc.Repo
 
-  # Tahoe winter is Nov 1 - Apr 30 (month in 1..4 or 11..12)
-  defp tahoe_winter_month?(month), do: month in [1, 2, 3, 4, 11, 12]
+  @doc """
+  Deletes all seasons in the current SQL sandbox and invalidates SeasonCache.
+
+  Committed seasons in the shared test DB are visible inside sandboxed tests;
+  never assume an empty seasons table without calling this (or `seed_canonical_seasons!/0`).
+  """
+  def clear_seasons! do
+    Repo.delete_all(Season)
+    Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
+  @doc """
+  Replaces all seasons with the canonical Tahoe/Clear Lake calendar used in seeds.
+
+  Winter: Nov 1 – Apr 30 (rooms-only buyout rule). Summer: May 1 – Oct 31
+  (default, unlimited advance for Tahoe summer). Prefer this over assuming
+  leftover seasons in `ysc_test` match production.
+  """
+  def seed_canonical_seasons! do
+    clear_seasons!()
+
+    base_year = 2024
+    winter_start = Date.new!(base_year, 11, 1)
+    winter_end = Date.new!(base_year + 1, 4, 30)
+    summer_start = Date.new!(base_year, 5, 1)
+    summer_end = Date.new!(base_year, 10, 31)
+
+    for attrs <- [
+          %{
+            name: "Winter",
+            property: :tahoe,
+            start_date: winter_start,
+            end_date: winter_end,
+            is_default: false,
+            advance_booking_days: 45,
+            max_nights: 4
+          },
+          %{
+            name: "Summer",
+            property: :tahoe,
+            start_date: summer_start,
+            end_date: summer_end,
+            is_default: true,
+            advance_booking_days: nil,
+            max_nights: 4
+          },
+          %{
+            name: "Winter",
+            property: :clear_lake,
+            start_date: winter_start,
+            end_date: winter_end,
+            is_default: false,
+            advance_booking_days: nil,
+            max_nights: 30
+          },
+          %{
+            name: "Summer",
+            property: :clear_lake,
+            start_date: summer_start,
+            end_date: summer_end,
+            is_default: true,
+            advance_booking_days: nil,
+            max_nights: 30
+          }
+        ] do
+      %Season{}
+      |> Season.changeset(attrs)
+      |> Repo.insert!()
+    end
+
+    Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
+  @doc """
+  Widens season advance-booking windows so locker/integration tests can use
+  far-future dates for isolation without tripping validation.
+
+  Uses a large day count (not `nil`): `nil` means “no per-date cap” but
+  `SeasonHelpers.calculate_max_booking_date/2` still clamps to the end of the
+  current season when the next season also has no limit. Prefer ~2 years over
+  365 so year+2 isolation dates remain valid.
+  """
+  def allow_far_future_booking_dates do
+    from(s in Season)
+    |> Repo.update_all(set: [advance_booking_days: 800])
+
+    Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
+  @doc """
+  Returns Tahoe buyout dates within advance-booking and season buyout rules.
+
+  `slot` selects different offsets for test isolation.
+  """
+  def locker_buyout_dates(slot \\ 0) do
+    buyout_monday_stay_at_index(7 + rem(slot, 34))
+  end
+
+  @doc """
+  Returns Tahoe room booking dates within advance-booking and season rules.
+
+  `slot` selects different offsets for test isolation.
+  """
+  def locker_room_dates(slot \\ 0, nights \\ 2) do
+    {checkin, _} = buyout_monday_stay_at_index(7 + rem(slot, 34))
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  @doc """
+  Returns buyout dates at least `min_days_ahead` days from today.
+  """
+  def locker_future_buyout_dates(min_days_ahead \\ 14) do
+    today = Date.utc_today()
+    min_checkin = Date.add(today, min_days_ahead)
+
+    Enum.find(enumerate_buyout_monday_stays(), fn {checkin, _} ->
+      Date.compare(checkin, min_checkin) != :lt
+    end) || buyout_monday_stay_at_index(14)
+  end
+
+  @doc """
+  Returns buyout dates starting after `after_date`, separated by at least `gap_days`.
+  """
+  def locker_buyout_dates_after(%Date{} = after_date, gap_days \\ 7) do
+    min_checkin = Date.add(after_date, gap_days)
+
+    Enum.find(enumerate_buyout_monday_stays(), fn {checkin, _} ->
+      Date.compare(checkin, min_checkin) != :lt
+    end) || buyout_monday_stay_at_index(0)
+  end
 
   defp first_monday_on_or_after(date) do
     case Date.day_of_week(date, :monday) do
@@ -37,11 +170,11 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
-  Returns `{checkin, checkout}` for a Tahoe stay that satisfies weekend and summer rules.
+  Returns `{checkin, checkout}` for a Tahoe stay that satisfies weekend and buyout rules.
 
   Used by tests that call `Bookings.create_booking/1` directly. `offset_days` is added to
-  today's date before snapping to the first Monday on or after that day (then summer
-  adjustment when the month is Tahoe winter).
+  today's date before snapping to the first Monday on or after that day (then adjusted
+  onto nights where the configured seasons allow buyout).
 
   Dates are clamped to the property's advance-booking window so tests stay valid when
   seasons enforce a limit (and when another test temporarily changes season settings).
@@ -72,21 +205,92 @@ defmodule Ysc.BookingsFixtures do
         end
       end)
 
-    # Buyout is only allowed in summer; ensure default checkin is in summer (May–Oct).
-    checkin =
-      if tahoe_winter_month?(checkin.month) do
-        year =
-          if checkin.month in [1, 2, 3, 4],
-            do: checkin.year,
-            else: checkin.year + 1
+    checkout = Date.add(checkin, 3)
 
-        may_first = Date.new!(year, 5, 1)
-        first_monday_on_or_after(may_first)
+    cond do
+      Season.buyout_allowed_for_stay?(:tahoe, checkin, checkout) and
+          Date.compare(checkout, max_booking_date) != :gt ->
+        {checkin, checkout}
+
+      next =
+          next_buyout_allowed_monday_stay(
+            earliest_checkin,
+            latest_checkin,
+            max_booking_date,
+            offset_days
+          ) ->
+        next
+
+      Date.compare(checkout, max_booking_date) == :gt ->
+        {Date.add(max_booking_date, -3), max_booking_date}
+
+      true ->
+        {checkin, checkout}
+    end
+  end
+
+  defp buyout_monday_stay_at_index(index) do
+    stays = enumerate_buyout_monday_stays()
+
+    case stays do
+      [] -> tahoe_booking_dates_fallback(index)
+      stays -> Enum.at(stays, rem(max(index, 0), length(stays)))
+    end
+  end
+
+  defp enumerate_buyout_monday_stays do
+    today = Date.utc_today()
+    max_booking_date = SeasonHelpers.calculate_max_booking_date(:tahoe, today)
+    earliest_checkin = Date.add(today, 1)
+    latest_checkin = Date.add(max_booking_date, -3)
+
+    earliest_checkin
+    |> first_monday_on_or_after()
+    |> Stream.iterate(&Date.add(&1, 7))
+    |> Stream.take_while(&(Date.compare(&1, latest_checkin) != :gt))
+    |> Enum.reduce([], fn checkin, acc ->
+      checkout = Date.add(checkin, 3)
+
+      if Date.compare(checkout, max_booking_date) != :gt and
+           Season.buyout_allowed_for_stay?(:tahoe, checkin, checkout) do
+        [{checkin, checkout} | acc]
       else
-        checkin
+        acc
       end
+    end)
+    |> Enum.reverse()
+  end
 
-    checkin = clamp_date(checkin, earliest_checkin, latest_checkin)
+  defp next_buyout_allowed_monday_stay(
+         _earliest_checkin,
+         _latest_checkin,
+         _max_booking_date,
+         offset_days
+       ) do
+    buyout_monday_stay_at_index(offset_days)
+  end
+
+  defp tahoe_booking_dates_fallback(offset_days) do
+    today = Date.utc_today()
+    max_booking_date = SeasonHelpers.calculate_max_booking_date(:tahoe, today)
+    latest_checkin = Date.add(max_booking_date, -3)
+    earliest_checkin = Date.add(today, 1)
+
+    base =
+      today
+      |> Date.add(offset_days)
+      |> clamp_date(earliest_checkin, latest_checkin)
+
+    checkin =
+      base
+      |> first_monday_on_or_after()
+      |> then(fn date ->
+        if Date.compare(date, latest_checkin) == :gt do
+          first_monday_on_or_before(latest_checkin)
+        else
+          date
+        end
+      end)
 
     checkout = Date.add(checkin, 3)
 
@@ -178,7 +382,9 @@ defmodule Ysc.BookingsFixtures do
         {fixture_rooms, attrs} -> {fixture_rooms, attrs}
       end
 
-    changeset_opts = if rooms, do: [rooms: List.wrap(rooms)], else: []
+    changeset_opts =
+      [skip_validation: true] ++
+        if(rooms, do: [rooms: List.wrap(rooms)], else: [])
 
     {:ok, booking} =
       %Booking{}
@@ -206,20 +412,17 @@ defmodule Ysc.BookingsFixtures do
 
       Map.get(attrs, :property) == :tahoe &&
         Map.get(attrs, :booking_mode, :buyout) == :buyout &&
-          tahoe_winter_checkin?(attrs.checkin_date) ->
+          not Season.buyout_allowed_for_stay?(
+            :tahoe,
+            attrs.checkin_date,
+            attrs.checkout_date
+          ) ->
         attrs
         |> Map.put(:booking_mode, :room)
         |> Map.put(:rooms, [tahoe_room_for_fixture!()])
 
       true ->
         attrs
-    end
-  end
-
-  defp tahoe_winter_checkin?(checkin) do
-    case Season.for_date(:tahoe, checkin) do
-      %{name: "Winter"} -> true
-      _ -> false
     end
   end
 
@@ -264,18 +467,16 @@ defmodule Ysc.BookingsFixtures do
       |> Date.add(-past_days)
       |> first_monday_on_or_before()
 
-    # Buyout is only allowed in summer at Tahoe.
+    # Prefer past dates where configured seasons still allow buyout.
     checkin =
-      if tahoe_winter_month?(checkin.month) do
-        year =
-          if checkin.month in [1, 2, 3, 4],
-            do: checkin.year - 1,
-            else: checkin.year
+      Enum.find_value(0..400, fn offset ->
+        candidate = Date.add(checkin, -offset) |> first_monday_on_or_before()
+        checkout = Date.add(candidate, 3)
 
-        first_monday_on_or_after(Date.new!(year, 6, 1))
-      else
-        checkin
-      end
+        if Season.buyout_allowed_for_stay?(:tahoe, candidate, checkout) do
+          candidate
+        end
+      end) || checkin
 
     checkout =
       checkin

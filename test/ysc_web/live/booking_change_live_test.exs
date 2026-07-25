@@ -185,7 +185,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
 
-    checkin = Date.utc_today() |> Date.add(160) |> first_monday_on_or_after()
+    # Stay inside Clear Lake summer (calendar max is season end when advance is nil).
+    checkin = Date.utc_today() |> Date.add(21) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)
     booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -212,7 +213,9 @@ defmodule YscWeb.BookingChangeLiveTest do
            )
   end
 
-  test "Tahoe change calendar blocks Saturday check-in", %{conn: conn} do
+  test "Tahoe change calendar allows Saturday check-in for Sat→Sun stays", %{
+    conn: conn
+  } do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
@@ -220,6 +223,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     {view, _html} = live_change(conn, booking)
 
     saturday = first_saturday_on_or_after(Date.add(booking.checkin_date, 7))
+    sunday = Date.add(saturday, 1)
+    monday = Date.add(saturday, 2)
 
     view
     |> element("#modification-dates [phx-click=open-calendar]")
@@ -229,7 +234,23 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(
              view,
-             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"][disabled]|
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    view
+    |> element(
+      ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]|
+    )
+    |> render_click()
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(sunday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(monday)}T00:00:00Z"][disabled]|
            )
   end
 
@@ -364,12 +385,14 @@ defmodule YscWeb.BookingChangeLiveTest do
       })
 
     room = create_test_room!()
-    checkin = Date.utc_today() |> Date.add(150) |> first_monday_on_or_after()
+    # Mon–Wed room stay, then a Wed–Fri buyout (weekday nights only) so the
+    # one-night extension collides without hitting winter/weekend rules.
+    {checkin, _} = locker_buyout_dates(8)
     checkout = Date.add(checkin, 2)
     booking = complete_room_booking!(user, room, checkin, checkout)
 
     overlapping_checkin = checkout
-    overlapping_checkout = Date.add(checkout, 4)
+    overlapping_checkout = Date.add(checkout, 2)
 
     assert {:ok, _} =
              BookingLocker.create_buyout_booking(
@@ -636,7 +659,7 @@ defmodule YscWeb.BookingChangeLiveTest do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
 
-    checkin = Date.utc_today() |> Date.add(160) |> first_monday_on_or_after()
+    checkin = Date.utc_today() |> Date.add(21) |> first_monday_on_or_after()
     checkout = Date.add(checkin, 2)
     booking = complete_clear_lake_day_booking!(user, checkin, checkout, 3)
 
@@ -905,6 +928,28 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert path =~ "/bookings/#{booking.id}/receipt"
     assert path =~ "payment_intent=#{payment_intent_id}"
     assert path =~ "redirect_status=succeeded"
+  end
+
+  test "reloads change data after pricing rule cache invalidation", %{
+    conn: conn
+  } do
+    user = user_fixture()
+    booking = complete_booking!(user)
+    conn = log_in_user(conn, user)
+
+    {view, _html} = live_change(conn, booking)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+
+    send(
+      view.pid,
+      {:pricing_rule_cache_invalidated, System.unique_integer([:positive])}
+    )
+
+    _ = render_async(view, @change_async_timeout)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+    assert is_list(:sys.get_state(view.pid).socket.assigns.seasons)
   end
 
   defp navigate_calendar_to_month!(view, %Date{} = target) do

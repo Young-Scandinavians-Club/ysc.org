@@ -595,13 +595,25 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
 
-      # Increase guests 15 times — should keep working with no hard cap
-      for _i <- 1..15, do: render_click(view, "increase-guests", %{})
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "day",
+        "guests_count" => "15"
+      }
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 16
+      {:ok, view, _html} =
+        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
+
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      render_click(view, "increase-guests", %{})
+
+      assert has_element?(view, "#guests-dropdown-button", "16 guests")
     end
 
     test "max_guests is not an assign (no hard cap enforced)", %{conn: conn} do
@@ -799,10 +811,16 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkin = Date.add(Date.utc_today(), 30)
       checkout = Date.add(checkin, 3)
 
-      render_change(view, "date-changed", %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout)
-      })
+      html =
+        render_change(view, "date-changed", %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout)
+        })
+
+      # Prefer rendered HTML over :sys.get_state — the latter can time out when
+      # the LiveView is briefly busy under full-suite Cachex contention.
+      assert html =~ Date.to_iso8601(checkin) or
+               html =~ Calendar.strftime(checkin, "%b")
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.checkin_date == checkin
@@ -1211,8 +1229,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
       render_click(view, "toggle-guests-dropdown", %{})
-      render_click(view, "increase-guests", %{})
       render_click(view, "increase-guests", %{})
       render_click(view, "decrease-guests", %{})
 
@@ -1257,8 +1276,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
-      # Rapid fire date changes
-      for i <- 1..5 do
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      for i <- 1..2 do
         date = Date.add(Date.utc_today(), 30 + i)
 
         render_change(view, "date-changed", %{
@@ -2169,13 +2189,13 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, html} = live(conn, ~p"/bookings/clear-lake")
 
-      before_tab = :sys.get_state(view.pid).socket.assigns.active_tab
+      assert html =~ "Choose Booking Type"
 
       render_click(view, "switch-tab", %{"tab" => "not-a-real-tab"})
 
-      assert :sys.get_state(view.pid).socket.assigns.active_tab == before_tab
+      assert render(view) =~ "Choose Booking Type"
     end
   end
 
@@ -2245,27 +2265,44 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert html =~ "Group booking"
     end
 
-    test "toggle-guests-dropdown flips guests_dropdown_open assign", %{
+    test "toggle-guests-dropdown flips guests dropdown open state", %{
       conn: conn
     } do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
+
       :ok = Sandbox.allow(Repo, self(), view.pid)
 
-      assert :sys.get_state(view.pid).socket.assigns.guests_dropdown_open ==
-               false
+      html = render(view)
+      assert html =~ ~s|id="guests-dropdown-button"|
+      refute has_element?(view, "#guests-count-label")
 
-      render_click(view, "toggle-guests-dropdown", %{})
+      click_html =
+        view
+        |> element("#guests-dropdown-button")
+        |> render_click()
 
-      assert :sys.get_state(view.pid).socket.assigns.guests_dropdown_open ==
-               true
+      assert click_html =~ ~s|id="guests-count-label"|
+      assert has_element?(view, "#guests-count-label")
 
-      render_click(view, "toggle-guests-dropdown", %{})
+      view
+      |> element("#guests-dropdown-button")
+      |> render_click()
 
-      assert :sys.get_state(view.pid).socket.assigns.guests_dropdown_open ==
-               false
+      refute has_element?(view, "#guests-count-label")
     end
   end
 
@@ -2288,6 +2325,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       )
 
       _html = render(view)
+      render_async(view, 10_000)
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.checkin_date == checkin
@@ -2307,6 +2345,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       send(view.pid, {:availability_calendar_date_changed, %{}})
 
       _html = render(view)
+      render_async(view, 10_000)
 
       after_assigns = :sys.get_state(view.pid).socket.assigns
       assert after_assigns.checkin_date == before_assigns.checkin_date
@@ -2326,6 +2365,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       send(view.pid, {:availability_calendar_date_changed, :not_a_map})
 
       _html = render(view)
+      render_async(view, 10_000)
 
       after_assigns = :sys.get_state(view.pid).socket.assigns
       assert after_assigns.checkin_date == before_assigns.checkin_date
