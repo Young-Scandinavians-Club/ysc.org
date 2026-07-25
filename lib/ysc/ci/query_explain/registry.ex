@@ -10,6 +10,20 @@ defmodule Ysc.Ci.QueryExplain.Registry do
 
   @doc false
   def all_targets do
+    key = {__MODULE__, :all_targets}
+
+    case :persistent_term.get(key, :miss) do
+      :miss ->
+        targets = build_all_targets()
+        :persistent_term.put(key, targets)
+        targets
+
+      targets when is_list(targets) ->
+        targets
+    end
+  end
+
+  defp build_all_targets do
     load_ysc_modules!()
 
     lib_ysc_paths()

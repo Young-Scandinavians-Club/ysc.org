@@ -1,4 +1,7 @@
-ExUnit.start(capture_log: true)
+# `:backup_integration` scans real WordPress SQL dumps (hundreds of MB) when
+# present locally — exclude from the default suite; opt in with:
+#   mix test --include backup_integration
+ExUnit.start(capture_log: true, exclude: [:backup_integration])
 {:ok, _} = Ysc.HttpTestServer.start_link()
 
 # Host .env may define QUICKBOOKS_*; never use those in tests (avoids Intuit HTTP).

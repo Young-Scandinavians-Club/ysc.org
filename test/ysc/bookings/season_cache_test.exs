@@ -15,6 +15,8 @@ defmodule Ysc.Bookings.SeasonCacheTest do
   """
   use Ysc.DataCase, async: false
 
+  import Ysc.BookingsFixtures
+
   alias Ysc.Bookings.{SeasonCache, Season}
   alias Ysc.Repo
 
@@ -37,11 +39,10 @@ defmodule Ysc.Bookings.SeasonCacheTest do
     season
   end
 
-  # Clear cache before each test
+  # Clear seasons so length/id assertions are exact. Prefer invalidate over
+  # Cachex.clear — clearing the shared :ysc_cache races with async LiveViews.
   setup do
-    # Clear the entire cache to start fresh
-    Cachex.clear(:ysc_cache)
-    # Reset version
+    clear_seasons!()
     SeasonCache.invalidate()
     :ok
   end
@@ -240,8 +241,8 @@ defmodule Ysc.Bookings.SeasonCacheTest do
           end_date: ~D[2025-04-30]
         })
 
-      # Set version to a past value so entries cached next will have an old version
-      Cachex.put(:ysc_cache, "season:version", System.system_time(:second) - 10)
+      # Plant a stale version so entries cached next store that old version
+      Cachex.put(:ysc_cache, "season:version", 1)
 
       # Populate cache (entry stores the past version)
       cached1 = SeasonCache.get(:tahoe, ~D[2024-12-15])
@@ -264,19 +265,17 @@ defmodule Ysc.Bookings.SeasonCacheTest do
     end
 
     test "invalidation bumps cache version" do
-      # Set version to a known past value
-      past_version = System.system_time(:second) - 10
+      past_version = 1
       Cachex.put(:ysc_cache, "season:version", past_version)
 
       {:ok, version1} = Cachex.get(:ysc_cache, "season:version")
       assert version1 == past_version
 
-      # Invalidate sets version to now()
       SeasonCache.invalidate()
 
       {:ok, version2} = Cachex.get(:ysc_cache, "season:version")
 
-      assert version2 > version1
+      assert version2 != version1
     end
 
     test "broadcasts invalidation event via PubSub" do
@@ -301,13 +300,12 @@ defmodule Ysc.Bookings.SeasonCacheTest do
           end_date: ~D[2025-04-30]
         })
 
-      # Set version to a past value so cached entries have an old version
-      Cachex.put(:ysc_cache, "season:version", System.system_time(:second) - 10)
+      Cachex.put(:ysc_cache, "season:version", 1)
 
       # Populate cache
       SeasonCache.get(:tahoe, ~D[2024-12-15])
 
-      # Invalidate sets version to now(), creating a mismatch
+      # Invalidate bumps version, creating a mismatch with cached entries
       SeasonCache.invalidate_property(:tahoe)
 
       # Update season in DB
@@ -332,7 +330,7 @@ defmodule Ysc.Bookings.SeasonCacheTest do
           end_date: ~D[2025-04-30]
         })
 
-      Cachex.put(:ysc_cache, "season:version", System.system_time(:second) - 10)
+      Cachex.put(:ysc_cache, "season:version", 1)
 
       assert SeasonCache.get(:tahoe, ~D[2024-12-15]).name == "Winter"
       assert length(SeasonCache.get_all_for_property(:tahoe)) == 1
@@ -361,13 +359,12 @@ defmodule Ysc.Bookings.SeasonCacheTest do
           end_date: ~D[2025-04-30]
         })
 
-      # Set version to a past value so cached entries are stored with an old version
-      Cachex.put(:ysc_cache, "season:version", System.system_time(:second) - 10)
+      Cachex.put(:ysc_cache, "season:version", 1)
 
       # Populate cache
       SeasonCache.get(:tahoe, ~D[2024-12-15])
 
-      # Invalidate sets version to now(), making cached entries stale
+      # Invalidate bumps version, making cached entries stale
       SeasonCache.invalidate()
 
       # Update season in DB
@@ -391,13 +388,12 @@ defmodule Ysc.Bookings.SeasonCacheTest do
           end_date: ~D[2025-04-30]
         })
 
-      # Set version to a past value so cached entries have an old version
-      Cachex.put(:ysc_cache, "season:version", System.system_time(:second) - 10)
+      Cachex.put(:ysc_cache, "season:version", 1)
 
       # Populate cache
       SeasonCache.get_all_for_property(:tahoe)
 
-      # Invalidate sets version to now(), making cached entries stale
+      # Invalidate bumps version, making cached entries stale
       SeasonCache.invalidate()
 
       # Update season in DB

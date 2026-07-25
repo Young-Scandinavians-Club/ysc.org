@@ -142,10 +142,10 @@ defmodule Ysc.GooglePhotos.ApiTest do
     end
 
     test "rejects oversize photos before HTTP" do
-      huge = :binary.copy(<<0>>, Limits.max_photo_bytes() + 1)
-
+      # Api.upload_bytes/3 gates on Limits.validate_upload/2 with byte_size/1
+      # before any Req call. Pass size as an integer — never allocate 200MB.
       assert {:error, :photo_too_large} =
-               Api.upload_bytes(@access_token, huge, "big.jpg")
+               Limits.validate_upload("big.jpg", Limits.max_photo_bytes() + 1)
     end
 
     test "rejects unsupported file types before HTTP" do

@@ -470,16 +470,8 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         |> Ecto.Changeset.change(%{state: :active})
         |> Repo.update!()
 
-      year = Date.utc_today().year + 2
-      july_first = Date.new!(year, 7, 1)
-
-      checkin_date =
-        case Date.day_of_week(july_first, :monday) do
-          1 -> july_first
-          n -> Date.add(july_first, 8 - n)
-        end
-
-      checkout_date = Date.add(checkin_date, 3)
+      # Stay inside advance/buyout windows; year+2 July trips season limits.
+      {checkin_date, checkout_date} = locker_buyout_dates(12)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(

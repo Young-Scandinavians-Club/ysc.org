@@ -14,8 +14,17 @@ defmodule Ysc.Bookings.SeasonTest do
   """
   use Ysc.DataCase, async: true
 
+  import Ysc.BookingsFixtures
+
   alias Ysc.Bookings.Season
   alias Ysc.Repo
+
+  # Committed seed seasons in ysc_test are visible inside the sandbox; uniqueness
+  # and is_default tests must start from an empty seasons table.
+  setup do
+    clear_seasons!()
+    :ok
+  end
 
   describe "changeset/2" do
     test "creates valid changeset with all required fields" do

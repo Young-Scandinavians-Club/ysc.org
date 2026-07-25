@@ -7,7 +7,7 @@ defmodule YscWeb.ConductViolationReportLiveTest do
   describe "report conduct violation page" do
     test "displays formatted phone number when user is logged in", %{conn: conn} do
       user =
-        user_fixture(%{
+        user_fixture_fast(%{
           first_name: "Jane",
           last_name: "Smith",
           phone_number: "+14155551234"
@@ -24,7 +24,7 @@ defmodule YscWeb.ConductViolationReportLiveTest do
 
     test "displays Not provided when logged-in user has no phone", %{conn: conn} do
       user =
-        user_fixture(%{
+        user_fixture_fast(%{
           phone_number: nil
         })
 
