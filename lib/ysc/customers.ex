@@ -12,6 +12,20 @@ defmodule Ysc.Customers do
   alias Ysc.Payments
 
   @doc """
+  Builds parameters for the Stripe Customer create/update APIs from a user.
+
+  ## Options
+
+    * `:include_address` - when `true`, includes billing address when present
+      (default `false`)
+  """
+  def stripe_customer_params(%User{} = user, opts \\ []) do
+    user
+    |> build_stripe_customer_params()
+    |> maybe_put_stripe_customer_address(user, opts)
+  end
+
+  @doc """
   Creates a Stripe customer for the given user.
 
   ## Examples
@@ -22,16 +36,7 @@ defmodule Ysc.Customers do
   """
   @dialyzer {:nowarn_function, create_stripe_customer: 1}
   def create_stripe_customer(%User{} = user) do
-    customer_params = %{
-      email: user.email,
-      name:
-        "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
-      phone: user.phone_number,
-      description: "User ID: #{user.id}",
-      metadata: %{
-        user_id: user.id
-      }
-    }
+    customer_params = stripe_customer_params(user)
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
            stripe_customer_module().create(customer_params)
@@ -63,25 +68,7 @@ defmodule Ysc.Customers do
       # Preload billing_address to ensure it's available for customer update
       user = Repo.preload(user, :billing_address)
 
-      customer_params = %{
-        email: user.email,
-        name:
-          "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
-        phone: user.phone_number,
-        description: "User ID: #{user.id}",
-        metadata: %{
-          user_id: user.id
-        }
-      }
-
-      # Add address if billing_address exists
-      customer_params =
-        if user.billing_address do
-          address = build_customer_address(user.billing_address)
-          Map.put(customer_params, :address, address)
-        else
-          customer_params
-        end
+      customer_params = stripe_customer_params(user, include_address: true)
 
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
              stripe_customer_module().update(
@@ -394,6 +381,33 @@ defmodule Ysc.Customers do
   end
 
   defp ensure_stripe_customer(%User{} = user), do: user
+
+  defp build_stripe_customer_params(%User{} = user) do
+    %{
+      email: user.email,
+      name:
+        "#{Ysc.title_case(user.first_name)} #{Ysc.title_case(user.last_name)}",
+      phone: user.phone_number,
+      description: "User ID: #{user.id}",
+      metadata: %{
+        user_id: user.id
+      }
+    }
+  end
+
+  defp maybe_put_stripe_customer_address(params, %User{} = user, opts) do
+    if Keyword.get(opts, :include_address, false) do
+      maybe_put_stripe_customer_address(params, user.billing_address)
+    else
+      params
+    end
+  end
+
+  defp maybe_put_stripe_customer_address(params, nil), do: params
+
+  defp maybe_put_stripe_customer_address(params, billing_address) do
+    Map.put(params, :address, build_customer_address(billing_address))
+  end
 
   defp build_customer_address(billing_address) do
     address = %{
