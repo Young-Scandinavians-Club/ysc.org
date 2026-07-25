@@ -159,14 +159,15 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
     end
   end
 
-  describe "sync_for_user/1" do
+  describe "sync_for_user/2" do
     test "returns :ok without calling Stripe in test mode" do
       user = user_fixture()
       assert :ok == BoardVolunteerBilling.sync_for_user(user)
     end
 
-    test "records sync target in test when recorder pid is configured" do
+    test "records sync target in test when household is on the board" do
       user = user_fixture()
+      {:ok, user} = Ysc.Accounts.assign_board_position(user, :president)
 
       Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
 
@@ -178,6 +179,135 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
 
       user_id = user.id
       assert_receive {:board_volunteer_sync, ^user_id}
+    end
+
+    test "does not record sync for households never on the board" do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok == BoardVolunteerBilling.sync_for_user(user)
+      refute_receive {:board_volunteer_sync, _}
+    end
+
+    test "records sync when applying off-board grace after board service" do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok ==
+               BoardVolunteerBilling.sync_for_user(user,
+                 apply_off_board_grace?: true
+               )
+
+      user_id = user.id
+      assert_receive {:board_volunteer_sync, ^user_id}
+    end
+  end
+
+  describe "sync_after_family_membership_change/2" do
+    test "syncs when a board member joins the household" do
+      primary = user_fixture()
+      sub = user_fixture()
+      {:ok, sub} = Ysc.Accounts.assign_board_position(sub, :treasurer)
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "spouse"
+        })
+        |> Ysc.Repo.update!()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok ==
+               BoardVolunteerBilling.sync_after_family_membership_change(
+                 primary,
+                 sub
+               )
+
+      primary_id = primary.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
+    end
+
+    test "applies grace sync when a board member leaves the household" do
+      primary = user_fixture()
+      sub = user_fixture()
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, sub} = Ysc.Accounts.assign_board_position(sub, :secretary)
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: nil,
+          family_relationship: nil
+        })
+        |> Ysc.Repo.update!()
+
+      refute BoardVolunteerBilling.household_on_board?(primary)
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok ==
+               BoardVolunteerBilling.sync_after_family_membership_change(
+                 primary,
+                 sub
+               )
+
+      primary_id = primary.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
+    end
+
+    test "skips sync when neither household nor member is on the board" do
+      primary = user_fixture()
+      sub = user_fixture()
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Ysc.Repo.update!()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok ==
+               BoardVolunteerBilling.sync_after_family_membership_change(
+                 primary,
+                 sub
+               )
+
+      refute_receive {:board_volunteer_sync, _}
     end
   end
 

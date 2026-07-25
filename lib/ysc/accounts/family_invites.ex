@@ -223,7 +223,8 @@ defmodule Ysc.Accounts.FamilyInvites do
             )
 
             sync_board_volunteer_billing_after_family_change(
-              invite.primary_user_id
+              invite.primary_user_id,
+              final_user.id
             )
 
             notify_invite_accepted(invite, final_user)
@@ -299,7 +300,8 @@ defmodule Ysc.Accounts.FamilyInvites do
             )
 
             sync_board_volunteer_billing_after_family_change(
-              invite.primary_user_id
+              invite.primary_user_id,
+              updated_user.id
             )
 
             notify_invite_accepted(invite, updated_user)
@@ -316,10 +318,18 @@ defmodule Ysc.Accounts.FamilyInvites do
     UserProfileCache.invalidate_user(primary_user_id)
   end
 
-  defp sync_board_volunteer_billing_after_family_change(primary_user_id) do
-    case Ysc.Accounts.get_user(primary_user_id) do
-      nil -> :ok
-      primary -> BoardVolunteerBilling.sync_for_user(primary)
+  defp sync_board_volunteer_billing_after_family_change(
+         primary_user_id,
+         affected_user_id
+       ) do
+    with %User{} = primary <- Ysc.Accounts.get_user(primary_user_id),
+         %User{} = affected_user <- Ysc.Accounts.get_user(affected_user_id) do
+      BoardVolunteerBilling.sync_after_family_membership_change(
+        primary,
+        affected_user
+      )
+    else
+      _ -> :ok
     end
   end
 
