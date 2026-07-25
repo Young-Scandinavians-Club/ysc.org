@@ -595,7 +595,10 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?guests_count=15")
+      # Explicitly request day mode so the day section (and guests dropdown) is
+      # rendered regardless of pricing rules
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/clear-lake?booking_mode=day&guests_count=15")
 
       render_click(view, "increase-guests", %{})
 
@@ -793,6 +796,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+
+      :ok = Sandbox.allow(Repo, self(), view.pid)
 
       checkin = Date.add(Date.utc_today(), 30)
       checkout = Date.add(checkin, 3)
