@@ -28,6 +28,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
+    allow_far_future_booking_dates()
 
     # Ensure stripe_client is the test client (defensive reset in case async tests leaked state)
     Application.put_env(:ysc, :stripe_client, Ysc.TestStripeClient)
@@ -89,8 +90,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "returns blackout_conflict when dates overlap a blackout", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(45)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = locker_room_dates(45, 3)
 
       assert {:ok, _} =
                Bookings.create_blackout(%{
@@ -131,8 +131,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(46)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = locker_room_dates(46, 3)
 
       first =
         BookingLocker.create_room_booking(
@@ -185,8 +184,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "honors hold_duration_minutes in opts for hold_expires_at", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(131)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(131)
 
       assert {:ok, %Booking{} = booking} =
                BookingLocker.create_buyout_booking(
@@ -249,8 +247,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
   describe "create_room_booking/6 validation" do
     test "returns :no_rooms_provided when room list is empty", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(40)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(40, 2)
 
       assert {:error, :no_rooms_provided} =
                BookingLocker.create_room_booking(
@@ -263,8 +260,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "returns rooms_not_found when a room id does not exist", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(41)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(41, 2)
       missing_id = Ecto.ULID.generate()
 
       assert {:error, {:error, {:rooms_not_found, [^missing_id]}}} =
@@ -307,8 +303,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(42)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(42, 2)
 
       assert {:error, {:error, :rooms_must_be_same_property}} =
                BookingLocker.create_room_booking(
@@ -342,7 +337,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(55))
+      {checkin, _checkout} = locker_room_dates(55, 2)
       checkout = Date.add(checkin, 2)
 
       assert {:ok, _} =
@@ -383,7 +378,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(58))
+      {checkin, _checkout} = locker_room_dates(58, 2)
       checkout = Date.add(checkin, 2)
 
       assert {:ok, _} =
@@ -429,8 +424,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(48)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = locker_buyout_dates(48)
 
       assert {:ok, %Booking{}} =
                BookingLocker.create_buyout_booking(
@@ -487,7 +481,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(14))
+      {checkin, _checkout} = locker_room_dates(14, 2)
       checkout = Date.add(checkin, 2)
 
       result =
@@ -592,7 +586,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 6
         })
 
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(16))
+      {checkin, _checkout} = locker_room_dates(16, 2)
       checkout = Date.add(checkin, 2)
 
       result =
@@ -648,7 +642,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(14))
+      {checkin, _checkout} = locker_room_dates(14, 2)
       checkout = Date.add(checkin, 2)
       guests = 2
       nights = Date.diff(checkout, checkin)
@@ -744,7 +738,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "returns blackout_conflict when dates overlap a blackout", %{
       user: user
     } do
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(420))
+      {checkin, _checkout} = locker_room_dates(420, 2)
       checkout = Date.add(checkin, 2)
 
       assert {:ok, _} =
@@ -775,8 +769,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "enqueues booking confirmation email when skip_email is false", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(412)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(412)
 
       attrs = %{
         user_id: user.id,
@@ -807,8 +800,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
     test "schedules check-in and checkout reminder Oban jobs when skip_reminders is false",
          %{user: user} do
-      checkin = Date.utc_today() |> Date.add(45)
-      checkout = Date.add(checkin, 4)
+      {checkin, checkout} = locker_future_buyout_dates(14)
 
       attrs = %{
         user_id: user.id,
@@ -861,8 +853,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(408)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(408, 2)
 
       attrs = %{
         user_id: user.id,
@@ -903,8 +894,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "creates a complete buyout booking and updates inventory", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(14)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(14)
 
       attrs = %{
         user_id: user.id,
@@ -953,8 +943,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(413)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(413, 2)
 
       result =
         BookingLocker.create_room_booking(
@@ -987,8 +976,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{user: user} do
       ensure_clear_lake_day_pricing_rule()
 
-      checkin = Date.utc_today() |> Date.add(414)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(414, 2)
 
       assert {:ok, hold} =
                BookingLocker.create_per_guest_booking(
@@ -1007,8 +995,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "refunds a complete booking and sets status to refunded", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(21)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(21)
 
       attrs = %{
         user_id: user.id,
@@ -1032,8 +1019,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
     test "refund_complete_booking with release_inventory false does not rollback",
          %{user: user} do
-      checkin = Date.utc_today() |> Date.add(28)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(28)
 
       attrs = %{
         user_id: user.id,
@@ -1083,8 +1069,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "create_per_guest_booking succeeds within capacity", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(30)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(30, 2)
 
       assert {:ok, %Booking{} = booking} =
                BookingLocker.create_per_guest_booking(
@@ -1104,8 +1089,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "create_per_guest_booking fails when capacity would be exceeded", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(35)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(35, 2)
 
       # Default Clear Lake capacity is 12; book all 12 first
       assert {:ok, _booking1} =
@@ -1134,8 +1118,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(88)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(88, 2)
 
       assert {:ok, _} =
                Bookings.create_blackout(%{
@@ -1159,8 +1142,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
   describe "confirm_booking/1 inventory errors" do
     test "returns inventory_update_failed when property inventory rows are missing after buyout hold",
          %{user: user} do
-      checkin = Date.utc_today() |> Date.add(206)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(206)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1202,8 +1184,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(210)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(210, 2)
 
       result =
         BookingLocker.create_room_booking(
@@ -1238,8 +1219,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{user: user} do
       ensure_clear_lake_day_pricing_rule()
 
-      checkin = Date.utc_today() |> Date.add(211)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(211, 2)
 
       {:ok, booking} =
         BookingLocker.create_per_guest_booking(
@@ -1279,8 +1259,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(203)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(203)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1322,8 +1301,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(207)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(207, 2)
 
       result =
         BookingLocker.create_room_booking(
@@ -1358,8 +1336,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
   describe "release_hold/1" do
     test "searches PaymentIntents and attempts cancel when metadata matches booking",
          %{user: user} do
-      checkin = Date.utc_today() |> Date.add(409)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(409)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1414,8 +1391,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     } do
       ensure_clear_lake_day_pricing_rule()
 
-      checkin = Date.utc_today() |> Date.add(125)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(125, 2)
       guests = 3
 
       assert {:ok, booking} =
@@ -1499,8 +1475,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(201)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(201, 2)
 
       result =
         BookingLocker.create_room_booking(
@@ -1535,8 +1510,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          } do
       ensure_clear_lake_day_pricing_rule()
 
-      checkin = Date.utc_today() |> Date.add(202)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(202, 2)
       guests = 3
 
       {:ok, hold} =
@@ -1575,8 +1549,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
   describe "cancel_complete_booking/1" do
     test "returns invalid_status when booking is still a hold", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(415)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(415)
 
       assert {:ok, hold} =
                BookingLocker.create_buyout_booking(
@@ -1626,8 +1599,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(411)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(411)
 
       {:ok, booking} =
         BookingLocker.create_buyout_booking(
@@ -1649,10 +1621,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "releases other hold bookings for the same property and user", %{
       user: user
     } do
-      week1_in = Date.utc_today() |> Date.add(410)
-      week1_out = Date.add(week1_in, 2)
-      week2_in = Date.add(week1_out, 5)
-      week2_out = Date.add(week2_in, 2)
+      {week1_in, week1_out} = locker_buyout_dates(10)
+      {week2_in, week2_out} = locker_buyout_dates_after(week1_out)
 
       assert {:ok, first_hold} =
                BookingLocker.create_buyout_booking(
@@ -1786,7 +1756,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
       user: user
     } do
       # Summer weekday — buyout + weekend rules now enforced on create
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(21))
+      {checkin, _checkout} = locker_room_dates(21, 2)
       checkout = Date.add(checkin, 2)
 
       assert {:ok, booking} =
@@ -1811,7 +1781,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
            user: user
          } do
       other_user = user_fixture(%{phone_number: "+14159098312"})
-      checkin = weekday_on_or_after(Date.utc_today() |> Date.add(28))
+      {checkin, _checkout} = locker_room_dates(28, 2)
       checkout = Date.add(checkin, 2)
 
       assert {:ok, booking} =
@@ -1860,8 +1830,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(122)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(122, 2)
 
       assert {:ok, hold} =
                BookingLocker.create_room_booking(
@@ -1904,8 +1873,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(123)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(123, 2)
 
       assert {:ok, hold} =
                BookingLocker.create_room_booking(
@@ -1940,8 +1908,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          } do
       ensure_clear_lake_day_pricing_rule()
 
-      checkin = Date.utc_today() |> Date.add(124)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(124, 2)
 
       assert {:ok, hold} =
                BookingLocker.create_per_guest_booking(
@@ -1967,8 +1934,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
       other_user = user_fixture(%{phone_number: "+14159098314"})
       ensure_clear_lake_day_pricing_rule()
 
-      checkin = Date.utc_today() |> Date.add(125)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(125, 2)
 
       assert {:ok, hold} =
                BookingLocker.create_per_guest_booking(
@@ -2008,8 +1974,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
          %{
            user: user
          } do
-      checkin = Date.utc_today() |> Date.add(121)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(121, 2)
 
       assert {:ok, _} =
                BookingLocker.create_per_guest_booking(
@@ -2033,8 +1998,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
 
   describe "create_admin_booking/2 Clear Lake" do
     test "creates a complete buyout for Clear Lake", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(122)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_buyout_dates(122)
 
       attrs = %{
         user_id: user.id,
@@ -2061,8 +2025,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "invalidates Clear Lake availability cache", %{user: user} do
       alias Ysc.Bookings.AvailabilityCache
 
-      checkin = Date.utc_today() |> Date.add(412)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(412, 2)
 
       AvailabilityCache.get_clear_lake_daily_availability(checkin, checkout)
 
@@ -2112,8 +2075,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     test "creates a complete per-guest (day) booking for Clear Lake", %{
       user: user
     } do
-      checkin = Date.utc_today() |> Date.add(123)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(123, 2)
 
       attrs = %{
         user_id: user.id,
@@ -2143,8 +2105,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
 
     test "confirms a per-guest hold and completes booking", %{user: user} do
-      checkin = Date.utc_today() |> Date.add(124)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(124, 2)
 
       assert {:ok, hold} =
                BookingLocker.create_per_guest_booking(
@@ -2177,8 +2138,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           season_id: nil
         })
 
-      checkin = Date.utc_today() |> Date.add(30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = locker_room_dates(30, 3)
       guests = 4
 
       assert {:ok, booking} =
@@ -2244,8 +2204,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(209)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = locker_room_dates(209, 3)
 
       first =
         BookingLocker.create_room_booking(
@@ -2295,8 +2254,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           capacity_max: 4
         })
 
-      checkin = Date.utc_today() |> Date.add(504)
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = locker_room_dates(504, 2)
 
       assert {:error, :pricing_calculation_failed} =
                BookingLocker.create_room_booking(
@@ -2320,15 +2278,5 @@ defmodule Ysc.Bookings.BookingLockerTest do
       |> Ysc.Repo.insert()
 
     category
-  end
-
-  # Prefer Mon–Thu so Tahoe weekend rules do not interfere with blackout tests.
-  defp weekday_on_or_after(%Date{} = date) do
-    case Date.day_of_week(date, :monday) do
-      day when day in 1..4 -> date
-      5 -> Date.add(date, 3)
-      6 -> Date.add(date, 2)
-      7 -> Date.add(date, 1)
-    end
   end
 end

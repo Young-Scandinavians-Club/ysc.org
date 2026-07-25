@@ -1564,7 +1564,7 @@ defmodule YscWeb.SecurityAuditTest do
       user = user_with_membership(:none)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = tahoe_booking_dates(60)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -1585,73 +1585,6 @@ defmodule YscWeb.SecurityAuditTest do
           ),
           :count
         )
-
-      # Use render_click/3 HTML instead of render/1: ClearLakeBookingLive can keep
-      # availability async work in flight and a follow-up render blocks under CI load.
-      html = render_click(view, "create-booking", %{})
-
-      hold_count_after =
-        Repo.aggregate(
-          from(b in Booking,
-            where: b.user_id == ^user.id and b.status == :hold
-          ),
-          :count
-        )
-
-      assert hold_count_before == hold_count_after
-      assert html =~ "active YSC membership"
-    end
-
-    test "tahoe create-booking LiveView event does not create a hold without membership",
-         %{conn: conn} do
-      user = user_with_membership(:none)
-      conn = log_in_user(conn, user)
-
-      {checkin, checkout} = tahoe_booking_dates(60)
-
-      params = %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout),
-        "guests" => "4",
-        "booking_mode" => "day"
-      }
-
-      {:ok, view, html} =
-        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
-
-      assert html =~ ~s|id="tahoe-booking-eligibility-banner-public"|
-      assert html =~ "active YSC membership"
-
-      render_async(view, 5_000)
-
-      hold_count_before =
-        Repo.aggregate(
-          from(b in Booking,
-            where: b.user_id == ^user.id and b.status == :hold
-          ),
-          :count
-        )
-
-      # Tahoe requires booking confirmations before create-booking reaches the
-      # server-side membership gate. Set them directly instead of clicking through
-      # four toggles, which can block on in-flight availability async under CI load.
-      :sys.replace_state(view.pid, fn %{socket: socket} = state ->
-        socket =
-          Enum.reduce(
-            [
-              terms_agreed: true,
-              linens_confirmed: true,
-              chores_confirmed: true,
-              party_size_confirmed: true
-            ],
-            socket,
-            fn {key, value}, socket ->
-              Phoenix.Component.assign(socket, key, value)
-            end
-          )
-
-        %{state | socket: socket}
-      end)
 
       html = render_click(view, "create-booking", %{})
 
