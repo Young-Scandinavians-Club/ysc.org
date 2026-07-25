@@ -234,6 +234,45 @@ defmodule YscWeb.AdminNewslettersLiveTest do
 
       assert_patch(view, ~p"/admin/newsletters?tab=editions")
     end
+
+    test "paginating subscribers patches to the next page", %{conn: conn} do
+      # default_limit is 20; need a second page of results
+      for i <- 1..21 do
+        Newsletter.subscribe(
+          "page-sub-#{i}-#{System.unique_integer()}@example.com",
+          source: "test"
+        )
+      end
+
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/newsletters?tab=subscribers&page=1")
+
+      render_async(view, 5000)
+
+      # Regression: path must not keep page=1 when linking to page=2
+      assert has_element?(
+               view,
+               ".hidden.md\\:block a[rel='next'][href*='page=2']"
+             )
+
+      refute has_element?(
+               view,
+               ".hidden.md\\:block a[rel='next'][href*='page=1']"
+             )
+
+      view
+      |> element(".hidden.md\\:block a[rel='next']")
+      |> render_click()
+
+      assert_patch(view, ~p"/admin/newsletters?page=2&tab=subscribers")
+      render_async(view, 5000)
+
+      assert has_element?(
+               view,
+               ".hidden.md\\:block a[aria-current='page']",
+               "2"
+             )
+    end
   end
 
   describe "saved notices tab" do

@@ -1492,6 +1492,6 @@ defmodule YscWeb.AdminNewslettersLive do
   end
 
   defp subscribers_list_path(params) do
-    ~p"/admin/newsletters?#{Map.put(params || %{}, "tab", "subscribers")}"
+    ~p"/admin/newsletters?#{Map.put(non_flop_params(params || %{}), "tab", "subscribers")}"
   end
 end
