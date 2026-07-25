@@ -1075,6 +1075,16 @@ defmodule YscWeb.EventDetailsLive do
               <div class="h-8 bg-gradient-to-t from-white to-transparent"></div>
 
               <div class="bg-white/95 backdrop-blur-md border-t border-zinc-100 px-6 py-5">
+                <p
+                  :if={
+                    @current_user == nil && @has_ticket_tiers &&
+                      !event_in_past?(@event) &&
+                      @event.partiful_link in [nil, ""]
+                  }
+                  class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                >
+                  Sign in to buy tickets. An active YSC membership is required.
+                </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
                   <%= if event_in_past?(@event) do %>
                     <div class="flex-1 text-center">

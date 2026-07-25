@@ -11,6 +11,7 @@ defmodule Ysc.WpMigration.StripeImport do
   alias Ysc.Repo
   alias Ysc.Accounts.User
   alias Ysc.Customers
+  alias Ysc.Payments
   alias Ysc.Subscriptions
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Stripe.RetryHelper
@@ -213,6 +214,202 @@ defmodule Ysc.WpMigration.StripeImport do
       do: period_end_in_future?(sub)
 
   def importable_subscription?(_), do: false
+
+  @doc """
+  Sets the Stripe customer's `invoice_settings.default_payment_method`.
+
+  Local default PM is set separately via `Payments`; Stripe billing needs the
+  customer default for renewals when the subscription has no explicit PM.
+  """
+  def set_customer_default_payment_method(
+        %User{} = user,
+        pm_id,
+        context,
+        report
+      )
+      when is_binary(pm_id) and pm_id != "" do
+    customer_id = user.stripe_id
+
+    if is_binary(customer_id) and customer_id != "" do
+      case RetryHelper.stripe_retry_transient(fn ->
+             stripe_customer_module().update(
+               customer_id,
+               %{invoice_settings: %{default_payment_method: pm_id}},
+               []
+             )
+           end) do
+        {:ok, _customer} ->
+          Ysc.Logging.info(
+            "[WP Load] Set Stripe customer #{customer_id} default payment method #{pm_id}"
+          )
+
+          {:ok, report}
+
+        {:error, %Stripe.Error{} = error} ->
+          report =
+            record_failure(
+              report,
+              failure_attrs(
+                context,
+                "stripe_customer_default_payment_method",
+                %{
+                  stripe_customer_id: customer_id,
+                  stripe_payment_method_id: pm_id,
+                  reason: format_stripe_error(error)
+                }
+              )
+            )
+
+          {:error, format_stripe_error(error), report}
+
+        {:error, reason} ->
+          report =
+            record_failure(
+              report,
+              failure_attrs(
+                context,
+                "stripe_customer_default_payment_method",
+                %{
+                  stripe_customer_id: customer_id,
+                  stripe_payment_method_id: pm_id,
+                  reason: inspect(reason)
+                }
+              )
+            )
+
+          {:error, reason, report}
+      end
+    else
+      {:ok, report}
+    end
+  end
+
+  def set_customer_default_payment_method(%User{}, _pm_id, _context, report),
+    do: {:ok, report}
+
+  @doc """
+  For WP auto-renew members, ensures imported Stripe subscriptions renew:
+
+  - `cancel_at_period_end: false` on Stripe
+  - optional `default_payment_method` on the Stripe subscription
+  - local `ends_at` cleared
+  """
+  def enforce_auto_renew_for_user(%User{} = user, context, report, opts \\ []) do
+    payment_method_id =
+      Keyword.get(opts, :payment_method_id) ||
+        default_stripe_payment_method_id(user)
+
+    subscriptions =
+      from(s in Subscription,
+        where: s.user_id == ^user.id,
+        where: not like(s.stripe_id, "migrated_%")
+      )
+      |> Repo.all()
+
+    Enum.reduce(subscriptions, report, fn subscription, acc_report ->
+      enforce_auto_renew_on_subscription(
+        user,
+        subscription,
+        payment_method_id,
+        context,
+        acc_report
+      )
+    end)
+  end
+
+  defp enforce_auto_renew_on_subscription(
+         user,
+         subscription,
+         payment_method_id,
+         context,
+         report
+       ) do
+    stripe_params = %{cancel_at_period_end: false}
+
+    stripe_params =
+      if is_binary(payment_method_id) and payment_method_id != "" do
+        Map.put(stripe_params, :default_payment_method, payment_method_id)
+      else
+        stripe_params
+      end
+
+    case RetryHelper.stripe_retry_transient(fn ->
+           stripe_subscription_module().update(
+             subscription.stripe_id,
+             stripe_params,
+             []
+           )
+         end) do
+      {:ok, stripe_sub} ->
+        period_end =
+          case SubscriptionHelpers.current_period_end(stripe_sub) do
+            nil ->
+              subscription.current_period_end
+
+            unix when is_integer(unix) ->
+              DateTime.from_unix!(unix) |> DateTime.truncate(:second)
+          end
+
+        case Subscriptions.update_subscription(subscription, %{
+               stripe_status: stripe_sub.status,
+               current_period_end: period_end,
+               ends_at: nil
+             }) do
+          {:ok, _} ->
+            Ysc.Logging.info(
+              "[WP Load] Enforced auto-renew on Stripe sub #{subscription.stripe_id} " <>
+                "for user #{user.id}"
+            )
+
+            report
+
+          {:error, reason} ->
+            record_failure(
+              report,
+              failure_attrs(
+                context,
+                "stripe_subscription_auto_renew_persist",
+                %{
+                  stripe_customer_id: user.stripe_id,
+                  stripe_subscription_id: subscription.stripe_id,
+                  reason: inspect(reason)
+                }
+              )
+            )
+        end
+
+      {:error, %Stripe.Error{} = error} ->
+        record_failure(
+          report,
+          failure_attrs(context, "stripe_subscription_auto_renew", %{
+            stripe_customer_id: user.stripe_id,
+            stripe_subscription_id: subscription.stripe_id,
+            reason: format_stripe_error(error)
+          })
+        )
+
+      {:error, reason} ->
+        record_failure(
+          report,
+          failure_attrs(context, "stripe_subscription_auto_renew", %{
+            stripe_customer_id: user.stripe_id,
+            stripe_subscription_id: subscription.stripe_id,
+            reason: inspect(reason)
+          })
+        )
+    end
+  end
+
+  defp default_stripe_payment_method_id(%User{} = user) do
+    case Payments.get_default_payment_method(user) do
+      %{provider: :stripe, provider_id: pm_id}
+      when is_binary(pm_id) and pm_id != "" ->
+        pm_id
+
+      _ ->
+        nil
+    end
+  end
 
   defp import_subscriptions(user, subscriptions, context, report) do
     {report, imported?} =

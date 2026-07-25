@@ -26,6 +26,8 @@ defmodule Ysc.WpMigration.Extract do
   - :export_dir  - output path (default: "wp_migration_export")
   - :wp_files    - path to wp_backup/files (for resolving uploads; default: "wp_backup/files")
   - :dry_run     - if true, only log what would be written
+  - :no_posts    - if true, write an empty posts.json (skip news extract)
+  - :no_media    - if true, skip copying media/ uploads into the export
   - :only_emails - a single email string or list of email strings; when provided,
                    only the matching users (and their associated applications, stripe
                    data, and bookings) are extracted. Useful for targeted test runs.
@@ -35,6 +37,8 @@ defmodule Ysc.WpMigration.Extract do
     export_dir = Path.expand(opts[:export_dir] || "wp_migration_export")
     wp_files = Path.expand(opts[:wp_files] || "wp_backup/files")
     dry_run = opts[:dry_run] || false
+    no_posts = Keyword.get(opts, :no_posts, false)
+    no_media = Keyword.get(opts, :no_media, false)
 
     only_emails =
       case opts[:only_emails] do
@@ -57,17 +61,28 @@ defmodule Ysc.WpMigration.Extract do
     if is_nil(db) or db == "" do
       {:error, "Missing :db (path to DuckDB file from mix ysc.wp_to_duckdb)"}
     else
-      do_run(db, export_dir, wp_files, dry_run, only_emails)
+      do_run(db, export_dir, wp_files, dry_run, no_posts, no_media, only_emails)
     end
   end
 
-  defp do_run(db, export_dir, wp_files, dry_run, only_emails) do
+  defp do_run(
+         db,
+         export_dir,
+         wp_files,
+         dry_run,
+         no_posts,
+         no_media,
+         only_emails
+       ) do
     case WpRepo.open(db) do
       {:ok, repo} ->
         try do
           if not dry_run do
             File.mkdir_p!(export_dir)
-            File.mkdir_p!(Path.join(export_dir, "media"))
+
+            if not no_media do
+              File.mkdir_p!(Path.join(export_dir, "media"))
+            end
           end
 
           all_users =
@@ -108,7 +123,17 @@ defmodule Ysc.WpMigration.Extract do
 
           write_json(export_dir, "applications.json", applications, dry_run)
 
-          posts = build_posts(repo)
+          posts =
+            if no_posts do
+              Ysc.Logging.info(
+                "[WP Extract] Skipping posts extract (no_posts=true)"
+              )
+
+              []
+            else
+              build_posts(repo)
+            end
+
           if dry_run, do: Ysc.Logging.info("Would write #{length(posts)} posts")
           write_json(export_dir, "posts.json", posts, dry_run)
 
@@ -142,8 +167,12 @@ defmodule Ysc.WpMigration.Extract do
 
           write_json(export_dir, "bookings.json", bookings, dry_run)
 
-          media_uploads_root = Path.join(wp_files, "wp-content/uploads")
-          copy_media(repo, export_dir, media_uploads_root, dry_run)
+          if no_media do
+            Ysc.Logging.info("[WP Extract] Skipping media copy (no_media=true)")
+          else
+            media_uploads_root = Path.join(wp_files, "wp-content/uploads")
+            copy_media(repo, export_dir, media_uploads_root, dry_run)
+          end
 
           {:ok, export_dir}
         after

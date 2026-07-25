@@ -4495,16 +4495,14 @@ defmodule YscWeb.AdminUserDetailsLive do
       has_lifetime,
       application,
       board_member,
-      last_login_at,
-      last_activity_at
+      {last_login_at, last_activity_at}
     ] =
       [
         fn -> fetch_subscription_data(selected_user) end,
         fn -> Accounts.has_lifetime_membership?(selected_user) end,
         fn -> fetch_application(id, current_user) end,
         fn -> Accounts.household_board_member(selected_user) end,
-        fn -> Accounts.get_last_successful_login_datetime(selected_user) end,
-        fn -> Accounts.get_last_login_session_datetime(selected_user) end
+        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end
       ]
       |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
       |> Enum.map(fn {:ok, result} -> result end)
