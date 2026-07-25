@@ -1645,7 +1645,9 @@ defmodule YscWeb.SecurityAuditTest do
               party_size_confirmed: true
             ],
             socket,
-            fn {key, value}, socket -> Phoenix.Component.assign(socket, key, value) end
+            fn {key, value}, socket ->
+              Phoenix.Component.assign(socket, key, value)
+            end
           )
 
         %{state | socket: socket}
