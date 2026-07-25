@@ -114,7 +114,6 @@ defmodule Ysc.Newsletter do
     source = Keyword.get(opts, :source, "public_signup")
     metadata = Keyword.get(opts, :metadata, %{})
     subscribed_at = Keyword.get(opts, :subscribed_at) || now
-    force_source = Keyword.get(opts, :force_source, false)
 
     case get_subscriber_by_email(email) do
       nil ->
