@@ -64,8 +64,6 @@ defmodule Ysc.Application do
         {Ysc.MobileAPIRateLimit, [clean_period: :timer.minutes(1)]},
         # Admin help LLM (guide finder + step clarifier)
         {Ysc.AdminHelpRateLimit, [clean_period: :timer.minutes(1)]},
-        # Start verification code cache
-        Ysc.VerificationCache,
         # Start Apple Wallet certificate manager
         Ysc.AppleWallet.CertManager,
         # Start Google Wallet credentials manager
@@ -164,7 +162,8 @@ defmodule Ysc.Application do
   end
 
   defp maybe_start_geo_ip_loader do
-    if Ysc.GeoIP.configured?() and Code.ensure_loaded?(:locus) do
+    if Ysc.GeoIP.configured?() and Ysc.Env.deployed?() and
+         Code.ensure_loaded?(:locus) do
       :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
     end
   end

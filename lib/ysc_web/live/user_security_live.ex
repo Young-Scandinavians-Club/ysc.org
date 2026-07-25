@@ -35,6 +35,7 @@ defmodule YscWeb.UserSecurityLive do
       |> assign(:active_plan_type, active_plan)
       |> assign(:show_reauth_modal, false)
       |> assign(:pending_password_change, nil)
+      |> assign(:reauth_resume_handled, false)
       |> assign(:user_has_password, !is_nil(user.hashed_password))
       |> assign(:login_history, [])
       |> assign(:login_history_loading, true)
@@ -246,6 +247,11 @@ defmodule YscWeb.UserSecurityLive do
   end
 
   @impl true
+  def handle_params(params, _uri, socket) do
+    {:noreply, maybe_resume_oauth_reauth(socket, params)}
+  end
+
+  @impl true
   def handle_info(:reauth_verified, socket) do
     {:noreply, process_password_change_after_reauth(socket)}
   end
@@ -259,6 +265,32 @@ defmodule YscWeb.UserSecurityLive do
 
   # Catch-all: drop unhandled messages (e.g. Swoosh email delivery in tests)
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  # Password params must not travel in the OAuth return URL. After OAuth, ask the
+  # user to submit the password form again — session reauth is still valid.
+  defp maybe_resume_oauth_reauth(socket, params) do
+    with true <- connected?(socket),
+         false <- socket.assigns[:reauth_resume_handled] == true,
+         token when is_binary(token) <- params["reauth_resume"],
+         {:ok, %{"purpose" => "password_change"}} <-
+           YscWeb.ReauthResume.verify(token) do
+      socket = assign(socket, :reauth_resume_handled, true)
+
+      if reauth_still_valid?(socket) do
+        socket
+        |> push_patch(to: ~p"/users/settings/security")
+        |> YscWeb.Flash.put_toast(
+          :info,
+          "Identity verified. Please submit your new password again to finish.",
+          title: "Verification"
+        )
+      else
+        assign(socket, :show_reauth_modal, true)
+      end
+    else
+      _ -> socket
+    end
+  end
 
   defp reauth_still_valid?(socket) do
     case socket.assigns[:session_reauth_expires_at] do
@@ -338,6 +370,7 @@ defmodule YscWeb.UserSecurityLive do
         user={@current_user}
         user_has_password={@user_has_password}
         return_to={@request_path}
+        reauth_intent={%{"purpose" => "password_change"}}
         description={
           if @user_has_password,
             do:

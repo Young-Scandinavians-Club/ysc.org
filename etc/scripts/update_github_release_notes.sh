@@ -6,7 +6,7 @@
 #   OPENROUTER_API_KEY  (required)  API key for https://openrouter.ai/
 #   GITHUB_TOKEN or GH_TOKEN        (required)  token with repo / contents:write
 #   GITHUB_REPOSITORY               (optional)  "owner/name"; inferred from `git remote` if unset
-#   OPENROUTER_MODEL                (optional)  default: google/gemma-4-31b-it
+#   OPENROUTER_MODEL                (optional)  default: deepseek/deepseek-v4-flash
 #   OPENROUTER_REFERER              (optional)  HTTP-Referer for OpenRouter (default: this repo on GitHub)
 #   OPENROUTER_MAX_FULL_PR_BODIES   (optional)  if PR count exceeds this, drop body text and send title/link only (default: 100)
 #   OPENROUTER_MAX_PRS              (optional)  max PRs to send after sorting by number, tail (default: 200; use after git scope)
@@ -32,7 +32,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 . "$SCRIPT_DIR/_colors.sh"
 
 DRY_RUN="${DRY_RUN:-0}"
-OPENROUTER_MODEL="${OPENROUTER_MODEL:-google/gemma-4-31b-it}"
+OPENROUTER_MODEL="${OPENROUTER_MODEL:-deepseek/deepseek-v4-flash}"
 OPENROUTER_PR_BODY_MAX="${OPENROUTER_PR_BODY_MAX:-8000}"
 OPENROUTER_MAX_TOKENS="${OPENROUTER_MAX_TOKENS:-8192}"
 GITHUB_API="${GITHUB_API:-https://api.github.com}"

@@ -11,11 +11,16 @@ defmodule YscWeb.ReauthComponent do
     - `user_has_password` — boolean
     - `description` — contextual sentence shown below the heading
     - `return_to` — path to redirect back to after OAuth reauth (e.g. `@request_path`)
+
+  Optional assigns:
+    - `reauth_intent` — map persisted across OAuth via a signed `reauth_resume`
+      query param on `return_to` (e.g. email/phone change payload)
   """
   use YscWeb, :live_component
 
   alias Ysc.Accounts
   alias Ysc.Accounts.UserPasskey
+  alias YscWeb.ReauthResume
 
   require Ysc.Logging
 
@@ -26,7 +31,8 @@ defmodule YscWeb.ReauthComponent do
      |> assign(assigns)
      |> assign_new(:reauth_form, fn -> to_form(%{"password" => ""}) end)
      |> assign_new(:reauth_error, fn -> nil end)
-     |> assign_new(:reauth_challenge, fn -> nil end)}
+     |> assign_new(:reauth_challenge, fn -> nil end)
+     |> assign_new(:reauth_intent, fn -> nil end)}
   end
 
   @impl true
@@ -203,14 +209,14 @@ defmodule YscWeb.ReauthComponent do
 
   def handle_event("reauth_with_google", _params, socket) do
     url =
-      ~p"/auth/google?#{[reauth: "true", return_to: socket.assigns.return_to]}"
+      ~p"/auth/google?#{[reauth: "true", return_to: oauth_return_to(socket)]}"
 
     {:noreply, Phoenix.LiveView.redirect(socket, to: url)}
   end
 
   def handle_event("reauth_with_facebook", _params, socket) do
     url =
-      ~p"/auth/facebook?#{[reauth: "true", return_to: socket.assigns.return_to]}"
+      ~p"/auth/facebook?#{[reauth: "true", return_to: oauth_return_to(socket)]}"
 
     {:noreply, Phoenix.LiveView.redirect(socket, to: url)}
   end
@@ -224,6 +230,18 @@ defmodule YscWeb.ReauthComponent do
     do: {:noreply, socket}
 
   def handle_event("device_detected", _params, socket), do: {:noreply, socket}
+
+  defp oauth_return_to(socket) do
+    base = socket.assigns.return_to || "/"
+
+    case socket.assigns[:reauth_intent] do
+      intent when is_map(intent) and map_size(intent) > 0 ->
+        ReauthResume.append_to_path(base, intent)
+
+      _ ->
+        base
+    end
+  end
 
   @impl true
   def render(assigns) do

@@ -6,7 +6,16 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
   import Ysc.AccountsFixtures
   alias Ysc.Accounts
-  alias Ysc.Accounts.{FamilyInvites, FamilyInvite, User, FamilyMember, Address}
+
+  alias Ysc.Accounts.{
+    FamilyInvites,
+    FamilyInvite,
+    User,
+    FamilyMember,
+    Address,
+    UserProfileCache
+  }
+
   alias Ysc.Subscriptions
   alias Ysc.Repo
 
@@ -305,6 +314,104 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       assert user_event != nil
       assert user_event.updated_by_user_id == primary_user.id
+    end
+
+    test "schedules accepted notification email to inviter" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      user_attrs = %{
+        email: email,
+        password: "password1234",
+        first_name: "Sub",
+        last_name: "User",
+        phone_number: "+14159098268",
+        date_of_birth: ~D[1990-01-01]
+      }
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _user} =
+                 FamilyInvites.accept_invite(invite.token, user_attrs)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "recipient" => primary_user.email,
+            "idempotency_key" => "family_invite_accepted_#{invite.id}",
+            "template" => "family_invite_accepted"
+          }
+        )
+      end)
+    end
+
+    test "link_existing_user/2 schedules accepted notification email to inviter" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Invitee",
+          last_name: "User"
+        })
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _linked} =
+                 FamilyInvites.link_existing_user(invite.token, invitee)
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "recipient" => primary_user.email,
+            "idempotency_key" => "family_invite_accepted_#{invite.id}",
+            "template" => "family_invite_accepted"
+          }
+        )
+      end)
+    end
+
+    test "family-linked application approval schedules accepted notification" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      applicant =
+        oauth_user_fixture(%{
+          email: email,
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      application =
+        signup_application_fixture(applicant)
+        |> Ecto.Changeset.change(family_invite_id: invite.id)
+        |> Repo.update!()
+
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _} =
+                 Accounts.record_application_outcome(
+                   :approved,
+                   applicant,
+                   application,
+                   admin
+                 )
+
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "recipient" => primary_user.email,
+            "idempotency_key" => "family_invite_accepted_#{invite.id}",
+            "template" => "family_invite_accepted"
+          }
+        )
+      end)
     end
 
     test "returns error when invite not found" do
@@ -770,6 +877,44 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert Repo.get!(FamilyInvite, invite.id).accepted_at != nil
     end
 
+    test "link_existing_user/2 syncs board volunteer billing when invitee has board position" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Board",
+          last_name: "Invitee"
+        })
+
+      {:ok, invitee} = Accounts.assign_board_position(invitee, :secretary)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary_user
+             )
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      assert linked.primary_user_id == primary_user.id
+
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary_user
+             )
+
+      primary_id = primary_user.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
+    end
+
     test "links existing account when Gmail address is a plus/dot alias of invite target" do
       primary_user = create_user_with_lifetime_membership()
 
@@ -869,5 +1014,190 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       assert invite.relationship == :spouse
     end
+  end
+
+  describe "family invite acceptance invalidates UserProfileCache" do
+    @describetag process_caches: true
+
+    setup do
+      Cachex.clear(:ysc_cache)
+      :ok
+    end
+
+    test "accept_invite serves stale family data before accept and fresh data after" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      warm_primary_family_caches(primary_user)
+
+      cached_before = Accounts.get_user!(primary_user.id, [:sub_accounts])
+      assert cached_before.sub_accounts == []
+      assert length(Accounts.get_family_group(cached_before)) == 1
+
+      assert {:ok, sub_user} =
+               FamilyInvites.accept_invite(
+                 invite.token,
+                 invite_accept_user_attrs(email)
+               )
+
+      cached_after = Accounts.get_user!(primary_user.id, [:sub_accounts])
+      assert length(cached_after.sub_accounts) == 1
+      assert hd(cached_after.sub_accounts).id == sub_user.id
+
+      db_group_ids =
+        primary_user.id
+        |> Accounts.get_user_from_db!([:sub_accounts])
+        |> then(&Accounts.get_family_group/1)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      cached_group_ids =
+        cached_after
+        |> Accounts.get_family_group()
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert cached_group_ids == db_group_ids
+    end
+
+    test "accept_invite sub-account profile is available via Accounts.get_user! with family fields" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :child)
+
+      assert {:ok, sub_user} =
+               FamilyInvites.accept_invite(
+                 invite.token,
+                 invite_accept_user_attrs(email)
+               )
+
+      cached_sub = Accounts.get_user!(sub_user.id, [])
+      assert cached_sub.primary_user_id == primary_user.id
+      assert cached_sub.family_relationship == :child
+    end
+
+    test "accept_invite invalidates all preload variants for the primary user" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+      warm_primary_family_caches(primary_user)
+
+      assert {:ok, _sub_user} =
+               FamilyInvites.accept_invite(
+                 invite.token,
+                 invite_accept_user_attrs(email)
+               )
+
+      assert length(
+               Accounts.get_user!(primary_user.id, [:sub_accounts]).sub_accounts
+             ) == 1
+
+      assert length(
+               Accounts.get_family_group(
+                 Accounts.get_user!(primary_user.id, [])
+               )
+             ) == 2
+    end
+
+    test "link_existing_user busts cached profiles for invitee and primary user" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Invitee",
+          last_name: "User"
+        })
+
+      warm_primary_family_caches(primary_user)
+      UserProfileCache.get_user!(invitee.id, [])
+
+      cached_primary = Accounts.get_user!(primary_user.id, [:sub_accounts])
+      assert cached_primary.sub_accounts == []
+
+      cached_invitee = Accounts.get_user!(invitee.id, [])
+      assert is_nil(cached_invitee.primary_user_id)
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      refreshed_primary = Accounts.get_user!(primary_user.id, [:sub_accounts])
+      assert length(refreshed_primary.sub_accounts) == 1
+      assert hd(refreshed_primary.sub_accounts).id == linked.id
+
+      refreshed_invitee = Accounts.get_user!(invitee.id, [])
+      assert refreshed_invitee.primary_user_id == primary_user.id
+      assert refreshed_invitee.family_relationship == :child
+    end
+
+    test "link_existing_user spouse relationship is reflected in cached invitee profile" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :spouse)
+
+      invitee = user_fixture(%{email: email})
+      UserProfileCache.get_user!(invitee.id, [])
+
+      assert {:ok, _} = FamilyInvites.link_existing_user(invite.token, invitee)
+
+      refreshed_invitee = Accounts.get_user!(invitee.id, [])
+      assert refreshed_invitee.family_relationship == :spouse
+    end
+
+    test "link_existing_user cached family group matches database for primary user" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee = user_fixture(%{email: email})
+      warm_primary_family_caches(primary_user)
+
+      assert {:ok, linked} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+
+      cached_primary = Accounts.get_user!(primary_user.id, [:sub_accounts])
+
+      db_group_ids =
+        primary_user.id
+        |> Accounts.get_user_from_db!([:sub_accounts])
+        |> then(&Accounts.get_family_group/1)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      cached_group_ids =
+        cached_primary
+        |> Accounts.get_family_group()
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert cached_group_ids == db_group_ids
+      assert linked.id in cached_group_ids
+    end
+  end
+
+  defp warm_primary_family_caches(primary_user) do
+    UserProfileCache.get_user!(primary_user.id, [])
+    UserProfileCache.get_user!(primary_user.id, [:sub_accounts])
+  end
+
+  defp invite_accept_user_attrs(email, opts \\ []) do
+    %{
+      email: email,
+      password: "password1234",
+      first_name: Keyword.get(opts, :first_name, "Sub"),
+      last_name: Keyword.get(opts, :last_name, "User"),
+      phone_number: "+14159098268",
+      date_of_birth: ~D[1990-01-01]
+    }
   end
 end

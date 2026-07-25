@@ -81,7 +81,6 @@ RUN apk add --no-cache \
     ncurses-libs \
     ca-certificates \
     tini \
-    imagemagick \
     chromium \
     nss \
     freetype \

@@ -1,17 +1,7 @@
 defmodule Ysc.VerificationCacheTest do
-  use ExUnit.Case, async: true
+  use Ysc.DataCase, async: true
 
   alias Ysc.VerificationCache
-
-  setup do
-    # Ensure the GenServer is running (it may already be started by the app).
-    case Process.whereis(VerificationCache) do
-      nil -> start_supervised!({VerificationCache, []})
-      _pid -> :ok
-    end
-
-    :ok
-  end
 
   test "store_code/4 and get_code/2 returns stored code when not expired" do
     assert :ok =
@@ -52,12 +42,16 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-3",
                :email_verification,
-               "abc",
+               "abc123",
                60
              )
 
     assert {:ok, :verified} =
-             VerificationCache.verify_code("user-3", :email_verification, "abc")
+             VerificationCache.verify_code(
+               "user-3",
+               :email_verification,
+               "abc123"
+             )
 
     assert {:error, :not_found} =
              VerificationCache.get_code("user-3", :email_verification)
@@ -68,7 +62,7 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-4",
                :email_verification,
-               "abc",
+               "abc123",
                60
              )
 
@@ -76,10 +70,10 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.verify_code(
                "user-4",
                :email_verification,
-               "nope"
+               "nope12"
              )
 
-    assert {:ok, "abc"} =
+    assert {:ok, "abc123"} =
              VerificationCache.get_code("user-4", :email_verification)
   end
 
@@ -88,12 +82,16 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-5",
                :email_verification,
-               "abc",
+               "abc123",
                -1
              )
 
     assert {:error, :expired} =
-             VerificationCache.verify_code("user-5", :email_verification, "abc")
+             VerificationCache.verify_code(
+               "user-5",
+               :email_verification,
+               "abc123"
+             )
 
     assert {:error, :not_found} =
              VerificationCache.get_code("user-5", :email_verification)
@@ -104,7 +102,7 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-6",
                :email_verification,
-               "abc",
+               "abc123",
                60
              )
 
@@ -119,11 +117,11 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-7",
                :email_verification,
-               "abc",
+               "abc123",
                -1
              )
 
-    assert :ok = VerificationCache.cleanup_expired()
+    assert {:ok, 1} = VerificationCache.cleanup_expired()
 
     assert {:error, :not_found} =
              VerificationCache.get_code("user-7", :email_verification)
@@ -134,7 +132,7 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-8",
                :email_verification,
-               "first",
+               "first1",
                600
              )
 
@@ -150,30 +148,12 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.get_code("user-8", :email_verification)
   end
 
-  test "periodic cleanup message removes expired entries" do
-    assert :ok =
-             VerificationCache.store_code(
-               "user-9",
-               :email_verification,
-               "gone",
-               -1
-             )
-
-    pid = Process.whereis(VerificationCache)
-    send(pid, :cleanup)
-
-    _ = VerificationCache.get_code("user-9-flush", :email_verification)
-
-    assert {:error, :not_found} =
-             VerificationCache.get_code("user-9", :email_verification)
-  end
-
   test "cleanup_expired/0 keeps valid codes and drops expired" do
     assert :ok =
              VerificationCache.store_code(
                "user-mix-a",
                :email_verification,
-               "keep",
+               "keep01",
                600
              )
 
@@ -181,59 +161,157 @@ defmodule Ysc.VerificationCacheTest do
              VerificationCache.store_code(
                "user-mix-b",
                :email_verification,
-               "gone",
+               "gone01",
                -1
              )
 
-    assert :ok = VerificationCache.cleanup_expired()
+    assert {:ok, 1} = VerificationCache.cleanup_expired()
 
-    assert {:ok, "keep"} =
+    assert {:ok, "keep01"} =
              VerificationCache.get_code("user-mix-a", :email_verification)
 
     assert {:error, :not_found} =
              VerificationCache.get_code("user-mix-b", :email_verification)
   end
 
-  test "cleanup_individual message removes matching entry" do
+  test "codes are readable across process boundaries (shared DB)", %{
+    sandbox_owner: owner
+  } do
     assert :ok =
              VerificationCache.store_code(
-               "user-indiv",
-               :sms_verification,
-               "code",
+               "user-shared",
+               :phone_verification,
+               "555555",
                600
              )
 
-    pid = Process.whereis(VerificationCache)
-    send(pid, {:cleanup_individual, {"user-indiv", :sms_verification}})
+    task =
+      Task.async(fn ->
+        allow_sandbox(self(), owner)
+        VerificationCache.get_code("user-shared", :phone_verification)
+      end)
 
-    assert {:error, :not_found} =
-             VerificationCache.get_code("user-indiv", :sms_verification)
+    assert {:ok, "555555"} = Task.await(task)
   end
 
-  test "periodic cleanup removes expired and keeps valid entries" do
+  test "verify_code/3 rejects different-length codes without raising" do
     assert :ok =
              VerificationCache.store_code(
-               "user-p-a",
+               "user-len",
                :email_verification,
-               "keep2",
-               600
+               "123456",
+               60
+             )
+
+    assert {:error, :invalid_code} =
+             VerificationCache.verify_code(
+               "user-len",
+               :email_verification,
+               "12345"
+             )
+
+    assert {:error, :invalid_code} =
+             VerificationCache.verify_code(
+               "user-len",
+               :email_verification,
+               "1234567"
+             )
+
+    assert {:ok, "123456"} =
+             VerificationCache.get_code("user-len", :email_verification)
+  end
+
+  test "atom and string code_type values normalize to the same storage key" do
+    assert :ok =
+             VerificationCache.store_code(
+               "user-type",
+               :email_verification,
+               "111111",
+               60
              )
 
     assert :ok =
              VerificationCache.store_code(
-               "user-p-b",
-               :email_verification,
-               "gone2",
-               -1
+               "user-type",
+               "email_verification",
+               "222222",
+               60
              )
 
-    pid = Process.whereis(VerificationCache)
-    send(pid, :cleanup)
+    # Both forms resolve to the same row (last write wins).
+    assert {:ok, "222222"} =
+             VerificationCache.get_code("user-type", :email_verification)
 
-    assert {:ok, "keep2"} =
-             VerificationCache.get_code("user-p-a", :email_verification)
+    assert {:ok, "222222"} =
+             VerificationCache.get_code("user-type", "email_verification")
+  end
+
+  test "concurrent verify of the same code succeeds once", %{
+    sandbox_owner: owner
+  } do
+    assert :ok =
+             VerificationCache.store_code(
+               "user-race",
+               :phone_verification,
+               "777777",
+               60
+             )
+
+    results =
+      1..8
+      |> Task.async_stream(
+        fn _ ->
+          allow_sandbox(self(), owner)
+
+          VerificationCache.verify_code(
+            "user-race",
+            :phone_verification,
+            "777777"
+          )
+        end,
+        timeout: 5_000
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    assert Enum.count(results, &(&1 == {:ok, :verified})) == 1
+
+    assert Enum.all?(results, fn
+             {:ok, :verified} -> true
+             {:error, :not_found} -> true
+             {:error, :invalid_code} -> true
+             _ -> false
+           end)
 
     assert {:error, :not_found} =
-             VerificationCache.get_code("user-p-b", :email_verification)
+             VerificationCache.get_code("user-race", :phone_verification)
+  end
+
+  test "concurrent store_code/4 for the same user/type replaces without raising",
+       %{sandbox_owner: owner} do
+    results =
+      1..8
+      |> Task.async_stream(
+        fn i ->
+          allow_sandbox(self(), owner)
+
+          code = i |> Integer.to_string() |> String.pad_leading(6, "0")
+
+          VerificationCache.store_code(
+            "user-upsert",
+            :email_verification,
+            code,
+            60
+          )
+        end,
+        timeout: 5_000
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    assert Enum.all?(results, &(&1 == :ok))
+
+    assert {:ok, code} =
+             VerificationCache.get_code("user-upsert", :email_verification)
+
+    assert String.match?(code, ~r/^\d{6}$/)
   end
 end

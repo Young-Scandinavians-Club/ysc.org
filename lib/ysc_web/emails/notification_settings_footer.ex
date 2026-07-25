@@ -31,7 +31,7 @@ defmodule YscWeb.Emails.NotificationSettingsFooter do
       end
 
     """
-    <mj-section padding="24px 48px 48px 48px">
+    <mj-section padding="16px 48px 8px 48px">
       <mj-column padding="0">
         <mj-text align="#{align_attr}" font-size="12px" line-height="1.5" padding="0px" color="#888888">
           #{inner}

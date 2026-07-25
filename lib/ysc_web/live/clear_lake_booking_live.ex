@@ -6,11 +6,14 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.Bookings.{
     AvailabilityCache,
     Booking,
+    ConfigCacheTelemetry,
     Season,
     SeasonCache,
     SeasonHelpers,
     PricingHelpers,
-    BookingLocker
+    PricingRuleCache,
+    BookingLocker,
+    RefundPolicyCache
   }
 
   alias Ysc.EmailConfig
@@ -26,7 +29,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     user = socket.assigns.current_user
 
     timezone = get_timezone_from_socket(socket)
-    today = today_in_timezone(timezone)
+    today = today_in_timezone(default_timezone())
     seasons = SeasonCache.get_all_for_property(:clear_lake)
 
     {current_season, season_start_date, season_end_date} =
@@ -179,7 +182,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     # Only run heavy validation when connected (availability checks run queries)
     socket =
       if connected?(socket) do
-        AvailabilityCache.subscribe()
+        subscribe_booking_config_caches()
 
         socket
         |> validate_all_conditions(
@@ -203,6 +206,13 @@ defmodule YscWeb.ClearLakeBookingLive do
       end
 
     {:ok, socket}
+  end
+
+  defp subscribe_booking_config_caches do
+    AvailabilityCache.subscribe()
+    SeasonCache.subscribe()
+    PricingRuleCache.subscribe()
+    RefundPolicyCache.subscribe()
   end
 
   @impl true
@@ -288,8 +298,7 @@ defmodule YscWeb.ClearLakeBookingLive do
         {today, max_booking_date, current_season, season_start_date,
          season_end_date} =
           if dates_changed do
-            timezone = socket.assigns[:timezone] || "America/Los_Angeles"
-            today = today_in_timezone(timezone)
+            today = today_in_timezone(default_timezone())
 
             seasons = socket.assigns.seasons
 
@@ -506,7 +515,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     ~H"""
     <div
       id="clear-lake-booking-page"
-      class="overflow-x-hidden"
+      class="overflow-x-clip"
       phx-hook={if assigns[:scroll_to_section], do: "ScrollToSection", else: nil}
       data-section={
         if assigns[:scroll_to_section], do: assigns.scroll_to_section, else: nil
@@ -989,6 +998,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     property={:clear_lake}
                     today={@today}
                     guests_count={@guests_count}
+                    seasons={@seasons}
                     availability_cache_version={@availability_cache_version}
                   />
                   <!-- Error Messages -->
@@ -1052,6 +1062,7 @@ defmodule YscWeb.ClearLakeBookingLive do
                     property={:clear_lake}
                     today={@today}
                     guests_count={@guests_count}
+                    seasons={@seasons}
                     availability_cache_version={@availability_cache_version}
                   />
                   <!-- Error Messages -->
@@ -1120,7 +1131,7 @@ defmodule YscWeb.ClearLakeBookingLive do
               </div>
             </div>
             <!-- Right Column: Sticky Reservation Summary (1 column on large screens) -->
-            <aside class="lg:sticky lg:top-24">
+            <aside class="lg:sticky lg:top-24 lg:max-h-[calc(100vh-6.5rem)] lg:overflow-y-auto">
               <div class="bg-white rounded-xl border-2 border-teal-600 overflow-hidden">
                 <div class="bg-teal-600 p-4 text-white text-center">
                   <h3 class="text-lg font-bold">Reservation Summary</h3>
@@ -3033,6 +3044,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   def handle_info(:availability_cache_invalidated, socket) do
     socket =
       if socket.assigns.active_tab == :booking do
+        ConfigCacheTelemetry.live_rebuild(:clear_lake_booking, :availability)
+
         socket
         |> assign(
           :availability_cache_version,
@@ -3044,6 +3057,47 @@ defmodule YscWeb.ClearLakeBookingLive do
       end
 
     {:noreply, socket}
+  end
+
+  def handle_info({:season_cache_invalidated, _version}, socket) do
+    ConfigCacheTelemetry.live_rebuild(:clear_lake_booking, :season)
+    {:noreply, refresh_after_season_cache_change(socket)}
+  end
+
+  def handle_info({:pricing_rule_cache_invalidated, _version}, socket) do
+    ConfigCacheTelemetry.live_rebuild(:clear_lake_booking, :pricing_rule)
+    {:noreply, calculate_price_if_ready(socket)}
+  end
+
+  def handle_info({:refund_policy_cache_invalidated, _version}, socket) do
+    # Clear Lake does not mount refund-policy assigns today; acknowledge the event.
+    ConfigCacheTelemetry.live_rebuild(:clear_lake_booking, :refund_policy)
+    {:noreply, socket}
+  end
+
+  defp refresh_after_season_cache_change(socket) do
+    seasons = SeasonCache.get_all_for_property(:clear_lake)
+    today = socket.assigns.today
+
+    {current_season, season_start_date, season_end_date} =
+      SeasonHelpers.get_current_season_info(:clear_lake, today, seasons)
+
+    max_booking_date =
+      SeasonHelpers.calculate_max_booking_date(:clear_lake, today, seasons)
+
+    socket
+    |> assign(
+      seasons: seasons,
+      current_season: current_season,
+      season_start_date: season_start_date,
+      season_end_date: season_end_date,
+      max_booking_date: max_booking_date
+    )
+    |> assign(
+      :availability_cache_version,
+      System.unique_integer([:positive])
+    )
+    |> refresh_selection_after_availability_change()
   end
 
   # Helper functions

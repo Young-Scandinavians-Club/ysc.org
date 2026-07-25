@@ -15,7 +15,10 @@ defmodule YscWeb.Components.Image do
       <canvas
         id={"blur-hash-image-#{@id}"}
         src={Image.blur_hash_for_display(@image)}
-        class="absolute inset-0 z-0 rounded-lg w-full h-full object-cover"
+        class={[
+          "absolute inset-0 z-0 w-full h-full object-cover",
+          @rounded_class
+        ]}
         phx-hook="BlurHashCanvas"
       ></canvas>
 
@@ -30,7 +33,10 @@ defmodule YscWeb.Components.Image do
         width={image_dimension(@image, :width)}
         height={image_dimension(@image, :height)}
         phx-hook="BlurHashImage"
-        class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out rounded-lg w-full h-full object-cover"
+        class={[
+          "absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover",
+          @rounded_class
+        ]}
         alt={
           if @image, do: @image.alt_text || @image.title || "Image", else: "Image"
         }
@@ -48,6 +54,8 @@ defmodule YscWeb.Components.Image do
     decoding = Map.get(assigns, :decoding, "async")
     fetchpriority = Map.get(assigns, :fetchpriority, nil)
     sizes = Map.get(assigns, :sizes, "(max-width: 1024px) 100vw, 50vw")
+    # Use "" when a parent already clips with overflow-hidden + its own radius
+    rounded_class = Map.get(assigns, :rounded_class, "rounded-lg")
 
     socket =
       socket
@@ -57,15 +65,18 @@ defmodule YscWeb.Components.Image do
       |> assign(:decoding, decoding)
       |> assign(:fetchpriority, fetchpriority)
       |> assign(:sizes, sizes)
+      |> assign(:rounded_class, rounded_class)
 
     # Use preloaded image if available (from batch loading), otherwise fetch
+    image_id = Map.get(assigns, :image_id)
+
     image =
       case Map.get(assigns, :image) do
         nil ->
-          if assigns.image_id == nil || assigns.image_id == "" do
+          if image_id == nil || image_id == "" do
             nil
           else
-            Media.get_image!(assigns.image_id)
+            Media.get_image!(image_id)
           end
 
         preloaded_image ->

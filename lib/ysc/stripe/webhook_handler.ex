@@ -1178,7 +1178,7 @@ defmodule Ysc.Stripe.WebhookHandler do
             billing_reason: billing_reason
           )
 
-          unless wp_migration_event?(subscription_id) do
+          if !wp_migration_event?(subscription_id) do
             enqueue_membership_payment_failure_email(
               user,
               membership_type,
@@ -1370,7 +1370,7 @@ defmodule Ysc.Stripe.WebhookHandler do
                       nil
                     end
 
-                  unless wp_migration_event?(subscription_id) do
+                  if !wp_migration_event?(subscription_id) do
                     if is_renewal do
                       enqueue_membership_renewal_success_email(
                         user,

@@ -660,6 +660,44 @@ defmodule Ysc.SubscriptionsTest do
         )
       end
     end
+
+    test "paid_out_of_band_stripe_create_params includes pause_collection for board member" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_board_#{System.unique_integer()}"
+        })
+
+      {:ok, user} = Accounts.assign_board_position(user, :treasurer)
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      params =
+        Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan)
+
+      assert params.pause_collection == %{behavior: :void}
+      assert params.cancel_at_period_end == false
+      assert params.customer == user.stripe_id
+
+      assert params.items == [
+               %{price: single_plan.stripe_price_id, quantity: 1}
+             ]
+    end
+
+    test "paid_out_of_band_stripe_create_params omits pause_collection when not on board" do
+      user =
+        user_fixture_unique(%{
+          stripe_id: "cus_member_#{System.unique_integer()}"
+        })
+
+      membership_plans = Application.get_env(:ysc, :membership_plans, [])
+      single_plan = Enum.find(membership_plans, &(&1.id == :single))
+
+      params =
+        Subscriptions.paid_out_of_band_stripe_create_params(user, single_plan)
+
+      refute Map.has_key?(params, :pause_collection)
+    end
   end
 
   describe "create_stripe_subscription/2" do

@@ -28,6 +28,7 @@ defmodule Ysc.Bookings do
   alias Ysc.Bookings.{
     Season,
     SeasonCache,
+    AvailabilityCache,
     PricingRule,
     Room,
     RoomCategory,
@@ -112,8 +113,7 @@ defmodule Ysc.Bookings do
 
     case result do
       {:ok, _season} ->
-        # Invalidate season cache
-        Ysc.Bookings.SeasonCache.invalidate()
+        invalidate_season_dependent_caches()
         result
 
       _ ->
@@ -132,8 +132,7 @@ defmodule Ysc.Bookings do
 
     case result do
       {:ok, _season} ->
-        # Invalidate season cache
-        Ysc.Bookings.SeasonCache.invalidate()
+        invalidate_season_dependent_caches()
         result
 
       _ ->
@@ -149,13 +148,18 @@ defmodule Ysc.Bookings do
 
     case result do
       {:ok, _season} ->
-        # Invalidate season cache
-        Ysc.Bookings.SeasonCache.invalidate()
+        invalidate_season_dependent_caches()
         result
 
       _ ->
         result
     end
+  end
+
+  defp invalidate_season_dependent_caches do
+    SeasonCache.invalidate()
+    # Buyout availability depends on season windows
+    AvailabilityCache.invalidate()
   end
 
   ## Pricing Rules
@@ -2383,10 +2387,60 @@ defmodule Ysc.Bookings do
   defp invalidate_blackout_caches(_), do: :ok
 
   @doc """
+  Occupied overnight dates for a stay `[checkin_date, checkout_date)`.
+
+  A one-night stay check-in D / check-out D+1 occupies night D only.
+  """
+  def stay_occupied_nights(checkin_date, checkout_date)
+      when not is_nil(checkin_date) and not is_nil(checkout_date) do
+    if Date.compare(checkout_date, checkin_date) == :gt do
+      Date.range(checkin_date, Date.add(checkout_date, -1)) |> Enum.to_list()
+    else
+      []
+    end
+  end
+
+  def stay_occupied_nights(_, _), do: []
+
+  @doc """
+  Calendar nights a blackout occupies.
+
+  Multi-day blackouts (`start < end`) occupy `start..end-1` so:
+  - checkout on blackout start is allowed (leave by 11 AM before blackout)
+  - check-in on blackout end is allowed (arrive after blackout ends at 11 AM)
+
+  Single-day blackouts (`start == end`) occupy that night only, so overnight
+  stays on that date conflict; checkout on that date is still allowed.
+  """
+  def blackout_occupied_nights(%{start_date: start_date, end_date: end_date})
+      when not is_nil(start_date) and not is_nil(end_date) do
+    case Date.compare(start_date, end_date) do
+      :lt ->
+        Date.range(start_date, Date.add(end_date, -1)) |> Enum.to_list()
+
+      :eq ->
+        [start_date]
+
+      :gt ->
+        []
+    end
+  end
+
+  def blackout_occupied_nights(_), do: []
+
+  @doc """
+  Dates that cannot be used as check-in because the first overnight would fall
+  on a blackout-occupied night. Same set as `blackout_occupied_nights/1`.
+  """
+  def blackout_checkin_blocked_dates(blackout),
+    do: blackout_occupied_nights(blackout)
+
+  @doc """
   Checks if a blackout overlaps with a booking date range, accounting for check-in/check-out times.
 
-  Since check-out is at 11 AM and check-in is at 3 PM, a blackout and booking can share the
-  same date if one ends and the other starts on that date.
+  Conflict is defined as overlap between stay occupied nights
+  (`checkin..checkout-1`) and blackout occupied nights
+  (`start..end-1`, or `[start]` when `start == end`).
 
   ## Parameters
   - `property`: The property to check
@@ -2408,36 +2462,22 @@ defmodule Ysc.Bookings do
   """
   def has_blackout?(property, checkin_date, checkout_date)
       when is_atom(property) do
-    # Get all blackouts that might overlap
-    blackouts = get_overlapping_blackouts(property, checkin_date, checkout_date)
+    stay_nights =
+      stay_occupied_nights(checkin_date, checkout_date) |> MapSet.new()
 
-    # Check if any blackout actually conflicts, accounting for check-in/checkout times
-    Enum.any?(blackouts, fn blackout ->
-      # A blackout conflicts with a booking if:
-      # 1. The booking's check-in date is before the blackout's end date
-      #    AND the booking's checkout date is after the blackout's start date
-      # 2. BUT we need to account for same-day turnarounds:
-      #    - If booking checkout is on blackout start date: No conflict (11 AM checkout vs 3 PM blackout start)
-      #    - If booking checkin is on blackout end date: No conflict (3 PM checkin vs 11 AM blackout end)
-
-      cond do
-        # Same-day turnarounds: no conflict
-        checkout_date == blackout.start_date ->
-          false
-
-        checkin_date == blackout.end_date ->
-          false
-
-        # Otherwise, check for standard overlap
-        # Conflict occurs if: checkin < blackout_end AND checkout > blackout_start
-        Date.compare(checkin_date, blackout.end_date) == :lt &&
-            Date.compare(checkout_date, blackout.start_date) == :gt ->
-          true
-
-        true ->
-          false
-      end
-    end)
+    if MapSet.size(stay_nights) == 0 do
+      false
+    else
+      property
+      |> get_overlapping_blackouts(checkin_date, checkout_date)
+      |> Enum.any?(fn blackout ->
+        blackout
+        |> blackout_occupied_nights()
+        |> MapSet.new()
+        |> MapSet.disjoint?(stay_nights)
+        |> Kernel.not()
+      end)
+    end
   end
 
   @doc """
@@ -4317,6 +4357,13 @@ defmodule Ysc.Bookings do
   def get_tahoe_daily_availability(start_date, end_date) do
     date_range = Date.range(start_date, end_date) |> Enum.to_list()
 
+    seasons =
+      if Application.get_env(:ysc, :season_cache_enabled, true) do
+        SeasonCache.get_all_for_property(:tahoe)
+      else
+        Season.list_all_for_property_db(:tahoe)
+      end
+
     # Get all bookings that overlap with the date range
     # Expand the date range by 1 day on each side to capture all relevant checkouts and checkins
     expanded_start = Date.add(start_date, -1)
@@ -4467,9 +4514,11 @@ defmodule Ysc.Bookings do
       # - Not blacked out
       # - No buyout already on that day (confirmed or held)
       # - No room bookings (confirmed or held) on that day
+      # - Season allows buyout (Tahoe winter is rooms-only)
       can_book_buyout =
         not is_blacked_out and not info.has_buyout and not buyout_held and
-          not info.has_room_booking and not has_held_room_booking
+          not info.has_room_booking and not has_held_room_booking and
+          Season.buyout_allowed_on_date?(seasons, date)
 
       {
         date,
@@ -4598,6 +4647,41 @@ defmodule Ysc.Bookings do
     @pst_timezone
     |> DateTime.now!()
     |> DateTime.to_date()
+  end
+
+  @doc """
+  Lists upcoming active bookings for a user's home dashboard itinerary.
+
+  Includes complete bookings whose checkout has not yet passed (11:00 AM PST on
+  checkout day), ordered by check-in date.
+
+  ## Options
+
+    * `:limit` - max rows (default `10`)
+  """
+  def list_upcoming_active_bookings_for_user(user_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 10)
+    today = pst_today()
+    now_pst = DateTime.now!(@pst_timezone)
+    checkout_cutoff = DateTime.new!(today, @checkout_time_pst, @pst_timezone)
+    now_before_checkout = DateTime.compare(now_pst, checkout_cutoff) == :lt
+
+    checkout_filter =
+      if now_before_checkout do
+        dynamic([b], b.checkout_date >= ^today)
+      else
+        dynamic([b], b.checkout_date > ^today)
+      end
+
+    from(b in Booking,
+      where: b.user_id == ^user_id,
+      where: b.status == :complete,
+      where: ^checkout_filter,
+      order_by: [asc: b.checkin_date],
+      limit: ^limit,
+      preload: [:rooms]
+    )
+    |> Repo.all()
   end
 
   @doc """
@@ -5612,6 +5696,21 @@ defmodule Ysc.Bookings do
             0
           )
       }
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_upcoming_active_bookings_for_user_query do
+    today = Ysc.Ci.QueryExplain.Fixtures.today()
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+
+    from(b in Booking,
+      where: b.user_id == ^user_id,
+      where: b.status == :complete,
+      where: b.checkout_date > ^today,
+      order_by: [asc: b.checkin_date],
+      limit: 10,
+      preload: [:rooms]
     )
   end
 end

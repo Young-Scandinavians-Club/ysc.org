@@ -20,6 +20,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.FamilyMembers
+  alias Ysc.Accounts.VerificationCodes
   alias Ysc.Avatars
   alias Ysc.Customers
   alias Ysc.Repo
@@ -517,7 +518,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Choose Your Membership Type
         <:subtitle>
-          We couldn't find a membership type on record. Please confirm whether you have a single or family membership so we can set up billing and family access correctly.
+          Please confirm your membership type so we can set up billing and family access correctly. Choose the plan that matches your current YSC membership.
         </:subtitle>
       </.header>
 
@@ -1003,15 +1004,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           |> assign(:user, updated_user)
 
         if phone_needs_verification and not is_nil(updated_user.phone_number) do
-          # Send verification code and go to phone verification step
-          phone_code =
-            Accounts.generate_and_store_phone_verification_code(updated_user)
-
-          _job =
-            Accounts.send_phone_verification_code(
-              updated_user,
-              phone_code,
-              "onboarding_initial"
+          {:ok, _} =
+            VerificationCodes.issue(updated_user, :phone,
+              suffix: "onboarding_initial"
             )
 
           YscWeb.Flash.send_toast(
@@ -1228,12 +1223,12 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
     normalized = normalize_verification_code(merged)
 
-    valid =
-      String.length(normalized) == 6 && String.match?(normalized, ~r/^\d{6}$/)
-
     {:noreply,
      socket
-     |> assign(:phone_code_valid, valid)
+     |> assign(
+       :phone_code_valid,
+       VerificationCodes.valid_otp_format?(normalized)
+     )
      |> assign(:phone_verification_code_state, merged)}
   end
 
@@ -1242,7 +1237,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     code = normalize_verification_code(raw)
     user = socket.assigns.user
 
-    case Accounts.verify_phone_verification_code(user, code) do
+    case VerificationCodes.verify(user, :phone, code) do
       {:ok, :verified} ->
         case Accounts.mark_phone_verified(user) do
           {:ok, updated_user} ->
@@ -1260,6 +1255,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
             {:noreply, socket}
         end
+
+      {:error, :rate_limited} ->
+        YscWeb.Flash.send_toast(
+          :error,
+          "Too many verification attempts. Please wait a minute and try again.",
+          title: "Phone Verification"
+        )
+
+        {:noreply, socket}
 
       {:error, :invalid_code} ->
         YscWeb.Flash.send_toast(
@@ -1293,38 +1297,22 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   def handle_event("resend_phone_code", _params, socket) do
     user = socket.assigns.user
 
-    case Ysc.ResendRateLimiter.check_and_record_resend(user.id, :sms) do
-      {:ok, :allowed} ->
-        {code, is_existing} =
-          case Ysc.VerificationCache.get_code(user.id, :phone_verification) do
-            {:ok, existing_code} ->
-              {existing_code, true}
-
-            {:error, _} ->
-              {Accounts.generate_and_store_phone_verification_code(user), false}
+    case VerificationCodes.resend(user, :phone) do
+      {:ok, %{disabled_until: disabled_until, reused?: reused?}} ->
+        message =
+          if reused? do
+            "Your code was sent again to #{user.phone_number}"
+          else
+            "A new code was sent to #{user.phone_number}"
           end
-
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-
-        suffix =
-          if is_existing,
-            do: "resend_existing_#{timestamp}",
-            else: "resend_new_#{timestamp}"
-
-        _job = Accounts.send_phone_verification_code(user, code, suffix)
 
         YscWeb.Flash.send_toast(
           :info,
-          "A new code was sent to #{user.phone_number}",
+          message,
           title: "Code Sent"
         )
 
-        {:noreply,
-         assign(
-           socket,
-           :sms_resend_disabled_until,
-           Ysc.ResendRateLimiter.disabled_until(60)
-         )}
+        {:noreply, assign(socket, :sms_resend_disabled_until, disabled_until)}
 
       {:error, :rate_limited, _remaining} ->
         YscWeb.Flash.send_toast(
@@ -2578,29 +2566,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     end
   end
 
-  # Normalise an OTP verification code from whichever format the OTP input
-  # delivers it: indexed-key map (%{"0" => "1", "1" => "2", ...}), list, or
-  # plain string.  Non-integer map keys (e.g. "_unused_1") are ignored.
-  defp normalize_verification_code(code) when is_map(code) do
-    code
-    |> Enum.filter(fn {k, _v} ->
-      case Integer.parse(k) do
-        {_int, ""} -> true
-        _ -> false
-      end
-    end)
-    |> Enum.sort_by(fn {k, _v} -> String.to_integer(k) end)
-    |> Enum.map(fn {_k, v} -> v end)
-    |> Enum.reject(&(&1 == "" || is_nil(&1)))
-    |> Enum.join("")
-  end
-
-  defp normalize_verification_code(code) when is_list(code) do
-    code |> Enum.reject(&(&1 == "" || is_nil(&1))) |> Enum.join("")
-  end
-
-  defp normalize_verification_code(code) when is_binary(code), do: code
-  defp normalize_verification_code(_), do: ""
+  defp normalize_verification_code(code),
+    do: VerificationCodes.normalize_otp_input(code)
 
   defp plan_name(:family), do: "Family Membership"
   defp plan_name(:single), do: "Single Membership"

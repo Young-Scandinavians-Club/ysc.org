@@ -15,6 +15,7 @@ defmodule YscWeb.Emails.EmailCoverageTest do
     ConductViolationConfirmation,
     ContactFormBoardNotification,
     FamilyInvite,
+    FamilyInviteAccepted,
     FamilyInviteCancelled,
     FamilyMemberRemoved,
     MembershipPaymentConfirmation,
@@ -136,6 +137,46 @@ defmodule YscWeb.Emails.EmailCoverageTest do
       url = YscWeb.Emails.Helpers.admin_dashboard_url()
       assert url =~ "/admin"
       assert url == YscWeb.Endpoint.url() <> "/admin"
+    end
+  end
+
+  describe "FamilyInviteAccepted" do
+    test "renders with invitee name and exposes template metadata" do
+      assigns = %{
+        inviter_first_name: "John",
+        invitee_name: "Jane Doe",
+        invitee_email: "jane@example.com",
+        relationship_label: "child",
+        family_management_url: "https://example.com/users/settings/family"
+      }
+
+      html = FamilyInviteAccepted.render(assigns)
+      assert is_binary(html)
+      assert html =~ "John"
+      assert html =~ "Jane Doe"
+      assert html =~ "jane@example.com"
+      assert html =~ "Manage Family Members"
+
+      assert FamilyInviteAccepted.get_template_name() ==
+               "family_invite_accepted"
+
+      assert FamilyInviteAccepted.get_subject() ==
+               "Family Invitation Accepted - YSC"
+    end
+
+    test "renders without invitee name" do
+      assigns = %{
+        inviter_first_name: "John",
+        invitee_name: nil,
+        invitee_email: "jane@example.com",
+        relationship_label: "spouse",
+        family_management_url: "https://example.com/users/settings/family"
+      }
+
+      html = FamilyInviteAccepted.render(assigns)
+      assert is_binary(html)
+      assert html =~ "jane@example.com"
+      assert html =~ "spouse"
     end
   end
 
@@ -795,6 +836,9 @@ defmodule YscWeb.Emails.EmailCoverageTest do
 
       assert Notifier.get_template_module("family_invite") ==
                YscWeb.Emails.FamilyInvite
+
+      assert Notifier.get_template_module("family_invite_accepted") ==
+               YscWeb.Emails.FamilyInviteAccepted
 
       assert Notifier.get_template_module("account_setup_verification") ==
                YscWeb.Emails.AccountSetupVerification

@@ -462,9 +462,14 @@ defmodule YscWeb.UserBookingDetailLiveTest do
     end
 
     test "partial cancel without payment reloads cancelled booking in UI", %{
-      conn: conn,
-      user: user
+      conn: conn
     } do
+      # Fresh user: describe setup already confirmed a buyout for `user`.
+      user =
+        user_fixture()
+        |> Ecto.Changeset.change(%{state: :active})
+        |> Repo.update!()
+
       year = Date.utc_today().year + 2
       july_first = Date.new!(year, 7, 1)
 
@@ -486,6 +491,7 @@ defmodule YscWeb.UserBookingDetailLiveTest do
         )
 
       {:ok, confirmed} = BookingLocker.confirm_booking(booking.id)
+      conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_booking_detail(conn, confirmed.id)
 

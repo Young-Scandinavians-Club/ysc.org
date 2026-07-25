@@ -5,7 +5,7 @@ defmodule Ysc.AccountsTest do
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
-  alias Ysc.Accounts.{User, UserPasskey, UserToken}
+  alias Ysc.Accounts.{User, UserPasskey, UserToken, UserProfileCache}
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Subscriptions
   alias Ysc.Newsletter
@@ -435,25 +435,6 @@ defmodule Ysc.AccountsTest do
       assert Accounts.get_email_verification_code(user) == code
     end
 
-    test "verify_email_code accepts valid 6-digit code", %{} do
-      user = user_fixture(%{phone_number: "+14159098286"})
-      assert Accounts.verify_email_code(user, "123456") == {:ok, user}
-      assert Accounts.verify_email_code(user, "000000") == {:ok, user}
-    end
-
-    test "verify_email_code rejects invalid format", %{} do
-      user = user_fixture(%{phone_number: "+14159098287"})
-
-      assert Accounts.verify_email_code(user, "12345") ==
-               {:error, :invalid_code}
-
-      assert Accounts.verify_email_code(user, "1234567") ==
-               {:error, :invalid_code}
-
-      assert Accounts.verify_email_code(user, "12a456") ==
-               {:error, :invalid_code}
-    end
-
     test "store and verify_phone_verification_code roundtrip", %{} do
       user = user_fixture(%{phone_number: "+14159098288"})
       Accounts.store_phone_verification_code(user, "555555", 600)
@@ -561,6 +542,40 @@ defmodule Ysc.AccountsTest do
       assert hd(group).id == primary.id
     end
 
+    test "remove_sub_account syncs board volunteer billing for primary household" do
+      primary = user_fixture(%{phone_number: "+14159098350"})
+      sub = user_fixture(%{phone_number: "+14159098351"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      {:ok, sub} = Accounts.assign_board_position(sub, :secretary)
+
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      assert_receive {:board_volunteer_sync, primary_id}
+                     when primary_id == primary.id
+    end
+
     test "remove_sub_account returns error when sub does not belong to primary",
          %{} do
       primary1 = user_fixture(%{phone_number: "+14159098300"})
@@ -575,6 +590,37 @@ defmodule Ysc.AccountsTest do
 
       assert {:error, :unauthorized} =
                Accounts.remove_sub_account(sub, primary2)
+    end
+
+    @tag process_caches: true
+    test "remove_sub_account busts cached profile so membership access is revoked" do
+      Cachex.clear(:ysc_cache)
+
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098303"})
+      sub = user_fixture(%{phone_number: "+14159098304"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      UserProfileCache.get_user!(sub.id, [])
+      UserProfileCache.get_user!(primary.id, [:sub_accounts])
+
+      cached_sub = Accounts.get_user!(sub.id, [])
+      assert Accounts.has_active_membership?(cached_sub)
+
+      assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
+
+      refreshed_sub = Accounts.get_user!(sub.id, [])
+      assert is_nil(refreshed_sub.primary_user_id)
+      refute Accounts.has_active_membership?(refreshed_sub)
+
+      refreshed_primary = Accounts.get_user!(primary.id, [:sub_accounts])
+      assert refreshed_primary.sub_accounts == []
     end
   end
 
@@ -1968,6 +2014,68 @@ defmodule Ysc.AccountsTest do
       assert Accounts.leave_family_membership(primary) ==
                {:error, :not_sub_account}
     end
+
+    test "leave_family_membership syncs board volunteer billing for primary household" do
+      primary = user_fixture(%{phone_number: "+14159098702"})
+      sub = user_fixture(%{phone_number: "+14159098703"})
+
+      {:ok, sub} =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update()
+
+      {:ok, sub} = Accounts.assign_board_position(sub, :treasurer)
+
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, _} = Accounts.leave_family_membership(sub)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      primary_id = primary.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
+    end
+
+    @tag process_caches: true
+    test "leave_family_membership busts cached profile so membership access is revoked" do
+      Cachex.clear(:ysc_cache)
+
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098318"})
+      sub = user_fixture(%{phone_number: "+14159098319"})
+
+      {:ok, sub} =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update()
+
+      UserProfileCache.get_user!(sub.id, [])
+
+      cached_sub = Accounts.get_user!(sub.id, [])
+      assert Accounts.has_active_membership?(cached_sub)
+
+      assert {:ok, left} = Accounts.leave_family_membership(sub)
+      assert is_nil(left.primary_user_id)
+
+      refreshed_sub = Accounts.get_user!(sub.id, [])
+      assert is_nil(refreshed_sub.primary_user_id)
+      refute Accounts.has_active_membership?(refreshed_sub)
+    end
   end
 
   describe "list_memberships/1 and get_membership_stats/0" do
@@ -2341,6 +2449,33 @@ defmodule Ysc.AccountsTest do
       assert {:ok, linked} = Accounts.admin_link_user_to_family(primary, victim)
       assert linked.primary_user_id == primary.id
       assert linked.family_relationship == :child
+    end
+
+    test "admin_link_user_to_family/3 syncs board volunteer billing when linking a board member" do
+      primary = user_with_lifetime_membership(%{phone_number: "+14159098700"})
+      victim = user_fixture(%{phone_number: "+14159098701"})
+
+      {:ok, victim} = Accounts.assign_board_position(victim, :secretary)
+
+      refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, linked} = Accounts.admin_link_user_to_family(primary, victim)
+      assert linked.primary_user_id == primary.id
+
+      assert Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
+               primary
+             )
+
+      primary_id = primary.id
+      assert_receive {:board_volunteer_sync, ^primary_id}
     end
 
     test "admin_link_user_to_family/3 links child when primary has family subscription" do

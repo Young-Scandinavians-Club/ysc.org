@@ -9,11 +9,19 @@ defmodule Ysc.Bookings.PricingRuleCache do
   """
 
   require Ysc.Logging
-  alias Ysc.Bookings.PricingRule
+  alias Ysc.Bookings.{ConfigCacheTelemetry, PricingRule}
 
   @cache_name :ysc_cache
   @cache_prefix "pricing_rule:"
   @cache_version_key "pricing_rule:version"
+  @pubsub_topic "pricing_rule_cache:invalidate"
+
+  @doc """
+  Subscribes the current process to pricing-rule cache invalidation events.
+  """
+  def subscribe do
+    Phoenix.PubSub.subscribe(Ysc.PubSub, @pubsub_topic)
+  end
 
   @doc """
   Gets a pricing rule from cache or fetches from database and caches it.
@@ -193,13 +201,16 @@ defmodule Ysc.Bookings.PricingRuleCache do
     Cachex.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
-    Phoenix.PubSub.broadcast(
-      Ysc.PubSub,
-      "pricing_rule_cache:invalidate",
-      {:pricing_rule_cache_invalidated, new_version}
-    )
+    if Process.whereis(Ysc.PubSub) do
+      Phoenix.PubSub.broadcast(
+        Ysc.PubSub,
+        @pubsub_topic,
+        {:pricing_rule_cache_invalidated, new_version}
+      )
+    end
 
     Ysc.Logging.debug("Pricing rule cache invalidated", version: new_version)
+    ConfigCacheTelemetry.invalidated(:pricing_rule)
     :ok
   end
 

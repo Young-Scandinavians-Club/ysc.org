@@ -47,7 +47,7 @@ defmodule Mix.Tasks.Ci.QueryExplain do
     heuristic_matched? = opts[:heuristic_matched] == true
     all_targets? = opts[:all_targets] == true
 
-    unless output_json && output_markdown do
+    if !(output_json && output_markdown) do
       Mix.raise("--output-json and --output-markdown are required")
     end
 
@@ -128,7 +128,7 @@ defmodule Mix.Tasks.Ci.QueryExplain do
         try do
           query = apply(m, f, a)
 
-          unless match?(%Ecto.Query{}, query) do
+          if !match?(%Ecto.Query{}, query) do
             raise "expected %Ecto.Query{}, got #{inspect(query)}"
           end
 

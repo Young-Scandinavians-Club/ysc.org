@@ -7,7 +7,7 @@ defmodule YscWeb.BookingChangeLiveTest do
   import Mox
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{BookingLocker, RoomCategory}
+  alias Ysc.Bookings.{Booking, BookingLocker, RoomCategory}
   alias Ysc.Ledgers
   alias Ysc.Repo
   alias Ysc.StripeMock
@@ -212,7 +212,9 @@ defmodule YscWeb.BookingChangeLiveTest do
            )
   end
 
-  test "Tahoe change calendar blocks Saturday check-in", %{conn: conn} do
+  test "Tahoe change calendar allows Saturday check-in for Sat→Sun stays", %{
+    conn: conn
+  } do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
     booking = complete_booking!(user)
@@ -220,6 +222,8 @@ defmodule YscWeb.BookingChangeLiveTest do
     {view, _html} = live_change(conn, booking)
 
     saturday = first_saturday_on_or_after(Date.add(booking.checkin_date, 7))
+    sunday = Date.add(saturday, 1)
+    monday = Date.add(saturday, 2)
 
     view
     |> element("#modification-dates [phx-click=open-calendar]")
@@ -229,7 +233,23 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert has_element?(
              view,
-             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"][disabled]|
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    view
+    |> element(
+      ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(saturday)}T00:00:00Z"]|
+    )
+    |> render_click()
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(sunday)}T00:00:00Z"]:not([disabled])|
+           )
+
+    assert has_element?(
+             view,
+             ~s|#modification-dates button[phx-value-date="#{Date.to_iso8601(monday)}T00:00:00Z"][disabled]|
            )
   end
 
@@ -803,6 +823,130 @@ defmodule YscWeb.BookingChangeLiveTest do
              })
 
     Repo.preload(booking, [:rooms, :user])
+  end
+
+  test "payment-success redirects to receipt when paid modification cannot be applied yet",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: "pi_change_recover",
+         client_secret: "pi_change_recover_secret",
+         status: "requires_payment_method"
+       }}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    extended_checkout = Date.add(booking.checkout_date, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => extended_checkout_str
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-payment-step")
+
+    payment_delta =
+      :sys.get_state(view.pid).socket.assigns.payment_delta
+
+    assert Money.positive?(payment_delta)
+
+    payment_intent_id =
+      "pi_change_recover_#{System.unique_integer([:positive])}"
+
+    amount_cents = Ysc.MoneyHelper.money_to_cents(payment_delta)
+
+    expired_at =
+      DateTime.utc_now()
+      |> DateTime.add(-1, :minute)
+      |> DateTime.truncate(:second)
+
+    Repo.get!(Booking, booking.id)
+    |> Ecto.Changeset.change(modification_hold_expires_at: expired_at)
+    |> Repo.update!()
+
+    assert {:ok, _} =
+             Bookings.create_blackout(%{
+               property: :tahoe,
+               reason: "Blocks change live recoverable path",
+               start_date: booking.checkin_date,
+               end_date: extended_checkout
+             })
+
+    stub(StripeMock, :retrieve_payment_intent, fn ^payment_intent_id, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: payment_intent_id,
+         status: "succeeded",
+         amount: amount_cents,
+         metadata: %{
+           "booking_id" => to_string(booking.id),
+           "user_id" => to_string(booking.user_id),
+           "modification" => "true"
+         },
+         latest_charge: %Stripe.Charge{id: "ch_#{payment_intent_id}"}
+       }}
+    end)
+
+    render_click(view, "payment-success", %{
+      "payment_intent_id" => payment_intent_id
+    })
+
+    {path, _flash} = assert_redirect(view, @change_async_timeout)
+
+    assert path =~ "/bookings/#{booking.id}/receipt"
+    assert path =~ "payment_intent=#{payment_intent_id}"
+    assert path =~ "redirect_status=succeeded"
+  end
+
+  test "reloads change data after pricing rule cache invalidation", %{
+    conn: conn
+  } do
+    user = user_fixture()
+    booking = complete_booking!(user)
+    conn = log_in_user(conn, user)
+
+    {view, _html} = live_change(conn, booking)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+
+    send(
+      view.pid,
+      {:pricing_rule_cache_invalidated, System.unique_integer([:positive])}
+    )
+
+    _ = render_async(view, @change_async_timeout)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+    assert is_list(:sys.get_state(view.pid).socket.assigns.seasons)
   end
 
   defp navigate_calendar_to_month!(view, %Date{} = target) do

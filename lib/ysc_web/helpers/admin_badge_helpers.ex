@@ -65,4 +65,24 @@ defmodule YscWeb.AdminBadgeHelpers do
   end
 
   def message_recipient_text(_), do: nil
+
+  @doc """
+  Badge `type` for booking status in admin lists and detail panels.
+  """
+  @spec booking_status_badge_type(atom()) :: String.t()
+  def booking_status_badge_type(:complete), do: "green"
+  def booking_status_badge_type(:canceled), do: "red"
+  def booking_status_badge_type(:refunded), do: "yellow"
+  def booking_status_badge_type(:hold), do: "sky"
+  def booking_status_badge_type(:draft), do: "dark"
+  def booking_status_badge_type(_), do: "dark"
+
+  @doc """
+  Badge `type` for ledger payment or refund status in admin booking views.
+  """
+  @spec ledger_payment_status_badge_type(atom()) :: String.t()
+  def ledger_payment_status_badge_type(:completed), do: "green"
+  def ledger_payment_status_badge_type(:pending), do: "yellow"
+  def ledger_payment_status_badge_type(:failed), do: "red"
+  def ledger_payment_status_badge_type(_), do: "dark"
 end

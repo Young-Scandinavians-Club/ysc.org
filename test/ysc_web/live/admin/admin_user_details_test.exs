@@ -5,6 +5,7 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.AuthEvent
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -214,6 +215,70 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       {:ok, _view, html} = live(conn, ~p"/admin/users/#{user.id}/details")
 
       assert html =~ "w-24 h-24"
+    end
+  end
+
+  describe "account activity" do
+    test "shows N/A when user has no auth events", %{conn: conn} do
+      user = user_fixture()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert has_element?(view, "details summary", "View Account Activity")
+      assert has_element?(view, "#account-activity")
+      assert has_element?(view, "#last-login-at", "N/A")
+      assert has_element?(view, "#last-activity-at", "N/A")
+    end
+
+    test "shows last login and activity from auth events", %{conn: conn} do
+      user = user_fixture()
+
+      # Use fixed past timestamps so Timex.from_now/1 is stable between setup and render.
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      login_inserted_at = DateTime.add(now, -7200, :second)
+      logout_inserted_at = DateTime.add(now, -3600, :second)
+
+      {:ok, login_event} =
+        AuthEvent.login_success_changeset(user, %{
+          ip_address: "127.0.0.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Ecto.Changeset.put_change(:inserted_at, login_inserted_at)
+        |> Repo.insert()
+
+      {:ok, logout_event} =
+        AuthEvent.logout_changeset(user, %{
+          ip_address: "127.0.0.1",
+          browser: "Chrome",
+          operating_system: "macOS"
+        })
+        |> Ecto.Changeset.put_change(:inserted_at, logout_inserted_at)
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      login_absolute =
+        login_event.inserted_at
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
+
+      login_relative = Timex.from_now(login_event.inserted_at)
+
+      logout_absolute =
+        logout_event.inserted_at
+        |> DateTime.shift_zone!("America/Los_Angeles")
+        |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
+
+      logout_relative = Timex.from_now(logout_event.inserted_at)
+
+      assert has_element?(view, "#account-activity")
+      assert has_element?(view, "#last-login-at", login_relative)
+      assert has_element?(view, "#last-login-at", login_absolute)
+      refute has_element?(view, "#last-login-at", logout_relative)
+      assert has_element?(view, "#last-activity-at", logout_relative)
+      assert has_element?(view, "#last-activity-at", logout_absolute)
+      refute has_element?(view, "#last-activity-at", login_relative)
     end
   end
 

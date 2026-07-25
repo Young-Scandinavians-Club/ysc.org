@@ -403,7 +403,10 @@ defmodule YscWeb.TicketQrLive do
   def handle_async(:load_ticket_data, {:ok, :not_found}, socket) do
     {:noreply,
      socket
-     |> put_flash(:error, "Ticket order not found.")
+     |> put_flash(
+       :error,
+       "We couldn't find those tickets. They may have expired or belong to another account. Open My Bookings & Tickets from your account menu, or browse events to buy tickets again."
+     )
      |> push_navigate(to: socket.assigns.return_to)}
   end
 

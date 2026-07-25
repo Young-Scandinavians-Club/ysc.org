@@ -390,4 +390,158 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       end)
     end
   end
+
+  describe "insert saved notice" do
+    setup [:create_admin]
+
+    test "opens picker from toolbar trigger and inserts notice HTML", %{
+      conn: conn,
+      admin: admin
+    } do
+      {:ok, notice} =
+        Newsletter.create_notice(
+          %{"name" => "Office hours", "body" => "<p>Open Tue–Thu</p>"},
+          created_by_id: admin.id
+        )
+
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      assert has_element?(view, "#open-notice-picker-btn")
+
+      assert has_element?(
+               view,
+               "#edition_intro_text[data-newsletter-notices='true']"
+             )
+
+      view |> element("#open-notice-picker-btn") |> render_click()
+      assert has_element?(view, "#insert-notice-picker-modal")
+      assert has_element?(view, "#insert-notice-#{notice.id}")
+
+      view |> element("#insert-notice-#{notice.id}") |> render_click()
+
+      assert_push_event(view, "insert-trix-html", %{
+        html: html,
+        target_input_id: "edition_intro_text"
+      })
+
+      assert html =~ "Open Tue"
+      refute has_element?(view, "#insert-notice-picker-modal")
+    end
+
+    test "can create a new notice from the picker and insert it", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      view |> element("#open-notice-picker-btn") |> render_click()
+      assert has_element?(view, "#notice-picker-new-btn")
+
+      view |> element("#notice-picker-new-btn") |> render_click()
+      assert has_element?(view, "#new-notice-from-picker-form")
+
+      view
+      |> form("#new-notice-from-picker-form", %{
+        "new_notice" => %{
+          "name" => "Volunteer call",
+          "body" => "Join us Saturday at 10am"
+        }
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#insert-notice-picker-modal")
+
+      assert_push_event(view, "insert-trix-html", %{
+        html: html,
+        target_input_id: "edition_intro_text"
+      })
+
+      assert html =~ "Join us Saturday"
+
+      assert Enum.any?(
+               Newsletter.list_notices(),
+               &(&1.name == "Volunteer call")
+             )
+    end
+  end
+
+  describe "save selection as notice" do
+    setup [:create_admin]
+
+    test "opens save modal from selection event and creates a notice", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      render_hook(view, "save-selection-as-notice", %{
+        "html" => "<p>Park in lot B please</p>"
+      })
+
+      assert has_element?(view, "#save-notice-modal")
+      assert has_element?(view, "#save-notice-form")
+      assert render(view) =~ "Park in lot B"
+
+      view
+      |> form("#save-notice-form", %{
+        "save_notice" => %{"name" => "Parking reminder"}
+      })
+      |> render_submit()
+
+      refute has_element?(view, "#save-notice-modal")
+
+      assert [%{name: "Parking reminder"} | _] =
+               Newsletter.list_notices()
+               |> Enum.filter(&(&1.name == "Parking reminder"))
+
+      # Picker should list the new notice
+      view |> element("#open-notice-picker-btn") |> render_click()
+      assert render(view) =~ "Parking reminder"
+    end
+
+    test "shows error when selection html is empty", %{conn: conn, admin: admin} do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      render_hook(view, "save-selection-as-notice", %{"html" => "   "})
+
+      refute has_element?(view, "#save-notice-modal")
+      assert render(view) =~ "Select some text first"
+    end
+  end
+
+  describe "duplicate from editor" do
+    setup [:create_admin]
+
+    test "shows duplicate on sent editions and navigates to new draft", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin, %{"title" => "Sent One"})
+
+      {:ok, _} =
+        Newsletter.update_edition(edition, %{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      view = live_editing_edition(conn, edition)
+      assert has_element?(view, "#duplicate-edition-btn")
+
+      {:ok, new_view, _html} =
+        view
+        |> element("#duplicate-edition-btn")
+        |> render_click()
+        |> follow_redirect(conn)
+
+      render_async(new_view, 5000)
+
+      assert new_view
+             |> element("input[name='edition[title]']")
+             |> render() =~ "Sent One (copy)"
+    end
+  end
 end

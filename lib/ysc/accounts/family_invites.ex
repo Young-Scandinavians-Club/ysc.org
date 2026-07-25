@@ -7,7 +7,8 @@ defmodule Ysc.Accounts.FamilyInvites do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
-  alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent}
+  alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent, UserProfileCache}
+  alias Ysc.Subscriptions.BoardVolunteerBilling
   alias YscWeb.Emails.Notifier
 
   @max_sub_accounts 10
@@ -183,7 +184,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                 rescue
                   e ->
                     # In test mode, silently ignore errors to keep test output clean
-                    unless is_test do
+                    if !is_test do
                       require Ysc.Logging
 
                       Ysc.Logging.error(
@@ -195,7 +196,7 @@ defmodule Ysc.Accounts.FamilyInvites do
                 catch
                   kind, reason ->
                     # Catch all other errors (throws, exits, etc.)
-                    unless is_test do
+                    if !is_test do
                       require Ysc.Logging
 
                       Ysc.Logging.error(
@@ -214,6 +215,23 @@ defmodule Ysc.Accounts.FamilyInvites do
               Repo.rollback(changeset)
           end
         end)
+        |> case do
+          {:ok, final_user} = ok ->
+            invalidate_family_link_profile_caches(
+              final_user.id,
+              invite.primary_user_id
+            )
+
+            sync_board_volunteer_billing_after_family_change(
+              invite.primary_user_id
+            )
+
+            notify_invite_accepted(invite, final_user)
+            ok
+
+          error ->
+            error
+        end
     end
   end
 
@@ -269,12 +287,123 @@ defmodule Ysc.Accounts.FamilyInvites do
           })
           |> Repo.insert!()
 
-          Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
-
           updated_user
         end)
+        |> case do
+          {:ok, updated_user} = ok ->
+            Ysc.Accounts.MembershipCache.invalidate_user(updated_user.id)
+
+            invalidate_family_link_profile_caches(
+              updated_user.id,
+              invite.primary_user_id
+            )
+
+            sync_board_volunteer_billing_after_family_change(
+              invite.primary_user_id
+            )
+
+            notify_invite_accepted(invite, updated_user)
+            ok
+
+          error ->
+            error
+        end
     end
   end
+
+  defp invalidate_family_link_profile_caches(user_id, primary_user_id) do
+    UserProfileCache.invalidate_user(user_id)
+    UserProfileCache.invalidate_user(primary_user_id)
+  end
+
+  defp sync_board_volunteer_billing_after_family_change(primary_user_id) do
+    case Ysc.Accounts.get_user(primary_user_id) do
+      nil -> :ok
+      primary -> BoardVolunteerBilling.sync_for_user(primary)
+    end
+  end
+
+  @doc """
+  Sends an email to the member who sent the invite when it is accepted.
+  """
+  def notify_invite_accepted(%FamilyInvite{} = invite, %User{} = accepted_user) do
+    invite =
+      if Ecto.assoc_loaded?(invite.created_by_user) do
+        invite
+      else
+        Repo.preload(invite, [:created_by_user, :primary_user])
+      end
+
+    inviter =
+      invite.created_by_user || Repo.get!(User, invite.created_by_user_id)
+
+    inviter_first_name = inviter.first_name || "there"
+    invitee_name = format_invitee_name(accepted_user)
+    invitee_email = accepted_user.email || invite.email
+    relationship_label = relationship_label(invite.relationship)
+
+    family_management_url =
+      YscWeb.Emails.Helpers.absolute_url("/users/settings/family")
+
+    email_vars = %{
+      inviter_first_name: inviter_first_name,
+      invitee_name: invitee_name,
+      invitee_email: invitee_email,
+      relationship_label: relationship_label,
+      family_management_url: family_management_url
+    }
+
+    subject =
+      if invitee_name do
+        "#{invitee_name} Accepted Your Family Invitation - YSC"
+      else
+        "Family Invitation Accepted - YSC"
+      end
+
+    invitee_display =
+      if invitee_name,
+        do: "#{invitee_name} (#{invitee_email})",
+        else: invitee_email
+
+    idempotency_key = "family_invite_accepted_#{invite.id}"
+
+    Notifier.schedule_email(
+      inviter.email,
+      idempotency_key,
+      subject,
+      "family_invite_accepted",
+      email_vars,
+      """
+      ==============================
+
+      Hi #{inviter_first_name},
+
+      Great news! #{invitee_display} has accepted your family membership invitation and joined your family account as your #{relationship_label}.
+
+      They now have access to all membership benefits, including cabin bookings and member event tickets.
+
+      Manage your family members: #{family_management_url}
+
+      ==============================
+      """,
+      inviter.id
+    )
+  end
+
+  defp format_invitee_name(%User{first_name: first_name, last_name: last_name})
+       when is_binary(first_name) and first_name != "" do
+    if is_binary(last_name) and last_name != "" do
+      "#{first_name} #{last_name}"
+    else
+      first_name
+    end
+  end
+
+  defp format_invitee_name(_), do: nil
+
+  defp relationship_label(:spouse), do: "spouse"
+  defp relationship_label("spouse"), do: "spouse"
+  defp relationship_label(_), do: "child"
 
   defp emails_match?(user_email, invite_email)
        when is_binary(user_email) and is_binary(invite_email) do
@@ -557,8 +686,10 @@ defmodule Ysc.Accounts.FamilyInvites do
         nil
       end
 
-    base_url = Application.get_env(:ysc, :base_url) || "http://localhost:4000"
-    invite_url = "#{base_url}/family-invite/#{invite.token}/accept"
+    invite_url =
+      YscWeb.Emails.Helpers.absolute_url(
+        "/family-invite/#{invite.token}/accept"
+      )
 
     idempotency_key = "family_invite_#{invite.id}"
 

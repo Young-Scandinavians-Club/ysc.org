@@ -405,6 +405,18 @@ defmodule YscWeb.AdminComponents do
   def newsletter_edition_status_label(other),
     do: other |> to_string() |> String.capitalize()
 
+  @doc """
+  Maps a newsletter subscriber subscribed flag to a `<.badge>` type.
+  """
+  def newsletter_subscriber_status_badge_type(true), do: "green"
+  def newsletter_subscriber_status_badge_type(false), do: "zinc"
+
+  @doc """
+  Human-readable label for a newsletter subscriber subscribed flag.
+  """
+  def newsletter_subscriber_status_label(true), do: "Active"
+  def newsletter_subscriber_status_label(false), do: "Inactive"
+
   # ---------------------------------------------------------------------------
   # QuickBooks sync status (admin money / ledgers)
   # ---------------------------------------------------------------------------
@@ -1710,10 +1722,14 @@ defmodule YscWeb.AdminComponents do
     <div class={["border-b border-zinc-200 mb-6 w-full min-w-0", @class]}>
       <nav
         id={@id}
-        class={[
-          admin_tabs_nav_class(@density),
-          "admin-tabs-nav flex-nowrap min-w-0 overflow-x-auto overflow-y-hidden"
-        ]}
+        class={
+          [
+            admin_tabs_nav_class(@density),
+            # pt/pe keep notification badges (-top-2/-end-2) inside the scrollport
+            # so overflow-y-hidden does not clip them
+            "admin-tabs-nav flex-nowrap min-w-0 overflow-x-auto overflow-y-hidden pt-2 pe-2"
+          ]
+        }
         aria-label={@aria_label}
         role={@role}
       >
@@ -2640,7 +2656,7 @@ defmodule YscWeb.AdminComponents do
       <div
         :if={@show_badge}
         class={[
-          "absolute inline-flex items-center justify-center w-6 h-6 text-xs font-bold",
+          "absolute z-10 inline-flex items-center justify-center w-6 h-6 text-xs font-bold",
           "border-2 rounded-full -top-2 -end-2",
           @badge_class
         ]}

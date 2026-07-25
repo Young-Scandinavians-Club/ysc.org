@@ -72,7 +72,7 @@ defmodule YscWeb.CoreComponents do
         <div class="flex items-center justify-center min-h-full">
           <div class={[
             "w-full sm:p-4 sm:py-6 lg:py-8",
-            unless(@fullscreen == true, do: @max_width, else: "")
+            if(@fullscreen != true, do: @max_width, else: "")
           ]}>
             <.focus_wrap
               id={"#{@id}-container"}
@@ -1027,13 +1027,21 @@ defmodule YscWeb.CoreComponents do
     <div>
       <.label :if={@label} for={@id}>{@label}</.label>
 
-      <div class="flex gap-x-3 mt-1" data-otp-input="">
+      <div
+        id={"#{@id}-otp"}
+        class="flex gap-x-3 mt-1"
+        data-otp-input=""
+        phx-hook="OtpInput"
+      >
         <%= for i <- 0..5 do %>
           <input
             type="text"
             name={"#{@name}[#{i}]"}
             id={"#{@id}_#{i}"}
+            inputmode="numeric"
+            pattern="[0-9]*"
             maxlength="1"
+            autocomplete={if i == 0, do: "one-time-code", else: "off"}
             class="block w-12 h-12 text-center border-zinc-200 rounded sm:text-sm focus:scale-110 focus:border-blue-600 focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none"
             data-otp-input-item=""
             {@rest}
@@ -1255,6 +1263,12 @@ defmodule YscWeb.CoreComponents do
     doc: "Unavailable checkout dates keyed by ISO date when selecting check-out"
   )
 
+  attr(:blocked_stay_dates, :map,
+    default: %{},
+    doc:
+      "Nights that cannot be stayed (ISO date => reason). Used when selecting check-out so blackout start dates remain valid check-outs."
+  )
+
   def date_range_picker(assigns) do
     ~H"""
     <.live_component
@@ -1272,6 +1286,7 @@ defmodule YscWeb.CoreComponents do
       max={@max}
       date_tooltips={@date_tooltips}
       checkout_date_tooltips={@checkout_date_tooltips}
+      blocked_stay_dates={@blocked_stay_dates}
       property={@property}
       today={@today}
       seasons={@seasons}

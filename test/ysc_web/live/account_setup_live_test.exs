@@ -143,6 +143,25 @@ defmodule YscWeb.AccountSetupLiveTest do
   end
 
   # ---------------------------------------------------------------------------
+  # Mount / dead render
+  # ---------------------------------------------------------------------------
+
+  describe "mount" do
+    test "static HTML shows loading shell before websocket connects", %{
+      conn: conn
+    } do
+      user = unverified_pending_user(%{email: "deferred-setup@example.com"})
+
+      conn = get(conn, account_setup_path(user))
+      html = html_response(conn, 200)
+
+      assert html =~ ~s|id="account-setup-loading"|
+      refute html =~ "deferred-setup@example.com"
+      refute html =~ ~s|id="email_form"|
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Step 0 — Email verification
   # ---------------------------------------------------------------------------
 
@@ -308,7 +327,10 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       render_click(view, "resend_code", %{})
 
-      assert render(view) =~ "verification code has been sent"
+      html = render(view)
+
+      assert html =~ "verification code was sent again" or
+               html =~ "verification code has been sent"
     end
 
     test "resend_timer_expired and update_resend_timers events do not crash", %{

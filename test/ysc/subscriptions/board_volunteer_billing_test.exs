@@ -102,24 +102,109 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
     end
   end
 
+  describe "household_on_board?/1" do
+    test "returns true when user has a board position" do
+      user = user_fixture()
+      {:ok, user} = Ysc.Accounts.assign_board_position(user, :treasurer)
+
+      assert BoardVolunteerBilling.household_on_board?(user)
+    end
+
+    test "returns true when a family member has a board position" do
+      primary = user_fixture()
+
+      sub_account =
+        %Ysc.Accounts.User{}
+        |> Ysc.Accounts.User.sub_account_registration_changeset(
+          %{
+            email: "sub-#{System.unique_integer()}@example.com",
+            password: valid_user_password(),
+            first_name: "Sub",
+            last_name: "User",
+            phone_number: unique_user_phone(),
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Ysc.Repo.insert!()
+
+      {:ok, _} = Ysc.Accounts.assign_board_position(sub_account, :secretary)
+
+      assert BoardVolunteerBilling.household_on_board?(primary)
+    end
+
+    test "returns false when nobody in the household is on the board" do
+      user = user_fixture()
+      refute BoardVolunteerBilling.household_on_board?(user)
+    end
+  end
+
+  describe "maybe_pause_collection_params/1" do
+    test "returns void pause and clears cancel_at_period_end when on the board" do
+      user = user_fixture()
+      {:ok, user} = Ysc.Accounts.assign_board_position(user, :president)
+
+      assert %{
+               pause_collection: %{behavior: :void},
+               cancel_at_period_end: false
+             } == BoardVolunteerBilling.maybe_pause_collection_params(user)
+    end
+
+    test "returns empty map when household is not on the board" do
+      user = user_fixture()
+
+      assert %{} == BoardVolunteerBilling.maybe_pause_collection_params(user)
+    end
+  end
+
   describe "sync_for_user/1" do
     test "returns :ok without calling Stripe in test mode" do
       user = user_fixture()
       assert :ok == BoardVolunteerBilling.sync_for_user(user)
     end
+
+    test "records sync target in test when recorder pid is configured" do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert :ok == BoardVolunteerBilling.sync_for_user(user)
+
+      user_id = user.id
+      assert_receive {:board_volunteer_sync, ^user_id}
+    end
   end
 
-  describe "stripe_pause_collection_params/1" do
-    test "household on board uses void pause without resumes_at so Stripe drops a stale grace date" do
-      assert %{pause_collection: %{behavior: :void}} ==
-               BoardVolunteerBilling.stripe_pause_collection_params(true)
+  describe "sync_all_board_households/0" do
+    test "returns :ok without calling Stripe in test mode" do
+      assert :ok == BoardVolunteerBilling.sync_all_board_households()
+    end
+  end
+
+  describe "stripe_sync_params/1" do
+    test "household on board uses void pause without resumes_at and clears cancel_at_period_end" do
+      assert %{
+               pause_collection: %{behavior: :void},
+               cancel_at_period_end: false
+             } == BoardVolunteerBilling.stripe_sync_params(true)
     end
 
-    test "household off board sets resumes_at six months ahead" do
+    test "household off board sets resumes_at six months ahead without touching cancel" do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       assert %{pause_collection: %{behavior: :void, resumes_at: unix}} =
-               BoardVolunteerBilling.stripe_pause_collection_params(false)
+               BoardVolunteerBilling.stripe_sync_params(false)
+
+      refute Map.has_key?(
+               BoardVolunteerBilling.stripe_sync_params(false),
+               :cancel_at_period_end
+             )
 
       expected_now = BoardVolunteerBilling.grace_resume_at_unix_from(now)
 
@@ -129,6 +214,13 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
         )
 
       assert unix in [expected_now, expected_next]
+    end
+  end
+
+  describe "stripe_pause_collection_params/1" do
+    test "household on board uses void pause without resumes_at so Stripe drops a stale grace date" do
+      assert %{pause_collection: %{behavior: :void}} ==
+               BoardVolunteerBilling.stripe_pause_collection_params(true)
     end
   end
 end

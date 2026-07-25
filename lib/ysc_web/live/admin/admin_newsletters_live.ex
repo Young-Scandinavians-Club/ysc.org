@@ -3,9 +3,11 @@ defmodule YscWeb.AdminNewslettersLive do
 
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
+  alias YscWeb.Admin.DateTimeDisplay
   alias YscWeb.DateDisplay
 
   alias Ysc.Newsletter
+  alias Ysc.Newsletter.Notice
 
   @impl true
   def mount(_params, _session, socket) do
@@ -32,6 +34,15 @@ defmodule YscWeb.AdminNewslettersLive do
         to_form(%{"email" => ""}, as: :add_subscriber)
       )
       |> assign(:show_add_subscriber_modal, false)
+      |> assign(:notices_empty?, false)
+      |> assign(:notices, [])
+      |> assign(:show_notice_modal, false)
+      |> assign(:notice_editor_key, "new")
+      |> assign(:editing_notice, nil)
+      |> assign(
+        :notice_form,
+        to_form(Notice.changeset(%Notice{}, %{}), as: :notice)
+      )
       |> stream_configure(:editions, dom_id: &"edition-#{&1.id}")
       |> stream_configure(:subscribers, dom_id: &"subscriber-#{&1.id}")
       |> stream(:editions, [])
@@ -60,26 +71,35 @@ defmodule YscWeb.AdminNewslettersLive do
 
     socket =
       if connected?(socket) do
-        if current_tab == "subscribers" do
-          subscriber_params = build_subscriber_flop_params(params)
+        cond do
+          current_tab == "subscribers" ->
+            subscriber_params = build_subscriber_flop_params(params)
 
-          socket
-          |> stream(:subscribers, [], reset: true)
-          |> start_async(:load_subscribers, fn ->
-            Newsletter.list_paginated_subscribers(subscriber_params)
-          end)
-        else
-          date_from = Map.get(params, "date_from", "")
-          date_to = Map.get(params, "date_to", "")
+            socket
+            |> stream(:subscribers, [], reset: true)
+            |> start_async(:load_subscribers, fn ->
+              Newsletter.list_paginated_subscribers(subscriber_params)
+            end)
 
-          socket
-          |> stream(:editions, [], reset: true)
-          |> start_async(:load_editions, fn ->
-            Newsletter.list_paginated_editions(params,
-              date_from: date_from,
-              date_to: date_to
-            )
-          end)
+          current_tab == "notices" ->
+            notices = Newsletter.list_notices()
+
+            socket
+            |> assign(:notices, notices)
+            |> assign(:notices_empty?, notices == [])
+
+          true ->
+            date_from = Map.get(params, "date_from", "")
+            date_to = Map.get(params, "date_to", "")
+
+            socket
+            |> stream(:editions, [], reset: true)
+            |> start_async(:load_editions, fn ->
+              Newsletter.list_paginated_editions(params,
+                date_from: date_from,
+                date_to: date_to
+              )
+            end)
         end
       else
         socket
@@ -93,6 +113,10 @@ defmodule YscWeb.AdminNewslettersLive do
     |> assign(:params, params)
     |> assign(:sub_search, Map.get(params, "sub_q", ""))
     |> assign(:sub_filter, Map.get(params, "subscribed_filter", "all"))
+  end
+
+  defp assign_newsletter_filter_params(socket, params, "notices") do
+    assign(socket, :params, params)
   end
 
   defp assign_newsletter_filter_params(socket, params, _current_tab) do
@@ -170,6 +194,7 @@ defmodule YscWeb.AdminNewslettersLive do
   end
 
   defp allowed_tab("subscribers"), do: "subscribers"
+  defp allowed_tab("notices"), do: "notices"
   defp allowed_tab(_), do: "editions"
 
   defp build_subscriber_flop_params(params) do
@@ -262,6 +287,15 @@ defmodule YscWeb.AdminNewslettersLive do
           phx-value-tab="subscribers"
         >
           Subscribers
+        </.admin_tab>
+        <.admin_tab
+          active={@current_tab == "notices"}
+          role="tab"
+          aria-selected={@current_tab == "notices"}
+          phx-click="switch-tab"
+          phx-value-tab="notices"
+        >
+          Saved notices
         </.admin_tab>
       </.admin_tabs>
 
@@ -379,11 +413,17 @@ defmodule YscWeb.AdminNewslettersLive do
                     <span class="text-sm text-zinc-500">
                       <%= cond do %>
                         <% edition.sent_at -> %>
-                          Sent {format_datetime(edition.sent_at)}
+                          Sent {DateTimeDisplay.format_datetime_compact(
+                            edition.sent_at
+                          )}
                         <% edition.scheduled_at -> %>
-                          Scheduled {format_datetime(edition.scheduled_at)}
+                          Scheduled {DateTimeDisplay.format_datetime_compact(
+                            edition.scheduled_at
+                          )}
                         <% true -> %>
-                          Created {format_datetime(edition.inserted_at)}
+                          Created {DateTimeDisplay.format_datetime_compact(
+                            edition.inserted_at
+                          )}
                       <% end %>
                     </span>
                     <span
@@ -476,7 +516,9 @@ defmodule YscWeb.AdminNewslettersLive do
                     <% edition.scheduled_at -> %>
                       <div class="text-zinc-500 text-xs font-medium">Scheduled</div>
                       <div class="text-zinc-600 text-xs">
-                        {format_datetime(edition.scheduled_at)}
+                        {DateTimeDisplay.format_datetime_compact(
+                          edition.scheduled_at
+                        )}
                       </div>
                     <% true -> %>
                       <span class="text-zinc-400">—</span>
@@ -618,8 +660,10 @@ defmodule YscWeb.AdminNewslettersLive do
                     {subscriber_name(subscriber)}
                   </p>
                   <div class="flex items-center gap-3 mt-2 flex-wrap">
-                    <.badge type={subscriber_status_badge(subscriber.subscribed)}>
-                      {if subscriber.subscribed, do: "Active", else: "Inactive"}
+                    <.badge type={
+                      newsletter_subscriber_status_badge_type(subscriber.subscribed)
+                    }>
+                      {newsletter_subscriber_status_label(subscriber.subscribed)}
                     </.badge>
                     <span :if={subscriber.source} class="text-xs text-zinc-400">
                       {subscriber.source}
@@ -680,8 +724,10 @@ defmodule YscWeb.AdminNewslettersLive do
                   <span class="text-zinc-600">{subscriber_name(sub)}</span>
                 </:col>
                 <:col :let={{_, sub}} label="Status" field={:subscribed}>
-                  <.badge type={subscriber_status_badge(sub.subscribed)}>
-                    {if sub.subscribed, do: "Active", else: "Inactive"}
+                  <.badge type={
+                    newsletter_subscriber_status_badge_type(sub.subscribed)
+                  }>
+                    {newsletter_subscriber_status_label(sub.subscribed)}
                   </.badge>
                 </:col>
                 <:col :let={{_, sub}} label="Source" field={:source}>
@@ -721,6 +767,171 @@ defmodule YscWeb.AdminNewslettersLive do
             </div>
           </div>
         </div>
+
+        <%!-- Saved notices tab --%>
+        <div :if={@current_tab == "notices"} class="space-y-6">
+          <.modal
+            :if={@show_notice_modal}
+            id="notice-modal"
+            on_cancel={JS.push("close-notice-modal")}
+            show
+          >
+            <.header>
+              {if @editing_notice, do: "Edit notice", else: "New notice"}
+            </.header>
+            <.form
+              for={@notice_form}
+              id="notice-form"
+              phx-change="validate-notice"
+              phx-submit="save-notice"
+              class="mt-4 space-y-4"
+            >
+              <.input
+                field={@notice_form[:name]}
+                type="text"
+                label="Name"
+                placeholder="e.g. Parking reminder"
+                id="notice-name"
+              />
+              <div>
+                <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-1">
+                  Body
+                </label>
+                <p class="text-sm text-zinc-500 mb-2">
+                  Rich text inserted into the newsletter intro at the cursor.
+                </p>
+                <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none border border-zinc-200 rounded-lg overflow-hidden">
+                  <.input
+                    type="hidden"
+                    id={"notice_body_#{@notice_editor_key}"}
+                    field={@notice_form[:body]}
+                    phx-hook="TrixHook"
+                    phx-debounce="400"
+                  />
+                  <div
+                    id={"notice-richtext-#{@notice_editor_key}"}
+                    class="relative"
+                    phx-update="ignore"
+                  >
+                    <trix-editor
+                      input={"notice_body_#{@notice_editor_key}"}
+                      class="trix-content block px-4 py-2 bg-white border-0 focus:ring-1 focus:ring-blue-400 transition text-wrap min-h-[160px]"
+                      placeholder="Write the notice…"
+                    >
+                    </trix-editor>
+                  </div>
+                </div>
+              </div>
+              <div class="flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  phx-click="close-notice-modal"
+                  class="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-200"
+                >
+                  Cancel
+                </button>
+                <.button type="submit" phx-disable-with="Saving...">
+                  Save notice
+                </.button>
+              </div>
+            </.form>
+          </.modal>
+
+          <div class="flex items-center justify-end">
+            <.button type="button" phx-click="open-notice-modal" id="new-notice-btn">
+              <.icon name="hero-document-plus" class="w-5 h-5" /> New notice
+            </.button>
+          </div>
+
+          <div class="block md:hidden space-y-4">
+            <div
+              :for={notice <- @notices}
+              id={"notice-mob-#{notice.id}"}
+              class="bg-white rounded-lg border border-zinc-200 p-4"
+            >
+              <button
+                type="button"
+                phx-click="edit-notice"
+                phx-value-id={notice.id}
+                class="block w-full text-left"
+              >
+                <h3 class="text-base font-semibold text-zinc-900 truncate">
+                  {notice.name}
+                </h3>
+                <p class="text-sm text-zinc-500 mt-1">
+                  Updated {format_date(notice.updated_at)}
+                  <span :if={notice.creator}>
+                    · by {creator_name(notice.creator)}
+                  </span>
+                </p>
+              </button>
+              <div class="flex justify-end pt-3 mt-3 border-t border-zinc-200">
+                <.notice_actions_dropdown
+                  notice={notice}
+                  menu_id={"notice-actions-mob-#{notice.id}"}
+                />
+              </div>
+            </div>
+
+            <.admin_list_empty_state
+              :if={@notices_empty?}
+              title="No saved notices"
+              suggestion="Create reusable notices to insert into newsletter intros."
+            />
+          </div>
+
+          <div class="hidden md:block py-6 w-full">
+            <table :if={!@notices_empty?} id="admin_notices_list">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Creator</th>
+                  <th>Updated</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  :for={notice <- @notices}
+                  id={"notice-#{notice.id}"}
+                  class="cursor-pointer"
+                  phx-click="edit-notice"
+                  phx-value-id={notice.id}
+                >
+                  <td>
+                    <span class="font-semibold text-zinc-900">{notice.name}</span>
+                  </td>
+                  <td>
+                    <%= if notice.creator do %>
+                      <span class="text-zinc-600">
+                        {creator_name(notice.creator)}
+                      </span>
+                    <% else %>
+                      <span class="text-zinc-400">—</span>
+                    <% end %>
+                  </td>
+                  <td>
+                    <span class="text-zinc-600">
+                      {format_date(notice.updated_at)}
+                    </span>
+                  </td>
+                  <td>
+                    <.notice_actions_dropdown
+                      notice={notice}
+                      menu_id={"notice-actions-dt-#{notice.id}"}
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <.admin_list_empty_state
+              :if={@notices_empty?}
+              title="No saved notices"
+              suggestion="Create reusable notices to insert into newsletter intros."
+            />
+          </div>
+        </div>
       </div>
     </.side_menu>
     """
@@ -740,6 +951,14 @@ defmodule YscWeb.AdminNewslettersLive do
         navigate={~p"/admin/newsletters/#{@edition.id}/edit"}
       >
         {if @edition.status == :sent, do: "View", else: "Edit"}
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-duplicate"}
+        icon="hero-document-duplicate"
+        phx-click="duplicate-edition"
+        phx-value-id={@edition.id}
+      >
+        Duplicate
       </.admin_dropdown_menu_item>
       <.admin_dropdown_menu_item
         :if={@edition.status == :sending}
@@ -809,6 +1028,34 @@ defmodule YscWeb.AdminNewslettersLive do
     """
   end
 
+  attr :notice, :map, required: true
+  attr :menu_id, :string, required: true
+
+  def notice_actions_dropdown(assigns) do
+    ~H"""
+    <.admin_row_actions_dropdown id={@menu_id} label="Notice actions">
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-edit"}
+        icon="hero-pencil-square"
+        phx-click="edit-notice"
+        phx-value-id={@notice.id}
+      >
+        Edit
+      </.admin_dropdown_menu_item>
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-delete"}
+        icon="hero-trash"
+        tone={:danger}
+        phx-click="delete-notice"
+        phx-value-id={@notice.id}
+        data-confirm="Delete this saved notice? This cannot be undone."
+      >
+        Delete
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
+    """
+  end
+
   def handle_event("send-now", %{"id" => id}, socket) do
     edition = Newsletter.get_edition!(id)
 
@@ -832,6 +1079,128 @@ defmodule YscWeb.AdminNewslettersLive do
       {:error, _} ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, "Failed to queue send.")}
+    end
+  end
+
+  def handle_event("duplicate-edition", %{"id" => id}, socket) do
+    edition = Newsletter.get_edition!(id)
+
+    case Newsletter.duplicate_edition(edition,
+           created_by_id: socket.assigns.current_user.id
+         ) do
+      {:ok, new_edition} ->
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Newsletter duplicated.",
+           title: "Newsletter"
+         )
+         |> push_navigate(to: ~p"/admin/newsletters/#{new_edition.id}/edit")}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Could not duplicate newsletter."
+         )}
+    end
+  end
+
+  def handle_event("open-notice-modal", _params, socket) do
+    {:noreply, assign_new_notice_modal(socket)}
+  end
+
+  def handle_event("close-notice-modal", _params, socket) do
+    {:noreply, assign(socket, :show_notice_modal, false)}
+  end
+
+  def handle_event("edit-notice", %{"id" => id}, socket) do
+    notice = Newsletter.get_notice!(id)
+
+    {:noreply,
+     socket
+     |> assign(:editing_notice, notice)
+     |> assign(:notice_editor_key, notice.id)
+     |> assign(
+       :notice_form,
+       to_form(Notice.changeset(notice, %{}), as: :notice)
+     )
+     |> assign(:show_notice_modal, true)}
+  end
+
+  def handle_event("validate-notice", %{"notice" => params}, socket) do
+    notice = socket.assigns.editing_notice || %Notice{}
+
+    changeset =
+      notice
+      |> Notice.changeset(params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :notice_form, to_form(changeset, as: :notice))}
+  end
+
+  def handle_event(
+        "editor-update",
+        %{"field" => field, "value" => value},
+        socket
+      )
+      when field in ["notice[body]", "notice_body"] do
+    params =
+      (socket.assigns.notice_form.params || %{})
+      |> Map.put("body", value)
+
+    # Preserve name from current form params / data
+    params =
+      Map.put_new(params, "name", socket.assigns.notice_form[:name].value || "")
+
+    notice = socket.assigns.editing_notice || %Notice{}
+
+    changeset =
+      notice
+      |> Notice.changeset(params)
+      |> Map.put(:action, :validate)
+
+    {:noreply, assign(socket, :notice_form, to_form(changeset, as: :notice))}
+  end
+
+  def handle_event("editor-update", _params, socket), do: {:noreply, socket}
+
+  def handle_event("save-notice", %{"notice" => params}, socket) do
+    case save_notice(socket, params) do
+      {:ok, _notice, socket} ->
+        notices = Newsletter.list_notices()
+
+        {:noreply,
+         socket
+         |> assign(:show_notice_modal, false)
+         |> assign(:notices, notices)
+         |> assign(:notices_empty?, notices == [])
+         |> YscWeb.Flash.put_toast(:info, "Notice saved.", title: "Newsletter")}
+
+      {:error, changeset} ->
+        {:noreply,
+         assign(socket, :notice_form, to_form(changeset, as: :notice))}
+    end
+  end
+
+  def handle_event("delete-notice", %{"id" => id}, socket) do
+    notice = Newsletter.get_notice!(id)
+
+    case Newsletter.delete_notice(notice) do
+      {:ok, _} ->
+        notices = Newsletter.list_notices()
+
+        {:noreply,
+         socket
+         |> assign(:notices, notices)
+         |> assign(:notices_empty?, notices == [])
+         |> YscWeb.Flash.put_toast(:info, "Notice deleted.",
+           title: "Newsletter"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Could not delete notice.")}
     end
   end
 
@@ -1066,6 +1435,36 @@ defmodule YscWeb.AdminNewslettersLive do
     {:noreply, push_patch(socket, to: ~p"/admin/newsletters?#{new_params}")}
   end
 
+  defp assign_new_notice_modal(socket) do
+    socket
+    |> assign(:editing_notice, nil)
+    |> assign(:notice_editor_key, "new-#{System.unique_integer([:positive])}")
+    |> assign(
+      :notice_form,
+      to_form(Notice.changeset(%Notice{}, %{}), as: :notice)
+    )
+    |> assign(:show_notice_modal, true)
+  end
+
+  defp save_notice(
+         %{assigns: %{editing_notice: %Notice{} = notice}} = socket,
+         params
+       ) do
+    case Newsletter.update_notice(notice, params) do
+      {:ok, updated} -> {:ok, updated, socket}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
+  defp save_notice(socket, params) do
+    case Newsletter.create_notice(params,
+           created_by_id: socket.assigns.current_user.id
+         ) do
+      {:ok, notice} -> {:ok, notice, socket}
+      {:error, changeset} -> {:error, changeset}
+    end
+  end
+
   defp maybe_update_filter(%{"value" => [""]} = filter),
     do: Map.replace(filter, "value", "")
 
@@ -1073,12 +1472,6 @@ defmodule YscWeb.AdminNewslettersLive do
 
   defp format_date(nil), do: ""
   defp format_date(dt), do: DateDisplay.format_datetime_display(dt)
-
-  defp format_datetime(nil), do: ""
-
-  defp format_datetime(dt) do
-    Calendar.strftime(dt, "%b %d, %Y %H:%M")
-  end
 
   defp creator_name(creator) do
     [creator.first_name, creator.last_name]
@@ -1097,9 +1490,6 @@ defmodule YscWeb.AdminNewslettersLive do
     |> Enum.filter(&is_binary/1)
     |> Enum.join(" ")
   end
-
-  defp subscriber_status_badge(true), do: "green"
-  defp subscriber_status_badge(false), do: "zinc"
 
   defp subscribers_list_path(params) do
     ~p"/admin/newsletters?#{Map.put(params || %{}, "tab", "subscribers")}"

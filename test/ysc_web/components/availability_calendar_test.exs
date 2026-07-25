@@ -39,6 +39,50 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
     if days_left == 0, do: today, else: Date.add(today, min(days_left, 4))
   end
 
+  # Floki helpers for querying nested calendar markup without brittle string matching.
+  defp calendar_document(html) do
+    {:ok, document} = Floki.parse_fragment(html)
+    document
+  end
+
+  defp calendar_role_present?(document, role) do
+    document
+    |> Floki.find(~s|[role="#{role}"]|)
+    |> Enum.any?()
+  end
+
+  defp calendar_day_button(document, day_str) do
+    case Floki.find(
+           document,
+           ~s|[data-day="#{day_str}"] button[data-calendar-day]|
+         ) do
+      [button | _] -> button
+      _ -> flunk("missing day button for #{day_str}")
+    end
+  end
+
+  defp calendar_element_attr(element, name) do
+    case Floki.attribute(element, name) do
+      [value | _] -> value
+      _ -> nil
+    end
+  end
+
+  defp calendar_element_attr_contains?(element, name, token) do
+    case calendar_element_attr(element, name) do
+      nil -> false
+      value -> String.contains?(value, token)
+    end
+  end
+
+  defp calendar_day_ok_badge?(document, day_str) do
+    document
+    |> Floki.find(
+      ~s|[data-day="#{day_str}"] span.text-green-800[aria-hidden="true"]|
+    )
+    |> Enum.any?()
+  end
+
   # Extracts the HTML content of a single day cell identified by its data-day value.
   # LazyHTML.filter only searches top-level nodes of a fragment, so it cannot reach
   # the deeply-nested day divs. Instead we split the rendered string on data-day markers.
@@ -102,8 +146,107 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
           today: today
         )
 
+      document = calendar_document(html)
+
       assert html =~ current_month
+      assert Floki.find(document, "#calendar-go-to-today") != []
+      assert calendar_role_present?(document, "grid")
+      assert calendar_role_present?(document, "row")
+      assert calendar_role_present?(document, "columnheader")
+      assert calendar_role_present?(document, "gridcell")
+
+      [today_button] = Floki.find(document, "#calendar-go-to-today")
+
+      assert calendar_element_attr_contains?(
+               today_button,
+               "class",
+               "inline-flex"
+             )
+
       assert html =~ "Today"
+
+      assert Floki.find(document, ~s|[aria-label="Calendar legend"]|) != []
+    end
+
+    test "disables the Today button when already showing the current month" do
+      today = ~D[2026-07-21]
+
+      html =
+        render_clear_lake_calendar(
+          today: today,
+          min: today,
+          max: Date.add(today, 90)
+        )
+
+      document = calendar_document(html)
+      today_button = List.first(Floki.find(document, "#calendar-go-to-today"))
+
+      assert today_button
+      assert calendar_element_attr(today_button, "phx-click") == "today"
+      assert calendar_element_attr(today_button, "disabled") in ["", "disabled"]
+
+      assert calendar_element_attr(today_button, "aria-label") ==
+               "Already showing July 2026"
+    end
+
+    test "renders descriptive aria labels and status text on day cells" do
+      today = ~D[2026-07-21]
+
+      html =
+        render_clear_lake_calendar(
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          checkin_date: today,
+          checkout_date: Date.add(today, 2)
+        )
+
+      assert html =~ "aria-label="
+      assert html =~ "Start"
+      assert html =~ "End"
+    end
+
+    test "highlights the today assign, not UTC today" do
+      today = ~D[2026-07-21]
+      tomorrow = Date.add(today, 1)
+
+      html =
+        render_clear_lake_calendar(
+          today: today,
+          min: today,
+          max: Date.add(today, 90)
+        )
+
+      today_cell = extract_day_cell(html, Date.to_iso8601(today))
+      tomorrow_cell = extract_day_cell(html, Date.to_iso8601(tomorrow))
+
+      assert today_cell =~ "border-2 border-zinc-400"
+      refute tomorrow_cell =~ "border-2 border-zinc-400"
+    end
+
+    test "shows OK badge on bookable day cells" do
+      today = ~D[2026-07-21]
+      bookable = Date.add(today, 2)
+
+      html =
+        render_clear_lake_calendar(
+          today: today,
+          min: today,
+          max: Date.add(today, 90)
+        )
+
+      document = calendar_document(html)
+      bookable_iso = Date.to_iso8601(bookable)
+      bookable_button = calendar_day_button(document, bookable_iso)
+
+      assert calendar_day_ok_badge?(document, bookable_iso)
+      refute calendar_element_attr(bookable_button, "aria-disabled") == "true"
+
+      assert calendar_element_attr_contains?(
+               bookable_button,
+               "class",
+               "bg-green-50"
+             )
     end
   end
 
@@ -114,6 +257,17 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute html =~ "spots"
       refute html =~ "spots available"
       refute html =~ " spot"
+    end
+
+    test "renders clear availability legend labels" do
+      html = render_clear_lake_calendar()
+
+      assert html =~ "Already booked"
+      assert html =~ "Closed (maintenance or club event)"
+      assert html =~ "Valid check-in day"
+      assert html =~ "Valid check-out day"
+      refute html =~ "Not available for booking"
+      refute html =~ ">Unavailable<"
     end
 
     test "does not render old dot indicators" do
@@ -248,6 +402,213 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       refute day_html =~ "Check-in allowed"
     end
 
+    test "styles checkout dates beyond max stay as restricted when selecting end date" do
+      today = ~D[2026-07-21]
+      # Use a weekday check-in so Saturday arrival rules do not interfere
+      checkin = ~D[2026-07-22]
+      valid_checkout = Date.add(checkin, 2)
+      restricted_checkout = Date.add(checkin, 5)
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: nil
+        )
+
+      valid_cell = extract_day_cell(html, Date.to_iso8601(valid_checkout))
+
+      restricted_cell =
+        extract_day_cell(html, Date.to_iso8601(restricted_checkout))
+
+      valid_button =
+        calendar_day_button(
+          calendar_document(html),
+          Date.to_iso8601(valid_checkout)
+        )
+
+      restricted_button =
+        calendar_day_button(
+          calendar_document(html),
+          Date.to_iso8601(restricted_checkout)
+        )
+
+      assert calendar_element_attr_contains?(
+               valid_button,
+               "class",
+               "bg-green-50"
+             )
+
+      refute calendar_element_attr(valid_button, "aria-disabled") == "true"
+
+      refute calendar_element_attr_contains?(
+               restricted_button,
+               "class",
+               "bg-green-50"
+             )
+
+      assert calendar_element_attr_contains?(
+               restricted_button,
+               "class",
+               "bg-zinc-100"
+             )
+
+      assert calendar_element_attr(restricted_button, "aria-disabled") == "true"
+
+      refute calendar_element_attr(restricted_button, "disabled") in [
+               "",
+               "disabled"
+             ]
+
+      assert valid_cell =~ "bg-green-50"
+      assert restricted_cell =~ "bg-zinc-100"
+    end
+
+    test "shows Saturday checkout restriction when selecting end date on Tahoe" do
+      today = ~D[2026-07-21]
+      checkin = ~D[2026-07-23]
+      saturday = ~D[2026-07-25]
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: nil
+        )
+
+      saturday_cell = extract_day_cell(html, Date.to_iso8601(saturday))
+
+      assert saturday_cell =~ "No check-out"
+      assert saturday_cell =~ "Check-outs are not permitted on Saturdays"
+      refute saturday_cell =~ "Restricted (e.g. min/max stay)"
+    end
+
+    test "valid checkout before blackout shows check-out only, not not available" do
+      today = ~D[2026-07-21]
+      checkin = ~D[2026-07-24]
+      checkout_candidate = ~D[2026-07-26]
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :tahoe,
+          start_date: checkout_candidate,
+          end_date: ~D[2026-07-29],
+          reason: "Test blackout"
+        })
+
+      AvailabilityCache.invalidate()
+      BlackoutListCache.invalidate()
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          checkin_date: checkin,
+          checkout_date: nil
+        )
+
+      checkout_cell =
+        extract_day_cell(html, Date.to_iso8601(checkout_candidate))
+
+      checkout_button =
+        calendar_day_button(
+          calendar_document(html),
+          Date.to_iso8601(checkout_candidate)
+        )
+
+      assert checkout_cell =~ "Check-out only"
+      refute checkout_cell =~ ">Not available<"
+      refute calendar_element_attr(checkout_button, "aria-disabled") == "true"
+    end
+
+    test "allows Saturday check-in when picking start date on Tahoe" do
+      today = ~D[2026-07-21]
+      saturday = ~D[2026-07-25]
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout
+        )
+
+      saturday_cell = extract_day_cell(html, Date.to_iso8601(saturday))
+
+      saturday_button =
+        calendar_day_button(calendar_document(html), Date.to_iso8601(saturday))
+
+      refute saturday_cell =~ "No check-in"
+      refute saturday_cell =~ "Check-ins are not permitted on Saturdays"
+      refute calendar_element_attr(saturday_button, "aria-disabled") == "true"
+    end
+
+    test "requires Sunday checkout after Saturday check-in on Tahoe" do
+      today = ~D[2026-07-21]
+      saturday = ~D[2026-07-25]
+      monday = ~D[2026-07-27]
+
+      html =
+        render_component(AvailabilityCalendar,
+          id: "calendar",
+          today: today,
+          min: today,
+          max: Date.add(today, 90),
+          property: :tahoe,
+          selected_booking_mode: :buyout,
+          checkin_date: saturday,
+          state: :set_end
+        )
+
+      monday_cell = extract_day_cell(html, Date.to_iso8601(monday))
+
+      monday_button =
+        calendar_day_button(calendar_document(html), Date.to_iso8601(monday))
+
+      assert String.contains?(monday_cell, "Sun only") or
+               String.contains?(
+                 monday_cell,
+                 "Saturday check-ins must check out on Sunday"
+               )
+
+      assert calendar_element_attr(monday_button, "aria-disabled") == "true"
+    end
+
+    test "does not apply Saturday booking restrictions on Clear Lake" do
+      today = ~D[2026-07-21]
+      saturday = ~D[2026-07-25]
+
+      html =
+        render_clear_lake_calendar(
+          today: today,
+          min: today,
+          max: Date.add(today, 90)
+        )
+
+      saturday_cell = extract_day_cell(html, Date.to_iso8601(saturday))
+
+      refute saturday_cell =~ "No check-in"
+      refute saturday_cell =~ "No check-out"
+      refute saturday_cell =~ "Check-ins are not permitted on Saturdays"
+      refute saturday_cell =~ "Check-outs are not permitted on Saturdays"
+    end
+
     test "a blacked-out date shows blackout styling" do
       blackout_date = blackout_calendar_test_date()
 
@@ -268,6 +629,29 @@ defmodule YscWeb.Components.AvailabilityCalendarTest do
       # The blackout day is a "check-in day" (morning available, afternoon blacked out),
       # so it renders a green-to-red-800 gradient rather than a fully blocked bg-red-800 cell.
       assert day_html =~ "to-red-800"
+    end
+
+    test "shows X icon on fully unavailable blackout cells" do
+      blackout_start = blackout_calendar_test_date()
+      blackout_end = Date.add(blackout_start, 2)
+      fully_blocked_day = Date.add(blackout_start, 1)
+
+      {:ok, _blackout} =
+        Bookings.create_blackout(%{
+          property: :clear_lake,
+          start_date: blackout_start,
+          end_date: blackout_end,
+          reason: "Test blackout"
+        })
+
+      BlackoutListCache.invalidate()
+
+      html = render_shifted_calendar(fully_blocked_day)
+      day_str = Calendar.strftime(fully_blocked_day, "%Y-%m-%d")
+      day_html = extract_day_cell(html, day_str)
+
+      assert day_html =~ "hero-x-mark"
+      refute day_html =~ "text-green-800"
     end
   end
 end

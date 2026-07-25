@@ -5,15 +5,21 @@ defmodule YscWeb.HomeLive do
 
   import YscWeb.Live.AsyncHelpers
 
-  alias Ysc.{Accounts, Events, Newsletter, PublicContentCache, Tickets}
+  alias Ysc.{
+    Accounts,
+    Bookings,
+    Events,
+    Newsletter,
+    PublicContentCache,
+    Tickets
+  }
+
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
-  alias Ysc.Bookings.{Booking, PropertyDisplay, Season}
+  alias Ysc.Bookings.{PropertyDisplay, Season}
   alias Ysc.Posts.Post
-  alias Ysc.Media.Image
   alias Ysc.GoogleWallet
   alias Ysc.Tickets.Display, as: TicketDisplay
   alias YscWeb.{DateDisplay, PlainText}
-  import Ecto.Query
 
   @impl true
   def mount(_params, session, socket) do
@@ -171,7 +177,8 @@ defmodule YscWeb.HomeLive do
       {:user_data,
        fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
-      {:bookings, fn -> get_future_active_bookings(user_id) end}
+      {:bookings,
+       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end}
     ]
 
     tasks
@@ -727,25 +734,12 @@ defmodule YscWeb.HomeLive do
                 navigate={~p"/events/#{event.id}"}
                 class="block relative aspect-[16/11] overflow-hidden"
               >
-                <canvas
-                  id={"blur-hash-event-#{event.id}"}
-                  src={Image.blur_hash_for_display(event.image)}
-                  class="absolute inset-0 z-0 w-full h-full object-cover"
-                  phx-hook="BlurHashCanvas"
-                ></canvas>
-                <img
-                  src={Image.display_path_with_fallback(event.image)}
-                  id={"image-event-#{event.id}"}
-                  phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full group-hover:scale-[1.03] transition-transform duration-500 opacity-80 group-hover:opacity-100"
-                  loading="lazy"
-                  alt={
-                    if event.image,
-                      do:
-                        event.image.alt_text || event.image.title || event.title ||
-                          "Event image",
-                      else: "Event image"
-                  }
+                <.live_component
+                  id={"home-event-image-#{event.id}"}
+                  module={YscWeb.Components.Image}
+                  image={event.image}
+                  aspect_class="h-full"
+                  preferred_type={:optimized}
                 />
                 <div class="absolute top-6 left-6 flex gap-2 z-[2] flex-wrap">
                   <%= if days_since_inserted(event.inserted_at) <= 7 do %>
@@ -867,26 +861,12 @@ defmodule YscWeb.HomeLive do
               ]}
             >
               <div class="relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] mb-6 sm:mb-8 aspect-square border border-zinc-100">
-                <canvas
-                  id={"blur-hash-news-#{post.id}"}
-                  src={Image.blur_hash_for_display(post.featured_image)}
-                  class="absolute inset-0 z-0 w-full h-full object-cover"
-                  phx-hook="BlurHashCanvas"
-                ></canvas>
-                <img
-                  src={Image.display_path_with_fallback(post.featured_image)}
-                  id={"image-news-#{post.id}"}
-                  phx-hook="BlurHashImage"
-                  class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out object-cover w-full h-full transition-transform duration-700 group-hover:scale-105"
-                  loading="lazy"
-                  alt={
-                    if post.featured_image,
-                      do:
-                        post.featured_image.alt_text || post.featured_image.title ||
-                          post.title ||
-                          "News article image",
-                      else: "News article image"
-                  }
+                <.live_component
+                  id={"home-news-image-#{post.id}"}
+                  module={YscWeb.Components.Image}
+                  image={post.featured_image}
+                  aspect_class="h-full"
+                  preferred_type={:optimized}
                 />
               </div>
               <time class="text-xs font-semibold text-blue-700 uppercase tracking-widest">
@@ -1203,19 +1183,6 @@ defmodule YscWeb.HomeLive do
               <p class="font-bold text-sm lg:text-base text-zinc-900">Clear Lake</p>
               <p class="text-xs lg:text-sm text-zinc-500">Reserve Cabin</p>
             </.link>
-            <.link
-              navigate={~p"/users/settings"}
-              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
-            >
-              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
-                <.icon
-                  name="hero-cog-6-tooth"
-                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
-                />
-              </div>
-              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
-              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
-            </.link>
             <%= if @current_user && @current_user.role in [:admin, :volunteer] do %>
               <.link
                 navigate={~p"/expensereport"}
@@ -1245,6 +1212,19 @@ defmodule YscWeb.HomeLive do
                 <p class="text-xs lg:text-sm text-zinc-500">Browse Events</p>
               </.link>
             <% end %>
+            <.link
+              navigate={~p"/users/settings"}
+              class="flex-shrink-0 w-[9.5rem] sm:w-44 lg:w-auto snap-center bg-white p-4 lg:p-6 rounded-lg lg:rounded-xl border border-zinc-200 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md active:scale-[0.98] active:transition-none transition-all duration-150 group"
+            >
+              <div class="w-8 h-8 lg:w-10 lg:h-10 bg-zinc-50 rounded-md flex items-center justify-center mb-2 lg:mb-4">
+                <.icon
+                  name="hero-cog-6-tooth"
+                  class="w-4 h-4 lg:w-5 lg:h-5 text-zinc-600"
+                />
+              </div>
+              <p class="font-bold text-sm lg:text-base text-zinc-900">Settings</p>
+              <p class="text-xs lg:text-sm text-zinc-500">Preferences</p>
+            </.link>
           </div>
 
           <%!-- Main Content Grid --%>
@@ -1935,34 +1915,13 @@ defmodule YscWeb.HomeLive do
                       class="flex gap-4 group"
                     >
                       <div class="w-16 h-16 rounded-md bg-zinc-200 overflow-hidden flex-shrink-0">
-                        <div class="relative w-full h-full">
-                          <canvas
-                            id={"blur-hash-sidebar-#{post.id}"}
-                            src={Image.blur_hash_for_display(post.featured_image)}
-                            class="absolute inset-0 z-0 w-full h-full object-cover"
-                            phx-hook="BlurHashCanvas"
-                          ></canvas>
-                          <img
-                            src={
-                              Image.thumbnail_path_with_fallback(
-                                post.featured_image
-                              )
-                            }
-                            id={"image-sidebar-#{post.id}"}
-                            loading="lazy"
-                            phx-hook="BlurHashImage"
-                            class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-                            alt={
-                              if post.featured_image,
-                                do:
-                                  post.featured_image.alt_text ||
-                                    post.featured_image.title ||
-                                    post.title ||
-                                    "News article image",
-                                else: "News article image"
-                            }
-                          />
-                        </div>
+                        <.live_component
+                          id={"sidebar-news-image-#{post.id}"}
+                          module={YscWeb.Components.Image}
+                          image={post.featured_image}
+                          aspect_class="h-full"
+                          preferred_type={:thumbnail}
+                        />
                       </div>
                       <div>
                         <p class="text-xs font-bold text-blue-600 mb-1">
@@ -2147,39 +2106,6 @@ defmodule YscWeb.HomeLive do
       end,
       {:asc, DateTime}
     )
-  end
-
-  defp get_future_active_bookings(user_id, limit \\ 10) do
-    # Get today's date in PST timezone
-    today_pst = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-    checkout_time = ~T[11:00:00]
-
-    query =
-      from b in Booking,
-        where: b.user_id == ^user_id,
-        where: b.status == :complete,
-        where: b.checkout_date >= ^today_pst,
-        order_by: [asc: b.checkin_date],
-        limit: ^limit,
-        preload: [:rooms]
-
-    bookings = Ysc.Repo.all(query)
-
-    # Filter out bookings that are past checkout time today (in PST)
-    bookings
-    |> Enum.filter(fn booking ->
-      if Date.compare(booking.checkout_date, today_pst) == :eq do
-        now_pst = DateTime.now!("America/Los_Angeles")
-
-        checkout_datetime_pst =
-          DateTime.new!(today_pst, checkout_time, "America/Los_Angeles")
-
-        DateTime.compare(now_pst, checkout_datetime_pst) == :lt
-      else
-        true
-      end
-    end)
-    |> Enum.take(limit)
   end
 
   defp days_until_booking(booking) do

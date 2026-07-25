@@ -16,7 +16,7 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
 fi
 
 OPENROUTER_API="${OPENROUTER_API:-https://openrouter.ai/api/v1/chat/completions}"
-OPENROUTER_MODEL="${OPENROUTER_MODEL:-google/gemma-3-27b-it}"
+OPENROUTER_MODEL="${OPENROUTER_MODEL:-deepseek/deepseek-v4-flash}"
 REPO_SLUG="${GITHUB_REPOSITORY:-unknown/repo}"
 referer="${OPENROUTER_REFERER:-https://github.com/${REPO_SLUG}}"
 

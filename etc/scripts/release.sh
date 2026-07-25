@@ -22,13 +22,13 @@ usage() {
   echo ""
   echo "After push, CI deploys ysc-prod from etc/fly/fly-prod.toml (tag must be v*)."
   echo ""
-  echo "TAG: Version tag (e.g. v1.0.0 or 1.0.0). If not provided, prompts (default: minor bump from latest tag)."
+  echo "TAG: Version tag (e.g. v1.0.0 or 1.0.0). If not provided, prompts (default: minor bump from highest v* tag)."
   exit 1
 }
 
-# Latest existing tag (chronological: most recently created), for interactive bump context
-latest_version_tag() {
-  git -C "$PROJECT_ROOT" tag -l --sort=-creatordate 2>/dev/null | head -n 1
+# Highest existing v* tag by semver (e.g. v1.12.0 over v1.11.9). Empty if none.
+highest_version_tag() {
+  git -C "$PROJECT_ROOT" tag -l 'v*' 2>/dev/null | LC_ALL=C sort -V | tail -n 1
 }
 
 # Next minor from semver core x.y.z in a tag (e.g. v1.2.3 -> 1.3.0). No prior tag or unparseable -> 0.1.0
@@ -44,44 +44,31 @@ suggest_next_minor() {
   fi
 }
 
-# Get tag from argument or prompt
-if [ -n "${1:-}" ]; then
-  TAG="$1"
-else
-  echo "${BOLD}Create new release${RESET}"
-  echo ""
-  # Best-effort sync of tags so "latest" matches origin when you're online
-  git -C "$PROJECT_ROOT" fetch -q --tags origin 2>/dev/null || true
-  PREV_TAG="$(latest_version_tag)"
-  if [ -n "$PREV_TAG" ]; then
-    echo "${TEAL}Latest tag (most recent, chronological): ${BOLD}${PREV_TAG}${RESET}"
-  else
-    echo "${TEAL}Latest tag (most recent, chronological): ${BOLD}(none yet)${RESET}"
+# True when $1 is strictly greater than $2 (semver; uses sort -V).
+semver_gt() {
+  local a="$1"
+  local b="$2"
+  [ "$a" != "$b" ] && [ "$(printf '%s\n' "$a" "$b" | LC_ALL=C sort -Vr | head -n 1)" = "$a" ]
+}
+
+validate_version_format() {
+  local version="$1"
+  if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
+    echo "${RED}Error: Invalid version format. Use semver (e.g. 1.0.0 or v1.0.0)${RESET}"
+    exit 1
   fi
-  DEFAULT_MIX="$(suggest_next_minor "$PREV_TAG")"
-  DEFAULT_GIT_TAG="v${DEFAULT_MIX}"
-  echo ""
-  echo "${TEAL}Default is a minor bump: ${BOLD}${DEFAULT_GIT_TAG}${RESET} — press ${BOLD}Enter${RESET} to use it, or type another version (e.g. v1.0.0 or 1.0.0)."
-  read -rp "Version tag: " TAG
-  if [ -z "$TAG" ]; then
-    TAG="$DEFAULT_GIT_TAG"
+}
+
+normalize_tag_inputs() {
+  local tag="$1"
+  GIT_TAG="$tag"
+  if [[ ! "$GIT_TAG" =~ ^v ]]; then
+    GIT_TAG="v$tag"
   fi
-fi
+  MIX_VERSION="${GIT_TAG#v}"
+}
 
-# Normalize tag: ensure it has 'v' prefix for git
-GIT_TAG="$TAG"
-if [[ ! "$GIT_TAG" =~ ^v ]]; then
-  GIT_TAG="v$TAG"
-fi
-
-# Version for mix.exs: strip leading 'v' (Elixir convention)
-MIX_VERSION="${GIT_TAG#v}"
-
-# Validate version format (semver: x.y.z)
-if [[ ! "$MIX_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?(\+[a-zA-Z0-9.]+)?$ ]]; then
-  echo "${RED}Error: Invalid version format. Use semver (e.g. 1.0.0 or v1.0.0)${RESET}"
-  exit 1
-fi
+TAG="${1:-}"
 
 cd "$PROJECT_ROOT"
 
@@ -99,16 +86,55 @@ if [ "$BRANCH" != "main" ]; then
   exit 1
 fi
 
-# Sync with remote before making any changes to avoid a push rejection mid-release
+# Sync with remote before prompting or validating so tags/versions match origin
 echo "${TEAL}Syncing with origin/main...${RESET}"
 git pull --rebase origin main
+git fetch -q --tags origin 2>/dev/null || true
 echo "${GREEN}✓ Up to date with origin/main${RESET}"
 echo ""
 
-# Check tag doesn't already exist (re-check after pull in case remote has it)
+HIGHEST_TAG="$(highest_version_tag)"
+
+# Get tag from argument or prompt (after sync so defaults and checks use remote tags)
+if [ -n "$TAG" ]; then
+  normalize_tag_inputs "$TAG"
+  validate_version_format "$MIX_VERSION"
+else
+  echo "${BOLD}Create new release${RESET}"
+  echo ""
+  if [ -n "$HIGHEST_TAG" ]; then
+    echo "${TEAL}Highest release tag (semver): ${BOLD}${HIGHEST_TAG}${RESET}"
+  else
+    echo "${TEAL}Highest release tag (semver): ${BOLD}(none yet)${RESET}"
+  fi
+  DEFAULT_MIX="$(suggest_next_minor "$HIGHEST_TAG")"
+  DEFAULT_GIT_TAG="v${DEFAULT_MIX}"
+  echo ""
+  echo "${TEAL}Default is a minor bump: ${BOLD}${DEFAULT_GIT_TAG}${RESET} — press ${BOLD}Enter${RESET} to use it, or type another version (e.g. v1.0.0 or 1.0.0)."
+  read -rp "Version tag: " TAG
+  if [ -z "$TAG" ]; then
+    TAG="$DEFAULT_GIT_TAG"
+  fi
+  normalize_tag_inputs "$TAG"
+  validate_version_format "$MIX_VERSION"
+fi
+
+# Re-check highest tag after any concurrent tag fetches during prompt
+HIGHEST_TAG="$(highest_version_tag)"
+
+# Check tag doesn't already exist
 if git rev-parse "$GIT_TAG" >/dev/null 2>&1; then
   echo "${RED}Error: Tag $GIT_TAG already exists${RESET}"
   exit 1
+fi
+
+# New release must be strictly greater than the highest existing v* tag
+if [ -n "$HIGHEST_TAG" ]; then
+  HIGHEST_VERSION="${HIGHEST_TAG#v}"
+  if ! semver_gt "$MIX_VERSION" "$HIGHEST_VERSION"; then
+    echo "${RED}Error: Version $MIX_VERSION must be greater than latest release $HIGHEST_TAG${RESET}"
+    exit 1
+  fi
 fi
 
 echo "${BOLD}═══════════════════════════════════════════════════════════════════════════${RESET}"

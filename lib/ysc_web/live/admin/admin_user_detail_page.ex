@@ -4,6 +4,7 @@ defmodule YscWeb.AdminUserDetailsLive do
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   import YscWeb.CoreComponents
+  import YscWeb.Live.AsyncHelpers
   alias Phoenix.LiveView.JS
 
   alias Ysc.Accounts
@@ -77,12 +78,52 @@ defmodule YscWeb.AdminUserDetailsLive do
           </form>
         </div>
 
-        <div class="w-full py-4">
-          <div class="h-24">
+        <div class="w-full py-4 flex flex-row items-center justify-between">
+          <div class="flex items-start gap-6">
             <.user_avatar_image
               user={@selected_user}
-              class="w-24 h-24 rounded-full"
+              class="w-24 h-24 rounded-full shrink-0"
             />
+            <details class="group pt-2">
+              <summary class="list-none cursor-pointer flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-800 select-none transition-colors [&::-webkit-details-marker]:hidden">
+                View Account Activity
+                <.icon
+                  name="hero-chevron-down"
+                  class="w-4 h-4 transition-transform duration-200 group-open:-rotate-180"
+                />
+              </summary>
+              <div
+                id="account-activity"
+                class="grid grid-cols-[max-content_1fr] items-start gap-x-4 gap-y-3 text-sm mt-4"
+              >
+                <span class="text-zinc-500 pt-[1px]">Last login</span>
+                <div id="last-login-at" class="min-w-0">
+                  <%= if @last_login_at do %>
+                    <div class="text-zinc-900 font-medium">
+                      {Timex.from_now(@last_login_at)}
+                    </div>
+                    <div class="text-zinc-500 text-xs mt-0.5">
+                      {format_datetime_for_display(@last_login_at)}
+                    </div>
+                  <% else %>
+                    <span class="text-zinc-900 font-medium">N/A</span>
+                  <% end %>
+                </div>
+                <span class="text-zinc-500 pt-[1px]">Last activity</span>
+                <div id="last-activity-at" class="min-w-0">
+                  <%= if @last_activity_at do %>
+                    <div class="text-zinc-900 font-medium">
+                      {Timex.from_now(@last_activity_at)}
+                    </div>
+                    <div class="text-zinc-500 text-xs mt-0.5">
+                      {format_datetime_for_display(@last_activity_at)}
+                    </div>
+                  <% else %>
+                    <span class="text-zinc-900 font-medium">N/A</span>
+                  <% end %>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -1299,9 +1340,21 @@ defmodule YscWeb.AdminUserDetailsLive do
                   </p>
                   <p>
                     <span class="font-semibold">Stripe Subscription ID:</span>
-                    <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
-                      {@active_subscription.stripe_id}
-                    </code>
+                    <%= if real_stripe_subscription_id?(@active_subscription.stripe_id) do %>
+                      <a
+                        href={"https://dashboard.stripe.com/subscriptions/#{@active_subscription.stripe_id}"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-xs bg-zinc-100 px-2 py-1 rounded font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
+                        title="View in Stripe Dashboard"
+                      >
+                        {@active_subscription.stripe_id}
+                      </a>
+                    <% else %>
+                      <code class="text-xs bg-zinc-100 px-2 py-1 rounded">
+                        {@active_subscription.stripe_id}
+                      </code>
+                    <% end %>
                   </p>
                 </div>
               </div>
@@ -3801,6 +3854,13 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> Timex.format!("{YYYY}-{0M}-{0D} {h12}:{m} {AM} {Zabbr}")
   end
 
+  defp real_stripe_subscription_id?(stripe_id)
+       when is_binary(stripe_id) and stripe_id != "" do
+    not String.starts_with?(stripe_id, "migrated_")
+  end
+
+  defp real_stripe_subscription_id?(_), do: false
+
   defp format_datetime_local(%DateTime{} = datetime) do
     # Convert UTC datetime to America/Los_Angeles for datetime-local input
     # datetime-local inputs expect a naive datetime string in local timezone
@@ -4400,6 +4460,8 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:show_booking_benefits?, false)
     |> assign(:entitlement_form, entitlement_form_defaults())
     |> assign(:form, to_form(%{}, as: "user"))
+    |> assign(:last_login_at, nil)
+    |> assign(:last_activity_at, nil)
   end
 
   defp load_user_detail(socket, id, current_user) do
@@ -4428,18 +4490,24 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:original_form_data, original_form_data)
       |> assign(:form, user_form)
 
-    [sub_result, has_lifetime, application, board_member] =
-      Task.await_many(
-        [
-          Task.async(fn -> fetch_subscription_data(selected_user) end),
-          Task.async(fn ->
-            Accounts.has_lifetime_membership?(selected_user)
-          end),
-          Task.async(fn -> fetch_application(id, current_user) end),
-          Task.async(fn -> Accounts.household_board_member(selected_user) end)
-        ],
-        :infinity
-      )
+    [
+      sub_result,
+      has_lifetime,
+      application,
+      board_member,
+      last_login_at,
+      last_activity_at
+    ] =
+      [
+        fn -> fetch_subscription_data(selected_user) end,
+        fn -> Accounts.has_lifetime_membership?(selected_user) end,
+        fn -> fetch_application(id, current_user) end,
+        fn -> Accounts.household_board_member(selected_user) end,
+        fn -> Accounts.get_last_successful_login_datetime(selected_user) end,
+        fn -> Accounts.get_last_login_session_datetime(selected_user) end
+      ]
+      |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
+      |> Enum.map(fn {:ok, result} -> result end)
 
     {active_subscription, subscription_payments} = sub_result
 
@@ -4478,6 +4546,8 @@ defmodule YscWeb.AdminUserDetailsLive do
         to_form(membership_type_cs, as: "membership_type")
       )
       |> assign(:lifetime_form, to_form(lifetime_cs, as: "lifetime"))
+      |> assign(:last_login_at, last_login_at)
+      |> assign(:last_activity_at, last_activity_at)
 
     if active_subscription do
       start_async(socket, :load_downgrade_info, fn ->

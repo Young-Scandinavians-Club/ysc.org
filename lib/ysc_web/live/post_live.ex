@@ -1,5 +1,4 @@
 defmodule YscWeb.PostLive do
-  alias Ysc.Media.Image
   use YscWeb, :live_view
 
   require Ysc.Logging
@@ -87,31 +86,15 @@ defmodule YscWeb.PostLive do
         id="post-featured-image"
         class="mt-16 md:mt-20 relative mx-auto rounded-xl max-w-6xl aspect-video overflow-hidden"
       >
-        <canvas
-          id={"blur-hash-image-#{@post.image_id}"}
-          src={Image.blur_hash_for_display(@post.featured_image)}
-          class="absolute inset-0 z-0 w-full h-full object-cover"
-          phx-hook="BlurHashCanvas"
-        ></canvas>
-
-        <img
-          src={Image.display_path_with_fallback(@post.featured_image)}
-          srcset={Image.responsive_srcset(@post.featured_image)}
+        <.live_component
+          id={"post-featured-image-#{@post.image_id}"}
+          module={YscWeb.Components.Image}
+          image={@post.featured_image}
+          aspect_class="h-full"
+          preferred_type={:optimized}
           sizes="(max-width: 1280px) 100vw, 1280px"
-          id={"image-#{@post.image_id}"}
           loading="eager"
-          decoding="async"
           fetchpriority="high"
-          class="absolute inset-0 z-[1] opacity-0 transition-opacity duration-300 ease-out w-full h-full object-cover"
-          phx-hook="BlurHashImage"
-          alt={
-            if @post.featured_image,
-              do:
-                @post.featured_image.alt_text || @post.featured_image.title ||
-                  @post.title ||
-                  "Featured image",
-              else: "Featured image"
-          }
         />
       </div>
 

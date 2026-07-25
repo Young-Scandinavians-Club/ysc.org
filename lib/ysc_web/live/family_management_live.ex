@@ -394,7 +394,7 @@ defmodule YscWeb.FamilyManagementLive do
          socket
          |> YscWeb.Flash.put_toast(
            :info,
-           "You have left the family membership. You can purchase your own membership or join another family from your Membership page.",
+           "You have left the family membership. You can purchase your own membership or join another family from Manage Membership in your account menu.",
            title: "Family"
          )
          |> redirect(to: ~p"/users/membership")}
