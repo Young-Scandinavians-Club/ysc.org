@@ -114,6 +114,7 @@ defmodule Ysc.Newsletter do
     source = Keyword.get(opts, :source, "public_signup")
     metadata = Keyword.get(opts, :metadata, %{})
     subscribed_at = Keyword.get(opts, :subscribed_at) || now
+    force_source = Keyword.get(opts, :force_source, false)
 
     case get_subscriber_by_email(email) do
       nil ->
@@ -136,7 +137,8 @@ defmodule Ysc.Newsletter do
           last_name,
           source,
           metadata,
-          email
+          email,
+          force_source
         )
     end
   end
@@ -176,7 +178,8 @@ defmodule Ysc.Newsletter do
          last_name,
          source,
          metadata,
-         email
+         email,
+         force_source
        ) do
     # If we now have a user_id but existing record doesn't, link them
     link_user = user_id && is_nil(existing.user_id)
@@ -184,6 +187,7 @@ defmodule Ysc.Newsletter do
     new_source =
       cond do
         link_user -> "user_registration_linked"
+        force_source -> source
         existing.subscribed -> existing.source || source
         true -> source
       end
