@@ -1633,17 +1633,23 @@ defmodule YscWeb.SecurityAuditTest do
         )
 
       # Tahoe requires booking confirmations before create-booking reaches the
-      # server-side membership gate. Avoid render/1 after the click: TahoeBookingLive
-      # keeps a date-tooltip async in flight and render blocks until it finishes,
-      # which can exceed the per-test timeout under CI load.
-      for event <- [
-            "toggle-terms-agreement",
-            "toggle-linens-confirmation",
-            "toggle-chores-confirmation",
-            "toggle-party-size-confirmation"
-          ] do
-        render_click(view, event, %{})
-      end
+      # server-side membership gate. Set them directly instead of clicking through
+      # four toggles, which can block on in-flight availability async under CI load.
+      :sys.replace_state(view.pid, fn %{socket: socket} = state ->
+        socket =
+          Enum.reduce(
+            [
+              terms_agreed: true,
+              linens_confirmed: true,
+              chores_confirmed: true,
+              party_size_confirmed: true
+            ],
+            socket,
+            fn {key, value}, socket -> Phoenix.Component.assign(socket, key, value) end
+          )
+
+        %{state | socket: socket}
+      end)
 
       html = render_click(view, "create-booking", %{})
 
