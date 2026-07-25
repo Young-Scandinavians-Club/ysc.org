@@ -86,6 +86,20 @@ defmodule YscWeb.AdminComponentsTest do
     end
   end
 
+  describe "newsletter_subscriber_status_badge_type/1" do
+    test "maps subscribed flag to badge types" do
+      assert newsletter_subscriber_status_badge_type(true) == "green"
+      assert newsletter_subscriber_status_badge_type(false) == "zinc"
+    end
+  end
+
+  describe "newsletter_subscriber_status_label/1" do
+    test "maps subscribed flag to labels" do
+      assert newsletter_subscriber_status_label(true) == "Active"
+      assert newsletter_subscriber_status_label(false) == "Inactive"
+    end
+  end
+
   describe "quickbooks_sync_status_badge_type/1" do
     test "maps known sync statuses to badge types" do
       assert quickbooks_sync_status_badge_type("pending") == "yellow"
