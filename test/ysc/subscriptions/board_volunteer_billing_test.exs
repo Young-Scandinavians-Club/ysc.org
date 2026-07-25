@@ -259,7 +259,10 @@ defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
 
       sub =
         sub
-        |> Ecto.Changeset.change(%{primary_user_id: nil, family_relationship: nil})
+        |> Ecto.Changeset.change(%{
+          primary_user_id: nil,
+          family_relationship: nil
+        })
         |> Ysc.Repo.update!()
 
       refute BoardVolunteerBilling.household_on_board?(primary)

@@ -41,7 +41,10 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   end
 
   @doc false
-  def sync_after_family_membership_change(%User{} = primary, %User{} = affected_user) do
+  def sync_after_family_membership_change(
+        %User{} = primary,
+        %User{} = affected_user
+      ) do
     on_board? = household_on_board?(primary)
     apply_grace? = not on_board? and not is_nil(affected_user.board_position)
 
