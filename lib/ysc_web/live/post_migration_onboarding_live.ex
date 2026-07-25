@@ -188,6 +188,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 payment_intent_secret={@payment_intent_secret}
                 payment_method_saved={@payment_method_saved}
                 default_payment_method={@default_payment_method}
+                stripe_billing_details={@stripe_billing_details}
               />
             <% end %>
             <%= if @current_step == 5 and @needs_family_members_step do %>
@@ -631,6 +632,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   attr :payment_intent_secret, :any, required: true
   attr :payment_method_saved, :boolean, required: true
   attr :default_payment_method, :any, required: true
+  attr :stripe_billing_details, :string, default: "{}"
 
   defp step_payment(assigns) do
     ~H"""

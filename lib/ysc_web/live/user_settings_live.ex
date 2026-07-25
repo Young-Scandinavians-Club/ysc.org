@@ -2850,6 +2850,10 @@ defmodule YscWeb.UserSettingsLive do
 
         socket
         |> assign(:user, user)
+        |> assign(
+          :stripe_billing_details,
+          Ysc.Customers.payment_element_default_values_json(user)
+        )
         |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
         |> assign(:primary_user, primary_user)
         |> assign(:membership_paused_by_board, board_member)
@@ -3203,6 +3207,10 @@ defmodule YscWeb.UserSettingsLive do
           {:noreply,
            socket
            |> assign(:user, updated_user)
+           |> assign(
+             :stripe_billing_details,
+             Ysc.Customers.payment_element_default_values_json(updated_user)
+           )
            |> assign(:profile_form, profile_form)
            |> YscWeb.Flash.put_toast(:info, "Profile updated successfully.",
              title: "Profile"
@@ -3582,6 +3590,10 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:user, updated_user)
+         |> assign(
+           :stripe_billing_details,
+           Ysc.Customers.payment_element_default_values_json(updated_user)
+         )
          |> assign(:address_form, address_form)
          |> YscWeb.Flash.put_toast(
            :info,
