@@ -316,6 +316,67 @@ defmodule Ysc.CustomersTest do
     end
   end
 
+  describe "stripe_customer_params/2" do
+    test "builds base Stripe customer params with title-cased name" do
+      user =
+        user_fixture_unique(%{
+          first_name: "jane",
+          last_name: "doe",
+          phone_number: "+14159098268"
+        })
+
+      assert Customers.stripe_customer_params(user) == %{
+               email: user.email,
+               name: "Jane Doe",
+               phone: "+14159098268",
+               description: "User ID: #{user.id}",
+               metadata: %{user_id: user.id}
+             }
+    end
+
+    test "includes billing address when include_address is true" do
+      user = user_fixture_unique()
+
+      {:ok, _} =
+        Ysc.Accounts.update_billing_address(user, %{
+          "address" => "123 Main St",
+          "city" => "San Francisco",
+          "region" => "CA",
+          "postal_code" => "94102",
+          "country" => "US"
+        })
+
+      user = Ysc.Accounts.get_user!(user.id, [:billing_address])
+
+      params = Customers.stripe_customer_params(user, include_address: true)
+
+      assert params.address == %{
+               line1: "123 Main St",
+               city: "San Francisco",
+               postal_code: "94102",
+               country: "US",
+               state: "CA"
+             }
+    end
+
+    test "omits address when include_address is false" do
+      user = user_fixture_unique()
+
+      {:ok, _} =
+        Ysc.Accounts.update_billing_address(user, %{
+          "address" => "123 Main St",
+          "city" => "San Francisco",
+          "region" => "CA",
+          "postal_code" => "94102",
+          "country" => "US"
+        })
+
+      user = Ysc.Accounts.get_user!(user.id, [:billing_address])
+
+      refute Map.has_key?(Customers.stripe_customer_params(user), :address)
+    end
+  end
+
   describe "create_stripe_customer/1 and update_stripe_customer/1" do
     test "create_stripe_customer assigns stripe_id in test environment" do
       user = user_fixture_unique()

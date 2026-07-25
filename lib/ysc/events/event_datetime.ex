@@ -68,4 +68,31 @@ defmodule Ysc.Events.EventDateTime do
       datetime -> DateTime.compare(DateTime.utc_now(), datetime) == :gt
     end
   end
+
+  @pass_date_format "%a, %b %-d, %Y"
+  @pass_time_format "%-I:%M %p"
+
+  @doc """
+  Formats an event start date and optional time for wallet passes
+  (e.g. `"Sat, Mar 15, 2024 at 3:30 PM"`).
+
+  Returns `"TBD"` when `start_date` is nil.
+  """
+  def format_pass_datetime(nil, _start_time), do: "TBD"
+
+  def format_pass_datetime(%DateTime{} = start_date, start_time) do
+    start_date
+    |> DateTime.to_date()
+    |> format_pass_datetime(start_time)
+  end
+
+  def format_pass_datetime(%Date{} = start_date, start_time) do
+    date_str = Calendar.strftime(start_date, @pass_date_format)
+
+    if start_time do
+      "#{date_str} at #{Calendar.strftime(start_time, @pass_time_format)}"
+    else
+      date_str
+    end
+  end
 end
