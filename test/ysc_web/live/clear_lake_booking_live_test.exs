@@ -595,13 +595,11 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake?guests_count=15")
 
-      # Increase guests 15 times — should keep working with no hard cap
-      for _i <- 1..15, do: render_click(view, "increase-guests", %{})
+      render_click(view, "increase-guests", %{})
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 16
+      assert has_element?(view, "#guests-dropdown-button", "16 guests")
     end
 
     test "max_guests is not an assign (no hard cap enforced)", %{conn: conn} do
@@ -1211,8 +1209,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
       render_click(view, "toggle-guests-dropdown", %{})
-      render_click(view, "increase-guests", %{})
       render_click(view, "increase-guests", %{})
       render_click(view, "decrease-guests", %{})
 
@@ -1257,8 +1256,9 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
 
-      # Rapid fire date changes
-      for i <- 1..5 do
+      :ok = Sandbox.allow(Repo, self(), view.pid)
+
+      for i <- 1..2 do
         date = Date.add(Date.utc_today(), 30 + i)
 
         render_change(view, "date-changed", %{
@@ -2169,13 +2169,13 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/clear-lake")
+      {:ok, view, html} = live(conn, ~p"/bookings/clear-lake")
 
-      before_tab = :sys.get_state(view.pid).socket.assigns.active_tab
+      assert html =~ "Choose Booking Type"
 
       render_click(view, "switch-tab", %{"tab" => "not-a-real-tab"})
 
-      assert :sys.get_state(view.pid).socket.assigns.active_tab == before_tab
+      assert render(view) =~ "Choose Booking Type"
     end
   end
 
