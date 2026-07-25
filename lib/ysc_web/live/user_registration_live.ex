@@ -839,12 +839,17 @@ defmodule YscWeb.UserRegistrationLive do
         (reg_form["birth_date"] && reg_form["birth_date"] != "") ||
         (reg_form["address"] && reg_form["address"] != "")
 
-    # Step 2: place_of_birth, citizenship, etc.
+    # Step 2: place_of_birth, citizenship, scandinavia connection fields, etc.
     has_step_2 =
       (reg_form["place_of_birth"] && reg_form["place_of_birth"] != "") ||
         (reg_form["citizenship"] && reg_form["citizenship"] != "") ||
         (reg_form["most_connected_nordic_country"] &&
-           reg_form["most_connected_nordic_country"] != "")
+           reg_form["most_connected_nordic_country"] != "") ||
+        (reg_form["link_to_scandinavia"] &&
+           reg_form["link_to_scandinavia"] != "") ||
+        (reg_form["lived_in_scandinavia"] &&
+           reg_form["lived_in_scandinavia"] != "") ||
+        (reg_form["spoken_languages"] && reg_form["spoken_languages"] != "")
 
     cond do
       has_step_2 -> 2
