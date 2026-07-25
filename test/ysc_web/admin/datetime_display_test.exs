@@ -42,4 +42,17 @@ defmodule YscWeb.Admin.DateTimeDisplayTest do
       assert DateTimeDisplay.format_event_date(%{}) == "—"
     end
   end
+
+  describe "format_datetime_compact/1" do
+    test "formats stored UTC datetime without timezone conversion" do
+      dt = ~U[2024-03-16 14:30:00Z]
+
+      assert DateTimeDisplay.format_datetime_compact(dt) == "Mar 16, 2024 14:30"
+    end
+
+    test "returns empty string for nil and invalid values" do
+      assert DateTimeDisplay.format_datetime_compact(nil) == ""
+      assert DateTimeDisplay.format_datetime_compact(%{}) == ""
+    end
+  end
 end
