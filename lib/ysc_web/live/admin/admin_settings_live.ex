@@ -4,6 +4,7 @@ defmodule YscWeb.AdminSettingsLive do
   alias Ysc.Repo
   alias Oban.Job
   alias Phoenix.LiveView.JS
+  alias YscWeb.Admin.DateTimeDisplay
 
   use YscWeb, :admin_live_view
 
@@ -151,9 +152,8 @@ defmodule YscWeb.AdminSettingsLive do
                       }
                       data-prefix=""
                     >
-                      {Calendar.strftime(
-                        @google_photos_status.connected_at,
-                        "%Y-%m-%d %H:%M UTC"
+                      {DateTimeDisplay.format_utc_iso_minute(
+                        @google_photos_status.connected_at
                       )}
                     </span>
                   </p>
@@ -389,10 +389,7 @@ defmodule YscWeb.AdminSettingsLive do
                         data-utc-time={DateTime.to_iso8601(job.completed_at)}
                         data-prefix=""
                       >
-                        {Calendar.strftime(
-                          job.completed_at,
-                          "%Y-%m-%d %H:%M:%S UTC"
-                        )}
+                        {DateTimeDisplay.format_utc_iso(job.completed_at)}
                       </span>
                     <% else %>
                       <%= if job.scheduled_at do %>
@@ -402,9 +399,8 @@ defmodule YscWeb.AdminSettingsLive do
                           data-utc-time={DateTime.to_iso8601(job.scheduled_at)}
                           data-prefix="Scheduled: "
                         >
-                          Scheduled: {Calendar.strftime(
-                            job.scheduled_at,
-                            "%Y-%m-%d %H:%M:%S UTC"
+                          Scheduled: {DateTimeDisplay.format_utc_iso(
+                            job.scheduled_at
                           )}
                         </span>
                       <% else %>
@@ -415,10 +411,7 @@ defmodule YscWeb.AdminSettingsLive do
                             data-utc-time={DateTime.to_iso8601(job.inserted_at)}
                             data-prefix=""
                           >
-                            {Calendar.strftime(
-                              job.inserted_at,
-                              "%Y-%m-%d %H:%M:%S UTC"
-                            )}
+                            {DateTimeDisplay.format_utc_iso(job.inserted_at)}
                           </span>
                         <% else %>
                           N/A
