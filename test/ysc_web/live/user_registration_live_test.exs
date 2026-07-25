@@ -838,7 +838,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
           "citizenship" => "SE",
           "most_connected_nordic_country" => "SE",
           "agreed_to_bylaws" => true,
-          "link_to_scandinavia" => "",
+          "link_to_scandinavia" => "Born in Stockholm",
           "lived_in_scandinavia" => "",
           "spoken_languages" => "",
           "hear_about_the_club" => ""
@@ -999,6 +999,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
         "place_of_birth" => "SE",
         "citizenship" => "SE",
         "most_connected_nordic_country" => "SE",
+        "link_to_scandinavia" => "Born in Stockholm",
         "agreed_to_bylaws" => true
       }
     }

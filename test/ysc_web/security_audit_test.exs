@@ -679,6 +679,7 @@ defmodule YscWeb.SecurityAuditTest do
           place_of_birth: "Oslo",
           citizenship: "Norwegian",
           most_connected_nordic_country: "Norway",
+          link_to_scandinavia: "Grandparents from Norway",
           agreed_to_bylaws: true,
           review_outcome: "approved",
           reviewed_at: ~U[2024-01-01 00:00:00Z],
@@ -963,6 +964,7 @@ defmodule YscWeb.SecurityAuditTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true
       }
     }

@@ -1601,6 +1601,7 @@ defmodule Ysc.AccountsTest do
           place_of_birth: "SE",
           citizenship: "SE",
           most_connected_nordic_country: "SE",
+          link_to_scandinavia: "Born in Stockholm",
           agreed_to_bylaws: true
         })
 
@@ -3252,6 +3253,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3311,6 +3313,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3566,6 +3569,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }
@@ -3605,6 +3609,7 @@ defmodule Ysc.AccountsTest do
             place_of_birth: "Bergen",
             citizenship: "Norwegian",
             most_connected_nordic_country: "Norway",
+            link_to_scandinavia: "Grandparents from Norway",
             agreed_to_bylaws: true,
             completed: DateTime.utc_now()
           }

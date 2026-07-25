@@ -144,6 +144,7 @@ defmodule Ysc.Accounts.SignupApplication do
     |> validate_birth_date()
     |> validate_agreed_to_bylaws()
     |> validate_membership_eligibility()
+    |> validate_scandinavia_connection_fields()
     |> validate_user_email(opts)
   end
 
@@ -181,6 +182,7 @@ defmodule Ysc.Accounts.SignupApplication do
     |> validate_birth_date()
     |> validate_agreed_to_bylaws()
     |> validate_membership_eligibility()
+    |> validate_scandinavia_connection_fields()
     |> validate_user_email(opts)
   end
 
@@ -281,6 +283,34 @@ defmodule Ysc.Accounts.SignupApplication do
       @valid_eligibility_option
     )
     |> validate_length(:membership_eligibility, min: 1)
+  end
+
+  @scandinavia_connection_fields [
+    :link_to_scandinavia,
+    :lived_in_scandinavia,
+    :spoken_languages
+  ]
+
+  defp validate_scandinavia_connection_fields(changeset) do
+    any_present? =
+      Enum.any?(@scandinavia_connection_fields, fn field ->
+        case get_field(changeset, field) do
+          nil -> false
+          value -> String.trim(value) != ""
+        end
+      end)
+
+    if any_present? do
+      changeset
+    else
+      Enum.reduce(@scandinavia_connection_fields, changeset, fn field, cs ->
+        add_error(
+          cs,
+          field,
+          "Please fill in at least one of these three fields"
+        )
+      end)
+    end
   end
 
   defp validate_user_email(changeset, opts) do

@@ -335,9 +335,12 @@ defmodule YscWeb.UserRegistrationLive do
                   ]}
                   required
                 />
+                <.header class="text-left pt-4">
+                  Please specify your eligibility where appropriate (minimum one required)
+                </.header>
                 <.input
                   field={rf[:link_to_scandinavia]}
-                  label="Optional — only if the options above don't fully describe your connection: Tell us about your family background or other ties to Scandinavia."
+                  label="Tell us about your connection to Scandinavia/the Nordics, such as citizenship, it being your birthplace, or family ties."
                   type="textarea"
                 />
                 <.input
@@ -780,6 +783,9 @@ defmodule YscWeb.UserRegistrationLive do
           :place_of_birth,
           :citizenship,
           :most_connected_nordic_country,
+          :link_to_scandinavia,
+          :lived_in_scandinavia,
+          :spoken_languages,
           :agreed_to_bylaws
         ]
       end)
@@ -876,6 +882,9 @@ defmodule YscWeb.UserRegistrationLive do
           :place_of_birth,
           :citizenship,
           :most_connected_nordic_country,
+          :link_to_scandinavia,
+          :lived_in_scandinavia,
+          :spoken_languages,
           :agreed_to_bylaws
         ]
       end)

@@ -30,6 +30,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true
       }
 
@@ -620,6 +621,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true,
         started: ~U[2000-01-01 00:00:00Z],
         completed: ~U[2000-01-02 00:00:00Z],
@@ -731,6 +733,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true
       }
 
@@ -872,6 +875,7 @@ defmodule Ysc.Accounts.SignupApplicationTest do
       place_of_birth: "Oslo",
       citizenship: "Norwegian",
       most_connected_nordic_country: "Norway",
+      link_to_scandinavia: "Grandparents from Norway",
       agreed_to_bylaws: true
     })
   end

@@ -193,6 +193,7 @@ defmodule Ysc.AccountsFixtures do
         place_of_birth: "Oslo",
         citizenship: "Norwegian",
         most_connected_nordic_country: "Norway",
+        link_to_scandinavia: "Grandparents from Norway",
         agreed_to_bylaws: true,
         completed: DateTime.utc_now()
       })
