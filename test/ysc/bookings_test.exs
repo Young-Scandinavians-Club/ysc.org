@@ -419,15 +419,7 @@ defmodule Ysc.BookingsTest do
 
     test "create_booking/1 with valid data creates a booking" do
       user = user_fixture()
-      # Ensure dates don't include Saturday without Sunday (Tahoe rule)
-      base_date = Date.utc_today() |> Date.add(7)
-
-      checkin =
-        if Date.day_of_week(base_date) == 1,
-          do: base_date,
-          else: Date.add(base_date, 8 - Date.day_of_week(base_date))
-
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_booking_dates(7)
 
       valid_attrs = %{
         user_id: user.id,
@@ -3380,9 +3372,7 @@ defmodule Ysc.BookingsTest do
       user = user_fixture()
       room = create_room_fixture(%{property: :tahoe})
 
-      base = Date.utc_today() |> Date.add(50) |> first_monday_on_or_after()
-      checkin = base
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_room_booking_dates(14, 3)
 
       {:ok, booking} =
         Bookings.create_booking(%{
@@ -4153,7 +4143,8 @@ defmodule Ysc.BookingsTest do
                  })
       end
 
-      checkin = Date.utc_today() |> Date.add(120) |> first_monday_on_or_after()
+      {checkin, checkout} = locker_buyout_dates(10)
+      # Far enough before check-in that no policy threshold matches
       cancellation = Date.add(checkin, -50)
 
       {:ok, booking} =
@@ -4162,7 +4153,7 @@ defmodule Ysc.BookingsTest do
           property: :tahoe,
           booking_mode: :buyout,
           checkin_date: checkin,
-          checkout_date: Date.add(checkin, 3),
+          checkout_date: checkout,
           guests_count: 4,
           status: :complete,
           total_price: Money.new(500, :USD)
@@ -4176,7 +4167,7 @@ defmodule Ysc.BookingsTest do
     test "returns cancellation_failed when buyout hold cannot clear inventory" do
       user = user_fixture()
 
-      checkin_date = Date.add(Date.utc_today(), 205)
+      {checkin_date, _} = locker_buyout_dates(14)
       checkout_date = Date.add(checkin_date, 2)
 
       assert {:ok, booking} =
@@ -4237,8 +4228,7 @@ defmodule Ysc.BookingsTest do
     test "get_tahoe_daily_availability/2 reflects held room bookings across stay nights" do
       user = user_fixture()
       room = create_room_fixture(%{property: :tahoe})
-      checkin = Date.utc_today() |> Date.add(70) |> first_monday_on_or_after()
-      checkout = Date.add(checkin, 2)
+      {checkin, checkout} = tahoe_room_booking_dates(21, 2)
 
       {:ok, booking} =
         Bookings.create_booking(%{

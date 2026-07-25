@@ -41,8 +41,10 @@ defmodule Ysc.Bookings.SeasonCache do
   This should be called when seasons are created, updated, or deleted.
   """
   def invalidate do
-    # Bump version to invalidate all cached seasons
-    new_version = System.system_time(:second)
+    # Use unique_integer so the version always increases, even when invalidate/0
+    # is called multiple times within the same second (e.g. in tests). Second-
+    # resolution versions were a no-op and leaked rolled-back Season structs.
+    new_version = System.unique_integer([:monotonic, :positive])
     Cachex.put(@cache_name, @cache_version_key, new_version)
 
     # Broadcast invalidation event via PubSub
@@ -144,7 +146,7 @@ defmodule Ysc.Bookings.SeasonCache do
 
       _ ->
         # No version set yet - initialize it
-        version = System.system_time(:second)
+        version = System.unique_integer([:monotonic, :positive])
         Cachex.put(@cache_name, @cache_version_key, version)
 
         Cachex.put(@cache_name, key, {:version, version, ttl_expires_at, value},

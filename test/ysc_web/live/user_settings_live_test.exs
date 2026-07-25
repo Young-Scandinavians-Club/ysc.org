@@ -2597,12 +2597,10 @@ defmodule YscWeb.UserSettingsLiveTest do
          %{
            conn: conn
          } do
-      user = user_fixture(%{state: :active})
+      user = user_fixture_fast(%{state: :active})
       conn = log_in_user(conn, user)
-
-      for _ <- 1..21 do
-        LedgersFixtures.payment_fixture(%{user_id: user.id})
-      end
+      # List/pagination only needs payment rows — avoid 21× process_payment.
+      LedgersFixtures.payment_rows!(user.id, 21)
 
       {:ok, view, _html} = live(conn, ~p"/users/payments")
       render(view)
@@ -2615,12 +2613,9 @@ defmodule YscWeb.UserSettingsLiveTest do
     end
 
     test "next-payments-page on last page stays on last page", %{conn: conn} do
-      user = user_fixture(%{state: :active})
+      user = user_fixture_fast(%{state: :active})
       conn = log_in_user(conn, user)
-
-      for _ <- 1..21 do
-        LedgersFixtures.payment_fixture(%{user_id: user.id})
-      end
+      LedgersFixtures.payment_rows!(user.id, 21)
 
       {:ok, view, _html} = live(conn, ~p"/users/payments")
       render(view)

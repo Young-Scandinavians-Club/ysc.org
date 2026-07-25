@@ -2,8 +2,9 @@ defmodule Ysc.WpMigration.FamilyMembersBackupIntegrationTest do
   @moduledoc """
   Validates family member parsing against the real WordPress SQL backup when present.
 
-  Tagged `:backup_integration` so it can be skipped in CI without the backup file:
-      mix test --exclude backup_integration
+  Tagged `:backup_integration` and excluded by default in `test/test_helper.exs`.
+  Opt in when the WordPress SQL backup is present:
+      mix test --include backup_integration
   """
 
   use ExUnit.Case, async: false

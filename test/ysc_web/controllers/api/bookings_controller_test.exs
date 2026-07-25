@@ -59,12 +59,23 @@ defmodule YscWeb.Api.BookingsControllerTest do
     {checkin, checkout}
   end
 
+  # Index defaults to today-7 .. today+30; fixture stays can land outside that
+  # window when seasons push buyout nights later — always pass an explicit range.
+  defp index_path_covering(booking, property \\ "tahoe") do
+    start_date = Date.add(booking.checkin_date, -1) |> Date.to_iso8601()
+    end_date = Date.add(booking.checkout_date, 1) |> Date.to_iso8601()
+
+    "/api/v1/mobile/bookings?property=#{property}&start_date=#{start_date}&end_date=#{end_date}"
+  end
+
   setup %{conn: conn} do
     original = KioskAPIKeyHelper.capture_kiosk_api_key!(@test_token)
 
     on_exit(fn ->
       KioskAPIKeyHelper.restore_kiosk_api_key!(original)
     end)
+
+    seed_canonical_seasons!()
 
     authed_conn =
       conn
@@ -77,7 +88,7 @@ defmodule YscWeb.Api.BookingsControllerTest do
   describe "GET /api/v1/mobile/bookings (index)" do
     test "returns bookings for a valid property", %{conn: conn} do
       booking = booking_fixture()
-      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+      response = get(conn, index_path_covering(booking))
 
       assert %{"data" => bookings} = json_response(response, 200)
       assert is_list(bookings)
@@ -162,8 +173,8 @@ defmodule YscWeb.Api.BookingsControllerTest do
     end
 
     test "booking response includes expected fields", %{conn: conn} do
-      booking_fixture()
-      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+      booking = booking_fixture()
+      response = get(conn, index_path_covering(booking))
 
       assert %{"data" => [booking | _]} = json_response(response, 200)
 
@@ -387,9 +398,9 @@ defmodule YscWeb.Api.BookingsControllerTest do
            conn: conn
          } do
       user = user_fixture(email: "avatar-test@example.com")
-      _booking = booking_fixture(user_id: user.id)
+      booking = booking_fixture(user_id: user.id)
 
-      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+      response = get(conn, index_path_covering(booking))
 
       assert %{"data" => [booking | _]} = json_response(response, 200)
       member = booking["member"]
@@ -441,9 +452,9 @@ defmodule YscWeb.Api.BookingsControllerTest do
           most_connected_country: "NO"
         )
 
-      _booking = booking_fixture(user_id: user.id)
+      booking = booking_fixture(user_id: user.id)
 
-      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+      response = get(conn, index_path_covering(booking))
 
       assert %{"data" => [booking | _]} = json_response(response, 200)
       avatar_url = booking["member"]["avatar_url"]
