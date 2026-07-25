@@ -352,6 +352,7 @@ defmodule YscWeb.UserSettingsLive do
                 data-publicKey={@public_key}
                 data-submitURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/payment-method"}
                 data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+                data-billing-details={@stripe_billing_details}
               >
                 <div id="error-message">
                   <p id="card-errors" class="text-red-400 text-sm"></p>
@@ -2647,6 +2648,10 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:is_sub_account, is_sub_account)
       |> assign(:primary_user, nil)
       |> assign(:payment_intent_secret, nil)
+      |> assign(
+        :stripe_billing_details,
+        Ysc.Customers.payment_element_default_values_json(user)
+      )
       |> assign(:public_key, public_key)
       |> assign(:email_form_current_password, nil)
       |> assign(:current_email, user.email)

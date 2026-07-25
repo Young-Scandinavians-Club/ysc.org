@@ -187,6 +187,7 @@ defmodule YscWeb.AccountSetupLive do
               data-publicKey={@public_key}
               data-submitURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/payment-method"}
               data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+              data-billing-details={@stripe_billing_details}
             >
               <div id="error-message">
                 <p id="card-errors" class="text-red-500 text-sm"></p>
@@ -678,6 +679,7 @@ defmodule YscWeb.AccountSetupLive do
     |> assign(:email_resend_disabled_until, nil)
     |> assign(:sms_resend_disabled_until, nil)
     |> assign(:payment_intent_secret, nil)
+    |> assign(:stripe_billing_details, "{}")
     |> assign(:signup_plan, nil)
     |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
   end
@@ -748,6 +750,10 @@ defmodule YscWeb.AccountSetupLive do
         |> assign(:email_resend_disabled_until, nil)
         |> assign(:sms_resend_disabled_until, nil)
         |> assign(:payment_intent_secret, nil)
+        |> assign(
+          :stripe_billing_details,
+          Ysc.Customers.payment_element_default_values_json(user)
+        )
         |> assign(:signup_plan, signup_plan)
         |> assign(:public_key, public_key)
         |> refine_setup_needs_assigns(user)

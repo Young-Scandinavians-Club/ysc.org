@@ -715,6 +715,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               data-clientSecret={@payment_intent_secret}
               data-publicKey={@public_key}
               data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+              data-billing-details={@stripe_billing_details}
             >
               <div id="onboarding-payment-errors">
                 <p id="card-errors" class="text-red-400 text-sm"></p>
@@ -802,6 +803,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               data-clientSecret={@payment_intent_secret}
               data-publicKey={@public_key}
               data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+              data-billing-details={@stripe_billing_details}
             >
               <div id="onboarding-payment-errors">
                 <p id="card-errors" class="text-red-400 text-sm"></p>
@@ -1795,6 +1797,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     |> assign(:sms_resend_disabled_until, nil)
     |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
     |> assign(:payment_intent_secret, nil)
+    |> assign(
+      :stripe_billing_details,
+      Ysc.Customers.payment_element_default_values_json(user)
+    )
     |> assign(:payment_method_saved, false)
     |> assign(:default_payment_method, nil)
     |> assign(
@@ -1837,6 +1843,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
     |> assign(:original_phone, user.phone_number)
     |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
+    |> assign(
+      :stripe_billing_details,
+      Ysc.Customers.payment_element_default_values_json(user)
+    )
     |> assign(:default_payment_method, default_payment_method)
     |> assign(
       :membership_selection_form,
