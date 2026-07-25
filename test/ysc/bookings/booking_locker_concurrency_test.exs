@@ -13,9 +13,11 @@ defmodule Ysc.Bookings.BookingLockerConcurrencyTest do
   alias Ysc.Ledgers
   alias Ysc.Repo
   import Ysc.AccountsFixtures
+  import Ysc.BookingsFixtures
 
   setup context do
     Ledgers.ensure_basic_accounts()
+    allow_far_future_booking_dates()
     users = Enum.map(1..10, fn _ -> user_fixture() end)
 
     {:ok, _} =
@@ -54,9 +56,7 @@ defmodule Ysc.Bookings.BookingLockerConcurrencyTest do
       }
       |> Repo.insert!()
 
-    today = Date.utc_today()
-    checkin_date = Date.add(today, 7)
-    checkout_date = Date.add(checkin_date, 3)
+    {checkin_date, checkout_date} = locker_room_dates(0, 2)
 
     {:ok,
      Map.merge(context, %{
