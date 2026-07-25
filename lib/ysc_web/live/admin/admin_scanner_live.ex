@@ -477,7 +477,9 @@ defmodule YscWeb.AdminScannerLive do
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(session.inserted_at)}
                     >
-                      {DateTimeDisplay.format_utc_datetime_short(session.inserted_at)}
+                      {DateTimeDisplay.format_utc_datetime_short(
+                        session.inserted_at
+                      )}
                     </span>
                   </div>
                 </div>
@@ -537,7 +539,9 @@ defmodule YscWeb.AdminScannerLive do
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(session.inserted_at)}
                     >
-                      {DateTimeDisplay.format_utc_datetime_short(session.inserted_at)}
+                      {DateTimeDisplay.format_utc_datetime_short(
+                        session.inserted_at
+                      )}
                     </span>
                   </div>
                 </div>

@@ -399,7 +399,9 @@ defmodule YscWeb.AdminSettingsLive do
                           data-utc-time={DateTime.to_iso8601(job.scheduled_at)}
                           data-prefix="Scheduled: "
                         >
-                          Scheduled: {DateTimeDisplay.format_utc_iso(job.scheduled_at)}
+                          Scheduled: {DateTimeDisplay.format_utc_iso(
+                            job.scheduled_at
+                          )}
                         </span>
                       <% else %>
                         <%= if job.inserted_at do %>

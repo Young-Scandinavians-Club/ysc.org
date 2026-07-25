@@ -58,7 +58,8 @@ defmodule YscWeb.Admin.DateTimeDisplayTest do
     end
 
     test "format_utc_datetime_short/1", %{dt: dt} do
-      assert DateTimeDisplay.format_utc_datetime_short(dt) == "Mar 15 at 14:30 UTC"
+      assert DateTimeDisplay.format_utc_datetime_short(dt) ==
+               "Mar 15 at 14:30 UTC"
     end
 
     test "format_utc_datetime_long/1", %{dt: dt} do
@@ -89,6 +90,7 @@ defmodule YscWeb.Admin.DateTimeDisplayTest do
       date = ~D[2024-03-15]
 
       assert DateTimeDisplay.format_date_month_year(date) == "March 2024"
+
       assert DateTimeDisplay.format_date_month_year(~U[2024-03-15 12:00:00Z]) ==
                "March 2024"
     end
@@ -109,6 +111,19 @@ defmodule YscWeb.Admin.DateTimeDisplayTest do
       assert DateTimeDisplay.format_date_month_year(nil) == "—"
       assert DateTimeDisplay.format_calendar_date_long(nil) == "—"
       assert DateTimeDisplay.format_month_day(nil) == "—"
+    end
+  end
+
+  describe "format_datetime_compact/1" do
+    test "formats stored UTC datetime without timezone conversion" do
+      dt = ~U[2024-03-16 14:30:00Z]
+
+      assert DateTimeDisplay.format_datetime_compact(dt) == "Mar 16, 2024 14:30"
+    end
+
+    test "returns empty string for nil and invalid values" do
+      assert DateTimeDisplay.format_datetime_compact(nil) == ""
+      assert DateTimeDisplay.format_datetime_compact(%{}) == ""
     end
   end
 end

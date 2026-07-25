@@ -189,7 +189,9 @@ defmodule YscWeb.AdminMembershipCheckInLive do
                       phx-hook="LocalTime"
                       data-utc-time={DateTime.to_iso8601(check_in.inserted_at)}
                     >
-                      {DateTimeDisplay.format_utc_datetime_short(check_in.inserted_at)}
+                      {DateTimeDisplay.format_utc_datetime_short(
+                        check_in.inserted_at
+                      )}
                     </span>
                     by {check_in.checked_in_by.first_name} {check_in.checked_in_by.last_name}
                   </p>
