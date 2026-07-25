@@ -31,12 +31,16 @@ defmodule Ysc.Tickets.StripeService do
   def create_payment_intent(ticket_order, opts \\ []) do
     customer_id = Keyword.get(opts, :customer_id)
     payment_method_id = Keyword.get(opts, :payment_method_id)
+    receipt_email = Keyword.get(opts, :receipt_email)
+    user = Keyword.get(opts, :user)
 
     with {:ok, ticket_order} <- Tickets.sync_pending_order_pricing(ticket_order) do
       create_payment_intent_for_order(
         ticket_order,
         customer_id,
-        payment_method_id
+        payment_method_id,
+        receipt_email,
+        user
       )
     end
   end
@@ -44,7 +48,9 @@ defmodule Ysc.Tickets.StripeService do
   defp create_payment_intent_for_order(
          ticket_order,
          customer_id,
-         payment_method_id
+         payment_method_id,
+         receipt_email,
+         user
        ) do
     amount_cents = MoneyHelper.money_to_cents(ticket_order.total_amount)
 
@@ -67,12 +73,21 @@ defmodule Ysc.Tickets.StripeService do
       }
     }
 
-    # Add customer if provided
     payment_intent_params =
-      if customer_id do
-        Map.put(payment_intent_params, :customer, customer_id)
-      else
-        payment_intent_params
+      cond do
+        match?(%Ysc.Accounts.User{}, user) ->
+          {params, _user} =
+            Ysc.Customers.attach_customer_to_payment_intent_params(
+              payment_intent_params,
+              user
+            )
+
+          params
+
+        true ->
+          payment_intent_params
+          |> maybe_put_opt(:customer, customer_id)
+          |> maybe_put_opt(:receipt_email, receipt_email)
       end
 
     # Add payment method if provided
@@ -236,6 +251,11 @@ defmodule Ysc.Tickets.StripeService do
 
   def cancel_payment_intent(nil), do: :ok
   def cancel_payment_intent(_), do: {:error, :invalid_payment_intent_id}
+
+  defp maybe_put_opt(params, _key, value) when is_nil(value) or value == "",
+    do: params
+
+  defp maybe_put_opt(params, key, value), do: Map.put(params, key, value)
 
   @doc """
   Creates a customer in Stripe for a user if they don't already have one.
