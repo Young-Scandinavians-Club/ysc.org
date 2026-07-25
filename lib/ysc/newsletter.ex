@@ -129,17 +129,7 @@ defmodule Ysc.Newsletter do
         )
 
       existing ->
-        update_existing_subscriber(
-          existing,
-          subscribed_at,
-          user_id,
-          first_name,
-          last_name,
-          source,
-          metadata,
-          email,
-          force_source
-        )
+        update_existing_subscriber(existing, subscribed_at, email, opts)
     end
   end
 
@@ -170,17 +160,14 @@ defmodule Ysc.Newsletter do
     |> Repo.insert()
   end
 
-  defp update_existing_subscriber(
-         existing,
-         subscribed_at,
-         user_id,
-         first_name,
-         last_name,
-         source,
-         metadata,
-         email,
-         force_source
-       ) do
+  defp update_existing_subscriber(existing, subscribed_at, email, opts) do
+    user_id = Keyword.get(opts, :user_id)
+    first_name = Keyword.get(opts, :first_name)
+    last_name = Keyword.get(opts, :last_name)
+    source = Keyword.get(opts, :source, "public_signup")
+    metadata = Keyword.get(opts, :metadata, %{})
+    force_source = Keyword.get(opts, :force_source, false)
+
     # If we now have a user_id but existing record doesn't, link them
     link_user = user_id && is_nil(existing.user_id)
 
