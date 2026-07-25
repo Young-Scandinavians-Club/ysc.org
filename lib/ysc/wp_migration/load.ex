@@ -35,6 +35,7 @@ defmodule Ysc.WpMigration.Load do
   - :export_dir - path to export directory (required)
   - :dry_run - if true, do not write to DB or S3
   - :upload_media - if true, upload media folder to S3 and create Images (default: true)
+  - :skip_posts - if true, skip loading news posts even when posts.json is present (default: false)
   - :create_stripe_subscriptions - if true, create real Stripe customers and subscriptions
       in the connected Stripe account (useful for sandbox/dev testing). Each subscription
       uses trial_end set to the WP renewal date so no charge fires immediately.
@@ -46,6 +47,7 @@ defmodule Ysc.WpMigration.Load do
     export_dir = opts[:export_dir]
     dry_run = opts[:dry_run] || false
     upload_media = Keyword.get(opts, :upload_media, true)
+    skip_posts = Keyword.get(opts, :skip_posts, false)
     create_stripe_subscriptions = opts[:create_stripe_subscriptions] || false
 
     only_emails = normalize_only_emails_option(opts[:only_emails])
@@ -58,6 +60,7 @@ defmodule Ysc.WpMigration.Load do
           export_dir,
           dry_run,
           upload_media,
+          skip_posts,
           create_stripe_subscriptions,
           only_emails
         )
@@ -124,6 +127,7 @@ defmodule Ysc.WpMigration.Load do
          export_dir,
          dry_run,
          upload_media,
+         skip_posts,
          create_stripe_subscriptions,
          only_emails
        ) do
@@ -158,7 +162,12 @@ defmodule Ysc.WpMigration.Load do
       |> IgnoredAccounts.reject_by_wp_user_id(ignored_wp_user_ids, "wp_user_id")
       |> IgnoredAccounts.reject_user_rows()
 
-    posts_data = read_json(posts_json)
+    posts_data =
+      if skip_posts do
+        []
+      else
+        read_json(posts_json)
+      end
 
     stripe_data =
       read_json(stripe_json)
@@ -176,7 +185,8 @@ defmodule Ysc.WpMigration.Load do
     if dry_run do
       Ysc.Logging.info(
         "[WP Load] DRY RUN — would load #{length(users_data)} users, " <>
-          "#{length(applications_data)} applications, #{length(posts_data)} posts"
+          "#{length(applications_data)} applications, #{length(posts_data)} posts" <>
+          if(skip_posts, do: " (skip_posts=true)", else: "")
       )
 
       {:ok, %{}}
@@ -185,7 +195,8 @@ defmodule Ysc.WpMigration.Load do
         "[WP Load] Starting migration load from #{export_dir} " <>
           "(#{length(users_data)} users, #{length(applications_data)} applications, " <>
           "#{length(posts_data)} posts, #{length(stripe_data)} stripe lookups, " <>
-          "#{length(bookings_data)} bookings, stripe_subscriptions=#{create_stripe_subscriptions})"
+          "#{length(bookings_data)} bookings, stripe_subscriptions=#{create_stripe_subscriptions}, " <>
+          "skip_posts=#{skip_posts})"
       )
 
       Ysc.Settings.get_or_create_setting(
@@ -229,9 +240,13 @@ defmodule Ysc.WpMigration.Load do
           {:ok, %{}, %{}}
         end
 
-      Ysc.Logging.info("[WP Load] Phase: Posts")
-      {:ok, _} = load_posts(posts_data, user_map, image_map, filename_map)
-      Ysc.Logging.info("[WP Load] Phase: Posts complete")
+      if skip_posts do
+        Ysc.Logging.info("[WP Load] Phase: Posts skipped")
+      else
+        Ysc.Logging.info("[WP Load] Phase: Posts")
+        {:ok, _} = load_posts(posts_data, user_map, image_map, filename_map)
+        Ysc.Logging.info("[WP Load] Phase: Posts complete")
+      end
 
       stripe_report =
         if stripe_data != [] do
@@ -672,6 +687,7 @@ defmodule Ysc.WpMigration.Load do
            first_name: user.first_name,
            last_name: user.last_name,
            source: "wp_migration",
+           force_source: true,
            metadata: metadata
          ) do
       {:ok, _subscriber} ->
@@ -2460,7 +2476,17 @@ defmodule Ysc.WpMigration.Load do
                      stripe_pm
                    ) do
                 {:ok, _} ->
-                  acc_report
+                  user = Repo.get!(User, user.id)
+
+                  case StripeImport.set_customer_default_payment_method(
+                         user,
+                         pm_id,
+                         context,
+                         acc_report
+                       ) do
+                    {:ok, report} -> report
+                    {:error, _reason, report} -> report
+                  end
 
                 {:error, reason} ->
                   StripeImport.record_failure(
@@ -2575,7 +2601,12 @@ defmodule Ysc.WpMigration.Load do
                   "[WP Load] Using existing Stripe subscription for user #{user_id} (#{status})"
                 )
 
-                report
+                maybe_enforce_imported_auto_renew(
+                  user,
+                  auto_renew,
+                  context,
+                  report
+                )
 
               {:ok, :no_stripe_customer, report} ->
                 load_subscription_fallback(
@@ -2680,6 +2711,18 @@ defmodule Ysc.WpMigration.Load do
       (is_binary(row["sub_status"]) and
          row["sub_status"] in ["wc-active", "wc-on-hold"])
   end
+
+  defp maybe_enforce_imported_auto_renew(
+         user,
+         true = _auto_renew,
+         context,
+         report
+       ) do
+    StripeImport.enforce_auto_renew_for_user(user, context, report)
+  end
+
+  defp maybe_enforce_imported_auto_renew(_user, _auto_renew, _context, report),
+    do: report
 
   # Pick the most favorable (latest) end date for the user by comparing:
   #   1. The recorded end date from WP (sub_next_payment_date / wcm_end_date)
@@ -2800,7 +2843,12 @@ defmodule Ysc.WpMigration.Load do
                 "[WP Load] Found existing Stripe subscription for user #{user_id} before create; imported"
               )
 
-              report
+              maybe_enforce_imported_auto_renew(
+                user,
+                auto_renew,
+                context,
+                report
+              )
 
             other ->
               create_stripe_subscription_if_needed(
@@ -2948,7 +2996,14 @@ defmodule Ysc.WpMigration.Load do
 
           stripe_params =
             if auto_renew do
-              stripe_params
+              case Payments.get_default_payment_method(user) do
+                %{provider: :stripe, provider_id: pm_id}
+                when is_binary(pm_id) and pm_id != "" ->
+                  Map.put(stripe_params, :default_payment_method, pm_id)
+
+                _ ->
+                  stripe_params
+              end
             else
               Map.put(stripe_params, :cancel_at_period_end, true)
             end

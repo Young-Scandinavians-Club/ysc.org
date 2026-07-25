@@ -57,6 +57,22 @@ defmodule Ysc.NewsletterTest do
                Newsletter.subscribe("user@#{domain}")
     end
 
+    test "skip_email_validation allows trusted imports without MX checks" do
+      stub_mx_no_records()
+
+      domain = "mx-reject-#{System.unique_integer([:positive])}.example.org"
+      email = "trusted@#{domain}"
+
+      assert {:ok, %Subscriber{} = s} =
+               Newsletter.subscribe(email,
+                 source: "wp_newsletter_csv",
+                 skip_email_validation: true
+               )
+
+      assert s.email == email
+      assert s.subscribed == true
+    end
+
     test "treats Gmail addresses with dots as the same subscriber" do
       tag = Integer.to_string(System.unique_integer([:positive]))
       dotted_email = "news.#{tag}@gmail.com"
@@ -99,6 +115,22 @@ defmodule Ysc.NewsletterTest do
       assert updated.subscribed == true
       assert updated.subscription_token == token
       assert updated.unsubscribed_at == nil
+    end
+
+    test "force_source overrides an existing subscribed source" do
+      {:ok, _} =
+        Newsletter.subscribe("force-source@example.com",
+          source: "public_signup"
+        )
+
+      assert {:ok, updated} =
+               Newsletter.subscribe("force-source@example.com",
+                 source: "wp_migration",
+                 force_source: true
+               )
+
+      assert updated.subscribed == true
+      assert updated.source == "wp_migration"
     end
 
     test "links existing anonymous subscription when user registers (same email)" do
