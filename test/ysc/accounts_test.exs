@@ -566,6 +566,8 @@ defmodule Ysc.AccountsTest do
         Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
       end)
 
+      primary = Repo.preload(primary, :sub_accounts)
+
       assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
 
       refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
@@ -574,6 +576,28 @@ defmodule Ysc.AccountsTest do
 
       assert_receive {:board_volunteer_sync, primary_id}
                      when primary_id == primary.id
+    end
+
+    test "remove_sub_account does not sync board billing when nobody is on the board" do
+      primary = user_fixture(%{phone_number: "+14159098360"})
+      sub = user_fixture(%{phone_number: "+14159098361"})
+
+      sub =
+        sub
+        |> Ecto.Changeset.change(%{
+          primary_user_id: primary.id,
+          family_relationship: "child"
+        })
+        |> Repo.update!()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
+      refute_receive {:board_volunteer_sync, _}
     end
 
     test "remove_sub_account returns error when sub does not belong to primary",
@@ -2467,6 +2491,8 @@ defmodule Ysc.AccountsTest do
       on_exit(fn ->
         Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
       end)
+
+      primary = Repo.preload(primary, :sub_accounts)
 
       assert {:ok, linked} = Accounts.admin_link_user_to_family(primary, victim)
       assert linked.primary_user_id == primary.id

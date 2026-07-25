@@ -595,10 +595,21 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      # Explicitly request day mode so the day section (and guests dropdown) is
-      # rendered regardless of pricing rules
+      checkin = Date.add(Date.utc_today(), 30)
+      checkout = Date.add(checkin, 3)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "day",
+        "guests_count" => "15"
+      }
+
       {:ok, view, _html} =
-        live(conn, ~p"/bookings/clear-lake?booking_mode=day&guests_count=15")
+        live(conn, "/bookings/clear-lake?" <> URI.encode_query(params))
+
+      :ok = Sandbox.allow(Repo, self(), view.pid)
 
       render_click(view, "increase-guests", %{})
 
@@ -802,10 +813,16 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       checkin = Date.add(Date.utc_today(), 30)
       checkout = Date.add(checkin, 3)
 
-      render_change(view, "date-changed", %{
-        "checkin_date" => Date.to_string(checkin),
-        "checkout_date" => Date.to_string(checkout)
-      })
+      html =
+        render_change(view, "date-changed", %{
+          "checkin_date" => Date.to_string(checkin),
+          "checkout_date" => Date.to_string(checkout)
+        })
+
+      # Prefer rendered HTML over :sys.get_state — the latter can time out when
+      # the LiveView is briefly busy under full-suite Cachex contention.
+      assert html =~ Date.to_iso8601(checkin) or
+               html =~ Calendar.strftime(checkin, "%b")
 
       state = :sys.get_state(view.pid)
       assert state.socket.assigns.checkin_date == checkin

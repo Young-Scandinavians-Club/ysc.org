@@ -17,34 +17,6 @@ defmodule YscWeb.EventsLiveLimitTest do
 
   defp render_events_async(view), do: render_async(view, @events_async_timeout)
 
-  defp create_past_event(attrs) do
-    organizer = attrs[:organizer] || user_fixture()
-
-    defaults = %{
-      title: "Past Event #{System.unique_integer()}",
-      description: "A test event description",
-      start_date: DateTime.add(DateTime.utc_now(), -30, :day),
-      end_date: DateTime.add(DateTime.utc_now(), -29, :day),
-      state: :published,
-      ticket_sales_start: DateTime.add(DateTime.utc_now(), -31, :day),
-      ticket_sales_end: DateTime.add(DateTime.utc_now(), -28, :day),
-      location: "Test Location",
-      max_attendees: 100,
-      organizer_id: organizer.id,
-      image_id: nil,
-      reference_id: "EVT-LIMIT-#{System.unique_integer()}"
-    }
-
-    attrs =
-      attrs
-      |> Map.drop([:organizer])
-      |> then(&Map.merge(defaults, &1))
-
-    %Events.Event{}
-    |> Events.Event.changeset(attrs)
-    |> Repo.insert!()
-  end
-
   defp create_upcoming_event(attrs) do
     organizer = attrs[:organizer] || user_fixture()
 
@@ -90,15 +62,32 @@ defmodule YscWeb.EventsLiveLimitTest do
   end
 
   test "limits maximum past events to 50", %{conn: conn} do
-    organizer = user_fixture()
+    organizer = user_fixture_fast()
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    for i <- 1..52 do
-      create_past_event(%{
-        title: "Past Limit #{i}",
-        organizer: organizer
-      })
-    end
+    # Bulk insert — N× changeset/insert was ~1s of fixture tax for this test.
+    rows =
+      for i <- 1..52 do
+        %{
+          id: Ecto.ULID.generate(),
+          title: "Past Limit #{i}",
+          description: "A test event description",
+          start_date: DateTime.add(now, -30 - i, :day),
+          end_date: DateTime.add(now, -29 - i, :day),
+          state: :published,
+          location_name: "Test Location",
+          max_attendees: 100,
+          organizer_id: organizer.id,
+          reference_id: "EVT-LIMIT-#{System.unique_integer([:positive])}-#{i}",
+          lock_version: 1,
+          show_participants: false,
+          tickets_tbd: false,
+          inserted_at: now,
+          updated_at: now
+        }
+      end
 
+    Repo.insert_all(Events.Event, rows)
     Ysc.Events.EventListCache.invalidate()
 
     {:ok, view, _html} = live(conn, ~p"/events")

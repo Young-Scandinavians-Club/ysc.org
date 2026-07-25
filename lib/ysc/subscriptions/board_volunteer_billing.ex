@@ -23,13 +23,35 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   - When the last volunteer leaves: same pause with `resumes_at` six calendar months ahead.
   - No-op in test environment (no Stripe calls).
   """
-  def sync_for_user(%User{} = user) do
-    maybe_record_test_sync(user.id)
+  def sync_for_user(%User{} = user, opts \\ []) do
+    apply_off_board_grace? = Keyword.get(opts, :apply_off_board_grace?, false)
+    on_board? = household_on_board?(user)
 
-    if Ysc.Env.test?() do
-      :ok
+    if on_board? or apply_off_board_grace? do
+      maybe_record_test_sync(user.id)
+
+      if Ysc.Env.test?() do
+        :ok
+      else
+        do_sync(user, on_board?)
+      end
     else
-      do_sync(user)
+      :ok
+    end
+  end
+
+  @doc false
+  def sync_after_family_membership_change(
+        %User{} = primary,
+        %User{} = affected_user
+      ) do
+    on_board? = household_on_board?(primary)
+    apply_grace? = not on_board? and not is_nil(affected_user.board_position)
+
+    if on_board? or apply_grace? do
+      sync_for_user(primary, apply_off_board_grace?: apply_grace?)
+    else
+      :ok
     end
   end
 
@@ -78,13 +100,22 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   @doc """
   Returns true when anyone in the user's family group currently holds a
   board position.
+
+  Always queries the database for current household membership so a stale
+  `sub_accounts` preload cannot skew Stripe billing sync after family
+  link/unlink.
   """
   def household_on_board?(%User{} = user) do
-    family_ids = Accounts.get_family_group_user_ids(user)
+    primary_id =
+      if is_nil(user.primary_user_id) do
+        user.id
+      else
+        user.primary_user_id
+      end
 
     Repo.exists?(
       from u in User,
-        where: u.id in ^family_ids,
+        where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
         where: not is_nil(u.board_position)
     )
   end
@@ -102,13 +133,12 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
     end
   end
 
-  defp do_sync(%User{} = user) do
+  defp do_sync(%User{} = user, on_board?) do
     [primary | _] = Accounts.get_family_group(user)
 
     if is_nil(primary.stripe_id) or primary.stripe_id == "" do
       :ok
     else
-      on_board? = household_on_board?(user)
       subs = list_membership_subscriptions_for_pause(primary)
       params = stripe_sync_params(on_board?)
 

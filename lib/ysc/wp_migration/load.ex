@@ -2185,7 +2185,7 @@ defmodule Ysc.WpMigration.Load do
   defp load_posts(posts_data, user_map, image_map, filename_map) do
     author_fallback =
       Repo.one(from u in User, where: u.role == ^:admin, limit: 1) ||
-        Repo.one(User)
+        Repo.one(from u in User, limit: 1)
 
     # Build url_map: wp_attachment_id → new S3 URL for class-based lookups,
     # merged with normalized_filename → new S3 URL for src-based fallback.
