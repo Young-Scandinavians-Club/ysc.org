@@ -57,5 +57,47 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
 
       assert html =~ "Invalid date range"
     end
+
+    test "download_csv pushes download event when report is loaded", %{conn: conn} do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        completed: DateTime.utc_now(),
+        review_outcome: nil
+      })
+
+      today = Date.utc_today()
+      from = Date.to_iso8601(%Date{today | day: 1})
+      to = Date.to_iso8601(today)
+
+      {view, _html} =
+        live_report(conn, ~p"/admin/memberships/report?from=#{from}&to=#{to}")
+
+      render_click(view, "download_csv")
+
+      assert_push_event(view, "download-csv", %{content: _content, filename: filename})
+      assert filename =~ "membership-report-"
+    end
+
+    test "email_report shows success flash when report is loaded", %{conn: conn} do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        completed: DateTime.utc_now(),
+        review_outcome: nil
+      })
+
+      today = Date.utc_today()
+      from = Date.to_iso8601(%Date{today | day: 1})
+      to = Date.to_iso8601(today)
+
+      {view, _html} =
+        live_report(conn, ~p"/admin/memberships/report?from=#{from}&to=#{to}")
+
+      render_click(view, "email_report")
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+      assert Phoenix.Flash.get(flash, :info) =~ "emailed to the board"
+    end
   end
 end
