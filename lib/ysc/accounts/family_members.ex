@@ -5,7 +5,7 @@ defmodule Ysc.Accounts.FamilyMembers do
   require Ysc.Logging
 
   alias Ysc.Repo
-  alias Ysc.Accounts.{FamilyMember, User}
+  alias Ysc.Accounts.{FamilyMember, User, UserProfileCache}
 
   @doc """
   Returns family members for a user, preloading when needed.
@@ -82,43 +82,84 @@ defmodule Ysc.Accounts.FamilyMembers do
   Creates or updates a family member for the user.
 
   Updates only when `params["id"]` matches an existing record; otherwise inserts a new one.
+  Invalidates the user profile cache so subsequent preloads see the change.
   """
   def upsert_family_member(%User{} = user, params) when is_map(params) do
     attrs = record_attrs(params)
 
-    case find_by_id(user, params["id"]) do
-      %FamilyMember{} = member ->
-        member
-        |> FamilyMember.family_member_changeset(attrs)
-        |> Repo.update()
+    result =
+      case find_by_id(user, params["id"]) do
+        %FamilyMember{} = member ->
+          member
+          |> FamilyMember.family_member_changeset(attrs)
+          |> Repo.update()
 
-      nil ->
-        %FamilyMember{}
-        |> FamilyMember.family_member_changeset(attrs)
-        |> Ecto.Changeset.put_change(:user_id, user.id)
-        |> Repo.insert()
+        nil ->
+          %FamilyMember{}
+          |> FamilyMember.family_member_changeset(attrs)
+          |> Ecto.Changeset.put_change(:user_id, user.id)
+          |> Repo.insert()
+      end
+
+    case result do
+      {:ok, member} ->
+        UserProfileCache.invalidate_user(user.id)
+        {:ok, member}
+
+      error ->
+        error
     end
   end
+
+  @doc """
+  Deletes a family member belonging to the user and invalidates the profile cache.
+  """
+  def delete_family_member(
+        %User{id: user_id},
+        %FamilyMember{user_id: user_id} = member
+      ) do
+    case Repo.delete(member) do
+      {:ok, deleted} ->
+        UserProfileCache.invalidate_user(user_id)
+        {:ok, deleted}
+
+      error ->
+        error
+    end
+  end
+
+  def delete_family_member(%User{}, %FamilyMember{}),
+    do: {:error, :unauthorized}
 
   @doc """
   Deletes family members not present in `kept_ids`.
   """
   def delete_removed_members(%User{} = user, kept_ids) when is_map(kept_ids) do
-    for member <- list_for_user(user),
-        not MapSet.member?(kept_ids, to_string(member.id)) do
-      case Repo.delete(member) do
-        {:ok, _} ->
-          :ok
+    deleted? =
+      Enum.reduce(list_for_user(user), false, fn member, acc ->
+        if MapSet.member?(kept_ids, to_string(member.id)) do
+          acc
+        else
+          case Repo.delete(member) do
+            {:ok, _} ->
+              true
 
-        {:error, reason} ->
-          Ysc.Logging.warning(
-            "Failed to delete removed family member",
-            user_id: user.id,
-            family_member_id: member.id,
-            reason: inspect(reason)
-          )
-      end
-    end
+            {:error, reason} ->
+              Ysc.Logging.warning(
+                "Failed to delete removed family member",
+                user_id: user.id,
+                family_member_id: member.id,
+                reason: inspect(reason)
+              )
+
+              acc
+          end
+        end
+      end)
+
+    if deleted?, do: UserProfileCache.invalidate_user(user.id)
+
+    :ok
   end
 
   defp struct_for_params(%User{} = user, params) do

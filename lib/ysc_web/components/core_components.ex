@@ -3153,7 +3153,7 @@ defmodule YscWeb.CoreComponents do
     assigns = assign(assigns, :nav_items, account_settings_nav_items())
 
     ~H"""
-    <ul class="flex-column space-y space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
+    <ul class="shrink-0 flex-column space-y space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
       <li>
         <h2 class="text-zinc-800 text-2xl font-semibold leading-8 mb-10">
           Account
@@ -3186,7 +3186,7 @@ defmodule YscWeb.CoreComponents do
     <.link
       navigate={@navigate}
       class={[
-        "inline-flex items-center px-4 py-3 rounded w-full",
+        "inline-flex items-center px-4 py-3 rounded w-full whitespace-nowrap",
         @active? && "bg-blue-600 active text-zinc-100",
         !@active? && "hover:bg-zinc-100 hover:text-zinc-900"
       ]}

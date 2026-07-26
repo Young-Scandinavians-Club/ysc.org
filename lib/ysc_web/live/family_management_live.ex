@@ -1,24 +1,20 @@
 defmodule YscWeb.FamilyManagementLive do
   use YscWeb, :live_view
 
+  import YscWeb.AdminComponents,
+    only: [admin_row_actions_dropdown: 1, admin_dropdown_menu_item: 1]
+
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyDisplay
   alias Ysc.Accounts.FamilyInvites
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.FamilyMembers
   alias YscWeb.DateDisplay
-  alias Ysc.Repo
 
   @impl true
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
     is_sub_account = Accounts.sub_account?(user)
-
-    invite_form =
-      to_form(
-        %{"email" => "", "family_member_id" => "", "relationship" => "child"},
-        as: "invite"
-      )
 
     socket =
       socket
@@ -30,8 +26,9 @@ defmodule YscWeb.FamilyManagementLive do
       |> assign(:sub_accounts, [])
       |> assign(:invites, [])
       |> assign(:family_members, [])
-      |> assign(:invite_form, invite_form)
       |> assign(:family_member_form, nil)
+      |> assign(:invite_target, nil)
+      |> assign(:invite_form, empty_invite_form())
       |> assign(:can_send_invite, false)
       |> assign(:loading_family_data, true)
       |> assign(:page_title, "Family")
@@ -90,96 +87,57 @@ defmodule YscWeb.FamilyManagementLive do
   end
 
   @impl true
-  def handle_event("validate_invite", %{"invite" => invite_params}, socket) do
-    changeset =
-      %{}
-      |> Map.put("email", invite_params["email"] || "")
-      |> Map.put("family_member_id", invite_params["family_member_id"] || "")
-      |> Map.put("relationship", invite_params["relationship"] || "child")
-      |> to_form(as: "invite")
+  def handle_event("open_invite_modal", %{"id" => id}, socket) do
+    member =
+      Enum.find(socket.assigns.family_members, fn fm ->
+        to_string(fm.id) == to_string(id)
+      end)
 
-    {:noreply, assign(socket, invite_form: changeset)}
+    if member do
+      {:noreply,
+       socket
+       |> assign(:invite_target, member)
+       |> assign(:invite_form, invite_form_for_member(member))}
+    else
+      {:noreply,
+       YscWeb.Flash.put_toast(socket, :error, "Family member not found.",
+         title: "Family"
+       )}
+    end
   end
 
-  def handle_event("send_invite", %{"invite" => invite_params}, socket) do
-    user = socket.assigns.current_user
-    email = invite_params["email"]
-    family_member_id = invite_params["family_member_id"]
+  def handle_event("cancel_invite_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:invite_target, nil)
+     |> assign(:invite_form, empty_invite_form())}
+  end
 
-    relationship =
-      case invite_params["relationship"] do
-        "spouse" -> :spouse
-        _ -> :child
-      end
+  def handle_event("validate_invite", %{"invite" => invite_params}, socket) do
+    family_member_id =
+      invite_params["family_member_id"] ||
+        (socket.assigns.invite_target &&
+           to_string(socket.assigns.invite_target.id)) ||
+        ""
 
-    opts = [relationship: relationship]
+    form =
+      to_form(
+        %{
+          "email" => invite_params["email"] || "",
+          "family_member_id" => family_member_id
+        },
+        as: "invite"
+      )
 
-    opts =
-      if family_member_id && family_member_id != "",
-        do: Keyword.put(opts, :family_member_id, family_member_id),
-        else: opts
+    {:noreply, assign(socket, :invite_form, form)}
+  end
 
-    case FamilyInvites.create_invite(user, email, opts) do
-      {:ok, _invite} ->
-        invites = FamilyInvites.list_invites(user)
-
-        cleared_form =
-          to_form(
-            %{
-              "email" => "",
-              "family_member_id" => family_member_id || "",
-              "relationship" => invite_params["relationship"] || "child"
-            },
-            as: "invite"
-          )
-
-        {:noreply,
-         socket
-         |> assign(:invites, invites)
-         |> assign(:invite_form, cleared_form)
-         |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}",
-           title: "Family"
-         )}
-
-      {:error, reason} ->
-        {:noreply, invite_error(socket, reason)}
-    end
+  def handle_event("invite_family_member", %{"invite" => params}, socket) do
+    do_invite_family_member(socket, params)
   end
 
   def handle_event("invite_family_member", params, socket) do
-    user = socket.assigns.current_user
-    family_member_id = params["family_member_id"]
-    email = params["email"]
-
-    member =
-      Enum.find(socket.assigns.family_members, fn fm ->
-        to_string(fm.id) == to_string(family_member_id)
-      end)
-
-    relationship =
-      case member && member.type do
-        :spouse -> :spouse
-        "spouse" -> :spouse
-        _ -> :child
-      end
-
-    case FamilyInvites.create_invite(user, email,
-           relationship: relationship,
-           family_member_id: family_member_id
-         ) do
-      {:ok, _invite} ->
-        invites = FamilyInvites.list_invites(user)
-
-        {:noreply,
-         socket
-         |> assign(:invites, invites)
-         |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}",
-           title: "Family"
-         )}
-
-      {:error, reason} ->
-        {:noreply, invite_error(socket, reason)}
-    end
+    do_invite_family_member(socket, params)
   end
 
   def handle_event("show_add_family_member", _params, socket) do
@@ -276,7 +234,7 @@ defmodule YscWeb.FamilyManagementLive do
 
     case FamilyMembers.find_by_id(user, id) do
       %FamilyMember{} = member ->
-        case Repo.delete(member) do
+        case FamilyMembers.delete_family_member(user, member) do
           {:ok, _} ->
             user = Accounts.get_user!(user.id, [:family_members])
 
@@ -433,7 +391,7 @@ defmodule YscWeb.FamilyManagementLive do
           }
         />
 
-        <div class="text-medium px-2 text-zinc-500 w-full md:border-l md:border-zinc-200 md:pl-10">
+        <div class="text-medium px-2 text-zinc-500 w-full md:border-l md:border-zinc-100 md:pl-16">
           <div
             :if={@loading_family_data}
             id="family-management-loading"
@@ -454,7 +412,7 @@ defmodule YscWeb.FamilyManagementLive do
               <.skeleton_block class="h-11 w-full rounded-lg" />
             </div>
           </div>
-          <div :if={!@loading_family_data} class="space-y-10">
+          <div :if={!@loading_family_data} class="space-y-8">
             <%= if @is_sub_account do %>
               <.sub_account_view
                 primary_user={@primary_user}
@@ -467,6 +425,7 @@ defmodule YscWeb.FamilyManagementLive do
                 family_members={@family_members}
                 family_member_form={@family_member_form}
                 invite_form={@invite_form}
+                invite_target={@invite_target}
                 invites={@invites}
                 sub_accounts={@sub_accounts}
               />
@@ -482,150 +441,118 @@ defmodule YscWeb.FamilyManagementLive do
   attr :family_members, :list, required: true
   attr :family_member_form, :any, required: true
   attr :invite_form, :any, required: true
+  attr :invite_target, :any, required: true
   attr :invites, :list, required: true
   attr :sub_accounts, :list, required: true
 
   defp primary_account_view(assigns) do
     pending_invites = Enum.filter(assigns.invites, &is_nil(&1.accepted_at))
-    assigns = assign(assigns, :pending_invites, pending_invites)
+
+    active_rows =
+      active_member_rows(assigns.sub_accounts, assigns.family_members)
+
+    assigns =
+      assigns
+      |> assign(:pending_invites, pending_invites)
+      |> assign(:active_rows, active_rows)
 
     ~H"""
-    <header>
-      <h1 class="text-zinc-900 font-bold text-2xl sm:text-3xl">
-        Family Management
-      </h1>
-      <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-        With a Family or Lifetime membership, you can add family members to your account and invite them to share your member benefits.
-      </p>
-      <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
-        <strong>How this works:</strong>
-        Add names to your family roster first. To give someone their own login and member benefits, send them an invite. After they accept, they appear under <strong>Linked family members</strong>.
-      </p>
-      <%= if not @can_send_invite do %>
-        <div class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <p class="text-sm text-amber-800">
-            You can't send family invites right now. Invites require an active Family or Lifetime
-            membership, and you can link up to 10 people who have their own login. If you have a
-            Single membership or unpaid dues, update your membership first.
-          </p>
-        </div>
-      <% end %>
+    <header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+      <div>
+        <h1 class="text-zinc-900 font-bold text-2xl sm:text-3xl">
+          Family Management
+        </h1>
+        <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
+          Manage your family roster and invite members to share your membership benefits.
+          Add someone to your roster first, then send an invite so they can create their own login.
+        </p>
+        <p class="text-xs text-zinc-500 mt-2">
+          Limit: 1 spouse, up to 9 children
+        </p>
+      </div>
+      <.button
+        type="button"
+        phx-click="show_add_family_member"
+        id="add-family-member-button"
+        class="shrink-0"
+      >
+        <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Family Member
+      </.button>
     </header>
 
-    <section>
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-200 pb-2 mb-4">
-        <h2 class="text-zinc-900 font-semibold text-lg">
-          Family Members on Your Account
+    <%= if not @can_send_invite do %>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+        <p class="text-sm text-amber-800">
+          You can't send family invites right now. Invites require an active Family or Lifetime
+          membership, and you can link up to 10 people who have their own login. If you have a
+          Single membership or unpaid dues, update your membership first.
+        </p>
+      </div>
+    <% end %>
+
+    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-zinc-900 font-bold text-xl">
+          Family Members
           <span class="text-zinc-400 font-normal text-sm ml-2">
-            ({length(@family_members)})
+            ({length(@active_rows)})
           </span>
         </h2>
-        <.button
-          :if={is_nil(@family_member_form)}
-          type="button"
-          variant="outline"
-          phx-click="show_add_family_member"
-          id="add-family-member-button"
-        >
-          <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add family member
-        </.button>
       </div>
 
-      <p class="text-xs text-zinc-500 mb-4">
-        These are the family members listed on your account. You can add or edit them here without sending an invitation.
+      <p class="text-sm text-zinc-500">
+        Roster members and linked accounts. Invite roster-only members so they can share benefits.
       </p>
 
-      <%= if @family_member_form do %>
-        <.family_member_editor form={@family_member_form} />
-      <% end %>
-
-      <%= if @family_members == [] and is_nil(@family_member_form) do %>
-        <p class="text-zinc-500 text-sm italic">
-          No family members on your account yet. Add a family member to keep their details on file.
-        </p>
+      <%= if @active_rows == [] do %>
+        <div class="text-center py-8">
+          <p class="text-zinc-600 text-sm mb-4">
+            No family members yet. Add someone to your roster to get started.
+          </p>
+          <.button type="button" phx-click="show_add_family_member">
+            <.icon name="hero-plus" class="w-4 h-4 me-1" /> Add Family Member
+          </.button>
+        </div>
       <% else %>
         <div class="overflow-x-auto">
           <table
             class="min-w-full divide-y divide-zinc-200"
-            id="account-family-members-table"
+            id="active-family-members-table"
           >
             <thead class="bg-zinc-50">
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Name
+                  Member
                 </th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Relationship
                 </th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Date of Birth
+                  Status
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Invite
-                </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-zinc-200">
               <tr
-                :for={member <- @family_members}
-                id={"family-member-row-#{member.id}"}
+                :for={row <- @active_rows}
+                id={row.dom_id}
+                class="hover:bg-zinc-50/50"
               >
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900">
-                  {member.first_name} {member.last_name}
-                </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                  {FamilyDisplay.relationship_label(member.type)}
-                </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                  {DateDisplay.format_date_long(member.birth_date, "—")}
-                </td>
                 <td class="px-4 py-4 text-sm">
-                  <form
-                    id={"invite-family-member-form-#{member.id}"}
-                    phx-submit="invite_family_member"
-                    class="flex flex-col sm:flex-row gap-2 sm:items-center"
-                  >
-                    <input type="hidden" name="family_member_id" value={member.id} />
-                    <input
-                      type="email"
-                      name="email"
-                      required
-                      disabled={not @can_send_invite}
-                      placeholder="Email address"
-                      class="block w-full sm:w-44 h-9 rounded border-zinc-300 focus:border-blue-500 focus:ring-blue-500 text-sm disabled:bg-zinc-100 disabled:text-zinc-400"
-                    />
-                    <button
-                      type="submit"
-                      phx-disable-with="Sending..."
-                      disabled={not @can_send_invite}
-                      class="inline-flex items-center justify-center rounded bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed text-white py-1.5 px-3 text-xs font-semibold shadow-sm transition whitespace-nowrap"
-                    >
-                      Send invite
-                    </button>
-                  </form>
+                  <div class="font-medium text-zinc-900">{row.name}</div>
+                  <div class="text-xs text-zinc-500 mt-0.5">{row.subtitle}</div>
                 </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm space-x-3">
-                  <button
-                    type="button"
-                    phx-click="edit_family_member"
-                    phx-value-id={member.id}
-                    class="text-blue-600 hover:text-blue-800"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="delete_family_member"
-                    phx-value-id={member.id}
-                    phx-disable-with="Removing..."
-                    data-confirm="Remove this family member from your list? This only removes their details from your account. It does not remove anyone who has already accepted an invitation and appears under Linked Family Members."
-                    class="text-red-600 hover:text-red-800"
-                  >
-                    Remove from list
-                  </button>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
+                  {row.relationship}
+                </td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm">
+                  <.badge type={row.badge_type}>{row.status_label}</.badge>
+                </td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-right">
+                  <.family_member_row_actions row={row} />
                 </td>
               </tr>
             </tbody>
@@ -634,263 +561,136 @@ defmodule YscWeb.FamilyManagementLive do
       <% end %>
     </section>
 
-    <div class="space-y-8">
-      <section>
-        <h2 class="text-zinc-900 font-semibold text-lg border-b border-zinc-200 pb-2 mb-4">
-          Linked Family Members
-          <span class="text-zinc-400 font-normal text-sm ml-2">
-            ({length(@sub_accounts)})
-          </span>
-        </h2>
+    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+      <h2 class="text-zinc-900 font-bold text-xl">
+        Pending Invitations
+        <span class="text-zinc-400 font-normal text-sm ml-2">
+          ({length(@pending_invites)})
+        </span>
+      </h2>
 
-        <%= if @sub_accounts == [] do %>
-          <p class="text-zinc-500 text-sm italic">
-            No linked family members yet. When someone accepts your invitation, they will appear here.
+      <%= if @pending_invites == [] do %>
+        <div
+          id="pending-invites-empty"
+          class="rounded-lg border border-dashed border-zinc-300 p-8 text-center bg-zinc-50/50"
+        >
+          <.icon name="hero-envelope" class="w-8 h-8 text-zinc-400 mx-auto mb-2" />
+          <p class="text-sm font-medium text-zinc-700">No pending invitations</p>
+          <p class="text-xs text-zinc-500 mt-1">
+            Invites you send will appear here until they are accepted.
           </p>
-        <% else %>
-          <div class="overflow-x-auto">
-            <table
-              class="min-w-full divide-y divide-zinc-200"
-              id="linked-family-members-table"
-            >
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Relationship
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={sub_account <- @sub_accounts}>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    {sub_account.first_name} {sub_account.last_name}
-                  </td>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {sub_account.email}
-                  </td>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {FamilyDisplay.relationship_label(
-                      sub_account.family_relationship
-                    )}
-                  </td>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm">
-                    <button
-                      phx-click="remove_sub_account"
-                      phx-value-user_id={sub_account.id}
-                      phx-disable-with="Removing..."
-                      data-confirm="Are you sure you want to remove this family member from your membership? They will lose access to membership benefits and receive an email notification."
-                      class="text-red-600 hover:text-red-800"
-                    >
-                      Remove from membership
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        <% end %>
-      </section>
-
-      <section>
-        <h2 class="text-zinc-900 font-semibold text-lg border-b border-zinc-200 pb-2 mb-4">
-          Pending Invitations
-        </h2>
-
-        <%= if @pending_invites == [] do %>
-          <p class="text-zinc-500 text-sm italic">No pending invitations.</p>
-          <p class="text-xs text-zinc-400 mt-2">
-            When you send an invite, it will appear here until the person accepts or the invite
-            expires.
-          </p>
-        <% else %>
-          <p class="text-xs text-zinc-500 mb-3">
-            Invitations awaiting acceptance. You can cancel any pending invite.
-          </p>
-          <div class="overflow-x-auto">
-            <table
-              class="min-w-full divide-y divide-zinc-200"
-              id="pending-invites-table"
-            >
-              <thead class="bg-zinc-50">
-                <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Relationship
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Expires
-                  </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={invite <- @pending_invites}>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900">
-                    {invite.email}
-                  </td>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {FamilyDisplay.relationship_label(invite.relationship)}
-                  </td>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
-                    {DateDisplay.format_date_long(invite.expires_at)}
-                  </td>
-                  <td class="px-4 py-4 whitespace-nowrap text-sm">
-                    <button
-                      phx-click="revoke_invite"
-                      phx-value-invite_id={invite.id}
-                      phx-disable-with="Cancelling..."
-                      data-confirm="Cancel this invite? The invitee will receive an email notification."
-                      class="text-red-600 hover:text-red-800"
-                    >
-                      Cancel invite
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        <% end %>
-      </section>
-    </div>
-
-    <section class="bg-zinc-50 rounded-xl border border-zinc-200 p-6 shadow-sm">
-      <h2 class="text-zinc-900 font-bold text-lg mb-1">Send an Invitation</h2>
-      <p class="text-xs text-zinc-500 mb-4">
-        Invite someone by email. Optionally link the invite to a family member on your account so their name appears in the email.
-      </p>
-
-      <.form
-        for={@invite_form}
-        id="invite-form"
-        phx-submit="send_invite"
-        phx-change="validate_invite"
-        class="space-y-6"
-      >
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <.input
-            field={@invite_form[:relationship]}
-            type="select"
-            label="Relationship"
-            options={[{"Spouse", "spouse"}, {"Child", "child"}]}
-            disabled={not @can_send_invite}
-          />
-          <p class="text-xs text-zinc-500 md:col-span-2 -mt-4">
-            Max 1 spouse and 9 children on your family membership.
-          </p>
-
-          <% valid_family_members =
-            Enum.filter(@family_members, fn fm ->
-              not is_nil(fm.first_name) && String.trim(fm.first_name) != "" &&
-                not is_nil(fm.last_name) && String.trim(fm.last_name) != ""
-            end) %>
-
-          <%= if valid_family_members != [] do %>
-            <.input
-              field={@invite_form[:family_member_id]}
-              type="select"
-              label="Select Family Member (Optional)"
-              options={
-                [{"Select a family member...", ""}] ++
-                  Enum.map(valid_family_members, fn fm ->
-                    {"#{fm.first_name} #{fm.last_name}", fm.id}
-                  end)
-              }
-              disabled={not @can_send_invite}
-            />
-            <p class="text-xs text-zinc-500 md:col-span-2 -mt-4">
-              If selected, their name will be included in the invitation email.
-            </p>
-          <% end %>
-
-          <div class="md:col-span-2">
-            <.input
-              field={@invite_form[:email]}
-              type="email"
-              label="Email Address"
-              placeholder="family.member@example.com"
-              required
-              disabled={not @can_send_invite}
-            />
-          </div>
         </div>
-
-        <div class="flex justify-end">
-          <.button
-            type="submit"
-            phx-disable-with="Sending..."
-            disabled={not @can_send_invite}
+      <% else %>
+        <p class="text-sm text-zinc-500">
+          Invitations awaiting acceptance. You can cancel any pending invite.
+        </p>
+        <div class="overflow-x-auto">
+          <table
+            class="min-w-full divide-y divide-zinc-200"
+            id="pending-invites-table"
           >
-            Send Invitation
-          </.button>
+            <thead class="bg-zinc-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  Email
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  Relationship
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  Expires
+                </th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-zinc-200">
+              <tr
+                :for={invite <- @pending_invites}
+                id={"pending-invite-row-#{invite.id}"}
+              >
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-900">
+                  {invite.email}
+                </td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
+                  {FamilyDisplay.relationship_label(invite.relationship)}
+                </td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-zinc-500">
+                  {DateDisplay.format_date_long(invite.expires_at)}
+                </td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-right">
+                  <.pending_invite_actions_dropdown invite={invite} />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </.form>
+      <% end %>
     </section>
-    """
-  end
 
-  attr :form, :any, required: true
-
-  defp family_member_editor(assigns) do
-    ~H"""
-    <div
-      id="family-member-editor"
-      class="mb-6 bg-zinc-50 rounded-xl border border-zinc-200 p-6 shadow-sm"
+    <.modal
+      :if={@family_member_form}
+      id="family-member-modal"
+      show
+      on_cancel={JS.push("cancel_family_member_form")}
     >
-      <h3 class="text-zinc-900 font-semibold text-base mb-4">
-        <%= if @form[:id].value in [nil, ""] do %>
+      <.modal_title id="family-member-modal-title">
+        <%= if @family_member_form[:id].value in [nil, ""] do %>
           Add Family Member
         <% else %>
           Edit Family Member
         <% end %>
-      </h3>
+      </.modal_title>
+
+      <.form_notice kind={:info} id="family-member-form-notice">
+        Saving here updates your account records only. To share membership benefits, send an invitation from the member row.
+      </.form_notice>
 
       <.form
-        for={@form}
+        for={@family_member_form}
         id="family-member-form"
         phx-change="validate_family_member"
         phx-submit="save_family_member"
         class="space-y-4"
       >
-        <input type="hidden" name="family_member[id]" value={@form[:id].value} />
+        <input
+          type="hidden"
+          name="family_member[id]"
+          value={@family_member_form[:id].value}
+        />
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <.input
-            field={@form[:first_name]}
+            field={@family_member_form[:first_name]}
             type="text"
             label="First Name"
             required
           />
-          <.input field={@form[:last_name]} type="text" label="Last Name" required />
-          <.input field={@form[:birth_date]} type="date" label="Date of Birth" />
           <.input
-            field={@form[:relationship]}
+            field={@family_member_form[:last_name]}
+            type="text"
+            label="Last Name"
+            required
+          />
+          <.input
+            field={@family_member_form[:birth_date]}
+            type="date"
+            label="Date of Birth"
+          />
+          <.input
+            field={@family_member_form[:relationship]}
             type="select"
             label="Relationship"
             options={[{"Child", "child"}, {"Spouse", "spouse"}]}
           />
         </div>
 
-        <p class="text-xs text-zinc-500 mt-2">
-          Saving here updates your account records only. To share membership benefits, send an invitation separately.
-        </p>
-
-        <div class="flex gap-3 justify-end">
+        <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
           <.button
             type="button"
             variant="outline"
+            color="zinc"
             phx-click="cancel_family_member_form"
           >
             Cancel
@@ -900,7 +700,69 @@ defmodule YscWeb.FamilyManagementLive do
           </.button>
         </div>
       </.form>
-    </div>
+    </.modal>
+
+    <.modal
+      :if={@invite_target}
+      id="invite-family-member-modal"
+      show
+      on_cancel={JS.push("cancel_invite_modal")}
+    >
+      <.modal_title id="invite-family-member-modal-title">
+        Invite {@invite_target.first_name} {@invite_target.last_name}
+      </.modal_title>
+
+      <%= if @can_send_invite do %>
+        <.form_notice kind={:info} id="invite-family-member-notice">
+          We'll email an invitation so they can create a login and share your membership benefits.
+          Relationship: {FamilyDisplay.relationship_label(@invite_target.type)}.
+        </.form_notice>
+      <% else %>
+        <.form_notice kind={:error} id="invite-family-member-disabled-notice">
+          You can't send family invites right now. Update your membership first.
+        </.form_notice>
+      <% end %>
+
+      <.form
+        for={@invite_form}
+        id="invite-family-member-form"
+        phx-change="validate_invite"
+        phx-submit="invite_family_member"
+        class="space-y-4"
+      >
+        <input
+          type="hidden"
+          name="invite[family_member_id]"
+          value={@invite_target.id}
+        />
+        <.input
+          field={@invite_form[:email]}
+          type="email"
+          label="Email Address"
+          placeholder="family.member@example.com"
+          required
+          disabled={not @can_send_invite}
+        />
+
+        <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-zinc-200">
+          <.button
+            type="button"
+            variant="outline"
+            color="zinc"
+            phx-click="cancel_invite_modal"
+          >
+            Cancel
+          </.button>
+          <.button
+            type="submit"
+            phx-disable-with="Sending..."
+            disabled={not @can_send_invite}
+          >
+            Send Invitation
+          </.button>
+        </div>
+      </.form>
+    </.modal>
     """
   end
 
@@ -919,10 +781,8 @@ defmodule YscWeb.FamilyManagementLive do
       </p>
     </header>
 
-    <section>
-      <h2 class="text-zinc-900 font-semibold text-lg border-b border-zinc-200 pb-2 mb-4">
-        Family membership manager
-      </h2>
+    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+      <h2 class="text-zinc-900 font-bold text-xl">Family membership manager</h2>
       <%= if @primary_user do %>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p class="text-sm font-semibold text-blue-900">
@@ -941,8 +801,8 @@ defmodule YscWeb.FamilyManagementLive do
       <% end %>
     </section>
 
-    <section>
-      <h2 class="text-zinc-900 font-semibold text-lg border-b border-zinc-200 pb-2 mb-4">
+    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+      <h2 class="text-zinc-900 font-bold text-xl">
         Other Family Members
         <span class="text-zinc-400 font-normal text-sm ml-2">
           ({length(@other_family_members)})
@@ -954,7 +814,10 @@ defmodule YscWeb.FamilyManagementLive do
         </p>
       <% else %>
         <div class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-zinc-200">
+          <table
+            class="min-w-full divide-y divide-zinc-200"
+            id="other-family-members-table"
+          >
             <thead class="bg-zinc-50">
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -983,11 +846,9 @@ defmodule YscWeb.FamilyManagementLive do
       <% end %>
     </section>
 
-    <section class="border-t border-zinc-200 pt-8">
-      <h2 class="text-zinc-900 font-semibold text-lg mb-2">
-        Leave Family Membership
-      </h2>
-      <p class="text-sm text-zinc-600 mb-4">
+    <section class="rounded border border-zinc-100 py-4 px-4 space-y-4">
+      <h2 class="text-zinc-900 font-bold text-xl">Leave Family Membership</h2>
+      <p class="text-sm text-zinc-600">
         You can leave this family membership at any time. You will no longer share membership benefits and can purchase your own membership or join another family later.
       </p>
       <.button
@@ -1001,6 +862,174 @@ defmodule YscWeb.FamilyManagementLive do
       </.button>
     </section>
     """
+  end
+
+  attr :row, :map, required: true
+
+  defp family_member_row_actions(assigns) do
+    menu_id = "family-member-actions-#{assigns.row.kind}-#{assigns.row.id}"
+    assigns = assign(assigns, :menu_id, menu_id)
+
+    ~H"""
+    <div class="inline-flex items-center justify-end gap-2">
+      <.button
+        :if={@row.kind == :roster}
+        type="button"
+        variant="outline"
+        color="blue"
+        id={"invite-family-member-button-#{@row.id}"}
+        phx-click="open_invite_modal"
+        phx-value-id={@row.id}
+        class="!min-h-0 py-1.5 px-2.5 text-xs"
+      >
+        <.icon name="hero-envelope" class="w-4 h-4" /> Send Invite
+      </.button>
+
+      <.admin_row_actions_dropdown id={@menu_id} label="Family member actions">
+        <%= if @row.kind == :linked do %>
+          <.admin_dropdown_menu_item
+            id={"#{@menu_id}-unlink"}
+            icon="hero-user-minus"
+            tone={:danger}
+            phx-click="remove_sub_account"
+            phx-value-user_id={@row.id}
+            data-confirm="Are you sure you want to remove this family member from your membership? They will lose access to membership benefits and receive an email notification."
+          >
+            Unlink
+          </.admin_dropdown_menu_item>
+        <% else %>
+          <.admin_dropdown_menu_item
+            id={"#{@menu_id}-edit"}
+            icon="hero-pencil-square"
+            phx-click="edit_family_member"
+            phx-value-id={@row.id}
+          >
+            Edit
+          </.admin_dropdown_menu_item>
+          <.admin_dropdown_menu_item
+            id={"#{@menu_id}-remove"}
+            icon="hero-trash"
+            tone={:danger}
+            phx-click="delete_family_member"
+            phx-value-id={@row.id}
+            data-confirm="Remove this family member from your list? This only removes their details from your account. It does not unlink anyone who has already accepted an invitation."
+          >
+            Remove
+          </.admin_dropdown_menu_item>
+        <% end %>
+      </.admin_row_actions_dropdown>
+    </div>
+    """
+  end
+
+  attr :invite, :any, required: true
+
+  defp pending_invite_actions_dropdown(assigns) do
+    menu_id = "pending-invite-actions-#{assigns.invite.id}"
+    assigns = assign(assigns, :menu_id, menu_id)
+
+    ~H"""
+    <.admin_row_actions_dropdown id={@menu_id} label="Invitation actions">
+      <.admin_dropdown_menu_item
+        id={"#{@menu_id}-cancel"}
+        icon="hero-x-mark"
+        tone={:danger}
+        phx-click="revoke_invite"
+        phx-value-invite_id={@invite.id}
+        data-confirm="Cancel this invite? The invitee will receive an email notification."
+      >
+        Cancel invite
+      </.admin_dropdown_menu_item>
+    </.admin_row_actions_dropdown>
+    """
+  end
+
+  defp do_invite_family_member(socket, params) do
+    user = socket.assigns.current_user
+    family_member_id = params["family_member_id"]
+    email = params["email"]
+
+    member =
+      Enum.find(socket.assigns.family_members, fn fm ->
+        to_string(fm.id) == to_string(family_member_id)
+      end)
+
+    relationship =
+      case member && member.type do
+        :spouse -> :spouse
+        "spouse" -> :spouse
+        _ -> :child
+      end
+
+    case FamilyInvites.create_invite(user, email,
+           relationship: relationship,
+           family_member_id: family_member_id
+         ) do
+      {:ok, _invite} ->
+        invites = FamilyInvites.list_invites(user)
+
+        {:noreply,
+         socket
+         |> assign(:invites, invites)
+         |> assign(:invite_target, nil)
+         |> assign(:invite_form, empty_invite_form())
+         |> YscWeb.Flash.put_toast(:info, "Invitation sent to #{email}",
+           title: "Family"
+         )}
+
+      {:error, reason} ->
+        {:noreply, invite_error(socket, reason)}
+    end
+  end
+
+  defp active_member_rows(sub_accounts, family_members) do
+    linked_rows =
+      Enum.map(sub_accounts, fn sub_account ->
+        %{
+          kind: :linked,
+          id: sub_account.id,
+          dom_id: "linked-family-member-row-#{sub_account.id}",
+          name: "#{sub_account.first_name} #{sub_account.last_name}",
+          subtitle: sub_account.email,
+          relationship:
+            FamilyDisplay.relationship_label(sub_account.family_relationship),
+          status_label: "Linked Account",
+          badge_type: "green"
+        }
+      end)
+
+    roster_rows =
+      Enum.map(family_members, fn member ->
+        subtitle =
+          case member.birth_date do
+            %Date{} = date -> "DOB: #{DateDisplay.format_date_long(date)}"
+            _ -> "Roster member"
+          end
+
+        %{
+          kind: :roster,
+          id: member.id,
+          dom_id: "family-member-row-#{member.id}",
+          name: "#{member.first_name} #{member.last_name}",
+          subtitle: subtitle,
+          relationship: FamilyDisplay.relationship_label(member.type),
+          status_label: "Roster Only",
+          badge_type: "yellow"
+        }
+      end)
+
+    linked_rows ++ roster_rows
+  end
+
+  defp empty_invite_form do
+    to_form(%{"email" => "", "family_member_id" => ""}, as: "invite")
+  end
+
+  defp invite_form_for_member(%FamilyMember{} = member) do
+    to_form(
+      %{"email" => "", "family_member_id" => to_string(member.id)},
+      as: "invite"
+    )
   end
 
   defp invite_error(socket, reason) do
@@ -1031,7 +1060,7 @@ defmodule YscWeb.FamilyManagementLive do
     socket =
       case reason do
         %Ecto.Changeset{} = changeset ->
-          assign(socket, :invite_form, to_form(changeset))
+          assign(socket, :invite_form, to_form(changeset, as: "invite"))
 
         _ ->
           socket
