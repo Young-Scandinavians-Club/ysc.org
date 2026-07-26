@@ -762,24 +762,24 @@ defmodule YscWeb.AdminUsersLive do
 
   def user_actions_dropdown(assigns) do
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="User actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="User actions">
+      <.dropdown_menu_item
         :if={@user.state == :pending_approval}
         id={"#{@menu_id}-review"}
         icon="hero-clipboard-document-check"
         phx-click={JS.patch(~p"/admin/users/#{@user.id}/review?#{@params}")}
       >
         Review
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={@user.state != :pending_approval}
         id={"#{@menu_id}-edit"}
         icon="hero-pencil-square"
         phx-click={JS.navigate(~p"/admin/users/#{@user.id}/details?#{@params}")}
       >
         Edit
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 

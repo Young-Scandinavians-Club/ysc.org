@@ -1886,6 +1886,187 @@ defmodule YscWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Ellipsis menu for per-row actions in tables and card lists.
+
+  Stops row click propagation and renders a right-aligned trigger.
+  Place `<.dropdown_menu_item>` elements in the default slot.
+
+  ## Examples
+
+      <.row_actions_dropdown id="member-actions-1" label="Member actions">
+        <.dropdown_menu_item
+          id="member-actions-1-edit"
+          icon="hero-pencil-square"
+          phx-click="edit"
+          phx-value-id={@member.id}
+        >
+          Edit
+        </.dropdown_menu_item>
+      </.row_actions_dropdown>
+  """
+  attr :id, :string, required: true
+
+  attr :label, :string,
+    required: true,
+    doc: "Accessible name for the trigger (rendered sr-only)"
+
+  slot :inner_block, required: true
+
+  def row_actions_dropdown(assigns) do
+    ~H"""
+    <div class="flex justify-end" onclick="event.stopPropagation()">
+      <.dropdown
+        id={@id}
+        right={true}
+        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+      >
+        <:button_block>
+          <span class="sr-only">{@label}</span>
+          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
+        </:button_block>
+
+        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
+          <ul class="py-1">
+            {render_slot(@inner_block)}
+          </ul>
+        </div>
+      </.dropdown>
+    </div>
+    """
+  end
+
+  @doc """
+  A single item inside `<.row_actions_dropdown>` (or any actions dropdown menu).
+
+  Renders a `<.link>` when `navigate`, `patch`, or `href` is set; otherwise a `<button>`.
+  Set `static` for non-interactive status rows (e.g. "Sending…").
+
+  ## Examples
+
+      <.dropdown_menu_item
+        id="actions-view"
+        icon="hero-arrow-top-right-on-square"
+        href={~p"/posts/1"}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        View live
+      </.dropdown_menu_item>
+
+      <.dropdown_menu_item
+        id="actions-delete"
+        icon="hero-trash"
+        tone={:danger}
+        phx-click="delete"
+        phx-value-id={@id}
+        data-confirm="Delete this item?"
+      >
+        Delete
+      </.dropdown_menu_item>
+  """
+  attr :id, :string, required: true
+  attr :icon, :string, default: nil
+
+  attr :tone, :atom,
+    default: :default,
+    values: [:default, :success, :danger, :info]
+
+  attr :static, :boolean, default: false
+  attr :navigate, :any, default: nil
+  attr :patch, :any, default: nil
+  attr :href, :any, default: nil
+
+  attr :class, :any,
+    default: nil,
+    doc: "Additional classes merged onto the menu item"
+
+  attr :icon_class, :any,
+    default: nil,
+    doc: "Override or extend default icon classes"
+
+  attr :rest, :global,
+    include:
+      ~w(phx-click phx-target phx-value-id phx-value-user_id phx-value-invite_id phx-value-tier-id phx-value-email data-confirm disabled target rel aria-label)
+
+  slot :inner_block, required: true
+  slot :leading, doc: "Custom leading content instead of a hero icon"
+
+  def dropdown_menu_item(assigns) do
+    assigns =
+      assign(
+        assigns,
+        :icon_classes,
+        dropdown_menu_item_icon_class(assigns.tone, assigns.icon_class)
+      )
+
+    ~H"""
+    <li>
+      <%= cond do %>
+        <% @static -> %>
+          <span id={@id} class={dropdown_menu_item_class(@tone, @class)}>
+            <%= if @leading != [] do %>
+              {render_slot(@leading)}
+            <% else %>
+              <.icon :if={@icon} name={@icon} class={@icon_classes} />
+            <% end %>
+            <span>{render_slot(@inner_block)}</span>
+          </span>
+        <% @navigate || @patch || @href -> %>
+          <.link
+            id={@id}
+            navigate={@navigate}
+            patch={@patch}
+            href={@href}
+            class={dropdown_menu_item_class(@tone, @class)}
+            {@rest}
+          >
+            <%= if @leading != [] do %>
+              {render_slot(@leading)}
+            <% else %>
+              <.icon :if={@icon} name={@icon} class={@icon_classes} />
+            <% end %>
+            <span>{render_slot(@inner_block)}</span>
+          </.link>
+        <% true -> %>
+          <button
+            id={@id}
+            type="button"
+            class={dropdown_menu_item_class(@tone, @class)}
+            {@rest}
+          >
+            <%= if @leading != [] do %>
+              {render_slot(@leading)}
+            <% else %>
+              <.icon :if={@icon} name={@icon} class={@icon_classes} />
+            <% end %>
+            <span>{render_slot(@inner_block)}</span>
+          </button>
+      <% end %>
+    </li>
+    """
+  end
+
+  defp dropdown_menu_item_class(tone, extra) do
+    [
+      "flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100",
+      dropdown_menu_item_tone_class(tone),
+      extra
+    ]
+  end
+
+  defp dropdown_menu_item_tone_class(:default), do: nil
+  defp dropdown_menu_item_tone_class(:success), do: "text-emerald-700"
+  defp dropdown_menu_item_tone_class(:danger), do: "text-red-600"
+  defp dropdown_menu_item_tone_class(:info), do: "text-blue-600"
+
+  defp dropdown_menu_item_icon_class(:default, nil),
+    do: "h-5 w-5 shrink-0 text-zinc-500"
+
+  defp dropdown_menu_item_icon_class(_tone, nil), do: "h-5 w-5 shrink-0"
+
+  defp dropdown_menu_item_icon_class(_tone, custom), do: custom
+
   attr :user, :any,
     default: nil,
     doc:
@@ -3153,7 +3334,7 @@ defmodule YscWeb.CoreComponents do
     assigns = assign(assigns, :nav_items, account_settings_nav_items())
 
     ~H"""
-    <ul class="flex-column space-y space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
+    <ul class="shrink-0 flex-column space-y-4 md:pr-10 text-sm font-medium text-zinc-600 md:me-4 mb-4 md:mb-0">
       <li>
         <h2 class="text-zinc-800 text-2xl font-semibold leading-8 mb-10">
           Account
@@ -3186,7 +3367,7 @@ defmodule YscWeb.CoreComponents do
     <.link
       navigate={@navigate}
       class={[
-        "inline-flex items-center px-4 py-3 rounded w-full",
+        "inline-flex items-center px-4 py-3 rounded w-full whitespace-nowrap",
         @active? && "bg-blue-600 active text-zinc-100",
         !@active? && "hover:bg-zinc-100 hover:text-zinc-900"
       ]}
