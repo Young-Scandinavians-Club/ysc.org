@@ -134,6 +134,128 @@ defmodule YscWeb.Emails.OutageNotificationTest do
     end
   end
 
+  describe "build_notification_variables/2 and text_body/1" do
+    setup do
+      user = user_fixture(%{first_name: "Erik"})
+
+      booking =
+        %Ysc.Bookings.Booking{
+          checkin_date: ~D[2024-11-22],
+          checkout_date: ~D[2024-11-24],
+          user: user
+        }
+
+      outage = %{
+        property: :clear_lake,
+        incident_type: :water_outage,
+        company_name: "PG&E",
+        incident_date: ~D[2024-11-20],
+        description: "Planned maintenance in the area."
+      }
+
+      %{booking: booking, outage: outage}
+    end
+
+    test "build_notification_variables uses first name and booking dates", %{
+      booking: booking,
+      outage: outage
+    } do
+      variables =
+        OutageNotification.build_notification_variables(booking, outage)
+
+      assert variables.first_name == "Erik"
+      assert variables.property == :clear_lake
+      assert variables.incident_type == :water_outage
+      assert variables.company_name == "PG&E"
+      assert variables.incident_date == ~D[2024-11-20]
+      assert variables.description == "Planned maintenance in the area."
+      assert variables.checkin_date == ~D[2024-11-22]
+      assert variables.checkout_date == ~D[2024-11-24]
+    end
+
+    test "text_body includes outage details, booking dates, and outage map link",
+         %{
+           booking: booking,
+           outage: outage
+         } do
+      variables =
+        OutageNotification.build_notification_variables(booking, outage)
+
+      body = OutageNotification.text_body(variables)
+
+      assert body =~ "Hej Erik"
+      assert body =~ "Water Outage"
+      assert body =~ "Clear Lake Property"
+      assert body =~ "PG&E"
+      assert body =~ "November 20, 2024"
+      assert body =~ "Planned maintenance in the area."
+      assert body =~ "November 22, 2024"
+      assert body =~ "November 24, 2024"
+      assert body =~ "pgealerts.alerts.pge.com"
+      assert body =~ "Young Scandinavians Club"
+    end
+
+    test "text_body omits description and cabin block when not provided" do
+      user = user_fixture(%{first_name: "Anna"})
+
+      booking = %Ysc.Bookings.Booking{
+        checkin_date: ~D[2024-06-10],
+        checkout_date: ~D[2024-06-12],
+        user: user
+      }
+
+      outage = %{
+        property: :tahoe,
+        incident_type: :power_outage,
+        company_name: "Unknown Utility",
+        incident_date: ~D[2024-06-01],
+        description: nil
+      }
+
+      variables =
+        OutageNotification.build_notification_variables(booking, outage)
+
+      body = OutageNotification.text_body(variables)
+
+      refute body =~ "Description:"
+      refute body =~ "Cabin Master:"
+      refute body =~ "View Outage Map"
+    end
+
+    test "text_body shows cabin block when only email is set" do
+      user = user_fixture(%{first_name: "Lars"})
+
+      booking = %Ysc.Bookings.Booking{
+        checkin_date: ~D[2024-01-05],
+        checkout_date: ~D[2024-01-07],
+        user: user
+      }
+
+      outage = %{
+        property: :tahoe,
+        incident_type: :internet_outage,
+        company_name: "Other",
+        incident_date: ~D[2024-01-01],
+        description: nil
+      }
+
+      variables =
+        booking
+        |> OutageNotification.build_notification_variables(outage)
+        |> Map.merge(%{
+          cabin_master_name: nil,
+          cabin_master_email: "only@example.com",
+          cabin_master_phone: nil
+        })
+
+      body = OutageNotification.text_body(variables)
+
+      assert body =~ "only@example.com"
+      assert body =~ "cabin master"
+      refute body =~ "Cabin Master:"
+    end
+  end
+
   describe "render/1" do
     setup do
       %{user: user_fixture()}

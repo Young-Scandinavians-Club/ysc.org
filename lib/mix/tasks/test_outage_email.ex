@@ -165,86 +165,13 @@ defmodule Mix.Tasks.TestOutageEmail do
       idempotency_key =
         "test_outage_alert_#{booking.id}_#{outage.incident_type}"
 
-      # Get user's first name or fallback to email
-      first_name = booking.user.first_name || booking.user.email
-
-      # Get cabin master information for the property
-      cabin_master = OutageNotification.get_cabin_master(outage.property)
-
-      cabin_master_name =
-        if cabin_master do
-          "#{cabin_master.first_name || ""} #{cabin_master.last_name || ""}"
-          |> String.trim()
-        else
-          nil
-        end
-
-      cabin_master_phone =
-        if cabin_master,
-          do:
-            Ysc.Extensions.PhoneNumber.format_for_display(
-              cabin_master.phone_number
-            ) ||
-              cabin_master.phone_number,
-          else: nil
-
-      cabin_master_email =
-        OutageNotification.get_cabin_master_email(outage.property)
-
-      # Build email variables
-      variables = %{
-        first_name: first_name,
-        property: outage.property,
-        incident_type: outage.incident_type,
-        company_name: outage.company_name,
-        incident_date: outage.incident_date,
-        description: outage.description,
-        checkin_date: booking.checkin_date,
-        checkout_date: booking.checkout_date,
-        cabin_master_name: cabin_master_name,
-        cabin_master_phone: cabin_master_phone,
-        cabin_master_email: cabin_master_email
-      }
+      variables =
+        OutageNotification.build_notification_variables(booking, outage)
 
       subject =
         "Property Outage Alert - #{OutageNotification.property_name(outage.property)}"
 
-      # Create text body for email
-      text_body = """
-      Hej #{first_name},
-
-      We wanted to let you know that a #{OutageNotification.incident_type_name(outage.incident_type)} has been reported at the #{OutageNotification.property_name(outage.property)}.
-
-      Outage Details:
-      - Type: #{OutageNotification.incident_type_name(outage.incident_type)}
-      - Provider: #{outage.company_name}
-      - Date: #{Calendar.strftime(outage.incident_date, "%B %d, %Y")}
-      #{if outage.description, do: "- Description: #{outage.description}", else: ""}
-
-      Your Booking:
-      - Check-in: #{Calendar.strftime(booking.checkin_date, "%B %d, %Y")}
-      - Check-out: #{Calendar.strftime(booking.checkout_date, "%B %d, %Y")}
-
-      #{if cabin_master_name || cabin_master_email do
-        "If you have any issues or need help, please reach out to the cabin master:\n\n" <> if(cabin_master_name, do: "- Cabin Master: #{cabin_master_name}\n", else: "") <> if(cabin_master_phone, do: "- Phone: #{cabin_master_phone}\n", else: "") <> if cabin_master_email, do: "- Email: #{cabin_master_email}\n", else: ""
-      else
-        ""
-      end}
-
-      We recommend checking the provider's outage map for the latest status and estimated restoration time.
-
-      #{if OutageNotification.provider_outage_map_url(outage.company_name) do
-        "View Outage Map: #{OutageNotification.provider_outage_map_url(outage.company_name)}"
-      else
-        ""
-      end}
-
-      Please note that outages can be unpredictable and restoration times may vary. We recommend checking the provider's website for the most up-to-date information.
-
-      If you have any questions or concerns, please don't hesitate to reach out to us.
-
-      Young Scandinavians Club
-      """
+      text_body = OutageNotification.text_body(variables)
 
       case Notifier.schedule_email(
              booking.user.email,
