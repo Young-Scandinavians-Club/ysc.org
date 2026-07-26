@@ -17,13 +17,9 @@ defmodule YscWeb.Api.BookingsControllerTest do
   # Creates a booking that is currently active (checked in already, not yet checked out),
   # which is required for the lookup endpoint to find it.
   defp active_booking_fixture(attrs) do
-    today = Date.utc_today()
     attrs = Map.new(attrs)
     user_id = Map.get(attrs, :user_id) || Ysc.AccountsFixtures.user_fixture().id
-
-    checkin = Date.add(today, -1)
-    checkout = Date.add(today, 2)
-    {checkin, checkout} = adjust_active_booking_dates(checkin, checkout)
+    {checkin, checkout} = active_stay_dates()
 
     {:ok, booking} =
       attrs
@@ -40,23 +36,6 @@ defmodule YscWeb.Api.BookingsControllerTest do
       |> Ysc.Bookings.create_booking()
 
     booking
-  end
-
-  # Tahoe weekend rule: inclusive stay dates containing Saturday must also contain Sunday.
-  # Keep within the default 4-night limit after adjustments.
-  defp adjust_active_booking_dates(checkin, checkout, max_nights \\ 4) do
-    checkout = ensure_sunday_when_saturday_included(checkin, checkout)
-
-    {checkin, checkout} =
-      if Date.diff(checkout, checkin) > max_nights do
-        checkin = Date.add(checkout, -max_nights)
-        checkout = ensure_sunday_when_saturday_included(checkin, checkout)
-        {checkin, checkout}
-      else
-        {checkin, checkout}
-      end
-
-    {checkin, checkout}
   end
 
   # Index defaults to today-7 .. today+30; fixture stays can land outside that

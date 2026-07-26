@@ -377,6 +377,148 @@ defmodule Ysc.CustomersTest do
     end
   end
 
+  describe "payment_element_default_values/1" do
+    test "includes email, name, phone, and full billing address" do
+      user =
+        user_fixture_unique(%{
+          first_name: "jane",
+          last_name: "doe",
+          phone_number: "+14159098268"
+        })
+
+      {:ok, _} =
+        Ysc.Accounts.update_billing_address(user, %{
+          "address" => "123 Main St",
+          "city" => "San Francisco",
+          "region" => "CA",
+          "postal_code" => "94102",
+          "country" => "US"
+        })
+
+      details = Customers.payment_element_default_values(user)
+
+      assert details == %{
+               "email" => user.email,
+               "name" => "Jane Doe",
+               "phone" => "+14159098268",
+               "address" => %{
+                 "line1" => "123 Main St",
+                 "city" => "San Francisco",
+                 "state" => "CA",
+                 "postal_code" => "94102",
+                 "country" => "US"
+               }
+             }
+    end
+
+    test "omits phone when missing" do
+      user =
+        user_fixture_unique(%{
+          first_name: "jane",
+          last_name: "doe"
+        })
+
+      user =
+        user
+        |> User.update_user_changeset(%{phone_number: nil})
+        |> Ysc.Repo.update!()
+
+      details = Customers.payment_element_default_values(user)
+
+      assert details["email"] == user.email
+      assert details["name"] == "Jane Doe"
+      refute Map.has_key?(details, "phone")
+      refute Map.has_key?(details, "address")
+    end
+
+    test "omits address when user has none" do
+      user = user_fixture_unique(%{phone_number: "+14159098268"})
+      details = Customers.payment_element_default_values(user)
+
+      refute Map.has_key?(details, "address")
+      assert details["phone"] == "+14159098268"
+    end
+
+    test "omits blank address fields" do
+      user = user_fixture_unique()
+
+      {:ok, _} =
+        Ysc.Accounts.update_billing_address(user, %{
+          "address" => "123 Main St",
+          "city" => "San Francisco",
+          "region" => "",
+          "postal_code" => "94102",
+          "country" => "US"
+        })
+
+      details = Customers.payment_element_default_values(user)
+
+      assert details["address"] == %{
+               "line1" => "123 Main St",
+               "city" => "San Francisco",
+               "postal_code" => "94102",
+               "country" => "US"
+             }
+
+      refute Map.has_key?(details["address"], "state")
+    end
+
+    test "payment_element_default_values_json encodes map" do
+      user = user_fixture_unique(%{phone_number: "+14159098268"})
+      json = Customers.payment_element_default_values_json(user)
+
+      assert Jason.decode!(json)["email"] == user.email
+      assert Customers.payment_element_default_values_json(nil) == "{}"
+    end
+  end
+
+  describe "ensure_stripe_customer/1" do
+    test "creates stripe customer when missing" do
+      user = user_fixture_unique()
+      assert user.stripe_id == nil
+
+      ensured = Customers.ensure_stripe_customer(user)
+
+      assert ensured.stripe_id
+      assert String.starts_with?(ensured.stripe_id, "cus_test_")
+    end
+
+    test "returns user unchanged when stripe_id already set" do
+      user = user_fixture_unique() |> update_user_stripe_id("cus_existing")
+
+      assert Customers.ensure_stripe_customer(user).stripe_id == "cus_existing"
+    end
+  end
+
+  describe "attach_customer_to_payment_intent_params/2" do
+    test "attaches customer and receipt_email" do
+      user =
+        user_fixture_unique(%{email: "pay@example.com"})
+        |> update_user_stripe_id("cus_attach")
+
+      {params, returned_user} =
+        Customers.attach_customer_to_payment_intent_params(
+          %{amount: 1000},
+          user
+        )
+
+      assert params.customer == "cus_attach"
+      assert params.receipt_email == "pay@example.com"
+      assert returned_user.id == user.id
+    end
+
+    test "creates customer when missing then attaches" do
+      user = user_fixture_unique()
+
+      {params, returned_user} =
+        Customers.attach_customer_to_payment_intent_params(%{amount: 500}, user)
+
+      assert returned_user.stripe_id
+      assert params.customer == returned_user.stripe_id
+      assert params.receipt_email == user.email
+    end
+  end
+
   describe "create_stripe_customer/1 and update_stripe_customer/1" do
     test "create_stripe_customer assigns stripe_id in test environment" do
       user = user_fixture_unique()
@@ -388,6 +530,39 @@ defmodule Ysc.CustomersTest do
       user = Ysc.Repo.get!(User, user.id)
       assert user.stripe_id == c.id
       assert String.starts_with?(user.stripe_id, "cus_test_")
+    end
+
+    test "create_stripe_customer includes billing address when present" do
+      user = user_fixture_unique()
+
+      {:ok, _} =
+        Ysc.Accounts.update_billing_address(user, %{
+          "address" => "123 Main St",
+          "city" => "San Francisco",
+          "region" => "CA",
+          "postal_code" => "94102",
+          "country" => "US"
+        })
+
+      user = Ysc.Accounts.get_user!(user.id, [:billing_address])
+
+      parent = self()
+
+      Mox.expect(Stripe.CustomerMock, :create, fn params ->
+        send(parent, {:create_params, params})
+
+        {:ok,
+         %Stripe.Customer{
+           id: "cus_addr_#{user.id}",
+           email: params.email
+         }}
+      end)
+
+      assert {:ok, _} = Customers.create_stripe_customer(user)
+
+      assert_receive {:create_params, params}
+      assert params.address.line1 == "123 Main St"
+      assert params.address.state == "CA"
     end
 
     test "update_stripe_customer returns error when user has no stripe_id" do

@@ -16,6 +16,8 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
   alias Ysc.Bookings.{BookingModeDisplay, PropertyDisplay}
   alias YscWeb.Emails.OutageNotification
 
+  @clear_lake_training_videos_url "https://www.youtube.com/watch?v=53ARqZXuE0o&list=PLCfwh7uBCuiwoTgkTJDsi5wfD__0EHk3l&index=4&t"
+
   def get_template_name() do
     "booking_checkin_reminder"
   end
@@ -154,7 +156,7 @@ defmodule YscWeb.Emails.BookingCheckinReminder do
       cabin_master_email: cabin_master_email,
       cabin_master_phone: cabin_master_phone,
       booking_url: booking_url(booking.id),
-      clear_lake_info_url: absolute_url("/bookings/clear-lake?tab=information")
+      clear_lake_info_url: @clear_lake_training_videos_url
     }
   end
 end
