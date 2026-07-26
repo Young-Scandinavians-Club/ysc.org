@@ -102,7 +102,8 @@ defmodule Ysc.Accounts.FamilyInvites do
           from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
           |> Repo.one!()
 
-          if count_sub_accounts_by_primary_id(primary_user_id) >= @max_sub_accounts do
+          if count_sub_accounts_by_primary_id(primary_user_id) >=
+               @max_sub_accounts do
             Repo.rollback(:max_sub_accounts_reached)
           end
 
