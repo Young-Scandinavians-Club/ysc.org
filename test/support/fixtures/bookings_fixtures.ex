@@ -92,15 +92,6 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
-  Widens season advance-booking windows so locker/integration tests can use
-  far-future dates for isolation without tripping validation.
-
-  Uses a large day count (not `nil`): `nil` means “no per-date cap” but
-  `SeasonHelpers.calculate_max_booking_date/2` still clamps to the end of the
-  current season when the next season also has no limit. Prefer ~2 years over
-  365 so year+2 isolation dates remain valid.
-  """
-  @doc """
   Returns a stable Clear Lake test date (`~D[2026-07-01]` plus `offset_days`).
 
   Prefer this over `Date.utc_today()` in booking LiveView tests.
@@ -137,6 +128,15 @@ defmodule Ysc.BookingsFixtures do
     Date.add(@tahoe_test_anchor, offset_days)
   end
 
+  @doc """
+  Widens season advance-booking windows so locker/integration tests can use
+  far-future dates for isolation without tripping validation.
+
+  Uses a large day count (not `nil`): `nil` means “no per-date cap” but
+  `SeasonHelpers.calculate_max_booking_date/2` still clamps to the end of the
+  current season when the next season also has no limit. Prefer ~2 years over
+  365 so year+2 isolation dates remain valid.
+  """
   def allow_far_future_booking_dates do
     from(s in Season)
     |> Repo.update_all(set: [advance_booking_days: 800])
