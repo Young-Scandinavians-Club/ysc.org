@@ -505,7 +505,8 @@ defmodule YscWeb.UserTicketsLive do
   defp format_visited_date(_), do: "Visited"
 
   defp cancel_order_error_message(:not_found),
-    do: "We couldn't find this ticket purchase. It may have already been cancelled."
+    do:
+      "We couldn't find this ticket purchase. It may have already been cancelled."
 
   defp cancel_order_error_message(:checkout_payment_in_progress),
     do:
