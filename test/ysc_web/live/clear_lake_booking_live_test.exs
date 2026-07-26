@@ -11,7 +11,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
   # setup and the LV process must be allowed to use the SQL sandbox for refetches.
   defp live_clear_lake(conn, path) do
     {:ok, view, html} = Phoenix.LiveViewTest.live(conn, path)
-    :ok = Sandbox.allow(Repo, self(), view.pid)
+
+    case Sandbox.allow(Repo, self(), view.pid) do
+      :ok -> :ok
+      {:already, :allowed} -> :ok
+    end
+
     {:ok, view, html}
   end
 
