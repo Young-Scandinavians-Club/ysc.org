@@ -187,8 +187,6 @@ defmodule Ysc.BookingsTest do
       staying =
         active_check_in_booking_fixture(%{
           property: :tahoe,
-          checkin_date: Date.add(today, -1),
-          checkout_date: two_day_checkout,
           status: :complete,
           guests_count: 3
         })
@@ -1128,12 +1126,13 @@ defmodule Ysc.BookingsTest do
 
     defp check_in_booking(overrides \\ %{}) do
       today = today_pst()
+      {default_checkin, default_checkout} = active_stay_dates(today)
 
       defaults = %{
         status: :complete,
         checked_in: false,
-        checkin_date: Date.add(today, -1),
-        checkout_date: Date.add(today, 2),
+        checkin_date: default_checkin,
+        checkout_date: default_checkout,
         reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
       }
 

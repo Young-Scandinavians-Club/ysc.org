@@ -17,7 +17,18 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       {:already, :allowed} -> :ok
     end
 
+    # Wait for mount-time deferred loads (subscriptions, availability caches) so
+    # rapid render_click/render_change calls do not race a busy LiveView process.
+    render_async(view, 2_000)
+
     {:ok, view, html}
+  end
+
+  # render/1 round-trips with the LiveView so :sys.get_state does not time out when
+  # the process is still finishing mount-time cache loads under full-suite contention.
+  defp guests_count_assign(view) do
+    render(view)
+    :sys.get_state(view.pid).socket.assigns.guests_count
   end
 
   describe "malformed query params" do
@@ -695,8 +706,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       render_click(view, "increase-guests", %{})
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 21
+      assert guests_count_assign(view) == 21
     end
   end
 
@@ -943,8 +953,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       render_change(view, "guests-changed", %{"guests_count" => "50"})
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 50
+      assert guests_count_assign(view) == 50
     end
   end
 
@@ -1167,9 +1176,12 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
           ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
         )
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 20
-      assert state.socket.assigns.selected_booking_mode == :day
+      assert guests_count_assign(view) == 20
+
+      render(view)
+
+      assert :sys.get_state(view.pid).socket.assigns.selected_booking_mode ==
+               :day
     end
 
     test "switches from day to buyout with valid dates", %{conn: conn} do
@@ -1352,8 +1364,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       render_click(view, "increase-guests", %{})
       render_click(view, "increase-guests", %{})
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 4
+      assert guests_count_assign(view) == 4
     end
   end
 
@@ -1363,7 +1374,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
-      render_async(view, 2_000)
 
       for i <- 1..2 do
         date = Date.add(Date.utc_today(), 30 + i)
@@ -1382,7 +1392,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
-      render_async(view, 2_000)
 
       # Rapid guest changes
       for _i <- 1..5 do
@@ -1402,7 +1411,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
-      render_async(view, 2_000)
 
       render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
       render_click(view, "booking-mode-changed", %{"booking_mode" => "day"})
@@ -1418,7 +1426,6 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
-      render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})
       render_click(view, "switch-tab", %{"tab" => "booking"})
@@ -1670,8 +1677,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
           ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
         )
 
-      state = :sys.get_state(view.pid)
-      assert state.socket.assigns.guests_count == 12
+      assert guests_count_assign(view) == 12
     end
 
     test "books with 4 guests", %{conn: conn} do
