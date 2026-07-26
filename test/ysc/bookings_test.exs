@@ -339,10 +339,10 @@ defmodule Ysc.BookingsTest do
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
       _stale_checkout_today =
-        insert_complete_booking(user, Date.add(today, -1), today)
+        insert_complete_tahoe_booking(user, Date.add(today, -1), today)
 
       future =
-        insert_complete_booking(user, Date.add(today, 7), Date.add(today, 9))
+        insert_complete_tahoe_booking(user, Date.add(today, 7), Date.add(today, 9))
 
       now_pst = DateTime.now!("America/Los_Angeles")
 
@@ -4831,6 +4831,22 @@ defmodule Ysc.BookingsTest do
       user_id: user.id,
       property: :clear_lake,
       booking_mode: :day,
+      checkin_date: checkin_date,
+      checkout_date: checkout_date,
+      guests_count: 2,
+      status: :complete,
+      total_price: Money.new(100, :USD),
+      reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
+    }
+    |> Ysc.Repo.insert!()
+    |> Ysc.Repo.preload(:rooms)
+  end
+
+  defp insert_complete_tahoe_booking(user, checkin_date, checkout_date) do
+    %Booking{
+      user_id: user.id,
+      property: :tahoe,
+      booking_mode: :room,
       checkin_date: checkin_date,
       checkout_date: checkout_date,
       guests_count: 2,
