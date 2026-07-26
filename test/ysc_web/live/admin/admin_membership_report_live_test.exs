@@ -27,7 +27,9 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       assert html =~ "Generate report"
     end
 
-    test "generates report for date range with pending applications", %{conn: conn} do
+    test "generates report for date range with pending applications", %{
+      conn: conn
+    } do
       user = user_fixture()
 
       signup_application_fixture(user, %{
@@ -48,7 +50,9 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
     end
 
     test "shows error for invalid date range", %{conn: conn} do
-      {:ok, view, _html} = live(conn, ~p"/admin/memberships/report?from=2026-05-01&to=2026-04-01")
+      {:ok, view, _html} =
+        live(conn, ~p"/admin/memberships/report?from=2026-05-01&to=2026-04-01")
+
       html = render(view)
 
       assert html =~ "Invalid date range"

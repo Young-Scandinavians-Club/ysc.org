@@ -4,7 +4,6 @@ defmodule Ysc.Accounts.MembershipReportTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Accounts.MembershipReport
-  alias Ysc.Repo
   alias Ysc.Subscriptions
 
   describe "generate/2" do
