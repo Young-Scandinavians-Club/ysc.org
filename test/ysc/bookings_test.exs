@@ -334,6 +334,46 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "list_active_tahoe_bookings_for_family/2 applies checkout cutoff before limit" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      _stale_checkout_today =
+        insert_complete_tahoe_booking(user, Date.add(today, -1), today)
+
+      future =
+        insert_complete_tahoe_booking(
+          user,
+          Date.add(today, 7),
+          Date.add(today, 9)
+        )
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      family_user_ids = [user.id]
+
+      if DateTime.compare(now_pst, checkout_cutoff) == :gt do
+        bookings =
+          Bookings.list_active_tahoe_bookings_for_family(family_user_ids,
+            limit: 1
+          )
+
+        assert length(bookings) == 1
+        assert hd(bookings).id == future.id
+      else
+        bookings =
+          Bookings.list_active_tahoe_bookings_for_family(family_user_ids,
+            limit: 2
+          )
+
+        assert length(bookings) == 2
+        assert future.id in Enum.map(bookings, & &1.id)
+      end
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()
@@ -4799,6 +4839,22 @@ defmodule Ysc.BookingsTest do
       user_id: user.id,
       property: :clear_lake,
       booking_mode: :day,
+      checkin_date: checkin_date,
+      checkout_date: checkout_date,
+      guests_count: 2,
+      status: :complete,
+      total_price: Money.new(100, :USD),
+      reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
+    }
+    |> Ysc.Repo.insert!()
+    |> Ysc.Repo.preload(:rooms)
+  end
+
+  defp insert_complete_tahoe_booking(user, checkin_date, checkout_date) do
+    %Booking{
+      user_id: user.id,
+      property: :tahoe,
+      booking_mode: :room,
       checkin_date: checkin_date,
       checkout_date: checkout_date,
       guests_count: 2,

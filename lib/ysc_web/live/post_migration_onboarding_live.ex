@@ -1799,10 +1799,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     |> assign(:sms_resend_disabled_until, nil)
     |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
     |> assign(:payment_intent_secret, nil)
-    |> assign(
-      :stripe_billing_details,
-      Ysc.Customers.payment_element_default_values_json(user)
-    )
+    |> assign(:stripe_billing_details, "{}")
     |> assign(:payment_method_saved, false)
     |> assign(:default_payment_method, nil)
     |> assign(

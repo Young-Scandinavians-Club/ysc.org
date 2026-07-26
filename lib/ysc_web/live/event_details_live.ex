@@ -3614,12 +3614,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:payment_redirect_in_progress, false)
     |> assign(:preserve_failed_checkout_state, false)
     |> assign(:stripe_payment_element_ready, false)
-    |> assign(
-      :stripe_billing_details,
-      Ysc.Customers.payment_element_default_values_json(
-        socket.assigns.current_user
-      )
-    )
+    |> assign(:stripe_billing_details, "{}")
     # Reservations - will be loaded async
     |> assign(:user_reservations, [])
     |> assign(:reservations_by_tier, %{})
@@ -4176,6 +4171,12 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(
        :subscribed_to_save_the_date,
        Map.get(results, :save_the_date_subscription, false)
+     )
+     |> assign(
+       :stripe_billing_details,
+       Ysc.Customers.payment_element_default_values_json(
+         socket.assigns.current_user
+       )
      )
      |> assign(:async_data_loaded, true)
      |> assign_checkout_pricing()}
