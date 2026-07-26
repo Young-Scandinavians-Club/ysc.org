@@ -15,7 +15,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
     test "dead render skips availability queries when dates are in the URL", %{
       conn: conn
     } do
-      {checkin, checkout} = tahoe_booking_dates(45)
+      {checkin, checkout} = clear_lake_booking_dates(45, 3)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -44,7 +44,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = tahoe_booking_dates(45)
+      {checkin, checkout} = clear_lake_booking_dates(45, 3)
 
       path =
         "/bookings/clear-lake?" <>
@@ -91,7 +91,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = tahoe_booking_dates(45)
+      {checkin, checkout} = clear_lake_booking_dates(45, 3)
 
       path =
         "/bookings/clear-lake?" <>
@@ -121,7 +121,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = tahoe_booking_dates(45)
+      {checkin, checkout} = clear_lake_booking_dates(45, 3)
 
       path =
         "/bookings/clear-lake?" <>
@@ -152,7 +152,7 @@ defmodule YscWeb.ClearLakeBookingDeferredTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {checkin, checkout} = tahoe_booking_dates(45)
+      {checkin, checkout} = clear_lake_booking_dates(45, 3)
 
       path =
         "/bookings/clear-lake?" <>

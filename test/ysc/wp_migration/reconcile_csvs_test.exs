@@ -66,7 +66,11 @@ defmodule Ysc.WpMigration.ReconcileCsvsTest do
     )
 
     assert {:ok, report} =
-             ReconcileCsvs.run(export_dir: export_dir, csv_dir: csv_dir)
+             ReconcileCsvs.run(
+               export_dir: export_dir,
+               csv_dir: csv_dir,
+               print: false
+             )
 
     assert report.users.export == 2
     assert report.users.csv == 2

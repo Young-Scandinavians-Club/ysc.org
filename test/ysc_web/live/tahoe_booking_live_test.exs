@@ -62,8 +62,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
     end
 
     test "loads page with query parameters", %{conn: conn} do
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -158,8 +157,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -644,8 +642,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       # Try to book far in the future (likely out of season)
-      checkin = Date.add(Date.utc_today(), 400)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(400)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -802,7 +799,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 30)
+      {checkin, _} = tahoe_booking_dates(30)
       # Before checkin
       checkout = Date.add(checkin, -5)
 
@@ -822,7 +819,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), -10)
+      checkin = ~D[2024-06-15]
       checkout = Date.add(checkin, 3)
 
       params = %{
@@ -1009,8 +1006,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       {:ok, view, _html} =
         live(
@@ -1033,7 +1029,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
       render_async(view, 2_000)
 
-      date_str = Date.to_string(Date.utc_today())
+      date_str = Date.to_string(tahoe_test_date(0))
       render_click(view, "cursor-move", %{"date" => date_str})
 
       html = render(view)
@@ -1090,7 +1086,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
       render_async(view, 2_000)
 
-      checkin = Date.add(Date.utc_today(), 30)
+      checkin = tahoe_test_date(30)
 
       render_change(view, "date-changed", %{
         "checkin_date" => Date.to_string(checkin)
@@ -1107,7 +1103,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
       render_async(view, 2_000)
 
-      checkout = Date.add(Date.utc_today(), 33)
+      checkout = tahoe_test_date(33)
 
       render_change(view, "date-changed", %{
         "checkout_date" => Date.to_string(checkout)
@@ -1180,8 +1176,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 1)
+      {checkin, checkout} = tahoe_room_booking_dates(30, 1)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -1198,7 +1193,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      base_date = Date.add(Date.utc_today(), 60)
+      base_date = tahoe_test_date(60)
       friday = find_next_weekday(base_date, 5)
       monday = Date.add(friday, 3)
 
@@ -1217,8 +1212,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 500)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(500)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -1237,8 +1231,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      checkin = Date.add(Date.utc_today(), 30)
-      checkout = Date.add(checkin, 3)
+      {checkin, checkout} = tahoe_booking_dates(30)
 
       params = %{
         "checkin_date" => Date.to_string(checkin),
@@ -1271,7 +1264,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      base_date = Date.add(Date.utc_today(), 60)
+      base_date = tahoe_test_date(60)
       monday = find_next_weekday(base_date, 1)
       wednesday = Date.add(monday, 2)
 
@@ -1292,7 +1285,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      base_date = Date.add(Date.utc_today(), 90)
+      base_date = tahoe_test_date(90)
       saturday = find_next_weekday(base_date, 6)
       next_saturday = Date.add(saturday, 7)
 
@@ -1319,7 +1312,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
       render_async(view, 2_000)
 
       for i <- 1..5 do
-        date = Date.add(Date.utc_today(), 30 + i)
+        date = tahoe_test_date(30 + i)
 
         render_change(view, "date-changed", %{
           "checkin_date" => Date.to_string(date)
