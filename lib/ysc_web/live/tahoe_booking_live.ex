@@ -7038,31 +7038,9 @@ defmodule YscWeb.TahoeBookingLive do
 
   # Get active bookings for the entire family group (primary user + all sub-accounts)
   defp get_family_group_active_bookings(user, limit \\ 10) do
-    family_user_ids = get_family_group_user_ids(user)
-    today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
-
-    query =
-      from b in Booking,
-        where: b.user_id in ^family_user_ids,
-        where: b.property == :tahoe,
-        where: b.status == :complete,
-        where: b.checkout_date >= ^today,
-        order_by: [asc: b.checkin_date],
-        limit: ^limit,
-        preload: [:rooms, :user]
-
-    bookings = Repo.all(query)
-
-    # Filter out bookings that are past checkout time today
-    bookings
-    |> Enum.filter(fn booking ->
-      if Date.compare(booking.checkout_date, today) == :eq do
-        not past_checkout_time?()
-      else
-        true
-      end
-    end)
-    |> Enum.take(limit)
+    user
+    |> get_family_group_user_ids()
+    |> Bookings.list_active_tahoe_bookings_for_family(limit: limit)
   end
 
   # Get all user IDs in the family group (primary user + all sub-accounts)

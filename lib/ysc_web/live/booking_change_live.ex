@@ -699,10 +699,7 @@ defmodule YscWeb.BookingChangeLive do
       loading_booking?: true,
       booking: nil,
       page_title: "Change Booking",
-      stripe_billing_details:
-        Ysc.Customers.payment_element_default_values_json(
-          socket.assigns.current_user
-        )
+      stripe_billing_details: "{}"
     )
   end
 
@@ -723,6 +720,10 @@ defmodule YscWeb.BookingChangeLive do
             socket
             |> assign(:loading_booking?, false)
             |> assign_change_page_shell(booking, calendar, form)
+            |> assign(
+              :stripe_billing_details,
+              Ysc.Customers.payment_element_default_values_json(user)
+            )
             |> load_change_data_async(booking, form)
           else
             socket

@@ -67,10 +67,7 @@ defmodule YscWeb.BookingCheckoutLive do
       selected_family_members_for_guests: %{},
       show_price_details: false,
       stripe_payment_element_ready: false,
-      stripe_billing_details:
-        Ysc.Customers.payment_element_default_values_json(
-          socket.assigns.current_user
-        ),
+      stripe_billing_details: "{}",
       page_title: "Booking Checkout",
       meta_description:
         "Complete your cabin booking with Young Scandinavians Club."
@@ -246,6 +243,8 @@ defmodule YscWeb.BookingCheckoutLive do
         selected_family_members_for_guests: %{},
         show_price_details: false,
         stripe_payment_element_ready: false,
+        stripe_billing_details:
+          Ysc.Customers.payment_element_default_values_json(user),
         checkout_data_loaded?: true,
         page_title: "Booking Checkout",
         meta_description:
