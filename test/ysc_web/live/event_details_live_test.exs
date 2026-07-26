@@ -414,8 +414,12 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
 
-      # Should show some indication to log in
       assert html =~ event.title
+
+      assert html =~
+               "Sign in to buy tickets. An active YSC membership is required."
+
+      assert html =~ "Sign In to Continue"
     end
 
     test "can toggle map without authentication", %{conn: conn} do

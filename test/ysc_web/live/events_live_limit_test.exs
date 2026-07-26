@@ -17,34 +17,6 @@ defmodule YscWeb.EventsLiveLimitTest do
 
   defp render_events_async(view), do: render_async(view, @events_async_timeout)
 
-  defp create_past_event(attrs) do
-    organizer = attrs[:organizer] || user_fixture()
-
-    defaults = %{
-      title: "Past Event #{System.unique_integer()}",
-      description: "A test event description",
-      start_date: DateTime.add(DateTime.utc_now(), -30, :day),
-      end_date: DateTime.add(DateTime.utc_now(), -29, :day),
-      state: :published,
-      ticket_sales_start: DateTime.add(DateTime.utc_now(), -31, :day),
-      ticket_sales_end: DateTime.add(DateTime.utc_now(), -28, :day),
-      location: "Test Location",
-      max_attendees: 100,
-      organizer_id: organizer.id,
-      image_id: nil,
-      reference_id: "EVT-LIMIT-#{System.unique_integer()}"
-    }
-
-    attrs =
-      attrs
-      |> Map.drop([:organizer])
-      |> then(&Map.merge(defaults, &1))
-
-    %Events.Event{}
-    |> Events.Event.changeset(attrs)
-    |> Repo.insert!()
-  end
-
   defp create_upcoming_event(attrs) do
     organizer = attrs[:organizer] || user_fixture()
 

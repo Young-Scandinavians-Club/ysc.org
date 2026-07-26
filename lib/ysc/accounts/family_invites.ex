@@ -606,10 +606,19 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   defp count_sub_accounts(primary_user) do
-    from(u in User,
-      where: u.primary_user_id == ^primary_user.id
-    )
-    |> Repo.aggregate(:count, :id)
+    case primary_user.sub_accounts do
+      %Ecto.Association.NotLoaded{} ->
+        from(u in User,
+          where: u.primary_user_id == ^primary_user.id
+        )
+        |> Repo.aggregate(:count, :id)
+
+      sub_accounts when is_list(sub_accounts) ->
+        length(sub_accounts)
+
+      _ ->
+        0
+    end
   end
 
   defp count_spouses(primary_user) do

@@ -1075,6 +1075,16 @@ defmodule YscWeb.EventDetailsLive do
               <div class="h-8 bg-gradient-to-t from-white to-transparent"></div>
 
               <div class="bg-white/95 backdrop-blur-md border-t border-zinc-100 px-6 py-5">
+                <p
+                  :if={
+                    @current_user == nil && @has_ticket_tiers &&
+                      !event_in_past?(@event) &&
+                      @event.partiful_link in [nil, ""]
+                  }
+                  class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
+                >
+                  Sign in to buy tickets. An active YSC membership is required.
+                </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
                   <%= if event_in_past?(@event) do %>
                     <div class="flex-1 text-center">
@@ -2530,6 +2540,7 @@ defmodule YscWeb.EventDetailsLive do
                   data-client-secret={@payment_intent.client_secret}
                   data-clientSecret={@payment_intent.client_secret}
                   data-ticket-order-id={@ticket_order.id}
+                  data-billing-details={@stripe_billing_details}
                 >
                   <!-- Stripe Elements will be mounted here -->
                 </div>
@@ -3603,6 +3614,7 @@ defmodule YscWeb.EventDetailsLive do
     |> assign(:payment_redirect_in_progress, false)
     |> assign(:preserve_failed_checkout_state, false)
     |> assign(:stripe_payment_element_ready, false)
+    |> assign(:stripe_billing_details, "{}")
     # Reservations - will be loaded async
     |> assign(:user_reservations, [])
     |> assign(:reservations_by_tier, %{})
@@ -4159,6 +4171,12 @@ defmodule YscWeb.EventDetailsLive do
      |> assign(
        :subscribed_to_save_the_date,
        Map.get(results, :save_the_date_subscription, false)
+     )
+     |> assign(
+       :stripe_billing_details,
+       Ysc.Customers.payment_element_default_values_json(
+         socket.assigns.current_user
+       )
      )
      |> assign(:async_data_loaded, true)
      |> assign_checkout_pricing()}
@@ -4822,13 +4840,13 @@ defmodule YscWeb.EventDetailsLive do
           {:error, _} ->
             # Payment intent not found, create a new one
             Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
-              customer_id: user.stripe_id
+              user: user
             )
         end
       else
         # No payment intent exists, create a new one
         Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
-          customer_id: user.stripe_id
+          user: user
         )
       end
     end
@@ -4862,7 +4880,7 @@ defmodule YscWeb.EventDetailsLive do
         )
 
         Ysc.Tickets.StripeService.create_payment_intent(ticket_order,
-          customer_id: user.stripe_id
+          user: user
         )
       end
     end
@@ -8332,7 +8350,7 @@ defmodule YscWeb.EventDetailsLive do
       # For paid tickets, create Stripe payment intent
       case Ysc.Tickets.StripeService.create_payment_intent(
              ticket_order,
-             customer_id: socket.assigns.current_user.stripe_id
+             user: socket.assigns.current_user
            ) do
         {:ok, payment_intent} ->
           ticket_order = %{ticket_order | payment_intent_id: payment_intent.id}

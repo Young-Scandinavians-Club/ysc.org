@@ -4649,6 +4649,19 @@ defmodule Ysc.Bookings do
     |> DateTime.to_date()
   end
 
+  @doc false
+  def checkout_still_active_dynamic do
+    today = pst_today()
+    now_pst = DateTime.now!(@pst_timezone)
+    checkout_cutoff = DateTime.new!(today, @checkout_time_pst, @pst_timezone)
+
+    if DateTime.compare(now_pst, checkout_cutoff) == :lt do
+      dynamic([b], b.checkout_date >= ^today)
+    else
+      dynamic([b], b.checkout_date > ^today)
+    end
+  end
+
   @doc """
   Lists upcoming active bookings for a user's home dashboard itinerary.
 
@@ -4661,17 +4674,7 @@ defmodule Ysc.Bookings do
   """
   def list_upcoming_active_bookings_for_user(user_id, opts \\ []) do
     limit = Keyword.get(opts, :limit, 10)
-    today = pst_today()
-    now_pst = DateTime.now!(@pst_timezone)
-    checkout_cutoff = DateTime.new!(today, @checkout_time_pst, @pst_timezone)
-    now_before_checkout = DateTime.compare(now_pst, checkout_cutoff) == :lt
-
-    checkout_filter =
-      if now_before_checkout do
-        dynamic([b], b.checkout_date >= ^today)
-      else
-        dynamic([b], b.checkout_date > ^today)
-      end
+    checkout_filter = checkout_still_active_dynamic()
 
     from(b in Booking,
       where: b.user_id == ^user_id,
@@ -4680,6 +4683,33 @@ defmodule Ysc.Bookings do
       order_by: [asc: b.checkin_date],
       limit: ^limit,
       preload: [:rooms]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Lists active Tahoe bookings for a family group (primary + sub-accounts).
+
+  Applies the same 11:00 AM PST checkout cutoff as
+  `list_upcoming_active_bookings_for_user/2` before `LIMIT`, so stale
+  checkout-today rows cannot hide future stays.
+
+  ## Options
+
+    * `:limit` - max rows (default `10`)
+  """
+  def list_active_tahoe_bookings_for_family(family_user_ids, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 10)
+    checkout_filter = checkout_still_active_dynamic()
+
+    from(b in Booking,
+      where: b.user_id in ^family_user_ids,
+      where: b.property == :tahoe,
+      where: b.status == :complete,
+      where: ^checkout_filter,
+      order_by: [asc: b.checkin_date],
+      limit: ^limit,
+      preload: [:rooms, :user]
     )
     |> Repo.all()
   end
@@ -5701,16 +5731,32 @@ defmodule Ysc.Bookings do
 
   @doc false
   def ci_query_explain_list_upcoming_active_bookings_for_user_query do
-    today = Ysc.Ci.QueryExplain.Fixtures.today()
     user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+    checkout_filter = checkout_still_active_dynamic()
 
     from(b in Booking,
       where: b.user_id == ^user_id,
       where: b.status == :complete,
-      where: b.checkout_date > ^today,
+      where: ^checkout_filter,
       order_by: [asc: b.checkin_date],
       limit: 10,
       preload: [:rooms]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_active_tahoe_bookings_for_family_query do
+    family_user_ids = [Ysc.Ci.QueryExplain.Fixtures.ulid()]
+    checkout_filter = checkout_still_active_dynamic()
+
+    from(b in Booking,
+      where: b.user_id in ^family_user_ids,
+      where: b.property == :tahoe,
+      where: b.status == :complete,
+      where: ^checkout_filter,
+      order_by: [asc: b.checkin_date],
+      limit: 10,
+      preload: [:rooms, :user]
     )
   end
 end

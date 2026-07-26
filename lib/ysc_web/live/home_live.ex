@@ -195,9 +195,18 @@ defmodule YscWeb.HomeLive do
   defp load_user_with_subscriptions(user_id, just_logged_in) do
     preloads =
       if just_logged_in do
-        [:passkeys, subscriptions: :subscription_items]
+        [
+          :passkeys,
+          :sub_accounts,
+          primary_user: :sub_accounts,
+          subscriptions: :subscription_items
+        ]
       else
-        [subscriptions: :subscription_items]
+        [
+          :sub_accounts,
+          primary_user: :sub_accounts,
+          subscriptions: :subscription_items
+        ]
       end
 
     user_with_subs =

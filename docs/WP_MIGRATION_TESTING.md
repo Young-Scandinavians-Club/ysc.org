@@ -37,10 +37,19 @@ Read the DuckDB file and uploads folder; write a single export directory (JSON +
 mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export --wp-files wp_backup/files
 ```
 
+Lean extract (users/memberships/bookings only — skip news + media):
+
+```bash
+mix ysc.wp_extract --db wp_backup/wp.duckdb --export-dir wp_migration_export --no-posts --no-media
+mix ysc.wp_reconcile_csvs --export-dir wp_migration_export --csv-dir wp_export_csvs
+```
+
 Optional:
 
 - `--dry-run` – only log what would be written, do not create files.
 - `--wp-files` defaults to `wp_backup/files` if omitted.
+- `--no-posts` – write empty `posts.json` (skip news).
+- `--no-media` – skip copying `media/` uploads.
 
 Compare export counts to source:
 
@@ -67,10 +76,18 @@ Load the export directory into the app database (and optionally upload media to 
 mix ysc.wp_load --export-dir wp_migration_export
 ```
 
+Lean load (no news/media; create Stripe subscriptions for remaining active members):
+
+```bash
+mix ysc.wp_load --export-dir wp_migration_export --no-upload-media --skip-posts --create-stripe-subscriptions
+```
+
 Optional:
 
 - `--dry-run` – no DB or S3 writes; only logs what would be done.
-- `--no-upload-media` – load users, applications, posts, and Stripe IDs only; do not upload media or create `Image` records.
+- `--no-upload-media` – do not upload media or create `Image` records.
+- `--skip-posts` – skip loading news posts.
+- `--create-stripe-subscriptions` – create Stripe trial subscriptions for active members without an importable Stripe sub.
 
 Ensure the app is configured (DB, S3/Tigris if you use media) and run against a dev or staging DB first.
 

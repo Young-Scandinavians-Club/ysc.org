@@ -566,6 +566,8 @@ defmodule Ysc.AccountsTest do
         Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
       end)
 
+      primary = Repo.preload(primary, :sub_accounts)
+
       assert {:ok, _} = Accounts.remove_sub_account(sub, primary)
 
       refute Ysc.Subscriptions.BoardVolunteerBilling.household_on_board?(
@@ -1649,6 +1651,24 @@ defmodule Ysc.AccountsTest do
       assert record.started_on == Date.utc_today()
     end
 
+    test "assign_board_position syncs board volunteer billing for the household" do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, updated_user} =
+               Accounts.assign_board_position(user, :president)
+
+      assert updated_user.board_position == :president
+
+      user_id = user.id
+      assert_receive {:board_volunteer_sync, ^user_id}
+    end
+
     test "assign_board_position when user already has a position closes old record and opens new one" do
       user = user_fixture()
       {:ok, user} = Accounts.assign_board_position(user, :president)
@@ -1692,6 +1712,23 @@ defmodule Ysc.AccountsTest do
       [record] = history
       assert record.position == :secretary
       assert record.ended_on == today
+    end
+
+    test "remove_board_position syncs board volunteer billing with off-board grace" do
+      user = user_fixture()
+      {:ok, user} = Accounts.assign_board_position(user, :secretary)
+
+      Application.put_env(:ysc, :board_volunteer_billing_sync_recorder, self())
+
+      on_exit(fn ->
+        Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
+      end)
+
+      assert {:ok, updated_user} = Accounts.remove_board_position(user)
+      assert updated_user.board_position == nil
+
+      user_id = user.id
+      assert_receive {:board_volunteer_sync, ^user_id}
     end
 
     test "remove_board_position when user has no position is a no-op for history and clears user" do
@@ -2488,6 +2525,8 @@ defmodule Ysc.AccountsTest do
       on_exit(fn ->
         Application.delete_env(:ysc, :board_volunteer_billing_sync_recorder)
       end)
+
+      primary = Repo.preload(primary, :sub_accounts)
 
       assert {:ok, linked} = Accounts.admin_link_user_to_family(primary, victim)
       assert linked.primary_user_id == primary.id

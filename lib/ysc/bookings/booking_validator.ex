@@ -9,6 +9,8 @@ defmodule Ysc.Bookings.BookingValidator do
     that includes Saturday must also include Sunday
   - Only one active booking per user at a time (all seasons)
   - Exception: Family/Couple members can have up to 2 bookings in the same time period (overlapping dates)
+  - Full buyout is mutually exclusive with any other active/future Tahoe reservation
+    (cannot buy out while a booking exists; cannot book rooms while a buyout exists)
   - Max nights come from the check-in season configuration (Tahoe default 4)
   - Family membership: Up to 2 rooms in same time period (same or overlapping dates)
   - Single membership: Only 1 room per booking
@@ -38,15 +40,16 @@ defmodule Ysc.Bookings.BookingValidator do
     else
       user = opts[:user] || get_user_from_changeset(changeset)
       property = Ecto.Changeset.get_field(changeset, :property)
+      family_context = tahoe_family_context(user, property)
 
       changeset
       |> validate_booking_mode(property)
       |> validate_advance_booking_limit(property)
       |> validate_weekend_requirement()
       |> validate_max_nights()
-      |> validate_single_active_booking(user, property)
-      |> validate_buyout_no_active_bookings(user, property)
-      |> validate_membership_room_limits(user, property)
+      |> validate_single_active_booking(user, property, family_context)
+      |> validate_buyout_exclusivity(user, property, family_context)
+      |> validate_membership_room_limits(user, property, family_context)
       |> validate_clear_lake_guest_limits(property)
       |> validate_room_capacity()
     end
@@ -208,19 +211,16 @@ defmodule Ysc.Bookings.BookingValidator do
 
   # Only one active booking per user at a time (all seasons)
   # Exception: Family/Lifetime members can have up to 2 bookings in the same time period
-  defp validate_single_active_booking(changeset, user, :tahoe) do
+  defp validate_single_active_booking(changeset, user, :tahoe, family_context) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
     booking_id = Ecto.Changeset.get_field(changeset, :id)
     user_id = Ecto.Changeset.get_field(changeset, :user_id) || (user && user.id)
 
-    if checkin_date && checkout_date && user_id && not is_nil(user) do
-      # Get primary user for membership type check (sub-accounts use primary's membership)
-      primary_user = get_primary_user_for_booking(user)
-      membership_type = get_membership_type(primary_user)
-
-      # Get all family member user IDs
-      family_user_ids = Ysc.Accounts.get_family_group_user_ids(primary_user)
+    if checkin_date && checkout_date && user_id && not is_nil(user) &&
+         family_context do
+      %{membership_type: membership_type, family_user_ids: family_user_ids} =
+        family_context
 
       # Family and lifetime members can have up to 2 bookings in the same time period
       # Single members can only have 1 active booking at a time (any dates)
@@ -263,14 +263,14 @@ defmodule Ysc.Bookings.BookingValidator do
         end
       else
         # For single members: Check for ANY active/future bookings, max 1 total
-        today = Ysc.Bookings.SeasonHelpers.cabin_today()
+        checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
 
         active_bookings_query =
           from b in Booking,
             where: b.user_id in ^family_user_ids,
             where: b.property == :tahoe,
             where: b.status == :complete,
-            where: b.checkout_date >= ^today
+            where: ^checkout_filter
 
         active_bookings_query =
           if booking_id do
@@ -299,53 +299,107 @@ defmodule Ysc.Bookings.BookingValidator do
     end
   end
 
-  defp validate_single_active_booking(changeset, _user, _property),
-    do: changeset
+  defp validate_single_active_booking(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
 
-  # Prevent buyout bookings if user has any active or future bookings
-  defp validate_buyout_no_active_bookings(changeset, user, :tahoe) do
+  # Full buyout is mutually exclusive with other active/future Tahoe reservations:
+  # - cannot create a buyout while any active booking exists
+  # - cannot create a room booking while an active buyout exists
+  defp validate_buyout_exclusivity(changeset, user, :tahoe, family_context) do
     booking_mode = Ecto.Changeset.get_field(changeset, :booking_mode)
     booking_id = Ecto.Changeset.get_field(changeset, :id)
     user_id = Ecto.Changeset.get_field(changeset, :user_id) || (user && user.id)
 
-    if booking_mode == :buyout && user_id && not is_nil(user) do
-      # Get primary user for family group check
-      primary_user = get_primary_user_for_booking(user)
-      family_user_ids = Ysc.Accounts.get_family_group_user_ids(primary_user)
-      today = Ysc.Bookings.SeasonHelpers.cabin_today()
+    if user_id && not is_nil(user) && family_context do
+      %{family_user_ids: family_user_ids} = family_context
 
-      active_bookings_query =
-        from b in Booking,
-          where: b.user_id in ^family_user_ids,
-          where: b.property == :tahoe,
-          where: b.status == :complete,
-          where: b.checkout_date >= ^today
+      cond do
+        booking_mode == :buyout ->
+          if family_has_active_tahoe_bookings?(
+               family_user_ids,
+               booking_id
+             ) do
+            Ecto.Changeset.add_error(
+              changeset,
+              :booking_mode,
+              "You cannot book a full buyout while you have an active or future reservation. Please complete or cancel your existing reservation first."
+            )
+          else
+            changeset
+          end
 
-      active_bookings_query =
-        if booking_id do
-          from b in active_bookings_query, where: b.id != ^booking_id
-        else
-          active_bookings_query
-        end
+        booking_mode == :room ->
+          if family_has_active_tahoe_buyout?(family_user_ids, booking_id) do
+            Ecto.Changeset.add_error(
+              changeset,
+              :booking_mode,
+              "You cannot book rooms while you have an active or future full buyout reservation. Please complete or cancel your buyout first."
+            )
+          else
+            changeset
+          end
 
-      has_active_booking = Repo.exists?(active_bookings_query)
-
-      if has_active_booking do
-        Ecto.Changeset.add_error(
-          changeset,
-          :booking_mode,
-          "You cannot book a full buyout while you have an active or future reservation. Please complete or cancel your existing reservation first."
-        )
-      else
-        changeset
+        true ->
+          changeset
       end
     else
       changeset
     end
   end
 
-  defp validate_buyout_no_active_bookings(changeset, _user, _property),
-    do: changeset
+  defp validate_buyout_exclusivity(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
+
+  defp family_has_active_tahoe_bookings?(family_user_ids, booking_id) do
+    checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
+
+    query =
+      from b in Booking,
+        where: b.user_id in ^family_user_ids,
+        where: b.property == :tahoe,
+        where: b.status == :complete,
+        where: ^checkout_filter
+
+    query =
+      if booking_id do
+        from b in query, where: b.id != ^booking_id
+      else
+        query
+      end
+
+    Repo.exists?(query)
+  end
+
+  defp family_has_active_tahoe_buyout?(family_user_ids, booking_id) do
+    checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
+
+    query =
+      from b in Booking,
+        where: b.user_id in ^family_user_ids,
+        where: b.property == :tahoe,
+        where: b.status == :complete,
+        where: b.booking_mode == :buyout,
+        where: ^checkout_filter
+
+    query =
+      if booking_id do
+        from b in query, where: b.id != ^booking_id
+      else
+        query
+      end
+
+    Repo.exists?(query)
+  end
 
   defp get_primary_user_for_booking(user) do
     if Ysc.Accounts.sub_account?(user) do
@@ -358,19 +412,16 @@ defmodule Ysc.Bookings.BookingValidator do
   # Membership-based room limits: Family = 2 rooms, Single = 1 room
   # Family memberships can book 2 rooms with overlapping dates (same timeframe)
   # Limits apply across the entire family group
-  defp validate_membership_room_limits(changeset, user, :tahoe) do
+  defp validate_membership_room_limits(changeset, user, :tahoe, family_context) do
     checkin_date = Ecto.Changeset.get_field(changeset, :checkin_date)
     checkout_date = Ecto.Changeset.get_field(changeset, :checkout_date)
     user_id = Ecto.Changeset.get_field(changeset, :user_id) || (user && user.id)
     booking_id = Ecto.Changeset.get_field(changeset, :id)
 
-    if checkin_date && checkout_date && user_id && not is_nil(user) do
-      # Get primary user for membership type check (sub-accounts use primary's membership)
-      primary_user = get_primary_user_for_booking(user)
-      membership_type = get_membership_type(primary_user)
-
-      # Get all family member user IDs
-      family_user_ids = Ysc.Accounts.get_family_group_user_ids(primary_user)
+    if checkin_date && checkout_date && user_id && not is_nil(user) &&
+         family_context do
+      %{membership_type: membership_type, family_user_ids: family_user_ids} =
+        family_context
 
       max_rooms =
         case membership_type do
@@ -452,8 +503,13 @@ defmodule Ysc.Bookings.BookingValidator do
     end
   end
 
-  defp validate_membership_room_limits(changeset, _user, _property),
-    do: changeset
+  defp validate_membership_room_limits(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
 
   # Clear Lake: A la carte (day) bookings have no guest cap — pass through unchanged.
   defp validate_clear_lake_guest_limits(changeset, _property), do: changeset
@@ -507,10 +563,25 @@ defmodule Ysc.Bookings.BookingValidator do
     user_id = Ecto.Changeset.get_field(changeset, :user_id)
 
     if user_id do
-      Repo.get(User, user_id) |> Repo.preload(:subscriptions)
+      Repo.get(User, user_id)
+      |> Repo.preload(subscriptions: :subscription_items)
     else
       nil
     end
+  end
+
+  defp tahoe_family_context(_user, property) when property != :tahoe, do: nil
+
+  defp tahoe_family_context(nil, :tahoe), do: nil
+
+  defp tahoe_family_context(user, :tahoe) do
+    primary_user = get_primary_user_for_booking(user)
+
+    %{
+      primary_user: primary_user,
+      membership_type: get_membership_type(primary_user),
+      family_user_ids: Ysc.Accounts.get_family_group_user_ids(primary_user)
+    }
   end
 
   defp get_membership_type(user) do
@@ -641,5 +712,34 @@ defmodule Ysc.Bookings.BookingValidator do
           ^checkin_date
         ),
       select: count(br.id)
+  end
+
+  @doc false
+  def family_active_tahoe_bookings_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    family_user_ids = [Fixtures.ulid()]
+    checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
+
+    from b in Booking,
+      where: b.user_id in ^family_user_ids,
+      where: b.property == :tahoe,
+      where: b.status == :complete,
+      where: ^checkout_filter
+  end
+
+  @doc false
+  def family_active_tahoe_buyout_query do
+    alias Ysc.Ci.QueryExplain.Fixtures
+
+    family_user_ids = [Fixtures.ulid()]
+    checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
+
+    from b in Booking,
+      where: b.user_id in ^family_user_ids,
+      where: b.property == :tahoe,
+      where: b.status == :complete,
+      where: b.booking_mode == :buyout,
+      where: ^checkout_filter
   end
 end

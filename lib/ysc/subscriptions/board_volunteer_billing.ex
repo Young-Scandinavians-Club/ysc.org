@@ -100,13 +100,22 @@ defmodule Ysc.Subscriptions.BoardVolunteerBilling do
   @doc """
   Returns true when anyone in the user's family group currently holds a
   board position.
+
+  Always queries the database for current household membership so a stale
+  `sub_accounts` preload cannot skew Stripe billing sync after family
+  link/unlink.
   """
   def household_on_board?(%User{} = user) do
-    family_ids = Accounts.get_family_group_user_ids(user)
+    primary_id =
+      if is_nil(user.primary_user_id) do
+        user.id
+      else
+        user.primary_user_id
+      end
 
     Repo.exists?(
       from u in User,
-        where: u.id in ^family_ids,
+        where: u.id == ^primary_id or u.primary_user_id == ^primary_id,
         where: not is_nil(u.board_position)
     )
   end

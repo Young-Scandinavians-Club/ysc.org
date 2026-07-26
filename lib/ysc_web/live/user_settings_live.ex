@@ -352,6 +352,7 @@ defmodule YscWeb.UserSettingsLive do
                 data-publicKey={@public_key}
                 data-submitURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/payment-method"}
                 data-returnURL={"#{YscWeb.Endpoint.url()}/billing/user/#{@user.id}/finalize"}
+                data-billing-details={@stripe_billing_details}
               >
                 <div id="error-message">
                   <p id="card-errors" class="text-red-400 text-sm"></p>
@@ -2647,6 +2648,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:is_sub_account, is_sub_account)
       |> assign(:primary_user, nil)
       |> assign(:payment_intent_secret, nil)
+      |> assign(:stripe_billing_details, "{}")
       |> assign(:public_key, public_key)
       |> assign(:email_form_current_password, nil)
       |> assign(:current_email, user.email)
@@ -2845,6 +2847,10 @@ defmodule YscWeb.UserSettingsLive do
 
         socket
         |> assign(:user, user)
+        |> assign(
+          :stripe_billing_details,
+          Ysc.Customers.payment_element_default_values_json(user)
+        )
         |> assign(:scheduled_downgrade_info, scheduled_downgrade_info)
         |> assign(:primary_user, primary_user)
         |> assign(:membership_paused_by_board, board_member)
@@ -3198,6 +3204,10 @@ defmodule YscWeb.UserSettingsLive do
           {:noreply,
            socket
            |> assign(:user, updated_user)
+           |> assign(
+             :stripe_billing_details,
+             Ysc.Customers.payment_element_default_values_json(updated_user)
+           )
            |> assign(:profile_form, profile_form)
            |> YscWeb.Flash.put_toast(:info, "Profile updated successfully.",
              title: "Profile"
@@ -3577,6 +3587,10 @@ defmodule YscWeb.UserSettingsLive do
         {:noreply,
          socket
          |> assign(:user, updated_user)
+         |> assign(
+           :stripe_billing_details,
+           Ysc.Customers.payment_element_default_values_json(updated_user)
+         )
          |> assign(:address_form, address_form)
          |> YscWeb.Flash.put_toast(
            :info,

@@ -187,8 +187,6 @@ defmodule Ysc.BookingsTest do
       staying =
         active_check_in_booking_fixture(%{
           property: :tahoe,
-          checkin_date: Date.add(today, -1),
-          checkout_date: two_day_checkout,
           status: :complete,
           guests_count: 3
         })
@@ -330,6 +328,46 @@ defmodule Ysc.BookingsTest do
       else
         bookings =
           Bookings.list_upcoming_active_bookings_for_user(user.id, limit: 2)
+
+        assert length(bookings) == 2
+        assert future.id in Enum.map(bookings, & &1.id)
+      end
+    end
+
+    test "list_active_tahoe_bookings_for_family/2 applies checkout cutoff before limit" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      _stale_checkout_today =
+        insert_complete_tahoe_booking(user, Date.add(today, -1), today)
+
+      future =
+        insert_complete_tahoe_booking(
+          user,
+          Date.add(today, 7),
+          Date.add(today, 9)
+        )
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      family_user_ids = [user.id]
+
+      if DateTime.compare(now_pst, checkout_cutoff) == :gt do
+        bookings =
+          Bookings.list_active_tahoe_bookings_for_family(family_user_ids,
+            limit: 1
+          )
+
+        assert length(bookings) == 1
+        assert hd(bookings).id == future.id
+      else
+        bookings =
+          Bookings.list_active_tahoe_bookings_for_family(family_user_ids,
+            limit: 2
+          )
 
         assert length(bookings) == 2
         assert future.id in Enum.map(bookings, & &1.id)
@@ -1128,12 +1166,13 @@ defmodule Ysc.BookingsTest do
 
     defp check_in_booking(overrides \\ %{}) do
       today = today_pst()
+      {default_checkin, default_checkout} = active_stay_dates(today)
 
       defaults = %{
         status: :complete,
         checked_in: false,
-        checkin_date: Date.add(today, -1),
-        checkout_date: Date.add(today, 2),
+        checkin_date: default_checkin,
+        checkout_date: default_checkout,
         reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
       }
 
@@ -1903,16 +1942,7 @@ defmodule Ysc.BookingsTest do
       last_name = "BatchSearch#{suffix}"
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
-      # Active booking requires checkin <= today < checkout; avoid Saturday-without-Sunday.
-      checkin = Date.add(today, -1)
-      raw_checkout = Date.add(today, 2)
-
-      checkout =
-        raw_checkout
-        |> then(fn date ->
-          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
-        end)
-        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+      {checkin, checkout} = active_stay_dates(today)
 
       for _ <- 1..3 do
         user = user_fixture(%{last_name: last_name})
@@ -3736,18 +3766,7 @@ defmodule Ysc.BookingsTest do
         })
 
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-      # The search requires an active booking: checkin <= today < checkout.
-      # Extend checkout by one day when it would land on Sunday (last night would be
-      # Saturday without Sunday, which fails the "full weekend required" validation).
-      checkin = Date.add(today, -1)
-      raw_checkout = Date.add(today, 2)
-
-      checkout =
-        raw_checkout
-        |> then(fn date ->
-          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
-        end)
-        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+      {checkin, checkout} = active_stay_dates(today)
 
       booking =
         booking_fixture(%{
@@ -4820,6 +4839,22 @@ defmodule Ysc.BookingsTest do
       user_id: user.id,
       property: :clear_lake,
       booking_mode: :day,
+      checkin_date: checkin_date,
+      checkout_date: checkout_date,
+      guests_count: 2,
+      status: :complete,
+      total_price: Money.new(100, :USD),
+      reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
+    }
+    |> Ysc.Repo.insert!()
+    |> Ysc.Repo.preload(:rooms)
+  end
+
+  defp insert_complete_tahoe_booking(user, checkin_date, checkout_date) do
+    %Booking{
+      user_id: user.id,
+      property: :tahoe,
+      booking_mode: :room,
       checkin_date: checkin_date,
       checkout_date: checkout_date,
       guests_count: 2,

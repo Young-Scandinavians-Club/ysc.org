@@ -966,7 +966,13 @@ defmodule YscWeb.AdminScannerLiveTest do
       assert_push_event(view, "stop-camera", %{})
     end
 
-    test "scan_result is rate limited after many scans", %{conn: conn} do
+    test "scan_result is rate limited after many scans", %{
+      conn: conn,
+      admin: admin
+    } do
+      # Hammer ETS state is shared across async tests; reset this admin's bucket.
+      _ = Ysc.ScanRateLimit.set("scan:#{admin.id}", :timer.minutes(1), 0)
+
       {:ok, view, _html} = live(conn, ~p"/admin/scanner")
       view |> element("button[phx-value-mode='membership']") |> render_click()
 
@@ -977,11 +983,11 @@ defmodule YscWeb.AdminScannerLiveTest do
       member = make_active_member()
       token = QrToken.sign_membership(member.id)
 
-      for _ <- 1..21 do
+      for _ <- 1..20 do
         view |> render_hook("scan_result", %{"data" => token})
       end
 
-      html = render(view)
+      html = view |> render_hook("scan_result", %{"data" => token})
       assert html =~ "Too many scans" or html =~ "slow down"
     end
 

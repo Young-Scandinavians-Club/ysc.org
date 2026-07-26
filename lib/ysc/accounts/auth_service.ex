@@ -485,15 +485,8 @@ defmodule Ysc.Accounts.AuthService do
   Returns nil if no successful login is found.
   """
   def get_last_successful_login_datetime(user) do
-    from(ae in AuthEvent,
-      where: ae.user_id == ^user.id,
-      where: ae.event_type == "login_success",
-      where: ae.success == true,
-      order_by: [desc: ae.inserted_at, desc: ae.id],
-      limit: 1,
-      select: ae.inserted_at
-    )
-    |> Repo.one()
+    {last_login_at, _last_activity_at} = get_user_login_activity_datetimes(user)
+    last_login_at
   end
 
   @doc """
@@ -517,16 +510,46 @@ defmodule Ysc.Accounts.AuthService do
   Returns nil if no login/logout events are found.
   """
   def get_last_login_session_datetime(user) do
+    {_last_login_at, last_activity_at} = get_user_login_activity_datetimes(user)
+    last_activity_at
+  end
+
+  @doc """
+  Returns the last successful login and last login/logout activity timestamps
+  for a user in a single database round trip.
+  """
+  def get_user_login_activity_datetimes(user) do
     from(ae in AuthEvent,
       where: ae.user_id == ^user.id,
-      where: ae.event_type in ["login_success", "logout"],
       where: ae.success == true,
-      order_by: [desc: ae.inserted_at, desc: ae.id],
-      limit: 1,
-      select: ae.inserted_at
+      where: ae.event_type in ["login_success", "logout"],
+      select: %{
+        last_login_at:
+          max(
+            fragment(
+              "CASE WHEN ? = 'login_success' THEN ? END",
+              ae.event_type,
+              ae.inserted_at
+            )
+          ),
+        last_activity_at: max(ae.inserted_at)
+      }
     )
     |> Repo.one()
+    |> case do
+      %{last_login_at: last_login_at, last_activity_at: last_activity_at} ->
+        {to_utc_datetime(last_login_at), to_utc_datetime(last_activity_at)}
+
+      nil ->
+        {nil, nil}
+    end
   end
+
+  defp to_utc_datetime(nil), do: nil
+  defp to_utc_datetime(%DateTime{} = datetime), do: datetime
+
+  defp to_utc_datetime(%NaiveDateTime{} = naive_datetime),
+    do: DateTime.from_naive!(naive_datetime, "Etc/UTC")
 
   @doc """
   Gets the last login session event for a user (either login or logout).

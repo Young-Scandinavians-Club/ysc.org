@@ -8,4 +8,13 @@ defmodule Stripe.SubscriptionBehaviour do
 
   @callback create(params :: map(), opts :: keyword()) ::
               {:ok, Stripe.Subscription.t()} | {:error, Stripe.Error.t()}
+
+  @callback update(String.t(), map()) ::
+              {:ok, Stripe.Subscription.t()} | {:error, Stripe.Error.t()}
+
+  @callback update(String.t(), map(), keyword()) ::
+              {:ok, Stripe.Subscription.t()} | {:error, Stripe.Error.t()}
+
+  @callback list(map()) ::
+              {:ok, Stripe.List.t()} | {:error, Stripe.Error.t()}
 end

@@ -674,5 +674,38 @@ defmodule Ysc.Bookings.SeasonTest do
     test "allows buyout when no season matches" do
       assert Season.buyout_allowed_on_date?([], ~D[2026-08-15])
     end
+
+    test "property atom form fetches seasons once for multi-night stays" do
+      seasons = [
+        %Season{
+          name: "Summer",
+          property: :tahoe,
+          start_date: ~D[2024-05-01],
+          end_date: ~D[2024-07-31]
+        },
+        %Season{
+          name: "Winter",
+          property: :tahoe,
+          start_date: ~D[2024-08-01],
+          end_date: ~D[2025-04-30]
+        }
+      ]
+
+      checkin = ~D[2026-07-28]
+      checkout = ~D[2026-07-31]
+
+      assert Season.buyout_allowed_for_stay?(seasons, checkin, checkout)
+
+      previous = Application.get_env(:ysc, :season_cache_enabled)
+
+      try do
+        Application.put_env(:ysc, :season_cache_enabled, false)
+
+        assert Season.buyout_allowed_for_stay?(:tahoe, checkin, checkout) ==
+                 Season.buyout_allowed_for_stay?(seasons, checkin, checkout)
+      after
+        Application.put_env(:ysc, :season_cache_enabled, previous)
+      end
+    end
   end
 end

@@ -4,7 +4,7 @@ defmodule Ysc.MixProject do
   def project do
     [
       app: :ysc,
-      version: "1.12.1",
+      version: "1.14.0",
       elixir: "~> 1.20",
       elixirc_options: elixirc_options_for(Mix.env()),
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -179,7 +179,9 @@ defmodule Ysc.MixProject do
       {:decimal, "~> 3.1", override: true},
       # ex_aws 2.7+ and stripity_stripe 3.3+ require hackney 4.x; tzdata still lists ~> 1.17
       # and its Hackney adapter expects the 1.x body/ref API. See Ysc.Tzdata.HttpClient.
-      {:hackney, "~> 4.0", override: true},
+      # webtransport 0.4.3 pins h2 ~> 0.10.4; hackney 4.7+ needs h2 ~> 0.11.0 — override below.
+      {:hackney, "~> 4.7", override: true},
+      {:h2, "~> 0.11.0", override: true},
       # ex_cldr_calendars 2.4.4 pins digital_token ~> 1.0; ex_cldr_numbers allows 1.x or 2.x but
       # otherwise resolves to 2.0, which blocks the calendars upgrade.
       {:digital_token, "~> 1.0", override: true},
@@ -235,7 +237,7 @@ defmodule Ysc.MixProject do
       {:jose, "1.11.12", override: true},
       {:joken, "~> 2.6"},
       {:let_me, "~> 3.0"},
-      {:live_toast, "~> 0.8"},
+      {:live_toast, "~> 0.9"},
       {:locus, "~> 2.3"},
       {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
       # passbook pins nested_filter ~> 1.2.2; 2.x keeps drop_by_key/drop_by_value API used in Passbook.Pass.generate_json/1.

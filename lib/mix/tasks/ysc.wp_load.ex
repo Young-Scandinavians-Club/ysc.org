@@ -3,18 +3,20 @@ defmodule Mix.Tasks.Ysc.WpLoad do
   Phase 2: Load the WordPress migration export into the app database.
 
   Reads the export directory produced by `mix ysc.wp_extract` (users.json,
-  applications.json, posts.json, media/, stripe_customer_lookup.json) and
-  inserts users, applications, media (upload to S3 + Image records), posts,
-  and Stripe customer IDs.
+  applications.json, posts.json, media/, stripe_customer_lookup.json,
+  bookings.json) and inserts users, applications, media (upload to S3 + Image
+  records), posts, Stripe customer IDs, subscriptions, and bookings.
 
   Usage:
-    mix ysc.wp_load --export-dir wp_migration_export [--dry-run] [--no-upload-media] [--create-stripe-subscriptions]
+    mix ysc.wp_load --export-dir wp_migration_export [--dry-run] [--no-upload-media] [--skip-posts] [--create-stripe-subscriptions]
 
   Options:
     --create-stripe-subscriptions  Creates real Stripe customers and subscriptions in the
                                    connected Stripe account. Each subscription is created
                                    with trial_end set to the membership renewal date (capped at
                                    Stripe's two-year trial maximum) so no immediate charge fires.
+    --skip-posts                   Skip loading news posts (even if posts.json is present).
+    --no-upload-media              Skip media upload / Image creation.
   """
 
   use Mix.Task
@@ -26,6 +28,7 @@ defmodule Mix.Tasks.Ysc.WpLoad do
     export_dir: :string,
     dry_run: :boolean,
     no_upload_media: :boolean,
+    skip_posts: :boolean,
     create_stripe_subscriptions: :boolean
   ]
 
@@ -38,6 +41,7 @@ defmodule Mix.Tasks.Ysc.WpLoad do
     export_dir = opts[:export_dir]
     dry_run = opts[:dry_run] || false
     upload_media = not (opts[:no_upload_media] || false)
+    skip_posts = opts[:skip_posts] || false
     create_stripe_subscriptions = opts[:create_stripe_subscriptions] || false
 
     if is_nil(export_dir) or export_dir == "" do
@@ -47,7 +51,7 @@ defmodule Mix.Tasks.Ysc.WpLoad do
       Example:
         mix ysc.wp_load --export-dir wp_migration_export
         mix ysc.wp_load --export-dir wp_migration_export --dry-run
-        mix ysc.wp_load --export-dir wp_migration_export --no-upload-media
+        mix ysc.wp_load --export-dir wp_migration_export --no-upload-media --skip-posts
         mix ysc.wp_load --export-dir wp_migration_export --create-stripe-subscriptions
       """)
     end
@@ -56,6 +60,7 @@ defmodule Mix.Tasks.Ysc.WpLoad do
       export_dir: export_dir,
       dry_run: dry_run,
       upload_media: upload_media,
+      skip_posts: skip_posts,
       create_stripe_subscriptions: create_stripe_subscriptions
     )
 
@@ -63,6 +68,7 @@ defmodule Mix.Tasks.Ysc.WpLoad do
            export_dir: export_dir,
            dry_run: dry_run,
            upload_media: upload_media,
+           skip_posts: skip_posts,
            create_stripe_subscriptions: create_stripe_subscriptions
          ) do
       {:ok, result} ->
