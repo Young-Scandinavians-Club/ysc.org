@@ -93,6 +93,22 @@ defmodule YscWeb.UserTicketsLiveTest do
                "couldn't find that ticket purchase"
     end
 
+    test "resume-order event shows error when order is no longer pending", %{
+      conn: conn
+    } do
+      data = Ysc.TestDataFactory.complete_ticket_order()
+      conn = log_in_user(conn, data.user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+
+      render_click(view, "resume-order", %{"order-id" => data.order.id})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :error) =~
+               "This ticket purchase has expired or was already completed"
+    end
+
     test "view-tickets event redirects to confirmation page", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
