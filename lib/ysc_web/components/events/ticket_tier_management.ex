@@ -1,8 +1,6 @@
 defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   use YscWeb, :live_component
 
-  import YscWeb.AdminComponents
-
   alias Ysc.Events
 
   @impl true
@@ -205,11 +203,11 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                   </div>
 
                   <div class="flex justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
-                    <.admin_row_actions_dropdown
+                    <.row_actions_dropdown
                       id={"ticket-tier-actions-#{ticket_tier.id}"}
                       label={"Actions for #{ticket_tier.name}"}
                     >
-                      <.admin_dropdown_menu_item
+                      <.dropdown_menu_item
                         :if={!is_donation}
                         id={"ticket-tier-actions-#{ticket_tier.id}-grant"}
                         icon="hero-gift"
@@ -219,8 +217,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         phx-target={@myself}
                       >
                         Grant tickets
-                      </.admin_dropdown_menu_item>
-                      <.admin_dropdown_menu_item
+                      </.dropdown_menu_item>
+                      <.dropdown_menu_item
                         :if={!is_donation}
                         id={"ticket-tier-actions-#{ticket_tier.id}-reserve"}
                         icon="hero-ticket"
@@ -230,8 +228,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         phx-target={@myself}
                       >
                         Reserve tickets
-                      </.admin_dropdown_menu_item>
-                      <.admin_dropdown_menu_item
+                      </.dropdown_menu_item>
+                      <.dropdown_menu_item
                         id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
                         icon="hero-pencil-square"
                         phx-click="edit-ticket-tier"
@@ -239,8 +237,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         phx-target={@myself}
                       >
                         Edit tier
-                      </.admin_dropdown_menu_item>
-                      <.admin_dropdown_menu_item
+                      </.dropdown_menu_item>
+                      <.dropdown_menu_item
                         id={"ticket-tier-actions-#{ticket_tier.id}-delete"}
                         icon="hero-trash"
                         tone={:danger}
@@ -255,8 +253,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                         }
                       >
                         Delete tier
-                      </.admin_dropdown_menu_item>
-                    </.admin_row_actions_dropdown>
+                      </.dropdown_menu_item>
+                    </.row_actions_dropdown>
                   </div>
                 </div>
                 <!-- Reservations Section -->

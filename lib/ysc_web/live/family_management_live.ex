@@ -1,9 +1,6 @@
 defmodule YscWeb.FamilyManagementLive do
   use YscWeb, :live_view
 
-  import YscWeb.AdminComponents,
-    only: [admin_row_actions_dropdown: 1, admin_dropdown_menu_item: 1]
-
   alias Ysc.Accounts
   alias Ysc.Accounts.FamilyDisplay
   alias Ysc.Accounts.FamilyInvites
@@ -912,9 +909,9 @@ defmodule YscWeb.FamilyManagementLive do
         <.icon name="hero-envelope" class="w-4 h-4" /> Send Invite
       </.button>
 
-      <.admin_row_actions_dropdown id={@menu_id} label="Family member actions">
+      <.row_actions_dropdown id={@menu_id} label="Family member actions">
         <%= if @row.kind == :linked do %>
-          <.admin_dropdown_menu_item
+          <.dropdown_menu_item
             id={"#{@menu_id}-unlink"}
             icon="hero-user-minus"
             tone={:danger}
@@ -923,17 +920,17 @@ defmodule YscWeb.FamilyManagementLive do
             data-confirm="Are you sure you want to remove this family member from your membership? They will lose access to membership benefits and receive an email notification."
           >
             Unlink
-          </.admin_dropdown_menu_item>
+          </.dropdown_menu_item>
         <% else %>
-          <.admin_dropdown_menu_item
+          <.dropdown_menu_item
             id={"#{@menu_id}-edit"}
             icon="hero-pencil-square"
             phx-click="edit_family_member"
             phx-value-id={@row.id}
           >
             Edit
-          </.admin_dropdown_menu_item>
-          <.admin_dropdown_menu_item
+          </.dropdown_menu_item>
+          <.dropdown_menu_item
             id={"#{@menu_id}-remove"}
             icon="hero-trash"
             tone={:danger}
@@ -942,9 +939,9 @@ defmodule YscWeb.FamilyManagementLive do
             data-confirm="Remove this family member from your list? This only removes their details from your account. It does not unlink anyone who has already accepted an invitation."
           >
             Remove
-          </.admin_dropdown_menu_item>
+          </.dropdown_menu_item>
         <% end %>
-      </.admin_row_actions_dropdown>
+      </.row_actions_dropdown>
     </div>
     """
   end
@@ -956,8 +953,8 @@ defmodule YscWeb.FamilyManagementLive do
     assigns = assign(assigns, :menu_id, menu_id)
 
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="Invitation actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="Invitation actions">
+      <.dropdown_menu_item
         id={"#{@menu_id}-cancel"}
         icon="hero-x-mark"
         tone={:danger}
@@ -966,8 +963,8 @@ defmodule YscWeb.FamilyManagementLive do
         data-confirm="Cancel this invite? The invitee will receive an email notification."
       >
         Cancel invite
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 

@@ -281,8 +281,8 @@ defmodule YscWeb.AdminEventsLive do
 
   def event_actions_dropdown(assigns) do
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="Event actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="Event actions">
+      <.dropdown_menu_item
         :if={@event.state in [:published, :scheduled]}
         id={"#{@menu_id}-view-live"}
         icon="hero-arrow-top-right-on-square"
@@ -291,8 +291,8 @@ defmodule YscWeb.AdminEventsLive do
         rel="noopener noreferrer"
       >
         View live
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         id={"#{@menu_id}-copy"}
         icon="hero-document-duplicate"
         phx-click="copy-event"
@@ -300,15 +300,15 @@ defmodule YscWeb.AdminEventsLive do
         data-confirm="Copy this event?"
       >
         Copy
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         id={"#{@menu_id}-edit"}
         icon="hero-pencil-square"
         navigate={~p"/admin/events/#{@event.id}/edit"}
       >
         Edit
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={@event.state in [:published, :scheduled]}
         id={"#{@menu_id}-check-in"}
         icon="hero-qr-code"
@@ -316,8 +316,8 @@ defmodule YscWeb.AdminEventsLive do
         navigate={@check_in_path}
       >
         Check in
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 

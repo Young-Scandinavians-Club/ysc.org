@@ -265,8 +265,8 @@ defmodule YscWeb.AdminPostsLive do
 
   def post_actions_dropdown(assigns) do
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="Post actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="Post actions">
+      <.dropdown_menu_item
         :if={@post.state == :published}
         id={"#{@menu_id}-view-live"}
         icon="hero-arrow-top-right-on-square"
@@ -275,15 +275,15 @@ defmodule YscWeb.AdminPostsLive do
         rel="noopener noreferrer"
       >
         View live
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         id={"#{@menu_id}-edit"}
         icon="hero-pencil-square"
         navigate={~p"/admin/posts/#{@post.id}"}
       >
         Edit
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         id={"#{@menu_id}-toggle-featured"}
         icon={if @post.featured_post, do: "hero-star-solid", else: "hero-star"}
         icon_class={[
@@ -294,8 +294,8 @@ defmodule YscWeb.AdminPostsLive do
         phx-value-id={@post.id}
       >
         {if @post.featured_post, do: "Unpin post", else: "Pin post"}
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={@post.state == :draft}
         id={"#{@menu_id}-delete"}
         icon="hero-trash"
@@ -305,8 +305,8 @@ defmodule YscWeb.AdminPostsLive do
         data-confirm="Delete this draft? It will be marked as deleted."
       >
         Delete
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 
