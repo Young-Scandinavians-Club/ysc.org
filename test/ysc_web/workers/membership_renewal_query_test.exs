@@ -1,0 +1,130 @@
+defmodule YscWeb.Workers.MembershipRenewalQueryTest do
+  use Ysc.DataCase, async: false
+
+  import Ysc.AccountsFixtures
+
+  alias Ysc.Repo
+  alias Ysc.Subscriptions.Subscription
+  alias YscWeb.Workers.MembershipRenewalQuery
+
+  describe "renewal_date_from_now/1" do
+    test "returns the calendar date N days from now" do
+      expected =
+        DateTime.utc_now()
+        |> DateTime.add(14, :day)
+        |> DateTime.to_date()
+
+      assert MembershipRenewalQuery.renewal_date_from_now(14) == expected
+    end
+  end
+
+  describe "utc_day_bounds/1" do
+    test "returns inclusive UTC bounds for a calendar day" do
+      date = ~D[2026-07-26]
+
+      assert MembershipRenewalQuery.utc_day_bounds(date) ==
+               {
+                 DateTime.new!(date, ~T[00:00:00], "Etc/UTC"),
+                 DateTime.new!(date, ~T[23:59:59], "Etc/UTC")
+               }
+    end
+  end
+
+  describe "list_subscriptions_renewing_on/1" do
+    test "returns active subscriptions renewing on the given day" do
+      user = user_fixture()
+      renewal_date = ~D[2026-07-26]
+
+      renewal_at =
+        DateTime.new!(renewal_date, ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      matching = insert_subscription(user, renewal_at)
+
+      other_user = user_fixture()
+
+      other_renewal_at =
+        DateTime.new!(Date.add(renewal_date, 1), ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(other_user, other_renewal_at)
+
+      results = MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
+
+      assert Enum.map(results, & &1.id) == [matching.id]
+      assert hd(results).user.id == user.id
+    end
+
+    test "excludes canceled, trialing, and scheduled-to-end subscriptions" do
+      user = user_fixture()
+      renewal_date = ~D[2026-08-01]
+
+      renewal_at =
+        DateTime.new!(renewal_date, ~T[09:30:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at, stripe_status: "canceled")
+
+      trialing_user = user_fixture()
+      insert_subscription(trialing_user, renewal_at, stripe_status: "trialing")
+
+      ending_user = user_fixture()
+
+      insert_subscription(ending_user, renewal_at,
+        ends_at:
+          DateTime.new!(Date.add(renewal_date, -1), ~T[12:00:00], "Etc/UTC")
+          |> DateTime.truncate(:second)
+      )
+
+      assert MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date) == []
+    end
+  end
+
+  describe "list_subscriptions_renewing_in_days/1" do
+    test "returns subscriptions renewing on the target day" do
+      user = user_fixture()
+
+      renewal_date =
+        DateTime.utc_now()
+        |> DateTime.add(7, :day)
+        |> DateTime.to_date()
+
+      renewal_at =
+        DateTime.new!(renewal_date, ~T[15:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      matching = insert_subscription(user, renewal_at)
+
+      assert Enum.map(
+               MembershipRenewalQuery.list_subscriptions_renewing_in_days(7),
+               & &1.id
+             ) == [matching.id]
+    end
+  end
+
+  defp insert_subscription(user, renewal_date, opts \\ []) do
+    stripe_status = Keyword.get(opts, :stripe_status, "active")
+    ends_at = Keyword.get(opts, :ends_at, nil)
+
+    renewal_date_truncated = DateTime.truncate(renewal_date, :second)
+
+    ends_at_truncated =
+      if ends_at, do: DateTime.truncate(ends_at, :second), else: nil
+
+    start_date =
+      DateTime.utc_now()
+      |> DateTime.add(-30, :day)
+      |> DateTime.truncate(:second)
+
+    %Subscription{
+      user_id: user.id,
+      stripe_id: "sub_query_#{System.unique_integer([:positive])}",
+      stripe_status: stripe_status,
+      name: "membership",
+      current_period_end: renewal_date_truncated,
+      current_period_start: start_date,
+      ends_at: ends_at_truncated
+    }
+    |> Repo.insert!()
+  end
+end

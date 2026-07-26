@@ -9,40 +9,26 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
   require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
 
-  import Ecto.Query
-  alias Ysc.Repo
-  alias Ysc.Subscriptions.Subscription
   alias Ysc.Payments
   alias YscWeb.Emails.{Notifier, MembershipRenewalPaymentMethodReminder}
+  alias YscWeb.Workers.MembershipRenewalQuery
+
+  @reminder_window_days 14
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
     Ysc.Logging.info("Starting membership renewal payment method check")
 
-    # Calculate the date 14 days from now
-    fourteen_days_from_now =
-      DateTime.utc_now()
-      |> DateTime.add(14, :day)
-      |> DateTime.to_date()
-
-    # Calculate the start and end of that day for the query
-    day_start = DateTime.new!(fourteen_days_from_now, ~T[00:00:00], "Etc/UTC")
-    day_end = DateTime.new!(fourteen_days_from_now, ~T[23:59:59], "Etc/UTC")
+    renewal_date = MembershipRenewalQuery.renewal_date_from_now(@reminder_window_days)
 
     Ysc.Logging.info(
-      "Checking for subscriptions renewing on #{fourteen_days_from_now}"
+      "Checking for subscriptions renewing on #{renewal_date}"
     )
 
-    # Find all active subscriptions renewing in 14 days
     subscriptions =
-      from(s in Subscription,
-        where: s.current_period_end >= ^day_start,
-        where: s.current_period_end <= ^day_end,
-        where: s.stripe_status == "active",
-        where: is_nil(s.ends_at),
-        preload: [:user]
+      MembershipRenewalQuery.list_subscriptions_renewing_in_days(
+        @reminder_window_days
       )
-      |> Repo.all()
 
     Ysc.Logging.info(
       "Found #{length(subscriptions)} subscriptions renewing in 14 days"
