@@ -1903,16 +1903,7 @@ defmodule Ysc.BookingsTest do
       last_name = "BatchSearch#{suffix}"
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
-      # Active booking requires checkin <= today < checkout; avoid Saturday-without-Sunday.
-      checkin = Date.add(today, -1)
-      raw_checkout = Date.add(today, 2)
-
-      checkout =
-        raw_checkout
-        |> then(fn date ->
-          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
-        end)
-        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+      {checkin, checkout} = active_stay_dates(today)
 
       for _ <- 1..3 do
         user = user_fixture(%{last_name: last_name})
@@ -3736,18 +3727,7 @@ defmodule Ysc.BookingsTest do
         })
 
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-      # The search requires an active booking: checkin <= today < checkout.
-      # Extend checkout by one day when it would land on Sunday (last night would be
-      # Saturday without Sunday, which fails the "full weekend required" validation).
-      checkin = Date.add(today, -1)
-      raw_checkout = Date.add(today, 2)
-
-      checkout =
-        raw_checkout
-        |> then(fn date ->
-          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
-        end)
-        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+      {checkin, checkout} = active_stay_dates(today)
 
       booking =
         booking_fixture(%{

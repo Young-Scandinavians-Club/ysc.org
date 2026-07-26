@@ -508,18 +508,53 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
+  Returns `{checkin, checkout}` for an active stay window (`checkin <= today < checkout`)
+  that satisfies Tahoe Saturday/Sunday booking rules regardless of which weekday today falls on.
+  """
+  def active_stay_dates(today \\ nil, max_nights \\ 4) do
+    today =
+      today ||
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+    checkin =
+      today
+      |> Date.add(-1)
+      |> then(fn date ->
+        if Date.day_of_week(date, :monday) == 6,
+          do: Date.add(date, -1),
+          else: date
+      end)
+
+    checkout =
+      today
+      |> Date.add(2)
+      |> then(fn date ->
+        if Date.day_of_week(date, :monday) == 7,
+          do: Date.add(date, 1),
+          else: date
+      end)
+      |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+
+    if Date.diff(checkout, checkin) > max_nights do
+      checkin = Date.add(checkout, -max_nights)
+      checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+      {checkin, checkout}
+    else
+      {checkin, checkout}
+    end
+  end
+
+  @doc """
   Creates a confirmed booking in an active stay window for kiosk check-in tests.
   """
   def active_check_in_booking_fixture(attrs \\ %{}) do
-    today_pst =
-      DateTime.now!("America/Los_Angeles")
-      |> DateTime.to_date()
-
     attrs = Map.new(attrs)
 
-    checkin = Map.get(attrs, :checkin_date, Date.add(today_pst, -1))
-    checkout = Map.get(attrs, :checkout_date, Date.add(today_pst, 2))
-    checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+    {default_checkin, default_checkout} = active_stay_dates()
+
+    checkin = Map.get(attrs, :checkin_date, default_checkin)
+    checkout = Map.get(attrs, :checkout_date, default_checkout)
 
     attrs
     |> Map.put_new(:status, :complete)

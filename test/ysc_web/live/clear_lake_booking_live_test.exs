@@ -1363,6 +1363,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      render_async(view, 2_000)
 
       for i <- 1..2 do
         date = Date.add(Date.utc_today(), 30 + i)
@@ -1381,6 +1382,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      render_async(view, 2_000)
 
       # Rapid guest changes
       for _i <- 1..5 do
@@ -1400,6 +1402,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      render_async(view, 2_000)
 
       render_click(view, "booking-mode-changed", %{"booking_mode" => "buyout"})
       render_click(view, "booking-mode-changed", %{"booking_mode" => "day"})
@@ -1415,6 +1418,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       conn = log_in_user(conn, user)
 
       {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})
       render_click(view, "switch-tab", %{"tab" => "booking"})
