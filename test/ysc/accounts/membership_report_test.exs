@@ -49,7 +49,7 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
       assert report.counts.accepted == 1
       assert report.counts.purchased == 1
-      assert length(report.accepted) == 0
+      assert report.accepted == []
       assert length(report.purchased) == 1
       assert hd(report.purchased).signup_application.user_id == user.id
     end
