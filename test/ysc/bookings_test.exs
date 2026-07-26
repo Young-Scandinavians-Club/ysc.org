@@ -342,7 +342,11 @@ defmodule Ysc.BookingsTest do
         insert_complete_tahoe_booking(user, Date.add(today, -1), today)
 
       future =
-        insert_complete_tahoe_booking(user, Date.add(today, 7), Date.add(today, 9))
+        insert_complete_tahoe_booking(
+          user,
+          Date.add(today, 7),
+          Date.add(today, 9)
+        )
 
       now_pst = DateTime.now!("America/Los_Angeles")
 
@@ -353,13 +357,17 @@ defmodule Ysc.BookingsTest do
 
       if DateTime.compare(now_pst, checkout_cutoff) == :gt do
         bookings =
-          Bookings.list_active_tahoe_bookings_for_family(family_user_ids, limit: 1)
+          Bookings.list_active_tahoe_bookings_for_family(family_user_ids,
+            limit: 1
+          )
 
         assert length(bookings) == 1
         assert hd(bookings).id == future.id
       else
         bookings =
-          Bookings.list_active_tahoe_bookings_for_family(family_user_ids, limit: 2)
+          Bookings.list_active_tahoe_bookings_for_family(family_user_ids,
+            limit: 2
+          )
 
         assert length(bookings) == 2
         assert future.id in Enum.map(bookings, & &1.id)

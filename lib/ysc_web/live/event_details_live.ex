@@ -4174,7 +4174,9 @@ defmodule YscWeb.EventDetailsLive do
      )
      |> assign(
        :stripe_billing_details,
-       Ysc.Customers.payment_element_default_values_json(socket.assigns.current_user)
+       Ysc.Customers.payment_element_default_values_json(
+         socket.assigns.current_user
+       )
      )
      |> assign(:async_data_loaded, true)
      |> assign_checkout_pricing()}

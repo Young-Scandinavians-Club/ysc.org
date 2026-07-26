@@ -299,8 +299,13 @@ defmodule Ysc.Bookings.BookingValidator do
     end
   end
 
-  defp validate_single_active_booking(changeset, _user, _property, _family_context),
-    do: changeset
+  defp validate_single_active_booking(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
 
   # Full buyout is mutually exclusive with other active/future Tahoe reservations:
   # - cannot create a buyout while any active booking exists
@@ -347,8 +352,13 @@ defmodule Ysc.Bookings.BookingValidator do
     end
   end
 
-  defp validate_buyout_exclusivity(changeset, _user, _property, _family_context),
-    do: changeset
+  defp validate_buyout_exclusivity(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
 
   defp family_has_active_tahoe_bookings?(family_user_ids, booking_id) do
     checkout_filter = Ysc.Bookings.checkout_still_active_dynamic()
@@ -493,8 +503,13 @@ defmodule Ysc.Bookings.BookingValidator do
     end
   end
 
-  defp validate_membership_room_limits(changeset, _user, _property, _family_context),
-    do: changeset
+  defp validate_membership_room_limits(
+         changeset,
+         _user,
+         _property,
+         _family_context
+       ),
+       do: changeset
 
   # Clear Lake: A la carte (day) bookings have no guest cap — pass through unchanged.
   defp validate_clear_lake_guest_limits(changeset, _property), do: changeset
@@ -548,7 +563,8 @@ defmodule Ysc.Bookings.BookingValidator do
     user_id = Ecto.Changeset.get_field(changeset, :user_id)
 
     if user_id do
-      Repo.get(User, user_id) |> Repo.preload(subscriptions: :subscription_items)
+      Repo.get(User, user_id)
+      |> Repo.preload(subscriptions: :subscription_items)
     else
       nil
     end
