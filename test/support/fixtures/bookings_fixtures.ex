@@ -11,6 +11,11 @@ defmodule Ysc.BookingsFixtures do
   alias Ysc.Bookings.SeasonHelpers
   alias Ysc.Repo
 
+  # Fixed anchor for Clear Lake LiveView tests — avoids `Date.utc_today()` flakiness
+  # across season boundaries and advance-booking windows.
+  @clear_lake_test_anchor ~D[2026-07-01]
+  @tahoe_test_anchor ~D[2026-07-01]
+
   @doc """
   Deletes all seasons in the current SQL sandbox and invalidates SeasonCache.
 
@@ -95,6 +100,43 @@ defmodule Ysc.BookingsFixtures do
   current season when the next season also has no limit. Prefer ~2 years over
   365 so year+2 isolation dates remain valid.
   """
+  @doc """
+  Returns a stable Clear Lake test date (`~D[2026-07-01]` plus `offset_days`).
+
+  Prefer this over `Date.utc_today()` in booking LiveView tests.
+  """
+  def clear_lake_test_date(offset_days \\ 0) do
+    Date.add(@clear_lake_test_anchor, offset_days)
+  end
+
+  @doc """
+  Returns `{checkin, checkout}` for Clear Lake LiveView/integration tests.
+  """
+  def clear_lake_booking_dates(offset_days \\ 0, nights \\ 3) do
+    checkin = clear_lake_test_date(offset_days)
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  @doc """
+  Returns upcoming Clear Lake stay dates relative to today.
+
+  Use when a test depends on "active" or "future" semantics (e.g. active bookings list).
+  """
+  def clear_lake_upcoming_stay_dates(days_until_checkin \\ 3, nights \\ 3) do
+    checkin = Date.utc_today() |> Date.add(days_until_checkin)
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  @doc """
+  Returns a stable Tahoe test date (`~D[2026-07-01]` plus `offset_days`).
+
+  Use for LiveView tests that only need a calendar date, not full season validation.
+  Prefer `tahoe_booking_dates/1` when dates must satisfy booking rules.
+  """
+  def tahoe_test_date(offset_days \\ 0) do
+    Date.add(@tahoe_test_anchor, offset_days)
+  end
+
   def allow_far_future_booking_dates do
     from(s in Season)
     |> Repo.update_all(set: [advance_booking_days: 800])
