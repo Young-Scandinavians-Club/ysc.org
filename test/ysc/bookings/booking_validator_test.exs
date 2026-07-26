@@ -7,7 +7,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
   - Weekend requirement validation (Saturday must include Sunday)
   - Max nights validation (property and season-specific)
   - Active booking limits (membership-dependent)
-  - Buyout rules (no concurrent active bookings)
+  - Buyout rules (mutually exclusive with other active bookings)
   - Membership room limits (Single: 1, Family/Lifetime: 2)
   - Clear Lake guest capacity (12 guests max per day)
   - Room capacity validation
@@ -858,6 +858,103 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       }
 
       changeset = Booking.changeset(%Booking{}, attrs, user: user)
+
+      assert changeset.valid?
+    end
+
+    test "rejects room booking if user has active buyout", %{
+      user: user,
+      rooms: rooms
+    } do
+      user = create_subscription(user, :family)
+
+      today = Date.utc_today()
+      days_to_monday = rem(8 - Date.day_of_week(today, :monday), 7)
+      next_monday = Date.add(today, days_to_monday + 7)
+      buyout_checkin = next_monday
+      buyout_checkout = Date.add(next_monday, 2)
+      room_checkin = Date.add(next_monday, 21)
+      room_checkout = Date.add(next_monday, 23)
+
+      {:ok, _buyout} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: buyout_checkin,
+            checkout_date: buyout_checkout,
+            booking_mode: :buyout,
+            guests_count: 10,
+            status: :complete,
+            total_price: Money.new(2000, :USD)
+          },
+          user: user
+        )
+        |> Repo.insert()
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: room_checkin,
+            checkout_date: room_checkout,
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :booking_mode)
+
+      assert {"You cannot book rooms while you have an active or future full buyout reservation. Please complete or cancel your buyout first.",
+              _} = Keyword.get(changeset.errors, :booking_mode)
+    end
+
+    test "allows room booking if buyout checkout is in the past", %{
+      user: user,
+      rooms: rooms
+    } do
+      user = create_subscription(user, :family)
+
+      {:ok, _past_buyout} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-08-05],
+            checkout_date: ~D[2024-08-07],
+            booking_mode: :buyout,
+            guests_count: 10,
+            status: :complete,
+            total_price: Money.new(2000, :USD)
+          },
+          skip_validation: true,
+          user: user
+        )
+        |> Repo.insert()
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-08-12],
+            checkout_date: ~D[2024-08-14],
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
 
       assert changeset.valid?
     end

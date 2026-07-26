@@ -187,8 +187,6 @@ defmodule Ysc.BookingsTest do
       staying =
         active_check_in_booking_fixture(%{
           property: :tahoe,
-          checkin_date: Date.add(today, -1),
-          checkout_date: two_day_checkout,
           status: :complete,
           guests_count: 3
         })
@@ -1128,12 +1126,13 @@ defmodule Ysc.BookingsTest do
 
     defp check_in_booking(overrides \\ %{}) do
       today = today_pst()
+      {default_checkin, default_checkout} = active_stay_dates(today)
 
       defaults = %{
         status: :complete,
         checked_in: false,
-        checkin_date: Date.add(today, -1),
-        checkout_date: Date.add(today, 2),
+        checkin_date: default_checkin,
+        checkout_date: default_checkout,
         reference_id: "BKG-TEST-#{System.unique_integer([:positive])}"
       }
 
@@ -1903,16 +1902,7 @@ defmodule Ysc.BookingsTest do
       last_name = "BatchSearch#{suffix}"
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
 
-      # Active booking requires checkin <= today < checkout; avoid Saturday-without-Sunday.
-      checkin = Date.add(today, -1)
-      raw_checkout = Date.add(today, 2)
-
-      checkout =
-        raw_checkout
-        |> then(fn date ->
-          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
-        end)
-        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+      {checkin, checkout} = active_stay_dates(today)
 
       for _ <- 1..3 do
         user = user_fixture(%{last_name: last_name})
@@ -3736,18 +3726,7 @@ defmodule Ysc.BookingsTest do
         })
 
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-      # The search requires an active booking: checkin <= today < checkout.
-      # Extend checkout by one day when it would land on Sunday (last night would be
-      # Saturday without Sunday, which fails the "full weekend required" validation).
-      checkin = Date.add(today, -1)
-      raw_checkout = Date.add(today, 2)
-
-      checkout =
-        raw_checkout
-        |> then(fn date ->
-          if Date.day_of_week(date) == 7, do: Date.add(date, 1), else: date
-        end)
-        |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+      {checkin, checkout} = active_stay_dates(today)
 
       booking =
         booking_fixture(%{

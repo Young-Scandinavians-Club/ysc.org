@@ -6896,13 +6896,36 @@ defmodule YscWeb.TahoeBookingLive do
          active_bookings_list,
          membership_type
        ) do
-    total_rooms = count_rooms_in_active_bookings(active_bookings_list)
+    case find_active_buyout(active_bookings_list) do
+      %Booking{} = buyout ->
+        check_family_active_buyout_reached(buyout)
 
-    if total_rooms >= 2 do
-      check_family_max_rooms_reached(active_bookings_list, membership_type)
-    else
-      {true, nil, nil}
+      nil ->
+        total_rooms = count_rooms_in_active_bookings(active_bookings_list)
+
+        if total_rooms >= 2 do
+          check_family_max_rooms_reached(active_bookings_list, membership_type)
+        else
+          {true, nil, nil}
+        end
     end
+  end
+
+  defp find_active_buyout(active_bookings_list) do
+    Enum.find(active_bookings_list, fn booking ->
+      booking.booking_mode == :buyout &&
+        booking_still_active?(booking.checkout_date)
+    end)
+  end
+
+  defp check_family_active_buyout_reached(buyout) do
+    formatted_date = DateDisplay.format_date_long(buyout.checkout_date)
+
+    {
+      false,
+      "Full buyout active",
+      "Your family group already has a full buyout reservation. You can make a new reservation once that stay is complete (after #{formatted_date}) or if the buyout is cancelled."
+    }
   end
 
   defp check_family_max_rooms_reached(active_bookings_list, membership_type) do

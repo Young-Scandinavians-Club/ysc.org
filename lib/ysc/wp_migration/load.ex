@@ -687,6 +687,7 @@ defmodule Ysc.WpMigration.Load do
            first_name: user.first_name,
            last_name: user.last_name,
            source: "wp_migration",
+           force_source: true,
            metadata: metadata
          ) do
       {:ok, _subscriber} ->

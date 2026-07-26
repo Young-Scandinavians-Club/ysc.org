@@ -6,6 +6,32 @@ function safePushEvent(hook, event, payload = {}) {
     pushEventIfConnected(hook, event, payload);
 }
 
+function parseBillingDetails(el) {
+    const raw = el?.dataset?.billingDetails;
+    if (!raw || raw.trim() === '') return null;
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return null;
+        }
+        return Object.keys(parsed).length > 0 ? parsed : null;
+    } catch (e) {
+        console.warn('Failed to parse Stripe billing details', e);
+        return null;
+    }
+}
+
+function paymentElementOptions(baseOptions, billingDetails) {
+    if (!billingDetails) return baseOptions;
+    return {
+        ...baseOptions,
+        defaultValues: {
+            billingDetails,
+        },
+    };
+}
+
 let StripeInput = {
     mounted() {
         this._destroyed = false;
@@ -103,7 +129,10 @@ let StripeInput = {
         const stripe = Stripe(publishableKey);
 
         const appearance = {};
-        const options = { layout: "accordion" };
+        const options = paymentElementOptions(
+            { layout: "accordion" },
+            parseBillingDetails(this.el)
+        );
         const elements = stripe.elements({ clientSecret, appearance });
         const paymentElement = elements.create("payment", options);
         paymentElement.mount("#payment-element");
