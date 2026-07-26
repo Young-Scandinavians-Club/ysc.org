@@ -18,8 +18,10 @@ defmodule Ysc.WpMigration.ReconcileCsvs do
   Options:
   - `:export_dir` (required)
   - `:csv_dir` (default: `"wp_export_csvs"`)
+  - `:print` (default: `true`) — set to `false` in tests to suppress stdout
 
-  Returns `{:ok, report}` or `{:error, reason}`. Prints a human-readable report.
+  Returns `{:ok, report}` or `{:error, reason}`. Prints a human-readable report when
+  `:print` is true.
   """
   def run(opts \\ []) do
     export_dir = opts[:export_dir]
@@ -36,11 +38,15 @@ defmodule Ysc.WpMigration.ReconcileCsvs do
         {:error, "CSV directory not found: #{csv_dir}"}
 
       true ->
-        do_run(Path.expand(export_dir), csv_dir)
+        do_run(
+          Path.expand(export_dir),
+          csv_dir,
+          Keyword.get(opts, :print, true)
+        )
     end
   end
 
-  defp do_run(export_dir, csv_dir) do
+  defp do_run(export_dir, csv_dir, print?) do
     users = read_json(Path.join(export_dir, "users.json"))
     bookings = read_json(Path.join(export_dir, "bookings.json"))
 
@@ -117,7 +123,8 @@ defmodule Ysc.WpMigration.ReconcileCsvs do
       }
     }
 
-    print_report(report)
+    if print?, do: print_report(report)
+
     {:ok, report}
   end
 
