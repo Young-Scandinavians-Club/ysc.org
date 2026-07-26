@@ -3197,7 +3197,7 @@ defmodule Ysc.Accounts do
           do_admin_link_user(primary_user, user_to_link, relationship)
         end
 
-      length(get_sub_accounts(primary_user)) >= 10 ->
+      count_sub_accounts_for_primary(primary_user.id) >= 10 ->
         {:error, :max_sub_accounts_reached}
 
       true ->
@@ -3255,6 +3255,11 @@ defmodule Ysc.Accounts do
         u.primary_user_id == ^primary_user.id and
           u.family_relationship == "spouse"
     )
+    |> Repo.aggregate(:count, :id)
+  end
+
+  defp count_sub_accounts_for_primary(primary_user_id) do
+    from(u in User, where: u.primary_user_id == ^primary_user_id)
     |> Repo.aggregate(:count, :id)
   end
 

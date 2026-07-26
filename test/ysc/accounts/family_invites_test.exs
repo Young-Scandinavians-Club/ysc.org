@@ -340,6 +340,58 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert user_event.updated_by_user_id == primary_user.id
     end
 
+    test "returns max_sub_accounts_reached when primary already has 10 sub-accounts" do
+      primary_user = create_user_with_lifetime_membership()
+
+      for i <- 1..9 do
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: "accept-cap-#{i}-#{System.unique_integer()}@example.com",
+            password: "password1234",
+            first_name: "Sub",
+            last_name: "User#{i}",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary_user.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+      end
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, unique_user_email())
+
+      # Another sub-account is linked before the invite is accepted.
+      %User{}
+      |> User.sub_account_registration_changeset(
+        %{
+          email: "accept-cap-extra-#{System.unique_integer()}@example.com",
+          password: "password1234",
+          first_name: "Extra",
+          last_name: "Sub",
+          phone_number: "+14159098268",
+          date_of_birth: ~D[1990-01-01]
+        },
+        primary_user.id,
+        hash_password: true,
+        validate_email: true
+      )
+      |> Repo.insert!()
+
+      assert {:error, :max_sub_accounts_reached} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: invite.email,
+                 password: "password1234",
+                 first_name: "Late",
+                 last_name: "Invite",
+                 phone_number: "+14159098268",
+                 date_of_birth: ~D[1990-01-01]
+               })
+    end
+
     test "schedules accepted notification email to inviter" do
       primary_user = create_user_with_lifetime_membership()
       email = unique_user_email()
@@ -870,29 +922,47 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert FamilyInvites.can_send_family_invite?(user) == false
     end
 
-    test "uses preloaded sub_accounts instead of counting in the database" do
+    test "counts sub-accounts from database even when sub_accounts preload is stale" do
+      %User{} = primary_user = create_user_with_lifetime_membership()
+
+      for i <- 1..10 do
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: "stale-sub-#{i}-#{System.unique_integer()}@example.com",
+            password: "password1234",
+            first_name: "Sub",
+            last_name: "User#{i}",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary_user.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+      end
+
+      # Simulate a stale preload from before the 10th sub-account was linked.
+      user_with_stale_preload = %User{primary_user | sub_accounts: []}
+
+      assert FamilyInvites.can_send_family_invite?(user_with_stale_preload) ==
+               false
+    end
+
+    test "counts pending child invites toward the sub-account cap" do
       user = create_user_with_lifetime_membership()
 
-      %User{}
-      |> User.sub_account_registration_changeset(
-        %{
-          email: unique_user_email(),
-          password: "password1234",
-          first_name: "Sub",
-          last_name: "User",
-          phone_number: "+14159098268",
-          date_of_birth: ~D[1990-01-01]
-        },
-        user.id,
-        hash_password: true,
-        validate_email: true
-      )
-      |> Repo.insert!()
+      for i <- 1..10 do
+        assert {:ok, _invite} =
+                 FamilyInvites.create_invite(
+                   user,
+                   "pending-cap-#{i}-#{System.unique_integer()}@example.com"
+                 )
+      end
 
-      user_with_sub_accounts = Repo.preload(user, :sub_accounts)
-
-      assert FamilyInvites.can_send_family_invite?(user_with_sub_accounts) ==
-               true
+      assert {:error, :max_sub_accounts_reached} =
+               FamilyInvites.create_invite(user, unique_user_email())
     end
   end
 

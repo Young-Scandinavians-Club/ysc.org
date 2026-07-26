@@ -96,6 +96,17 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       true ->
         Repo.transaction(fn ->
+          primary_user_id = invite.primary_user_id
+
+          # Lock the primary account so concurrent accepts cannot exceed the cap.
+          from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
+          |> Repo.one!()
+
+          if count_sub_accounts_by_primary_id(primary_user_id) >=
+               @max_sub_accounts do
+            Repo.rollback(:max_sub_accounts_reached)
+          end
+
           # Create sub-account user
           case %User{}
                |> User.sub_account_registration_changeset(
@@ -545,7 +556,7 @@ defmodule Ysc.Accounts.FamilyInvites do
       not has_family_or_lifetime_membership?(user) ->
         {:error, :invalid_membership_type}
 
-      count_sub_accounts(user) >= @max_sub_accounts ->
+      reserved_sub_account_slots(user) >= @max_sub_accounts ->
         {:error, :max_sub_accounts_reached}
 
       true ->
@@ -606,19 +617,26 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   defp count_sub_accounts(primary_user) do
-    case primary_user.sub_accounts do
-      %Ecto.Association.NotLoaded{} ->
-        from(u in User,
-          where: u.primary_user_id == ^primary_user.id
-        )
-        |> Repo.aggregate(:count, :id)
+    count_sub_accounts_by_primary_id(primary_user.id)
+  end
 
-      sub_accounts when is_list(sub_accounts) ->
-        length(sub_accounts)
+  defp count_sub_accounts_by_primary_id(primary_user_id) do
+    from(u in User, where: u.primary_user_id == ^primary_user_id)
+    |> Repo.aggregate(:count, :id)
+  end
 
-      _ ->
-        0
-    end
+  defp reserved_sub_account_slots(primary_user) do
+    count_sub_accounts(primary_user) + count_pending_child_invites(primary_user)
+  end
+
+  defp count_pending_child_invites(primary_user) do
+    from(i in FamilyInvite,
+      where: i.primary_user_id == ^primary_user.id,
+      where: is_nil(i.accepted_at),
+      where: i.expires_at > ^DateTime.utc_now(),
+      where: i.relationship != :spouse and i.relationship != "spouse"
+    )
+    |> Repo.aggregate(:count, :id)
   end
 
   defp count_spouses(primary_user) do
@@ -654,7 +672,7 @@ defmodule Ysc.Accounts.FamilyInvites do
           :ok
         end
 
-      count_sub_accounts(primary_user) >= @max_sub_accounts ->
+      reserved_sub_account_slots(primary_user) >= @max_sub_accounts ->
         {:error, :max_sub_accounts_reached}
 
       true ->
