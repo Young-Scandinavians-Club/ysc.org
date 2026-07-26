@@ -1284,6 +1284,30 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       assert to == "/users/membership"
     end
+
+    test "sub-account cannot select a separate membership plan", %{conn: conn} do
+      primary = user_fixture(%{phone_number: "+14159098411", state: :active})
+
+      sub =
+        user_fixture(%{phone_number: "+14159098412", state: :active})
+        |> then(fn u ->
+          u
+          |> Ecto.Changeset.change(%{})
+          |> Ecto.Changeset.put_change(:primary_user_id, primary.id)
+          |> Repo.update!()
+        end)
+
+      conn = log_in_user(conn, sub)
+
+      {:ok, view, _html} = live(conn, ~p"/users/membership")
+      render(view)
+
+      render_click(view, "select_membership", %{"membership_type" => "single"})
+
+      flash = :sys.get_state(view.pid).socket.assigns.flash
+
+      assert Phoenix.Flash.get(flash, :error) =~ "family membership manager"
+    end
   end
 
   describe "membership plan change (stubbed Subscriptions callback)" do
