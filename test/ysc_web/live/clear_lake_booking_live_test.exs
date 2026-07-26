@@ -1428,7 +1428,15 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {checkin, checkout} = clear_lake_booking_dates(30, 3)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?tab=booking&checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
+        )
+
+      render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})
       render_click(view, "switch-tab", %{"tab" => "booking"})

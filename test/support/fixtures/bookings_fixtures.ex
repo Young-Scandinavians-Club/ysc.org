@@ -100,6 +100,14 @@ defmodule Ysc.BookingsFixtures do
   current season when the next season also has no limit. Prefer ~2 years over
   365 so year+2 isolation dates remain valid.
   """
+  def allow_far_future_booking_dates do
+    from(s in Season)
+    |> Repo.update_all(set: [advance_booking_days: 800])
+
+    Ysc.Bookings.SeasonCache.invalidate()
+    :ok
+  end
+
   @doc """
   Returns a stable Clear Lake test date (`~D[2026-07-01]` plus `offset_days`).
 
@@ -135,14 +143,6 @@ defmodule Ysc.BookingsFixtures do
   """
   def tahoe_test_date(offset_days \\ 0) do
     Date.add(@tahoe_test_anchor, offset_days)
-  end
-
-  def allow_far_future_booking_dates do
-    from(s in Season)
-    |> Repo.update_all(set: [advance_booking_days: 800])
-
-    Ysc.Bookings.SeasonCache.invalidate()
-    :ok
   end
 
   @doc """
