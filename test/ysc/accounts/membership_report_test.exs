@@ -73,6 +73,23 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert length(report.expired) == 1
       assert hd(report.expired).user_id == user.id
     end
+
+    test "includes rejected applications reviewed in the date range" do
+      user = user_fixture()
+      reviewed_at = ~U[2026-03-18 14:00:00Z]
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-03-10 09:00:00Z],
+        review_outcome: "rejected",
+        reviewed_at: reviewed_at
+      })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.rejected == 1
+      assert length(report.rejected) == 1
+      assert hd(report.rejected).user_id == user.id
+    end
   end
 
   describe "to_csv/1" do
