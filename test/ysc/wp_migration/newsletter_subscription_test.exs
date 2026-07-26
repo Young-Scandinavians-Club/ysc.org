@@ -13,6 +13,8 @@ defmodule Ysc.WpMigration.NewsletterSubscriptionTest do
   @moduletag skip_settings_setup: true
 
   setup do
+    stub_mx_ok()
+
     export_dir =
       System.tmp_dir!()
       |> Path.join("wp-export-#{System.unique_integer()}")
@@ -71,8 +73,13 @@ defmodule Ysc.WpMigration.NewsletterSubscriptionTest do
     test "subscribes existing users on re-import", %{export_dir: export_dir} do
       email = "wp-newsletter-existing-#{System.unique_integer()}@example.com"
 
+      # Skip register_user so the user exists without an auto newsletter subscription.
       user =
-        user_fixture(%{email: email, first_name: "Henrik", last_name: "Member"})
+        user_fixture_fast(%{
+          email: email,
+          first_name: "Henrik",
+          last_name: "Member"
+        })
 
       write_users_json(export_dir, [
         %{
