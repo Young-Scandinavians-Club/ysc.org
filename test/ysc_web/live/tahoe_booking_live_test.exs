@@ -293,7 +293,10 @@ defmodule YscWeb.TahoeBookingLiveTest do
             [room1, create_tahoe_room!("eligibility-guard")]
 
           [] ->
-            [create_tahoe_room!("eligibility-guard-1"), create_tahoe_room!("eligibility-guard-2")]
+            [
+              create_tahoe_room!("eligibility-guard-1"),
+              create_tahoe_room!("eligibility-guard-2")
+            ]
         end
 
       {checkin, checkout} = tahoe_booking_dates(40)
@@ -1434,7 +1437,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
     {:ok, category} =
       %RoomCategory{}
       |> RoomCategory.changeset(%{
-        name: "Tahoe calendar test category #{suffix} #{System.unique_integer([:positive])}"
+        name:
+          "Tahoe calendar test category #{suffix} #{System.unique_integer([:positive])}"
       })
       |> Repo.insert()
 
