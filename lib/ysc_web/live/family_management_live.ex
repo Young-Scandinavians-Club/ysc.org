@@ -459,14 +459,17 @@ defmodule YscWeb.FamilyManagementLive do
     ~H"""
     <header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
       <div>
-        <h1 class="text-zinc-900 font-bold text-2xl sm:text-3xl">
+        <h1
+          id="family-management-heading"
+          class="text-zinc-900 font-bold text-2xl sm:text-3xl"
+        >
           Family Management
         </h1>
         <p class="text-sm text-zinc-600 mt-2 max-w-2xl">
           Manage your family roster and invite members to share your membership benefits.
           Add someone to your roster first, then send an invite so they can create their own login.
         </p>
-        <p class="text-xs text-zinc-500 mt-2">
+        <p id="family-member-limit" class="text-xs text-zinc-500 mt-2">
           Limit: 1 spouse, up to 9 children
         </p>
       </div>
@@ -521,16 +524,28 @@ defmodule YscWeb.FamilyManagementLive do
           >
             <thead class="bg-zinc-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Member
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Relationship
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Status
                 </th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Actions
                 </th>
               </tr>
@@ -591,16 +606,28 @@ defmodule YscWeb.FamilyManagementLive do
           >
             <thead class="bg-zinc-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Email
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Relationship
                 </th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Expires
                 </th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                <th
+                  scope="col"
+                  class="px-4 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                >
                   Actions
                 </th>
               </tr>
@@ -947,8 +974,19 @@ defmodule YscWeb.FamilyManagementLive do
   defp do_invite_family_member(socket, params) do
     user = socket.assigns.current_user
     family_member_id = params["family_member_id"]
-    email = params["email"]
+    email = String.trim(params["email"] || "")
 
+    if email == "" do
+      {:noreply,
+       YscWeb.Flash.put_toast(socket, :error, "Please enter an email address.",
+         title: "Family"
+       )}
+    else
+      send_family_invite(socket, user, email, family_member_id)
+    end
+  end
+
+  defp send_family_invite(socket, user, email, family_member_id) do
     member =
       Enum.find(socket.assigns.family_members, fn fm ->
         to_string(fm.id) == to_string(family_member_id)
@@ -957,7 +995,6 @@ defmodule YscWeb.FamilyManagementLive do
     relationship =
       case member && member.type do
         :spouse -> :spouse
-        "spouse" -> :spouse
         _ -> :child
       end
 
@@ -1073,7 +1110,6 @@ defmodule YscWeb.FamilyManagementLive do
     relationship =
       case member.type do
         :spouse -> "spouse"
-        "spouse" -> "spouse"
         _ -> "child"
       end
 

@@ -134,7 +134,8 @@ defmodule Ysc.Accounts.FamilyMembers do
   @doc """
   Deletes family members not present in `kept_ids`.
   """
-  def delete_removed_members(%User{} = user, kept_ids) when is_map(kept_ids) do
+  def delete_removed_members(%User{} = user, kept_ids)
+      when is_struct(kept_ids, MapSet) do
     deleted? =
       Enum.reduce(list_for_user(user), false, fn member, acc ->
         if MapSet.member?(kept_ids, to_string(member.id)) do

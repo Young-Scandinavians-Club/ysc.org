@@ -217,6 +217,32 @@ defmodule Ysc.Accounts.FamilyMembersTest do
         assert reloaded.family_members == []
       end)
     end
+
+    test "returns unauthorized when member belongs to another user" do
+      with_process_caches(fn ->
+        owner = user_fixture()
+        other = user_fixture()
+
+        {:ok, member} =
+          FamilyMembers.upsert_family_member(owner, %{
+            "first_name" => "Keep",
+            "last_name" => "Me",
+            "relationship" => "child"
+          })
+
+        # Prime owner's cached profile with the member present.
+        cached = Accounts.get_user!(owner.id, @family_page_preloads)
+        assert length(cached.family_members) == 1
+
+        assert {:error, :unauthorized} =
+                 FamilyMembers.delete_family_member(other, member)
+
+        # Owner cache must not have been invalidated by the unauthorized attempt.
+        still_cached = Accounts.get_user!(owner.id, @family_page_preloads)
+        assert length(still_cached.family_members) == 1
+        assert Repo.get(FamilyMember, member.id)
+      end)
+    end
   end
 
   describe "delete_removed_members/2" do
