@@ -11,6 +11,11 @@ defmodule Ysc.BookingsFixtures do
   alias Ysc.Bookings.SeasonHelpers
   alias Ysc.Repo
 
+  # Fixed anchor for Clear Lake LiveView tests — avoids `Date.utc_today()` flakiness
+  # across season boundaries and advance-booking windows.
+  @clear_lake_test_anchor ~D[2026-07-01]
+  @tahoe_test_anchor ~D[2026-07-01]
+
   @doc """
   Deletes all seasons in the current SQL sandbox and invalidates SeasonCache.
 
@@ -84,6 +89,43 @@ defmodule Ysc.BookingsFixtures do
 
     Ysc.Bookings.SeasonCache.invalidate()
     :ok
+  end
+
+  @doc """
+  Returns a stable Clear Lake test date (`~D[2026-07-01]` plus `offset_days`).
+
+  Prefer this over `Date.utc_today()` in booking LiveView tests.
+  """
+  def clear_lake_test_date(offset_days \\ 0) do
+    Date.add(@clear_lake_test_anchor, offset_days)
+  end
+
+  @doc """
+  Returns `{checkin, checkout}` for Clear Lake LiveView/integration tests.
+  """
+  def clear_lake_booking_dates(offset_days \\ 0, nights \\ 3) do
+    checkin = clear_lake_test_date(offset_days)
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  @doc """
+  Returns upcoming Clear Lake stay dates relative to today.
+
+  Use when a test depends on "active" or "future" semantics (e.g. active bookings list).
+  """
+  def clear_lake_upcoming_stay_dates(days_until_checkin \\ 3, nights \\ 3) do
+    checkin = Date.utc_today() |> Date.add(days_until_checkin)
+    {checkin, Date.add(checkin, nights)}
+  end
+
+  @doc """
+  Returns a stable Tahoe test date (`~D[2026-07-01]` plus `offset_days`).
+
+  Use for LiveView tests that only need a calendar date, not full season validation.
+  Prefer `tahoe_booking_dates/1` when dates must satisfy booking rules.
+  """
+  def tahoe_test_date(offset_days \\ 0) do
+    Date.add(@tahoe_test_anchor, offset_days)
   end
 
   @doc """
@@ -508,18 +550,53 @@ defmodule Ysc.BookingsFixtures do
   end
 
   @doc """
+  Returns `{checkin, checkout}` for an active stay window (`checkin <= today < checkout`)
+  that satisfies Tahoe Saturday/Sunday booking rules regardless of which weekday today falls on.
+  """
+  def active_stay_dates(today \\ nil, max_nights \\ 4) do
+    today =
+      today ||
+        DateTime.now!("America/Los_Angeles")
+        |> DateTime.to_date()
+
+    checkin =
+      today
+      |> Date.add(-1)
+      |> then(fn date ->
+        if Date.day_of_week(date, :monday) == 6,
+          do: Date.add(date, -1),
+          else: date
+      end)
+
+    checkout =
+      today
+      |> Date.add(2)
+      |> then(fn date ->
+        if Date.day_of_week(date, :monday) == 7,
+          do: Date.add(date, 1),
+          else: date
+      end)
+      |> then(&ensure_sunday_when_saturday_included(checkin, &1))
+
+    if Date.diff(checkout, checkin) > max_nights do
+      checkin = Date.add(checkout, -max_nights)
+      checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+      {checkin, checkout}
+    else
+      {checkin, checkout}
+    end
+  end
+
+  @doc """
   Creates a confirmed booking in an active stay window for kiosk check-in tests.
   """
   def active_check_in_booking_fixture(attrs \\ %{}) do
-    today_pst =
-      DateTime.now!("America/Los_Angeles")
-      |> DateTime.to_date()
-
     attrs = Map.new(attrs)
 
-    checkin = Map.get(attrs, :checkin_date, Date.add(today_pst, -1))
-    checkout = Map.get(attrs, :checkout_date, Date.add(today_pst, 2))
-    checkout = ensure_sunday_when_saturday_included(checkin, checkout)
+    {default_checkin, default_checkout} = active_stay_dates()
+
+    checkin = Map.get(attrs, :checkin_date, default_checkin)
+    checkout = Map.get(attrs, :checkout_date, default_checkout)
 
     attrs
     |> Map.put_new(:status, :complete)

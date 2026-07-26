@@ -61,6 +61,32 @@ function paymentElementHasStripeContent(container) {
         container.children.length > 0;
 }
 
+function parseBillingDetails(el) {
+    const raw = el?.dataset?.billingDetails;
+    if (!raw || raw.trim() === '') return null;
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return null;
+        }
+        return Object.keys(parsed).length > 0 ? parsed : null;
+    } catch (e) {
+        console.warn('Failed to parse Stripe billing details', e);
+        return null;
+    }
+}
+
+function paymentElementOptions(baseOptions, billingDetails) {
+    if (!billingDetails) return baseOptions;
+    return {
+        ...baseOptions,
+        defaultValues: {
+            billingDetails,
+        },
+    };
+}
+
 const StripeElements = {
     mounted() {
         this.loadPromise = loadScript("stripe-js", "https://js.stripe.com/v3/");
@@ -199,12 +225,18 @@ const StripeElements = {
                     }
                 });
 
-                this.paymentElement = this.elements.create('payment', {
-                    layout: 'tabs',
-                    business: {
-                        name: 'Young Scandinavians Club'
-                    }
-                });
+                this.paymentElement = this.elements.create(
+                    'payment',
+                    paymentElementOptions(
+                        {
+                            layout: 'tabs',
+                            business: {
+                                name: 'Young Scandinavians Club'
+                            }
+                        },
+                        parseBillingDetails(this.el)
+                    )
+                );
 
                 // Only mount if the container is still in the DOM
                 if (document.contains(paymentElementContainer)) {

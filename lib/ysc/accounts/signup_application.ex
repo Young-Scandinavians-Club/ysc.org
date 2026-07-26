@@ -294,7 +294,7 @@ defmodule Ysc.Accounts.SignupApplication do
   defp validate_scandinavia_connection_fields(changeset) do
     any_present? =
       Enum.any?(@scandinavia_connection_fields, fn field ->
-        case get_field(changeset, field) do
+        case Ecto.Changeset.get_field(changeset, field) do
           nil -> false
           value -> String.trim(value) != ""
         end

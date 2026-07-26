@@ -1607,6 +1607,15 @@ defmodule Ysc.AccountsTest do
       assert %{
                agreed_to_bylaws: [
                  "Please check the box to confirm you agree to the bylaws"
+               ],
+               link_to_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               lived_in_scandinavia: [
+                 "Please fill in at least one of these three fields"
+               ],
+               spoken_languages: [
+                 "Please fill in at least one of these three fields"
                ]
              } =
                errors_on(changeset)

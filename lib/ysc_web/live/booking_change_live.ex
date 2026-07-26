@@ -501,6 +501,7 @@ defmodule YscWeb.BookingChangeLive do
             payment_error={@payment_error}
             payment_processing={@payment_processing}
             stripe_payment_element_ready={@stripe_payment_element_ready}
+            stripe_billing_details={@stripe_billing_details}
             submitting={@submitting}
             booking={@booking}
           />
@@ -697,7 +698,8 @@ defmodule YscWeb.BookingChangeLive do
       booking_id: booking_id,
       loading_booking?: true,
       booking: nil,
-      page_title: "Change Booking"
+      page_title: "Change Booking",
+      stripe_billing_details: "{}"
     )
   end
 
@@ -718,6 +720,10 @@ defmodule YscWeb.BookingChangeLive do
             socket
             |> assign(:loading_booking?, false)
             |> assign_change_page_shell(booking, calendar, form)
+            |> assign(
+              :stripe_billing_details,
+              Ysc.Customers.payment_element_default_values_json(user)
+            )
             |> load_change_data_async(booking, form)
           else
             socket
@@ -1478,12 +1484,11 @@ defmodule YscWeb.BookingChangeLive do
       automatic_payment_methods: %{enabled: true}
     }
 
-    payment_intent_params =
-      if user.stripe_id do
-        Map.put(payment_intent_params, :customer, user.stripe_id)
-      else
-        payment_intent_params
-      end
+    {payment_intent_params, _user} =
+      Ysc.Customers.attach_customer_to_payment_intent_params(
+        payment_intent_params,
+        user
+      )
 
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
     attempt_id = System.unique_integer([:positive])
@@ -1564,6 +1569,7 @@ defmodule YscWeb.BookingChangeLive do
   attr :payment_error, :string, default: nil
   attr :payment_processing, :boolean, default: false
   attr :stripe_payment_element_ready, :boolean, default: false
+  attr :stripe_billing_details, :string, default: "{}"
   attr :submitting, :boolean, default: false
   attr :booking, :map, required: true
 
@@ -1624,6 +1630,7 @@ defmodule YscWeb.BookingChangeLive do
           data-client-secret={@payment_intent.client_secret}
           data-booking-id={@booking.id}
           data-modification="true"
+          data-billing-details={@stripe_billing_details}
         >
           <.payment_element_loading :if={!@stripe_payment_element_ready} />
           <div
