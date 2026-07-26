@@ -75,7 +75,11 @@ defmodule Ysc.WpMigration.NewsletterSubscriptionTest do
 
       # Skip register_user so the user exists without an auto newsletter subscription.
       user =
-        user_fixture_fast(%{email: email, first_name: "Henrik", last_name: "Member"})
+        user_fixture_fast(%{
+          email: email,
+          first_name: "Henrik",
+          last_name: "Member"
+        })
 
       write_users_json(export_dir, [
         %{
