@@ -976,7 +976,7 @@ defmodule YscWeb.UserSettingsLiveTest do
       assert has_element?(
                view,
                "#member-ticket-reservations-section h2",
-               "Unfinished ticket orders"
+               "Tickets waiting for payment"
              )
 
       assert has_element?(
