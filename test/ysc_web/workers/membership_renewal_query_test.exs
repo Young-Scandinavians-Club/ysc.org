@@ -49,7 +49,8 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
 
       insert_subscription(other_user, other_renewal_at)
 
-      results = MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
+      results =
+        MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
 
       assert Enum.map(results, & &1.id) == [matching.id]
       assert hd(results).user.id == user.id
@@ -76,7 +77,8 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
           |> DateTime.truncate(:second)
       )
 
-      assert MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date) == []
+      assert MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date) ==
+               []
     end
   end
 

@@ -19,11 +19,10 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker do
   def perform(%Oban.Job{}) do
     Ysc.Logging.info("Starting membership renewal payment method check")
 
-    renewal_date = MembershipRenewalQuery.renewal_date_from_now(@reminder_window_days)
+    renewal_date =
+      MembershipRenewalQuery.renewal_date_from_now(@reminder_window_days)
 
-    Ysc.Logging.info(
-      "Checking for subscriptions renewing on #{renewal_date}"
-    )
+    Ysc.Logging.info("Checking for subscriptions renewing on #{renewal_date}")
 
     subscriptions =
       MembershipRenewalQuery.list_subscriptions_renewing_in_days(

@@ -50,7 +50,8 @@ defmodule YscWeb.Workers.MembershipRenewalQuery do
   @doc """
   Lists subscriptions renewing N days from now.
   """
-  def list_subscriptions_renewing_in_days(days) when is_integer(days) and days >= 0 do
+  def list_subscriptions_renewing_in_days(days)
+      when is_integer(days) and days >= 0 do
     days
     |> renewal_date_from_now()
     |> list_subscriptions_renewing_on()
