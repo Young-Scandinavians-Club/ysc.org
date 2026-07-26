@@ -78,8 +78,19 @@ defmodule YscWeb.FamilyManagementLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings/family")
 
       _ = render_loaded(view)
-      assert has_element?(view, "#family-management-heading", "Family Management")
-      assert has_element?(view, "#family-member-limit", "Limit: 1 spouse, up to 9 children")
+
+      assert has_element?(
+               view,
+               "#family-management-heading",
+               "Family Management"
+             )
+
+      assert has_element?(
+               view,
+               "#family-member-limit",
+               "Limit: 1 spouse, up to 9 children"
+             )
+
       assert has_element?(view, "#add-family-member-button")
       assert has_element?(view, "#pending-invites-empty")
       refute has_element?(view, "#invite-form")
