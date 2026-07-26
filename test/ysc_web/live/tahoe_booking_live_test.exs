@@ -12,6 +12,8 @@ defmodule YscWeb.TahoeBookingLiveTest do
   alias Ysc.Bookings.{
     AvailabilityCache,
     BlackoutListCache,
+    Booking,
+    BookingRoom,
     RoomCategory,
     RoomsListCache
   }
@@ -182,6 +184,164 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       # Should still load, using default dates
       assert html =~ "Tahoe"
+    end
+  end
+
+  describe "booking eligibility guards" do
+    test "shows buyout active banner when family group has an active full buyout",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      {:ok, _buyout} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            booking_mode: :buyout,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            status: :complete,
+            guests_count: 4,
+            total_price: Money.new(2000, :USD)
+          },
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      render_async(view, 2_000)
+      html = render(view)
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "Full buyout active"
+             )
+
+      assert html =~ "full buyout reservation"
+
+      socket = :sys.get_state(view.pid).socket
+      refute socket.assigns.can_book
+      assert socket.assigns.booking_error_title == "Full buyout active"
+    end
+
+    test "blocks another family member when primary has an active full buyout",
+         %{conn: conn} do
+      family = family_with_sub_accounts(1)
+
+      sub_account =
+        family.sub_accounts
+        |> hd()
+        |> Ecto.Changeset.change(primary_user_id: family.primary.id)
+        |> Repo.update!()
+
+      conn = log_in_user(conn, sub_account)
+      {checkin, checkout} = tahoe_booking_dates(35)
+
+      {:ok, _buyout} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: family.primary.id,
+            property: :tahoe,
+            booking_mode: :buyout,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            status: :complete,
+            guests_count: 4,
+            total_price: Money.new(2000, :USD)
+          },
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      render_async(view, 5_000)
+      html = render(view)
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "Your family already has an active booking"
+             )
+
+      assert html =~ "full buyout" or html =~ "active booking"
+
+      refute :sys.get_state(view.pid).socket.assigns.can_book
+    end
+
+    test "shows maximum rooms banner when family group has two active room bookings",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      rooms =
+        Bookings.list_rooms(:tahoe)
+        |> Enum.filter(& &1.is_active)
+
+      rooms =
+        case rooms do
+          [room1, room2 | _] ->
+            [room1, room2]
+
+          [room1] ->
+            [room1, create_tahoe_room!("eligibility-guard")]
+
+          [] ->
+            [
+              create_tahoe_room!("eligibility-guard-1"),
+              create_tahoe_room!("eligibility-guard-2")
+            ]
+        end
+
+      {checkin, checkout} = tahoe_booking_dates(40)
+      overlapping_checkin = Date.add(checkin, 2)
+
+      for {room, index} <- Enum.with_index(rooms) do
+        booking_checkin = if index == 0, do: checkin, else: overlapping_checkin
+
+        {:ok, booking} =
+          %Booking{}
+          |> Booking.changeset(
+            %{
+              user_id: user.id,
+              property: :tahoe,
+              booking_mode: :room,
+              checkin_date: booking_checkin,
+              checkout_date: checkout,
+              status: :complete,
+              guests_count: 2,
+              total_price: Money.new(400, :USD)
+            },
+            skip_validation: true
+          )
+          |> Repo.insert()
+
+        %BookingRoom{booking_id: booking.id, room_id: room.id}
+        |> Repo.insert!()
+      end
+
+      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+
+      render_async(view, 2_000)
+      html = render(view)
+
+      assert has_element?(
+               view,
+               "#tahoe-booking-eligibility-banner-public",
+               "Maximum rooms reached"
+             )
+
+      assert html =~ "maximum of 2 rooms"
+
+      socket = :sys.get_state(view.pid).socket
+      refute socket.assigns.can_book
+      assert socket.assigns.booking_error_title == "Maximum rooms reached"
     end
   end
 
@@ -1273,10 +1433,13 @@ defmodule YscWeb.TahoeBookingLiveTest do
       )
   end
 
-  defp create_tahoe_room! do
+  defp create_tahoe_room!(suffix \\ "default") do
     {:ok, category} =
       %RoomCategory{}
-      |> RoomCategory.changeset(%{name: "Tahoe calendar test category"})
+      |> RoomCategory.changeset(%{
+        name:
+          "Tahoe calendar test category #{suffix} #{System.unique_integer([:positive])}"
+      })
       |> Repo.insert()
 
     {:ok, room} =
