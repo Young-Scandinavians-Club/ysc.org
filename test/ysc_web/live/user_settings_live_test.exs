@@ -984,6 +984,12 @@ defmodule YscWeb.UserSettingsLiveTest do
                "#member-ticket-reservation-#{reservation.id}",
                "15% off member tickets"
              )
+
+      assert has_element?(
+               view,
+               "#member-ticket-reservation-#{reservation.id}",
+               "2 tickets"
+             )
     end
 
     test "payment pagination prev on first page is a no-op", %{conn: conn} do
