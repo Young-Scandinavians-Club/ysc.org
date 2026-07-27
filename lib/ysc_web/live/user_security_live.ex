@@ -420,7 +420,7 @@ defmodule YscWeb.UserSecurityLive do
               <div
                 :if={@passkeys_loading}
                 id="user-security-passkeys-loading"
-                class="space-y-3"
+                class="space-y-3 min-h-[12rem]"
                 role="status"
                 aria-live="polite"
               >
@@ -439,7 +439,7 @@ defmodule YscWeb.UserSecurityLive do
 
               <div
                 :if={@passkeys_loaded && @passkeys == []}
-                class="text-center py-8"
+                class="text-center py-8 min-h-[12rem] flex flex-col items-center justify-center"
               >
                 <p class="text-zinc-600 text-sm mb-4">
                   You don't have any passkeys yet.
@@ -449,7 +449,10 @@ defmodule YscWeb.UserSecurityLive do
                 </.button>
               </div>
 
-              <div :if={@passkeys_loaded && @passkeys != []} class="space-y-4">
+              <div
+                :if={@passkeys_loaded && @passkeys != []}
+                class="space-y-4 min-h-[12rem]"
+              >
                 <.button navigate={~p"/users/settings/passkeys/new"} class="mb-4">
                   <.icon name="hero-plus" class="w-5 h-5" /> Add Passkey
                 </.button>

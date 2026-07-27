@@ -3220,7 +3220,12 @@ defmodule YscWeb.CoreComponents do
 
   def payment_method_row_skeleton(assigns) do
     ~H"""
-    <div id={@id} class={@class} role="status" aria-live="polite">
+    <div
+      id={@id}
+      class={[@class, "min-h-[4.5rem]"]}
+      role="status"
+      aria-live="polite"
+    >
       <span class="sr-only">Loading payment methods…</span>
       <div class="flex items-center gap-3">
         <.skeleton_block class="h-8 w-12 rounded" />
