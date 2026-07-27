@@ -374,6 +374,36 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "list_active_clear_lake_bookings_for_user/2 applies checkout cutoff before limit" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      _stale_checkout_today =
+        insert_complete_booking(user, Date.add(today, -1), today)
+
+      future =
+        insert_complete_booking(user, Date.add(today, 7), Date.add(today, 9))
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      if DateTime.compare(now_pst, checkout_cutoff) == :gt do
+        bookings =
+          Bookings.list_active_clear_lake_bookings_for_user(user.id, limit: 1)
+
+        assert length(bookings) == 1
+        assert hd(bookings).id == future.id
+      else
+        bookings =
+          Bookings.list_active_clear_lake_bookings_for_user(user.id, limit: 2)
+
+        assert length(bookings) == 2
+        assert future.id in Enum.map(bookings, & &1.id)
+      end
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()
