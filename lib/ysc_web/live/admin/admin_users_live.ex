@@ -10,7 +10,6 @@ defmodule YscWeb.AdminUsersLive do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.{User, UserDisplay}
-  alias Ysc.Customers
   alias Ysc.Payments
   alias Ysc.Subscriptions
   alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers, AdminExportFiles}
@@ -1382,98 +1381,38 @@ defmodule YscWeb.AdminUsersLive do
   defp list_params_for_back(_), do: %{}
 
   # Attempts to auto-activate a membership by charging the user's saved payment method.
-  # Returns true if the subscription was successfully created, false otherwise.
-  # Also sends the appropriate approval email in all cases.
+  # On success, sends the payment-success email; on failure, sends the pay-now approval
+  # email and schedules payment reminders.
   defp attempt_membership_activation_on_approval(user, approved_application) do
-    default_pm = Payments.get_default_payment_method(user)
+    membership_type = approved_application.membership_type || :single
+    return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
 
-    if default_pm do
-      membership_type = approved_application.membership_type || :single
-      price_id = get_membership_price_id(membership_type)
-      return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
+    case Subscriptions.activate_membership_with_saved_payment_method(user,
+           membership_type: membership_type,
+           return_url: return_url
+         ) do
+      {:ok, status} when status in [:activated, :already_active] ->
+        YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+          user,
+          status
+        )
 
-      subscription_result =
-        if price_id do
-          Customers.create_subscription(
-            user,
-            return_url: return_url,
-            prices: [%{price: price_id, quantity: 1}],
-            default_payment_method: default_pm.provider_id,
-            expand: ["latest_invoice"]
-          )
-        else
-          Ysc.Logging.error(
-            "No Stripe price ID found for membership type on approval",
-            user_id: user.id,
-            membership_type: inspect(membership_type)
-          )
+        :activated
 
-          {:error, :no_price_id}
-        end
+      {:error, :no_payment_method} ->
+        send_approved_pay_now_email(user)
+        schedule_payment_reminders(user.id)
+        :activation_failed
 
-      case subscription_result do
-        {:ok, stripe_subscription} ->
-          case Subscriptions.create_subscription_from_stripe(
-                 user,
-                 stripe_subscription
-               ) do
-            {:ok, _} ->
-              _ = Ysc.Accounts.MembershipCache.invalidate_user(user.id)
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to auto-charge membership on approval",
+          user_id: user.id,
+          reason: inspect(reason)
+        )
 
-            {:error, reason} ->
-              Ysc.Logging.error(
-                "Failed to persist Stripe subscription locally on approval",
-                user_id: user.id,
-                stripe_subscription_id: stripe_subscription.id,
-                reason: inspect(reason)
-              )
-          end
-
-          YscWeb.Emails.Notifier.schedule_email(
-            user.email,
-            "approved_payment_success_#{user.id}",
-            "Velkommen! Your YSC Membership is Active! 🎉",
-            "application_approved_payment_success",
-            %{first_name: user.first_name},
-            """
-            ==============================
-
-            Hi #{user.email},
-
-            Your application has been approved and your membership payment has been processed! 🎉
-
-            Your membership is now active. Welcome to the Young Scandinavians Club!
-
-            Visit: #{YscWeb.Endpoint.url()}
-
-            If you have any questions, please don't hesitate to contact us at memberships@ysc.org.
-
-            Velkommen!
-
-            Young Scandinavians Club
-
-            ==============================
-            """,
-            user.id
-          )
-
-          :activated
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to auto-charge membership on approval",
-            user_id: user.id,
-            reason: inspect(reason)
-          )
-
-          send_approved_pay_now_email(user)
-          schedule_payment_reminders(user.id)
-          :activation_failed
-      end
-    else
-      # No payment method on file
-      send_approved_pay_now_email(user)
-      schedule_payment_reminders(user.id)
-      :activation_failed
+        send_approved_pay_now_email(user)
+        schedule_payment_reminders(user.id)
+        :activation_failed
     end
   end
 
@@ -1515,13 +1454,5 @@ defmodule YscWeb.AdminUsersLive do
     YscWeb.Workers.MembershipPaymentReminderWorker.schedule_30day_reminder(
       user_id
     )
-  end
-
-  defp get_membership_price_id(membership_type) do
-    plans = Application.get_env(:ysc, :membership_plans, [])
-
-    Enum.find_value(plans, fn plan ->
-      if plan.id == membership_type, do: plan[:stripe_price_id]
-    end)
   end
 end
