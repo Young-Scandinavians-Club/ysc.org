@@ -426,12 +426,8 @@ defmodule YscWeb.ClearLakeBookingLive do
   defp date_assign_changed?(_, nil), do: true
   defp date_assign_changed?(date1, date2), do: Date.compare(date1, date2) != :eq
 
-  defp resolve_info_tab(requested_info_tab, active_tab, current_info_tab) do
-    cond do
-      requested_info_tab != nil -> requested_info_tab
-      active_tab == :information -> :general
-      true -> current_info_tab || :general
-    end
+  defp resolve_info_tab(requested_info_tab, _active_tab, _current_info_tab) do
+    requested_info_tab || :general
   end
 
   defp maybe_validate_and_price(

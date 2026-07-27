@@ -34,7 +34,8 @@ defmodule YscWeb.TrixImagePickerComponent do
      |> assign(:selected_year, nil)
      |> assign(:available_years, [])
      |> assign(:end_of_timeline?, false)
-     |> assign(:last_image_date, nil)}
+     |> assign(:last_image_date, nil)
+     |> assign(:last_image_id, nil)}
   end
 
   @impl true
@@ -108,7 +109,7 @@ defmodule YscWeb.TrixImagePickerComponent do
      |> assign(:show_modal?, true)
      |> assign(:available_years, available_years)
      |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign(:last_image_date, last_date(images))
+     |> assign_cursor_from_images(images)
      |> stream(:picker_images, images, reset: true)}
   end
 
@@ -130,7 +131,7 @@ defmodule YscWeb.TrixImagePickerComponent do
      socket
      |> assign(:search, search)
      |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign(:last_image_date, last_date(images))
+     |> assign_cursor_from_images(images)
      |> stream(:picker_images, images, reset: true)}
   end
 
@@ -143,7 +144,7 @@ defmodule YscWeb.TrixImagePickerComponent do
      socket
      |> assign(:selected_year, nil)
      |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign(:last_image_date, last_date(images))
+     |> assign_cursor_from_images(images)
      |> stream(:picker_images, images, reset: true)}
   end
 
@@ -162,7 +163,7 @@ defmodule YscWeb.TrixImagePickerComponent do
      socket
      |> assign(:selected_year, year)
      |> assign(:end_of_timeline?, length(images) < @per_page)
-     |> assign(:last_image_date, last_date(images))
+     |> assign_cursor_from_images(images)
      |> stream(:picker_images, images, reset: true)}
   end
 
@@ -180,7 +181,7 @@ defmodule YscWeb.TrixImagePickerComponent do
       {:noreply,
        socket
        |> assign(:end_of_timeline?, length(images) < @per_page)
-       |> assign(:last_image_date, last_date(images))
+       |> assign_cursor_from_images(images)
        |> stream(:picker_images, images)}
     end
   end
@@ -194,13 +195,48 @@ defmodule YscWeb.TrixImagePickerComponent do
 
   # --- Helpers ---
 
-  defp last_date([]), do: nil
-  defp last_date(images), do: List.last(images).inserted_at
+  defp assign_cursor_from_images(socket, []),
+    do: socket |> assign(:last_image_date, nil) |> assign(:last_image_id, nil)
+
+  defp assign_cursor_from_images(socket, images) do
+    case List.last(images) do
+      nil ->
+        assign_cursor_from_images(socket, [])
+
+      %{inserted_at: inserted_at, id: id} ->
+        socket
+        |> assign(:last_image_date, inserted_at)
+        |> assign(:last_image_id, id)
+    end
+  end
 
   defp maybe_add_cursor(opts, %{last_image_date: nil}), do: opts
 
+  defp maybe_add_cursor(opts, %{
+         last_image_date: date,
+         last_image_id: id,
+         selected_year: nil
+       })
+       when not is_nil(id) do
+    opts
+    |> Keyword.put(:before_date, date)
+    |> Keyword.put(:before_id, id)
+  end
+
   defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: nil}),
     do: Keyword.put(opts, :before_date, date)
+
+  defp maybe_add_cursor(opts, %{
+         last_image_date: date,
+         last_image_id: id,
+         selected_year: year
+       })
+       when not is_nil(year) and not is_nil(id) do
+    opts
+    |> Keyword.put(:before_date, date)
+    |> Keyword.put(:before_id, id)
+    |> Keyword.put(:start_at_year, year)
+  end
 
   defp maybe_add_cursor(opts, %{last_image_date: date, selected_year: year})
        when not is_nil(year) do
