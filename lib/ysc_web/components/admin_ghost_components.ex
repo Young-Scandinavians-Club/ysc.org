@@ -505,7 +505,7 @@ defmodule YscWeb.AdminGhostComponents do
           <.admin_ghost_bar width="w-full" height="h-3.5" />
         </div>
         <.admin_ghost_bar width="w-20" height="h-3" />
-        <.badge type={post_state_badge_type(row.state)}>{row.label}</.badge>
+        <.badge type={YscWeb.AdminBadgeHelpers.post_state_badge_type(row.state)}>{row.label}</.badge>
         <.admin_ghost_bar width="w-16" height="h-3" />
         <div class="relative flex justify-end">
           <button
@@ -1992,10 +1992,6 @@ defmodule YscWeb.AdminGhostComponents do
   defp event_state_badge_type(:draft), do: "sky"
   defp event_state_badge_type(:scheduled), do: "yellow"
   defp event_state_badge_type(:published), do: "green"
-
-  defp post_state_badge_type(:draft), do: "yellow"
-  defp post_state_badge_type(:published), do: "green"
-  defp post_state_badge_type(_), do: "default"
 
   defp event_state_label(:draft), do: "Draft"
   defp event_state_label(:scheduled), do: "Scheduled"
