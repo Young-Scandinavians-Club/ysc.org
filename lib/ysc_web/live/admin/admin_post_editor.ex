@@ -366,7 +366,8 @@ defmodule YscWeb.AdminPostEditorLive do
         </div>
       </.form>
 
-      <.form :let={_f} for={@form} id="trix-editor-form">
+      <%!-- Mount Trix only after load; phx-update="ignore" would keep an empty editor. --%>
+      <.form :let={_f} :if={!@loading_post?} for={@form} id="trix-editor-form">
         <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none mx-auto py-8">
           <.input
             type="hidden"

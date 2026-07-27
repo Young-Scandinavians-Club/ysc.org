@@ -1852,6 +1852,7 @@ defmodule YscWeb.CoreComponents do
   attr :right, :boolean, default: false
   attr :mobile, :boolean, default: false
   attr :wide, :boolean, default: false
+  attr :drop_up, :boolean, default: false
   slot :button_block, required: true
   slot :inner_block, required: true
 
@@ -1872,7 +1873,9 @@ defmodule YscWeb.CoreComponents do
       <div
         id={@id}
         class={[
-          "z-[110] hidden mt-1 font-normal bg-white divide-y rounded divide-zinc-100 shadow w-52 wide:w-72",
+          "z-[110] hidden font-normal bg-white divide-y rounded divide-zinc-100 shadow w-52 wide:w-72",
+          @drop_up && "bottom-full mb-1",
+          !@drop_up && "mt-1",
           @right && "right-0",
           !@right && "left-0",
           @mobile && "block lg:absolute shadow-none lg:shadow",
@@ -1919,6 +1922,7 @@ defmodule YscWeb.CoreComponents do
       <.dropdown
         id={@id}
         right={true}
+        drop_up={true}
         class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
       >
         <:button_block>
