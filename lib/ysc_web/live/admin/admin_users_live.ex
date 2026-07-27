@@ -1381,7 +1381,8 @@ defmodule YscWeb.AdminUsersLive do
   defp list_params_for_back(_), do: %{}
 
   # Attempts to auto-activate a membership by charging the user's saved payment method.
-  # Sends the appropriate approval email in all cases.
+  # On success, sends the payment-success email; on failure, sends the pay-now approval
+  # email and schedules payment reminders.
   defp attempt_membership_activation_on_approval(user, approved_application) do
     membership_type = approved_application.membership_type || :single
     return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"

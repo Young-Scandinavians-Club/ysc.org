@@ -1916,39 +1916,37 @@ defmodule Ysc.Subscriptions do
   defp do_activate_membership_with_saved_payment_method(user, opts) do
     return_url = Keyword.get(opts, :return_url)
 
-    cond do
-      is_nil(return_url) or return_url == "" ->
-        {:error, :missing_return_url}
+    if is_nil(return_url) or return_url == "" do
+      {:error, :missing_return_url}
+    else
+      case Ysc.Payments.get_default_payment_method(user) do
+        nil ->
+          {:error, :no_payment_method}
 
-      true ->
-        case Ysc.Payments.get_default_payment_method(user) do
-          nil ->
-            {:error, :no_payment_method}
+        default_pm ->
+          membership_type =
+            Keyword.get(opts, :membership_type) ||
+              resolve_membership_type_for_activation(user)
 
-          default_pm ->
-            membership_type =
-              Keyword.get(opts, :membership_type) ||
-                resolve_membership_type_for_activation(user)
+          case membership_price_id(membership_type) do
+            nil ->
+              Ysc.Logging.error(
+                "No Stripe price ID found for membership type on activation",
+                user_id: user.id,
+                membership_type: inspect(membership_type)
+              )
 
-            case membership_price_id(membership_type) do
-              nil ->
-                Ysc.Logging.error(
-                  "No Stripe price ID found for membership type on activation",
-                  user_id: user.id,
-                  membership_type: inspect(membership_type)
-                )
+              {:error, :no_price_id}
 
-                {:error, :no_price_id}
-
-              price_id ->
-                create_and_persist_membership_subscription(
-                  user,
-                  default_pm,
-                  price_id,
-                  return_url
-                )
-            end
-        end
+            price_id ->
+              create_and_persist_membership_subscription(
+                user,
+                default_pm,
+                price_id,
+                return_url
+              )
+          end
+      end
     end
   end
 
@@ -1968,7 +1966,7 @@ defmodule Ysc.Subscriptions do
       {:ok, stripe_subscription} ->
         case create_subscription_from_stripe(user, stripe_subscription) do
           {:ok, _} ->
-            _ = MembershipCache.invalidate_user(user.id)
+            invalidate_activation_membership_caches(user)
             {:ok, :activated}
 
           {:error, reason} ->
@@ -1981,7 +1979,7 @@ defmodule Ysc.Subscriptions do
 
             # Stripe already charged; treat as activated so callers do not
             # re-prompt for payment. Webhooks can repair the local row.
-            _ = MembershipCache.invalidate_user(user.id)
+            invalidate_activation_membership_caches(user)
             {:ok, :activated}
         end
 
@@ -1996,6 +1994,16 @@ defmodule Ysc.Subscriptions do
 
         {:error, reason}
     end
+  end
+
+  defp invalidate_activation_membership_caches(user) do
+    _ = MembershipCache.invalidate_user(user.id)
+
+    user
+    |> Ysc.Accounts.get_sub_accounts()
+    |> Enum.each(&MembershipCache.invalidate_user(&1.id))
+
+    :ok
   end
 
   defp resolve_membership_type_for_activation(user) do

@@ -4740,7 +4740,6 @@ defmodule YscWeb.UserSettingsLive do
           {socket
            |> assign(:user, refreshed)
            |> assign(:current_membership, membership)
-           |> assign(:active_membership?, not is_nil(membership))
            |> assign(:active_plan_type, plan_type),
            "Payment method saved and your membership is now active!"}
 

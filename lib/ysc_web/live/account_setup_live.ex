@@ -824,6 +824,7 @@ defmodule YscWeb.AccountSetupLive do
     |> assign(:payment_intent_secret, nil)
     |> assign(:stripe_billing_details, "{}")
     |> assign(:signup_plan, nil)
+    |> assign(:activation_attempted?, false)
     |> assign(:public_key, Application.get_env(:stripity_stripe, :public_key))
   end
 
@@ -834,6 +835,8 @@ defmodule YscWeb.AccountSetupLive do
 
     {user, user_needs, activation_result} =
       maybe_activate_membership_on_load(user)
+
+    activation_attempted? = activation_result != :skipped
 
     needs_any_setup = user_needs_needs_setup?(user_needs)
     can_access = needs_any_setup
@@ -912,6 +915,7 @@ defmodule YscWeb.AccountSetupLive do
           )
           |> assign(:signup_plan, signup_plan)
           |> assign(:public_key, public_key)
+          |> assign(:activation_attempted?, activation_attempted?)
           |> refine_setup_needs_assigns(user)
           |> then(fn s ->
             if s.assigns.user_needs.email_verification and
@@ -954,6 +958,37 @@ defmodule YscWeb.AccountSetupLive do
       end
     else
       {user, user_needs, :skipped}
+    end
+  end
+
+  # Mid-setup approval with PM on file: try activation before routing steps.
+  # Skip when mount already attempted activation in this load cycle to avoid
+  # a duplicate Stripe subscription create.
+  defp maybe_activate_membership_on_params(socket, fresh_user, user_needs) do
+    cond do
+      connected?(socket) and user_needs.membership_activation and
+          socket.assigns[:activation_attempted?] ->
+        assign(socket, :activation_attempted?, false)
+
+      connected?(socket) and user_needs.membership_activation ->
+        case Subscriptions.activate_membership_with_saved_payment_method(
+               fresh_user,
+               return_url: membership_return_url(fresh_user)
+             ) do
+          {:ok, status} when status in [:activated, :already_active] ->
+            YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+              fresh_user,
+              status
+            )
+
+            refresh_setup_user_and_needs(socket)
+
+          {:error, _} ->
+            socket
+        end
+
+      true ->
+        socket
     end
   end
 
@@ -1035,27 +1070,8 @@ defmodule YscWeb.AccountSetupLive do
       fresh_user = socket.assigns.user
       user_needs = socket.assigns.user_needs
 
-      # Mid-setup approval with PM on file: try activation before routing steps
       socket =
-        if connected?(socket) and user_needs.membership_activation do
-          case Subscriptions.activate_membership_with_saved_payment_method(
-                 fresh_user,
-                 return_url: membership_return_url(fresh_user)
-               ) do
-            {:ok, status} when status in [:activated, :already_active] ->
-              YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
-                fresh_user,
-                status
-              )
-
-              refresh_setup_user_and_needs(socket)
-
-            {:error, _} ->
-              socket
-          end
-        else
-          socket
-        end
+        maybe_activate_membership_on_params(socket, fresh_user, user_needs)
 
       case maybe_redirect_after_activation(socket) do
         {:halt, redirected} ->

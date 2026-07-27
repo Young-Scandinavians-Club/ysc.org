@@ -1193,7 +1193,7 @@ defmodule YscWeb.AccountSetupLiveTest do
 
       conn = log_in_user(conn, user)
 
-      # Activation attempt on load fails without Stripe charge; stay on pay step
+      # Activation attempt on load fails via ConnCase Stripe.SubscriptionMock stub
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "1"}))
 
