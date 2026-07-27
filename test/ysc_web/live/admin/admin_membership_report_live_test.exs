@@ -58,7 +58,9 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       assert html =~ "Invalid date range"
     end
 
-    test "download_csv pushes download event when report is loaded", %{conn: conn} do
+    test "download_csv pushes download event when report is loaded", %{
+      conn: conn
+    } do
       user = user_fixture()
 
       signup_application_fixture(user, %{
@@ -75,7 +77,11 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
 
       render_click(view, "download_csv")
 
-      assert_push_event(view, "download-csv", %{content: _content, filename: filename})
+      assert_push_event(view, "download-csv", %{
+        content: _content,
+        filename: filename
+      })
+
       assert filename =~ "membership-report-"
     end
 
