@@ -1216,7 +1216,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <p class="field-error flex gap-3 mt-3 text-sm leading-6 text-rose-600">
       <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
-      {render_slot(@inner_block)}
+      <span class="min-w-0">{render_slot(@inner_block)}</span>
     </p>
     """
   end
