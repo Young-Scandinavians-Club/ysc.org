@@ -382,7 +382,11 @@ defmodule Ysc.BookingsTest do
         insert_complete_booking(user, Date.add(today, 5), Date.add(today, 7))
 
       _tahoe =
-        insert_complete_tahoe_booking(user, Date.add(today, 5), Date.add(today, 7))
+        insert_complete_tahoe_booking(
+          user,
+          Date.add(today, 5),
+          Date.add(today, 7)
+        )
 
       bookings = Bookings.list_active_clear_lake_bookings_for_user(user.id)
       ids = Enum.map(bookings, & &1.id)
