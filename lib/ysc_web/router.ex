@@ -56,16 +56,25 @@ defmodule YscWeb.Router do
     plug :mount_site_settings
   end
 
-  # Pipeline for auto-login that bypasses CSRF but mounts current user
+  # Pipeline for token-login GET pages that render a CSRF-protected POST form.
   pipeline :auto_login do
     plug :fetch_session
     plug :fetch_live_flash
     plug :fetch_current_user
   end
 
+  # POST handlers for token login require CSRF to prevent login CSRF via cross-site GET.
+  pipeline :token_login do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :protect_from_forgery
+    plug :fetch_current_user
+  end
+
   # Rate limit all auth endpoints by IP (and per-identifier in controllers) to slow down credential stuffing.
-  # Covers: email/password (POST /users/log-in), passkey (GET /users/log-in/passkey),
-  # auto-login (GET /users/log-in/auto), OAuth (GET /auth/:provider, callback), forgot/reset password.
+  # Covers: email/password (POST /users/log-in), passkey (GET/POST /users/log-in/passkey),
+  # auto-login (GET/POST /users/log-in/auto), OAuth (GET /auth/:provider, callback), forgot/reset password.
   pipeline :auth_rate_limit do
     plug YscWeb.Plugs.AuthRateLimitPlug
   end
@@ -259,12 +268,19 @@ defmodule YscWeb.Router do
     get "/:provider/callback", AuthController, :callback
   end
 
-  ## Special routes that bypass CSRF protection for programmatic logins
+  ## Token login: GET renders an auto-submit form; POST consumes the one-time token.
   scope "/", YscWeb do
     pipe_through [:auto_login, :auth_rate_limit]
 
     get "/users/log-in/auto", UserSessionController, :auto_login
     get "/users/log-in/passkey", UserSessionController, :passkey_login
+  end
+
+  scope "/", YscWeb do
+    pipe_through [:token_login, :auth_rate_limit]
+
+    post "/users/log-in/auto", UserSessionController, :create_auto_login
+    post "/users/log-in/passkey", UserSessionController, :create_passkey_login
   end
 
   ## Password reset (allow unauthenticated access)

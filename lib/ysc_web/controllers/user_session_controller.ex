@@ -19,17 +19,30 @@ defmodule YscWeb.UserSessionController do
     create(conn, params, "Welcome back! 👋 Good to see you again.")
   end
 
-  def auto_login(conn, %{"token" => token, "redirect_to" => redirect_to}) do
-    do_auto_login(conn, token, redirect_to)
+  def auto_login(conn, %{"token" => token, "redirect_to" => redirect_to})
+      when is_binary(token) and token != "" do
+    render_token_login_form(conn, ~p"/users/log-in/auto", token, redirect_to)
   end
 
-  def auto_login(conn, %{"token" => token}) do
-    do_auto_login(conn, token, nil)
+  def auto_login(conn, %{"token" => token}) when is_binary(token) and token != "" do
+    render_token_login_form(conn, ~p"/users/log-in/auto", token, nil)
   end
 
   def auto_login(conn, _params) do
     # Redirect without setting flash to avoid overwriting a concurrent successful
     # login's session (e.g. prefetch or duplicate request without token).
+    redirect(conn, to: ~p"/users/log-in")
+  end
+
+  def create_auto_login(conn, %{"token" => token, "redirect_to" => redirect_to}) do
+    do_auto_login(conn, token, redirect_to)
+  end
+
+  def create_auto_login(conn, %{"token" => token}) do
+    do_auto_login(conn, token, nil)
+  end
+
+  def create_auto_login(conn, _params) do
     redirect(conn, to: ~p"/users/log-in")
   end
 
@@ -278,11 +291,12 @@ defmodule YscWeb.UserSessionController do
     )
 
     case parsed_params do
-      %{"token" => token, "redirect_to" => redirect_to} ->
-        passkey_login_with_token(conn, token, redirect_to)
+      %{"token" => token, "redirect_to" => redirect_to}
+      when is_binary(token) and token != "" ->
+        render_token_login_form(conn, ~p"/users/log-in/passkey", token, redirect_to)
 
-      %{"token" => token} ->
-        passkey_login_with_token(conn, token, "")
+      %{"token" => token} when is_binary(token) and token != "" ->
+        render_token_login_form(conn, ~p"/users/log-in/passkey", token, nil)
 
       %{"user_id" => user_id} when is_binary(user_id) and user_id != "" ->
         case Ysc.AuthRateLimit.check_identifier(user_id) do
@@ -341,6 +355,29 @@ defmodule YscWeb.UserSessionController do
         nil
       end
     end)
+  end
+
+  def create_passkey_login(conn, %{"token" => token, "redirect_to" => redirect_to}) do
+    passkey_login_with_token(conn, token, redirect_to)
+  end
+
+  def create_passkey_login(conn, %{"token" => token}) do
+    passkey_login_with_token(conn, token, "")
+  end
+
+  def create_passkey_login(conn, _params) do
+    conn
+    |> YscWeb.Flash.put_toast(:error, "Invalid login request.", title: "Login")
+    |> redirect(to: ~p"/users/log-in")
+  end
+
+  defp render_token_login_form(conn, action, token, redirect_to) do
+    render(conn, :token_login_form,
+      action: action,
+      token: token,
+      redirect_to: redirect_to,
+      layout: false
+    )
   end
 
   # sobelow_skip ["XSS.SendResp"]
