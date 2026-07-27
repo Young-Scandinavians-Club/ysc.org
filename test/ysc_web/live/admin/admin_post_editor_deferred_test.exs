@@ -19,12 +19,15 @@ defmodule YscWeb.AdminPostEditorDeferredTest do
     {:ok, post} =
       %Post{}
       |> Post.new_post_changeset(
-        Enum.into(attrs, %{
-          user_id: author.id,
-          title: "Deferred Load Post",
-          url_name: "deferred-load-#{System.unique_integer()}",
-          state: :draft
-        })
+        Map.merge(
+          %{
+            user_id: author.id,
+            title: "Deferred Load Post",
+            url_name: "deferred-load-#{System.unique_integer()}",
+            state: :draft
+          },
+          attrs
+        )
       )
       |> Repo.insert()
 
@@ -35,7 +38,7 @@ defmodule YscWeb.AdminPostEditorDeferredTest do
     conn: conn,
     admin: admin
   } do
-    post = post_fixture(admin, %{})
+    post = post_fixture(admin, %{raw_body: "<div>Reload body content</div>"})
 
     posts_pattern = ~r/FROM "posts"/i
 
@@ -52,14 +55,25 @@ defmodule YscWeb.AdminPostEditorDeferredTest do
     assert query_count == 0
     assert html =~ "Loading post"
     refute html =~ "Deferred Load Post"
+    refute html =~ "trix-editor-form"
+    refute html =~ "Reload body content"
   end
 
-  test "connected mount loads post editor", %{conn: conn, admin: admin} do
-    post = post_fixture(admin, %{})
+  test "connected mount loads post editor with body content", %{
+    conn: conn,
+    admin: admin
+  } do
+    post = post_fixture(admin, %{raw_body: "<div>Reload body content</div>"})
 
     {:ok, view, _html} = live(conn, ~p"/admin/posts/#{post.id}")
 
     assert render(view) =~ "Deferred Load Post"
     assert has_element?(view, "#edit_post_form")
+    assert has_element?(view, "#trix-editor-form")
+
+    assert has_element?(
+             view,
+             "#post\\[raw_body\\][value='<div>Reload body content</div>']"
+           )
   end
 end

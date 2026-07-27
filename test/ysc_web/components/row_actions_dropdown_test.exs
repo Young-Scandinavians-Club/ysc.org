@@ -26,6 +26,8 @@ defmodule YscWeb.RowActionsDropdownTest do
       assert html =~ "Edit"
       assert html =~ "hero-pencil-square"
       assert html =~ "event.stopPropagation()"
+      assert html =~ "bottom-full mb-1"
+      refute html =~ ~r/\bmt-1\b/
     end
   end
 

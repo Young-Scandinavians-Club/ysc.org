@@ -514,7 +514,7 @@ defmodule YscWeb.FamilyManagementLive do
           </.button>
         </div>
       <% else %>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto sm:overflow-x-visible">
           <table
             class="min-w-full divide-y divide-zinc-200"
             id="active-family-members-table"
@@ -596,7 +596,7 @@ defmodule YscWeb.FamilyManagementLive do
         <p class="text-sm text-zinc-500">
           Invitations awaiting acceptance. You can cancel any pending invite.
         </p>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto sm:overflow-x-visible">
           <table
             class="min-w-full divide-y divide-zinc-200"
             id="pending-invites-table"
@@ -837,7 +837,7 @@ defmodule YscWeb.FamilyManagementLive do
           No other family members in your group.
         </p>
       <% else %>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto sm:overflow-x-visible">
           <table
             class="min-w-full divide-y divide-zinc-200"
             id="other-family-members-table"
