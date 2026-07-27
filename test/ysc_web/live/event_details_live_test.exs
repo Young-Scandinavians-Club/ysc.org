@@ -514,7 +514,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       render_async(view)
 
       assert html =~ "Your membership has expired"
-      assert html =~ "open Manage Membership in your account menu to renew"
+      assert html =~ "open Membership in your account menu to renew"
       refute html =~ "pay dues or activate your membership"
       refute has_element?(view, "button", "Get Tickets")
     end

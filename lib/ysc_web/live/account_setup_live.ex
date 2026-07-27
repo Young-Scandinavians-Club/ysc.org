@@ -80,7 +80,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Verify Your Email Address
             <:subtitle>
-              We sent a verification code to <strong><%= @display_email %></strong>. Please enter it below to continue.
+              We sent a 6-digit code to <strong><%= @display_email %></strong>. Enter it below to continue.
             </:subtitle>
           </.header>
 
@@ -94,7 +94,7 @@ defmodule YscWeb.AccountSetupLive do
             <.input
               field={@email_form[:verification_code]}
               type="otp"
-              label="Verification Code"
+              label="6-digit verification code"
               required
             />
             <p class="text-xs text-zinc-600 mt-1">
