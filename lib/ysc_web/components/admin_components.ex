@@ -1981,7 +1981,8 @@ defmodule YscWeb.AdminComponents do
 
   Used by `YscWeb.MediaPickerComponent` and `YscWeb.TrixImagePickerComponent`.
   Parent LiveComponents must handle `search-media`, `filter-year`, `load-more-media`,
-  and `select-image` events.
+  and `select-image` events. Infinite scroll uses the
+  `MediaLibraryBrowserInfiniteScroll` hook on the scroll container.
 
   ## Examples
 
@@ -2010,59 +2011,73 @@ defmodule YscWeb.AdminComponents do
 
   def admin_media_library_browser(assigns) do
     ~H"""
-    <div class="space-y-4">
-      <div class="flex flex-col sm:flex-row gap-3">
-        <form
-          id={"#{@id}-search-form"}
-          phx-change="search-media"
-          phx-target={@target}
-          class="flex-1"
-        >
-          <.input
-            type="text"
-            name="search"
-            value={@search}
-            placeholder="Search by title or alt text..."
-            phx-debounce="300"
-          />
-        </form>
-
-        <.admin_year_filter_pills
-          target={@target}
-          selected_year={@selected_year}
-          available_years={@available_years}
+    <div class="space-y-3">
+      <form
+        id={"#{@id}-search-form"}
+        phx-change="search-media"
+        phx-target={@target}
+        class="w-full min-w-0"
+      >
+        <.input
+          type="text"
+          name="search"
+          value={@search}
+          placeholder="Search by title or alt text..."
+          phx-debounce="300"
         />
-      </div>
+      </form>
+
+      <.admin_year_filter_pills
+        target={@target}
+        selected_year={@selected_year}
+        available_years={@available_years}
+      />
 
       <div
-        id={@grid_id}
-        phx-update="stream"
-        phx-viewport-bottom={!@end_of_timeline? && "load-more-media"}
+        id={"#{@id}-scroll"}
+        phx-hook="MediaLibraryBrowserInfiniteScroll"
         phx-target={@target}
-        class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto pr-1"
+        data-load-more-enabled={to_string(!@end_of_timeline?)}
+        data-load-more-footer-id={"#{@id}-load-more-footer"}
+        class="max-h-[60vh] overflow-y-auto pr-1"
       >
-        <button
-          :for={{dom_id, image} <- @picker_images}
-          type="button"
-          id={dom_id}
-          phx-click="select-image"
-          phx-target={@target}
-          phx-value-image-id={image.id}
-          class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
+        <div
+          id={@grid_id}
+          phx-update="stream"
+          class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2"
         >
-          <img
-            src={media_library_thumbnail_url(image)}
-            alt={image.alt_text || image.title || "Image"}
-            loading="lazy"
-            class="absolute inset-0 w-full h-full object-cover"
-          />
-          <div
-            :if={image.title}
-            class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
+          <button
+            :for={{dom_id, image} <- @picker_images}
+            type="button"
+            id={dom_id}
+            phx-click="select-image"
+            phx-target={@target}
+            phx-value-image-id={image.id}
+            class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
           >
-            <p class="text-xs text-white truncate">{image.title}</p>
-          </div>
-        </button>
+            <img
+              src={media_library_thumbnail_url(image)}
+              alt={image.alt_text || image.title || "Image"}
+              loading="lazy"
+              class="absolute inset-0 w-full h-full object-cover"
+            />
+            <div
+              :if={image.title}
+              class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
+            >
+              <p class="text-xs text-white truncate">{image.title}</p>
+            </div>
+          </button>
+        </div>
+        <div
+          :if={!@end_of_timeline?}
+          id={"#{@id}-load-more-footer"}
+          class="flex flex-col items-center justify-center gap-1 py-4 text-zinc-500"
+          aria-live="polite"
+        >
+          <.icon name="hero-chevron-down" class="h-5 w-5 animate-bounce" />
+          <p class="text-sm font-medium">Scroll down for more images</p>
+        </div>
       </div>
     </div>
     """
@@ -2074,30 +2089,32 @@ defmodule YscWeb.AdminComponents do
 
   defp admin_year_filter_pills(assigns) do
     ~H"""
-    <div class="flex flex-wrap gap-1.5 items-center">
-      <.admin_toggle_pill
-        active={@selected_year == nil}
-        variant={:dark}
-        size={:compact}
-        shape={:pill}
-        phx-click="filter-year"
-        phx-target={@target}
-        phx-value-year=""
-      >
-        All
-      </.admin_toggle_pill>
-      <.admin_toggle_pill
-        :for={year <- @available_years}
-        active={@selected_year == year}
-        variant={:dark}
-        size={:compact}
-        shape={:pill}
-        phx-click="filter-year"
-        phx-target={@target}
-        phx-value-year={year}
-      >
-        {year}
-      </.admin_toggle_pill>
+    <div class="-mx-1 px-1 overflow-x-auto">
+      <div class="flex w-max min-w-full flex-nowrap gap-1.5 items-center pb-0.5">
+        <.admin_toggle_pill
+          active={@selected_year == nil}
+          variant={:dark}
+          size={:compact}
+          shape={:pill}
+          phx-click="filter-year"
+          phx-target={@target}
+          phx-value-year=""
+        >
+          All
+        </.admin_toggle_pill>
+        <.admin_toggle_pill
+          :for={year <- @available_years}
+          active={@selected_year == year}
+          variant={:dark}
+          size={:compact}
+          shape={:pill}
+          phx-click="filter-year"
+          phx-target={@target}
+          phx-value-year={year}
+        >
+          {year}
+        </.admin_toggle_pill>
+      </div>
     </div>
     """
   end

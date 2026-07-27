@@ -101,6 +101,25 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       assert decoded =~ "tab=information"
       # Default info tab (:general) is omitted from the query string
       refute decoded =~ "info_tab="
+      assert :sys.get_state(view.pid).socket.assigns.info_tab == :general
+    end
+
+    test "switches back to general from rules on default booking tab", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, ~p"/bookings/clear-lake?info_tab=rules")
+
+      assert :sys.get_state(view.pid).socket.assigns.info_tab == :rules
+
+      render_click(view, "switch-info-tab", %{"tab" => "general"})
+
+      assert :sys.get_state(view.pid).socket.assigns.info_tab == :general
+      refute has_element?(view, "#cabin-rules")
+      assert has_element?(view, "#general-info")
     end
   end
 

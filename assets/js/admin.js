@@ -22,6 +22,7 @@ import EventCheckInKeyboard from "./event_checkin_keyboard";
 import MediaDropZone from "./media_drop_zone";
 import MediaLayoutPreference from "./media_layout_preference";
 import MediaGalleryInfiniteScroll from "./media_gallery_infinite_scroll";
+import MediaLibraryBrowserInfiniteScroll from "./media_library_browser_infinite_scroll";
 import { applyPlatformKeyLabels } from "./platform_keys";
 import AdminHelpHotspots from "./admin_help_hotspots";
 import AdminHelpGhostFrame from "./admin_help_ghost_frame";
@@ -63,6 +64,7 @@ window.__adminHooks = {
     MediaDropZone,
     MediaLayoutPreference,
     MediaGalleryInfiniteScroll,
+    MediaLibraryBrowserInfiniteScroll,
     AdminHelpHotspots,
     AdminHelpGhostFrame,
     AdminHelpGhostScroll,
