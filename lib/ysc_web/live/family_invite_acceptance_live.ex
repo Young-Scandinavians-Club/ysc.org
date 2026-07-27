@@ -152,7 +152,7 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You can only be linked to one family membership at a time. Open Manage Membership in your account menu and use \"Leave family membership\" to leave your current family first, then you can accept this invitation.",
+           "You can only be linked to one family membership at a time. Open Membership in your account menu and use \"Leave family membership\" to leave your current family first, then you can accept this invitation.",
            title: "Invitation"
          )}
 
@@ -226,6 +226,11 @@ defmodule YscWeb.FamilyInviteAcceptanceLive do
         <p>
           As a family member, you'll share their membership benefits including cabin bookings and
           event ticket purchases.
+        </p>
+
+        <p>
+          This is a quick sign-up to join an existing family membership. It is not a new membership
+          application and does not need board approval.
         </p>
 
         <%!-- Logged in with matching email: show Join button --%>

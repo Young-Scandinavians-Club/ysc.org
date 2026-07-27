@@ -6,6 +6,7 @@ defmodule YscWeb.MediaPickerComponentTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  alias Ysc.Media
   alias Ysc.Media.Image
   alias Ysc.Repo
 
@@ -102,6 +103,60 @@ defmodule YscWeb.MediaPickerComponentTest do
       |> render_click()
 
       refute has_element?(view, "#media-picker-modal-newsletter_cover")
+    end
+
+    test "load-more-media appends the next page of images", %{
+      conn: conn,
+      admin: admin
+    } do
+      # Page size is 30; create enough rows for a second page.
+      for i <- 1..35 do
+        create_image(admin, %{
+          title: "Pager #{i}",
+          raw_image_path: "https://example.com/pager-#{i}.jpg",
+          thumbnail_path: "https://example.com/pager-#{i}_thumb.jpg"
+        })
+      end
+
+      first_page = Media.list_images_cursor(limit: 30)
+      last_on_first = List.last(first_page)
+
+      second_page =
+        Media.list_images_cursor(
+          limit: 30,
+          before_date: last_on_first.inserted_at,
+          before_id: last_on_first.id
+        )
+
+      second_page_image = hd(second_page)
+
+      {:ok, view, _html} = live(conn, ~p"/admin/newsletters/new")
+
+      view
+      |> element("#media-picker-newsletter_cover button", "Choose from library")
+      |> render_click()
+
+      assert has_element?(view, "#newsletter_cover-scroll")
+      assert has_element?(view, "#newsletter_cover-load-more-footer")
+
+      assert has_element?(
+               view,
+               "#media-picker-grid-newsletter_cover button[phx-value-image-id='#{hd(first_page).id}']"
+             )
+
+      refute has_element?(
+               view,
+               "#media-picker-grid-newsletter_cover button[phx-value-image-id='#{second_page_image.id}']"
+             )
+
+      view
+      |> element("#newsletter_cover-scroll")
+      |> render_hook("load-more-media", %{})
+
+      assert has_element?(
+               view,
+               "#media-picker-grid-newsletter_cover button[phx-value-image-id='#{second_page_image.id}']"
+             )
     end
   end
 end

@@ -1,11 +1,32 @@
 defmodule Ysc.Accounts.FamilyMembersTest do
-  use Ysc.DataCase, async: true
+  # async: false — cache-invalidation tests toggle :process_caches_enabled
+  use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
 
+  alias Ysc.Accounts
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Accounts.FamilyMembers
   alias Ysc.Repo
+
+  @family_page_preloads [
+    :sub_accounts,
+    :family_members,
+    subscriptions: :subscription_items
+  ]
+
+  defp with_process_caches(fun) do
+    previous = Application.get_env(:ysc, :process_caches_enabled, false)
+    Application.put_env(:ysc, :process_caches_enabled, true)
+    Cachex.clear(:ysc_cache)
+
+    try do
+      fun.()
+    after
+      Application.put_env(:ysc, :process_caches_enabled, previous)
+      Cachex.clear(:ysc_cache)
+    end
+  end
 
   describe "upsert_family_member/2" do
     test "inserts a new record when no id is provided" do
@@ -20,6 +41,27 @@ defmodule Ysc.Accounts.FamilyMembersTest do
 
       assert member.first_name == "Jane"
       assert member.user_id == user.id
+    end
+
+    test "invalidates profile cache so family page preloads see new members" do
+      with_process_caches(fn ->
+        user = user_fixture()
+
+        cached = Accounts.get_user!(user.id, @family_page_preloads)
+        assert cached.family_members == []
+
+        assert {:ok, _member} =
+                 FamilyMembers.upsert_family_member(user, %{
+                   "first_name" => "Pelle",
+                   "last_name" => "Svans",
+                   "relationship" => "child"
+                 })
+
+        reloaded = Accounts.get_user!(user.id, @family_page_preloads)
+
+        assert [%{first_name: "Pelle", last_name: "Svans"}] =
+                 reloaded.family_members
+      end)
     end
 
     test "updates an existing record when id matches" do
@@ -152,6 +194,54 @@ defmodule Ysc.Accounts.FamilyMembersTest do
                })
 
       assert "cannot be in the future" in errors_on(changeset).birth_date
+    end
+  end
+
+  describe "delete_family_member/2" do
+    test "deletes member and invalidates profile cache" do
+      with_process_caches(fn ->
+        user = user_fixture()
+
+        {:ok, member} =
+          FamilyMembers.upsert_family_member(user, %{
+            "first_name" => "Gone",
+            "last_name" => "Soon",
+            "relationship" => "child"
+          })
+
+        _ = Accounts.get_user!(user.id, @family_page_preloads)
+
+        assert {:ok, _} = FamilyMembers.delete_family_member(user, member)
+
+        reloaded = Accounts.get_user!(user.id, @family_page_preloads)
+        assert reloaded.family_members == []
+      end)
+    end
+
+    test "returns unauthorized when member belongs to another user" do
+      with_process_caches(fn ->
+        owner = user_fixture()
+        other = user_fixture()
+
+        {:ok, member} =
+          FamilyMembers.upsert_family_member(owner, %{
+            "first_name" => "Keep",
+            "last_name" => "Me",
+            "relationship" => "child"
+          })
+
+        # Prime owner's cached profile with the member present.
+        cached = Accounts.get_user!(owner.id, @family_page_preloads)
+        assert length(cached.family_members) == 1
+
+        assert {:error, :unauthorized} =
+                 FamilyMembers.delete_family_member(other, member)
+
+        # Owner cache must not have been invalidated by the unauthorized attempt.
+        still_cached = Accounts.get_user!(owner.id, @family_page_preloads)
+        assert length(still_cached.family_members) == 1
+        assert Repo.get(FamilyMember, member.id)
+      end)
     end
   end
 

@@ -26,7 +26,7 @@ defmodule YscWeb.AdminMediaLibraryBrowserTest do
   end
 
   describe "admin_media_library_browser/1" do
-    test "renders search, year pills, and grid shell" do
+    test "renders search, year pills, and infinite-scroll shell" do
       assigns = %{}
 
       html =
@@ -49,14 +49,19 @@ defmodule YscWeb.AdminMediaLibraryBrowserTest do
       assert html =~ "Search by title or alt text"
       assert html =~ ~s(id="media-picker-grid-cover")
       assert html =~ ~s(phx-update="stream")
-      assert html =~ ~s(phx-viewport-bottom="load-more-media")
+      assert html =~ ~s(id="cover-scroll")
+      assert html =~ ~s(phx-hook="MediaLibraryBrowserInfiniteScroll")
+      assert html =~ ~s(data-load-more-enabled="true")
+      assert html =~ ~s(id="cover-load-more-footer")
+      assert html =~ "Scroll down for more images"
+      refute html =~ "phx-viewport-bottom"
       assert html =~ "All"
       assert html =~ "2025"
       assert html =~ "2024"
       assert html =~ "bg-zinc-800 text-white"
     end
 
-    test "omits infinite-scroll trigger when end of timeline is reached" do
+    test "omits load-more footer when end of timeline is reached" do
       assigns = %{}
 
       html =
@@ -73,7 +78,9 @@ defmodule YscWeb.AdminMediaLibraryBrowserTest do
         />
         """)
 
-      refute html =~ ~s(phx-viewport-bottom="load-more-media")
+      assert html =~ ~s(data-load-more-enabled="false")
+      refute html =~ "Scroll down for more images"
+      refute html =~ "phx-viewport-bottom"
     end
   end
 end

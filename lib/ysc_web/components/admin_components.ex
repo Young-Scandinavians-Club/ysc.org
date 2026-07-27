@@ -1981,7 +1981,8 @@ defmodule YscWeb.AdminComponents do
 
   Used by `YscWeb.MediaPickerComponent` and `YscWeb.TrixImagePickerComponent`.
   Parent LiveComponents must handle `search-media`, `filter-year`, `load-more-media`,
-  and `select-image` events.
+  and `select-image` events. Infinite scroll uses the
+  `MediaLibraryBrowserInfiniteScroll` hook on the scroll container.
 
   ## Examples
 
@@ -2010,59 +2011,73 @@ defmodule YscWeb.AdminComponents do
 
   def admin_media_library_browser(assigns) do
     ~H"""
-    <div class="space-y-4">
-      <div class="flex flex-col sm:flex-row gap-3">
-        <form
-          id={"#{@id}-search-form"}
-          phx-change="search-media"
-          phx-target={@target}
-          class="flex-1"
-        >
-          <.input
-            type="text"
-            name="search"
-            value={@search}
-            placeholder="Search by title or alt text..."
-            phx-debounce="300"
-          />
-        </form>
-
-        <.admin_year_filter_pills
-          target={@target}
-          selected_year={@selected_year}
-          available_years={@available_years}
+    <div class="space-y-3">
+      <form
+        id={"#{@id}-search-form"}
+        phx-change="search-media"
+        phx-target={@target}
+        class="w-full min-w-0"
+      >
+        <.input
+          type="text"
+          name="search"
+          value={@search}
+          placeholder="Search by title or alt text..."
+          phx-debounce="300"
         />
-      </div>
+      </form>
+
+      <.admin_year_filter_pills
+        target={@target}
+        selected_year={@selected_year}
+        available_years={@available_years}
+      />
 
       <div
-        id={@grid_id}
-        phx-update="stream"
-        phx-viewport-bottom={!@end_of_timeline? && "load-more-media"}
+        id={"#{@id}-scroll"}
+        phx-hook="MediaLibraryBrowserInfiniteScroll"
         phx-target={@target}
-        class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 max-h-[60vh] overflow-y-auto pr-1"
+        data-load-more-enabled={to_string(!@end_of_timeline?)}
+        data-load-more-footer-id={"#{@id}-load-more-footer"}
+        class="max-h-[60vh] overflow-y-auto pr-1"
       >
-        <button
-          :for={{dom_id, image} <- @picker_images}
-          type="button"
-          id={dom_id}
-          phx-click="select-image"
-          phx-target={@target}
-          phx-value-image-id={image.id}
-          class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
+        <div
+          id={@grid_id}
+          phx-update="stream"
+          class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2"
         >
-          <img
-            src={media_library_thumbnail_url(image)}
-            alt={image.alt_text || image.title || "Image"}
-            loading="lazy"
-            class="absolute inset-0 w-full h-full object-cover"
-          />
-          <div
-            :if={image.title}
-            class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
+          <button
+            :for={{dom_id, image} <- @picker_images}
+            type="button"
+            id={dom_id}
+            phx-click="select-image"
+            phx-target={@target}
+            phx-value-image-id={image.id}
+            class="group relative aspect-square rounded-lg overflow-hidden border-2 border-transparent hover:border-blue-500 focus:border-blue-500 focus:outline-none transition p-0"
           >
-            <p class="text-xs text-white truncate">{image.title}</p>
-          </div>
-        </button>
+            <img
+              src={media_library_thumbnail_url(image)}
+              alt={image.alt_text || image.title || "Image"}
+              loading="lazy"
+              class="absolute inset-0 w-full h-full object-cover"
+            />
+            <div
+              :if={image.title}
+              class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition"
+            >
+              <p class="text-xs text-white truncate">{image.title}</p>
+            </div>
+          </button>
+        </div>
+        <div
+          :if={!@end_of_timeline?}
+          id={"#{@id}-load-more-footer"}
+          class="flex flex-col items-center justify-center gap-1 py-4 text-zinc-500"
+          aria-live="polite"
+        >
+          <.icon name="hero-chevron-down" class="h-5 w-5 animate-bounce" />
+          <p class="text-sm font-medium">Scroll down for more images</p>
+        </div>
       </div>
     </div>
     """
@@ -2074,30 +2089,32 @@ defmodule YscWeb.AdminComponents do
 
   defp admin_year_filter_pills(assigns) do
     ~H"""
-    <div class="flex flex-wrap gap-1.5 items-center">
-      <.admin_toggle_pill
-        active={@selected_year == nil}
-        variant={:dark}
-        size={:compact}
-        shape={:pill}
-        phx-click="filter-year"
-        phx-target={@target}
-        phx-value-year=""
-      >
-        All
-      </.admin_toggle_pill>
-      <.admin_toggle_pill
-        :for={year <- @available_years}
-        active={@selected_year == year}
-        variant={:dark}
-        size={:compact}
-        shape={:pill}
-        phx-click="filter-year"
-        phx-target={@target}
-        phx-value-year={year}
-      >
-        {year}
-      </.admin_toggle_pill>
+    <div class="-mx-1 px-1 overflow-x-auto">
+      <div class="flex w-max min-w-full flex-nowrap gap-1.5 items-center pb-0.5">
+        <.admin_toggle_pill
+          active={@selected_year == nil}
+          variant={:dark}
+          size={:compact}
+          shape={:pill}
+          phx-click="filter-year"
+          phx-target={@target}
+          phx-value-year=""
+        >
+          All
+        </.admin_toggle_pill>
+        <.admin_toggle_pill
+          :for={year <- @available_years}
+          active={@selected_year == year}
+          variant={:dark}
+          size={:compact}
+          shape={:pill}
+          phx-click="filter-year"
+          phx-target={@target}
+          phx-value-year={year}
+        >
+          {year}
+        </.admin_toggle_pill>
+      </div>
     </div>
     """
   end
@@ -2715,190 +2732,6 @@ defmodule YscWeb.AdminComponents do
     </div>
     """
   end
-
-  # ---------------------------------------------------------------------------
-  # admin_row_actions_dropdown / admin_dropdown_menu_item
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Ellipsis menu for per-row actions in admin tables and card lists.
-
-  Stops row click propagation and renders the standard right-aligned trigger.
-  Place `<.admin_dropdown_menu_item>` elements in the default slot.
-
-  ## Examples
-
-      <.admin_row_actions_dropdown id="event-actions-1" label="Event actions">
-        <.admin_dropdown_menu_item
-          id="event-actions-1-edit"
-          icon="hero-pencil-square"
-          navigate={~p"/admin/events/1/edit"}
-        >
-          Edit
-        </.admin_dropdown_menu_item>
-      </.admin_row_actions_dropdown>
-  """
-  attr :id, :string, required: true
-
-  attr :label, :string,
-    required: true,
-    doc: "Accessible name for the trigger (rendered sr-only)"
-
-  slot :inner_block, required: true
-
-  def admin_row_actions_dropdown(assigns) do
-    ~H"""
-    <div class="flex justify-end" onclick="event.stopPropagation()">
-      <.dropdown
-        id={@id}
-        right={true}
-        class="min-w-0 !w-auto shrink-0 rounded-md px-1 py-1 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
-      >
-        <:button_block>
-          <span class="sr-only">{@label}</span>
-          <.icon name="hero-ellipsis-vertical" class="h-5 w-5" />
-        </:button_block>
-
-        <div class="w-full divide-y divide-zinc-100 py-1 text-sm text-zinc-700">
-          <ul class="py-1">
-            {render_slot(@inner_block)}
-          </ul>
-        </div>
-      </.dropdown>
-    </div>
-    """
-  end
-
-  @doc """
-  A single item inside `<.admin_row_actions_dropdown>` (or any admin dropdown menu).
-
-  Renders a `<.link>` when `navigate`, `patch`, or `href` is set; otherwise a `<button>`.
-  Set `static` for non-interactive status rows (e.g. "Sending…").
-
-  ## Examples
-
-      <.admin_dropdown_menu_item
-        id="post-actions-view"
-        icon="hero-arrow-top-right-on-square"
-        href={~p"/posts/1"}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        View live
-      </.admin_dropdown_menu_item>
-
-      <.admin_dropdown_menu_item
-        id="post-actions-delete"
-        icon="hero-trash"
-        tone={:danger}
-        phx-click="delete-post"
-        phx-value-id={@post.id}
-        data-confirm="Delete this draft?"
-      >
-        Delete
-      </.admin_dropdown_menu_item>
-  """
-  attr :id, :string, required: true
-  attr :icon, :string, default: nil
-
-  attr :tone, :atom,
-    default: :default,
-    values: [:default, :success, :danger, :info]
-
-  attr :static, :boolean, default: false
-  attr :navigate, :any, default: nil
-  attr :patch, :any, default: nil
-  attr :href, :any, default: nil
-
-  attr :class, :any,
-    default: nil,
-    doc: "Additional classes merged onto the menu item"
-
-  attr :icon_class, :any,
-    default: nil,
-    doc: "Override or extend default icon classes"
-
-  attr :rest, :global,
-    include:
-      ~w(phx-click phx-target phx-value-id phx-value-tier-id phx-value-email data-confirm disabled target rel aria-label)
-
-  slot :inner_block, required: true
-  slot :leading, doc: "Custom leading content instead of a hero icon"
-
-  def admin_dropdown_menu_item(assigns) do
-    assigns =
-      assign(
-        assigns,
-        :icon_classes,
-        dropdown_menu_item_icon_class(assigns.tone, assigns.icon_class)
-      )
-
-    ~H"""
-    <li>
-      <%= cond do %>
-        <% @static -> %>
-          <span id={@id} class={dropdown_menu_item_class(@tone, @class)}>
-            <%= if @leading != [] do %>
-              {render_slot(@leading)}
-            <% else %>
-              <.icon :if={@icon} name={@icon} class={@icon_classes} />
-            <% end %>
-            <span>{render_slot(@inner_block)}</span>
-          </span>
-        <% @navigate || @patch || @href -> %>
-          <.link
-            id={@id}
-            navigate={@navigate}
-            patch={@patch}
-            href={@href}
-            class={dropdown_menu_item_class(@tone, @class)}
-            {@rest}
-          >
-            <%= if @leading != [] do %>
-              {render_slot(@leading)}
-            <% else %>
-              <.icon :if={@icon} name={@icon} class={@icon_classes} />
-            <% end %>
-            <span>{render_slot(@inner_block)}</span>
-          </.link>
-        <% true -> %>
-          <button
-            id={@id}
-            type="button"
-            class={dropdown_menu_item_class(@tone, @class)}
-            {@rest}
-          >
-            <%= if @leading != [] do %>
-              {render_slot(@leading)}
-            <% else %>
-              <.icon :if={@icon} name={@icon} class={@icon_classes} />
-            <% end %>
-            <span>{render_slot(@inner_block)}</span>
-          </button>
-      <% end %>
-    </li>
-    """
-  end
-
-  defp dropdown_menu_item_class(tone, extra) do
-    [
-      "flex w-full items-center gap-2 px-4 py-2 text-left transition hover:bg-zinc-100",
-      dropdown_menu_item_tone_class(tone),
-      extra
-    ]
-  end
-
-  defp dropdown_menu_item_tone_class(:default), do: nil
-  defp dropdown_menu_item_tone_class(:success), do: "text-emerald-700"
-  defp dropdown_menu_item_tone_class(:danger), do: "text-red-600"
-  defp dropdown_menu_item_tone_class(:info), do: "text-blue-600"
-
-  defp dropdown_menu_item_icon_class(:default, nil),
-    do: "h-5 w-5 shrink-0 text-zinc-500"
-
-  defp dropdown_menu_item_icon_class(_tone, nil), do: "h-5 w-5 shrink-0"
-
-  defp dropdown_menu_item_icon_class(_tone, custom), do: custom
 
   # ---------------------------------------------------------------------------
   # admin_filter_dropdown

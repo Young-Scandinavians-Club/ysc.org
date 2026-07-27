@@ -365,6 +365,91 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       refute html =~ "Renewal Payment"
       assert html =~ ">Family</span>"
     end
+
+    test "sub-accounts skip membership selection and payment; show inherited membership step",
+         %{conn: conn} do
+      primary =
+        user_fixture(%{first_name: "Primary", last_name: "Member"})
+
+      sub_user = user_needing_post_migration_onboarding()
+
+      {:ok, sub_user} =
+        sub_user
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update()
+
+      conn = log_in_user(conn, sub_user)
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render_async(view, 5_000)
+
+      assert has_element?(view, ~s|button[phx-value-step="0"]|, "Profile")
+      assert has_element?(view, ~s|button[phx-value-step="1"]|, "Address")
+      assert has_element?(view, ~s|button[phx-value-step="2"]|, "Membership")
+      refute has_element?(view, "button", "Membership Type")
+      refute has_element?(view, "button", "Renewal Payment")
+      refute has_element?(view, "button", "Family")
+      refute has_element?(view, "#membership-selection")
+      refute has_element?(view, "#onboarding-payment-form")
+    end
+  end
+
+  describe "inherited membership step" do
+    @onboarding_async_timeout 5_000
+
+    defp sub_account_needing_onboarding!(primary_attrs \\ %{}) do
+      primary =
+        user_fixture(
+          Map.merge(
+            %{first_name: "Primary", last_name: "Member"},
+            primary_attrs
+          )
+        )
+
+      sub_user = user_needing_post_migration_onboarding()
+
+      {:ok, sub_user} =
+        sub_user
+        |> Ecto.Changeset.change(%{primary_user_id: primary.id})
+        |> Repo.update()
+
+      {primary, sub_user}
+    end
+
+    test "shows inherited membership info and continues without payment", %{
+      conn: conn
+    } do
+      {primary, sub_user} = sub_account_needing_onboarding!()
+      conn = log_in_user(conn, sub_user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render_async(view, @onboarding_async_timeout)
+      refute has_element?(view, "#onboarding-loading")
+
+      render_click(view, "set-step", %{"step" => "2"})
+
+      assert has_element?(view, "#inherited-membership-step")
+      assert has_element?(view, "#continue-inherited-membership")
+
+      assert has_element?(
+               view,
+               "#inherited-membership-step",
+               "Membership inherited from primary member"
+             )
+
+      assert has_element?(
+               view,
+               "#inherited-membership-step",
+               primary.first_name
+             )
+
+      assert has_element?(view, "#inherited-membership-step", primary.last_name)
+      refute has_element?(view, "#membership-selection")
+      refute has_element?(view, "#confirm-membership-selection")
+
+      render_click(view, "continue_inherited_membership")
+
+      assert Accounts.get_user!(sub_user.id).post_migration_onboarding_completed_at
+    end
   end
 
   describe "family members step" do

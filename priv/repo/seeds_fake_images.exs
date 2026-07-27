@@ -94,14 +94,16 @@ total_created =
           width: width,
           height: height,
           processing_state: "completed",
-          user_id: admin_user.id,
           upload_data: %{
             filename: "fake_image_#{year}_#{i}.jpg",
             content_type: "image/jpeg"
           }
         }
 
-        changeset = Image.add_image_changeset(%Image{}, attrs)
+        # user_id is not cast (set programmatically for security)
+        changeset =
+          %Image{user_id: admin_user.id}
+          |> Image.add_image_changeset(attrs)
 
         case Repo.insert(changeset) do
           {:ok, image} ->

@@ -1,22 +1,22 @@
-defmodule YscWeb.AdminDropdownMenuTest do
+defmodule YscWeb.RowActionsDropdownTest do
   use ExUnit.Case, async: true
 
   use Phoenix.Component
 
   import Phoenix.LiveViewTest
-  import YscWeb.AdminComponents
+  import YscWeb.CoreComponents
 
-  describe "admin_row_actions_dropdown/1" do
+  describe "row_actions_dropdown/1" do
     test "renders ellipsis trigger and menu container" do
       assigns = %{}
 
       html =
         rendered_to_string(~H"""
-        <.admin_row_actions_dropdown id="row-actions-1" label="Event actions">
-          <.admin_dropdown_menu_item id="row-actions-1-edit" icon="hero-pencil-square">
+        <.row_actions_dropdown id="row-actions-1" label="Event actions">
+          <.dropdown_menu_item id="row-actions-1-edit" icon="hero-pencil-square">
             Edit
-          </.admin_dropdown_menu_item>
-        </.admin_row_actions_dropdown>
+          </.dropdown_menu_item>
+        </.row_actions_dropdown>
         """)
 
       assert html =~ ~s(id="row-actions-1")
@@ -26,24 +26,26 @@ defmodule YscWeb.AdminDropdownMenuTest do
       assert html =~ "Edit"
       assert html =~ "hero-pencil-square"
       assert html =~ "event.stopPropagation()"
+      assert html =~ "bottom-full mb-1"
+      refute html =~ ~r/\bmt-1\b/
     end
   end
 
-  describe "admin_dropdown_menu_item/1" do
+  describe "dropdown_menu_item/1" do
     test "renders a navigate link with default tone" do
       assigns = %{}
 
       html =
         rendered_to_string(~H"""
-        <.admin_row_actions_dropdown id="menu-1" label="Actions">
-          <.admin_dropdown_menu_item
+        <.row_actions_dropdown id="menu-1" label="Actions">
+          <.dropdown_menu_item
             id="menu-1-edit"
             icon="hero-pencil-square"
             navigate="/admin/items/1"
           >
             Edit
-          </.admin_dropdown_menu_item>
-        </.admin_row_actions_dropdown>
+          </.dropdown_menu_item>
+        </.row_actions_dropdown>
         """)
 
       assert html =~ ~s(href="/admin/items/1")
@@ -56,16 +58,16 @@ defmodule YscWeb.AdminDropdownMenuTest do
 
       html =
         rendered_to_string(~H"""
-        <.admin_row_actions_dropdown id="menu-2" label="Actions">
-          <.admin_dropdown_menu_item
+        <.row_actions_dropdown id="menu-2" label="Actions">
+          <.dropdown_menu_item
             id="menu-2-check-in"
             icon="hero-qr-code"
             tone={:success}
             phx-click="check-in"
           >
             Check in
-          </.admin_dropdown_menu_item>
-        </.admin_row_actions_dropdown>
+          </.dropdown_menu_item>
+        </.row_actions_dropdown>
         """)
 
       assert html =~ ~s(phx-click="check-in")
@@ -78,14 +80,14 @@ defmodule YscWeb.AdminDropdownMenuTest do
 
       html =
         rendered_to_string(~H"""
-        <.admin_row_actions_dropdown id="menu-3" label="Actions">
-          <.admin_dropdown_menu_item id="menu-3-sending" static tone={:info}>
+        <.row_actions_dropdown id="menu-3" label="Actions">
+          <.dropdown_menu_item id="menu-3-sending" static tone={:info}>
             <:leading>
               <span class="spinner-test"></span>
             </:leading>
             Sending…
-          </.admin_dropdown_menu_item>
-        </.admin_row_actions_dropdown>
+          </.dropdown_menu_item>
+        </.row_actions_dropdown>
         """)
 
       assert html =~ "spinner-test"
@@ -100,8 +102,8 @@ defmodule YscWeb.AdminDropdownMenuTest do
 
       html =
         rendered_to_string(~H"""
-        <.admin_row_actions_dropdown id="menu-4" label="Actions">
-          <.admin_dropdown_menu_item
+        <.row_actions_dropdown id="menu-4" label="Actions">
+          <.dropdown_menu_item
             id="menu-4-delete"
             icon="hero-trash"
             tone={:danger}
@@ -109,8 +111,8 @@ defmodule YscWeb.AdminDropdownMenuTest do
             data-confirm="Delete this item?"
           >
             Delete
-          </.admin_dropdown_menu_item>
-        </.admin_row_actions_dropdown>
+          </.dropdown_menu_item>
+        </.row_actions_dropdown>
         """)
 
       assert html =~ "text-red-600"

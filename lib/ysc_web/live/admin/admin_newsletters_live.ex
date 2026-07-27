@@ -942,8 +942,8 @@ defmodule YscWeb.AdminNewslettersLive do
 
   def edition_actions_dropdown(assigns) do
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="Newsletter actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="Newsletter actions">
+      <.dropdown_menu_item
         id={"#{@menu_id}-open"}
         icon={
           if @edition.status == :sent, do: "hero-eye", else: "hero-pencil-square"
@@ -951,16 +951,16 @@ defmodule YscWeb.AdminNewslettersLive do
         navigate={~p"/admin/newsletters/#{@edition.id}/edit"}
       >
         {if @edition.status == :sent, do: "View", else: "Edit"}
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         id={"#{@menu_id}-duplicate"}
         icon="hero-document-duplicate"
         phx-click="duplicate-edition"
         phx-value-id={@edition.id}
       >
         Duplicate
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={@edition.status == :sending}
         id={"#{@menu_id}-sending"}
         static
@@ -970,8 +970,8 @@ defmodule YscWeb.AdminNewslettersLive do
           <span class="inline-block h-5 w-5 shrink-0 rounded-full border-2 border-blue-400 border-t-transparent animate-spin"></span>
         </:leading>
         Sending…
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={@edition.status == :draft}
         id={"#{@menu_id}-send-now"}
         icon="hero-paper-airplane"
@@ -981,8 +981,8 @@ defmodule YscWeb.AdminNewslettersLive do
         data-confirm="Send this newsletter to all subscribers now? This cannot be undone."
       >
         Send now
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={@edition.status not in [:sent, :sending]}
         id={"#{@menu_id}-delete"}
         icon="hero-trash"
@@ -992,8 +992,8 @@ defmodule YscWeb.AdminNewslettersLive do
         data-confirm="Delete this newsletter? This cannot be undone."
       >
         Delete
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 
@@ -1002,8 +1002,8 @@ defmodule YscWeb.AdminNewslettersLive do
 
   def subscriber_actions_dropdown(assigns) do
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="Subscriber actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="Subscriber actions">
+      <.dropdown_menu_item
         :if={@subscriber.subscribed}
         id={"#{@menu_id}-remove"}
         icon="hero-user-minus"
@@ -1013,8 +1013,8 @@ defmodule YscWeb.AdminNewslettersLive do
         data-confirm="Remove this subscriber? They will no longer receive newsletters."
       >
         Remove
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         :if={!@subscriber.subscribed}
         id={"#{@menu_id}-re-add"}
         icon="hero-user-plus"
@@ -1023,8 +1023,8 @@ defmodule YscWeb.AdminNewslettersLive do
         phx-value-email={@subscriber.email}
       >
         Re-add
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 
@@ -1033,16 +1033,16 @@ defmodule YscWeb.AdminNewslettersLive do
 
   def notice_actions_dropdown(assigns) do
     ~H"""
-    <.admin_row_actions_dropdown id={@menu_id} label="Notice actions">
-      <.admin_dropdown_menu_item
+    <.row_actions_dropdown id={@menu_id} label="Notice actions">
+      <.dropdown_menu_item
         id={"#{@menu_id}-edit"}
         icon="hero-pencil-square"
         phx-click="edit-notice"
         phx-value-id={@notice.id}
       >
         Edit
-      </.admin_dropdown_menu_item>
-      <.admin_dropdown_menu_item
+      </.dropdown_menu_item>
+      <.dropdown_menu_item
         id={"#{@menu_id}-delete"}
         icon="hero-trash"
         tone={:danger}
@@ -1051,8 +1051,8 @@ defmodule YscWeb.AdminNewslettersLive do
         data-confirm="Delete this saved notice? This cannot be undone."
       >
         Delete
-      </.admin_dropdown_menu_item>
-    </.admin_row_actions_dropdown>
+      </.dropdown_menu_item>
+    </.row_actions_dropdown>
     """
   end
 
