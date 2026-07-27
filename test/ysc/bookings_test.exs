@@ -374,6 +374,23 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "list_active_clear_lake_bookings_for_user/2 returns only clear lake bookings" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      clear_lake =
+        insert_complete_booking(user, Date.add(today, 5), Date.add(today, 7))
+
+      _tahoe =
+        insert_complete_tahoe_booking(user, Date.add(today, 5), Date.add(today, 7))
+
+      bookings = Bookings.list_active_clear_lake_bookings_for_user(user.id)
+      ids = Enum.map(bookings, & &1.id)
+
+      assert clear_lake.id in ids
+      assert Enum.all?(bookings, &(&1.property == :clear_lake))
+    end
+
     test "list_active_clear_lake_bookings_for_user/2 applies checkout cutoff before limit" do
       user = user_fixture()
       today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
