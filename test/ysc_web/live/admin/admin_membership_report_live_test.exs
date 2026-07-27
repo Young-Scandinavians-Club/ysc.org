@@ -49,6 +49,22 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       assert html =~ user.email
     end
 
+    test "shows accepted applications in report output", %{conn: conn} do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-03-05 10:00:00Z],
+        review_outcome: "approved",
+        reviewed_at: ~U[2026-03-12 10:00:00Z]
+      })
+
+      {_view, html} =
+        live_report(conn, ~p"/admin/memberships/report?from=2026-03-01&to=2026-03-31")
+
+      assert html =~ ~s(id="report-accepted")
+      assert html =~ user.email
+    end
+
     test "shows error for invalid date range", %{conn: conn} do
       {:ok, view, _html} =
         live(conn, ~p"/admin/memberships/report?from=2026-05-01&to=2026-04-01")
@@ -104,6 +120,19 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
 
       flash = :sys.get_state(view.pid).socket.assigns.flash
       assert Phoenix.Flash.get(flash, :info) =~ "emailed to the board"
+    end
+
+    test "generate form patches to selected date range", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin/memberships/report")
+
+      view
+      |> form("#membership-report-form", %{
+        "date_from" => "2026-02-01",
+        "date_to" => "2026-02-28"
+      })
+      |> render_submit()
+
+      assert_patch(view, ~p"/admin/memberships/report?from=2026-02-01&to=2026-02-28")
     end
   end
 end

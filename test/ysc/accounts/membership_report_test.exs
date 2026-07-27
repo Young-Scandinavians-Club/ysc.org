@@ -90,6 +90,23 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert length(report.rejected) == 1
       assert hd(report.rejected).user_id == user.id
     end
+
+    test "includes accepted applications without a purchase in range" do
+      user = user_fixture()
+      reviewed_at = ~U[2026-03-12 10:00:00Z]
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-03-05 10:00:00Z],
+        review_outcome: "approved",
+        reviewed_at: reviewed_at
+      })
+
+      report = MembershipReport.generate(~D[2026-03-01], ~D[2026-03-31])
+
+      assert report.counts.accepted == 1
+      assert length(report.accepted) == 1
+      assert hd(report.accepted).user_id == user.id
+    end
   end
 
   describe "to_csv/1" do
@@ -115,6 +132,39 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert csv =~ "Born in Stockholm"
       assert csv =~ "Friend"
       assert csv =~ "Engineer"
+    end
+
+    test "exports purchased rows with attached application details" do
+      user = user_fixture()
+      reviewed_at = ~U[2026-04-05 10:00:00Z]
+      start_date = ~U[2026-04-06 10:00:00Z]
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-04-01 09:00:00Z],
+        review_outcome: "approved",
+        reviewed_at: reviewed_at,
+        link_to_scandinavia: "Family in Oslo",
+        hear_about_the_club: "Event",
+        occupation: "Designer",
+        city: "Portland",
+        country: "US"
+      })
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_csv_#{System.unique_integer()}",
+          stripe_status: "active",
+          name: "Single Membership",
+          start_date: start_date,
+          current_period_end: DateTime.add(start_date, 365, :day)
+        })
+
+      report = MembershipReport.generate(~D[2026-04-01], ~D[2026-04-30])
+      csv = MembershipReport.to_csv(report)
+
+      assert csv =~ "Purchased"
+      assert csv =~ user.email
     end
   end
 end

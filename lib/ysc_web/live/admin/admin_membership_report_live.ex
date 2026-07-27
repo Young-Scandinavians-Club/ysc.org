@@ -191,7 +191,7 @@ defmodule YscWeb.AdminMembershipReportLive do
 
         <%!-- Date range form --%>
         <div class="bg-white rounded-lg shadow-sm border border-zinc-200 px-6 py-5 mb-8">
-          <form phx-submit="generate" class="flex flex-wrap items-end gap-4">
+          <form id="membership-report-form" phx-submit="generate" class="flex flex-wrap items-end gap-4">
             <div>
               <label
                 for="date_from"
