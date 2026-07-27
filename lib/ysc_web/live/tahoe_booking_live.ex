@@ -836,23 +836,10 @@ defmodule YscWeb.TahoeBookingLive do
         max_booking_date
       )
 
-    # Only regenerate date tooltips if the date range actually changed
-    {date_tooltips, blocked_stay_dates} =
-      if restricted_min_date != socket.assigns[:restricted_min_date] ||
-           restricted_max_date != socket.assigns[:restricted_max_date] ||
-           !socket.assigns[:date_tooltips] do
-        generate_date_tooltips(
-          restricted_min_date,
-          restricted_max_date,
-          socket.assigns.today,
-          :tahoe,
-          socket.assigns.seasons,
-          socket.assigns.property_rooms_snapshot
-        )
-      else
-        {socket.assigns[:date_tooltips] || %{},
-         socket.assigns[:blocked_stay_dates] || %{}}
-      end
+    tooltips_need_reload? =
+      restricted_min_date != socket.assigns[:restricted_min_date] ||
+        restricted_max_date != socket.assigns[:restricted_max_date] ||
+        !socket.assigns[:date_tooltips]
 
     socket =
       socket
@@ -869,12 +856,17 @@ defmodule YscWeb.TahoeBookingLive do
         price_error: nil,
         form_errors: %{},
         date_form: date_form,
-        date_validation_errors: %{},
-        date_tooltips: date_tooltips,
-        blocked_stay_dates: blocked_stay_dates
+        date_validation_errors: %{}
       )
       |> enforce_season_booking_mode()
       |> validate_dates()
+      |> then(fn socket ->
+        if tooltips_need_reload? do
+          force_reload_date_tooltips(socket)
+        else
+          socket
+        end
+      end)
       |> update_available_rooms()
       |> calculate_price_if_ready()
       |> update_url_with_dates(checkin_date, checkout_date)
@@ -7574,7 +7566,8 @@ defmodule YscWeb.TahoeBookingLive do
     # Get all bookings in the range (preload rooms for availability checking)
     bookings =
       Bookings.list_bookings(property, start_range, end_range,
-        preload: [:rooms]
+        preload: [:rooms],
+        statuses: [:hold, :complete]
       )
 
     # Get all blackouts in the range
