@@ -785,6 +785,125 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     end
   end
 
+  describe "checkout cutoff (11 AM PST)" do
+    defp pst_today do
+      DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+    end
+
+    defp before_checkout_cutoff? do
+      today = pst_today()
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      DateTime.compare(now_pst, checkout_cutoff) == :lt
+    end
+
+    defp future_monday_wednesday do
+      today = Date.utc_today()
+      days_to_monday = rem(8 - Date.day_of_week(today, :monday), 7)
+      next_monday = Date.add(today, days_to_monday + 7)
+      {next_monday, Date.add(next_monday, 2)}
+    end
+
+    defp insert_checkout_today_booking!(user, rooms, booking_mode \\ :room) do
+      today = pst_today()
+      checkin = Date.add(today, -2)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: today,
+        booking_mode: booking_mode,
+        guests_count: if(booking_mode == :buyout, do: 10, else: 2),
+        status: :complete,
+        total_price: Money.new(400, :USD)
+      }
+
+      opts =
+        if booking_mode == :room do
+          [rooms: [rooms.tahoe_room1], user: user, skip_validation: true]
+        else
+          [skip_validation: true, user: user]
+        end
+
+      {:ok, booking} =
+        %Booking{}
+        |> Booking.changeset(attrs, opts)
+        |> Repo.insert()
+
+      booking
+    end
+
+    test "single member: checkout-today booking blocks second active booking only before cutoff",
+         %{user: user, rooms: rooms} do
+      user = create_subscription(user, :single)
+      _existing = insert_checkout_today_booking!(user, rooms)
+
+      {checkin, checkout} = future_monday_wednesday()
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      if before_checkout_cutoff?() do
+        refute changeset.valid?
+
+        {message, _} = Keyword.fetch!(changeset.errors, :user_id)
+        assert message =~ "one active booking at a time"
+      else
+        assert changeset.valid?
+      end
+    end
+
+    test "buyout exclusivity: checkout-today buyout blocks room booking only before cutoff",
+         %{user: user, rooms: rooms} do
+      user = create_subscription(user, :family)
+      _existing = insert_checkout_today_booking!(user, rooms, :buyout)
+
+      {checkin, checkout} = future_monday_wednesday()
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      if before_checkout_cutoff?() do
+        refute changeset.valid?
+
+        {message, _} = Keyword.fetch!(changeset.errors, :booking_mode)
+        assert message =~ "active or future full buyout"
+      else
+        assert changeset.valid?
+      end
+    end
+  end
+
   describe "Buyout rules" do
     test "rejects buyout if user has active room bookings", %{
       user: user,
