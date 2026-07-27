@@ -112,5 +112,86 @@ defmodule Ysc.SubscriptionsActivationTest do
       _ = MembershipCache.invalidate_user(user.id)
       assert MembershipCache.get_active_membership(user)
     end
+
+    test "returns already_active when Stripe reports an existing subscription" do
+      user = user_with_default_pm()
+
+      expect(Stripe.SubscriptionMock, :create, fn _params ->
+        {:error, :user_already_has_active_subscription}
+      end)
+
+      assert {:ok, :already_active} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 return_url: "http://localhost/finalize"
+               )
+    end
+
+    test "returns error when Stripe subscription create fails" do
+      user = user_with_default_pm()
+
+      expect(Stripe.SubscriptionMock, :create, fn _params ->
+        {:error,
+         %Stripe.Error{
+           message: "card declined",
+           code: "card_declined",
+           source: :stripe
+         }}
+      end)
+
+      assert {:error,
+              %Stripe.Error{
+                message: "card declined",
+                code: "card_declined",
+                source: :stripe
+              }} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 return_url: "http://localhost/finalize"
+               )
+    end
+
+    test "returns error when membership price id is not configured" do
+      user = user_with_default_pm()
+      plans = Application.get_env(:ysc, :membership_plans)
+
+      on_exit(fn -> Application.put_env(:ysc, :membership_plans, plans) end)
+      Application.put_env(:ysc, :membership_plans, [])
+
+      assert {:error, :no_price_id} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 return_url: "http://localhost/finalize"
+               )
+    end
+
+    test "still returns activated when local persistence fails after Stripe success" do
+      user = user_with_default_pm()
+      stripe_sub_id = "sub_dup_#{System.unique_integer([:positive])}"
+
+      {:ok, _} =
+        Subscriptions.create_subscription(%{
+          name: "Collision",
+          stripe_id: stripe_sub_id,
+          stripe_status: "canceled",
+          user_id: user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), -1, :day)
+        })
+
+      expect(Stripe.SubscriptionMock, :create, fn _params ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      assert {:ok, :activated} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 return_url: "http://localhost/finalize"
+               )
+    end
   end
 end

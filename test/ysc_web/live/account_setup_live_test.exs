@@ -5,6 +5,9 @@ defmodule YscWeb.AccountSetupLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Mox
+
+  setup :verify_on_exit!
 
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
@@ -1259,6 +1262,39 @@ defmodule YscWeb.AccountSetupLiveTest do
         live(conn, account_setup_path(user, %{"step" => "2"}))
 
       assert html =~ "Activate Your Membership"
+    end
+
+    test "redirects home when membership activates on mount", %{conn: conn} do
+      user = unpaid_active_user_needing_payment()
+      {:ok, user} = Accounts.mark_password_set(user)
+      {:ok, user} = Accounts.mark_phone_verified(user)
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      stripe_sub_id = "sub_mount_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn _params ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               live(conn, account_setup_path(user))
     end
   end
 end
