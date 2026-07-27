@@ -1029,6 +1029,91 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       assert Repo.get!(FamilyInvite, invite.id).accepted_at != nil
     end
 
+    test "returns max_sub_accounts_reached when primary already has 10 sub-accounts" do
+      primary_user = create_user_with_lifetime_membership()
+
+      for i <- 1..9 do
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: "link-cap-#{i}-#{System.unique_integer()}@example.com",
+            password: "password1234",
+            first_name: "Sub",
+            last_name: "User#{i}",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary_user.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+      end
+
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Invitee",
+          last_name: "User"
+        })
+
+      # Another sub-account is linked before the invitee accepts.
+      %User{}
+      |> User.sub_account_registration_changeset(
+        %{
+          email: "link-cap-extra-#{System.unique_integer()}@example.com",
+          password: "password1234",
+          first_name: "Extra",
+          last_name: "Sub",
+          phone_number: "+14159098268",
+          date_of_birth: ~D[1990-01-01]
+        },
+        primary_user.id,
+        hash_password: true,
+        validate_email: true
+      )
+      |> Repo.insert!()
+
+      assert {:error, :max_sub_accounts_reached} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+    end
+
+    test "returns max_spouses_reached when primary already has a spouse" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} =
+        FamilyInvites.create_invite(primary_user, email, relationship: :spouse)
+
+      invitee =
+        user_fixture(%{
+          email: email,
+          first_name: "Second",
+          last_name: "Spouse"
+        })
+
+      existing_spouse =
+        user_fixture(%{
+          email: unique_user_email(),
+          first_name: "First",
+          last_name: "Spouse"
+        })
+
+      assert {:ok, _} =
+               Accounts.admin_link_user_to_family(
+                 primary_user,
+                 existing_spouse,
+                 relationship: :spouse
+               )
+
+      assert {:error, :max_spouses_reached} =
+               FamilyInvites.link_existing_user(invite.token, invitee)
+    end
+
     test "link_existing_user/2 syncs board volunteer billing when invitee has board position" do
       primary_user = create_user_with_lifetime_membership()
       email = unique_user_email()
