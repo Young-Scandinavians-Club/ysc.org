@@ -42,7 +42,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_guest_info_step_enter_guests do
-    "Enter the names of everyone else staying with you (you're already counted as a guest)"
+    "Enter the names of everyone else staying with you. You're already included in the reservation — only list the other people below."
   end
 
   def checkout_guest_info_step_continue_payment do
@@ -85,7 +85,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def membership_required_plain_message do
-    "You need an active YSC membership to book the cabin. Open Manage Membership in your account menu to pay or renew."
+    "You need an active YSC membership to book the cabin. Open Membership in your account menu to pay or renew."
   end
 
   def application_pending_approval_message do
