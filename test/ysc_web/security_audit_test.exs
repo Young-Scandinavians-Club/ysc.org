@@ -40,8 +40,10 @@ defmodule YscWeb.SecurityAuditTest do
   import Mox
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.Tickets
   alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
+  alias Ysc.Subscriptions
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
   alias Ysc.Test.KioskAPIKeyHelper
@@ -119,13 +121,23 @@ defmodule YscWeb.SecurityAuditTest do
   describe "Finding 5: AccountSetupLive redirects when user has no pending setup" do
     test "active user who has completed all setup steps is redirected away from account setup",
          %{conn: conn} do
-      # Create an active user and drive them through all the setup completion functions.
-      # can_access = false requires: email_verified AND password_set AND
-      # phone_verified AND state != :pending_approval (no payment method needed).
+      # Fully set up means verified credentials plus an active membership; unpaid
+      # active users remain in the setup funnel to collect payment/activation.
       user = user_fixture(%{state: :active})
       {:ok, user} = Accounts.mark_email_verified(user)
       {:ok, user} = Accounts.mark_password_set(user)
       {:ok, user} = Accounts.mark_phone_verified(user)
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          name: "Test Membership",
+          stripe_id: "sub_audit_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      _ = MembershipCache.invalidate_user(user.id)
 
       conn = log_in_user(conn, user)
 
