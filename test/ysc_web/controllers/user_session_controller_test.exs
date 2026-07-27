@@ -209,6 +209,29 @@ defmodule YscWeb.UserSessionControllerTest do
       refute get_session(conn, :user_token)
     end
 
+    test "GET form CSRF token is accepted by POST (end-to-end auto-submit flow)",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
+
+      {conn, _csrf} = fetch_conn_csrf(conn)
+
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
+      {conn, form_csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/auto", %{
+          "_csrf_token" => form_csrf,
+          "token" => one_time_token
+        })
+
+      assert redirected_to(conn) == ~p"/"
+      assert get_session(conn, :user_token)
+    end
+
     test "redirects to login when no token is provided", %{conn: conn} do
       conn = get(conn, ~p"/users/log-in/auto")
 
@@ -349,6 +372,35 @@ defmodule YscWeb.UserSessionControllerTest do
 
       assert html_response(conn, 200) =~ ~s(id="token-login-form")
       refute get_session(conn, :user_token)
+    end
+
+    test "GET form CSRF token is accepted by POST (end-to-end auto-submit flow)",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
+
+      # Simulate an existing browser session (e.g. user was already browsing the site)
+      {conn, _csrf} = fetch_conn_csrf(conn)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
+        )
+
+      {conn, form_csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/passkey", %{
+          "_csrf_token" => form_csrf,
+          "token" => token
+        })
+
+      assert redirected_to(conn) == ~p"/"
+      assert get_session(conn, :user_token)
     end
 
     test "redirects to login when params are missing token", %{conn: conn} do

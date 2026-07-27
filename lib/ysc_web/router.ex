@@ -57,10 +57,13 @@ defmodule YscWeb.Router do
   end
 
   # Pipeline for token-login GET pages that render a CSRF-protected POST form.
+  # protect_from_forgery must run here so get_csrf_token/0 in the template loads
+  # the session token instead of generating an ephemeral one that POST cannot verify.
   pipeline :auto_login do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
+    plug :protect_from_forgery
     plug :fetch_current_user
   end
 
