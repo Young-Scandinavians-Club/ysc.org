@@ -195,9 +195,10 @@ defmodule YscWeb.UserSessionControllerTest do
   end
 
   describe "GET /users/log-in/auto" do
-    test "renders auto-submit form for valid token without creating a session", %{
-      conn: conn
-    } do
+    test "renders auto-submit form for valid token without creating a session",
+         %{
+           conn: conn
+         } do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
       one_time_token = Ysc.Accounts.generate_auto_login_token(user)
@@ -332,9 +333,10 @@ defmodule YscWeb.UserSessionControllerTest do
   end
 
   describe "GET /users/log-in/passkey" do
-    test "renders auto-submit form for valid token without creating a session", %{
-      conn: conn
-    } do
+    test "renders auto-submit form for valid token without creating a session",
+         %{
+           conn: conn
+         } do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
       token = Ysc.Accounts.generate_passkey_login_token(user)

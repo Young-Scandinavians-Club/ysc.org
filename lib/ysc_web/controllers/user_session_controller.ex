@@ -24,7 +24,8 @@ defmodule YscWeb.UserSessionController do
     render_token_login_form(conn, ~p"/users/log-in/auto", token, redirect_to)
   end
 
-  def auto_login(conn, %{"token" => token}) when is_binary(token) and token != "" do
+  def auto_login(conn, %{"token" => token})
+      when is_binary(token) and token != "" do
     render_token_login_form(conn, ~p"/users/log-in/auto", token, nil)
   end
 
@@ -293,7 +294,12 @@ defmodule YscWeb.UserSessionController do
     case parsed_params do
       %{"token" => token, "redirect_to" => redirect_to}
       when is_binary(token) and token != "" ->
-        render_token_login_form(conn, ~p"/users/log-in/passkey", token, redirect_to)
+        render_token_login_form(
+          conn,
+          ~p"/users/log-in/passkey",
+          token,
+          redirect_to
+        )
 
       %{"token" => token} when is_binary(token) and token != "" ->
         render_token_login_form(conn, ~p"/users/log-in/passkey", token, nil)
@@ -357,7 +363,10 @@ defmodule YscWeb.UserSessionController do
     end)
   end
 
-  def create_passkey_login(conn, %{"token" => token, "redirect_to" => redirect_to}) do
+  def create_passkey_login(conn, %{
+        "token" => token,
+        "redirect_to" => redirect_to
+      }) do
     passkey_login_with_token(conn, token, redirect_to)
   end
 

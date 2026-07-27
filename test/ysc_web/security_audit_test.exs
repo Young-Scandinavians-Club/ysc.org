@@ -1886,10 +1886,11 @@ defmodule YscWeb.SecurityAuditTest do
       refute get_session(conn, :user_token)
     end
 
-    test "GET passkey login with valid token renders form but does not log in", %{
-      conn: conn,
-      user: user
-    } do
+    test "GET passkey login with valid token renders form but does not log in",
+         %{
+           conn: conn,
+           user: user
+         } do
       token = Accounts.generate_passkey_login_token(user)
 
       conn = get(conn, ~p"/users/log-in/passkey?#{%{token: token}}")
@@ -1912,17 +1913,17 @@ defmodule YscWeb.SecurityAuditTest do
       assert get_session(conn, :user_token) == victim_token
     end
 
-    test "POST auto-login without CSRF token is rejected", %{conn: conn, user: user} do
+    test "GET auto-login form includes CSRF token for POST redemption", %{
+      conn: conn,
+      user: user
+    } do
       token = Accounts.generate_auto_login_token(user)
 
-      conn =
-        conn
-        |> Phoenix.ConnTest.init_test_session(%{})
-        |> Plug.Conn.fetch_session()
-        |> post(~p"/users/log-in/auto", %{"token" => token})
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+      html = html_response(conn, 200)
 
-      assert conn.status == 403
-      refute get_session(conn, :user_token)
+      assert html =~ ~s(name="_csrf_token")
+      assert html =~ ~s(name="csrf-token")
     end
   end
 

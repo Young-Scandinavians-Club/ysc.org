@@ -48,6 +48,13 @@ defmodule YscWeb.ConnCase do
       import Phoenix.ConnTest
       import YscWeb.ConnCase
       import Ysc.EmailValidatorTestHelper
+
+      def post_token_login(conn, path, params)
+          when is_binary(path) and is_map(params) do
+        {conn, csrf} = YscWeb.ConnCase.fetch_conn_csrf(conn)
+        post(conn, path, Map.put(params, "_csrf_token", csrf))
+      end
+
       import Ysc.Test.Invoke
       import Mox
 
@@ -176,15 +183,5 @@ defmodule YscWeb.ConnCase do
       end
 
     {conn, token}
-  end
-
-  @doc """
-  Completes a token-based login via POST with CSRF protection.
-
-  Use after generating a one-time auto-login or passkey login token.
-  """
-  def post_token_login(conn, path, params) when is_binary(path) and is_map(params) do
-    {conn, csrf} = fetch_conn_csrf(conn)
-    post(conn, path, Map.put(params, "_csrf_token", csrf))
   end
 end

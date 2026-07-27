@@ -58,6 +58,7 @@ defmodule YscWeb.Router do
 
   # Pipeline for token-login GET pages that render a CSRF-protected POST form.
   pipeline :auto_login do
+    plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :fetch_current_user
