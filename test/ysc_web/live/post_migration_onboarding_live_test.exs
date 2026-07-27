@@ -381,12 +381,13 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       conn = log_in_user(conn, sub_user)
       {:ok, view, _html} = live(conn, ~p"/onboarding")
       render_async(view, 5_000)
-      html = render(view)
 
-      refute html =~ "Membership Type"
-      refute html =~ "Renewal Payment"
-      refute html =~ ">Family</span>"
-      assert html =~ ">Membership</span>"
+      assert has_element?(view, ~s|button[phx-value-step="0"]|, "Profile")
+      assert has_element?(view, ~s|button[phx-value-step="1"]|, "Address")
+      assert has_element?(view, ~s|button[phx-value-step="2"]|, "Membership")
+      refute has_element?(view, "button", "Membership Type")
+      refute has_element?(view, "button", "Renewal Payment")
+      refute has_element?(view, "button", "Family")
       refute has_element?(view, "#membership-selection")
       refute has_element?(view, "#onboarding-payment-form")
     end
@@ -428,9 +429,20 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       assert has_element?(view, "#inherited-membership-step")
       assert has_element?(view, "#continue-inherited-membership")
-      assert render(view) =~ "Membership inherited from primary member"
-      assert render(view) =~ primary.first_name
-      assert render(view) =~ primary.last_name
+
+      assert has_element?(
+               view,
+               "#inherited-membership-step",
+               "Membership inherited from primary member"
+             )
+
+      assert has_element?(
+               view,
+               "#inherited-membership-step",
+               primary.first_name
+             )
+
+      assert has_element?(view, "#inherited-membership-step", primary.last_name)
       refute has_element?(view, "#membership-selection")
       refute has_element?(view, "#confirm-membership-selection")
 

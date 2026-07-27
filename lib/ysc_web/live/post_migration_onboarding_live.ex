@@ -1722,6 +1722,43 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   defp needs_family_members_step?(plan), do: plan in [:family, :lifetime]
 
+  defp compute_onboarding_state(user) do
+    inherited_membership = Accounts.sub_account?(user)
+    membership_plan = resolve_membership_plan(user)
+
+    needs_family_members_step =
+      not inherited_membership and needs_family_members_step?(membership_plan)
+
+    skip_payment = inherited_membership or membership_plan == :lifetime
+
+    needs_plan_selection =
+      not inherited_membership and membership_plan == :unknown
+
+    primary_user = if inherited_membership, do: Accounts.get_primary_user(user)
+
+    steps =
+      build_steps(
+        needs_family_members_step,
+        skip_payment,
+        needs_plan_selection,
+        inherited_membership
+      )
+
+    active_subscription = find_active_real_subscription(user)
+
+    %{
+      inherited_membership: inherited_membership,
+      membership_plan: membership_plan,
+      needs_family_members_step: needs_family_members_step,
+      skip_payment: skip_payment,
+      needs_plan_selection: needs_plan_selection,
+      primary_user: primary_user,
+      steps: steps,
+      active_subscription: active_subscription,
+      has_real_subscription: not is_nil(active_subscription)
+    }
+  end
+
   defp build_steps(
          _needs_family_members_step,
          _skip_payment,
@@ -1802,41 +1839,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         subscriptions: :subscription_items
       ])
 
-    inherited_membership = Accounts.sub_account?(user)
-    membership_plan = resolve_membership_plan(user)
-
-    needs_family_members_step =
-      not inherited_membership and needs_family_members_step?(membership_plan)
-
-    skip_payment = inherited_membership or membership_plan == :lifetime
-
-    needs_plan_selection =
-      not inherited_membership and membership_plan == :unknown
-
-    primary_user = if inherited_membership, do: Accounts.get_primary_user(user)
-
-    steps =
-      build_steps(
-        needs_family_members_step,
-        skip_payment,
-        needs_plan_selection,
-        inherited_membership
-      )
+    state = compute_onboarding_state(user)
 
     socket
     |> assign(:user, user)
-    |> assign(:is_sub_account, inherited_membership)
-    |> assign(:primary_user, primary_user)
-    |> assign(:membership_plan, membership_plan)
-    |> assign(:needs_plan_selection, needs_plan_selection)
-    |> assign(:needs_family_members_step, needs_family_members_step)
-    |> assign(:skip_payment, skip_payment)
-    |> assign(:steps, steps)
-    |> assign(
-      :has_real_subscription,
-      not is_nil(find_active_real_subscription(user))
-    )
-    |> assign(:active_subscription, find_active_real_subscription(user))
+    |> assign(:is_sub_account, state.inherited_membership)
+    |> assign(:primary_user, state.primary_user)
+    |> assign(:membership_plan, state.membership_plan)
+    |> assign(:needs_plan_selection, state.needs_plan_selection)
+    |> assign(:needs_family_members_step, state.needs_family_members_step)
+    |> assign(:skip_payment, state.skip_payment)
+    |> assign(:steps, state.steps)
+    |> assign(:has_real_subscription, state.has_real_subscription)
+    |> assign(:active_subscription, state.active_subscription)
   end
 
   # Advance from the given step to the next applicable step.
@@ -1923,39 +1938,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp assign_onboarding_data(socket, user, default_payment_method) do
-    inherited_membership = Accounts.sub_account?(user)
-    membership_plan = resolve_membership_plan(user)
-    active_subscription = find_active_real_subscription(user)
-    has_real_subscription = not is_nil(active_subscription)
-
-    needs_plan_selection =
-      not inherited_membership and membership_plan == :unknown
-
-    needs_family_members_step =
-      not inherited_membership and needs_family_members_step?(membership_plan)
-
-    skip_payment = inherited_membership or membership_plan == :lifetime
-    primary_user = if inherited_membership, do: Accounts.get_primary_user(user)
-
-    steps =
-      build_steps(
-        needs_family_members_step,
-        skip_payment,
-        needs_plan_selection,
-        inherited_membership
-      )
+    state = compute_onboarding_state(user)
 
     socket
     |> assign(:user, user)
-    |> assign(:is_sub_account, inherited_membership)
-    |> assign(:primary_user, primary_user)
-    |> assign(:steps, steps)
-    |> assign(:membership_plan, membership_plan)
-    |> assign(:needs_plan_selection, needs_plan_selection)
-    |> assign(:needs_family_members_step, needs_family_members_step)
-    |> assign(:skip_payment, skip_payment)
-    |> assign(:has_real_subscription, has_real_subscription)
-    |> assign(:active_subscription, active_subscription)
+    |> assign(:is_sub_account, state.inherited_membership)
+    |> assign(:primary_user, state.primary_user)
+    |> assign(:steps, state.steps)
+    |> assign(:membership_plan, state.membership_plan)
+    |> assign(:needs_plan_selection, state.needs_plan_selection)
+    |> assign(:needs_family_members_step, state.needs_family_members_step)
+    |> assign(:skip_payment, state.skip_payment)
+    |> assign(:has_real_subscription, state.has_real_subscription)
+    |> assign(:active_subscription, state.active_subscription)
     |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
     |> assign(:original_phone, user.phone_number)
     |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
@@ -1969,9 +1964,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       to_form(
         %{
           "membership_plan" =>
-            if(membership_plan == :unknown,
+            if(state.membership_plan == :unknown,
               do: "",
-              else: to_string(membership_plan)
+              else: to_string(state.membership_plan)
             )
         },
         as: "membership_selection"
@@ -1979,7 +1974,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     )
     |> assign(
       :family_members_forms,
-      if(needs_family_members_step,
+      if(state.needs_family_members_step,
         do: initial_family_members_forms(user),
         else: []
       )
