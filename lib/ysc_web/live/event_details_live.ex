@@ -6546,7 +6546,9 @@ defmodule YscWeb.EventDetailsLive do
     html =
       Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
 
-    Scrubber.scrub(html, Ysc.TrixScrubber)
+    html
+    |> Scrubber.scrub(Ysc.TrixScrubber)
+    |> Ysc.Html.Links.open_in_new_tab()
   end
 
   defp format_relative_time(%DateTime{} = dt), do: Timex.from_now(dt)

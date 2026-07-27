@@ -1509,7 +1509,12 @@ defmodule YscWeb.AdminEventsNewLive do
       ) do
     # Reload event to get latest lock_version
     current_event = Events.get_event!(socket.assigns[:event].id)
-    rendered = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+
+    rendered =
+      raw_body
+      |> Scrubber.scrub(Ysc.TrixScrubber)
+      |> Ysc.Html.Links.open_in_new_tab()
+
     update_attrs = %{"raw_details" => raw_body, "rendered_details" => rendered}
     changeset = Event.editor_changeset(current_event, update_attrs)
 
