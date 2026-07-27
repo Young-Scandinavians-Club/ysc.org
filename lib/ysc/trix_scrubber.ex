@@ -18,7 +18,14 @@ defmodule Ysc.TrixScrubber do
 
   # Links
   Meta.allow_tag_with_uri_attributes("a", ["href"], @valid_schemes)
-  Meta.allow_tag_with_these_attributes("a", ["name", "title", "tabindex"])
+
+  Meta.allow_tag_with_these_attributes("a", [
+    "name",
+    "title",
+    "tabindex",
+    "target",
+    "rel"
+  ])
 
   # Basic text formatting
   Meta.allow_tag_with_these_attributes("b", [])

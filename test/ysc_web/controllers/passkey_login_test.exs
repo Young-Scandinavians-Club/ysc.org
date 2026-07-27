@@ -17,6 +17,10 @@ defmodule YscWeb.PasskeyLoginTest do
     Accounts.generate_passkey_login_token(user)
   end
 
+  defp post_passkey_login(conn, params) do
+    post_token_login(conn, ~p"/users/log-in/passkey", params)
+  end
+
   describe "passkey_login/2 with valid token" do
     setup do
       user = user_fixture()
@@ -26,8 +30,7 @@ defmodule YscWeb.PasskeyLoginTest do
 
     test "logs in user and redirects to default path", %{conn: conn, user: user} do
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{
+        post_passkey_login(conn, %{
           "token" => valid_passkey_token(user)
         })
 
@@ -43,8 +46,7 @@ defmodule YscWeb.PasskeyLoginTest do
       redirect_to = ~p"/bookings/tahoe"
 
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{
+        post_passkey_login(conn, %{
           "token" => valid_passkey_token(user),
           "redirect_to" => redirect_to
         })
@@ -58,13 +60,11 @@ defmodule YscWeb.PasskeyLoginTest do
       user: user
     } do
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{
+        post_passkey_login(conn, %{
           "token" => valid_passkey_token(user),
           "redirect_to" => "https://evil.example.com/phishing"
         })
 
-      # External redirect must not be followed
       assert redirected_to(conn) == ~p"/"
       assert get_session(conn, :user_token) != nil
     end
@@ -74,8 +74,7 @@ defmodule YscWeb.PasskeyLoginTest do
       user: user
     } do
       _conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{
+        post_passkey_login(conn, %{
           "token" => valid_passkey_token(user)
         })
 
@@ -100,7 +99,7 @@ defmodule YscWeb.PasskeyLoginTest do
         conn
         |> Phoenix.ConnTest.init_test_session(%{})
         |> put_session(:failed_login_attempts, 3)
-        |> get(~p"/users/log-in/passkey", %{
+        |> post_passkey_login(%{
           "token" => valid_passkey_token(user)
         })
 
@@ -112,8 +111,7 @@ defmodule YscWeb.PasskeyLoginTest do
       {:ok, user} = Accounts.mark_email_verified(user)
 
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{
+        post_passkey_login(conn, %{
           "token" => valid_passkey_token(user)
         })
 
@@ -131,8 +129,6 @@ defmodule YscWeb.PasskeyLoginTest do
 
     test "rejects request with raw user_id only (no token) - prevents login-by-user-id attack",
          %{conn: conn, user: user} do
-      # Simulates the previously vulnerable URL: anyone with a user's ID could log in.
-      # The endpoint must require a signed token from the LiveView after passkey verification.
       encoded_user_id = Base.url_encode64(user.id, padding: false)
 
       conn =
@@ -165,15 +161,15 @@ defmodule YscWeb.PasskeyLoginTest do
     end
 
     test "rejects token signed with wrong salt", %{conn: conn, user: user} do
-      # Token verifies with a different purpose; must not be accepted for passkey_login
       wrong_salt_token =
         Phoenix.Token.sign(YscWeb.Endpoint, "other_purpose", user.id,
           max_age: 120
         )
 
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{"token" => wrong_salt_token})
+        post_passkey_login(conn, %{
+          "token" => wrong_salt_token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
@@ -185,8 +181,9 @@ defmodule YscWeb.PasskeyLoginTest do
 
     test "rejects invalid or tampered token", %{conn: conn} do
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{"token" => "invalid_or_tampered"})
+        post_passkey_login(conn, %{
+          "token" => "invalid_or_tampered"
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
@@ -197,9 +194,7 @@ defmodule YscWeb.PasskeyLoginTest do
     end
 
     test "rejects empty token", %{conn: conn} do
-      conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{"token" => ""})
+      conn = get(conn, ~p"/users/log-in/passkey", %{"token" => ""})
 
       assert redirected_to(conn) == ~p"/users/log-in"
       assert get_session(conn, :user_token) == nil
@@ -207,16 +202,15 @@ defmodule YscWeb.PasskeyLoginTest do
 
     test "rejects a Phoenix.Token-format token that is not a DB one-time token",
          %{conn: conn} do
-      # The controller now validates DB one-time tokens, not Phoenix.Token signatures.
-      # Any well-formed Phoenix.Token that was never inserted into the DB must be rejected.
       phoenix_token =
         Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", "some_user_id",
           max_age: 120
         )
 
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{"token" => phoenix_token})
+        post_passkey_login(conn, %{
+          "token" => phoenix_token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
@@ -253,12 +247,12 @@ defmodule YscWeb.PasskeyLoginTest do
     test "redirects to login for suspended user with valid token", %{conn: conn} do
       user = user_fixture(%{state: :suspended})
       {:ok, user} = Accounts.mark_email_verified(user)
-
       token = valid_passkey_token(user)
 
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{"token" => token})
+        post_passkey_login(conn, %{
+          "token" => token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
@@ -272,18 +266,15 @@ defmodule YscWeb.PasskeyLoginTest do
          %{
            conn: conn
          } do
-      # Simulate: token issued, then user account deleted before the redirect completes.
-      # The DB token is cascade-deleted with the user, so consume returns :error.
       user = user_fixture()
       {:ok, user} = Accounts.mark_email_verified(user)
       token = Accounts.generate_passkey_login_token(user)
-
-      # Delete the user — cascade removes all their tokens
       Ysc.Repo.delete!(user)
 
       conn =
-        conn
-        |> get(~p"/users/log-in/passkey", %{"token" => token})
+        post_passkey_login(conn, %{
+          "token" => token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 

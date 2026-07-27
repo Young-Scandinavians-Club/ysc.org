@@ -120,6 +120,15 @@ defmodule Ysc.TrixScrubberTest do
       assert out =~ "title=\"t\""
     end
 
+    test "allows target and rel on links" do
+      html =
+        ~s|<a href="https://example.com" target="_blank" rel="noopener noreferrer">x</a>|
+
+      out = scrub(html)
+      assert out =~ ~s|target="_blank"|
+      assert out =~ ~s|rel="noopener noreferrer"|
+    end
+
     test "strips unknown attributes on allowed tags" do
       html = ~s|<p id="x" data-x="1">x</p>|
       out = scrub(html)

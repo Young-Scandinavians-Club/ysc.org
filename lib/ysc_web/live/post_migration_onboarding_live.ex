@@ -7,6 +7,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     2 - Phone verification via SMS OTP (only if phone was added/changed or unverified)
     3 - Payment method collection + Stripe subscription creation
     5 - Family member listing; saved on continue, invites sent when email provided (family and lifetime plans)
+
+  Sub-accounts (users linked via `primary_user_id`) skip membership selection, payment,
+  and family steps. They see an informational step explaining that membership is
+  inherited from the primary member.
   """
   use YscWeb, :live_view
 
@@ -42,6 +46,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   @step_address 2
   @step_phone_verification 3
   @step_membership_selection 7
+  @step_inherited_membership 8
   @step_payment 4
   @step_family 5
   @step_complete 6
@@ -84,6 +89,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         :registration_form,
         :billing_address,
         :current_avatar,
+        :primary_user,
         subscriptions: :subscription_items
       ])
 
@@ -169,6 +175,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
                 membership_plan={@membership_plan}
                 membership_plans={@membership_plans}
               />
+            <% end %>
+            <%= if @current_step == 8 do %>
+              <.step_inherited_membership primary_user={@primary_user} />
             <% end %>
             <%= if @current_step == 3 do %>
               <.step_phone_verification
@@ -505,6 +514,63 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           </div>
         </:actions>
       </.simple_form>
+    </div>
+    """
+  end
+
+  attr :primary_user, :any, default: nil
+
+  defp step_inherited_membership(assigns) do
+    ~H"""
+    <div id="inherited-membership-step">
+      <.header class="text-left">
+        Family Membership
+        <:subtitle>
+          Your membership benefits are shared with you through the primary family member. You do not need to choose a plan or add a payment method.
+        </:subtitle>
+      </.header>
+
+      <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex gap-3">
+          <.icon
+            name="hero-user-group"
+            class="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5"
+          />
+          <div>
+            <h3 class="text-sm font-semibold text-blue-800">
+              Membership inherited from primary member
+            </h3>
+            <p class="text-sm text-blue-700 mt-1">
+              You are a family member. You share membership benefits from <strong>
+                <%= if @primary_user do %>
+                  {@primary_user.first_name} {@primary_user.last_name}
+                <% else %>
+                  your family membership manager
+                <% end %>
+              </strong>. Family members cannot purchase or manage their own membership.
+            </p>
+            <%= if @primary_user do %>
+              <p class="text-sm text-blue-700 mt-1">
+                Contact
+                <strong>
+                  {@primary_user.first_name} {@primary_user.last_name}
+                </strong>
+                if you need changes to billing or membership.
+              </p>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end">
+        <.button
+          id="continue-inherited-membership"
+          phx-click="continue_inherited_membership"
+          phx-disable-with="Continuing..."
+        >
+          Continue <.icon name="hero-arrow-right" class="w-4 h-4" />
+        </.button>
+      </div>
     </div>
     """
   end
@@ -1523,6 +1589,10 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     {:noreply, advance_to_next_step(socket, @step_payment)}
   end
 
+  def handle_event("continue_inherited_membership", _params, socket) do
+    {:noreply, advance_to_next_step(socket, @step_inherited_membership)}
+  end
+
   def handle_event("set-step", %{"step" => step_str}, socket) do
     steps = socket.assigns.steps
 
@@ -1652,10 +1722,61 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   defp needs_family_members_step?(plan), do: plan in [:family, :lifetime]
 
+  defp compute_onboarding_state(user) do
+    inherited_membership = Accounts.sub_account?(user)
+    membership_plan = resolve_membership_plan(user)
+
+    needs_family_members_step =
+      not inherited_membership and needs_family_members_step?(membership_plan)
+
+    skip_payment = inherited_membership or membership_plan == :lifetime
+
+    needs_plan_selection =
+      not inherited_membership and membership_plan == :unknown
+
+    primary_user = if inherited_membership, do: Accounts.get_primary_user(user)
+
+    steps =
+      build_steps(
+        needs_family_members_step,
+        skip_payment,
+        needs_plan_selection,
+        inherited_membership
+      )
+
+    active_subscription = find_active_real_subscription(user)
+
+    %{
+      inherited_membership: inherited_membership,
+      membership_plan: membership_plan,
+      needs_family_members_step: needs_family_members_step,
+      skip_payment: skip_payment,
+      needs_plan_selection: needs_plan_selection,
+      primary_user: primary_user,
+      steps: steps,
+      active_subscription: active_subscription,
+      has_real_subscription: not is_nil(active_subscription)
+    }
+  end
+
+  defp build_steps(
+         _needs_family_members_step,
+         _skip_payment,
+         _needs_plan_selection,
+         true
+       ) do
+    [
+      {"Profile", @step_profile},
+      {"Address", @step_address},
+      {"Membership", @step_inherited_membership}
+    ]
+  end
+
   defp build_steps(
          needs_family_members_step,
          skip_payment,
-         needs_plan_selection
+         needs_plan_selection,
+         false
        ) do
     base = [
       {"Profile", @step_profile},
@@ -1678,14 +1799,21 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp rebuild_onboarding_steps(socket) do
+    inherited_membership = socket.assigns.is_sub_account
+
     needs_family_members_step =
-      needs_family_members_step?(socket.assigns.membership_plan)
+      if inherited_membership do
+        false
+      else
+        needs_family_members_step?(socket.assigns.membership_plan)
+      end
 
     steps =
       build_steps(
         needs_family_members_step,
         socket.assigns.skip_payment,
-        socket.assigns.needs_plan_selection
+        socket.assigns.needs_plan_selection,
+        inherited_membership
       )
 
     family_members_forms =
@@ -1707,31 +1835,23 @@ defmodule YscWeb.PostMigrationOnboardingLive do
         :family_members,
         :registration_form,
         :billing_address,
+        :primary_user,
         subscriptions: :subscription_items
       ])
 
-    membership_plan = resolve_membership_plan(user)
-    needs_family_members_step = needs_family_members_step?(membership_plan)
-    skip_payment = membership_plan == :lifetime
-
-    steps =
-      build_steps(
-        needs_family_members_step,
-        skip_payment,
-        socket.assigns.needs_plan_selection
-      )
+    state = compute_onboarding_state(user)
 
     socket
     |> assign(:user, user)
-    |> assign(:membership_plan, membership_plan)
-    |> assign(:needs_family_members_step, needs_family_members_step)
-    |> assign(:skip_payment, skip_payment)
-    |> assign(:steps, steps)
-    |> assign(
-      :has_real_subscription,
-      not is_nil(find_active_real_subscription(user))
-    )
-    |> assign(:active_subscription, find_active_real_subscription(user))
+    |> assign(:is_sub_account, state.inherited_membership)
+    |> assign(:primary_user, state.primary_user)
+    |> assign(:membership_plan, state.membership_plan)
+    |> assign(:needs_plan_selection, state.needs_plan_selection)
+    |> assign(:needs_family_members_step, state.needs_family_members_step)
+    |> assign(:skip_payment, state.skip_payment)
+    |> assign(:steps, state.steps)
+    |> assign(:has_real_subscription, state.has_real_subscription)
+    |> assign(:active_subscription, state.active_subscription)
   end
 
   # Advance from the given step to the next applicable step.
@@ -1785,6 +1905,8 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       :membership_plans,
       Application.get_env(:ysc, :membership_plans, [])
     )
+    |> assign(:is_sub_account, Accounts.sub_account?(user))
+    |> assign(:primary_user, nil)
     |> assign(:needs_plan_selection, true)
     |> assign(:needs_family_members_step, false)
     |> assign(:skip_payment, false)
@@ -1816,29 +1938,19 @@ defmodule YscWeb.PostMigrationOnboardingLive do
   end
 
   defp assign_onboarding_data(socket, user, default_payment_method) do
-    membership_plan = resolve_membership_plan(user)
-    active_subscription = find_active_real_subscription(user)
-    has_real_subscription = not is_nil(active_subscription)
-    needs_plan_selection = membership_plan == :unknown
-    needs_family_members_step = needs_family_members_step?(membership_plan)
-    skip_payment = membership_plan == :lifetime
-
-    steps =
-      build_steps(
-        needs_family_members_step,
-        skip_payment,
-        needs_plan_selection
-      )
+    state = compute_onboarding_state(user)
 
     socket
     |> assign(:user, user)
-    |> assign(:steps, steps)
-    |> assign(:membership_plan, membership_plan)
-    |> assign(:needs_plan_selection, needs_plan_selection)
-    |> assign(:needs_family_members_step, needs_family_members_step)
-    |> assign(:skip_payment, skip_payment)
-    |> assign(:has_real_subscription, has_real_subscription)
-    |> assign(:active_subscription, active_subscription)
+    |> assign(:is_sub_account, state.inherited_membership)
+    |> assign(:primary_user, state.primary_user)
+    |> assign(:steps, state.steps)
+    |> assign(:membership_plan, state.membership_plan)
+    |> assign(:needs_plan_selection, state.needs_plan_selection)
+    |> assign(:needs_family_members_step, state.needs_family_members_step)
+    |> assign(:skip_payment, state.skip_payment)
+    |> assign(:has_real_subscription, state.has_real_subscription)
+    |> assign(:active_subscription, state.active_subscription)
     |> assign(:profile_form, to_form(Accounts.change_user_profile(user)))
     |> assign(:original_phone, user.phone_number)
     |> assign(:address_form, to_form(Accounts.change_billing_address(user)))
@@ -1852,9 +1964,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       to_form(
         %{
           "membership_plan" =>
-            if(membership_plan == :unknown,
+            if(state.membership_plan == :unknown,
               do: "",
-              else: to_string(membership_plan)
+              else: to_string(state.membership_plan)
             )
         },
         as: "membership_selection"
@@ -1862,7 +1974,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
     )
     |> assign(
       :family_members_forms,
-      if(needs_family_members_step,
+      if(state.needs_family_members_step,
         do: initial_family_members_forms(user),
         else: []
       )
