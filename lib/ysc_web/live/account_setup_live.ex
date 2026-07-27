@@ -4,10 +4,12 @@ defmodule YscWeb.AccountSetupLive do
   require Ysc.Logging
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.Accounts.VerificationCodes
   alias Ysc.Customers
   alias YscWeb.AccountSetupAccess
   alias Ysc.Payments
+  alias Ysc.Subscriptions
 
   defp payment_method_module do
     Application.get_env(
@@ -141,14 +143,23 @@ defmodule YscWeb.AccountSetupLive do
 
         <div :if={
           !@loading_account_setup? and @current_step === 1 and
-            @user_needs.payment_method_setup
+            (@user_needs.payment_method_setup or @user_needs.membership_activation)
         }>
-          <.header class="text-left">
-            Save Your Payment Method
-            <:subtitle>
-              Save a payment method so we can activate your membership if you're approved. You won't be charged until the board approves your application.
-            </:subtitle>
-          </.header>
+          <%= if @user.state == :active do %>
+            <.header class="text-left">
+              Activate Your Membership
+              <:subtitle>
+                Your application is approved. Add or confirm a payment method to activate your membership and unlock member benefits.
+              </:subtitle>
+            </.header>
+          <% else %>
+            <.header class="text-left">
+              Save Your Payment Method
+              <:subtitle>
+                Save a payment method so we can activate your membership if you're approved. You won't be charged until the board approves your application.
+              </:subtitle>
+            </.header>
+          <% end %>
 
           <%= if @signup_plan do %>
             <div class="mt-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -163,20 +174,50 @@ defmodule YscWeb.AccountSetupLive do
             </div>
           <% end %>
 
-          <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900 space-y-2">
-            <p>
-              <.icon
-                name="hero-shield-check"
-                class="w-4 h-4 inline-block mr-1 -mt-0.5"
-              />
-              <strong>
-                Your card will not be charged until your application is approved.
-              </strong>
-            </p>
-            <p>
-              If your application is approved, we'll charge this card for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
-            </p>
-          </div>
+          <%= if @user.state == :active do %>
+            <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-900 space-y-2">
+              <p>
+                <strong>You're approved.</strong>
+                We'll charge your card now for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
+              </p>
+            </div>
+
+            <div
+              :if={@user_needs.membership_activation}
+              class="mb-6 flex flex-col sm:flex-row gap-3"
+            >
+              <.button
+                id="retry-membership-activation"
+                type="button"
+                phx-click="retry_membership_activation"
+                phx-disable-with="Activating..."
+                color="blue"
+              >
+                Activate Membership Now
+              </.button>
+              <.link
+                navigate={~p"/users/membership"}
+                class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-blue-700 hover:underline"
+              >
+                Or pay from membership settings
+              </.link>
+            </div>
+          <% else %>
+            <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900 space-y-2">
+              <p>
+                <.icon
+                  name="hero-shield-check"
+                  class="w-4 h-4 inline-block mr-1 -mt-0.5"
+                />
+                <strong>
+                  Your card will not be charged until your application is approved.
+                </strong>
+              </p>
+              <p>
+                If your application is approved, we'll charge this card for your first year of membership. Your membership renews automatically each year unless you turn off auto-renewal in account settings.
+              </p>
+            </div>
+          <% end %>
 
           <%= if @payment_intent_secret do %>
             <form
@@ -201,12 +242,19 @@ defmodule YscWeb.AccountSetupLive do
                   color="blue"
                 >
                   <.icon name="hero-credit-card" class="w-4 h-4" />
-                  Save Payment Method &amp; Continue
+                  <%= if @user.state == :active do %>
+                    Save Payment Method &amp; Activate
+                  <% else %>
+                    Save Payment Method &amp; Continue
+                  <% end %>
                 </.button>
               </div>
             </form>
           <% else %>
-            <div class="text-center py-8 space-y-4">
+            <div
+              :if={@user_needs.payment_method_setup}
+              class="text-center py-8 space-y-4"
+            >
               <p class="text-zinc-500">
                 There was a problem loading the payment form. Please try again.
               </p>
@@ -405,28 +453,78 @@ defmodule YscWeb.AccountSetupLive do
         <div :if={
           (!@loading_account_setup? and @current_step === 5) && !@trigger_login
         }>
-          <.header class="text-left">
-            Account Setup Complete!
-            <:subtitle>
-              Your account is ready. Your application is under review.
-            </:subtitle>
-          </.header>
+          <%= cond do %>
+            <% @user.state == :active and not @user_needs.payment_method_setup and
+                 not @user_needs.membership_activation -> %>
+              <.header class="text-left">
+                You're All Set!
+                <:subtitle>
+                  Your membership is active. Welcome to the Young Scandinavians Club!
+                </:subtitle>
+              </.header>
 
-          <div class="text-center py-8">
-            <.icon
-              name="hero-check-circle"
-              class="w-16 h-16 text-green-600 mx-auto mb-4"
-            />
-            <p class="text-zinc-600 mb-4">
-              Your account has been successfully set up. The board will review your application and you'll receive an email with their decision.
-            </p>
-            <.link
-              navigate={~p"/pending-review"}
-              class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-            >
-              View Application Status
-            </.link>
-          </div>
+              <div class="text-center py-8">
+                <.icon
+                  name="hero-check-circle"
+                  class="w-16 h-16 text-green-600 mx-auto mb-4"
+                />
+                <p class="text-zinc-600 mb-4">
+                  Account setup is complete and your membership is active.
+                </p>
+                <.link
+                  navigate={~p"/"}
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Go to Home
+                </.link>
+              </div>
+            <% @user.state == :active -> %>
+              <.header class="text-left">
+                One More Step
+                <:subtitle>
+                  Your application is approved — activate your membership to unlock member benefits.
+                </:subtitle>
+              </.header>
+
+              <div class="text-center py-8">
+                <.icon
+                  name="hero-credit-card"
+                  class="w-16 h-16 text-blue-600 mx-auto mb-4"
+                />
+                <p class="text-zinc-600 mb-4">
+                  Add a payment method to activate your membership.
+                </p>
+                <.link
+                  patch={~p"/account/setup/#{@user.id}?step=1"}
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Activate Membership
+                </.link>
+              </div>
+            <% true -> %>
+              <.header class="text-left">
+                Account Setup Complete!
+                <:subtitle>
+                  Your account is ready. Your application is under review.
+                </:subtitle>
+              </.header>
+
+              <div class="text-center py-8">
+                <.icon
+                  name="hero-check-circle"
+                  class="w-16 h-16 text-green-600 mx-auto mb-4"
+                />
+                <p class="text-zinc-600 mb-4">
+                  Your account has been successfully set up. The board will review your application and you'll receive an email with their decision.
+                </p>
+                <.link
+                  navigate={~p"/pending-review"}
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  View Application Status
+                </.link>
+              </div>
+          <% end %>
         </div>
       </div>
     </div>
@@ -441,9 +539,10 @@ defmodule YscWeb.AccountSetupLive do
 
     # Add payment method step first (step 1) if needed — it comes before password
     steps =
-      if Map.get(user_needs, :payment_method_setup, false),
-        do: steps ++ ["Payment"],
-        else: steps
+      if Map.get(user_needs, :payment_method_setup, false) or
+           Map.get(user_needs, :membership_activation, false),
+         do: steps ++ ["Payment"],
+         else: steps
 
     # Add password setup if needed
     steps =
@@ -499,27 +598,50 @@ defmodule YscWeb.AccountSetupLive do
 
   # Helper function to add payment method step (step 1 in the flow)
   defp add_payment_step_if_needed({step_index, step_mapping}, user_needs) do
-    if Map.get(user_needs, :payment_method_setup, false) do
+    if Map.get(user_needs, :payment_method_setup, false) or
+         Map.get(user_needs, :membership_activation, false) do
       {step_index + 1, Map.put(step_mapping, 1, step_index)}
     else
       {step_index, step_mapping}
     end
   end
 
+  defp unpaid_active_primary?(user) do
+    user.state == :active and not Accounts.sub_account?(user) and
+      is_nil(MembershipCache.get_active_membership(user))
+  end
+
   # Compute user_needs map from a user struct.
   defp compute_user_needs(user, opts \\ []) do
     check_payment? = Keyword.get(opts, :check_payment?, true)
 
-    payment_method_setup =
-      if user.state == :pending_approval do
-        if check_payment? do
-          is_nil(Payments.get_default_payment_method(user))
-        else
-          true
-        end
+    has_default_pm? =
+      if check_payment? do
+        not is_nil(Payments.get_default_payment_method(user))
       else
         false
       end
+
+    unpaid_active? = unpaid_active_primary?(user)
+
+    payment_method_setup =
+      cond do
+        not check_payment? and
+            (user.state == :pending_approval or unpaid_active?) ->
+          true
+
+        user.state == :pending_approval ->
+          not has_default_pm?
+
+        unpaid_active? and not has_default_pm? ->
+          true
+
+        true ->
+          false
+      end
+
+    membership_activation =
+      unpaid_active? and has_default_pm? and check_payment?
 
     %{
       email_verification: is_nil(user.email_verified_at),
@@ -527,12 +649,13 @@ defmodule YscWeb.AccountSetupLive do
       phone_setup: is_nil(user.phone_number),
       phone_verification:
         not is_nil(user.phone_number) and is_nil(user.phone_verified_at),
-      payment_method_setup: payment_method_setup
+      payment_method_setup: payment_method_setup,
+      membership_activation: membership_activation
     }
   end
 
   defp signup_plan_for(user, user_needs) do
-    if user_needs.payment_method_setup do
+    if user_needs.payment_method_setup or user_needs.membership_activation do
       registration_form = user.registration_form
 
       if registration_form do
@@ -548,7 +671,7 @@ defmodule YscWeb.AccountSetupLive do
       user_needs.email_verification ->
         0
 
-      user_needs.payment_method_setup and is_owner ->
+      needs_payment_step?(user_needs) and is_owner ->
         1
 
       user_needs.password_setup and is_owner ->
@@ -565,13 +688,32 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
+  defp needs_payment_step?(user_needs) do
+    Map.get(user_needs, :payment_method_setup, false) or
+      Map.get(user_needs, :membership_activation, false)
+  end
+
+  defp next_setup_step(user_needs) do
+    cond do
+      needs_payment_step?(user_needs) -> 1
+      user_needs.password_setup -> 2
+      user_needs.phone_setup -> 3
+      user_needs.phone_verification -> 4
+      true -> 5
+    end
+  end
+
+  defp membership_return_url(user) do
+    YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
+  end
+
   defp ensure_verification_email_sent(user) do
     _ = VerificationCodes.ensure(user, :email, suffix: "initial")
     :ok
   end
 
   defp maybe_adjust_step_after_payment_refine(socket, user_needs) do
-    if socket.assigns.current_step == 1 and not user_needs.payment_method_setup do
+    if socket.assigns.current_step == 1 and not needs_payment_step?(user_needs) do
       assign(
         socket,
         :current_step,
@@ -642,7 +784,8 @@ defmodule YscWeb.AccountSetupLive do
       password_setup: false,
       phone_setup: false,
       phone_verification: false,
-      payment_method_setup: false
+      payment_method_setup: false,
+      membership_activation: false
     }
 
     socket
@@ -689,97 +832,135 @@ defmodule YscWeb.AccountSetupLive do
     current_user = socket.assigns.current_user
     is_owner = !!(current_user && current_user.id == user.id)
 
-    user_needs = compute_user_needs(user, check_payment?: true)
-    needs_any_setup = user_needs_needs_setup?(user_needs)
+    {user, user_needs, activation_result} =
+      maybe_activate_membership_on_load(user)
 
+    needs_any_setup = user_needs_needs_setup?(user_needs)
     can_access = needs_any_setup
 
-    if can_access do
-      signup_plan = signup_plan_for(user, user_needs)
-      current_step = starting_step_for(user_needs, is_owner)
+    cond do
+      activation_result in [:activated, :already_active] and not needs_any_setup ->
+        {:ok,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your membership is active. Welcome!",
+           title: "Membership"
+         )
+         |> redirect(to: ~p"/")}
 
-      phone_changeset =
-        if user_needs.phone_setup or is_nil(user.phone_number) do
-          Ysc.Accounts.User.registration_changeset(user, %{},
-            hash_password: false,
-            validate_email: false
-          )
-        else
-          Ysc.Accounts.User.registration_changeset(
-            user,
-            %{"phone_number" => user.phone_number},
-            hash_password: false,
-            validate_email: false
-          )
-        end
+      can_access ->
+        signup_plan = signup_plan_for(user, user_needs)
+        current_step = starting_step_for(user_needs, is_owner)
 
-      phone_verification_changeset = %{"verification_code" => ""} |> to_form()
-      password_changeset = Accounts.change_user_password(user)
-      email_changeset = %{"verification_code" => ""} |> to_form()
-
-      display_email = if is_owner, do: user.email, else: mask_email(user.email)
-
-      public_key = Application.get_env(:stripity_stripe, :public_key)
-
-      socket =
-        socket
-        |> assign(:loading_account_setup?, false)
-        |> assign(:user_id, user_id)
-        |> assign(:page_title, "Complete Your Account Setup")
-        |> assign(
-          :meta_description,
-          "Complete your Young Scandinavians Club membership account setup."
-        )
-        |> assign(:user, user)
-        |> assign(:is_owner, is_owner)
-        |> assign(:display_email, display_email)
-        |> assign(:current_step, current_step)
-        |> assign(:email_verified, false)
-        |> assign(:from_signup, false)
-        |> assign(:user_needs, user_needs)
-        |> assign(:stepper_needs, user_needs)
-        |> assign(:trigger_login, false)
-        |> assign(:email_form, email_changeset)
-        |> assign(:password_form, to_form(password_changeset))
-        |> assign(:phone_form, to_form(phone_changeset))
-        |> assign(:phone_verification_form, phone_verification_changeset)
-        |> assign(:code_valid, false)
-        |> assign(:phone_code_valid, false)
-        |> assign(:email_verification_code_state, %{})
-        |> assign(:phone_verification_code_state, %{})
-        |> assign(:email_resend_disabled_until, nil)
-        |> assign(:sms_resend_disabled_until, nil)
-        |> assign(:payment_intent_secret, nil)
-        |> assign(
-          :stripe_billing_details,
-          Ysc.Customers.payment_element_default_values_json(user)
-        )
-        |> assign(:signup_plan, signup_plan)
-        |> assign(:public_key, public_key)
-        |> refine_setup_needs_assigns(user)
-        |> then(fn s ->
-          if s.assigns.user_needs.email_verification and
-               email_verification_authorized?(s) do
-            ensure_verification_email_sent(user)
+        phone_changeset =
+          if user_needs.phone_setup or is_nil(user.phone_number) do
+            Ysc.Accounts.User.registration_changeset(user, %{},
+              hash_password: false,
+              validate_email: false
+            )
+          else
+            Ysc.Accounts.User.registration_changeset(
+              user,
+              %{"phone_number" => user.phone_number},
+              hash_password: false,
+              validate_email: false
+            )
           end
 
-          s
-        end)
+        phone_verification_changeset = %{"verification_code" => ""} |> to_form()
+        password_changeset = Accounts.change_user_password(user)
+        email_changeset = %{"verification_code" => ""} |> to_form()
 
-      if user_needs_needs_setup?(socket.assigns.user_needs) do
-        {:ok, socket}
-      else
+        display_email =
+          if is_owner, do: user.email, else: mask_email(user.email)
+
+        public_key = Application.get_env(:stripity_stripe, :public_key)
+
+        socket =
+          socket
+          |> assign(:loading_account_setup?, false)
+          |> assign(:user_id, user_id)
+          |> assign(:page_title, "Complete Your Account Setup")
+          |> assign(
+            :meta_description,
+            "Complete your Young Scandinavians Club membership account setup."
+          )
+          |> assign(:user, user)
+          |> assign(:is_owner, is_owner)
+          |> assign(:display_email, display_email)
+          |> assign(:current_step, current_step)
+          |> assign(:email_verified, false)
+          |> assign(:from_signup, false)
+          |> assign(:user_needs, user_needs)
+          |> assign(:stepper_needs, user_needs)
+          |> assign(:trigger_login, false)
+          |> assign(:email_form, email_changeset)
+          |> assign(:password_form, to_form(password_changeset))
+          |> assign(:phone_form, to_form(phone_changeset))
+          |> assign(:phone_verification_form, phone_verification_changeset)
+          |> assign(:code_valid, false)
+          |> assign(:phone_code_valid, false)
+          |> assign(:email_verification_code_state, %{})
+          |> assign(:phone_verification_code_state, %{})
+          |> assign(:email_resend_disabled_until, nil)
+          |> assign(:sms_resend_disabled_until, nil)
+          |> assign(:payment_intent_secret, nil)
+          |> assign(
+            :stripe_billing_details,
+            Ysc.Customers.payment_element_default_values_json(user)
+          )
+          |> assign(:signup_plan, signup_plan)
+          |> assign(:public_key, public_key)
+          |> refine_setup_needs_assigns(user)
+          |> then(fn s ->
+            if s.assigns.user_needs.email_verification and
+                 email_verification_authorized?(s) do
+              ensure_verification_email_sent(user)
+            end
+
+            s
+          end)
+
+        if user_needs_needs_setup?(socket.assigns.user_needs) do
+          {:ok, socket}
+        else
+          {:ok, redirect(socket, to: ~p"/")}
+        end
+
+      true ->
         {:ok, redirect(socket, to: ~p"/")}
+    end
+  end
+
+  defp maybe_activate_membership_on_load(user) do
+    user_needs = compute_user_needs(user, check_payment?: true)
+
+    if user_needs.membership_activation do
+      case Subscriptions.activate_membership_with_saved_payment_method(user,
+             return_url: membership_return_url(user)
+           ) do
+        {:ok, status} when status in [:activated, :already_active] ->
+          YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+            user,
+            status
+          )
+
+          refreshed = Accounts.get_user!(user.id, [:registration_form])
+          {refreshed, compute_user_needs(refreshed), status}
+
+        {:error, _reason} ->
+          {user, user_needs, :activation_failed}
       end
     else
-      {:ok, redirect(socket, to: ~p"/")}
+      {user, user_needs, :skipped}
     end
   end
 
   defp user_needs_needs_setup?(user_needs) do
     user_needs.email_verification or user_needs.password_setup or
       user_needs.phone_setup or user_needs.phone_verification or
-      user_needs.payment_method_setup
+      needs_payment_step?(user_needs)
   end
 
   defp refine_setup_needs_assigns(socket, user) do
@@ -791,6 +972,36 @@ defmodule YscWeb.AccountSetupLive do
     |> assign(:stepper_needs, user_needs)
     |> assign(:signup_plan, signup_plan)
     |> maybe_adjust_step_after_payment_refine(user_needs)
+  end
+
+  defp refresh_setup_user_and_needs(socket) do
+    user = Accounts.get_user!(socket.assigns.user.id, [:registration_form])
+
+    socket
+    |> assign(:user, user)
+    |> refine_setup_needs_assigns(user)
+  end
+
+  defp maybe_redirect_after_activation(socket) do
+    user_needs = socket.assigns.user_needs
+
+    cond do
+      user_needs_needs_setup?(user_needs) ->
+        {:cont, socket}
+
+      socket.assigns.user.state == :active ->
+        {:halt,
+         socket
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Your membership is active. Welcome!",
+           title: "Membership"
+         )
+         |> redirect(to: ~p"/")}
+
+      true ->
+        {:halt, redirect(socket, to: ~p"/")}
+    end
   end
 
   @impl true
@@ -813,119 +1024,146 @@ defmodule YscWeb.AccountSetupLive do
     if step_param do
       requested_step = String.to_integer(step_param)
       current_user = socket.assigns.current_user
-      user = socket.assigns.user
 
-      fresh_user =
+      socket =
         if connected?(socket) do
-          Accounts.get_user!(user.id)
+          refresh_setup_user_and_needs(socket)
         else
-          user
+          socket
         end
 
-      # Steps after email verification require a real session whose user matches the
-      # account in the URL. Never derive current_user from the path alone — that would
-      # let an unauthenticated visitor impersonate the account for LiveView events.
-      can_access_step =
-        cond do
-          requested_step == 0 ->
-            # Email verification step: always accessible
-            true
+      fresh_user = socket.assigns.user
+      user_needs = socket.assigns.user_needs
 
-          is_nil(fresh_user.email_verified_at) ->
-            false
+      # Mid-setup approval with PM on file: try activation before routing steps
+      socket =
+        if connected?(socket) and user_needs.membership_activation do
+          case Subscriptions.activate_membership_with_saved_payment_method(
+                 fresh_user,
+                 return_url: membership_return_url(fresh_user)
+               ) do
+            {:ok, status} when status in [:activated, :already_active] ->
+              YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+                fresh_user,
+                status
+              )
 
-          is_nil(current_user) or current_user.id != fresh_user.id ->
-            false
+              refresh_setup_user_and_needs(socket)
 
-          true ->
-            true
+            {:error, _} ->
+              socket
+          end
+        else
+          socket
         end
 
-      if can_access_step do
-        user_needs = socket.assigns.user_needs
+      case maybe_redirect_after_activation(socket) do
+        {:halt, redirected} ->
+          {:noreply, redirected}
 
-        # Update socket assigns with fresh user data
-        socket =
-          if connected?(socket) do
-            assign(socket, user: fresh_user)
-          else
-            socket
-          end
+        {:cont, socket} ->
+          fresh_user = socket.assigns.user
+          user_needs = socket.assigns.user_needs
 
-        # Calculate allowed step based on what user needs and their authentication
-        # New order: 0=email, 1=payment, 2=password, 3=phone setup, 4=phone verify
-        allowed_step =
-          cond do
-            # Step 0 (email verification): Always allow if user needs it
-            requested_step == 0 and user_needs.email_verification ->
-              0
+          # Steps after email verification require a real session whose user matches the
+          # account in the URL. Never derive current_user from the path alone — that would
+          # let an unauthenticated visitor impersonate the account for LiveView events.
+          can_access_step =
+            cond do
+              requested_step == 0 ->
+                true
 
-            # Step 1 (payment method): Require authentication and need
-            requested_step == 1 and not is_nil(current_user) and
-                Map.get(user_needs, :payment_method_setup, false) ->
-              1
+              is_nil(fresh_user.email_verified_at) ->
+                false
 
-            # Step 2 (password setup): Require authentication and need
-            requested_step == 2 and not is_nil(current_user) and
-                user_needs.password_setup ->
-              2
+              is_nil(current_user) or current_user.id != fresh_user.id ->
+                false
 
-            # Step 3 (phone setup): Require authentication and need
-            requested_step == 3 and not is_nil(current_user) and
-                user_needs.phone_setup ->
-              3
-
-            # Step 4 (phone verification): Require authentication and need
-            requested_step == 4 and not is_nil(current_user) and
-                user_needs.phone_verification ->
-              4
-
-            # Default: Stay on current step or go to completion
-            true ->
-              socket.assigns.current_step
-          end
-
-        # Create setup intent when user reaches the payment step (step 1)
-        socket =
-          if connected?(socket) && allowed_step == 1 &&
-               is_nil(socket.assigns.payment_intent_secret) do
-            user = socket.assigns.user
-
-            case Customers.create_setup_intent(user,
-                   stripe: %{payment_method_types: ["card", "us_bank_account"]}
-                 ) do
-              {:ok, setup_intent} ->
-                assign(
-                  socket,
-                  :payment_intent_secret,
-                  setup_intent.client_secret
-                )
-
-              {:error, _} ->
-                assign(socket, :payment_intent_secret, nil)
+              true ->
+                true
             end
+
+          if can_access_step do
+            allowed_step =
+              cond do
+                requested_step == 0 and user_needs.email_verification ->
+                  0
+
+                # Keep unpaid / pending-without-PM users on payment until done
+                needs_payment_step?(user_needs) and not is_nil(current_user) and
+                    requested_step != 0 ->
+                  1
+
+                requested_step == 1 and not is_nil(current_user) and
+                    needs_payment_step?(user_needs) ->
+                  1
+
+                requested_step == 2 and not is_nil(current_user) and
+                    user_needs.password_setup ->
+                  2
+
+                # Allow returning to phone setup to change number while verifying
+                requested_step == 3 and not is_nil(current_user) and
+                    (user_needs.phone_setup or user_needs.phone_verification) ->
+                  3
+
+                requested_step == 4 and not is_nil(current_user) and
+                    user_needs.phone_verification ->
+                  4
+
+                # Approval flipped needs — send them to the correct next step
+                true ->
+                  starting_step_for(
+                    user_needs,
+                    not is_nil(current_user) and
+                      current_user.id == fresh_user.id
+                  )
+              end
+
+            socket =
+              if connected?(socket) && allowed_step == 1 &&
+                   is_nil(socket.assigns.payment_intent_secret) do
+                case Customers.create_setup_intent(fresh_user,
+                       stripe: %{
+                         payment_method_types: ["card", "us_bank_account"]
+                       }
+                     ) do
+                  {:ok, setup_intent} ->
+                    assign(
+                      socket,
+                      :payment_intent_secret,
+                      setup_intent.client_secret
+                    )
+
+                  {:error, _} ->
+                    assign(socket, :payment_intent_secret, nil)
+                end
+              else
+                socket
+              end
+
+            socket =
+              if (connected?(socket) && allowed_step == 4 &&
+                    not is_nil(fresh_user.phone_number)) and
+                   is_nil(fresh_user.phone_verified_at) do
+                _ =
+                  VerificationCodes.ensure(fresh_user, :phone,
+                    suffix: "auto_step4"
+                  )
+
+                socket
+              else
+                socket
+              end
+
+            {:noreply,
+             assign(socket,
+               current_step: allowed_step,
+               from_signup: from_signup
+             )}
           else
-            socket
+            {:noreply, assign(socket, :from_signup, from_signup)}
           end
-
-        # Automatically send phone verification code if user reaches step 4 with unverified phone
-        socket =
-          if (connected?(socket) && allowed_step == 4 &&
-                not is_nil(fresh_user.phone_number)) and
-               is_nil(fresh_user.phone_verified_at) do
-            _ =
-              VerificationCodes.ensure(fresh_user, :phone, suffix: "auto_step4")
-
-            socket
-          else
-            socket
-          end
-
-        {:noreply,
-         assign(socket, current_step: allowed_step, from_signup: from_signup)}
-      else
-        # Access denied — stay on the current step without changing anything
-        {:noreply, assign(socket, :from_signup, from_signup)}
       end
     else
       {:noreply, assign(socket, :from_signup, from_signup)}
@@ -1071,24 +1309,11 @@ defmodule YscWeb.AccountSetupLive do
     else
       case Accounts.set_user_initial_password(socket.assigns.user, user_params) do
         {:ok, updated_user} ->
+          updated_user =
+            Accounts.get_user!(updated_user.id, [:registration_form])
+
           updated_user_needs = compute_user_needs(updated_user)
-
-          # Determine next step based on phone status
-          # Payment was already handled in step 1, so we continue with phone or completion
-          next_step =
-            cond do
-              # Phone already verified — all done
-              not is_nil(updated_user.phone_verified_at) ->
-                5
-
-              # Phone set but not verified, go to phone verification (step 4)
-              not is_nil(updated_user.phone_number) ->
-                4
-
-              # Need to set up phone first (step 3)
-              true ->
-                3
-            end
+          next_step = next_setup_step(updated_user_needs)
 
           YscWeb.Flash.send_toast(:info, "Password set successfully!",
             title: "Account setup"
@@ -1101,7 +1326,8 @@ defmodule YscWeb.AccountSetupLive do
              to: ~p"/account/setup/#{socket.assigns.user.id}?step=#{next_step}"
            )
            |> assign(:user, updated_user)
-           |> assign(:user_needs, updated_user_needs)}
+           |> assign(:user_needs, updated_user_needs)
+           |> assign(:stepper_needs, updated_user_needs)}
 
         {:error, changeset} ->
           {:noreply, assign(socket, password_form: to_form(changeset))}
@@ -1197,9 +1423,8 @@ defmodule YscWeb.AccountSetupLive do
         not owner? ->
           false
 
-        # Step 1: Allow if user needs payment method setup
-        requested_step == 1 and
-            Map.get(user_needs, :payment_method_setup, false) ->
+        # Step 1: Allow if user needs payment method setup or membership activation
+        requested_step == 1 and needs_payment_step?(user_needs) ->
           true
 
         # Step 2: Allow if user needs password setup
@@ -1355,7 +1580,7 @@ defmodule YscWeb.AccountSetupLive do
         %{"payment_method_id" => payment_method_id},
         socket
       ) do
-    user = socket.assigns.user
+    user = Accounts.get_user!(socket.assigns.user.id, [:registration_form])
 
     if not setup_owner?(socket) or socket.assigns.current_step != 1 do
       YscWeb.Flash.send_toast(
@@ -1395,36 +1620,7 @@ defmodule YscWeb.AccountSetupLive do
                   )
                 end)
 
-              # Advance to the next required step (password, phone, or pending-review)
-              updated_user_needs =
-                compute_user_needs(Accounts.get_user!(user.id))
-
-              next_step =
-                cond do
-                  updated_user_needs.password_setup -> 2
-                  updated_user_needs.phone_setup -> 3
-                  updated_user_needs.phone_verification -> 4
-                  true -> 5
-                end
-
-              YscWeb.Flash.send_toast(
-                :info,
-                "Payment method saved! We'll charge it automatically if your application is approved.",
-                title: "Account setup"
-              )
-
-              socket = assign(socket, :user_needs, updated_user_needs)
-
-              if next_step == 5 do
-                {:noreply, push_navigate(socket, to: ~p"/pending-review")}
-              else
-                {:noreply,
-                 socket
-                 |> assign(:current_step, next_step)
-                 |> push_patch(
-                   to: ~p"/account/setup/#{user.id}?step=#{next_step}"
-                 )}
-              end
+              advance_after_payment_method_saved(socket, user)
 
             {:error, _error} ->
               Ysc.Logging.error(
@@ -1446,6 +1642,65 @@ defmodule YscWeb.AccountSetupLive do
 
           YscWeb.Flash.send_toast(:error, message, title: "Payment")
           {:noreply, socket}
+      end
+    end
+  end
+
+  def handle_event("retry_membership_activation", _params, socket) do
+    if not setup_owner?(socket) do
+      {:noreply, socket}
+    else
+      user = Accounts.get_user!(socket.assigns.user.id, [:registration_form])
+
+      case Subscriptions.activate_membership_with_saved_payment_method(user,
+             return_url: membership_return_url(user)
+           ) do
+        {:ok, status} when status in [:activated, :already_active] ->
+          YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+            user,
+            status
+          )
+
+          socket = refresh_setup_user_and_needs(socket)
+
+          case maybe_redirect_after_activation(socket) do
+            {:halt, redirected} ->
+              {:noreply, redirected}
+
+            {:cont, socket} ->
+              next_step = next_setup_step(socket.assigns.user_needs)
+
+              YscWeb.Flash.send_toast(
+                :info,
+                "Your membership is active!",
+                title: "Membership"
+              )
+
+              {:noreply,
+               socket
+               |> assign(:current_step, next_step)
+               |> push_patch(
+                 to: ~p"/account/setup/#{user.id}?step=#{next_step}"
+               )}
+          end
+
+        {:error, :no_payment_method} ->
+          YscWeb.Flash.send_toast(
+            :error,
+            "Please save a payment method first.",
+            title: "Membership"
+          )
+
+          {:noreply, refresh_setup_user_and_needs(socket)}
+
+        {:error, _reason} ->
+          YscWeb.Flash.send_toast(
+            :error,
+            "We couldn't activate your membership. Please try again or pay from membership settings.",
+            title: "Membership"
+          )
+
+          {:noreply, refresh_setup_user_and_needs(socket)}
       end
     end
   end
@@ -1476,6 +1731,73 @@ defmodule YscWeb.AccountSetupLive do
       )
 
       {:noreply, socket}
+    end
+  end
+
+  defp advance_after_payment_method_saved(socket, user) do
+    user = Accounts.get_user!(user.id, [:registration_form])
+
+    {socket, toast_message, activated?} =
+      if user.state == :active and unpaid_active_primary?(user) do
+        case Subscriptions.activate_membership_with_saved_payment_method(user,
+               return_url: membership_return_url(user)
+             ) do
+          {:ok, status} when status in [:activated, :already_active] ->
+            YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+              user,
+              status
+            )
+
+            socket = refresh_setup_user_and_needs(socket)
+
+            {socket, "Payment saved and your membership is now active!", true}
+
+          {:error, _reason} ->
+            socket = refresh_setup_user_and_needs(socket)
+
+            {socket,
+             "Payment method saved, but we couldn't activate membership yet. Use Activate Membership Now or pay from settings.",
+             false}
+        end
+      else
+        socket =
+          socket
+          |> assign(:user, user)
+          |> refine_setup_needs_assigns(user)
+
+        {socket,
+         "Payment method saved! We'll charge it automatically if your application is approved.",
+         false}
+      end
+
+    YscWeb.Flash.send_toast(:info, toast_message, title: "Account setup")
+
+    case maybe_redirect_after_activation(socket) do
+      {:halt, redirected} ->
+        {:noreply, redirected}
+
+      {:cont, socket} ->
+        next_step = next_setup_step(socket.assigns.user_needs)
+
+        cond do
+          activated? and next_step == 5 ->
+            {:noreply, push_navigate(socket, to: ~p"/")}
+
+          next_step == 5 and socket.assigns.user.state == :pending_approval ->
+            {:noreply, push_navigate(socket, to: ~p"/pending-review")}
+
+          next_step == 5 and socket.assigns.user.state == :active ->
+            {:noreply,
+             socket
+             |> assign(:current_step, 1)
+             |> push_patch(to: ~p"/account/setup/#{user.id}?step=1")}
+
+          true ->
+            {:noreply,
+             socket
+             |> assign(:current_step, next_step)
+             |> push_patch(to: ~p"/account/setup/#{user.id}?step=#{next_step}")}
+        end
     end
   end
 
@@ -1556,16 +1878,10 @@ defmodule YscWeb.AccountSetupLive do
 
   defp do_verify_email_code_success(socket) do
     {:ok, updated_user} = Accounts.mark_email_verified(socket.assigns.user)
-    updated_user_needs = compute_user_needs(updated_user)
 
-    next_step =
-      cond do
-        updated_user_needs.payment_method_setup -> 1
-        updated_user_needs.password_setup -> 2
-        updated_user_needs.phone_setup -> 3
-        updated_user_needs.phone_verification -> 4
-        true -> 5
-      end
+    updated_user = Accounts.get_user!(updated_user.id, [:registration_form])
+    updated_user_needs = compute_user_needs(updated_user)
+    next_step = next_setup_step(updated_user_needs)
 
     one_time_token = Accounts.generate_auto_login_token(updated_user)
 

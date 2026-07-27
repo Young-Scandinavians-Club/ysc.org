@@ -3841,6 +3841,14 @@ defmodule YscWeb.UserSettingsLive do
                   updated_default =
                     Ysc.Payments.get_default_payment_method(updated_user)
 
+                  {socket, toast_message} =
+                    maybe_activate_membership_after_settings_pm(
+                      socket,
+                      updated_user
+                    )
+
+                  updated_user = Ysc.Accounts.get_user!(user.id)
+
                   {:noreply,
                    socket
                    |> assign(:user, updated_user)
@@ -3849,7 +3857,7 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:show_new_payment_form, false)
                    |> YscWeb.Flash.put_toast(
                      :info,
-                     "Payment method updated and set as default.",
+                     toast_message,
                      title: "Payment",
                      icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
                    )
@@ -4704,6 +4712,45 @@ defmodule YscWeb.UserSettingsLive do
 
   defp validate_user_active(user) do
     if user.state == :active, do: :ok, else: {:error, :user_not_active}
+  end
+
+  defp maybe_activate_membership_after_settings_pm(socket, user) do
+    unpaid_primary? =
+      user.state == :active and not Accounts.sub_account?(user) and
+        is_nil(MembershipCache.get_active_membership(user))
+
+    if unpaid_primary? do
+      return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
+
+      case Subscriptions.activate_membership_with_saved_payment_method(user,
+             return_url: return_url
+           ) do
+        {:ok, status} when status in [:activated, :already_active] ->
+          YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+            user,
+            status
+          )
+
+          _ = MembershipCache.invalidate_user(user.id)
+          refreshed = Accounts.get_user!(user.id)
+
+          membership = MembershipCache.get_active_membership(refreshed)
+          plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+
+          {socket
+           |> assign(:user, refreshed)
+           |> assign(:current_membership, membership)
+           |> assign(:active_membership?, not is_nil(membership))
+           |> assign(:active_plan_type, plan_type),
+           "Payment method saved and your membership is now active!"}
+
+        {:error, _reason} ->
+          {socket,
+           "Payment method updated. We couldn't activate membership automatically — choose a plan below to finish."}
+      end
+    else
+      {socket, "Payment method updated and set as default."}
+    end
   end
 
   defp validate_user_active_for_membership(user) do

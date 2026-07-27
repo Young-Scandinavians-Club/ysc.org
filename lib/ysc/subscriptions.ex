@@ -1881,6 +1881,140 @@ defmodule Ysc.Subscriptions do
     BoardVolunteerBilling.household_on_board?(user)
   end
 
+  @doc """
+  Charges the user's default payment method and creates a local membership subscription.
+
+  Used when approving an application and when an already-approved user saves a
+  payment method during account setup or settings.
+
+  ## Options
+
+    * `:membership_type` - `:single` or `:family`. Defaults to the user's signup
+      application membership type, or `:single`.
+    * `:return_url` - Stripe return URL (required for subscription create).
+
+  ## Returns
+
+    * `{:ok, :activated}` - Stripe subscription created (and persisted when possible)
+    * `{:ok, :already_active}` - user already has a blocking local subscription
+    * `{:error, :no_payment_method}`
+    * `{:error, :no_price_id}`
+    * `{:error, :missing_return_url}`
+    * `{:error, reason}` - Stripe or other failure
+  """
+  def activate_membership_with_saved_payment_method(
+        %Ysc.Accounts.User{} = user,
+        opts \\ []
+      ) do
+    if duplicate_create_blocked_by_existing_subscription?(user) do
+      {:ok, :already_active}
+    else
+      do_activate_membership_with_saved_payment_method(user, opts)
+    end
+  end
+
+  defp do_activate_membership_with_saved_payment_method(user, opts) do
+    return_url = Keyword.get(opts, :return_url)
+
+    cond do
+      is_nil(return_url) or return_url == "" ->
+        {:error, :missing_return_url}
+
+      true ->
+        case Ysc.Payments.get_default_payment_method(user) do
+          nil ->
+            {:error, :no_payment_method}
+
+          default_pm ->
+            membership_type =
+              Keyword.get(opts, :membership_type) ||
+                resolve_membership_type_for_activation(user)
+
+            case membership_price_id(membership_type) do
+              nil ->
+                Ysc.Logging.error(
+                  "No Stripe price ID found for membership type on activation",
+                  user_id: user.id,
+                  membership_type: inspect(membership_type)
+                )
+
+                {:error, :no_price_id}
+
+              price_id ->
+                create_and_persist_membership_subscription(
+                  user,
+                  default_pm,
+                  price_id,
+                  return_url
+                )
+            end
+        end
+    end
+  end
+
+  defp create_and_persist_membership_subscription(
+         user,
+         default_pm,
+         price_id,
+         return_url
+       ) do
+    case Ysc.Customers.create_subscription(
+           user,
+           return_url: return_url,
+           prices: [%{price: price_id, quantity: 1}],
+           default_payment_method: default_pm.provider_id,
+           expand: ["latest_invoice"]
+         ) do
+      {:ok, stripe_subscription} ->
+        case create_subscription_from_stripe(user, stripe_subscription) do
+          {:ok, _} ->
+            _ = MembershipCache.invalidate_user(user.id)
+            {:ok, :activated}
+
+          {:error, reason} ->
+            Ysc.Logging.error(
+              "Failed to persist Stripe subscription locally on activation",
+              user_id: user.id,
+              stripe_subscription_id: stripe_subscription.id,
+              reason: inspect(reason)
+            )
+
+            # Stripe already charged; treat as activated so callers do not
+            # re-prompt for payment. Webhooks can repair the local row.
+            _ = MembershipCache.invalidate_user(user.id)
+            {:ok, :activated}
+        end
+
+      {:error, :user_already_has_active_subscription} ->
+        {:ok, :already_active}
+
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to auto-charge membership on activation",
+          user_id: user.id,
+          reason: inspect(reason)
+        )
+
+        {:error, reason}
+    end
+  end
+
+  defp resolve_membership_type_for_activation(user) do
+    user = Ysc.Repo.preload(user, :registration_form)
+
+    case user.registration_form do
+      %{membership_type: type} when not is_nil(type) -> type
+      _ -> :single
+    end
+  end
+
+  defp membership_price_id(membership_type) do
+    plans = Application.get_env(:ysc, :membership_plans, [])
+
+    Enum.find_value(plans, fn plan ->
+      if plan.id == membership_type, do: plan[:stripe_price_id]
+    end)
+  end
+
   @doc false
   def ci_query_explain_query do
     alias Ysc.Ci.QueryExplain.Fixtures
