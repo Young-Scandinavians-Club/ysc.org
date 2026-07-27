@@ -591,13 +591,10 @@ defmodule YscWeb.AdminSettingsLive do
         end
       end)
 
-    {:ok, socket,
-     temporary_assigns: [
-       scopes: [],
-       grouped_settings: %{},
-       form: nil,
-       recent_jobs: []
-     ]}
+    # Only recent_jobs is temporary — it is re-assigned on Oban notifications. Settings
+    # form assigns must persist across re-renders (e.g. queue stats updates) or inputs
+    # disappear from the DOM after the first connected render.
+    {:ok, socket, temporary_assigns: [recent_jobs: []]}
   end
 
   @impl true
