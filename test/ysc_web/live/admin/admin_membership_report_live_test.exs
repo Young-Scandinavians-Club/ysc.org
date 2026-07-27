@@ -59,7 +59,10 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       })
 
       {_view, html} =
-        live_report(conn, ~p"/admin/memberships/report?from=2026-03-01&to=2026-03-31")
+        live_report(
+          conn,
+          ~p"/admin/memberships/report?from=2026-03-01&to=2026-03-31"
+        )
 
       assert html =~ ~s(id="report-accepted")
       assert html =~ user.email
@@ -132,7 +135,10 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       })
       |> render_submit()
 
-      assert_patch(view, ~p"/admin/memberships/report?from=2026-02-01&to=2026-02-28")
+      assert_patch(
+        view,
+        ~p"/admin/memberships/report?from=2026-02-01&to=2026-02-28"
+      )
     end
   end
 end
