@@ -5,7 +5,6 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   alias Ysc.Bookings.{
     AvailabilityCache,
-    Booking,
     ConfigCacheTelemetry,
     Season,
     SeasonCache,
@@ -20,9 +19,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
-  alias Ysc.Repo
   alias YscWeb.DateDisplay
-  import Ecto.Query
 
   @impl true
   def mount(params, _session, socket) do
@@ -112,7 +109,10 @@ defmodule YscWeb.ClearLakeBookingLive do
         # Load active bookings for the user
         active_bookings =
           if user_with_subs,
-            do: Bookings.list_active_clear_lake_bookings_for_user(user_with_subs.id),
+            do:
+              Bookings.list_active_clear_lake_bookings_for_user(
+                user_with_subs.id
+              ),
             else: []
 
         {user_with_subs, can_book, booking_error_title, booking_disabled_reason,
