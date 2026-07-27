@@ -274,12 +274,27 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       true ->
         Repo.transaction(fn ->
+          primary_user_id = invite.primary_user_id
           relationship = invite.relationship || :child
+
+          # Lock the primary account so concurrent links cannot exceed the cap.
+          from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
+          |> Repo.one!()
+
+          if count_sub_accounts_by_primary_id(primary_user_id) >=
+               @max_sub_accounts do
+            Repo.rollback(:max_sub_accounts_reached)
+          end
+
+          if relationship in [:spouse, "spouse"] and
+               count_spouses(%User{id: primary_user_id}) >= @max_spouses do
+            Repo.rollback(:max_spouses_reached)
+          end
 
           updated_user =
             current_user
             |> Ecto.Changeset.change(%{
-              primary_user_id: invite.primary_user_id,
+              primary_user_id: primary_user_id,
               family_relationship: relationship
             })
             |> Repo.update!()
