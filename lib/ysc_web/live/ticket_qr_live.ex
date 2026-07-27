@@ -55,14 +55,14 @@ defmodule YscWeb.TicketQrLive do
       <%!-- Event details strip --%>
       <%= cond do %>
         <% @loading -> %>
-          <div class="px-5 py-4 flex flex-col gap-2 border-b border-white/10">
+          <div class="px-5 py-4 flex flex-col gap-2 border-b border-white/10 min-h-[5.5rem]">
             <div class="h-4 w-56 bg-white/10 rounded animate-pulse"></div>
             <div class="h-4 w-40 bg-white/10 rounded animate-pulse"></div>
           </div>
         <% @load_error -> %>
           <%!-- no strip on error --%>
         <% true -> %>
-          <div class="px-5 py-4 flex items-start justify-between gap-4 border-b border-white/10">
+          <div class="px-5 py-4 flex items-start justify-between gap-4 border-b border-white/10 min-h-[5.5rem]">
             <div class="flex flex-col gap-2">
               <span
                 :if={@event.start_date}
@@ -89,24 +89,27 @@ defmodule YscWeb.TicketQrLive do
                 {@event.address}
               </span>
             </div>
-            <add-to-calendar-button
-              :if={@event.start_date}
-              name={@event.title}
-              startDate={date_for_add_to_cal(@event.start_date)}
-              {if get_end_date_for_calendar(@event), do: [endDate: date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
-              options="'Apple','Google','iCal','Outlook.com','Yahoo'"
-              startTime={@event.start_time}
-              {if get_end_time_for_calendar(@event), do: [endTime: get_end_time_for_calendar(@event)], else: []}
-              timeZone="America/Los_Angeles"
-              location={@event.location_name}
-              size="4"
-              lightMode="dark"
-            ></add-to-calendar-button>
+            <%!-- Fixed slot so add-to-calendar web component cannot expand the strip --%>
+            <div class="shrink-0 min-h-[2.5rem] min-w-[2.5rem] flex items-start justify-end">
+              <add-to-calendar-button
+                :if={@event.start_date}
+                name={@event.title}
+                startDate={date_for_add_to_cal(@event.start_date)}
+                {if get_end_date_for_calendar(@event), do: [endDate: date_for_add_to_cal(get_end_date_for_calendar(@event))], else: []}
+                options="'Apple','Google','iCal','Outlook.com','Yahoo'"
+                startTime={@event.start_time}
+                {if get_end_time_for_calendar(@event), do: [endTime: get_end_time_for_calendar(@event)], else: []}
+                timeZone="America/Los_Angeles"
+                location={@event.location_name}
+                size="4"
+                lightMode="dark"
+              ></add-to-calendar-button>
+            </div>
           </div>
       <% end %>
 
-      <%!-- Main content area --%>
-      <div class="flex-1 flex flex-col justify-center py-8">
+      <%!-- Main content area: fixed min-height avoids skeleton→ticket CLS --%>
+      <div class="flex-1 flex flex-col justify-center py-8 min-h-[36rem]">
         <%= cond do %>
           <% @loading -> %>
             <%!-- Loading skeleton --%>
@@ -115,8 +118,12 @@ defmodule YscWeb.TicketQrLive do
                 <div class="h-20 bg-emerald-700/50 animate-pulse rounded-t-3xl">
                 </div>
                 <div class="bg-white/10 px-6 pt-6 pb-4 flex flex-col items-center gap-4">
-                  <div class="w-56 h-56 bg-white/5 rounded-xl animate-pulse"></div>
+                  <div class="w-[230px] h-[230px] bg-white/5 rounded-xl animate-pulse">
+                  </div>
                   <div class="h-3 w-28 bg-white/10 rounded animate-pulse"></div>
+                  <%!-- Reserved wallet action row (matches loaded ticket) --%>
+                  <div class="h-12 w-40 bg-white/5 rounded-lg animate-pulse mt-2">
+                  </div>
                 </div>
                 <div class="h-8 bg-white/10 animate-pulse"></div>
                 <div class="h-20 bg-white/10 animate-pulse rounded-b-3xl"></div>
@@ -195,22 +202,21 @@ defmodule YscWeb.TicketQrLive do
                         <p class="text-center text-xs font-bold tracking-[0.2em] uppercase text-zinc-400 mt-4">
                           Scan to check in
                         </p>
-                        <%= if @apple_wallet_enabled? && @wallet_platform in [:apple_only, :both] do %>
-                          <div class="flex justify-center mt-4">
+                        <%!-- Fixed-height wallet row: platform detection must not expand the card --%>
+                        <div class="flex flex-col items-center justify-center gap-2 mt-4 min-h-[3.5rem]">
+                          <%= if @apple_wallet_enabled? && @wallet_platform in [:apple_only, :both] do %>
                             <.add_to_wallet_button href={
                               ~p"/wallet/tickets/#{ticket.id}"
                             } />
-                          </div>
-                        <% end %>
-                        <%= if @google_wallet_enabled? &&
-                              @wallet_platform in [:google_only, :both] &&
-                              Map.get(@google_wallet_ticket_urls, ticket.id) do %>
-                          <div class="flex justify-center mt-2">
+                          <% end %>
+                          <%= if @google_wallet_enabled? &&
+                                @wallet_platform in [:google_only, :both] &&
+                                Map.get(@google_wallet_ticket_urls, ticket.id) do %>
                             <.add_to_google_wallet_button href={
                               Map.get(@google_wallet_ticket_urls, ticket.id)
                             } />
-                          </div>
-                        <% end %>
+                          <% end %>
+                        </div>
                       </div>
 
                       <%!-- ③ Perforation tear-line with side notches --%>

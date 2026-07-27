@@ -1,5 +1,5 @@
 defmodule Ysc.Subscriptions.BoardVolunteerBillingTest do
-  use Ysc.DataCase, async: true
+  use Ysc.DataCase, async: false
 
   import Ysc.AccountsFixtures
 
