@@ -1647,9 +1647,7 @@ defmodule YscWeb.AccountSetupLive do
   end
 
   def handle_event("retry_membership_activation", _params, socket) do
-    if not setup_owner?(socket) do
-      {:noreply, socket}
-    else
+    if setup_owner?(socket) do
       user = Accounts.get_user!(socket.assigns.user.id, [:registration_form])
 
       case Subscriptions.activate_membership_with_saved_payment_method(user,
@@ -1702,6 +1700,8 @@ defmodule YscWeb.AccountSetupLive do
 
           {:noreply, refresh_setup_user_and_needs(socket)}
       end
+    else
+      {:noreply, socket}
     end
   end
 
