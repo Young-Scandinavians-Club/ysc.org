@@ -962,9 +962,9 @@ defmodule YscWeb.EventDetailsLive do
                             <% @current_user.state == :pending_approval -> %>
                               Member tickets require an active membership. Your application is under board review; you can buy tickets after approval (dues may still be required).
                             <% @had_membership? -> %>
-                              Member tickets require an active paid membership. Your membership has expired — open Manage Membership in your account menu to renew.
+                              Member tickets require an active paid membership. Your membership has expired — open Membership in your account menu to renew.
                             <% true -> %>
-                              Member tickets require an active paid membership. Open Manage Membership in your account menu to pay dues or activate your membership.
+                              Member tickets require an active paid membership. Open Membership in your account menu to pay dues or activate your membership.
                           <% end %>
                         </p>
                         <.link
@@ -6418,7 +6418,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "You need an active, paid YSC membership to buy these tickets. Open Manage Membership in your account menu to renew or activate, then try again.",
+           "You need an active, paid YSC membership to buy these tickets. Open Membership in your account menu to renew or activate, then try again.",
            title: "Membership"
          )
          |> assign(:show_ticket_modal, false)}
@@ -6438,7 +6438,7 @@ defmodule YscWeb.EventDetailsLive do
         error_message =
           case changeset.errors do
             [user_id: {"active membership required to purchase tickets", _}] ->
-              "You need an active, paid YSC membership to buy these tickets. Open Manage Membership in your account menu to renew or activate, then try again."
+              "You need an active, paid YSC membership to buy these tickets. Open Membership in your account menu to renew or activate, then try again."
 
             _ ->
               "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening."
@@ -6546,7 +6546,9 @@ defmodule YscWeb.EventDetailsLive do
     html =
       Map.get(event, :rendered_details) || Map.get(event, :raw_details) || ""
 
-    Scrubber.scrub(html, Ysc.TrixScrubber)
+    html
+    |> Scrubber.scrub(Ysc.TrixScrubber)
+    |> Ysc.Html.Links.open_in_new_tab()
   end
 
   defp format_relative_time(%DateTime{} = dt), do: Timex.from_now(dt)

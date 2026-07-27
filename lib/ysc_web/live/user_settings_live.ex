@@ -573,16 +573,12 @@ defmodule YscWeb.UserSettingsLive do
                     Processing your photo…
                   </div>
 
-                  <%!-- Avatar library --%>
-                  <div :if={@loading_avatars} class="pt-2">
-                    <div class="h-4 w-20 bg-zinc-200 rounded animate-pulse mb-2">
-                    </div>
-                    <div class="flex flex-wrap gap-2">
-                      <%= for _i <- 1..4 do %>
-                        <div class="w-14 h-14 rounded-full bg-zinc-200 animate-pulse">
-                        </div>
-                      <% end %>
-                    </div>
+                  <%!-- Avatar library: avoid tall skeleton that collapses when empty (CLS) --%>
+                  <div
+                    :if={@loading_avatars}
+                    class="pt-2 min-h-[1.25rem]"
+                    aria-hidden="true"
+                  >
                   </div>
                   <div :if={!@loading_avatars && @user_avatars != []} class="pt-2">
                     <p class="text-sm font-bold text-zinc-900 mb-2">
@@ -1871,172 +1867,188 @@ defmodule YscWeb.UserSettingsLive do
               <div
                 :if={@loading_notification_preferences}
                 id="notification-preferences-loading"
-                class="overflow-x-auto rounded-lg border border-zinc-200 divide-y divide-zinc-100"
+                class="overflow-x-auto rounded-lg border border-zinc-200 min-h-[22rem]"
                 role="status"
                 aria-live="polite"
               >
                 <span class="sr-only">Loading notification preferences…</span>
-                <div :for={_ <- 1..4} class="flex items-center gap-4 px-6 py-4">
-                  <div class="flex-1 space-y-2">
-                    <.skeleton_block class="h-4 w-40 rounded" />
-                    <.skeleton_block class="h-3 w-64 rounded" />
+                <div class="bg-zinc-50 px-6 py-3 border-b border-zinc-200 flex gap-4">
+                  <.skeleton_block class="h-3 w-20 rounded" />
+                  <.skeleton_block class="h-3 w-12 rounded ml-auto" />
+                  <.skeleton_block class="h-3 w-10 rounded" />
+                </div>
+                <div class="divide-y divide-zinc-100">
+                  <div :for={_ <- 1..3} class="flex items-center gap-4 px-6 py-4">
+                    <div class="flex-1 space-y-2">
+                      <.skeleton_block class="h-4 w-40 rounded" />
+                      <.skeleton_block class="h-3 w-64 max-w-full rounded" />
+                    </div>
+                    <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                    <.skeleton_block class="h-4 w-4 rounded shrink-0" />
                   </div>
-                  <.skeleton_block class="h-4 w-4 rounded shrink-0" />
-                  <.skeleton_block class="h-4 w-4 rounded shrink-0" />
+                </div>
+                <div class="px-6 py-4">
+                  <.skeleton_block class="h-10 w-40 rounded" />
                 </div>
               </div>
 
-              <.simple_form
+              <div
                 :if={!@loading_notification_preferences}
-                for={@notification_form}
-                id="notification_form"
-                data-testid="notification-preferences-ready"
-                phx-submit="update_notifications"
-                phx-change="validate_notifications"
+                class="min-h-[22rem]"
               >
-                <div class="overflow-x-auto">
-                  <table class="min-w-full divide-y divide-zinc-200">
-                    <thead class="bg-zinc-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
-                        >
-                          Category
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
-                        >
-                          Email
-                        </th>
-                        <th
-                          scope="col"
-                          class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
-                        >
-                          SMS
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-zinc-200">
-                      <!-- Newsletter Row -->
-                      <tr>
-                        <td class="px-6 py-4">
-                          <div>
-                            <div class="text-sm font-medium text-zinc-900">
-                              Newsletters
+                <.simple_form
+                  for={@notification_form}
+                  id="notification_form"
+                  data-testid="notification-preferences-ready"
+                  phx-submit="update_notifications"
+                  phx-change="validate_notifications"
+                >
+                  <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-zinc-200">
+                      <thead class="bg-zinc-50">
+                        <tr>
+                          <th
+                            scope="col"
+                            class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          >
+                            Category
+                          </th>
+                          <th
+                            scope="col"
+                            class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          >
+                            Email
+                          </th>
+                          <th
+                            scope="col"
+                            class="px-6 py-3 text-center text-xs font-medium text-zinc-500 uppercase tracking-wider"
+                          >
+                            SMS
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-zinc-200">
+                        <!-- Newsletter Row -->
+                        <tr>
+                          <td class="px-6 py-4">
+                            <div>
+                              <div class="text-sm font-medium text-zinc-900">
+                                Newsletters
+                              </div>
+                              <div class="text-sm text-zinc-500 mt-1">
+                                Receive our newsletter with updates about YSC events, news, and community highlights.
+                              </div>
                             </div>
-                            <div class="text-sm text-zinc-500 mt-1">
-                              Receive our newsletter with updates about YSC events, news, and community highlights.
+                          </td>
+                          <td class="px-6 py-4">
+                            <input
+                              type="hidden"
+                              name={
+                                @notification_form[:newsletter_notifications].name
+                              }
+                              value="false"
+                            />
+                            <.input
+                              field={@notification_form[:newsletter_notifications]}
+                              type="checkbox"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                            />
+                          </td>
+                          <td class="px-6 py-4">
+                            <span class="text-sm text-zinc-400">—</span>
+                          </td>
+                        </tr>
+                        <!-- Event Updates Row -->
+                        <tr>
+                          <td class="px-6 py-4">
+                            <div>
+                              <div class="text-sm font-medium text-zinc-900">
+                                Event Updates
+                              </div>
+                              <div class="text-sm text-zinc-500 mt-1">
+                                Receive notifications when new events are published and reminders before events you're attending.
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td class="px-6 py-4">
-                          <input
-                            type="hidden"
-                            name={
-                              @notification_form[:newsletter_notifications].name
-                            }
-                            value="false"
-                          />
-                          <.input
-                            field={@notification_form[:newsletter_notifications]}
-                            type="checkbox"
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
-                          />
-                        </td>
-                        <td class="px-6 py-4">
-                          <span class="text-sm text-zinc-400">—</span>
-                        </td>
-                      </tr>
-                      <!-- Event Updates Row -->
-                      <tr>
-                        <td class="px-6 py-4">
-                          <div>
-                            <div class="text-sm font-medium text-zinc-900">
-                              Event Updates
+                          </td>
+                          <td class="px-6 py-4">
+                            <input
+                              type="hidden"
+                              name={@notification_form[:event_notifications].name}
+                              value="false"
+                            />
+                            <.input
+                              field={@notification_form[:event_notifications]}
+                              type="checkbox"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                            />
+                          </td>
+                          <td class="px-6 py-4">
+                            <input
+                              type="hidden"
+                              name={
+                                @notification_form[:event_notifications_sms].name
+                              }
+                              value="false"
+                            />
+                            <.input
+                              field={@notification_form[:event_notifications_sms]}
+                              type="checkbox"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                            />
+                          </td>
+                        </tr>
+                        <!-- Account Updates Row -->
+                        <tr>
+                          <td class="px-6 py-4">
+                            <div>
+                              <div class="text-sm font-medium text-zinc-900">
+                                Account Updates
+                              </div>
+                              <div class="text-sm text-zinc-500 mt-1">
+                                Important account-related notifications such as password changes, email confirmations, and security alerts.
+                              </div>
                             </div>
-                            <div class="text-sm text-zinc-500 mt-1">
-                              Receive notifications when new events are published and reminders before events you're attending.
-                            </div>
-                          </div>
-                        </td>
-                        <td class="px-6 py-4">
-                          <input
-                            type="hidden"
-                            name={@notification_form[:event_notifications].name}
-                            value="false"
-                          />
-                          <.input
-                            field={@notification_form[:event_notifications]}
-                            type="checkbox"
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
-                          />
-                        </td>
-                        <td class="px-6 py-4">
-                          <input
-                            type="hidden"
-                            name={@notification_form[:event_notifications_sms].name}
-                            value="false"
-                          />
-                          <.input
-                            field={@notification_form[:event_notifications_sms]}
-                            type="checkbox"
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
-                          />
-                        </td>
-                      </tr>
-                      <!-- Account Updates Row -->
-                      <tr>
-                        <td class="px-6 py-4">
-                          <div>
-                            <div class="text-sm font-medium text-zinc-900">
-                              Account Updates
-                            </div>
-                            <div class="text-sm text-zinc-500 mt-1">
-                              Important account-related notifications such as password changes, email confirmations, and security alerts.
-                            </div>
-                          </div>
-                        </td>
-                        <td class="px-6 py-4">
-                          <input
-                            type="hidden"
-                            name={@notification_form[:account_notifications].name}
-                            value="true"
-                          />
-                          <input
-                            type="checkbox"
-                            id={@notification_form[:account_notifications].id}
-                            name={@notification_form[:account_notifications].name}
-                            value="true"
-                            checked={true}
-                            disabled
-                            class="h-4 w-4 text-zinc-600 focus:ring-blue-500 border-zinc-300 rounded opacity-50 cursor-not-allowed"
-                          />
-                        </td>
-                        <td class="px-6 py-4">
-                          <input
-                            type="hidden"
-                            name={
-                              @notification_form[:account_notifications_sms].name
-                            }
-                            value="false"
-                          />
-                          <.input
-                            field={@notification_form[:account_notifications_sms]}
-                            type="checkbox"
-                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
-                          />
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+                          </td>
+                          <td class="px-6 py-4">
+                            <input
+                              type="hidden"
+                              name={@notification_form[:account_notifications].name}
+                              value="true"
+                            />
+                            <input
+                              type="checkbox"
+                              id={@notification_form[:account_notifications].id}
+                              name={@notification_form[:account_notifications].name}
+                              value="true"
+                              checked={true}
+                              disabled
+                              class="h-4 w-4 text-zinc-600 focus:ring-blue-500 border-zinc-300 rounded opacity-50 cursor-not-allowed"
+                            />
+                          </td>
+                          <td class="px-6 py-4">
+                            <input
+                              type="hidden"
+                              name={
+                                @notification_form[:account_notifications_sms].name
+                              }
+                              value="false"
+                            />
+                            <.input
+                              field={@notification_form[:account_notifications_sms]}
+                              type="checkbox"
+                              class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                            />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
 
-                <:actions>
-                  <.button phx-disable-with="Saving...">Save Preferences</.button>
-                </:actions>
-              </.simple_form>
+                  <:actions>
+                    <.button phx-disable-with="Saving...">Save Preferences</.button>
+                  </:actions>
+                </.simple_form>
+              </div>
             </div>
           </div>
 
@@ -6150,7 +6162,7 @@ defmodule YscWeb.UserSettingsLive do
   end
 
   defp retry_invoice_link_help_message do
-    "This payment link didn't work — it may have expired. Open Manage Membership in your account settings to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
+    "This payment link didn't work — it may have expired. Open Membership in your account menu to update your card and try again, or email #{Ysc.EmailConfig.membership_email()} for help."
   end
 
   defp subscription_items_contain_price?(subscription, price_id) do

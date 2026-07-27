@@ -195,19 +195,61 @@ defmodule YscWeb.UserSessionControllerTest do
   end
 
   describe "GET /users/log-in/auto" do
-    test "auto-logs in user with valid token and redirects to pending review",
-         %{conn: conn} do
-      # Create a pending approval user (like after account setup)
-      user = user_fixture(%{state: :pending_approval})
-
-      # Mark email as verified so user can log in without being redirected to account setup
+    test "renders auto-submit form for valid token without creating a session",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
-
-      # Short-lived one-time token (same as account setup flow)
-      one_time_token =
-        Ysc.Accounts.generate_auto_login_token(user)
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
 
       conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
+
+      assert html_response(conn, 200) =~ ~s(id="token-login-form")
+      refute get_session(conn, :user_token)
+    end
+
+    test "GET form CSRF token is accepted by POST (end-to-end auto-submit flow)",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
+
+      {conn, _csrf} = fetch_conn_csrf(conn)
+
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
+      {conn, form_csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/auto", %{
+          "_csrf_token" => form_csrf,
+          "token" => one_time_token
+        })
+
+      assert redirected_to(conn) == ~p"/"
+      assert get_session(conn, :user_token)
+    end
+
+    test "redirects to login when no token is provided", %{conn: conn} do
+      conn = get(conn, ~p"/users/log-in/auto")
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+    end
+  end
+
+  describe "POST /users/log-in/auto" do
+    test "auto-logs in user with valid token and redirects to pending review",
+         %{conn: conn} do
+      user = user_fixture(%{state: :pending_approval})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
+
+      conn =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => one_time_token
+        })
 
       assert redirected_to(conn) == ~p"/pending-review"
       assert get_session(conn, :user_token)
@@ -217,11 +259,12 @@ defmodule YscWeb.UserSessionControllerTest do
          %{conn: conn} do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
 
-      one_time_token =
-        Ysc.Accounts.generate_auto_login_token(user)
-
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
+      conn =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => one_time_token
+        })
 
       assert redirected_to(conn) == ~p"/"
       assert get_session(conn, :user_token)
@@ -233,17 +276,20 @@ defmodule YscWeb.UserSessionControllerTest do
          } do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
 
-      one_time_token =
-        Ysc.Accounts.generate_auto_login_token(user)
+      conn1 =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => one_time_token
+        })
 
-      conn1 = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
       assert redirected_to(conn1) == ~p"/"
       assert get_session(conn1, :user_token)
 
       conn2 =
-        build_conn()
-        |> get(~p"/users/log-in/auto?#{%{token: one_time_token}}")
+        post_token_login(build_conn(), ~p"/users/log-in/auto", %{
+          "token" => one_time_token
+        })
 
       assert redirected_to(conn2) =~ "/users/log-in"
       assert redirected_to(conn2) =~ "reason=expired_link"
@@ -253,7 +299,10 @@ defmodule YscWeb.UserSessionControllerTest do
          %{
            conn: conn
          } do
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: "invalid_token"}}")
+      conn =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => "invalid_token"
+        })
 
       assert redirected_to(conn) =~ "/users/log-in"
       assert redirected_to(conn) =~ "reason=expired_link"
@@ -261,22 +310,17 @@ defmodule YscWeb.UserSessionControllerTest do
 
     test "redirects to login for inactive accounts", %{conn: conn} do
       user = user_fixture(%{state: :suspended})
+      one_time_token = Ysc.Accounts.generate_auto_login_token(user)
 
-      one_time_token =
-        Ysc.Accounts.generate_auto_login_token(user)
-
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: one_time_token}}")
+      conn =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => one_time_token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
                "Your account is not currently active."
-    end
-
-    test "redirects to login when no token is provided", %{conn: conn} do
-      conn = get(conn, ~p"/users/log-in/auto")
-
-      assert redirected_to(conn) == ~p"/users/log-in"
     end
 
     test "redirects to login when auto-login token is expired", %{conn: conn} do
@@ -286,7 +330,10 @@ defmodule YscWeb.UserSessionControllerTest do
 
       Repo.update_all(UserToken, set: [inserted_at: ~N[2020-01-01 00:00:00]])
 
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+      conn =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => token
+        })
 
       assert redirected_to(conn) =~ "/users/log-in"
       assert redirected_to(conn) =~ "reason=expired_link"
@@ -295,16 +342,13 @@ defmodule YscWeb.UserSessionControllerTest do
     test "redirects to internal path when redirect_to is valid", %{conn: conn} do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
-
-      token =
-        Ysc.Accounts.generate_auto_login_token(user)
+      token = Ysc.Accounts.generate_auto_login_token(user)
 
       conn =
-        get(
-          conn,
-          "/users/log-in/auto?" <>
-            URI.encode_query(%{"token" => token, "redirect_to" => "/events"})
-        )
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => token,
+          "redirect_to" => "/events"
+        })
 
       assert redirected_to(conn) == "/events"
       assert get_session(conn, :user_token)
@@ -312,12 +356,12 @@ defmodule YscWeb.UserSessionControllerTest do
   end
 
   describe "GET /users/log-in/passkey" do
-    test "logs in with valid passkey token for active verified user", %{
-      conn: conn
-    } do
+    test "renders auto-submit form for valid token without creating a session",
+         %{
+           conn: conn
+         } do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
-
       token = Ysc.Accounts.generate_passkey_login_token(user)
 
       conn =
@@ -326,61 +370,37 @@ defmodule YscWeb.UserSessionControllerTest do
           "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
         )
 
-      assert get_session(conn, :user_token)
+      assert html_response(conn, 200) =~ ~s(id="token-login-form")
+      refute get_session(conn, :user_token)
+    end
+
+    test "GET form CSRF token is accepted by POST (end-to-end auto-submit flow)",
+         %{
+           conn: conn
+         } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
+
+      # Simulate an existing browser session (e.g. user was already browsing the site)
+      {conn, _csrf} = fetch_conn_csrf(conn)
+
+      conn =
+        get(
+          conn,
+          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
+        )
+
+      {conn, form_csrf} = fetch_conn_csrf_from_html(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/passkey", %{
+          "_csrf_token" => form_csrf,
+          "token" => token
+        })
+
       assert redirected_to(conn) == ~p"/"
-    end
-
-    test "redirects with internal path when valid redirect_to is provided", %{
-      conn: conn
-    } do
-      user = user_fixture(%{state: :active})
-      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
-
-      token = Ysc.Accounts.generate_passkey_login_token(user)
-
-      conn =
-        get(
-          conn,
-          "/users/log-in/passkey?" <>
-            URI.encode_query(%{"token" => token, "redirect_to" => "/contact"})
-        )
-
-      assert redirected_to(conn) == "/contact"
       assert get_session(conn, :user_token)
-    end
-
-    test "rejects a token not present in the DB (e.g. forged Phoenix.Token)", %{
-      conn: conn
-    } do
-      # The controller now requires a DB-backed one-time token; any token that was
-      # never inserted (including a valid-looking Phoenix.Token) must be rejected.
-      token =
-        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", "some_user_id")
-
-      conn =
-        get(
-          conn,
-          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
-        )
-
-      assert redirected_to(conn) == ~p"/users/log-in"
-
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid or expired login link. Please sign in again."
-    end
-
-    test "redirects to login when token verification fails", %{conn: conn} do
-      conn =
-        get(
-          conn,
-          "/users/log-in/passkey?" <>
-            URI.encode_query(%{"token" => "not-a-valid-token"})
-        )
-
-      assert redirected_to(conn) == ~p"/users/log-in"
-
-      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
-               "Invalid or expired login link. Please sign in again."
     end
 
     test "redirects to login when params are missing token", %{conn: conn} do
@@ -391,18 +411,94 @@ defmodule YscWeb.UserSessionControllerTest do
       assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
                "Invalid login request."
     end
+  end
+
+  describe "POST /users/log-in/passkey" do
+    test "logs in with valid passkey token for active verified user", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
+
+      conn =
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
+
+      assert get_session(conn, :user_token)
+      assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects with internal path when valid redirect_to is provided", %{
+      conn: conn
+    } do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Ysc.Accounts.mark_email_verified(user)
+      token = Ysc.Accounts.generate_passkey_login_token(user)
+
+      conn =
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token,
+          "redirect_to" => "/contact"
+        })
+
+      assert redirected_to(conn) == "/contact"
+      assert get_session(conn, :user_token)
+    end
+
+    test "rejects a token not present in the DB (e.g. forged Phoenix.Token)", %{
+      conn: conn
+    } do
+      token =
+        Phoenix.Token.sign(YscWeb.Endpoint, "passkey_login", "some_user_id")
+
+      conn =
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid or expired login link. Please sign in again."
+    end
+
+    test "redirects to login when token verification fails", %{conn: conn} do
+      conn =
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => "not-a-valid-token"
+        })
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid or expired login link. Please sign in again."
+    end
+
+    test "redirects to login when params are missing token", %{conn: conn} do
+      {conn, csrf} = fetch_conn_csrf(conn)
+
+      conn =
+        post(conn, ~p"/users/log-in/passkey", %{
+          "_csrf_token" => csrf
+        })
+
+      assert redirected_to(conn) == ~p"/users/log-in"
+
+      assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+               "Invalid login request."
+    end
 
     test "rejects passkey login for inactive accounts", %{conn: conn} do
       user = user_fixture(%{state: :suspended})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
-
       token = Ysc.Accounts.generate_passkey_login_token(user)
 
       conn =
-        get(
-          conn,
-          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
-        )
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 
@@ -416,15 +512,12 @@ defmodule YscWeb.UserSessionControllerTest do
       user = user_fixture(%{state: :active})
       {:ok, user} = Ysc.Accounts.mark_email_verified(user)
       token = Ysc.Accounts.generate_passkey_login_token(user)
-
-      # Delete the user — cascade removes all their tokens
       Ysc.Repo.delete!(user)
 
       conn =
-        get(
-          conn,
-          "/users/log-in/passkey?" <> URI.encode_query(%{"token" => token})
-        )
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
 
       assert redirected_to(conn) == ~p"/users/log-in"
 

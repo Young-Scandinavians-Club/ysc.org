@@ -1076,15 +1076,32 @@ defmodule YscWeb.HomeLive do
       :if={@current_user != nil}
       class="flex-1 w-full bg-zinc-50/50 min-h-screen"
     >
-      <%!-- Passkey Setup Prompt Banner --%>
+      <%!-- Passkey Setup Prompt Banner.
+           When just_logged_in, reserve banner height during async load so showing
+           the real prompt does not shift the dashboard (CLS). --%>
+      <div
+        :if={@just_logged_in && !@async_data_loaded}
+        id="passkey-prompt-banner-placeholder"
+        class="bg-blue-50/60 border-b border-blue-100 min-h-[4.75rem] sm:min-h-[5.25rem]"
+        aria-hidden="true"
+      >
+        <div class="max-w-screen-xl mx-auto px-4 py-3 sm:py-3.5 animate-pulse">
+          <div class="flex items-center gap-4">
+            <div class="hidden sm:block h-10 w-10 rounded-full bg-blue-100"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-4 w-48 bg-blue-100 rounded"></div>
+              <div class="h-3 w-72 max-w-full bg-blue-100/80 rounded"></div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div
         :if={@show_passkey_prompt}
         id="passkey-prompt-banner"
-        class="bg-blue-50 border-b border-blue-100 shadow-sm"
+        class="bg-blue-50 border-b border-blue-100 shadow-sm min-h-[4.75rem] sm:min-h-[5.25rem]"
         phx-mounted={
           JS.transition(
-            {"transition ease-out duration-300", "opacity-0 -translate-y-1",
-             "opacity-100 translate-y-0"}
+            {"transition ease-out duration-300", "opacity-0", "opacity-100"}
           )
         }
         phx-remove={
@@ -1253,24 +1270,26 @@ defmodule YscWeb.HomeLive do
                   </.link>
                 </div>
 
-                <%!-- Loading skeleton for bookings --%>
+                <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
                 <div
                   :if={!@async_data_loaded}
-                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 animate-pulse"
+                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center min-h-[17.5rem] animate-pulse"
                 >
-                  <div class="flex gap-4">
-                    <div class="w-24 h-20 bg-zinc-200 rounded"></div>
-                    <div class="flex-1 space-y-3">
-                      <div class="h-4 bg-zinc-200 rounded w-1/3"></div>
-                      <div class="h-3 bg-zinc-200 rounded w-1/2"></div>
-                      <div class="h-3 bg-zinc-200 rounded w-1/4"></div>
+                  <div class="w-14 h-14 bg-zinc-200 rounded-full mx-auto mb-4">
+                  </div>
+                  <div class="h-4 bg-zinc-200 rounded w-48 mx-auto mb-2"></div>
+                  <div class="h-3 bg-zinc-200 rounded w-56 mx-auto mb-6"></div>
+                  <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <div class="h-10 w-36 bg-zinc-200 rounded mx-auto sm:mx-0">
+                    </div>
+                    <div class="h-10 w-36 bg-zinc-200 rounded mx-auto sm:mx-0">
                     </div>
                   </div>
                 </div>
 
                 <div
                   :if={@async_data_loaded && Enum.empty?(@future_bookings)}
-                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
+                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center min-h-[17.5rem]"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-home" class="w-7 h-7 text-zinc-400" />
@@ -1402,25 +1421,22 @@ defmodule YscWeb.HomeLive do
                   </.link>
                 </div>
 
-                <%!-- Loading skeleton for tickets --%>
+                <%!-- Loading skeleton sized to match empty-state card (avoids CLS) --%>
                 <div
                   :if={!@async_data_loaded}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-6"
+                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center min-h-[16rem] animate-pulse"
                 >
-                  <div class="bg-white/50 border-2 border-dashed border-zinc-200 rounded-xl p-8 animate-pulse">
-                    <div class="flex justify-between items-start mb-4">
-                      <div class="w-16 h-5 bg-zinc-200 rounded"></div>
-                      <div class="w-8 h-8 bg-zinc-200 rounded"></div>
-                    </div>
-                    <div class="h-5 bg-zinc-200 rounded w-3/4 mb-2"></div>
-                    <div class="h-3 bg-zinc-200 rounded w-1/2 mb-4"></div>
-                    <div class="h-3 bg-zinc-200 rounded w-2/3"></div>
+                  <div class="w-14 h-14 bg-zinc-200 rounded-full mx-auto mb-4">
                   </div>
+                  <div class="h-4 bg-zinc-200 rounded w-56 mx-auto mb-2"></div>
+                  <div class="h-3 bg-zinc-200 rounded w-64 max-w-full mx-auto mb-6">
+                  </div>
+                  <div class="h-10 w-36 bg-zinc-200 rounded mx-auto"></div>
                 </div>
 
                 <div
                   :if={@async_data_loaded && Enum.empty?(@upcoming_tickets)}
-                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center"
+                  class="bg-white border-2 border-dashed border-zinc-200 rounded-xl shadow-sm p-12 text-center min-h-[16rem]"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-calendar-days" class="w-7 h-7 text-zinc-400" />
@@ -1551,12 +1567,12 @@ defmodule YscWeb.HomeLive do
                   </.link>
                 </div>
 
-                <%!-- Loading skeleton for events --%>
+                <%!-- Loading skeleton: two cards (~one grid row) balances empty vs loaded CLS --%>
                 <div
                   :if={!@async_data_loaded}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-8"
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-[22rem]"
                 >
-                  <%= for _i <- 1..4 do %>
+                  <%= for _i <- 1..2 do %>
                     <div class="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden animate-pulse">
                       <div class="h-48 bg-zinc-200"></div>
                       <div class="p-6 space-y-3">
@@ -1570,7 +1586,7 @@ defmodule YscWeb.HomeLive do
 
                 <div
                   :if={@async_data_loaded && Enum.empty?(@upcoming_events)}
-                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center"
+                  class="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center min-h-[22rem] flex flex-col items-center justify-center"
                 >
                   <div class="w-14 h-14 bg-zinc-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <.icon name="hero-calendar" class="w-7 h-7 text-zinc-400" />
@@ -1588,7 +1604,7 @@ defmodule YscWeb.HomeLive do
 
                 <div
                   :if={@async_data_loaded && !Enum.empty?(@upcoming_events)}
-                  class="grid grid-cols-1 md:grid-cols-2 gap-8"
+                  class="grid grid-cols-1 md:grid-cols-2 gap-8 min-h-[22rem]"
                 >
                   <%= for event <- @upcoming_events do %>
                     <.event_card
@@ -1874,7 +1890,7 @@ defmodule YscWeb.HomeLive do
                 <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
                   Your Family
                 </h2>
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
+                <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3 min-h-[7.5rem]">
                   <%= for member <- @other_family_members do %>
                     <div class="flex items-center justify-between text-sm">
                       <span class="text-zinc-900 font-medium">

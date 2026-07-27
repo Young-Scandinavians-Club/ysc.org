@@ -1216,7 +1216,7 @@ defmodule YscWeb.CoreComponents do
     ~H"""
     <p class="field-error flex gap-3 mt-3 text-sm leading-6 text-rose-600">
       <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
-      {render_slot(@inner_block)}
+      <span class="min-w-0">{render_slot(@inner_block)}</span>
     </p>
     """
   end
@@ -3220,7 +3220,12 @@ defmodule YscWeb.CoreComponents do
 
   def payment_method_row_skeleton(assigns) do
     ~H"""
-    <div id={@id} class={@class} role="status" aria-live="polite">
+    <div
+      id={@id}
+      class={[@class, "min-h-[4.5rem]"]}
+      role="status"
+      aria-live="polite"
+    >
       <span class="sr-only">Loading payment methods…</span>
       <div class="flex items-center gap-3">
         <.skeleton_block class="h-8 w-12 rounded" />

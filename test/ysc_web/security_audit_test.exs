@@ -24,6 +24,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 24 (MEDIUM)   Ticket payment intents did not bind metadata to order/user
   Finding 25 (MEDIUM)   User settings verification lacks attempt rate limits; phone change lacks step-up reauth
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
+  Finding 27 (MEDIUM)   GET auto-login/passkey endpoints allowed login CSRF (session fixation to attacker account)
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -118,13 +119,21 @@ defmodule YscWeb.SecurityAuditTest do
   describe "Finding 5: AccountSetupLive redirects when user has no pending setup" do
     test "active user who has completed all setup steps is redirected away from account setup",
          %{conn: conn} do
-      # Create an active user and drive them through all the setup completion functions.
-      # can_access = false requires: email_verified AND password_set AND
-      # phone_verified AND state != :pending_approval (no payment method needed).
+      # Fully set up: email/password/phone verified, and an active membership
+      # (unpaid actives are intentionally kept in the pay funnel).
       user = user_fixture(%{state: :active})
       {:ok, user} = Accounts.mark_email_verified(user)
       {:ok, user} = Accounts.mark_password_set(user)
       {:ok, user} = Accounts.mark_phone_verified(user)
+
+      {:ok, _sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          name: "Test Membership",
+          stripe_id: "sub_audit_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
 
       conn = log_in_user(conn, user)
 
@@ -326,10 +335,11 @@ defmodule YscWeb.SecurityAuditTest do
     } do
       token = Accounts.generate_passkey_login_token(user)
 
-      # Hit the passkey login redirect endpoint with the one-time token
-      conn = get(conn, ~p"/users/log-in/passkey?#{%{token: token}}")
+      conn =
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
 
-      # After consuming the token a real session should be established
       assert get_session(conn, :user_token) != nil,
              "Expected a session to be created after passkey login"
     end
@@ -340,13 +350,18 @@ defmodule YscWeb.SecurityAuditTest do
     } do
       token = Accounts.generate_passkey_login_token(user)
 
-      # First consumption establishes a session
-      conn1 = get(build_conn(), ~p"/users/log-in/passkey?#{%{token: token}}")
+      conn1 =
+        post_token_login(build_conn(), ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
+
       assert get_session(conn1, :user_token) != nil
 
-      # Second request with the same token must be rejected
-      conn2 = get(conn, ~p"/users/log-in/passkey?#{%{token: token}}")
-      # Should redirect to login page, not create a session
+      conn2 =
+        post_token_login(conn, ~p"/users/log-in/passkey", %{
+          "token" => token
+        })
+
       assert get_session(conn2, :user_token) == nil or
                redirected_to(conn2) == ~p"/users/log-in"
     end
@@ -1824,7 +1839,10 @@ defmodule YscWeb.SecurityAuditTest do
     } do
       token = Accounts.generate_auto_login_token(user)
 
-      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+      conn =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => token
+        })
 
       assert get_session(conn, :user_token) != nil,
              "Expected a session to be created after auto-login"
@@ -1836,12 +1854,84 @@ defmodule YscWeb.SecurityAuditTest do
     } do
       token = Accounts.generate_auto_login_token(user)
 
-      conn1 = get(build_conn(), ~p"/users/log-in/auto?#{%{token: token}}")
+      conn1 =
+        post_token_login(build_conn(), ~p"/users/log-in/auto", %{
+          "token" => token
+        })
+
       assert get_session(conn1, :user_token) != nil
 
-      conn2 = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+      conn2 =
+        post_token_login(conn, ~p"/users/log-in/auto", %{
+          "token" => token
+        })
+
       assert redirected_to(conn2) =~ "/users/log-in"
       assert redirected_to(conn2) =~ "reason=expired_link"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Finding 27 (MEDIUM): GET token-login must not establish a session (login CSRF)
+  # ---------------------------------------------------------------------------
+
+  describe "Finding 27: token login requires POST with CSRF" do
+    setup do
+      user = user_fixture(%{state: :active})
+      {:ok, user} = Accounts.mark_email_verified(user)
+      %{user: user}
+    end
+
+    test "GET auto-login with valid token renders form but does not log in", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_auto_login_token(user)
+
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+
+      assert html_response(conn, 200) =~ ~s(id="token-login-form")
+      refute get_session(conn, :user_token)
+    end
+
+    test "GET passkey login with valid token renders form but does not log in",
+         %{
+           conn: conn,
+           user: user
+         } do
+      token = Accounts.generate_passkey_login_token(user)
+
+      conn = get(conn, ~p"/users/log-in/passkey?#{%{token: token}}")
+
+      assert html_response(conn, 200) =~ ~s(id="token-login-form")
+      refute get_session(conn, :user_token)
+    end
+
+    test "GET auto-login cannot switch an authenticated victim into the attacker account",
+         %{conn: conn, user: attacker} do
+      victim = user_fixture(%{state: :active})
+      {:ok, victim} = Accounts.mark_email_verified(victim)
+      victim_conn = log_in_user(conn, victim)
+      victim_token = get_session(victim_conn, :user_token)
+      attacker_token = Accounts.generate_auto_login_token(attacker)
+
+      conn =
+        get(victim_conn, ~p"/users/log-in/auto?#{%{token: attacker_token}}")
+
+      assert get_session(conn, :user_token) == victim_token
+    end
+
+    test "GET auto-login form includes CSRF token for POST redemption", %{
+      conn: conn,
+      user: user
+    } do
+      token = Accounts.generate_auto_login_token(user)
+
+      conn = get(conn, ~p"/users/log-in/auto?#{%{token: token}}")
+      html = html_response(conn, 200)
+
+      assert html =~ ~s(name="_csrf_token")
+      assert html =~ ~s(name="csrf-token")
     end
   end
 

@@ -398,6 +398,27 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute article_html =~ "<script"
       refute article_html =~ "onerror="
     end
+
+    test "opens details body links in a new tab", %{conn: conn} do
+      event =
+        event_with_state(:upcoming,
+          with_image: true,
+          attrs: %{title: "Details Links New Tab"}
+        )
+
+      {:ok, event} =
+        Ysc.Events.update_event(event, %{
+          rendered_details:
+            ~s|<p>See <a href="https://example.com/info">info</a></p>|
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               "#article-body a[href='https://example.com/info'][target='_blank'][rel='noopener noreferrer']"
+             )
+    end
   end
 
   describe "unauthenticated user interactions" do
@@ -514,7 +535,7 @@ defmodule YscWeb.EventDetailsLiveTest do
       render_async(view)
 
       assert html =~ "Your membership has expired"
-      assert html =~ "open Manage Membership in your account menu to renew"
+      assert html =~ "open Membership in your account menu to renew"
       refute html =~ "pay dues or activate your membership"
       refute has_element?(view, "button", "Get Tickets")
     end

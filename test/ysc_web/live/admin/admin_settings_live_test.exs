@@ -2,13 +2,23 @@ defmodule YscWeb.AdminSettingsLiveTest do
   @moduledoc """
   Admin settings LiveView tests.
 
-  Runs with `async: false` because the settings form uses `temporary_assigns` and
-  connected-mount timing can otherwise submit before settings fields are in the DOM.
+  Runs with `async: false` because connected-mount async loading and Oban PubSub
+  can race with assertions when the full suite runs under CI load.
   """
   use YscWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+
+  @settings_async_timeout 5_000
+
+  defp render_loaded_settings(view) do
+    html = render_async(view, @settings_async_timeout)
+    refute html =~ ~s|id="admin-settings-loading"|
+    assert html =~ "Save"
+    assert html =~ ~s|name="settings|
+    html
+  end
 
   defp create_admin(%{conn: conn}) do
     user = user_fixture(%{role: "admin"})
@@ -27,7 +37,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
 
     test "shows connect when not connected", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
-      render_async(view)
+      render_loaded_settings(view)
       assert has_element?(view, "#google-photos-connect")
       refute has_element?(view, "#google-photos-disconnect")
     end
@@ -45,7 +55,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
       )
 
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
-      render_async(view)
+      render_loaded_settings(view)
 
       assert has_element?(view, "#google-photos-disconnect")
       assert has_element?(view, "#google-photos-test-connection")
@@ -69,7 +79,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
       )
 
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
-      html = render_async(view)
+      html = render_loaded_settings(view)
 
       assert html =~ "Missing upload, read, or edit permissions"
       assert html =~ "Disconnect and connect again"
@@ -77,14 +87,7 @@ defmodule YscWeb.AdminSettingsLiveTest do
 
     test "updates settings", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/settings")
-
-      # Drain connected mount work before submitting. temporary_assigns clears
-      # form/scopes after the dead render, so an immediate submit can post %{} and
-      # raise FunctionClauseError in handle_event/3 under CI load.
-      html = render_async(view)
-      assert html =~ "Save"
-      assert has_element?(view, "#admin-settings-form")
-      assert has_element?(view, "input[name^='settings']")
+      render_loaded_settings(view)
 
       view
       |> form("#admin-settings-form", %{settings: %{}})
