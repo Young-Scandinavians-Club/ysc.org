@@ -406,8 +406,8 @@ defmodule YscWeb.UserTicketsLive do
            YscWeb.Flash.put_toast(
              socket,
              :error,
-             "This ticket order has expired or was already completed. Browse events to buy tickets again. If you see a charge on your card, email info@ysc.org with the date and amount.",
-             title: "Order"
+             "This ticket purchase has expired or was already completed. Browse events to buy tickets again. If you see a charge on your card, email info@ysc.org with the date and amount.",
+             title: "Tickets"
            )}
         end
     end
@@ -505,7 +505,8 @@ defmodule YscWeb.UserTicketsLive do
   defp format_visited_date(_), do: "Visited"
 
   defp cancel_order_error_message(:not_found),
-    do: "We couldn't find this order. It may have already been cancelled."
+    do:
+      "We couldn't find this ticket purchase. It may have already been cancelled."
 
   defp cancel_order_error_message(:checkout_payment_in_progress),
     do:
@@ -513,5 +514,5 @@ defmodule YscWeb.UserTicketsLive do
 
   defp cancel_order_error_message(_reason),
     do:
-      "We couldn't cancel this order. Please try again, or contact info@ysc.org for help."
+      "We couldn't cancel these tickets. Please try again, or contact info@ysc.org for help."
 end

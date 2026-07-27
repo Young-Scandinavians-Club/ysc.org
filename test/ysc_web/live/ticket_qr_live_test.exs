@@ -175,6 +175,9 @@ defmodule YscWeb.TicketQrLiveTest do
       render_async(view)
 
       assert has_element?(view, "#confirmation-link")
+      html = render(view)
+      assert html =~ "Reference"
+      assert html =~ "View ticket details"
     end
 
     test "shows navigation controls when order has multiple tickets", %{

@@ -2115,7 +2115,7 @@ defmodule YscWeb.UserSettingsLive do
                 <div class="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
                     <h2 class="text-lg font-bold text-zinc-900">
-                      Unfinished ticket orders
+                      Tickets waiting for payment
                     </h2>
                     <p class="text-sm text-zinc-500 mt-1 max-w-xl">
                       You started buying event tickets but didn't finish payment. Your selections and member price are still saved. Finish checkout before the time shown on each item — or as soon as you can if no time is listed.
@@ -2141,7 +2141,9 @@ defmodule YscWeb.UserSettingsLive do
                         Payment not finished
                       </span>
                       <span class="text-xs font-medium text-zinc-500 mt-1 tabular-nums">
-                        Qty {res.quantity}
+                        {if res.quantity == 1,
+                          do: "1 ticket",
+                          else: "#{res.quantity} tickets"}
                       </span>
                     </div>
                     <div class="mb-4 flex-grow">
@@ -3629,7 +3631,7 @@ defmodule YscWeb.UserSettingsLive do
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "You're on a family membership and can't purchase a separate plan. Ask the main member on the account to make membership changes.",
+           "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
            title: "Membership"
          )}
       else
@@ -3704,7 +3706,7 @@ defmodule YscWeb.UserSettingsLive do
              YscWeb.Flash.put_toast(
                socket,
                :error,
-               "You're on a family membership and can't purchase a separate plan. Ask the main member on the account to make membership changes.",
+               "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
                title: "Membership"
              )}
 
@@ -5634,8 +5636,8 @@ defmodule YscWeb.UserSettingsLive do
 
     <%= if @payment_info.type == :ticket && @payment_info.ticket_order && @payment_info.ticket_order.status == :cancelled do %>
       <div class="mb-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-        <strong>Order Cancelled:</strong>
-        This ticket order has been cancelled. {if @payment_info.payment do
+        <strong>Tickets cancelled:</strong>
+        These tickets have been cancelled. {if @payment_info.payment do
           if @payment_info.refund_data && @payment_info.refund_data.total_refunded do
             " A refund of #{Ysc.MoneyHelper.format_money!(@payment_info.refund_data.total_refunded)} has been processed."
           else
@@ -5687,7 +5689,7 @@ defmodule YscWeb.UserSettingsLive do
     do: "View booking receipt"
 
   defp payment_row_navigate_aria_label(%{type: :ticket}, %JS{}),
-    do: "View ticket order confirmation"
+    do: "View ticket confirmation"
 
   defp payment_row_navigate_aria_label(_, _), do: nil
 

@@ -300,14 +300,14 @@ defmodule YscWeb.TicketQrLive do
             <div class="mt-8 text-center px-4">
               <%= if @order_id do %>
                 <p class="text-sm text-zinc-300">
-                  Order&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
+                  Reference&nbsp;<span class="font-mono font-semibold text-white">{@order_reference}</span>
                 </p>
                 <.link
                   id="confirmation-link"
                   navigate={~p"/orders/#{@order_id}/confirmation"}
                   class="mt-2 inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
                 >
-                  View full order details
+                  View ticket details
                   <.icon name="hero-arrow-right" class="w-4 h-4" />
                 </.link>
               <% else %>
@@ -316,7 +316,7 @@ defmodule YscWeb.TicketQrLive do
                   navigate={~p"/users/tickets"}
                   class="inline-flex items-center gap-1.5 text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition-colors"
                 >
-                  View all ticket orders
+                  View all your tickets
                   <.icon name="hero-arrow-right" class="w-4 h-4" />
                 </.link>
               <% end %>
