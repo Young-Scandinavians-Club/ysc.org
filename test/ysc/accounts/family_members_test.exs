@@ -218,6 +218,25 @@ defmodule Ysc.Accounts.FamilyMembersTest do
       end)
     end
 
+    test "treats an already-deleted member as a successful deletion" do
+      user = user_fixture()
+
+      {:ok, member} =
+        FamilyMembers.upsert_family_member(user, %{
+          "first_name" => "Already",
+          "last_name" => "Gone",
+          "relationship" => "child"
+        })
+
+      Repo.delete!(member)
+
+      assert {:ok, %FamilyMember{id: deleted_id}} =
+               FamilyMembers.delete_family_member(user, member)
+
+      assert deleted_id == member.id
+      refute Repo.get(FamilyMember, member.id)
+    end
+
     test "returns unauthorized when member belongs to another user" do
       with_process_caches(fn ->
         owner = user_fixture()
@@ -276,6 +295,25 @@ defmodule Ysc.Accounts.FamilyMembersTest do
       user = Repo.preload(user, :family_members, force: true)
       assert Enum.map(user.family_members, & &1.id) == [kept.id]
       refute Enum.any?(user.family_members, &(&1.id == removed.id))
+    end
+
+    test "ignores members deleted after the user's association was loaded" do
+      user = user_fixture()
+
+      removed =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "Concurrently",
+          last_name: "Removed",
+          type: :child
+        })
+        |> Ecto.Changeset.put_change(:user_id, user.id)
+        |> Repo.insert!()
+
+      user = Repo.preload(user, :family_members)
+      Repo.delete!(removed)
+
+      assert :ok = FamilyMembers.delete_removed_members(user, MapSet.new())
     end
   end
 end
