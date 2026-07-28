@@ -56,6 +56,27 @@ defmodule Ysc.PostsTest do
       posts = Posts.list_posts_by_ids([post_b.id, post_a.id])
       assert Enum.map(posts, & &1.id) == [post_b.id, post_a.id]
     end
+
+    test "preserves duplicate ids and skips nil or invalid ids", %{
+      author: author
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{"title" => "Dup", "body" => "Body", "url_name" => "post-dup"},
+          author
+        )
+
+      posts =
+        Posts.list_posts_by_ids([
+          post.id,
+          nil,
+          "images.php",
+          post.id,
+          "invalid-id"
+        ])
+
+      assert Enum.map(posts, & &1.id) == [post.id, post.id]
+    end
   end
 
   describe "get_post/2" do
@@ -90,6 +111,10 @@ defmodule Ysc.PostsTest do
     test "returns nil for non-existent post" do
       assert Posts.get_post(Ecto.ULID.generate()) == nil
     end
+
+    test "returns nil for invalid ULID values" do
+      assert Posts.get_post("images.php") == nil
+    end
   end
 
   describe "get_post!/1" do
@@ -107,6 +132,12 @@ defmodule Ysc.PostsTest do
     test "raises for non-existent post" do
       assert_raise Ecto.NoResultsError, fn ->
         Posts.get_post!(Ecto.ULID.generate())
+      end
+    end
+
+    test "raises NoResultsError for invalid ULID format" do
+      assert_raise Ecto.NoResultsError, fn ->
+        Posts.get_post!("images.php")
       end
     end
   end
@@ -179,6 +210,21 @@ defmodule Ysc.PostsTest do
 
       refute to_string(post.id) == ulid_slug
       assert Posts.get_post_by_id_or_url_name(ulid_slug).id == post.id
+    end
+
+    test "returns post by non-ULID url_name without raising", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "images.php-slug-#{System.unique_integer()}"
+          },
+          author
+        )
+
+      assert Posts.get_post_by_id_or_url_name(post.url_name).id == post.id
+      assert Posts.get_post_by_id_or_url_name("images.php") == nil
     end
   end
 
@@ -1010,6 +1056,23 @@ defmodule Ysc.PostsTest do
       assert Posts.get_public_post(draft.id) == nil
       assert %Post{id: id} = Posts.get_public_post(published.id)
       assert id == published.id
+    end
+
+    test "get_public_post/2 returns nil for invalid ULID values" do
+      assert Posts.get_public_post("images.php") == nil
+      assert Posts.get_public_post("invalid-id") == nil
+    end
+
+    test "get_post_for_page/3 returns nil for invalid ULID values" do
+      admin = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      assert Posts.get_post_for_page("images.php", nil) == nil
+      assert Posts.get_post_for_page("invalid-id", nil) == nil
+      assert Posts.get_post_for_page("images.php", admin) == nil
+      assert Posts.get_post_for_page("invalid-id", admin) == nil
+      assert Posts.get_post_for_page("images.php", volunteer) == nil
+      assert Posts.get_post_for_page("invalid-id", volunteer) == nil
     end
 
     test "get_post_for_page/3 hides drafts from members but allows staff preview",

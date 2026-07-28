@@ -2025,7 +2025,7 @@ defmodule YscWeb.AdminBookingsLive do
               <% end %>
             </div>
             <!-- Scrollable Right Area: Date Columns -->
-            <div class="flex-1 overflow-x-auto calendar-scroll-area">
+            <div class="flex-1 overflow-x-scroll calendar-scroll-area">
               <!-- Header: Date columns -->
               <div>
                 <div

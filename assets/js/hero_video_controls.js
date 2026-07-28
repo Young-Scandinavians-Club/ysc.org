@@ -21,7 +21,7 @@ export default {
 
         this.toggle = () => {
             if (this.video.paused) {
-                this.video.play().catch(() => {});
+                Promise.resolve(this.video.play()).catch(() => {});
             } else {
                 this.video.pause();
             }
@@ -33,9 +33,10 @@ export default {
         this.video.addEventListener("pause", this.updateButtonState);
 
         // Suppress unhandled rejections from autoplay being interrupted by the browser
-        // (e.g. power-saving policies, tab backgrounded during LiveView navigation)
+        // (e.g. power-saving policies, tab backgrounded during LiveView navigation).
+        // Promise.resolve handles browsers where play() returns undefined instead of a Promise.
         if (this.video.paused) {
-            this.video.play().catch(() => {});
+            Promise.resolve(this.video.play()).catch(() => {});
         }
 
         this.updateButtonState();
