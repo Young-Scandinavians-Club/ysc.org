@@ -25,6 +25,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 25 (MEDIUM)   User settings verification lacks attempt rate limits; phone change lacks step-up reauth
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
   Finding 27 (MEDIUM)   GET auto-login/passkey endpoints allowed login CSRF (session fixation to attacker account)
+  Finding 28 (CRITICAL) Account setup auto-activation charged saved cards without owner session
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -41,6 +42,7 @@ defmodule YscWeb.SecurityAuditTest do
 
   alias Ysc.Accounts
   alias Ysc.Accounts.MembershipCache
+  alias Ysc.Payments
   alias Ysc.Tickets
   alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
   alias Ysc.Subscriptions
@@ -960,6 +962,83 @@ defmodule YscWeb.SecurityAuditTest do
 
       assert {:ok, _code} =
                Ysc.VerificationCache.get_code(user.id, :email_verification)
+    end
+  end
+
+  describe "Finding 28: Account setup auto-activation requires owner session" do
+    defp unpaid_active_user_with_payment_method do
+      user =
+        user_fixture(%{
+          state: :active,
+          phone_number: "+12065551234"
+        })
+
+      {:ok, user} = Accounts.mark_email_verified(user)
+      {:ok, user} = Accounts.mark_phone_verified(user)
+      {:ok, user} = Accounts.mark_password_set(user)
+
+      user =
+        user
+        |> User.update_user_changeset(%{
+          stripe_id: "cus_sec_#{System.unique_integer([:positive])}"
+        })
+        |> Repo.update!()
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_sec_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      user
+    end
+
+    test "unauthenticated mount does not create a Stripe subscription", %{
+      conn: conn
+    } do
+      user = unpaid_active_user_with_payment_method()
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+        flunk("unauthenticated mount should not create a Stripe subscription")
+      end)
+
+      assert {:ok, _view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      count =
+        Repo.aggregate(
+          from(s in Subscriptions.Subscription, where: s.user_id == ^user.id),
+          :count
+        )
+
+      assert count == 0
+      assert is_nil(MembershipCache.get_active_membership(user))
+    end
+
+    test "unauthenticated step navigation does not create a Stripe subscription",
+         %{
+           conn: conn
+         } do
+      user = unpaid_active_user_with_payment_method()
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+        flunk("unauthenticated mount should not create a Stripe subscription")
+      end)
+
+      assert {:ok, _view, _html} =
+               live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      count =
+        Repo.aggregate(
+          from(s in Subscriptions.Subscription, where: s.user_id == ^user.id),
+          :count
+        )
+
+      assert count == 0
     end
   end
 
