@@ -17,7 +17,7 @@ defmodule Ysc.MixProject do
         plt_add_apps: [:mix, :credo, :stripity_stripe, :duckdbex],
         list_unused_filters: true
       ],
-      # cowlib 2.18.0 has open EEF advisories; no patched Hex release yet. Revisit by 2026-07-22.
+      # cowlib still has open EEF advisories with no patched Hex release. Revisit by 2026-08-28.
       # Requires Hex >= 2.5.1-dev for ignore_advisories (see etc/scripts/install_hex.sh).
       hex: [
         ignore_advisories: [
@@ -192,11 +192,10 @@ defmodule Ysc.MixProject do
       {:cachex, "~> 4.1"},
       {:chromic_pdf, "~> 1.17"},
       {:cloak_ecto, "~> 1.3"},
-      # Official Hex cowlib 2.18.0 (cowboy 2.17 needs stream_identity/no_trailers API).
-      # EEF-CVE-2026-43969/43966: no patched release yet — ignored until 2026-07-22 (see mix.exs hex config).
-      {:cowlib, "~> 2.18.0", override: true},
-      # cowboy 2.18 requires cowlib >= 2.19; keep 2.17 while cowlib stays pinned at 2.18.0.
-      {:cowboy, "~> 2.17.0", override: true},
+      # Official Hex cowlib 2.19.0 (cowboy 2.18 needs >= 2.19; fixes EEF-CVE-2026-59248).
+      # EEF-CVE-2026-43969/43966: still unpatched — ignored until 2026-08-28 (see mix.exs hex config).
+      {:cowboy, "~> 2.18", override: true},
+      {:cowlib, "~> 2.19", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
