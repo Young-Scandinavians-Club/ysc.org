@@ -8,7 +8,7 @@ defmodule Ysc.PromEx do
   - Ecto (database queries)
   - BEAM VM (memory, processes, etc.)
   - Oban (background jobs)
-  - Custom application metrics (tickets, bookings, booking config caches, payments, ledger)
+  - Custom application metrics (tickets, bookings, booking config caches, payments, ledger, email)
   """
 
   use PromEx, otp_app: :ysc
@@ -29,7 +29,9 @@ defmodule Ysc.PromEx do
       # BEAM VM metrics
       Plugins.Beam,
       # Oban metrics
-      Plugins.Oban
+      Plugins.Oban,
+      # Custom YSC business metrics (required for Fly /metrics scrape)
+      Ysc.PromEx.Plugins.Ysc
     ]
   end
 
@@ -70,14 +72,17 @@ defmodule Ysc.PromEx do
         tag_values: &extract_payment_tags/1,
         measurement: :count
       ),
-      summary("ysc.tickets.payment_processed.duration.milliseconds",
+      distribution("ysc.tickets.payment_processed.duration.milliseconds",
         event_name: [:ysc, :tickets, :payment_processed],
         description:
           "Duration of ticket order payment processing in milliseconds",
-        buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000],
+        reporter_options: [
+          buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000]
+        ],
         tags: [:event_id, :status],
         tag_values: &extract_payment_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       ),
       counter("ysc.tickets.timeout_expired.total",
         event_name: [:ysc, :tickets, :timeout_expired],
@@ -141,13 +146,17 @@ defmodule Ysc.PromEx do
         tags: [:event_type],
         tag_values: &extract_webhook_tags/1
       ),
-      summary("ysc.payments.stripe_webhook_processing.duration.milliseconds",
+      distribution(
+        "ysc.payments.stripe_webhook_processing.duration.milliseconds",
         event_name: [:ysc, :payments, :stripe_webhook_processing_duration],
         description: "Duration of Stripe webhook processing in milliseconds",
-        buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000],
+        reporter_options: [
+          buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000]
+        ],
         tags: [:event_type, :status],
         tag_values: &extract_webhook_processing_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       ),
 
       # Ledger Metrics
@@ -168,13 +177,16 @@ defmodule Ysc.PromEx do
         tags: [:status],
         tag_values: &extract_reconciliation_tags/1
       ),
-      summary("ysc.ledgers.reconciliation.duration.milliseconds",
+      distribution("ysc.ledgers.reconciliation.duration.milliseconds",
         event_name: [:ysc, :ledgers, :reconciliation_completed],
         description: "Duration of reconciliation checks in milliseconds",
-        buckets: [100, 500, 1000, 2500, 5000, 10_000, 30_000, 60_000],
+        reporter_options: [
+          buckets: [100, 500, 1000, 2500, 5000, 10_000, 30_000, 60_000]
+        ],
         tags: [:status],
         tag_values: &extract_reconciliation_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       ),
       counter("ysc.ledgers.reconciliation_errors.total",
         event_name: [:ysc, :ledgers, :reconciliation_errors],
@@ -236,12 +248,17 @@ defmodule Ysc.PromEx do
         tag_values: &extract_ses_webhook_tags/1,
         measurement: :count
       ),
-      summary("ysc.email.ses_webhook.processing.duration.milliseconds",
+      distribution(
+        "ysc.email.ses_webhook.processing.duration.milliseconds",
         event_name: [:ysc, :email, :ses_webhook],
         description: "SES webhook processing duration in milliseconds",
+        reporter_options: [
+          buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000]
+        ],
         tags: [:event_type, :outcome],
         tag_values: &extract_ses_webhook_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       )
     ]
   end

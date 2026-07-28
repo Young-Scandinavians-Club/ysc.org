@@ -5,7 +5,7 @@ defmodule Ysc.PromExTest do
   alias Ysc.PromEx
 
   describe "plugins/0" do
-    test "includes Phoenix, LiveView, Ecto, BEAM, and Oban plugins" do
+    test "includes Phoenix, LiveView, Ecto, BEAM, Oban, and YSC plugins" do
       plugins = PromEx.plugins()
 
       assert {Plugins.Phoenix, _} =
@@ -15,6 +15,7 @@ defmodule Ysc.PromExTest do
       assert Plugins.Ecto in plugins
       assert Plugins.Beam in plugins
       assert Plugins.Oban in plugins
+      assert Ysc.PromEx.Plugins.Ysc in plugins
     end
   end
 
@@ -55,6 +56,35 @@ defmodule Ysc.PromExTest do
                :duration,
                :milliseconds
              ] in metric_names
+    end
+
+    test "exposes duration metrics as Prometheus distributions" do
+      duration_metrics =
+        PromEx.metrics()
+        |> Enum.filter(&match?(%Telemetry.Metrics.Distribution{}, &1))
+
+      assert Enum.any?(duration_metrics, fn metric ->
+               metric.name == [
+                 :ysc,
+                 :email,
+                 :ses_webhook,
+                 :processing,
+                 :duration,
+                 :milliseconds
+               ]
+             end)
+    end
+  end
+
+  describe "Ysc.PromEx.Plugins.Ysc" do
+    test "publishes application metrics through PromEx event groups" do
+      event_group = Ysc.PromEx.Plugins.Ysc.event_metrics([])
+
+      assert event_group.group_name == :ysc_application_event_metrics
+
+      metric_names = Enum.map(event_group.metrics, & &1.name)
+      assert [:ysc, :email, :sent, :total] in metric_names
+      assert [:ysc, :email, :ses_webhook, :events, :total] in metric_names
     end
   end
 end
