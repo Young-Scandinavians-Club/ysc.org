@@ -218,6 +218,13 @@ defmodule YscWeb.PostLiveTest do
       assert path == "/news"
     end
 
+    test "redirects to news for crawler junk paths without raising", %{
+      conn: conn
+    } do
+      assert {:error, {:redirect, %{to: "/news"}}} =
+               live(conn, ~p"/posts/images.php")
+    end
+
     test "sets page title to post title", %{conn: conn} do
       post = create_post(%{title: "Amazing Article"})
 
