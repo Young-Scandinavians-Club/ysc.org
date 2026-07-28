@@ -274,23 +274,18 @@ defmodule Ysc.Newsletter do
   defp do_unsubscribe(subscriber, edition_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    case Repo.transaction(fn ->
-           case subscriber
-                |> Subscriber.update_changeset(%{
-                  subscribed: false,
-                  unsubscribed_at: now
-                })
-                |> Repo.update() do
-             {:ok, updated} ->
-               maybe_record_unsubscribe_event(updated, edition_id, now)
-               updated
+    case subscriber
+         |> Subscriber.update_changeset(%{
+           subscribed: false,
+           unsubscribed_at: now
+         })
+         |> Repo.update() do
+      {:ok, updated} ->
+        maybe_record_unsubscribe_event(updated, edition_id, now)
+        {:ok, updated}
 
-             {:error, changeset} ->
-               Repo.rollback(changeset)
-           end
-         end) do
-      {:ok, updated} -> {:ok, updated}
-      {:error, reason} -> {:error, reason}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -300,23 +295,57 @@ defmodule Ysc.Newsletter do
 
   defp maybe_record_unsubscribe_event(subscriber, edition_id, now) do
     if edition_exists?(edition_id) do
-      %UnsubscribeEvent{}
-      |> UnsubscribeEvent.changeset(%{
-        edition_id: edition_id,
-        subscriber_id: subscriber.id,
-        unsubscribed_at: now
-      })
-      |> Repo.insert(
-        on_conflict: :nothing,
-        conflict_target: [:edition_id, :subscriber_id]
-      )
+      result =
+        try do
+          %UnsubscribeEvent{}
+          |> UnsubscribeEvent.changeset(%{
+            edition_id: edition_id,
+            subscriber_id: subscriber.id,
+            unsubscribed_at: now
+          })
+          |> Repo.insert(
+            on_conflict: :nothing,
+            conflict_target: [:edition_id, :subscriber_id]
+          )
+        rescue
+          error ->
+            Ysc.Logging.error(
+              "Newsletter: failed to record unsubscribe event",
+              error: error,
+              stacktrace: __STACKTRACE__,
+              extra: %{
+                edition_id: edition_id,
+                subscriber_id: subscriber.id
+              }
+            )
+
+            {:error, :insert_failed}
+        end
+
+      case result do
+        {:ok, _} ->
+          :ok
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          Ysc.Logging.warning(
+            "Newsletter: unsubscribe event changeset invalid",
+            edition_id: edition_id,
+            subscriber_id: subscriber.id,
+            errors: inspect(changeset.errors)
+          )
+
+          :ok
+
+        {:error, _reason} ->
+          :ok
+      end
     else
       :ok
     end
   end
 
   defp edition_exists?(edition_id) when is_binary(edition_id) do
-    ulid?(edition_id) and
+    valid_ulid?(edition_id) and
       Repo.exists?(from(e in Edition, where: e.id == ^edition_id))
   end
 
@@ -1185,9 +1214,7 @@ defmodule Ysc.Newsletter do
   """
   def count_clicks_by_link(edition_id) when is_binary(edition_id) do
     base_url = String.trim_trailing(YscWeb.Endpoint.url(), "/")
-
-    # Match absolute or relative unsubscribe paths (with or without query string).
-    unsubscribe_pattern = "%newsletter/unsubscribe%"
+    unsubscribe_pattern = unsubscribe_link_like_pattern()
 
     raw =
       EmailEvent
@@ -1202,7 +1229,6 @@ defmodule Ysc.Newsletter do
       |> select([e], {e.link_url, count(e.id)})
       |> order_by([e], desc: count(e.id))
       |> Repo.all()
-      |> Enum.reject(fn {url, _clicks} -> newsletter_unsubscribe_link?(url) end)
 
     classified =
       Enum.map(raw, fn {url, clicks} ->
@@ -1234,7 +1260,7 @@ defmodule Ysc.Newsletter do
         # matching column type — mixing slugs into the ULID-typed `id` binding
         # raises an Ecto.Query.CastError at runtime.
         {post_ids, post_slugs} =
-          Enum.split_with(post_identifiers, &ulid?/1)
+          Enum.split_with(post_identifiers, &valid_ulid?/1)
 
         rows =
           Repo.all(
@@ -1262,11 +1288,18 @@ defmodule Ysc.Newsletter do
     end)
   end
 
-  # Ecto.ULID values are 26-character Crockford base-32 strings.
-  defp ulid?(value) when is_binary(value),
+  @doc """
+  Returns true when `value` is a 26-character Crockford base-32 ULID string.
+  """
+  def valid_ulid?(value) when is_binary(value),
     do: String.match?(value, ~r/^[0-9A-HJKMNP-TV-Z]{26}$/i)
 
-  defp ulid?(_), do: false
+  def valid_ulid?(_), do: false
+
+  # Match absolute or relative unsubscribe paths (with or without query string).
+  @unsubscribe_link_like_pattern "%newsletter/unsubscribe%"
+
+  defp unsubscribe_link_like_pattern, do: @unsubscribe_link_like_pattern
 
   defp classify_link(url, base_url) do
     path =
@@ -1296,7 +1329,7 @@ defmodule Ysc.Newsletter do
   end
 
   def unsubscribe_link_clicks_query(edition_id) when is_binary(edition_id) do
-    unsubscribe_pattern = "%newsletter/unsubscribe%"
+    unsubscribe_pattern = unsubscribe_link_like_pattern()
 
     from(e in EmailEvent,
       where: e.edition_id == ^edition_id,
@@ -1306,12 +1339,6 @@ defmodule Ysc.Newsletter do
       select: count(e.email, :distinct)
     )
   end
-
-  defp newsletter_unsubscribe_link?(url) when is_binary(url) do
-    String.contains?(url, "newsletter/unsubscribe")
-  end
-
-  defp newsletter_unsubscribe_link?(_), do: false
 
   @doc false
   def confirmed_unsubscribes_query(edition_id \\ nil)

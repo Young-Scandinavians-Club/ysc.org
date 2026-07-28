@@ -379,6 +379,29 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     |> Enum.join()
   end
 
+  attr :label, :string, required: true
+  attr :count, :integer, required: true
+  attr :total, :integer, default: 0
+  attr :id, :string, default: nil
+
+  defp stat_with_percentage(assigns) do
+    ~H"""
+    <div id={@id}>
+      <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+        {@label}
+      </p>
+      <p class="text-sm font-semibold text-green-900 mt-0.5">
+        {format_count(@count)}
+        <%= if (@total || 0) > 0 do %>
+          <span class="font-normal text-green-700">
+            ({Float.round(@count / @total * 100, 1)}%)
+          </span>
+        <% end %>
+      </p>
+    </div>
+    """
+  end
+
   defp newsletter_edition_status_label_with_progress(%Edition{
          status: :sending,
          sent_count: sent_count,
@@ -484,91 +507,33 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 Stats could not be loaded
               </div>
             <% true -> %>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Unique opens
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(Map.get(@email_stats, "open", 0))}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        Map.get(@email_stats, "open", 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Unique clickers
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(Map.get(@email_stats, "click", 0))}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        Map.get(@email_stats, "click", 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Bounces
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(Map.get(@email_stats, "bounce", 0))}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        Map.get(@email_stats, "bounce", 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div id="edition-unsubscribe-link-clicks">
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Unsubscribe link clicks
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(@unsubscribe_link_clicks || 0)}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        (@unsubscribe_link_clicks || 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div id="edition-confirmed-unsubscribes">
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Confirmed unsubscribes
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(@confirmed_unsubscribes || 0)}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        (@confirmed_unsubscribes || 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
+              <.stat_with_percentage
+                label="Unique opens"
+                count={Map.get(@email_stats, "open", 0)}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                label="Unique clickers"
+                count={Map.get(@email_stats, "click", 0)}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                label="Bounces"
+                count={Map.get(@email_stats, "bounce", 0)}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                id="edition-unsubscribe-link-clicks"
+                label="Unsubscribe link clicks"
+                count={@unsubscribe_link_clicks || 0}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                id="edition-confirmed-unsubscribes"
+                label="Confirmed unsubscribes"
+                count={@confirmed_unsubscribes || 0}
+                total={@edition.sent_count}
+              />
           <% end %>
         </div>
         <%!-- Link click breakdown --%>

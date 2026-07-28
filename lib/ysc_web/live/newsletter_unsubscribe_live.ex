@@ -36,7 +36,7 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
   defp normalize_edition_id(edition_id) when is_binary(edition_id) do
     trimmed = String.trim(edition_id)
 
-    if trimmed != "" and String.match?(trimmed, ~r/^[0-9A-HJKMNP-TV-Z]{26}$/i) do
+    if Newsletter.valid_ulid?(trimmed) do
       trimmed
     else
       nil
