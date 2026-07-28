@@ -6,7 +6,7 @@ defmodule YscWeb.Components.DateRangePicker do
   """
   use YscWeb, :live_component
 
-  @week_start_at :sunday
+  @week_start_at :monday
   @fsm %{
     set_start: :set_end,
     set_end: :reset,
