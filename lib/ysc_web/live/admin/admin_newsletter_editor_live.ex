@@ -126,7 +126,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     socket
     |> assign(:loading_edition?, false)
     |> assign(:edition, edition)
-    |> assign(:readonly?, edition.status == :sent)
+    |> assign(:readonly?, edition_readonly?(edition))
     |> assign(:selected_post_ids, edition.post_ids || [])
     |> assign(:selected_event_ids, edition.event_ids || [])
     |> assign_form_from_edition(edition)
@@ -2079,11 +2079,13 @@ defmodule YscWeb.AdminNewsletterEditorLive do
          %Edition{id: edition_id} = updated_edition},
         %{assigns: %{edition: %Edition{id: edition_id} = edition}} = socket
       ) do
+    updated_edition = merge_edition_delivery_progress(edition, updated_edition)
+
     {:noreply,
      assign(
        socket,
-       :edition,
-       merge_edition_delivery_progress(edition, updated_edition)
+       edition: updated_edition,
+       readonly?: edition_readonly?(updated_edition)
      )}
   end
 
@@ -2099,7 +2101,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     {:noreply,
      socket
      |> assign(:edition, updated_edition)
-     |> assign(:readonly?, true)
+     |> assign(:readonly?, edition_readonly?(updated_edition))
      |> maybe_load_email_stats(updated_edition)}
   end
 
@@ -2173,4 +2175,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         recipient_count: updated_edition.recipient_count
     }
   end
+
+  defp edition_readonly?(%Edition{status: status}),
+    do: status in [:sending, :sent]
 end

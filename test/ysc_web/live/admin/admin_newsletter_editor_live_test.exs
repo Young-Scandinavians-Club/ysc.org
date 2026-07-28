@@ -147,6 +147,9 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
                "#newsletter-sending-progress",
                "Sending… 12 / 20"
              )
+
+      assert has_element?(view, "#duplicate-edition-btn")
+      refute has_element?(view, "[phx-click='open-send-modal']")
     end
 
     test "shows the Send test button for an existing edition", %{
