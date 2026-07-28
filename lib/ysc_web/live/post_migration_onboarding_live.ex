@@ -2550,7 +2550,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
     case FamilyMembers.find_by_id(user, id) do
       %FamilyMember{} = member ->
-        case Ysc.Repo.delete(member) do
+        case FamilyMembers.delete_family_member(user, member) do
           {:ok, _} ->
             socket
 
