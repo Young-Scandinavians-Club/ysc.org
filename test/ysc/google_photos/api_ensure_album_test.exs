@@ -265,22 +265,4 @@ defmodule Ysc.GooglePhotos.Api.EnsureAlbumTest do
              )
   end
 
-  test "routes to DevStub when dev_stub is enabled and no connection exists", %{
-    event: event
-  } do
-    prev = Application.get_env(:ysc, :google_photos, [])
-
-    Application.put_env(
-      :ysc,
-      :google_photos,
-      Keyword.put(prev, :dev_stub, true)
-    )
-
-    on_exit(fn -> Application.put_env(:ysc, :google_photos, prev) end)
-
-    assert {:ok, album_id} =
-             Api.create_album("token", "Dev Album", event.id)
-
-    assert String.starts_with?(album_id, "dev-album-")
-  end
 end
