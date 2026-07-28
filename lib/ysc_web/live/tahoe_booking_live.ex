@@ -6652,7 +6652,6 @@ defmodule YscWeb.TahoeBookingLive do
 
       # 1. Check if user has ANY active or future bookings (stricter rule for buyout)
       if socket.assigns.user do
-        user = socket.assigns.user
         today = DateTime.now!(cabin_timezone()) |> DateTime.to_date()
 
         has_active_booking =
@@ -6790,7 +6789,8 @@ defmodule YscWeb.TahoeBookingLive do
 
       # For family/lifetime members, check room count instead of just booking existence
       if membership_type in [:family, :lifetime] do
-        existing_room_count = count_rooms_in_active_bookings(overlapping_bookings)
+        existing_room_count =
+          count_rooms_in_active_bookings(overlapping_bookings)
 
         if existing_room_count >= 2 do
           Map.put(
