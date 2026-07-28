@@ -352,6 +352,50 @@ defmodule YscWeb.EventDetailsLiveTest do
       refute has_element?(view, "p.text-sm.text-zinc-500", "7:00 PM -")
     end
 
+    test "shows duration for single-day events with start and end times", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Timed Single Day Event",
+          start_date: ~U[2026-07-18 18:00:00Z],
+          end_date: ~U[2026-07-18 22:00:00Z],
+          start_time: ~T[19:00:00],
+          end_time: ~T[22:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      assert has_element?(
+               view,
+               "p.text-xs.font-black.text-zinc-400",
+               "Duration"
+             )
+
+      assert has_element?(view, "p.font-black.text-xl", "3 Hours")
+    end
+
+    test "hides duration for multi-day events even when times are set", %{
+      conn: conn
+    } do
+      event =
+        event_fixture(%{
+          title: "Timed Multi Day Event",
+          start_date: ~U[2026-07-18 10:00:00Z],
+          end_date: ~U[2026-07-20 22:00:00Z],
+          start_time: ~T[10:00:00],
+          end_time: ~T[22:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/events/#{event.id}")
+
+      refute has_element?(
+               view,
+               "p.text-xs.font-black.text-zinc-400",
+               "Duration"
+             )
+    end
+
     test "displays event with image", %{conn: conn} do
       event =
         event_with_state(:upcoming,
@@ -980,9 +1024,13 @@ defmodule YscWeb.EventDetailsLiveTest do
 
   describe "error scenarios" do
     test "handles invalid event ID format", %{conn: conn} do
-      assert_raise Ecto.Query.CastError, fn ->
-        live(conn, ~p"/events/invalid-id")
-      end
+      assert {:error, {:redirect, %{to: "/events"}}} =
+               live(conn, ~p"/events/invalid-id")
+    end
+
+    test "handles crawler junk paths without raising", %{conn: conn} do
+      assert {:error, {:redirect, %{to: "/events"}}} =
+               live(conn, ~p"/events/images.php")
     end
 
     test "handles expired event gracefully", %{conn: conn} do

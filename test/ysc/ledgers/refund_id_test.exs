@@ -5,6 +5,49 @@ defmodule Ysc.Ledgers.RefundIdTest do
   alias Ysc.Ledgers.{Refund, Payment}
 
   import Ysc.AccountsFixtures
+  import Mox
+
+  setup do
+    # Oban runs QuickBooks sync inline; stub so UnexpectedCallError noise
+    # cannot obscure real reconciliation failures.
+    Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+    stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+      {:ok, %{"Id" => "qb_customer_refund_id_test"}}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params, _opts ->
+      {:ok, %{"Id" => "qb_sr_refund_id_test", "TotalAmt" => "0.00"}}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :create_refund_receipt, fn _params, _opts ->
+      {:ok, %{"Id" => "qb_rr_refund_id_test", "TotalAmt" => "0.00"}}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :query_account_by_name, fn
+      "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
+      _ -> {:error, :not_found}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :query_class_by_name, fn _ ->
+      {:error, :not_found}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :get_or_create_item, fn _name, _opts ->
+      {:ok, "qb_item_default"}
+    end)
+
+    stub(Ysc.Quickbooks.ClientMock, :get_item_by_id, fn _item_id ->
+      {:ok,
+       %{
+         "Id" => "item_123",
+         "Name" => "Test Item",
+         "IncomeAccountRef" => %{"value" => "income_account_123"}
+       }}
+    end)
+
+    :ok
+  end
 
   describe "refund_id foreign key constraint" do
     setup do
@@ -272,7 +315,10 @@ defmodule Ysc.Ledgers.RefundIdTest do
       # Run reconciliation
       {:ok, report} = Ledgers.Reconciliation.run_full_reconciliation()
 
-      # Should have no issues
+      # Should have no issues (payment check must ignore linked refund transactions)
+      assert report.checks.payments.discrepancies == [],
+             inspect(report.checks.payments.discrepancies)
+
       assert report.overall_status == :ok
       assert report.checks.refunds.status == :ok
       assert report.checks.refunds.discrepancies == []

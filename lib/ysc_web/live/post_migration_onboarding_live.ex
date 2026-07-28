@@ -1555,7 +1555,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
              |> advance_to_next_step(@step_payment)}
 
           {:error, :user_already_has_active_subscription} ->
-            Ysc.Logging.error(
+            Ysc.Logging.warning(
               "User already has active subscription during onboarding",
               user_id: user.id
             )
@@ -1564,6 +1564,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               :error,
               "Your membership renewal is already set up. Click Continue to next step at the bottom of this page to finish updating your profile.",
               title: "Membership renewal"
+            )
+
+            {:noreply, socket}
+
+          {:error, :sub_accounts_cannot_create_subscriptions} ->
+            Ysc.Logging.warning(
+              "Sub-account cannot create subscription during onboarding",
+              user_id: user.id
+            )
+
+            YscWeb.Flash.send_toast(
+              :error,
+              "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
+              title: "Membership"
             )
 
             {:noreply, socket}

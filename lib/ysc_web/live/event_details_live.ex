@@ -353,7 +353,10 @@ defmodule YscWeb.EventDetailsLive do
             </div>
 
             <%!-- Meta Info Row - Magazine Style --%>
-            <% has_duration = @event.start_time != nil && @event.end_time != nil %>
+            <%!-- Duration only for single-day events; multi-day spans don't map cleanly to Time.diff --%>
+            <% has_duration =
+              @event.start_time != nil && @event.end_time != nil &&
+                not multi_day_event?(@event) %>
             <div class={[
               "grid gap-0 border border-zinc-100 rounded-xl overflow-hidden bg-white mb-12",
               if has_duration do
@@ -6506,6 +6509,19 @@ defmodule YscWeb.EventDetailsLive do
         else
           format_event_when_weekday_range(start, finish)
         end
+    end
+  end
+
+  defp multi_day_event?(event) do
+    start = event_calendar_date(event.start_date)
+    finish = event_calendar_date(event.end_date)
+
+    case {start, finish} do
+      {%Date{} = start, %Date{} = finish} ->
+        Date.compare(start, finish) != :eq
+
+      _ ->
+        false
     end
   end
 

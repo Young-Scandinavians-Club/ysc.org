@@ -531,12 +531,11 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       view = live_editing_edition(conn, edition)
       assert has_element?(view, "#duplicate-edition-btn")
 
-      view
-      |> element("#duplicate-edition-btn")
-      |> render_click()
-
-      {path, _flash} = assert_redirect(view)
-      {:ok, new_view, _html} = live(conn, path)
+      {:ok, new_view, _html} =
+        view
+        |> element("#duplicate-edition-btn")
+        |> render_click()
+        |> follow_redirect(conn)
 
       render_async(new_view, 5000)
 

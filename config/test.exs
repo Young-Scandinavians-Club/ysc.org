@@ -30,6 +30,9 @@ config :ysc,
   payment_success_retry_delay_ms: 0,
   payment_success_total_timeout_ms: 1_000
 
+# Run Tahoe party-size availability refresh immediately in tests
+config :ysc, :tahoe_party_availability_debounce_ms, 0
+
 # Speed up Stripe customer database sync delays
 config :ysc,
   stripe_customer_db_sync_delay_ms: 0,
