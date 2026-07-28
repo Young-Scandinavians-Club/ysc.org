@@ -11,6 +11,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
   alias Ysc.Accounts.FamilyMember
   alias Ysc.Avatars
   alias Ysc.Avatars.Avatar
+  alias Ysc.Payments
   alias Ysc.Repo
   alias Ysc.Subscriptions
 
@@ -449,6 +450,71 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       render_click(view, "continue_inherited_membership")
 
       assert Accounts.get_user!(sub_user.id).post_migration_onboarding_completed_at
+    end
+
+    test "confirm_payment_step shows family toast for sub-accounts with a payment method",
+         %{conn: conn} do
+      import ExUnit.CaptureLog
+
+      {_primary, sub_user} = sub_account_needing_onboarding!()
+
+      plans = Application.fetch_env!(:ysc, :membership_plans)
+      single_plan = Enum.find(plans, &(&1.id == :single))
+      assert single_plan, "membership_plans must include single"
+
+      # Migrated plan so get_price_id/1 resolves and Customers.create_subscription
+      # is reached (where sub-accounts are rejected).
+      {:ok, subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: sub_user.id,
+          stripe_id: "migrated_#{sub_user.id}",
+          stripe_status: "active",
+          name: "Migrated Single",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      {:ok, _item} =
+        Subscriptions.create_subscription_item(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_migrated_#{System.unique_integer([:positive])}",
+          stripe_product_id: "prod_single",
+          stripe_price_id: single_plan.stripe_price_id,
+          quantity: 1
+        })
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: sub_user.id,
+          provider: :stripe,
+          provider_id: "pm_onboard_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_onboard_#{System.unique_integer([:positive])}",
+          type: :card,
+          provider_type: "card",
+          is_default: true,
+          last_four: "4242",
+          display_brand: "visa"
+        })
+
+      # Reload so LiveView mount sees the payment method + migrated sub.
+      sub_user = Accounts.get_user!(sub_user.id, [:subscriptions])
+
+      conn = log_in_user(conn, sub_user)
+
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render_async(view, @onboarding_async_timeout)
+      refute has_element?(view, "#onboarding-loading")
+
+      # Sub-accounts skip the payment step UI, but if confirm_payment_step is
+      # invoked (stale client, race, etc.) they must get the family toast path —
+      # not the generic payment-setup Sentry error.
+      log =
+        capture_log(fn ->
+          render_click(view, "confirm_payment_step")
+        end)
+
+      assert log =~ "Sub-account cannot create subscription during onboarding"
+      refute log =~ "Failed to create subscription during onboarding"
     end
   end
 

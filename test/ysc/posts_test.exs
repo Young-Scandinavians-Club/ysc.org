@@ -109,6 +109,12 @@ defmodule Ysc.PostsTest do
         Posts.get_post!(Ecto.ULID.generate())
       end
     end
+
+    test "raises NoResultsError for invalid ULID format" do
+      assert_raise Ecto.NoResultsError, fn ->
+        Posts.get_post!("images.php")
+      end
+    end
   end
 
   describe "get_post_by_url_name/2" do
@@ -179,6 +185,21 @@ defmodule Ysc.PostsTest do
 
       refute to_string(post.id) == ulid_slug
       assert Posts.get_post_by_id_or_url_name(ulid_slug).id == post.id
+    end
+
+    test "returns post by non-ULID url_name without raising", %{author: author} do
+      {:ok, post} =
+        Posts.create_post(
+          %{
+            "title" => "Test",
+            "body" => "Body",
+            "url_name" => "images.php-slug-#{System.unique_integer()}"
+          },
+          author
+        )
+
+      assert Posts.get_post_by_id_or_url_name(post.url_name).id == post.id
+      assert Posts.get_post_by_id_or_url_name("images.php") == nil
     end
   end
 
@@ -1010,6 +1031,16 @@ defmodule Ysc.PostsTest do
       assert Posts.get_public_post(draft.id) == nil
       assert %Post{id: id} = Posts.get_public_post(published.id)
       assert id == published.id
+    end
+
+    test "get_public_post/2 returns nil for invalid ULID values" do
+      assert Posts.get_public_post("images.php") == nil
+      assert Posts.get_public_post("invalid-id") == nil
+    end
+
+    test "get_post_for_page/3 returns nil for invalid ULID values" do
+      assert Posts.get_post_for_page("images.php", nil) == nil
+      assert Posts.get_post_for_page("invalid-id", nil) == nil
     end
 
     test "get_post_for_page/3 hides drafts from members but allows staff preview",

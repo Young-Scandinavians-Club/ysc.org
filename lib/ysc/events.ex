@@ -58,10 +58,21 @@ defmodule Ysc.Events do
 
   @doc """
   Returns an event visible on public pages (published or cancelled), or nil.
+
+  Returns `nil` for invalid ULID values (e.g. crawler junk like `"images.php"`)
+  instead of raising `Ecto.Query.CastError`.
   """
   def get_public_event(id) do
-    from(e in Event, where: e.id == ^id and e.state in ^@public_event_states)
-    |> Repo.one()
+    case Ecto.ULID.cast(id) do
+      {:ok, id} ->
+        from(e in Event,
+          where: e.id == ^id and e.state in ^@public_event_states
+        )
+        |> Repo.one()
+
+      :error ->
+        nil
+    end
   end
 
   @doc """
@@ -108,10 +119,16 @@ defmodule Ysc.Events do
 
   defp get_staff_preview_event(id, viewer) do
     if StaffPreview.staff_content_preview?(viewer) do
-      from(e in Event,
-        where: e.id == ^id and e.state in ^@staff_preview_event_states
-      )
-      |> Repo.one()
+      case Ecto.ULID.cast(id) do
+        {:ok, id} ->
+          from(e in Event,
+            where: e.id == ^id and e.state in ^@staff_preview_event_states
+          )
+          |> Repo.one()
+
+        :error ->
+          nil
+      end
     end
   end
 

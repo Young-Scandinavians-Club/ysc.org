@@ -13,7 +13,10 @@ defmodule Ysc.Posts do
   alias Ysc.StaffPreview
 
   def get_post(id, preloads \\ []) do
-    Repo.get(Post, id) |> Repo.preload(preloads)
+    case Ecto.ULID.cast(id) do
+      {:ok, id} -> Repo.get(Post, id) |> Repo.preload(preloads)
+      :error -> nil
+    end
   end
 
   @doc """
@@ -21,7 +24,16 @@ defmodule Ysc.Posts do
   (skipping missing ids).
   """
   def list_posts_by_ids(ids, preloads \\ []) when is_list(ids) do
-    ids = Enum.uniq(Enum.reject(ids, &is_nil/1))
+    ids =
+      ids
+      |> Enum.reject(&is_nil/1)
+      |> Enum.flat_map(fn id ->
+        case Ecto.ULID.cast(id) do
+          {:ok, id} -> [id]
+          :error -> []
+        end
+      end)
+      |> Enum.uniq()
 
     if ids == [] do
       []
@@ -45,7 +57,13 @@ defmodule Ysc.Posts do
   end
 
   def get_post!(id) do
-    Repo.get!(Post, id)
+    case Ecto.ULID.cast(id) do
+      {:ok, id} ->
+        Repo.get!(Post, id)
+
+      :error ->
+        raise Ecto.NoResultsError, queryable: Post
+    end
   end
 
   def get_post_by_url_name(url_name, preloads \\ []) do
@@ -58,11 +76,19 @@ defmodule Ysc.Posts do
 
   @doc """
   Returns a published post by id for public pages, or nil if missing or not published.
+
+  Returns `nil` for invalid ULID values instead of raising `Ecto.Query.CastError`.
   """
   def get_public_post(id, preloads \\ []) do
-    from(p in Post, where: p.id == ^id and p.state == :published)
-    |> Repo.one()
-    |> preload_public_post(preloads)
+    case Ecto.ULID.cast(id) do
+      {:ok, id} ->
+        from(p in Post, where: p.id == ^id and p.state == :published)
+        |> Repo.one()
+        |> preload_public_post(preloads)
+
+      :error ->
+        nil
+    end
   end
 
   @doc """
@@ -109,11 +135,17 @@ defmodule Ysc.Posts do
 
   defp get_staff_preview_post(id, viewer, preloads) do
     if StaffPreview.staff_content_preview?(viewer) do
-      from(p in Post,
-        where: p.id == ^id and p.state in ^@staff_preview_post_states
-      )
-      |> Repo.one()
-      |> preload_public_post(preloads)
+      case Ecto.ULID.cast(id) do
+        {:ok, id} ->
+          from(p in Post,
+            where: p.id == ^id and p.state in ^@staff_preview_post_states
+          )
+          |> Repo.one()
+          |> preload_public_post(preloads)
+
+        :error ->
+          nil
+      end
     end
   end
 
@@ -135,9 +167,15 @@ defmodule Ysc.Posts do
   end
 
   def get_post_by_id_or_url_name(value) do
-    Repo.one(
-      from p in Post, where: p.id == ^value, or_where: p.url_name == ^value
-    )
+    case Ecto.ULID.cast(value) do
+      {:ok, id} ->
+        Repo.one(
+          from p in Post, where: p.id == ^id, or_where: p.url_name == ^value
+        )
+
+      :error ->
+        Repo.one(from p in Post, where: p.url_name == ^value)
+    end
   end
 
   def get_featured_post() do
