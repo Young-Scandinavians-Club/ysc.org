@@ -20,7 +20,15 @@ defmodule Ysc.Repo.Migrations.AddEmailDeliveryReliability do
       add :window_started_at, :utc_datetime, null: false
       add :used, :integer, null: false, default: 0
       add :cooldown_until, :utc_datetime
-      timestamps(updated_at: true, inserted_at: false)
+      add :updated_at, :utc_datetime, null: false
+    end
+
+    create table(:email_suppressions, primary_key: false) do
+      add :email, :citext, null: false, primary_key: true
+      add :reason, :string, null: false
+      add :suppressed_at, :utc_datetime, null: false
+      add :inserted_at, :utc_datetime, null: false
+      add :updated_at, :utc_datetime, null: false
     end
   end
 end

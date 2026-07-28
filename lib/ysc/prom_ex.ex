@@ -228,6 +228,20 @@ defmodule Ysc.PromEx do
         description: "Email deliveries skipped due to recipient suppression",
         tags: [:reason, :template, :category],
         tag_values: &extract_email_suppression_tags/1
+      ),
+      counter("ysc.email.ses_webhook.events.total",
+        event_name: [:ysc, :email, :ses_webhook],
+        description: "SES webhook events handled by event type and outcome",
+        tags: [:event_type, :outcome],
+        tag_values: &extract_ses_webhook_tags/1,
+        measurement: :count
+      ),
+      summary("ysc.email.ses_webhook.processing.duration.milliseconds",
+        event_name: [:ysc, :email, :ses_webhook],
+        description: "SES webhook processing duration in milliseconds",
+        tags: [:event_type, :outcome],
+        tag_values: &extract_ses_webhook_tags/1,
+        measurement: :duration
       )
     ]
   end
@@ -299,27 +313,37 @@ defmodule Ysc.PromEx do
   defp extract_config_cache_live_rebuild_tags(_),
     do: %{live_view: "unknown", cache: "unknown"}
 
+  defp email_tag(nil), do: "unknown"
+  defp email_tag(value), do: to_string(value)
+
   defp extract_email_tags(%{template: template}),
-    do: %{template: to_string(template)}
+    do: %{template: email_tag(template)}
 
   defp extract_email_tags(_), do: %{template: "unknown"}
 
   defp extract_email_terminal_tags(%{template: template, category: category}),
-    do: %{template: to_string(template), category: to_string(category)}
+    do: %{template: email_tag(template), category: email_tag(category)}
 
   defp extract_email_terminal_tags(metadata),
     do: Map.put(extract_email_tags(metadata), :category, "unknown")
 
   defp extract_email_hard_bounce_tags(%{outcome: outcome}),
-    do: %{outcome: to_string(outcome)}
+    do: %{outcome: email_tag(outcome)}
 
   defp extract_email_hard_bounce_tags(_), do: %{outcome: "unknown"}
 
   defp extract_email_suppression_tags(metadata) do
     %{
-      reason: metadata |> Map.get(:reason, :unknown) |> to_string(),
-      template: metadata |> Map.get(:template, :unknown) |> to_string(),
-      category: metadata |> Map.get(:category, :unknown) |> to_string()
+      reason: metadata |> Map.get(:reason, :unknown) |> email_tag(),
+      template: metadata |> Map.get(:template, :unknown) |> email_tag(),
+      category: metadata |> Map.get(:category, :unknown) |> email_tag()
+    }
+  end
+
+  defp extract_ses_webhook_tags(metadata) do
+    %{
+      event_type: metadata |> Map.get(:event_type, :unknown) |> to_string(),
+      outcome: metadata |> Map.get(:outcome, :unknown) |> to_string()
     }
   end
 

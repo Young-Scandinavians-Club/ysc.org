@@ -380,10 +380,15 @@ if config_env() == :prod do
 
   config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
 
+  ses_max_send_rate =
+    case Integer.parse(String.trim(System.get_env("SES_MAX_SEND_RATE") || "")) do
+      {rate, _} when rate > 0 -> rate
+      _ -> 10
+    end
+
   config :ysc,
     ses_region: System.get_env("SES_AWS_REGION") || "us-west-1",
-    ses_max_send_rate:
-      System.get_env("SES_MAX_SEND_RATE", "10") |> String.to_integer(),
+    ses_max_send_rate: ses_max_send_rate,
     ses_rate_window_seconds: 1,
     email_delivery_retry_window_seconds: 48 * 60 * 60
 

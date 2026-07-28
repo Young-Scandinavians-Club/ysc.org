@@ -45,8 +45,8 @@ defmodule Ysc.Messages do
 
     if attrs[:delivery_retry] do
       with {:ok, delivery} <- ensure_email_delivery(attrs),
-           {:send, delivery} <- claim_email_delivery(delivery),
-           :ok <- RateLimiter.check(recipient_count(email)) do
+           :ok <- RateLimiter.check(recipient_count(email)),
+           {:send, delivery} <- claim_email_delivery(delivery) do
         deliver_claimed_email(email, attrs, delivery)
       else
         {:accepted, _delivery} ->
@@ -159,7 +159,7 @@ defmodule Ysc.Messages do
       from(m in MessageIdempotency,
         where: m.id == ^delivery.id,
         where:
-          m.delivery_status in [:pending, :terminal_failed] or
+          m.delivery_status == :pending or
             (m.delivery_status == :sending and
                (is_nil(m.delivery_lease_expires_at) or
                   m.delivery_lease_expires_at < ^now))
@@ -173,8 +173,17 @@ defmodule Ysc.Messages do
            ],
            inc: [delivery_attempts: 1]
          ) do
-      {1, _} -> {:send, %{delivery | delivery_status: :sending}}
-      {0, _} -> {:busy, delivery}
+      {1, _} ->
+        {:send,
+         %{
+           delivery
+           | delivery_status: :sending,
+             delivery_attempts: delivery.delivery_attempts + 1,
+             delivery_lease_expires_at: lease_expires_at
+         }}
+
+      {0, _} ->
+        {:busy, delivery}
     end
   end
 

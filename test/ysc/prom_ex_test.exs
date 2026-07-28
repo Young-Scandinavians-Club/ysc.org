@@ -45,6 +45,16 @@ defmodule Ysc.PromExTest do
       assert [:ysc, :email, :send_failed, :total] in metric_names
       assert [:ysc, :email, :hard_bounce, :total] in metric_names
       assert [:ysc, :email, :suppressed, :total] in metric_names
+      assert [:ysc, :email, :ses_webhook, :events, :total] in metric_names
+
+      assert [
+               :ysc,
+               :email,
+               :ses_webhook,
+               :processing,
+               :duration,
+               :milliseconds
+             ] in metric_names
     end
   end
 end
