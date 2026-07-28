@@ -22,9 +22,9 @@ defmodule Ysc.Application do
 
     :logger.add_handler(:ysc_sentry_handler, Sentry.LoggerHandler, %{
       config: %{
-        # Include Logger metadata (user_id, reason, etc.) on captured events so
-        # Sentry issues are diagnosable without digging through Fly logs.
-        capture_metadata: :all,
+        # Explicit allowlist only — do not forward newly added Logger options
+        # automatically. Keep scrubbed diagnostic identifiers used at error sites.
+        capture_metadata: [:user_id, :reason],
         # Most call sites use Ysc.Logging.error/2 without an :error struct; still report
         # those Logger.error lines to Sentry (crashes were already captured by default).
         capture_log_messages: true,

@@ -956,9 +956,32 @@ trix-editor .attachment[data-trix-content-type="application/vnd.trix.horizontal-
 
 /* Admin bookings calendar — continuation zigzag when booking extends past view range */
 
+/* Keep the horizontal scrollbar always visible so date columns remain discoverable */
 .calendar-scroll-area {
     padding-left: 14px;
     padding-right: 14px;
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #a1a1aa #f4f4f5;
+}
+
+.calendar-scroll-area::-webkit-scrollbar {
+    height: 10px;
+    display: block;
+}
+
+.calendar-scroll-area::-webkit-scrollbar-track {
+    background: #f4f4f5;
+    border-radius: 9999px;
+}
+
+.calendar-scroll-area::-webkit-scrollbar-thumb {
+    background: #a1a1aa;
+    border-radius: 9999px;
+}
+
+.calendar-scroll-area::-webkit-scrollbar-thumb:hover {
+    background: #71717a;
 }
 
 .calendar-booking-bar {

@@ -56,6 +56,27 @@ defmodule Ysc.PostsTest do
       posts = Posts.list_posts_by_ids([post_b.id, post_a.id])
       assert Enum.map(posts, & &1.id) == [post_b.id, post_a.id]
     end
+
+    test "preserves duplicate ids and skips nil or invalid ids", %{
+      author: author
+    } do
+      {:ok, post} =
+        Posts.create_post(
+          %{"title" => "Dup", "body" => "Body", "url_name" => "post-dup"},
+          author
+        )
+
+      posts =
+        Posts.list_posts_by_ids([
+          post.id,
+          nil,
+          "images.php",
+          post.id,
+          "invalid-id"
+        ])
+
+      assert Enum.map(posts, & &1.id) == [post.id, post.id]
+    end
   end
 
   describe "get_post/2" do
@@ -89,6 +110,10 @@ defmodule Ysc.PostsTest do
 
     test "returns nil for non-existent post" do
       assert Posts.get_post(Ecto.ULID.generate()) == nil
+    end
+
+    test "returns nil for invalid ULID values" do
+      assert Posts.get_post("images.php") == nil
     end
   end
 
@@ -1039,8 +1064,15 @@ defmodule Ysc.PostsTest do
     end
 
     test "get_post_for_page/3 returns nil for invalid ULID values" do
+      admin = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
       assert Posts.get_post_for_page("images.php", nil) == nil
       assert Posts.get_post_for_page("invalid-id", nil) == nil
+      assert Posts.get_post_for_page("images.php", admin) == nil
+      assert Posts.get_post_for_page("invalid-id", admin) == nil
+      assert Posts.get_post_for_page("images.php", volunteer) == nil
+      assert Posts.get_post_for_page("invalid-id", volunteer) == nil
     end
 
     test "get_post_for_page/3 hides drafts from members but allows staff preview",

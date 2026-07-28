@@ -3502,8 +3502,15 @@ defmodule Ysc.EventsTest do
     end
 
     test "get_event_for_page/2 returns nil for invalid ULID values" do
+      admin = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
       assert Events.get_event_for_page("images.php", nil) == nil
       assert Events.get_event_for_page("invalid-id", nil) == nil
+      assert Events.get_event_for_page("images.php", admin) == nil
+      assert Events.get_event_for_page("invalid-id", admin) == nil
+      assert Events.get_event_for_page("images.php", volunteer) == nil
+      assert Events.get_event_for_page("invalid-id", volunteer) == nil
     end
 
     test "get_event_for_page/2 hides draft events from members but allows staff preview" do

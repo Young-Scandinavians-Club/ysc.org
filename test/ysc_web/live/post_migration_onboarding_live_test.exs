@@ -515,6 +515,12 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
 
       assert log =~ "Sub-account cannot create subscription during onboarding"
       refute log =~ "Failed to create subscription during onboarding"
+
+      assert has_element?(
+               view,
+               "[role=alert][data-kind=error]",
+               "family membership"
+             )
     end
   end
 

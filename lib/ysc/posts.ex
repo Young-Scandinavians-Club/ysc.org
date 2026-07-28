@@ -21,7 +21,7 @@ defmodule Ysc.Posts do
 
   @doc """
   Loads posts by id in one query. Returns records in the same order as `ids`
-  (skipping missing ids).
+  (including duplicates; skipping nil, invalid, and missing ids).
   """
   def list_posts_by_ids(ids, preloads \\ []) when is_list(ids) do
     ids =
@@ -33,7 +33,6 @@ defmodule Ysc.Posts do
           :error -> []
         end
       end)
-      |> Enum.uniq()
 
     if ids == [] do
       []
