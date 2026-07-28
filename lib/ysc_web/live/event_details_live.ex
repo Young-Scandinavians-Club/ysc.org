@@ -936,7 +936,7 @@ defmodule YscWeb.EventDetailsLive do
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-6 h-6"
                         />
-                        Sign in to buy tickets. An active YSC membership is required.
+                        Sign in with your YSC account to buy tickets. An active, paid membership is required.
                       </div>
                       <.button
                         class="w-full py-4 uppercase tracking-widest"
@@ -944,7 +944,7 @@ defmodule YscWeb.EventDetailsLive do
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6" />Sign In to Continue
+                        <.icon name="hero-ticket" class="w-6 h-6" />Sign in
                       </.button>
                     </div>
 
@@ -1086,7 +1086,7 @@ defmodule YscWeb.EventDetailsLive do
                   }
                   class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
-                  Sign in to buy tickets. An active YSC membership is required.
+                  Sign in with your YSC account to buy tickets. An active, paid membership is required.
                 </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
                   <%= if event_in_past?(@event) do %>
@@ -1191,7 +1191,7 @@ defmodule YscWeb.EventDetailsLive do
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
-                          <.icon name="hero-ticket" class="w-5 h-5" />Sign In to Continue
+                          <.icon name="hero-ticket" class="w-5 h-5" />Sign in
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>

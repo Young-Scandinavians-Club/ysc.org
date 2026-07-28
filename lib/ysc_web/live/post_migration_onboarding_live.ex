@@ -538,7 +538,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           />
           <div>
             <h3 class="text-sm font-semibold text-blue-800">
-              Membership inherited from primary member
+              Membership shared through your family membership manager
             </h3>
             <p class="text-sm text-blue-700 mt-1">
               You are a family member. You share membership benefits from <strong>
@@ -822,7 +822,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
             <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
             <span class="text-sm font-medium">
-              Payment method saved. You're all set for automatic renewal.
+              Payment method saved. Click Continue to turn on automatic renewal for next year.
             </span>
           </div>
           <p class="mt-2 text-sm text-zinc-600">
@@ -840,9 +840,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </.button>
             <.button
               phx-click="confirm_payment_step"
-              phx-disable-with="Saving..."
+              phx-disable-with="Setting up renewal..."
             >
-              Save and continue
+              Turn on auto-renewal and continue
               <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>

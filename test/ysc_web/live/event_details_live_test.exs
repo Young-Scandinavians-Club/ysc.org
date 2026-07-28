@@ -482,9 +482,10 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert html =~ event.title
 
       assert html =~
-               "Sign in to buy tickets. An active YSC membership is required."
+               "Sign in with your YSC account to buy tickets. An active, paid membership is required."
 
-      assert html =~ "Sign In to Continue"
+      assert html =~ "Sign in"
+      refute html =~ "Sign In to Continue"
     end
 
     test "can toggle map without authentication", %{conn: conn} do
