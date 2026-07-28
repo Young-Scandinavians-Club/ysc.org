@@ -4,6 +4,7 @@ defmodule Ysc.NewsletterTest do
   alias Ysc.Newsletter
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.Subscriber
+  alias Ysc.Newsletter.UnsubscribeEvent
   alias Ysc.Repo
 
   import Ysc.AccountsFixtures
@@ -686,6 +687,188 @@ defmodule Ysc.NewsletterTest do
 
       rows = Newsletter.count_clicks_by_link(edition.id)
       assert [%{type: :post, clicks: 1} | _] = rows
+    end
+
+    test "excludes unsubscribe URLs from the link breakdown" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Unsub clicks", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      base = YscWeb.Endpoint.url() |> String.trim_trailing("/")
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "click",
+          email: "keep@example.com",
+          environment: "test",
+          edition_id: edition.id,
+          link_url: "#{base}/posts/keep-me"
+        })
+
+      for url <- [
+            "#{base}/newsletter/unsubscribe/token-abc?edition_id=#{edition.id}",
+            "https://ysc.org/newsletter/unsubscribe/a2JwRbHkn14ux2pTRpekarhmCLomkYmxSi-Y-9DQiyM",
+            "/newsletter/unsubscribe/relative-token"
+          ] do
+        {:ok, _} =
+          Newsletter.record_email_event(%{
+            event_type: "click",
+            email: "unsub-#{System.unique_integer([:positive])}@example.com",
+            environment: "test",
+            edition_id: edition.id,
+            link_url: url
+          })
+      end
+
+      rows = Newsletter.count_clicks_by_link(edition.id)
+
+      assert Enum.any?(rows, &(&1.type == :post))
+
+      refute Enum.any?(rows, fn row ->
+               String.contains?(row.url, "newsletter/unsubscribe")
+             end)
+    end
+  end
+
+  describe "unsubscribe metrics" do
+    setup do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Unsub metrics", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      %{user: user, edition: edition}
+    end
+
+    test "count_unsubscribe_link_clicks counts distinct recipients", %{
+      edition: edition
+    } do
+      base = YscWeb.Endpoint.url() |> String.trim_trailing("/")
+
+      for email <- ["a@example.com", "a@example.com", "b@example.com"] do
+        {:ok, _} =
+          Newsletter.record_email_event(%{
+            event_type: "click",
+            email: email,
+            environment: "test",
+            edition_id: edition.id,
+            link_url: "#{base}/newsletter/unsubscribe/tok-#{email}"
+          })
+      end
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "click",
+          email: "other@example.com",
+          environment: "test",
+          edition_id: edition.id,
+          link_url: "#{base}/posts/hello"
+        })
+
+      assert Newsletter.count_unsubscribe_link_clicks(edition.id) == 2
+    end
+
+    test "unsubscribe with edition_id records a confirmed event", %{
+      edition: edition
+    } do
+      {:ok, sub} =
+        Newsletter.subscribe("confirm-unsub@example.com",
+          source: "public_signup"
+        )
+
+      assert {:ok, _} =
+               Newsletter.unsubscribe(sub.subscription_token,
+                 edition_id: edition.id
+               )
+
+      assert Newsletter.count_confirmed_unsubscribes(edition.id) == 1
+
+      assert Repo.get_by(UnsubscribeEvent,
+               edition_id: edition.id,
+               subscriber_id: sub.id
+             )
+    end
+
+    test "confirmed unsubscribe is idempotent per edition/subscriber", %{
+      edition: edition
+    } do
+      {:ok, sub} =
+        Newsletter.subscribe("idempotent-unsub@example.com",
+          source: "public_signup"
+        )
+
+      assert {:ok, _} =
+               Newsletter.unsubscribe(sub.subscription_token,
+                 edition_id: edition.id
+               )
+
+      # Re-subscribe then unsubscribe again with the same edition
+      assert {:ok, _} =
+               Newsletter.subscribe("idempotent-unsub@example.com",
+                 source: "public_signup"
+               )
+
+      assert {:ok, _} =
+               Newsletter.unsubscribe(sub.subscription_token,
+                 edition_id: edition.id
+               )
+
+      assert Newsletter.count_confirmed_unsubscribes(edition.id) == 1
+    end
+
+    test "confirmed unsubscribes are isolated per edition", %{
+      user: user,
+      edition: edition
+    } do
+      {:ok, other} =
+        Newsletter.create_edition(
+          %{"title" => "Other", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      {:ok, sub} =
+        Newsletter.subscribe("iso-unsub@example.com", source: "public_signup")
+
+      assert {:ok, _} =
+               Newsletter.unsubscribe(sub.subscription_token,
+                 edition_id: edition.id
+               )
+
+      assert Newsletter.count_confirmed_unsubscribes(edition.id) == 1
+      assert Newsletter.count_confirmed_unsubscribes(other.id) == 0
+    end
+
+    test "unsubscribe without edition_id still works and records no event", %{
+      edition: edition
+    } do
+      {:ok, sub} =
+        Newsletter.subscribe("legacy-unsub@example.com",
+          source: "public_signup"
+        )
+
+      assert {:ok, updated} = Newsletter.unsubscribe(sub.subscription_token)
+      refute updated.subscribed
+      assert Newsletter.count_confirmed_unsubscribes(edition.id) == 0
+    end
+
+    test "invalid edition_id does not prevent unsubscribe", %{edition: edition} do
+      {:ok, sub} =
+        Newsletter.subscribe("bad-edition@example.com", source: "public_signup")
+
+      assert {:ok, updated} =
+               Newsletter.unsubscribe(sub.subscription_token,
+                 edition_id: "not-a-valid-ulid"
+               )
+
+      refute updated.subscribed
+      assert Newsletter.count_confirmed_unsubscribes(edition.id) == 0
     end
   end
 

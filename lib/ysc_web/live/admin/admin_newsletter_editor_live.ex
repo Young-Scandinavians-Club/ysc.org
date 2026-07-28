@@ -44,6 +44,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:readonly?, false)
      |> assign(:email_stats, nil)
      |> assign(:click_stats, nil)
+     |> assign(:unsubscribe_link_clicks, nil)
+     |> assign(:confirmed_unsubscribes, nil)
      |> assign(:loading_edition?, false)
      |> assign(:saved_notices, [])
      |> assign(:show_notice_picker?, false)
@@ -140,7 +142,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       start_async(socket, :load_email_stats, fn ->
         %{
           by_type: Newsletter.count_email_events_by_type(edition_id),
-          by_link: Newsletter.count_clicks_by_link(edition_id)
+          by_link: Newsletter.count_clicks_by_link(edition_id),
+          unsubscribe_link_clicks:
+            Newsletter.count_unsubscribe_link_clicks(edition_id),
+          confirmed_unsubscribes:
+            Newsletter.count_confirmed_unsubscribes(edition_id)
         }
       end)
     else
@@ -522,6 +528,40 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                     <span class="font-normal text-green-700">
                       ({Float.round(
                         Map.get(@email_stats, "bounce", 0) / @edition.sent_count *
+                          100,
+                        1
+                      )}%)
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+              <div id="edition-unsubscribe-link-clicks">
+                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+                  Unsubscribe link clicks
+                </p>
+                <p class="text-sm font-semibold text-green-900 mt-0.5">
+                  {format_count(@unsubscribe_link_clicks || 0)}
+                  <%= if (@edition.sent_count || 0) > 0 do %>
+                    <span class="font-normal text-green-700">
+                      ({Float.round(
+                        (@unsubscribe_link_clicks || 0) / @edition.sent_count *
+                          100,
+                        1
+                      )}%)
+                    </span>
+                  <% end %>
+                </p>
+              </div>
+              <div id="edition-confirmed-unsubscribes">
+                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+                  Confirmed unsubscribes
+                </p>
+                <p class="text-sm font-semibold text-green-900 mt-0.5">
+                  {format_count(@confirmed_unsubscribes || 0)}
+                  <%= if (@edition.sent_count || 0) > 0 do %>
+                    <span class="font-normal text-green-700">
+                      ({Float.round(
+                        (@confirmed_unsubscribes || 0) / @edition.sent_count *
                           100,
                         1
                       )}%)
@@ -2033,20 +2073,30 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   def handle_async(
         :load_email_stats,
-        {:ok, %{by_type: by_type, by_link: by_link}},
+        {:ok,
+         %{
+           by_type: by_type,
+           by_link: by_link,
+           unsubscribe_link_clicks: unsubscribe_link_clicks,
+           confirmed_unsubscribes: confirmed_unsubscribes
+         }},
         socket
       ) do
     {:noreply,
      socket
      |> assign(:email_stats, by_type)
-     |> assign(:click_stats, by_link)}
+     |> assign(:click_stats, by_link)
+     |> assign(:unsubscribe_link_clicks, unsubscribe_link_clicks)
+     |> assign(:confirmed_unsubscribes, confirmed_unsubscribes)}
   end
 
   def handle_async(:load_email_stats, {:exit, _reason}, socket) do
     {:noreply,
      socket
      |> assign(:email_stats, :error)
-     |> assign(:click_stats, :error)}
+     |> assign(:click_stats, :error)
+     |> assign(:unsubscribe_link_clicks, :error)
+     |> assign(:confirmed_unsubscribes, :error)}
   end
 
   def handle_async(:load_saved_notices, {:ok, notices}, socket) do

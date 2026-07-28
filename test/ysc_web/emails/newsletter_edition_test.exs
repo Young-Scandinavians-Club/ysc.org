@@ -217,6 +217,17 @@ defmodule YscWeb.Emails.NewsletterEditionTest do
       assert assigns.edition_title == "Spring Update"
     end
 
+    test "includes edition_id in unsubscribe url when edition has an id" do
+      edition_id = Ecto.ULID.generate()
+      edition = Map.put(base_edition(), :id, edition_id)
+
+      assigns =
+        NewsletterEdition.build_assigns(edition, base_subscriber(), [], [])
+
+      assert assigns.unsubscribe_url =~ "token123"
+      assert assigns.unsubscribe_url =~ "edition_id=#{edition_id}"
+    end
+
     test "includes edition_date from sent_at when present" do
       sent_at = ~U[2026-07-09 12:00:00Z]
       edition = Map.put(base_edition(), :sent_at, sent_at)
