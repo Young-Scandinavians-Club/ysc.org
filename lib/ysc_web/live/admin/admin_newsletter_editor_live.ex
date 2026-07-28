@@ -279,7 +279,19 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           "<p style=\"padding: 1rem; color: #71717a;\">Preview unavailable.</p>"
       end
 
+    previous_hash = Map.get(socket.assigns, :_preview_hash)
+    preview_hash = :erlang.phash2(preview_html)
+    preview_already_ready? = socket.assigns.preview_ready?
+
+    socket =
+      if preview_already_ready? and preview_hash != previous_hash do
+        push_event(socket, "preview-html", %{html: preview_html})
+      else
+        socket
+      end
+
     socket
+    |> assign(:_preview_hash, preview_hash)
     |> assign(:_preview_html, preview_html)
     |> assign(:preview_posts, preview_posts)
     |> assign(:preview_events, preview_events)
@@ -973,8 +985,16 @@ defmodule YscWeb.AdminNewsletterEditorLive do
               </div>
             </div>
             <div
+              :if={!@preview_ready?}
+              id="preview-loading"
+              class="flex-1 bg-white"
+            >
+            </div>
+            <div
+              :if={@preview_ready?}
               id="preview-scroll-container"
               class="flex-1 overflow-y-auto bg-white"
+              phx-update="ignore"
             >
               <iframe
                 id="newsletter-email-preview-iframe"
@@ -1331,6 +1351,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp image_url(%{optimized_image_path: url}), do: url
 
   defp event_image_url(%{cover_image: img}), do: image_url(img)
+
+  # Compatibility for clients that loaded the former EmailPreview handshake.
+  @impl true
+  def handle_event("preview-ready", _params, socket), do: {:noreply, socket}
 
   def handle_event(
         "validate",

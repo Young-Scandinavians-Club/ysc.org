@@ -33,6 +33,21 @@ const EmailPreview = {
         );
     },
 
+    writeToIframe(html) {
+        try {
+            const doc =
+                this.el.contentDocument || this.el.contentWindow.document;
+            doc.open();
+            doc.write(html);
+            doc.close();
+        } catch (_e) {}
+    },
+
+    renderPreview(html) {
+        this.writeToIframe(html);
+        this.resizeAfterLoad();
+    },
+
     async resizeAfterLoad() {
         const container = this.scrollContainer();
         const scrollPos = container ? container.scrollTop : 0;
@@ -60,6 +75,9 @@ const EmailPreview = {
     mounted() {
         this.handleLoad = () => this.resizeAfterLoad();
         this.el.addEventListener("load", this.handleLoad);
+        this.handleEvent("preview-html", ({ html }) => {
+            if (html) this.renderPreview(html);
+        });
 
         // The initial srcdoc can finish loading before LiveView mounts the hook.
         this.resizeAfterLoad();

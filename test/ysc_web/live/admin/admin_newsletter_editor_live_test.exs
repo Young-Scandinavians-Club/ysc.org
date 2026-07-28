@@ -182,6 +182,28 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
                view,
                "#newsletter-email-preview-iframe[srcdoc*='Already Sent']"
              )
+
+      assert has_element?(
+               view,
+               "#preview-scroll-container[phx-update='ignore']"
+             )
+    end
+
+    test "pushes later preview changes without patching the iframe", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      view
+      |> form("#newsletter-editor-form", %{
+        "edition" => %{"title" => "Updated Preview", "subject" => "Subject"}
+      })
+      |> render_change()
+
+      assert_push_event(view, "preview-html", %{html: updated_html})
+      assert updated_html =~ "Updated Preview"
     end
 
     test "shows draft status badge", %{conn: conn, admin: admin} do

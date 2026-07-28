@@ -2598,6 +2598,10 @@ defmodule YscWeb.AdminUserDetailsLive do
     {:noreply, socket}
   end
 
+  # Compatibility for clients that loaded the former EmailPreview handshake.
+  @impl true
+  def handle_event("preview-ready", _params, socket), do: {:noreply, socket}
+
   def handle_event("select_notification", %{"id" => id}, socket) do
     notification =
       socket.assigns.notifications
