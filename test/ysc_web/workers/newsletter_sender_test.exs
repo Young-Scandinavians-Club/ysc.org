@@ -157,15 +157,20 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
         Newsletter.update_edition(edition, %{"status" => :sending})
 
       original_rate = Application.get_env(:ysc, :ses_max_send_rate)
+      original_window = Application.get_env(:ysc, :ses_rate_window_seconds)
 
       on_exit(fn ->
         Application.put_env(:ysc, :ses_max_send_rate, original_rate)
+        Application.put_env(:ysc, :ses_rate_window_seconds, original_window)
       end)
 
+      # Keep the window open for the whole paced run so a slow CI second-boundary
+      # cannot reset the limiter between the first and second send.
       Application.put_env(:ysc, :ses_max_send_rate, 1)
+      Application.put_env(:ysc, :ses_rate_window_seconds, 60)
       Repo.query!("DELETE FROM email_rate_limits")
 
-      assert {:snooze, 1} =
+      assert {:snooze, _} =
                perform_job(NewsletterSender, %{edition_id: sending_edition.id})
 
       partial_records = idempotency_records_for(sending_edition)
