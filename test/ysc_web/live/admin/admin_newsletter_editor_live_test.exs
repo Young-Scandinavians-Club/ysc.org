@@ -125,6 +125,33 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert html =~ "Subj"
     end
 
+    test "shows live sending progress", %{conn: conn, admin: admin} do
+      edition = edition_fixture(admin)
+
+      {:ok, sending_edition} =
+        Newsletter.update_edition(edition, %{
+          "status" => :sending,
+          "sent_count" => 0,
+          "recipient_count" => 20
+        })
+
+      view = live_editing_edition(conn, sending_edition)
+
+      {:ok, progress_edition} =
+        Newsletter.update_edition(sending_edition, %{"sent_count" => 12})
+
+      Newsletter.broadcast_edition_delivery_progress(progress_edition)
+
+      assert has_element?(
+               view,
+               "#newsletter-sending-progress",
+               "Sending… 12 / 20"
+             )
+
+      assert has_element?(view, "#duplicate-edition-btn")
+      refute has_element?(view, "[phx-click='open-send-modal']")
+    end
+
     test "shows the Send test button for an existing edition", %{
       conn: conn,
       admin: admin
@@ -136,7 +163,7 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert has_element?(view, "[phx-click='send-test-email']")
     end
 
-    test "replays the preview when the iframe hook mounts after a sent edition loads",
+    test "renders a sent edition preview directly in the iframe srcdoc",
          %{
            conn: conn,
            admin: admin
@@ -151,13 +178,32 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
 
       view = live_editing_edition(conn, edition)
 
-      assert_push_event(view, "preview-html", %{html: initial_html})
-      assert initial_html =~ "Already Sent"
+      assert has_element?(
+               view,
+               "#newsletter-email-preview-iframe[srcdoc*='Already Sent']"
+             )
 
-      render_hook(view, "preview-ready", %{})
+      assert has_element?(
+               view,
+               "#preview-scroll-container[phx-update='ignore']"
+             )
+    end
 
-      assert_push_event(view, "preview-html", %{html: replayed_html})
-      assert replayed_html =~ "Already Sent"
+    test "pushes later preview changes without patching the iframe", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      view
+      |> form("#newsletter-editor-form", %{
+        "edition" => %{"title" => "Updated Preview", "subject" => "Subject"}
+      })
+      |> render_change()
+
+      assert_push_event(view, "preview-html", %{html: updated_html})
+      assert updated_html =~ "Updated Preview"
     end
 
     test "shows draft status badge", %{conn: conn, admin: admin} do
