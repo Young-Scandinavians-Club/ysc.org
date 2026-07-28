@@ -31,6 +31,7 @@ defmodule Ysc.Newsletter.Edition do
     field :scheduled_at, :utc_datetime
     field :sent_at, :utc_datetime
     field :sent_count, :integer, default: 0
+    field :recipient_count, :integer
     field :archived_html, :string
 
     belongs_to :cover_image, Image
@@ -55,7 +56,8 @@ defmodule Ysc.Newsletter.Edition do
     edition
     |> cast(
       attrs,
-      @draft_fields ++ [:status, :scheduled_at, :sent_at, :sent_count]
+      @draft_fields ++
+        [:status, :scheduled_at, :sent_at, :sent_count, :recipient_count]
     )
     |> validate_required([:title, :subject])
     |> shared_validations()

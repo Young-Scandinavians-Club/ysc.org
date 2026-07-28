@@ -1,6 +1,6 @@
 const EmailPreview = {
     scrollContainer() {
-        return document.getElementById("preview-scroll-container");
+        return this.el.closest("#preview-scroll-container");
     },
 
     resize(minHeight = 0) {
@@ -33,25 +33,11 @@ const EmailPreview = {
         );
     },
 
-    writeToIframe(html) {
-        try {
-            const doc =
-                this.el.contentDocument || this.el.contentWindow.document;
-            doc.open();
-            doc.write(html);
-            doc.close();
-        } catch (_e) {}
-    },
-
-    async renderPreview(html) {
+    async resizeAfterLoad() {
         const container = this.scrollContainer();
         const scrollPos = container ? container.scrollTop : 0;
         const lockedHeight = this.el.offsetHeight;
 
-        this.el.style.transition = "opacity 0.1s ease";
-        this.el.style.opacity = "0.4";
-
-        this.writeToIframe(html);
         this.resize(lockedHeight);
 
         if (container && scrollPos > 0) {
@@ -69,19 +55,22 @@ const EmailPreview = {
         if (container && scrollPos > 0) {
             container.scrollTop = scrollPos;
         }
-
-        this.el.style.transition = "opacity 0.15s ease";
-        this.el.style.opacity = "1";
     },
 
     mounted() {
-        this.handleEvent("preview-html", ({ html }) => {
-            if (html) this.renderPreview(html);
-        });
+        this.handleLoad = () => this.resizeAfterLoad();
+        this.el.addEventListener("load", this.handleLoad);
 
-        // The server may finish rendering before this hook is mounted. Request
-        // the latest HTML so a preview event lost during connection is replayed.
-        this.pushEvent("preview-ready", {});
+        // The initial srcdoc can finish loading before LiveView mounts the hook.
+        this.resizeAfterLoad();
+    },
+
+    updated() {
+        this.resizeAfterLoad();
+    },
+
+    destroyed() {
+        this.el.removeEventListener("load", this.handleLoad);
     },
 };
 

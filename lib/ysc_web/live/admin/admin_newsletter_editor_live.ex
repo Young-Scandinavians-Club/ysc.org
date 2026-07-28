@@ -18,6 +18,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
+
     {:ok,
      socket
      |> assign(:page_title, "Newsletter")
@@ -277,19 +279,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           "<p style=\"padding: 1rem; color: #71717a;\">Preview unavailable.</p>"
       end
 
-    # Only push the HTML to the client when it actually changed.
-    prev_hash = Map.get(socket.assigns, :_preview_hash)
-    new_hash = :erlang.phash2(preview_html)
-
-    socket =
-      if new_hash != prev_hash do
-        socket
-        |> assign(:_preview_hash, new_hash)
-        |> push_event("preview-html", %{html: preview_html})
-      else
-        socket
-      end
-
     socket
     |> assign(:_preview_html, preview_html)
     |> assign(:preview_posts, preview_posts)
@@ -372,6 +361,18 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     |> Enum.join()
   end
 
+  defp newsletter_edition_status_label_with_progress(%Edition{
+         status: :sending,
+         sent_count: sent_count,
+         recipient_count: recipient_count
+       })
+       when is_integer(recipient_count) do
+    "Sending… #{format_count(sent_count || 0)} / #{format_count(recipient_count)}"
+  end
+
+  defp newsletter_edition_status_label_with_progress(%Edition{} = edition),
+    do: newsletter_edition_status_label(edition.status)
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -387,12 +388,20 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         >
           <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to Newsletters
         </.link>
-        <.badge
-          :if={@edition}
-          type={newsletter_edition_status_badge_type(@edition.status)}
-        >
-          {newsletter_edition_status_label(@edition.status)}
-        </.badge>
+        <%= if @edition && @edition.status == :sending do %>
+          <span id="newsletter-sending-progress">
+            <.admin_sending_badge label={
+              newsletter_edition_status_label_with_progress(@edition)
+            } />
+          </span>
+        <% else %>
+          <.badge
+            :if={@edition}
+            type={newsletter_edition_status_badge_type(@edition.status)}
+          >
+            {newsletter_edition_status_label_with_progress(@edition)}
+          </.badge>
+        <% end %>
         <.badge :if={!@edition} type="yellow">Draft</.badge>
         <.admin_help_link
           topic="newsletters/compose"
@@ -966,7 +975,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
             <div
               id="preview-scroll-container"
               class="flex-1 overflow-y-auto bg-white"
-              phx-update="ignore"
             >
               <iframe
                 id="newsletter-email-preview-iframe"
@@ -974,6 +982,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 style="height: 800px;"
                 title="Email preview"
                 phx-hook="EmailPreview"
+                srcdoc={@_preview_html || ""}
               ></iframe>
             </div>
           </div>
@@ -984,13 +993,21 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       <div class="sticky bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 border-t border-zinc-200 bg-white/95 backdrop-blur-sm px-6 py-3">
         <%!-- Left: status badge + autosave indicator --%>
         <div class="flex items-center gap-3 min-w-0">
-          <.badge
-            :if={@edition}
-            type={newsletter_edition_status_badge_type(@edition.status)}
-            class="hidden sm:inline-block shrink-0"
-          >
-            {newsletter_edition_status_label(@edition.status)}
-          </.badge>
+          <%= if @edition && @edition.status == :sending do %>
+            <span class="hidden sm:inline-block shrink-0">
+              <.admin_sending_badge label={
+                newsletter_edition_status_label_with_progress(@edition)
+              } />
+            </span>
+          <% else %>
+            <.badge
+              :if={@edition}
+              type={newsletter_edition_status_badge_type(@edition.status)}
+              class="hidden sm:inline-block shrink-0"
+            >
+              {newsletter_edition_status_label_with_progress(@edition)}
+            </.badge>
+          <% end %>
 
           <%!-- Scheduled time indicator --%>
           <span
@@ -1314,17 +1331,6 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp image_url(%{optimized_image_path: url}), do: url
 
   defp event_image_url(%{cover_image: img}), do: image_url(img)
-
-  @impl true
-  def handle_event("preview-ready", _params, socket) do
-    case socket.assigns._preview_html do
-      html when is_binary(html) ->
-        {:noreply, push_event(socket, "preview-html", %{html: html})}
-
-      nil ->
-        {:noreply, socket}
-    end
-  end
 
   def handle_event(
         "validate",
@@ -2068,6 +2074,37 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp wrap_plain_notice_body(_), do: ""
 
   @impl true
+  def handle_info(
+        {:edition_delivery_progress,
+         %Edition{id: edition_id} = updated_edition},
+        %{assigns: %{edition: %Edition{id: edition_id} = edition}} = socket
+      ) do
+    {:noreply,
+     assign(
+       socket,
+       :edition,
+       merge_edition_delivery_progress(edition, updated_edition)
+     )}
+  end
+
+  def handle_info({:edition_delivery_progress, %Edition{}}, socket),
+    do: {:noreply, socket}
+
+  def handle_info(
+        {:edition_sent, %Edition{id: edition_id} = updated_edition},
+        %{assigns: %{edition: %Edition{id: edition_id} = edition}} = socket
+      ) do
+    updated_edition = merge_edition_delivery_progress(edition, updated_edition)
+
+    {:noreply,
+     socket
+     |> assign(:edition, updated_edition)
+     |> assign(:readonly?, true)
+     |> maybe_load_email_stats(updated_edition)}
+  end
+
+  def handle_info({:edition_sent, %Edition{}}, socket), do: {:noreply, socket}
+
   def handle_info(:auto_save, %{assigns: %{readonly?: true}} = socket),
     do: {:noreply, socket}
 
@@ -2125,5 +2162,15 @@ defmodule YscWeb.AdminNewsletterEditorLive do
        alt: image.alt_text || image.title || "",
        target_input_id: "edition_intro_text"
      })}
+  end
+
+  defp merge_edition_delivery_progress(edition, updated_edition) do
+    %{
+      edition
+      | status: updated_edition.status,
+        sent_at: updated_edition.sent_at,
+        sent_count: updated_edition.sent_count,
+        recipient_count: updated_edition.recipient_count
+    }
   end
 end

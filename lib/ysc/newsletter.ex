@@ -18,6 +18,7 @@ defmodule Ysc.Newsletter do
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.EmailEvent
   alias Ysc.Newsletter.Notice
+  alias Ysc.Messages.MessageIdempotency
   alias Ysc.Events.Event
   alias Ysc.Posts.Post
 
@@ -26,7 +27,8 @@ defmodule Ysc.Newsletter do
   @doc """
   Subscribes the calling process to edition lifecycle broadcasts.
 
-  Broadcasted messages: `{:edition_sent, %Edition{}}`.
+  Broadcasted messages: `{:edition_delivery_progress, %Edition{}}` and
+  `{:edition_sent, %Edition{}}`.
   """
   def subscribe_to_edition_updates do
     Phoenix.PubSub.subscribe(Ysc.PubSub, @editions_topic)
@@ -40,6 +42,15 @@ defmodule Ysc.Newsletter do
       Ysc.PubSub,
       @editions_topic,
       {:edition_sent, edition}
+    )
+  end
+
+  @doc false
+  def broadcast_edition_delivery_progress(%Edition{} = edition) do
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      @editions_topic,
+      {:edition_delivery_progress, edition}
     )
   end
 
@@ -569,6 +580,48 @@ defmodule Ysc.Newsletter do
     |> Edition.changeset(attrs)
     |> Repo.update()
   end
+
+  @doc """
+  Persists and broadcasts delivery progress for a sending newsletter edition.
+
+  The recipient count is set only once, when the sender loads its recipients.
+  Accepted deliveries are counted from the durable email delivery ledger.
+  """
+  def record_edition_delivery_progress(%Edition{} = edition, recipient_count)
+      when is_integer(recipient_count) and recipient_count >= 0 do
+    accepted_count =
+      from(m in MessageIdempotency,
+        where:
+          m.message_type == :email and
+            m.message_template == "newsletter_edition" and
+            m.delivery_status == :accepted and
+            like(m.idempotency_key, ^"newsletter_#{edition.id}_%"),
+        select: count(m.id)
+      )
+      |> Repo.one()
+
+    attrs =
+      %{sent_count: accepted_count}
+      |> maybe_put_recipient_count(edition, recipient_count)
+
+    case update_edition(edition, attrs) do
+      {:ok, updated_edition} ->
+        broadcast_edition_delivery_progress(updated_edition)
+        {:ok, updated_edition}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp maybe_put_recipient_count(
+         attrs,
+         %Edition{recipient_count: nil},
+         recipient_count
+       ),
+       do: Map.put(attrs, :recipient_count, recipient_count)
+
+  defp maybe_put_recipient_count(attrs, %Edition{}, _recipient_count), do: attrs
 
   @doc """
   Updates editorial newsletter fields from the admin editor draft save path.

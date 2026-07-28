@@ -134,6 +134,21 @@ defmodule YscWeb.Workers.NewsletterSender do
       )
       |> Enum.to_list()
 
+    case Newsletter.record_edition_delivery_progress(
+           edition,
+           length(subscribers)
+         ) do
+      {:ok, _updated_edition} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "NewsletterSender: failed to record delivery progress",
+          edition_id: edition.id,
+          reason: inspect(reason)
+        )
+    end
+
     failed_count =
       Enum.count(results, fn
         {:ok, :ok} -> false

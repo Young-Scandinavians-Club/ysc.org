@@ -98,6 +98,7 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.status == :sent
       assert reloaded.sent_count == expected_count
+      assert reloaded.recipient_count == expected_count
       assert reloaded.sent_at != nil
     end
 
