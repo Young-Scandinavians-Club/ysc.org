@@ -195,6 +195,8 @@ defmodule Ysc.MixProject do
       # Official Hex cowlib 2.18.0 (cowboy 2.17 needs stream_identity/no_trailers API).
       # EEF-CVE-2026-43969/43966: no patched release yet — ignored until 2026-07-22 (see mix.exs hex config).
       {:cowlib, "~> 2.18.0", override: true},
+      # cowboy 2.18 requires cowlib >= 2.19; keep 2.17 while cowlib stays pinned at 2.18.0.
+      {:cowboy, "~> 2.17.0", override: true},
       {:credo, "~> 1.7.19", only: [:dev, :test], runtime: false},
       {:csv, "~> 3.2"},
       {:debouncer, "~> 1.0"},
