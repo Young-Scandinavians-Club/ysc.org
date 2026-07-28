@@ -626,8 +626,8 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp tooltip_party_params(socket) do
-    guests_count = socket.assigns[:guests_count] || 1
-    children_count = socket.assigns[:children_count] || 0
+    guests_count = parse_guests_count(socket.assigns[:guests_count] || 1)
+    children_count = parse_children_count(socket.assigns[:children_count] || 0)
     total_people = guests_count + children_count
     max_rooms = max_rooms_for_user(socket.assigns)
     {total_people, max_rooms}
@@ -936,6 +936,13 @@ defmodule YscWeb.TahoeBookingLive do
     # Season/blackout/room-driven inventory changes; rebuild tooltips + buyout calendar.
     ConfigCacheTelemetry.live_rebuild(:tahoe_booking, :availability)
     {:noreply, refresh_after_availability_cache_change(socket)}
+  end
+
+  def handle_info(:refresh_party_availability, socket) do
+    {:noreply,
+     socket
+     |> assign(:party_availability_refresh_timer, nil)
+     |> refresh_party_availability()}
   end
 
   def handle_info(_msg, socket) do
@@ -4859,42 +4866,40 @@ defmodule YscWeb.TahoeBookingLive do
     max_adults = @max_cabin_capacity - current_children
     new_count = min(current_guests + 1, max(1, max_adults))
 
-    socket =
-      socket
-      |> assign(
-        guests_count: new_count,
-        calculated_price: nil,
-        price_error: nil,
-        guests_dropdown_open: socket.assigns.guests_dropdown_open
-      )
-      |> validate_guest_capacity()
-      |> clear_selected_stay_if_insufficient_capacity()
-      |> force_reload_date_tooltips()
-      |> update_available_rooms()
-      |> calculate_price_if_ready()
-
-    {:noreply, socket}
+    if new_count == current_guests do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(
+         guests_count: new_count,
+         calculated_price: nil,
+         price_error: nil,
+         guests_dropdown_open: socket.assigns.guests_dropdown_open
+       )
+       |> validate_guest_capacity()
+       |> schedule_party_availability_refresh()}
+    end
   end
 
   def handle_event("decrease-guests", _params, socket) do
     current_count = socket.assigns.guests_count || 1
     new_count = max(1, current_count - 1)
 
-    socket =
-      socket
-      |> assign(
-        guests_count: new_count,
-        calculated_price: nil,
-        price_error: nil,
-        guests_dropdown_open: socket.assigns.guests_dropdown_open
-      )
-      |> validate_guest_capacity()
-      |> clear_selected_stay_if_insufficient_capacity()
-      |> force_reload_date_tooltips()
-      |> update_available_rooms()
-      |> calculate_price_if_ready()
-
-    {:noreply, socket}
+    if new_count == current_count do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(
+         guests_count: new_count,
+         calculated_price: nil,
+         price_error: nil,
+         guests_dropdown_open: socket.assigns.guests_dropdown_open
+       )
+       |> validate_guest_capacity()
+       |> schedule_party_availability_refresh()}
+    end
   end
 
   def handle_event("increase-children", _params, socket) do
@@ -4903,42 +4908,40 @@ defmodule YscWeb.TahoeBookingLive do
     max_children = @max_cabin_capacity - current_guests
     new_count = min(current_children + 1, max(0, max_children))
 
-    socket =
-      socket
-      |> assign(
-        children_count: new_count,
-        calculated_price: nil,
-        price_error: nil,
-        guests_dropdown_open: socket.assigns.guests_dropdown_open
-      )
-      |> validate_guest_capacity()
-      |> clear_selected_stay_if_insufficient_capacity()
-      |> force_reload_date_tooltips()
-      |> update_available_rooms()
-      |> calculate_price_if_ready()
-
-    {:noreply, socket}
+    if new_count == current_children do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(
+         children_count: new_count,
+         calculated_price: nil,
+         price_error: nil,
+         guests_dropdown_open: socket.assigns.guests_dropdown_open
+       )
+       |> validate_guest_capacity()
+       |> schedule_party_availability_refresh()}
+    end
   end
 
   def handle_event("decrease-children", _params, socket) do
     current_count = socket.assigns.children_count || 0
     new_count = max(0, current_count - 1)
 
-    socket =
-      socket
-      |> assign(
-        children_count: new_count,
-        calculated_price: nil,
-        price_error: nil,
-        guests_dropdown_open: socket.assigns.guests_dropdown_open
-      )
-      |> validate_guest_capacity()
-      |> clear_selected_stay_if_insufficient_capacity()
-      |> force_reload_date_tooltips()
-      |> update_available_rooms()
-      |> calculate_price_if_ready()
-
-    {:noreply, socket}
+    if new_count == current_count do
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(
+         children_count: new_count,
+         calculated_price: nil,
+         price_error: nil,
+         guests_dropdown_open: socket.assigns.guests_dropdown_open
+       )
+       |> validate_guest_capacity()
+       |> schedule_party_availability_refresh()}
+    end
   end
 
   def handle_event("guests-changed", %{"guests_count" => guests_str}, socket) do
@@ -7636,17 +7639,26 @@ defmodule YscWeb.TahoeBookingLive do
       |> Repo.all()
       |> MapSet.new()
 
+    room_status_by_date =
+      Map.new(date_range, fn date ->
+        {date,
+         date_room_availability_status(
+           date,
+           all_rooms,
+           bookings,
+           total_people,
+           max_rooms
+         )}
+      end)
+
     # Nights that cannot be stayed (check-in date of each night). Checkout on a
     # blackout/buyout start date is still allowed via stay-range validation.
     blocked_stay_dates =
       build_blocked_stay_dates(
-        date_range,
         blackouts,
         buyout_dates,
-        all_rooms,
-        bookings,
-        total_people,
-        max_rooms
+        room_status_by_date,
+        total_people
       )
 
     # Build check-in tooltip map
@@ -7660,12 +7672,10 @@ defmodule YscWeb.TahoeBookingLive do
           today: today,
           property: property,
           seasons: seasons,
-          all_rooms: all_rooms,
-          bookings: bookings,
           blackout_dates: blackout_dates,
           buyout_dates: buyout_dates,
           total_people: total_people,
-          max_rooms: max_rooms
+          room_status: Map.fetch!(room_status_by_date, date)
         }
 
         tooltip = get_date_unavailability_reason(availability_context)
@@ -7681,13 +7691,10 @@ defmodule YscWeb.TahoeBookingLive do
   end
 
   defp build_blocked_stay_dates(
-         date_range,
          blackouts,
          buyout_dates,
-         all_rooms,
-         bookings,
-         total_people,
-         max_rooms
+         room_status_by_date,
+         total_people
        ) do
     blackout_nights =
       blackouts
@@ -7714,15 +7721,8 @@ defmodule YscWeb.TahoeBookingLive do
       end)
 
     capacity_blocked_nights =
-      date_range
-      |> Enum.reduce(%{}, fn date, acc ->
-        case date_room_availability_status(
-               date,
-               all_rooms,
-               bookings,
-               total_people,
-               max_rooms
-             ) do
+      Enum.reduce(room_status_by_date, %{}, fn {date, status}, acc ->
+        case status do
           :available ->
             acc
 
@@ -7773,13 +7773,7 @@ defmodule YscWeb.TahoeBookingLive do
 
       # Room inventory / capacity for the selected party size
       true ->
-        case date_room_availability_status(
-               context.date,
-               context.all_rooms,
-               context.bookings,
-               context.total_people,
-               context.max_rooms
-             ) do
+        case context.room_status do
           :available ->
             nil
 
@@ -7875,6 +7869,30 @@ defmodule YscWeb.TahoeBookingLive do
     Map.get(room, :capacity_max) || 0
   end
 
+  defp schedule_party_availability_refresh(socket) do
+    debounce_ms =
+      Application.get_env(:ysc, :tahoe_party_availability_debounce_ms, 200)
+
+    if debounce_ms <= 0 do
+      refresh_party_availability(socket)
+    else
+      if ref = socket.assigns[:party_availability_refresh_timer] do
+        Process.cancel_timer(ref)
+      end
+
+      ref = Process.send_after(self(), :refresh_party_availability, debounce_ms)
+      assign(socket, :party_availability_refresh_timer, ref)
+    end
+  end
+
+  defp refresh_party_availability(socket) do
+    socket
+    |> clear_selected_stay_if_insufficient_capacity()
+    |> force_reload_date_tooltips()
+    |> update_available_rooms()
+    |> calculate_price_if_ready()
+  end
+
   defp clear_selected_stay_if_insufficient_capacity(socket) do
     checkin_date = socket.assigns[:checkin_date]
     checkout_date = socket.assigns[:checkout_date]
@@ -7883,53 +7901,72 @@ defmodule YscWeb.TahoeBookingLive do
          socket.assigns[:selected_booking_mode] == :room do
       {total_people, max_rooms} = tooltip_party_params(socket)
 
-      if selected_stay_can_accommodate?(
-           socket,
-           checkin_date,
-           checkout_date,
-           total_people,
-           max_rooms
-         ) do
-        socket
-      else
-        clear_selected_stay(socket)
+      case selected_stay_capacity_outcome(
+             socket,
+             checkin_date,
+             checkout_date,
+             total_people,
+             max_rooms
+           ) do
+        :unknown ->
+          socket
+
+        :ok ->
+          socket
+
+        :insufficient ->
+          socket
+          |> clear_selected_stay()
+          |> YscWeb.Flash.put_toast(
+            :info,
+            "Selected dates no longer have enough room capacity for your party. Please choose new dates.",
+            title: "Dates cleared"
+          )
       end
     else
       socket
     end
   end
 
-  defp selected_stay_can_accommodate?(
+  # Returns :ok | :insufficient | :unknown (empty/missing room snapshot).
+  defp selected_stay_capacity_outcome(
          socket,
          checkin_date,
          checkout_date,
          total_people,
          max_rooms
        ) do
-    if Date.compare(checkin_date, checkout_date) == :lt do
+    if Date.compare(checkin_date, checkout_date) != :lt do
+      :insufficient
+    else
       all_rooms =
         (socket.assigns[:property_rooms_snapshot] || [])
         |> Enum.filter(& &1[:is_active])
 
-      bookings =
-        Bookings.list_bookings(:tahoe, checkin_date, checkout_date,
-          preload: [:rooms],
-          statuses: [:hold, :complete]
-        )
+      if all_rooms == [] do
+        :unknown
+      else
+        bookings =
+          Bookings.list_bookings(:tahoe, checkin_date, checkout_date,
+            preload: [:rooms],
+            statuses: [:hold, :complete]
+          )
 
-      checkin_date
-      |> Date.range(Date.add(checkout_date, -1))
-      |> Enum.all?(fn night ->
-        date_room_availability_status(
-          night,
-          all_rooms,
-          bookings,
-          total_people,
-          max_rooms
-        ) == :available
-      end)
-    else
-      false
+        can_accommodate? =
+          checkin_date
+          |> Date.range(Date.add(checkout_date, -1))
+          |> Enum.all?(fn night ->
+            date_room_availability_status(
+              night,
+              all_rooms,
+              bookings,
+              total_people,
+              max_rooms
+            ) == :available
+          end)
+
+        if can_accommodate?, do: :ok, else: :insufficient
+      end
     end
   end
 

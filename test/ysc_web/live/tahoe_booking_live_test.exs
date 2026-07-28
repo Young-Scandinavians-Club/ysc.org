@@ -735,23 +735,52 @@ defmodule YscWeb.TahoeBookingLiveTest do
       _small_room = create_tahoe_room!(capacity_max: 2)
 
       {checkin, _} = tahoe_booking_dates(21)
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
       checkin_key = Date.to_iso8601(checkin)
+      tooltip_id = "1-tooltip-#{checkin_key}"
 
       {:ok, view, _html} =
         live(conn, ~p"/bookings/tahoe?booking_mode=room&guests_count=2")
 
       render_async(view, 5_000)
 
-      tooltips = :sys.get_state(view.pid).socket.assigns.date_tooltips
-      refute Map.has_key?(tooltips, checkin_key)
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
 
-      render_click(view, "increase-guests", %{})
+      navigate_room_calendar_to_month!(view, checkin)
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+
+      view
+      |> element("#guests-dropdown-button")
+      |> render_click()
+
+      view
+      |> element("#increase-guests-button")
+      |> render_click()
+
       render_async(view, 5_000)
 
-      tooltips_after = :sys.get_state(view.pid).socket.assigns.date_tooltips
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
 
-      assert tooltips_after[checkin_key] =~
+      navigate_room_calendar_to_month!(view, checkin)
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"][disabled]|
+             )
+
+      assert has_element?(
+               view,
+               "##{tooltip_id}",
                "Not enough room capacity for 3 guests"
+             )
     end
 
     test "clears selected dates when guests no longer fit capacity", %{
@@ -779,12 +808,20 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       assert :sys.get_state(view.pid).socket.assigns.checkin_date == checkin
 
-      render_click(view, "increase-guests", %{})
+      view
+      |> element("#guests-dropdown-button")
+      |> render_click()
+
+      view
+      |> element("#increase-guests-button")
+      |> render_click()
+
       render_async(view, 5_000)
 
       assigns = :sys.get_state(view.pid).socket.assigns
       assert assigns.checkin_date == nil
       assert assigns.checkout_date == nil
+      assert assigns.flash["info"] =~ "enough room capacity"
     end
   end
 
@@ -1634,6 +1671,12 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
     RoomsListCache.invalidate()
     AvailabilityCache.invalidate()
+
+    # Caches are process-wide; invalidate again after sandbox rollback.
+    on_exit(fn ->
+      RoomsListCache.invalidate()
+      AvailabilityCache.invalidate()
+    end)
   end
 
   describe "admin config cache rebuild" do
