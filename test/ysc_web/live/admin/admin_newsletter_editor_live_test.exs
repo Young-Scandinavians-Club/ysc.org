@@ -136,6 +136,30 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert has_element?(view, "[phx-click='send-test-email']")
     end
 
+    test "replays the preview when the iframe hook mounts after a sent edition loads",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      edition = edition_fixture(admin, %{"title" => "Already Sent"})
+
+      {:ok, edition} =
+        Newsletter.update_edition(edition, %{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      view = live_editing_edition(conn, edition)
+
+      assert_push_event(view, "preview-html", %{html: initial_html})
+      assert initial_html =~ "Already Sent"
+
+      render_hook(view, "preview-ready", %{})
+
+      assert_push_event(view, "preview-html", %{html: replayed_html})
+      assert replayed_html =~ "Already Sent"
+    end
+
     test "shows draft status badge", %{conn: conn, admin: admin} do
       edition = edition_fixture(admin)
 
