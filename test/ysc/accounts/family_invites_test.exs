@@ -4,6 +4,7 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
   """
   use Ysc.DataCase, async: true
 
+  import Ecto.Query
   import Ysc.AccountsFixtures
   alias Ysc.Accounts
 
@@ -65,13 +66,28 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       primary_user = create_user_with_lifetime_membership()
       email = unique_user_email()
 
-      assert {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
-      assert invite.email == email
-      assert invite.primary_user_id == primary_user.id
-      assert invite.created_by_user_id == primary_user.id
-      assert not is_nil(invite.token)
-      assert not is_nil(invite.expires_at)
-      assert is_nil(invite.accepted_at)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+        assert invite.email == email
+        assert invite.primary_user_id == primary_user.id
+        assert invite.created_by_user_id == primary_user.id
+        assert not is_nil(invite.token)
+        assert not is_nil(invite.expires_at)
+        assert is_nil(invite.accepted_at)
+
+        assert %Oban.Job{
+                 args: %{"idempotency_key" => "family_invite_" <> invite_id}
+               } =
+                 Repo.one(
+                   from(j in Oban.Job,
+                     where:
+                       j.args["idempotency_key"] ==
+                         ^"family_invite_#{invite.id}"
+                   )
+                 )
+
+        assert invite_id == invite.id
+      end)
     end
 
     test "creates an invite for user with family membership" do
@@ -771,13 +787,24 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
 
       {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
 
-      assert {:ok, deleted_invite} =
-               FamilyInvites.revoke_invite(invite.id, primary_user)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, deleted_invite} =
+                 FamilyInvites.revoke_invite(invite.id, primary_user)
 
-      assert deleted_invite.id == invite.id
+        assert deleted_invite.id == invite.id
 
-      # Verify invite is deleted
-      assert is_nil(Repo.get(FamilyInvite, invite.id))
+        # Verify invite is deleted
+        assert is_nil(Repo.get(FamilyInvite, invite.id))
+
+        assert %Oban.Job{} =
+                 Repo.one(
+                   from(j in Oban.Job,
+                     where:
+                       j.args["idempotency_key"] ==
+                         ^"family_invite_cancelled_#{invite.id}"
+                   )
+                 )
+      end)
     end
 
     test "returns error when invite not found" do
