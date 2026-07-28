@@ -240,6 +240,7 @@ defmodule YscWeb.TahoeBookingLive do
         room_refund_policy: room_refund_policy,
         date_tooltips: %{},
         blocked_stay_dates: %{},
+        date_tooltips_party: nil,
         date_tooltips_loading?: false,
         availability_cache_version: 0,
         max_cabin_capacity: @max_cabin_capacity,
@@ -349,19 +350,7 @@ defmodule YscWeb.TahoeBookingLive do
           dates_changed || guests_changed || children_changed ||
             booking_mode_changed
 
-        # Only regenerate date tooltips after connect, when the selectable range changes
-        socket =
-          if connected?(socket) do
-            maybe_load_date_tooltips(
-              socket,
-              restricted_min_date,
-              restricted_max_date,
-              today,
-              seasons
-            )
-          else
-            socket
-          end
+        party_changed = guests_changed || children_changed
 
         date_tooltips = socket.assigns[:date_tooltips] || %{}
 
@@ -387,10 +376,28 @@ defmodule YscWeb.TahoeBookingLive do
             }
           )
           |> then(fn s ->
+            if connected?(socket) do
+              if party_changed do
+                force_reload_date_tooltips(s)
+              else
+                maybe_load_date_tooltips(
+                  s,
+                  restricted_min_date,
+                  restricted_max_date,
+                  today,
+                  seasons
+                )
+              end
+            else
+              s
+            end
+          end)
+          |> then(fn s ->
             if connected?(socket) && needs_booking_recalculation do
               s
               |> enforce_season_booking_mode()
               |> validate_dates()
+              |> clear_selected_stay_if_insufficient_capacity()
               |> update_available_rooms()
               |> calculate_price_if_ready()
             else
@@ -540,11 +547,14 @@ defmodule YscWeb.TahoeBookingLive do
          today,
          seasons
        ) do
+    {total_people, max_rooms} = tooltip_party_params(socket)
+
     needs_load =
       restricted_min_date != socket.assigns[:restricted_min_date] ||
         restricted_max_date != socket.assigns[:restricted_max_date] ||
         !socket.assigns[:date_tooltips] ||
-        socket.assigns[:date_tooltips] == %{}
+        socket.assigns[:date_tooltips] == %{} ||
+        socket.assigns[:date_tooltips_party] != {total_people, max_rooms}
 
     cond do
       !needs_load ->
@@ -558,7 +568,9 @@ defmodule YscWeb.TahoeBookingLive do
             restricted_min_date,
             restricted_max_date,
             today,
-            seasons
+            seasons,
+            total_people,
+            max_rooms
           )
         )
 
@@ -581,6 +593,7 @@ defmodule YscWeb.TahoeBookingLive do
          seasons
        ) do
     property_rooms_snapshot = socket.assigns.property_rooms_snapshot
+    {total_people, max_rooms} = tooltip_party_params(socket)
 
     socket
     |> assign(:date_tooltips_loading?, true)
@@ -591,7 +604,9 @@ defmodule YscWeb.TahoeBookingLive do
           restricted_min_date,
           restricted_max_date,
           today,
-          seasons
+          seasons,
+          total_people,
+          max_rooms
         )
 
       {tooltips, blocked_stay_dates} =
@@ -601,20 +616,33 @@ defmodule YscWeb.TahoeBookingLive do
           today,
           :tahoe,
           seasons,
-          property_rooms_snapshot
+          property_rooms_snapshot,
+          total_people,
+          max_rooms
         )
 
       {request_key, tooltips, blocked_stay_dates}
     end)
   end
 
+  defp tooltip_party_params(socket) do
+    guests_count = socket.assigns[:guests_count] || 1
+    children_count = socket.assigns[:children_count] || 0
+    total_people = guests_count + children_count
+    max_rooms = max_rooms_for_user(socket.assigns)
+    {total_people, max_rooms}
+  end
+
   defp tooltip_request_key(
          restricted_min_date,
          restricted_max_date,
          today,
-         seasons
+         seasons,
+         total_people,
+         max_rooms
        ) do
-    {restricted_min_date, restricted_max_date, today, :erlang.phash2(seasons)}
+    {restricted_min_date, restricted_max_date, today, :erlang.phash2(seasons),
+     total_people, max_rooms}
   end
 
   # Helper function to update socket with parsed params
@@ -686,12 +714,16 @@ defmodule YscWeb.TahoeBookingLive do
         {:ok, {request_key, date_tooltips, blocked_stay_dates}},
         socket
       ) do
+    {total_people, max_rooms} = tooltip_party_params(socket)
+
     current_key =
       tooltip_request_key(
         socket.assigns.restricted_min_date,
         socket.assigns.restricted_max_date,
         socket.assigns.today,
-        socket.assigns.seasons
+        socket.assigns.seasons,
+        total_people,
+        max_rooms
       )
 
     socket =
@@ -702,6 +734,7 @@ defmodule YscWeb.TahoeBookingLive do
           s
           |> assign(:date_tooltips, date_tooltips)
           |> assign(:blocked_stay_dates, blocked_stay_dates)
+          |> assign(:date_tooltips_party, {total_people, max_rooms})
         else
           s
         end
@@ -980,6 +1013,7 @@ defmodule YscWeb.TahoeBookingLive do
       assign(socket,
         date_tooltips: %{},
         blocked_stay_dates: %{},
+        date_tooltips_party: nil,
         date_tooltips_loading?: false,
         date_tooltips_pending_range: nil
       ),
@@ -4834,6 +4868,8 @@ defmodule YscWeb.TahoeBookingLive do
         guests_dropdown_open: socket.assigns.guests_dropdown_open
       )
       |> validate_guest_capacity()
+      |> clear_selected_stay_if_insufficient_capacity()
+      |> force_reload_date_tooltips()
       |> update_available_rooms()
       |> calculate_price_if_ready()
 
@@ -4853,6 +4889,8 @@ defmodule YscWeb.TahoeBookingLive do
         guests_dropdown_open: socket.assigns.guests_dropdown_open
       )
       |> validate_guest_capacity()
+      |> clear_selected_stay_if_insufficient_capacity()
+      |> force_reload_date_tooltips()
       |> update_available_rooms()
       |> calculate_price_if_ready()
 
@@ -4874,6 +4912,8 @@ defmodule YscWeb.TahoeBookingLive do
         guests_dropdown_open: socket.assigns.guests_dropdown_open
       )
       |> validate_guest_capacity()
+      |> clear_selected_stay_if_insufficient_capacity()
+      |> force_reload_date_tooltips()
       |> update_available_rooms()
       |> calculate_price_if_ready()
 
@@ -4893,6 +4933,8 @@ defmodule YscWeb.TahoeBookingLive do
         guests_dropdown_open: socket.assigns.guests_dropdown_open
       )
       |> validate_guest_capacity()
+      |> clear_selected_stay_if_insufficient_capacity()
+      |> force_reload_date_tooltips()
       |> update_available_rooms()
       |> calculate_price_if_ready()
 
@@ -7551,7 +7593,9 @@ defmodule YscWeb.TahoeBookingLive do
          today,
          property,
          seasons,
-         property_rooms_snapshot
+         property_rooms_snapshot,
+         total_people,
+         max_rooms
        ) do
     # Generate tooltips for a more limited date range (1 month before min to 1 month after max)
     # This reduces the number of dates we need to check significantly
@@ -7600,7 +7644,9 @@ defmodule YscWeb.TahoeBookingLive do
         blackouts,
         buyout_dates,
         all_rooms,
-        bookings
+        bookings,
+        total_people,
+        max_rooms
       )
 
     # Build check-in tooltip map
@@ -7617,7 +7663,9 @@ defmodule YscWeb.TahoeBookingLive do
           all_rooms: all_rooms,
           bookings: bookings,
           blackout_dates: blackout_dates,
-          buyout_dates: buyout_dates
+          buyout_dates: buyout_dates,
+          total_people: total_people,
+          max_rooms: max_rooms
         }
 
         tooltip = get_date_unavailability_reason(availability_context)
@@ -7637,7 +7685,9 @@ defmodule YscWeb.TahoeBookingLive do
          blackouts,
          buyout_dates,
          all_rooms,
-         bookings
+         bookings,
+         total_people,
+         max_rooms
        ) do
     blackout_nights =
       blackouts
@@ -7663,19 +7713,34 @@ defmodule YscWeb.TahoeBookingLive do
         )
       end)
 
-    fully_booked_nights =
+    capacity_blocked_nights =
       date_range
       |> Enum.reduce(%{}, fn date, acc ->
-        if check_date_availability_for_rooms(date, all_rooms, bookings) do
-          acc
-        else
-          Map.put(acc, Date.to_iso8601(date), "All rooms are booked")
+        case date_room_availability_status(
+               date,
+               all_rooms,
+               bookings,
+               total_people,
+               max_rooms
+             ) do
+          :available ->
+            acc
+
+          :all_booked ->
+            Map.put(acc, Date.to_iso8601(date), "All rooms are booked")
+
+          :insufficient_capacity ->
+            Map.put(
+              acc,
+              Date.to_iso8601(date),
+              insufficient_capacity_tooltip(total_people)
+            )
         end
       end)
 
     blackout_nights
     |> Map.merge(buyout_nights)
-    |> Map.merge(fully_booked_nights)
+    |> Map.merge(capacity_blocked_nights)
   end
 
   # Get the reason why a date is unavailable (returns nil if available)
@@ -7706,35 +7771,63 @@ defmodule YscWeb.TahoeBookingLive do
       MapSet.member?(context.buyout_dates, context.date) ->
         "The entire cabin is already reserved on this date"
 
-      # Check if all rooms are booked (for room booking mode)
+      # Room inventory / capacity for the selected party size
       true ->
-        # Check if all active rooms are booked for this date
-        # We need to check if there's at least one room available for a single night stay
-        date_available =
-          check_date_availability_for_rooms(
-            context.date,
-            context.all_rooms,
-            context.bookings
-          )
+        case date_room_availability_status(
+               context.date,
+               context.all_rooms,
+               context.bookings,
+               context.total_people,
+               context.max_rooms
+             ) do
+          :available ->
+            nil
 
-        if date_available do
-          nil
-        else
-          "All rooms are booked"
+          :all_booked ->
+            "All rooms are booked"
+
+          :insufficient_capacity ->
+            insufficient_capacity_tooltip(context.total_people)
         end
     end
   end
 
-  # Check if at least one room is available for a specific date (as check-in date)
-  defp check_date_availability_for_rooms(checkin_date, all_rooms, bookings) do
+  defp insufficient_capacity_tooltip(total_people) do
+    guest_label = if total_people == 1, do: "guest", else: "guests"
+    "Not enough room capacity for #{total_people} #{guest_label}"
+  end
+
+  # Free rooms for a one-night stay starting on checkin_date, then whether they
+  # can accommodate the party with at most max_rooms rooms.
+  defp date_room_availability_status(
+         checkin_date,
+         all_rooms,
+         bookings,
+         total_people,
+         max_rooms
+       ) do
+    free_rooms = free_rooms_for_night(checkin_date, all_rooms, bookings)
+
+    cond do
+      free_rooms == [] ->
+        :all_booked
+
+      rooms_can_accommodate?(free_rooms, total_people, max_rooms) ->
+        :available
+
+      true ->
+        :insufficient_capacity
+    end
+  end
+
+  defp free_rooms_for_night(checkin_date, all_rooms, bookings) do
     if Enum.empty?(all_rooms) do
-      false
+      []
     else
       # For tooltip purposes, we check if a single night stay is possible
       # (checkin_date to checkin_date + 1 day)
       checkout_date = Date.add(checkin_date, 1)
 
-      # Filter bookings that overlap with this date range
       overlapping_bookings =
         Enum.filter(bookings, fn booking ->
           booking.status in [:hold, :complete] &&
@@ -7746,7 +7839,6 @@ defmodule YscWeb.TahoeBookingLive do
             )
         end)
 
-      # Get room IDs that are booked
       booked_room_ids =
         overlapping_bookings
         |> Enum.flat_map(fn booking ->
@@ -7758,14 +7850,113 @@ defmodule YscWeb.TahoeBookingLive do
         end)
         |> MapSet.new()
 
-      # Check if there's at least one room not booked
-      available_rooms =
-        Enum.filter(all_rooms, fn room ->
-          not MapSet.member?(booked_room_ids, room[:id])
-        end)
-
-      available_rooms != []
+      Enum.filter(all_rooms, fn room ->
+        room_id = room[:id] || Map.get(room, :id)
+        not MapSet.member?(booked_room_ids, room_id)
+      end)
     end
+  end
+
+  defp rooms_can_accommodate?(_free_rooms, total_people, max_rooms)
+       when total_people <= 0 or max_rooms <= 0 do
+    false
+  end
+
+  defp rooms_can_accommodate?(free_rooms, total_people, max_rooms) do
+    free_rooms
+    |> Enum.map(&room_capacity/1)
+    |> Enum.sort(:desc)
+    |> Enum.take(max_rooms)
+    |> Enum.sum()
+    |> Kernel.>=(total_people)
+  end
+
+  defp room_capacity(room) when is_map(room) do
+    Map.get(room, :capacity_max) || 0
+  end
+
+  defp clear_selected_stay_if_insufficient_capacity(socket) do
+    checkin_date = socket.assigns[:checkin_date]
+    checkout_date = socket.assigns[:checkout_date]
+
+    if checkin_date && checkout_date &&
+         socket.assigns[:selected_booking_mode] == :room do
+      {total_people, max_rooms} = tooltip_party_params(socket)
+
+      if selected_stay_can_accommodate?(
+           socket,
+           checkin_date,
+           checkout_date,
+           total_people,
+           max_rooms
+         ) do
+        socket
+      else
+        clear_selected_stay(socket)
+      end
+    else
+      socket
+    end
+  end
+
+  defp selected_stay_can_accommodate?(
+         socket,
+         checkin_date,
+         checkout_date,
+         total_people,
+         max_rooms
+       ) do
+    if Date.compare(checkin_date, checkout_date) == :lt do
+      all_rooms =
+        (socket.assigns[:property_rooms_snapshot] || [])
+        |> Enum.filter(& &1[:is_active])
+
+      bookings =
+        Bookings.list_bookings(:tahoe, checkin_date, checkout_date,
+          preload: [:rooms],
+          statuses: [:hold, :complete]
+        )
+
+      checkin_date
+      |> Date.range(Date.add(checkout_date, -1))
+      |> Enum.all?(fn night ->
+        date_room_availability_status(
+          night,
+          all_rooms,
+          bookings,
+          total_people,
+          max_rooms
+        ) == :available
+      end)
+    else
+      false
+    end
+  end
+
+  defp clear_selected_stay(socket) do
+    date_form =
+      to_form(
+        %{
+          "checkin_date" => "",
+          "checkout_date" => ""
+        },
+        as: "booking_dates"
+      )
+
+    socket
+    |> assign(
+      checkin_date: nil,
+      checkout_date: nil,
+      selected_room_id: nil,
+      selected_room_ids: [],
+      available_rooms: [],
+      calculated_price: nil,
+      price_error: nil,
+      availability_error: nil,
+      date_validation_errors: %{},
+      date_form: date_form
+    )
+    |> update_url_with_dates(nil, nil)
   end
 
   defp get_timezone_from_socket(socket) do

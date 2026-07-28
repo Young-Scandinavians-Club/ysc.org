@@ -624,6 +624,168 @@ defmodule YscWeb.TahoeBookingLiveTest do
                ~s|#1_calendar button[phx-value-date="#{blocked_night_iso}"][disabled]|
              )
     end
+
+    test "blocks dates when free rooms cannot fit selected guests", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      deactivate_all_tahoe_rooms!()
+      _small_room = create_tahoe_room!(capacity_max: 2)
+
+      {checkin, _} = tahoe_booking_dates(21)
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+      checkin_key = Date.to_iso8601(checkin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?booking_mode=room&guests_count=3")
+
+      render_async(view, 5_000)
+
+      assert :sys.get_state(view.pid).socket.assigns.guests_count == 3
+
+      tooltips = :sys.get_state(view.pid).socket.assigns.date_tooltips
+
+      assert tooltips[checkin_key] =~ "Not enough room capacity for 3 guests"
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"][disabled]|
+             )
+    end
+
+    test "keeps dates selectable when a free room fits selected guests", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      deactivate_all_tahoe_rooms!()
+      _small_room = create_tahoe_room!(capacity_max: 2)
+
+      {checkin, _} = tahoe_booking_dates(21)
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+      checkin_key = Date.to_iso8601(checkin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?booking_mode=room&guests_count=2")
+
+      render_async(view, 5_000)
+
+      tooltips = :sys.get_state(view.pid).socket.assigns.date_tooltips
+      refute Map.has_key?(tooltips, checkin_key)
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+    end
+
+    test "allows dates when combined free rooms fit guests for multi-room members",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      deactivate_all_tahoe_rooms!()
+      _room_a = create_tahoe_room!(capacity_max: 2)
+      _room_b = create_tahoe_room!(capacity_max: 1)
+
+      {checkin, _} = tahoe_booking_dates(21)
+      checkin_iso = "#{Date.to_iso8601(checkin)}T00:00:00Z"
+      checkin_key = Date.to_iso8601(checkin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?booking_mode=room&guests_count=3")
+
+      render_async(view, 5_000)
+
+      tooltips = :sys.get_state(view.pid).socket.assigns.date_tooltips
+      refute Map.has_key?(tooltips, checkin_key)
+
+      view
+      |> element("#1 [phx-click=open-calendar]")
+      |> render_click()
+
+      navigate_room_calendar_to_month!(view, checkin)
+
+      assert has_element?(
+               view,
+               ~s|#1_calendar button[phx-value-date="#{checkin_iso}"]:not([disabled])|
+             )
+    end
+
+    test "reloads date tooltips when guest count changes", %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      deactivate_all_tahoe_rooms!()
+      _small_room = create_tahoe_room!(capacity_max: 2)
+
+      {checkin, _} = tahoe_booking_dates(21)
+      checkin_key = Date.to_iso8601(checkin)
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?booking_mode=room&guests_count=2")
+
+      render_async(view, 5_000)
+
+      tooltips = :sys.get_state(view.pid).socket.assigns.date_tooltips
+      refute Map.has_key?(tooltips, checkin_key)
+
+      render_click(view, "increase-guests", %{})
+      render_async(view, 5_000)
+
+      tooltips_after = :sys.get_state(view.pid).socket.assigns.date_tooltips
+
+      assert tooltips_after[checkin_key] =~
+               "Not enough room capacity for 3 guests"
+    end
+
+    test "clears selected dates when guests no longer fit capacity", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      deactivate_all_tahoe_rooms!()
+      _small_room = create_tahoe_room!(capacity_max: 2)
+
+      {checkin, checkout} = tahoe_booking_dates(21)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room",
+        "guests_count" => "2"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
+      render_async(view, 5_000)
+
+      assert :sys.get_state(view.pid).socket.assigns.checkin_date == checkin
+
+      render_click(view, "increase-guests", %{})
+      render_async(view, 5_000)
+
+      assigns = :sys.get_state(view.pid).socket.assigns
+      assert assigns.checkin_date == nil
+      assert assigns.checkout_date == nil
+    end
   end
 
   describe "season information" do
@@ -1433,7 +1595,16 @@ defmodule YscWeb.TahoeBookingLiveTest do
       )
   end
 
-  defp create_tahoe_room!(suffix \\ "default") do
+  defp create_tahoe_room!(opts \\ [])
+
+  defp create_tahoe_room!(suffix) when is_binary(suffix) do
+    create_tahoe_room!(suffix: suffix)
+  end
+
+  defp create_tahoe_room!(opts) when is_list(opts) do
+    suffix = Keyword.get(opts, :suffix, "default")
+    capacity_max = Keyword.get(opts, :capacity_max, 4)
+
     {:ok, category} =
       %RoomCategory{}
       |> RoomCategory.changeset(%{
@@ -1447,11 +1618,22 @@ defmodule YscWeb.TahoeBookingLiveTest do
         name: "Tahoe calendar test room #{System.unique_integer([:positive])}",
         property: :tahoe,
         room_category_id: category.id,
-        capacity_max: 4
+        capacity_max: capacity_max
       })
 
     RoomsListCache.invalidate()
     room
+  end
+
+  defp deactivate_all_tahoe_rooms! do
+    Bookings.list_rooms(:tahoe)
+    |> Enum.filter(& &1.is_active)
+    |> Enum.each(fn room ->
+      {:ok, _} = Bookings.update_room(room, %{is_active: false})
+    end)
+
+    RoomsListCache.invalidate()
+    AvailabilityCache.invalidate()
   end
 
   describe "admin config cache rebuild" do
