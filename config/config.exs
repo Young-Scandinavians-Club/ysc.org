@@ -53,6 +53,7 @@ config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Local
 config :ysc,
   ses_max_send_rate: 10,
   ses_rate_window_seconds: 1,
+  newsletter_send_interval_ms: 125,
   email_delivery_retry_window_seconds: 48 * 60 * 60
 
 # Configure esbuild (the version is required)

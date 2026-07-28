@@ -587,22 +587,27 @@ defmodule Ysc.Newsletter do
   The recipient count is set only once, when the sender loads its recipients.
   Accepted deliveries are counted from the durable email delivery ledger.
   """
-  def record_edition_delivery_progress(%Edition{} = edition, recipient_count)
-      when is_integer(recipient_count) and recipient_count >= 0 do
+  def record_edition_delivery_progress(%Edition{} = edition, subscribers)
+      when is_list(subscribers) do
+    delivery_keys =
+      Enum.map(subscribers, fn subscriber ->
+        "newsletter_#{edition.id}_#{subscriber.id}"
+      end)
+
     accepted_count =
       from(m in MessageIdempotency,
         where:
           m.message_type == :email and
             m.message_template == "newsletter_edition" and
             m.delivery_status == :accepted and
-            like(m.idempotency_key, ^"newsletter_#{edition.id}_%"),
+            m.idempotency_key in ^delivery_keys,
         select: count(m.id)
       )
       |> Repo.one()
 
     attrs =
       %{sent_count: accepted_count}
-      |> maybe_put_recipient_count(edition, recipient_count)
+      |> maybe_put_recipient_count(edition, length(subscribers))
 
     case update_edition(edition, attrs) do
       {:ok, updated_edition} ->
@@ -622,6 +627,31 @@ defmodule Ysc.Newsletter do
        do: Map.put(attrs, :recipient_count, recipient_count)
 
   defp maybe_put_recipient_count(attrs, %Edition{}, _recipient_count), do: attrs
+
+  @doc false
+  def subscribers_needing_newsletter_delivery(%Edition{} = edition, subscribers)
+      when is_list(subscribers) do
+    delivery_keys =
+      Enum.map(subscribers, fn subscriber ->
+        "newsletter_#{edition.id}_#{subscriber.id}"
+      end)
+
+    accepted_keys =
+      from(m in MessageIdempotency,
+        where:
+          m.message_type == :email and
+            m.message_template == "newsletter_edition" and
+            m.delivery_status == :accepted and
+            m.idempotency_key in ^delivery_keys,
+        select: m.idempotency_key
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    Enum.reject(subscribers, fn subscriber ->
+      MapSet.member?(accepted_keys, "newsletter_#{edition.id}_#{subscriber.id}")
+    end)
+  end
 
   @doc """
   Updates editorial newsletter fields from the admin editor draft save path.
