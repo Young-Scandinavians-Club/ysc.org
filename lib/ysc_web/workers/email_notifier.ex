@@ -251,7 +251,7 @@ defmodule YscWeb.Workers.EmailNotifier do
           code: "render_exception",
           message: Exception.message(error),
           exception: inspect(error.__struct__),
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          stacktrace: __STACKTRACE__
         })
     end
   end

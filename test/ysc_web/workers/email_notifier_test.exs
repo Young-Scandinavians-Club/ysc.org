@@ -279,12 +279,8 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       assert_email_sent(subject: "Unknown User Subject")
     end
 
-    test "raises error for invalid template", %{user: user} do
-      assert {:error,
-              %RuntimeError{
-                message:
-                  "Template module not found for template: non_existent_template"
-              }} =
+    test "records invalid templates as terminal render failures", %{user: user} do
+      assert {:error, :email_render_failed} =
                perform_job(EmailNotifier, %{
                  "recipient" => user.email,
                  "idempotency_key" => "invalid_template_123",
@@ -812,7 +808,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
              )
     end
 
-    test "skips delivery when auth event cannot be resolved for the user" do
+    test "records a terminal failure when auth event cannot be resolved for the user" do
       user = user_fixture()
       other = user_fixture()
 
@@ -824,7 +820,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
         })
         |> Ysc.Repo.insert()
 
-      assert :ok =
+      assert {:error, :email_render_failed} =
                perform_job(EmailNotifier, %{
                  "recipient" => user.email,
                  "idempotency_key" =>
@@ -840,7 +836,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       refute_email_sent()
     end
 
-    test "skips delivery when deferred template is missing user_id" do
+    test "records a terminal failure when deferred template is missing user_id" do
       user = user_fixture()
 
       {:ok, auth_event} =
@@ -851,7 +847,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
         })
         |> Ysc.Repo.insert()
 
-      assert :ok =
+      assert {:error, :email_render_failed} =
                perform_job(EmailNotifier, %{
                  "recipient" => user.email,
                  "idempotency_key" =>
@@ -934,9 +930,10 @@ defmodule YscWeb.Workers.EmailNotifierTest do
                  "category" => "bookings"
                })
 
-      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
-               idempotency_key: key
-             ) == nil
+      assert %Ysc.Messages.MessageIdempotency{delivery_status: :pending} =
+               Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+                 idempotency_key: key
+               )
     end
   end
 
