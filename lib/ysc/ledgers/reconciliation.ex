@@ -402,11 +402,15 @@ defmodule Ysc.Ledgers.Reconciliation do
     end
   end
 
-  # Returns the ledger transaction for a payment. Payments can have transaction type
-  # :payment (customer payments), :payout (Stripe payout virtual payment), or :adjustment.
+  # Returns the primary ledger transaction for a payment.
+  # Refund rows also store payment_id (for linkage); exclude them so a partial
+  # refund cannot be picked non-deterministically via LIMIT 1 without ORDER BY.
+  # Remaining types: :payment (customer), :payout (Stripe transfer), :adjustment.
   defp get_transaction_for_payment(payment_id) do
     from(t in LedgerTransaction,
       where: t.payment_id == ^payment_id,
+      where: t.type != :refund,
+      order_by: [asc: t.inserted_at, asc: t.id],
       limit: 1
     )
     |> Repo.one()
