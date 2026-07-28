@@ -10,6 +10,8 @@ defmodule Ysc.AccountsTest do
   alias Ysc.Subscriptions
   alias Ysc.Newsletter
 
+  import Ecto.Query
+
   defp user_with_lifetime_membership(attrs) do
     user_fixture(attrs)
     |> Ecto.Changeset.change(
@@ -2062,9 +2064,20 @@ defmodule Ysc.AccountsTest do
         })
         |> Repo.update()
 
-      assert {:ok, left} = Accounts.leave_family_membership(sub)
-      assert is_nil(left.primary_user_id)
-      assert is_nil(left.family_relationship)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, left} = Accounts.leave_family_membership(sub)
+        assert is_nil(left.primary_user_id)
+        assert is_nil(left.family_relationship)
+
+        assert Repo.aggregate(
+                 from(j in Oban.Job,
+                   where:
+                     j.args["idempotency_key"] ==
+                       ^"family_member_removed_#{sub.id}_#{primary.id}"
+                 ),
+                 :count
+               ) == 1
+      end)
     end
 
     test "returns error when user is not a sub-account" do

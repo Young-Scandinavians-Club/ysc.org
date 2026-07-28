@@ -87,7 +87,7 @@ defmodule YscWeb.Emails.Notifier do
   # New call sites pass keyword options (reply_to:, cc:, etc.).
   #
   # This standalone enqueue is appropriate for worker-originated fan-out and
-  # external events. State mutations must use `schedule_email_multi/10` in
+  # external events. State mutations must use `schedule_email_multi/3` in
   # their existing Ecto.Multi so the state and Oban job commit together.
   def schedule_email(
         recipient,

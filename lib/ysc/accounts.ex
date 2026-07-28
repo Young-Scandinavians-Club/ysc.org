@@ -3311,7 +3311,7 @@ defmodule Ysc.Accounts do
       primary_user_id = user.primary_user_id
       primary_user = get_primary_user(user)
 
-      result =
+      multi =
         Ecto.Multi.new()
         |> Ecto.Multi.update(
           :sub_account,
@@ -3333,7 +3333,21 @@ defmodule Ysc.Accounts do
             }
           )
         )
-        |> Repo.transaction()
+
+      multi =
+        if primary_user do
+          YscWeb.Emails.Notifier.schedule_email_multi(
+            multi,
+            :family_member_removed_email,
+            fn _changes ->
+              family_member_removed_email_args(user, primary_user)
+            end
+          )
+        else
+          multi
+        end
+
+      result = Repo.transaction(multi)
 
       case result do
         {:ok, %{sub_account: updated_sub_account}} ->
@@ -3349,8 +3363,6 @@ defmodule Ysc.Accounts do
               primary_user,
               updated_sub_account
             )
-
-            send_family_member_removed_email(updated_sub_account, primary_user)
           end
 
           {:ok, updated_sub_account}
@@ -3437,21 +3449,6 @@ defmodule Ysc.Accounts do
     BoardVolunteerBilling.sync_after_family_membership_change(
       primary_user,
       affected_user
-    )
-  end
-
-  defp send_family_member_removed_email(removed_user, primary_user) do
-    attrs = family_member_removed_email_args(removed_user, primary_user)
-
-    YscWeb.Emails.Notifier.schedule_email(
-      attrs.recipient,
-      attrs.idempotency_key,
-      attrs.subject,
-      attrs.template,
-      attrs.variables,
-      attrs.text_body,
-      attrs.user_id,
-      attrs.opts
     )
   end
 
