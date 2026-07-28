@@ -12,6 +12,8 @@ defmodule Ysc.Messages do
   alias Ysc.Messages.MessageIdempotency
 
   alias Ysc.Mailer
+  alias Ysc.Email.DeliveryError
+  alias Ysc.Email.RateLimiter
   alias Ysc.Email.LinkTracking
   alias Ysc.Flowroute.Client
   alias Ysc.SmsRateLimit
@@ -41,20 +43,54 @@ defmodule Ysc.Messages do
       message_template: attrs[:message_template]
     )
 
-    if idempotency_record_exists?(attrs) do
-      Ysc.Logging.info(
-        "Duplicate message detected (pre-check), treating as success",
-        recipient: email.to,
-        idempotency_key: attrs[:idempotency_key],
-        message_template: attrs[:message_template]
-      )
+    if attrs[:delivery_retry] do
+      with {:ok, delivery} <- ensure_email_delivery(attrs),
+           {:send, delivery} <- claim_email_delivery(delivery),
+           :ok <- RateLimiter.check(recipient_count(email)) do
+        deliver_claimed_email(email, attrs, delivery)
+      else
+        {:accepted, _delivery} ->
+          emit_email_sent_telemetry(email, attrs, %{duplicate: true})
+          {:ok, email}
 
+        {:busy, _delivery} ->
+          delivery_error_result(attrs, %{
+            category: :transient,
+            code: "delivery_in_progress",
+            message: "Delivery is already in progress"
+          })
+
+        {:error, :rate_limited, seconds} ->
+          emit_email_telemetry(:rate_limited, attrs, %{
+            retry_after_seconds: seconds
+          })
+
+          {:error, {:snooze, seconds}}
+
+        {:error, :unavailable, reason} ->
+          delivery_error_result(attrs, %{
+            category: :unknown,
+            code: "limiter_unavailable",
+            message: inspect(reason)
+          })
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    else
+      legacy_run_send_message_idempotent(email, attrs)
+    end
+  end
+
+  defp legacy_run_send_message_idempotent(email, attrs) do
+    if idempotency_record_exists?(attrs) do
       emit_email_sent_telemetry(email, attrs, %{duplicate: true})
       {:ok, email}
     else
       try do
-        result = build_and_run_email_transaction(email, attrs)
-        handle_email_transaction_result(result, email, attrs)
+        email
+        |> build_and_run_email_transaction(attrs)
+        |> handle_email_transaction_result(email, attrs)
       rescue
         error in [Ecto.ConstraintError] ->
           handle_email_constraint_error(error, email, attrs)
@@ -69,6 +105,160 @@ defmodule Ysc.Messages do
       end
     end
   end
+
+  @doc false
+  def mark_email_terminal(attrs, delivery_error) do
+    with %MessageIdempotency{} = delivery <- find_email_delivery(attrs) do
+      delivery
+      |> MessageIdempotency.changeset(%{
+        delivery_status: :terminal_failed,
+        delivery_lease_expires_at: nil,
+        last_delivery_error: delivery_error,
+        accepted_at: nil
+      })
+      |> Repo.update()
+
+      emit_email_telemetry(:terminal_failed, attrs, %{
+        category: delivery_error.category
+      })
+    end
+
+    :ok
+  end
+
+  @doc false
+  def ensure_email_delivery(attrs) do
+    delivery_attrs =
+      attrs
+      |> Map.put(:delivery_status, :pending)
+      |> Map.put(:delivery_attempts, 0)
+
+    case create_message_idempotency(delivery_attrs) do
+      {:ok, delivery} ->
+        {:ok, delivery}
+
+      {:error, _changeset} ->
+        case find_email_delivery(attrs) do
+          %MessageIdempotency{} = delivery -> {:ok, delivery}
+          nil -> {:error, :delivery_record_not_found}
+        end
+    end
+  end
+
+  defp claim_email_delivery(
+         %MessageIdempotency{delivery_status: status} = delivery
+       )
+       when status in [:accepted, :suppressed],
+       do: {:accepted, delivery}
+
+  defp claim_email_delivery(%MessageIdempotency{} = delivery) do
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    lease_expires_at = DateTime.add(now, 5 * 60, :second)
+
+    query =
+      from(m in MessageIdempotency,
+        where: m.id == ^delivery.id,
+        where:
+          m.delivery_status in [:pending, :terminal_failed] or
+            (m.delivery_status == :sending and
+               (is_nil(m.delivery_lease_expires_at) or
+                  m.delivery_lease_expires_at < ^now))
+      )
+
+    case Repo.update_all(query,
+           set: [
+             delivery_status: :sending,
+             delivery_lease_expires_at: lease_expires_at,
+             updated_at: now
+           ],
+           inc: [delivery_attempts: 1]
+         ) do
+      {1, _} -> {:send, %{delivery | delivery_status: :sending}}
+      {0, _} -> {:busy, delivery}
+    end
+  end
+
+  defp deliver_claimed_email(email, attrs, delivery) do
+    tracked_email =
+      email
+      |> maybe_disable_ses_link_tracking(attrs[:message_template])
+      |> attach_ses_tracking(attrs)
+
+    case Mailer.deliver(tracked_email) do
+      {:ok, metadata} ->
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+        delivery
+        |> MessageIdempotency.changeset(%{
+          delivery_status: :accepted,
+          delivery_lease_expires_at: nil,
+          accepted_at: now,
+          provider_message_id: Map.get(metadata, :id),
+          provider_request_id: Map.get(metadata, :request_id),
+          last_delivery_error: nil
+        })
+        |> Repo.update!()
+
+        emit_email_sent_telemetry(email, attrs, %{})
+        emit_email_telemetry(:accepted, attrs, %{})
+        {:ok, email}
+
+      error ->
+        delivery_error = DeliveryError.classify(error)
+        persist_email_failure(delivery, delivery_error)
+
+        if delivery_error.category == :rate_limited do
+          RateLimiter.throttle!(retry_after_seconds(delivery.delivery_attempts))
+
+          emit_email_telemetry(:ses_throttled, attrs, %{category: :rate_limited})
+        end
+
+        emit_email_send_failed_telemetry(email, attrs, %{
+          category: delivery_error.category
+        })
+
+        delivery_error_result(attrs, delivery_error)
+    end
+  rescue
+    error ->
+      delivery_error = DeliveryError.classify({:error, error})
+      persist_email_failure(delivery, delivery_error)
+      delivery_error_result(attrs, delivery_error)
+  end
+
+  defp persist_email_failure(delivery, delivery_error) do
+    delivery
+    |> MessageIdempotency.changeset(%{
+      delivery_status:
+        if(delivery_error.category == :permanent,
+          do: :terminal_failed,
+          else: :pending
+        ),
+      delivery_lease_expires_at: nil,
+      last_delivery_error: delivery_error
+    })
+    |> Repo.update()
+  end
+
+  defp find_email_delivery(attrs) do
+    Repo.get_by(MessageIdempotency,
+      message_type: :email,
+      idempotency_key: attrs[:idempotency_key],
+      message_template: attrs[:message_template]
+    )
+  end
+
+  defp recipient_count(email) do
+    length(List.wrap(email.to)) + length(List.wrap(email.cc))
+  end
+
+  defp retry_after_seconds(attempts), do: min(15 * max(1, attempts), 300)
+
+  defp delivery_error_result(%{delivery_retry: true}, delivery_error),
+    do: {:error, {:delivery, delivery_error}}
+
+  defp delivery_error_result(_attrs, _delivery_error),
+    do: {:error, "failed to send email"}
 
   @dialyzer {:nowarn_function, build_and_run_email_transaction: 2}
   defp build_and_run_email_transaction(email, attrs) do
@@ -397,6 +587,20 @@ defmodule Ysc.Messages do
       [:ysc, :email, :send_failed],
       %{count: 1},
       build_email_telemetry_metadata(email, attrs, additional)
+    )
+  end
+
+  defp emit_email_telemetry(event, attrs, additional) do
+    :telemetry.execute(
+      [:ysc, :email, event],
+      %{count: 1},
+      Map.merge(
+        %{
+          template: attrs[:message_template] || "unknown",
+          idempotency_key: attrs[:idempotency_key] || nil
+        },
+        additional
+      )
     )
   end
 

@@ -867,6 +867,20 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
+  Returns whether an email address has been suppressed after a hard bounce.
+
+  Hard-bounce suppression applies to every email category, not only newsletters.
+  """
+  def hard_bounced?(email) when is_binary(email) do
+    case get_subscriber_by_email(email) do
+      %Subscriber{metadata: %{"unsubscribe_reason" => "hard_bounce"}} -> true
+      _ -> false
+    end
+  end
+
+  def hard_bounced?(_), do: false
+
+  @doc """
   Returns email events for a given edition, ordered by most recent first.
   """
   def list_email_events_for_edition(edition_id) when is_binary(edition_id) do

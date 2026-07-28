@@ -649,12 +649,15 @@ defmodule Ysc.NewsletterTest do
       {:ok, sub} =
         Newsletter.subscribe("hard-bounce@example.com", source: "public_signup")
 
+      refute Newsletter.hard_bounced?("hard-bounce@example.com")
+
       assert {:ok, updated} =
                Newsletter.handle_hard_bounce("hard-bounce@example.com")
 
       assert updated.id == sub.id
       refute updated.subscribed
       assert updated.metadata["unsubscribe_reason"] == "hard_bounce"
+      assert Newsletter.hard_bounced?("hard-bounce@example.com")
     end
   end
 

@@ -380,6 +380,13 @@ if config_env() == :prod do
 
   config :ysc, :ses_configuration_set, System.get_env("SES_CONFIGURATION_SET")
 
+  config :ysc,
+    ses_region: System.get_env("SES_AWS_REGION") || "us-west-1",
+    ses_max_send_rate:
+      System.get_env("SES_MAX_SEND_RATE", "10") |> String.to_integer(),
+    ses_rate_window_seconds: 1,
+    email_delivery_retry_window_seconds: 48 * 60 * 60
+
   # Wax (WebAuthn): no third-party API keys (only `PHX_HOST` and optional `WEBAUTHN_RP_ID`).
   # Apply for every prod process including `RELEASE_COMMAND=1` so we never fall back to
   # dev-style defaults in `user_login_live` / `passkey_registration_live` if the block below

@@ -2,6 +2,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
   use Ysc.DataCase, async: false
 
   alias Ysc.Accounts.AuthEvent
+  alias Ysc.Newsletter
   alias YscWeb.Emails.Notifier
   alias YscWeb.Workers.EmailNotifier
   import Ysc.AccountsFixtures
@@ -56,6 +57,53 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
                idempotency_key: "idemp_123"
              )
+    end
+
+    test "skips all email categories after recipient hard bounces", %{
+      user: user
+    } do
+      test_pid = self()
+
+      handler_id =
+        "hard-bounce-suppression-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler_id,
+        [:ysc, :email, :suppressed],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      {:ok, _subscriber} =
+        Newsletter.subscribe(user.email, user_id: user.id)
+
+      assert {:ok, _subscriber} = Newsletter.handle_hard_bounce(user.email)
+
+      assert :ok =
+               perform_job(EmailNotifier, %{
+                 "recipient" => user.email,
+                 "idempotency_key" =>
+                   "hard_bounce_account_#{System.unique_integer()}",
+                 "subject" => "Must not send",
+                 "template" => "booking_confirmation",
+                 "params" => %{},
+                 "text_body" => "Must not send",
+                 "user_id" => user.id,
+                 "category" => "account"
+               })
+
+      assert_no_email_sent()
+
+      assert_receive {:telemetry, [:ysc, :email, :suppressed], %{count: 1},
+                      %{
+                        reason: :hard_bounce,
+                        template: "booking_confirmation",
+                        category: "account"
+                      }}
     end
 
     test "handles legacy args without category", %{user: user} do

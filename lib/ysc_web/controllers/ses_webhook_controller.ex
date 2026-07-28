@@ -188,9 +188,12 @@ defmodule YscWeb.SesWebhookController do
 
       case Newsletter.handle_hard_bounce(email) do
         {:ok, :not_subscribed} ->
+          emit_hard_bounce_telemetry(:not_subscribed)
           :ok
 
         {:ok, subscriber} ->
+          emit_hard_bounce_telemetry(:unsubscribed)
+
           Ysc.Logging.info(
             "SES webhook: subscriber unsubscribed due to hard bounce",
             email: mask_email(email),
@@ -198,6 +201,8 @@ defmodule YscWeb.SesWebhookController do
           )
 
         {:error, reason} ->
+          emit_hard_bounce_telemetry(:error)
+
           Ysc.Logging.error("SES webhook: failed to unsubscribe hard bounce",
             email: mask_email(email),
             error: inspect(reason)
@@ -207,6 +212,14 @@ defmodule YscWeb.SesWebhookController do
   end
 
   defp handle_event_side_effects(_event_type, _email, _ses_event), do: :ok
+
+  defp emit_hard_bounce_telemetry(outcome) do
+    :telemetry.execute(
+      [:ysc, :email, :hard_bounce],
+      %{count: 1},
+      %{outcome: outcome}
+    )
+  end
 
   # SES tags come back as a map where each value is a list of strings.
   # e.g. %{"env" => ["prod"], "user_id" => ["abc123"]}

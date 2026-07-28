@@ -7,8 +7,8 @@ defmodule YscWeb.Workers.EmailNotifier do
   require Ysc.Logging
 
   use Oban.Worker,
-    queue: :mailers,
-    max_attempts: 3,
+    queue: :transactional_mail,
+    max_attempts: 100,
     unique: [
       fields: [:args],
       keys: [:idempotency_key, :template],
@@ -111,6 +111,13 @@ defmodule YscWeb.Workers.EmailNotifier do
     end
   end
 
+  @doc false
+  def queue_for_category(category)
+      when category in [:event, :newsletter, "event", "newsletter"],
+      do: :bulk_mail
+
+  def queue_for_category(_category), do: :transactional_mail
+
   defp perform_with_args(params) do
     Ysc.Logging.debug("EmailNotifier job started",
       job_id: params.job.id,
@@ -122,9 +129,8 @@ defmodule YscWeb.Workers.EmailNotifier do
       category: params.category
     )
 
-    # Check user notification preferences if user_id is provided
     {should_send, final_user_id} =
-      check_user_email_preferences(
+      check_email_delivery(
         params.user_id,
         params.template,
         params.category,
@@ -132,95 +138,23 @@ defmodule YscWeb.Workers.EmailNotifier do
       )
 
     if should_send do
-      try do
-        template_module =
-          YscWeb.Emails.Notifier.get_template_module(params.template)
+      case Ysc.Messages.ensure_email_delivery(
+             delivery_attrs(params, final_user_id)
+           ) do
+        {:ok, _delivery} ->
+          render_and_send(params, final_user_id)
 
-        if template_module do
-          Ysc.Logging.debug(
-            "Template module found: #{inspect(template_module)}"
-          )
-        else
-          error_message =
-            "Template module not found for template: #{params.template}"
-
-          Ysc.Logging.warning(
-            "Template module not found for template: #{params.template}"
-          )
-
-          raise error_message
-        end
-
-        case resolve_render_content(
-               template_module,
-               params.params,
-               params.text_body,
-               final_user_id
-             ) do
-          {:ok, {atomized_params, text_body}} ->
-            Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
-
-            # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
-            normalized_recipient = normalize_recipient(params.recipient)
-
-            result =
-              YscWeb.Emails.Notifier.send_email_idempotent(
-                normalized_recipient,
-                params.idempotency_key,
-                params.subject,
-                template_module,
-                atomized_params,
-                text_body,
-                final_user_id,
-                email_send_opts(params)
-              )
-
-            case result do
-              {:ok, _email} ->
-                Ysc.Logging.info("Email sent successfully",
-                  job_id: params.job.id,
-                  recipient: params.recipient,
-                  idempotency_key: params.idempotency_key
-                )
-
-                :ok
-
-              {:error, reason} ->
-                Ysc.Logging.warning("Failed to send email",
-                  job_id: params.job.id,
-                  recipient: params.recipient,
-                  idempotency_key: params.idempotency_key,
-                  error: reason
-                )
-
-                {:error, reason}
-            end
-
-          {:error, reason} ->
-            Ysc.Logging.warning("Email render skipped",
-              job_id: params.job.id,
-              recipient: params.recipient,
-              idempotency_key: params.idempotency_key,
-              template: params.template,
-              reason: reason
-            )
-
-            :ok
-        end
-      rescue
-        error ->
-          Ysc.Logging.warning("EmailNotifier job failed",
+        {:error, reason} ->
+          Ysc.Logging.error("Unable to create email delivery record",
             job_id: params.job.id,
             recipient: params.recipient,
             idempotency_key: params.idempotency_key,
             template: params.template,
-            error: inspect(error),
-            error_type: inspect(error.__struct__),
-            error_message: Exception.message(error),
-            stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+            error: inspect(reason, limit: :infinity),
+            tags: %{error_type: "email_delivery_record_failed"}
           )
 
-          {:error, error}
+          {:error, :delivery_record_failed}
       end
     else
       Ysc.Logging.info("Email notification skipped",
@@ -233,6 +167,190 @@ defmodule YscWeb.Workers.EmailNotifier do
       :ok
     end
   end
+
+  defp render_and_send(params, final_user_id) do
+    try do
+      template_module =
+        YscWeb.Emails.Notifier.get_template_module(params.template)
+
+      if template_module do
+        Ysc.Logging.debug("Template module found: #{inspect(template_module)}")
+      else
+        error_message =
+          "Template module not found for template: #{params.template}"
+
+        raise error_message
+      end
+
+      case resolve_render_content(
+             template_module,
+             params.params,
+             params.text_body,
+             final_user_id
+           ) do
+        {:ok, {atomized_params, text_body}} ->
+          Ysc.Logging.debug("Atomized params: #{inspect(atomized_params)}")
+
+          # Normalize recipient to ensure it's a string (Swoosh can handle tuples/lists, but we want consistency)
+          normalized_recipient = normalize_recipient(params.recipient)
+
+          result =
+            YscWeb.Emails.Notifier.send_email_idempotent(
+              normalized_recipient,
+              params.idempotency_key,
+              params.subject,
+              template_module,
+              atomized_params,
+              text_body,
+              final_user_id,
+              email_send_opts(params)
+            )
+
+          case result do
+            {:ok, _email} ->
+              Ysc.Logging.info("Email sent successfully",
+                job_id: params.job.id,
+                recipient: params.recipient,
+                idempotency_key: params.idempotency_key
+              )
+
+              :ok
+
+            {:error, {:snooze, seconds}} ->
+              Ysc.Logging.info("Email delivery paced by SES limiter",
+                job_id: params.job.id,
+                recipient: params.recipient,
+                retry_after_seconds: seconds
+              )
+
+              {:snooze, seconds}
+
+            {:error, {:delivery, delivery_error}} ->
+              handle_delivery_error(params, delivery_error)
+
+            {:error, reason} ->
+              Ysc.Logging.warning("Failed to send email",
+                job_id: params.job.id,
+                recipient: params.recipient,
+                idempotency_key: params.idempotency_key,
+                error: reason
+              )
+
+              {:error, reason}
+          end
+
+        {:error, reason} ->
+          mark_render_failure(params, %{
+            code: "render_data_failed",
+            message: inspect(reason)
+          })
+      end
+    rescue
+      error ->
+        mark_render_failure(params, %{
+          code: "render_exception",
+          message: Exception.message(error),
+          exception: inspect(error.__struct__),
+          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+        })
+    end
+  end
+
+  defp delivery_attrs(params, final_user_id) do
+    %{
+      message_type: :email,
+      idempotency_key: params.idempotency_key,
+      message_template: params.template,
+      params: params.params,
+      email: normalize_recipient(params.recipient),
+      user_id: final_user_id,
+      rendered_message: nil,
+      delivery_retry: true
+    }
+  end
+
+  defp mark_render_failure(params, details) do
+    error = %{
+      category: :permanent,
+      code: details.code,
+      message: details.message
+    }
+
+    Ysc.Messages.mark_email_terminal(params_to_attrs(params), error)
+
+    Ysc.Logging.error("Email rendering failed; delivery marked terminal",
+      job_id: params.job.id,
+      recipient: params.recipient,
+      idempotency_key: params.idempotency_key,
+      template: params.template,
+      error_code: details.code,
+      error: details.message,
+      params_keys: render_param_keys(params.params),
+      stacktrace: Map.get(details, :stacktrace),
+      tags: %{
+        error_type: "email_render_failed",
+        email_template: params.template
+      }
+    )
+
+    {:error, :email_render_failed}
+  end
+
+  @impl Oban.Worker
+  def backoff(%Oban.Job{attempt: attempt}) do
+    # Full jitter prevents a throttled batch from retrying in lockstep.
+    cap = min((60 * :math.pow(2, min(attempt, 8))) |> trunc(), 60 * 60)
+    :rand.uniform(max(cap, 1))
+  end
+
+  defp handle_delivery_error(params, %{category: category} = delivery_error) do
+    age_seconds =
+      DateTime.diff(DateTime.utc_now(), params.job.inserted_at, :second)
+
+    if category == :permanent or age_seconds >= retry_window_seconds() do
+      Ysc.Messages.mark_email_terminal(params_to_attrs(params), delivery_error)
+
+      Ysc.Logging.error("Email delivery reached terminal failure",
+        job_id: params.job.id,
+        recipient: params.recipient,
+        category: category,
+        attempts: params.job.attempt,
+        age_seconds: age_seconds
+      )
+
+      :ok
+    else
+      Ysc.Logging.warning("Email delivery will retry",
+        job_id: params.job.id,
+        recipient: params.recipient,
+        category: category,
+        attempts: params.job.attempt
+      )
+
+      {:error, "failed to send email"}
+    end
+  end
+
+  defp params_to_attrs(params) do
+    %{
+      message_type: :email,
+      idempotency_key: params.idempotency_key,
+      message_template: params.template
+    }
+  end
+
+  defp retry_window_seconds do
+    Application.get_env(
+      :ysc,
+      :email_delivery_retry_window_seconds,
+      48 * 60 * 60
+    )
+  end
+
+  defp render_param_keys(params) when is_map(params),
+    do: params |> Map.keys() |> Enum.map(&to_string/1) |> Enum.sort()
+
+  defp render_param_keys(_params), do: []
 
   defp resolve_render_content(template_module, job_params, text_body, user_id) do
     if deferred_email_params?(template_module, job_params) do
@@ -303,6 +421,7 @@ defmodule YscWeb.Workers.EmailNotifier do
 
   defp email_send_opts(params) do
     []
+    |> Keyword.put(:delivery_retry, true)
     |> maybe_put_send_opt(:reply_to, params[:reply_to])
     |> maybe_put_send_opt(:cc, params[:cc])
   end
@@ -373,6 +492,34 @@ defmodule YscWeb.Workers.EmailNotifier do
 
       true ->
         :other
+    end
+  end
+
+  defp check_email_delivery(user_id, template, category, recipient) do
+    email = normalize_recipient(recipient)
+
+    if Ysc.Newsletter.hard_bounced?(email) do
+      :telemetry.execute(
+        [:ysc, :email, :suppressed],
+        %{count: 1},
+        %{
+          reason: :hard_bounce,
+          template: template,
+          category: category
+        }
+      )
+
+      Ysc.Logging.info(
+        "Email skipped because recipient previously hard bounced",
+        user_id: user_id,
+        template: template,
+        category: category,
+        recipient: recipient
+      )
+
+      {false, user_id}
+    else
+      check_user_email_preferences(user_id, template, category, recipient)
     end
   end
 
