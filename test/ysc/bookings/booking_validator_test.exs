@@ -1134,6 +1134,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
          %{rooms: rooms} do
       %{primary: primary, sub_account: sub} = family_with_sub_account(:single)
       {checkin, checkout} = booking_dates_monday_wednesday(5)
+
       _existing =
         insert_family_booking!(primary, rooms, %{
           checkin_date: checkin,
