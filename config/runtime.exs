@@ -386,10 +386,19 @@ if config_env() == :prod do
       _ -> 10
     end
 
+  newsletter_send_rate =
+    case Integer.parse(
+           String.trim(System.get_env("NEWSLETTER_SEND_RATE") || "")
+         ) do
+      {rate, _} when rate > 0 -> min(rate, max(ses_max_send_rate - 2, 1))
+      _ -> min(8, max(ses_max_send_rate - 2, 1))
+    end
+
   config :ysc,
     ses_region: System.get_env("SES_AWS_REGION") || "us-west-1",
     ses_max_send_rate: ses_max_send_rate,
     ses_rate_window_seconds: 1,
+    newsletter_send_interval_ms: Integer.ceil_div(1_000, newsletter_send_rate),
     email_delivery_retry_window_seconds: 48 * 60 * 60
 
   # Wax (WebAuthn): no third-party API keys (only `PHX_HOST` and optional `WEBAUTHN_RP_ID`).

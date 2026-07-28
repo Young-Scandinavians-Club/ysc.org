@@ -145,6 +145,49 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
       assert reloaded.status == :sent
     end
 
+    test "snoozes on the limiter and resumes pending deliveries without duplicates",
+         %{
+           edition: edition
+         } do
+      subscribe("paced-alice@example.com")
+      subscribe("paced-bob@example.com")
+      expected_count = active_subscriber_count()
+
+      {:ok, sending_edition} =
+        Newsletter.update_edition(edition, %{"status" => :sending})
+
+      original_rate = Application.get_env(:ysc, :ses_max_send_rate)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :ses_max_send_rate, original_rate)
+      end)
+
+      Application.put_env(:ysc, :ses_max_send_rate, 1)
+      Repo.query!("DELETE FROM email_rate_limits")
+
+      assert {:snooze, 1} =
+               perform_job(NewsletterSender, %{edition_id: sending_edition.id})
+
+      partial_records = idempotency_records_for(sending_edition)
+
+      assert Enum.count(partial_records, &(&1.delivery_status == :accepted)) ==
+               1
+
+      assert Enum.count(partial_records, &(&1.delivery_status == :pending)) == 1
+      assert Newsletter.get_edition!(sending_edition.id).status == :sending
+
+      Application.put_env(:ysc, :ses_max_send_rate, 10)
+      Repo.query!("DELETE FROM email_rate_limits")
+
+      assert :ok =
+               perform_job(NewsletterSender, %{edition_id: sending_edition.id})
+
+      records = idempotency_records_for(sending_edition)
+      assert length(records) == expected_count
+      assert Enum.all?(records, &(&1.delivery_status == :accepted))
+      assert Newsletter.get_edition!(sending_edition.id).status == :sent
+    end
+
     test "skips a :sent edition and does not double-send", %{edition: edition} do
       {:ok, _} = Newsletter.update_edition(edition, %{"status" => :sent})
       subscribe("member@example.com")

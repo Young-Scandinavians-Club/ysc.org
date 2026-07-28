@@ -86,58 +86,32 @@ defmodule YscWeb.Workers.NewsletterSender do
 
     subscribers = Newsletter.list_subscribers(subscribed: true)
 
-    results =
-      Task.async_stream(
-        subscribers,
-        fn subscriber ->
-          assigns =
-            NewsletterEdition.build_assigns(edition, subscriber, posts, events)
+    pending_subscribers =
+      Newsletter.subscribers_needing_newsletter_delivery(edition, subscribers)
 
-          html = NewsletterEdition.render(assigns)
+    result =
+      Enum.reduce_while(pending_subscribers, %{failures: 0}, fn subscriber,
+                                                                acc ->
+        case send_to_subscriber(edition, subscriber, posts, events) do
+          :ok ->
+            pace_next_delivery()
+            {:cont, acc}
 
-          email =
-            new()
-            |> to(subscriber.email)
-            |> from({Ysc.EmailConfig.from_name(), Ysc.EmailConfig.from_email()})
-            |> subject("[YSC] #{edition.subject}")
-            |> html_body(html)
-            |> text_body(plain_text_fallback(edition))
+          {:snooze, seconds} ->
+            {:halt, {:snooze, seconds, acc.failures}}
 
-          idempotency_attrs = %{
-            message_type: :email,
-            idempotency_key: "newsletter_#{edition.id}_#{subscriber.id}",
-            message_template: "newsletter_edition",
-            params: %{edition_id: edition.id},
-            email: subscriber.email,
-            user_id: subscriber.user_id,
-            rendered_message: html,
-            edition_id: edition.id,
-            subscriber_id: subscriber.id,
-            delivery_retry: true
-          }
+          {:error, reason} ->
+            Ysc.Logging.warning("NewsletterSender: failed to send",
+              email: subscriber.email,
+              reason: inspect(reason)
+            )
 
-          case Messages.run_send_message_idempotent(email, idempotency_attrs) do
-            {:ok, _} ->
-              :ok
+            pace_next_delivery()
+            {:cont, %{acc | failures: acc.failures + 1}}
+        end
+      end)
 
-            {:error, reason} ->
-              Ysc.Logging.warning("NewsletterSender: failed to send",
-                email: subscriber.email,
-                reason: inspect(reason)
-              )
-
-              {:error, reason}
-          end
-        end,
-        max_concurrency: 5,
-        timeout: 30_000
-      )
-      |> Enum.to_list()
-
-    case Newsletter.record_edition_delivery_progress(
-           edition,
-           length(subscribers)
-         ) do
+    case Newsletter.record_edition_delivery_progress(edition, subscribers) do
       {:ok, _updated_edition} ->
         :ok
 
@@ -149,21 +123,92 @@ defmodule YscWeb.Workers.NewsletterSender do
         )
     end
 
-    failed_count =
-      Enum.count(results, fn
-        {:ok, :ok} -> false
-        _ -> true
-      end)
+    handle_send_result(result, edition, posts, events, subscribers)
+  end
 
-    if failed_count > 0 do
-      Ysc.Logging.warning("NewsletterSender: retrying incomplete delivery",
-        edition_id: edition.id,
-        failed_count: failed_count
-      )
+  defp send_to_subscriber(edition, subscriber, posts, events) do
+    assigns =
+      NewsletterEdition.build_assigns(edition, subscriber, posts, events)
 
-      {:error, {:incomplete_delivery, failed_count}}
-    else
-      complete_newsletter_delivery(edition, posts, events, subscribers)
+    html = NewsletterEdition.render(assigns)
+
+    email =
+      new()
+      |> to(subscriber.email)
+      |> from({Ysc.EmailConfig.from_name(), Ysc.EmailConfig.from_email()})
+      |> subject("[YSC] #{edition.subject}")
+      |> html_body(html)
+      |> text_body(plain_text_fallback(edition))
+
+    idempotency_attrs = %{
+      message_type: :email,
+      idempotency_key: "newsletter_#{edition.id}_#{subscriber.id}",
+      message_template: "newsletter_edition",
+      params: %{edition_id: edition.id},
+      email: subscriber.email,
+      user_id: subscriber.user_id,
+      rendered_message: html,
+      edition_id: edition.id,
+      subscriber_id: subscriber.id,
+      delivery_retry: true
+    }
+
+    case Messages.run_send_message_idempotent(email, idempotency_attrs) do
+      {:ok, _} -> :ok
+      {:error, {:snooze, seconds}} -> {:snooze, seconds}
+      {:error, {:delivery, %{category: :rate_limited}}} -> {:snooze, 15}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp handle_send_result(
+         {:snooze, seconds, 0},
+         _edition,
+         _posts,
+         _events,
+         _subscribers
+       ),
+       do: {:snooze, seconds}
+
+  defp handle_send_result(
+         {:snooze, _seconds, failures},
+         edition,
+         _posts,
+         _events,
+         _subscribers
+       ) do
+    log_incomplete_delivery(edition, failures)
+    {:error, {:incomplete_delivery, failures}}
+  end
+
+  defp handle_send_result(%{failures: 0}, edition, posts, events, subscribers),
+    do: complete_newsletter_delivery(edition, posts, events, subscribers)
+
+  defp handle_send_result(
+         %{failures: failures},
+         edition,
+         _posts,
+         _events,
+         _subscribers
+       ) do
+    log_incomplete_delivery(edition, failures)
+    {:error, {:incomplete_delivery, failures}}
+  end
+
+  defp log_incomplete_delivery(edition, failed_count) do
+    Ysc.Logging.warning("NewsletterSender: retrying incomplete delivery",
+      edition_id: edition.id,
+      failed_count: failed_count
+    )
+  end
+
+  defp pace_next_delivery do
+    case Application.get_env(:ysc, :newsletter_send_interval_ms, 0) do
+      interval when is_integer(interval) and interval > 0 ->
+        Process.sleep(interval)
+
+      _ ->
+        :ok
     end
   end
 
