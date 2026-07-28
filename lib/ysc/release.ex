@@ -324,7 +324,8 @@ defmodule Ysc.Release do
   @doc """
   Clears `wp_migration_active`, re-enabling Stripe webhook side effects (emails, QuickBooks, etc.).
 
-  Run after migration load and validation are complete.
+  Prefer relying on app boot (which always clears this flag) or a successful
+  `wp_load` finish. Use this for an immediate unlock without restarting.
 
   Usage in production:
 
@@ -335,30 +336,17 @@ defmodule Ysc.Release do
     {:ok, _} = Application.ensure_all_started(@app)
     require Ysc.Logging
 
-    current = Ysc.Settings.get_setting_safe("wp_migration_active")
+    case Ysc.Settings.ensure_wp_migration_inactive() do
+      :ok ->
+        Ysc.Logging.info(
+          "[WP Migration] Comms suppression DISABLED via Release.wp_migration_unlock"
+        )
 
-    if current == "true" do
-      case Ysc.Settings.update_setting("wp_migration_active", "false") do
-        {:ok, _} ->
-          Ysc.Logging.info(
-            "[WP Migration] Comms suppression DISABLED via Release.wp_migration_unlock"
-          )
+        :ok
 
-          :ok
-
-        {:error, reason} ->
-          Ysc.Logging.error("Failed to clear wp_migration_active",
-            error: reason
-          )
-
-          {:error, reason}
-      end
-    else
-      Ysc.Logging.info(
-        "[WP Migration] wp_migration_active is already #{inspect(current)} — nothing to do"
-      )
-
-      :ok
+      {:error, reason} = error ->
+        Ysc.Logging.error("Failed to clear wp_migration_active", error: reason)
+        error
     end
   end
 

@@ -94,9 +94,45 @@ defmodule Ysc.Settings do
   end
 
   def init(state) do
+    # Migration is complete — never leave webhook/email suppression enabled.
+    ensure_wp_migration_inactive()
     # Warm up cache on startup
     cache_all_settings()
     {:ok, state}
+  end
+
+  @doc """
+  Forces `wp_migration_active` to `"false"` when present.
+
+  WordPress migration is done; this setting must stay off so Stripe webhook
+  side effects (emails, QuickBooks, etc.) are not suppressed. Called on app
+  boot and after WP load finishes.
+  """
+  def ensure_wp_migration_inactive do
+    case Repo.get_by(SiteSetting, name: "wp_migration_active") do
+      nil ->
+        :ok
+
+      %{value: value} when value != "true" ->
+        :ok
+
+      _setting ->
+        case update_setting("wp_migration_active", "false") do
+          {:ok, _} ->
+            Ysc.Logging.info(
+              "[Settings] Cleared wp_migration_active (migration complete)"
+            )
+
+            :ok
+
+          {:error, reason} ->
+            Ysc.Logging.error("Failed to clear wp_migration_active",
+              error: reason
+            )
+
+            {:error, reason}
+        end
+    end
   end
 
   defp cache_all_settings do
