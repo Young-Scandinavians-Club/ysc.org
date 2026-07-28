@@ -36,6 +36,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:saving?, false)
      |> assign(:preview_cover_image_id, nil)
      |> assign(:preview_ready?, false)
+     |> assign(:_preview_html, nil)
      |> assign(:post_visible_count, 10)
      |> assign(:event_visible_count, 10)
      |> assign(:readonly?, false)
@@ -290,6 +291,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       end
 
     socket
+    |> assign(:_preview_html, preview_html)
     |> assign(:preview_posts, preview_posts)
     |> assign(:preview_events, preview_events)
     |> assign(:preview_cover_image_id, cover_image_id)
@@ -1314,6 +1316,16 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp event_image_url(%{cover_image: img}), do: image_url(img)
 
   @impl true
+  def handle_event("preview-ready", _params, socket) do
+    case socket.assigns._preview_html do
+      html when is_binary(html) ->
+        {:noreply, push_event(socket, "preview-html", %{html: html})}
+
+      nil ->
+        {:noreply, socket}
+    end
+  end
+
   def handle_event(
         "validate",
         _params,

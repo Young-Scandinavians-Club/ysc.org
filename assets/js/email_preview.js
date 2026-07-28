@@ -78,6 +78,10 @@ const EmailPreview = {
         this.handleEvent("preview-html", ({ html }) => {
             if (html) this.renderPreview(html);
         });
+
+        // The server may finish rendering before this hook is mounted. Request
+        // the latest HTML so a preview event lost during connection is replayed.
+        this.pushEvent("preview-ready", {});
     },
 };
 
