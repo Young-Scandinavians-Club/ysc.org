@@ -276,6 +276,41 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert Money.equal?(result.totals.payments_table, expected)
     end
 
+    test "does not treat linked refund transactions as the payment transaction",
+         %{user: user} do
+      # Refund ledger_transactions also set payment_id. Without excluding :refund,
+      # LIMIT 1 can non-deterministically pick the refund row and fail amount checks.
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(15_000, :USD),
+          external_provider: :stripe,
+          external_payment_id: "pi_payment_with_refund_tx",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(450, :USD),
+          description: "Payment with refund",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      {:ok, {_refund, _transaction, _entries}} =
+        Ledgers.process_refund(%{
+          payment_id: payment.id,
+          refund_amount: Money.new(7_500, :USD),
+          reason: "Partial refund",
+          external_refund_id: "re_payment_with_refund_tx"
+        })
+
+      result = Reconciliation.reconcile_payments()
+
+      refute Enum.any?(result.discrepancies, fn d ->
+               d.payment_id == payment.id
+             end),
+             inspect(result.discrepancies)
+    end
+
     test "does not report payout payments as missing ledger transaction", %{
       user: _user
     } do
