@@ -157,6 +157,20 @@ defmodule YscWeb.SesWebhookControllerTest do
     end
 
     test "records an open event in the database", %{conn: conn} do
+      test_pid = self()
+      handler_id = "ses-webhook-event-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler_id,
+        [:ysc, :email, :ses_webhook],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
       {:ok, subscriber} = Newsletter.subscribe("opener@example.com")
 
       ses_event =
@@ -179,6 +193,12 @@ defmodule YscWeb.SesWebhookControllerTest do
       # Should NOT unsubscribe on open
       subscriber = Repo.reload!(subscriber)
       assert subscriber.subscribed == true
+
+      assert_receive {:telemetry, [:ysc, :email, :ses_webhook],
+                      %{count: 1, duration: duration},
+                      %{event_type: "open", outcome: :recorded}}
+
+      assert duration >= 0
     end
 
     test "records open event with edition_id and subscriber_id tags", %{
@@ -368,6 +388,20 @@ defmodule YscWeb.SesWebhookControllerTest do
     end
 
     test "records a hard bounce and unsubscribes the subscriber", %{conn: conn} do
+      test_pid = self()
+      handler_id = "hard-bounce-webhook-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach(
+        handler_id,
+        [:ysc, :email, :hard_bounce],
+        fn event, measurements, metadata, _config ->
+          send(test_pid, {:telemetry, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
       {:ok, subscriber} = Newsletter.subscribe("hardbounce@example.com")
       assert subscriber.subscribed == true
 
@@ -398,6 +432,9 @@ defmodule YscWeb.SesWebhookControllerTest do
       assert subscriber.source == "hard_bounce"
       assert subscriber.metadata["unsubscribe_reason"] == "hard_bounce"
       assert subscriber.metadata["hard_bounced_at"] != nil
+
+      assert_receive {:telemetry, [:ysc, :email, :hard_bounce], %{count: 1},
+                      %{outcome: :unsubscribed}}
     end
 
     test "hard bounce for non-subscriber returns 200 without error", %{

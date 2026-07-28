@@ -7,7 +7,7 @@ defmodule YscWeb.Workers.SmsNotifier do
   require Ysc.Logging
 
   use Oban.Worker,
-    queue: :mailers,
+    queue: :sms,
     max_attempts: 3,
     unique: [
       fields: [:args],

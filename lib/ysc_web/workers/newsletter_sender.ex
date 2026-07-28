@@ -9,8 +9,8 @@ defmodule YscWeb.Workers.NewsletterSender do
   require Ysc.Logging
 
   use Oban.Worker,
-    queue: :mailers,
-    max_attempts: 3,
+    queue: :bulk_mail,
+    max_attempts: 100,
     unique: [
       keys: [:edition_id],
       states: :incomplete,
@@ -59,6 +59,12 @@ defmodule YscWeb.Workers.NewsletterSender do
     end
   end
 
+  @impl Oban.Worker
+  def backoff(%Oban.Job{attempt: attempt}) do
+    cap = min((60 * :math.pow(2, min(attempt, 8))) |> trunc(), 60 * 60)
+    :rand.uniform(max(cap, 1))
+  end
+
   if Ysc.Env.dev?() do
     defp maybe_dev_delay, do: Process.sleep(8_000)
   else
@@ -80,7 +86,7 @@ defmodule YscWeb.Workers.NewsletterSender do
 
     subscribers = Newsletter.list_subscribers(subscribed: true)
 
-    sent_count =
+    results =
       Task.async_stream(
         subscribers,
         fn subscriber ->
@@ -106,12 +112,13 @@ defmodule YscWeb.Workers.NewsletterSender do
             user_id: subscriber.user_id,
             rendered_message: html,
             edition_id: edition.id,
-            subscriber_id: subscriber.id
+            subscriber_id: subscriber.id,
+            delivery_retry: true
           }
 
           case Messages.run_send_message_idempotent(email, idempotency_attrs) do
             {:ok, _} ->
-              1
+              :ok
 
             {:error, reason} ->
               Ysc.Logging.warning("NewsletterSender: failed to send",
@@ -119,18 +126,37 @@ defmodule YscWeb.Workers.NewsletterSender do
                 reason: inspect(reason)
               )
 
-              0
+              {:error, reason}
           end
         end,
         max_concurrency: 5,
         timeout: 30_000
       )
-      |> Enum.reduce(0, fn {:ok, n}, acc -> acc + n end)
+      |> Enum.to_list()
 
+    failed_count =
+      Enum.count(results, fn
+        {:ok, :ok} -> false
+        _ -> true
+      end)
+
+    if failed_count > 0 do
+      Ysc.Logging.warning("NewsletterSender: retrying incomplete delivery",
+        edition_id: edition.id,
+        failed_count: failed_count
+      )
+
+      {:error, {:incomplete_delivery, failed_count}}
+    else
+      complete_newsletter_delivery(edition, posts, events, subscribers)
+    end
+  end
+
+  defp complete_newsletter_delivery(edition, posts, events, subscribers) do
     attrs = %{
       status: :sent,
       sent_at: DateTime.utc_now() |> DateTime.truncate(:second),
-      sent_count: sent_count
+      sent_count: length(subscribers)
     }
 
     case Newsletter.update_edition(edition, attrs) do
@@ -160,7 +186,7 @@ defmodule YscWeb.Workers.NewsletterSender do
 
         Ysc.Logging.info("NewsletterSender: completed",
           edition_id: edition.id,
-          sent_count: sent_count,
+          sent_count: length(subscribers),
           subscriber_count: length(subscribers)
         )
 

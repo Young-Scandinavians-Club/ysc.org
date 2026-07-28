@@ -29,6 +29,8 @@ defmodule YscWeb.SesWebhookController do
   alias Ysc.Newsletter
   alias Ysc.SNS.SignatureVerifier
 
+  @ses_event_types ~w(open click bounce complaint send delivery)
+
   @doc """
   Handles SNS HTTP POST notifications.
   """
@@ -104,6 +106,12 @@ defmodule YscWeb.SesWebhookController do
         process_ses_event(ses_event)
 
       {:error, reason} ->
+        emit_ses_webhook_telemetry(
+          "unknown",
+          :invalid_payload,
+          System.monotonic_time()
+        )
+
         Ysc.Logging.warning("SES webhook: failed to decode SES event JSON",
           reason: inspect(reason),
           message: sns_message["Message"]
@@ -119,11 +127,15 @@ defmodule YscWeb.SesWebhookController do
   end
 
   defp process_ses_event(ses_event) do
+    started_at = System.monotonic_time()
     tags = extract_tags(ses_event)
     event_env = Map.get(tags, "env")
     current_env = to_string(Ysc.Env.current())
+    event_type = get_event_type(ses_event)
 
     if event_env != current_env do
+      emit_ses_webhook_telemetry(event_type, :ignored_environment, started_at)
+
       Ysc.Logging.info(
         "SES webhook: skipping event from different environment",
         event_env: event_env,
@@ -132,16 +144,11 @@ defmodule YscWeb.SesWebhookController do
 
       :ok
     else
-      do_process_ses_event(ses_event, tags)
+      do_process_ses_event(ses_event, tags, event_type, started_at)
     end
   end
 
-  defp do_process_ses_event(ses_event, tags) do
-    event_type =
-      ses_event
-      |> Map.get("eventType", "")
-      |> String.downcase()
-
+  defp do_process_ses_event(ses_event, tags, event_type, started_at) do
     recipients = get_in(ses_event, ["mail", "destination"]) || []
     email = List.first(recipients) || ""
 
@@ -150,8 +157,11 @@ defmodule YscWeb.SesWebhookController do
     case Newsletter.record_email_event(event_attrs) do
       {:ok, _event} ->
         handle_event_side_effects(event_type, email, ses_event)
+        emit_ses_webhook_telemetry(event_type, :recorded, started_at)
 
       {:error, changeset} ->
+        emit_ses_webhook_telemetry(event_type, :record_failed, started_at)
+
         Ysc.Logging.warning("SES webhook: failed to record email event",
           errors: inspect(changeset.errors),
           event_type: event_type,
@@ -188,9 +198,12 @@ defmodule YscWeb.SesWebhookController do
 
       case Newsletter.handle_hard_bounce(email) do
         {:ok, :not_subscribed} ->
+          emit_hard_bounce_telemetry(:not_subscribed)
           :ok
 
         {:ok, subscriber} ->
+          emit_hard_bounce_telemetry(:unsubscribed)
+
           Ysc.Logging.info(
             "SES webhook: subscriber unsubscribed due to hard bounce",
             email: mask_email(email),
@@ -198,6 +211,8 @@ defmodule YscWeb.SesWebhookController do
           )
 
         {:error, reason} ->
+          emit_hard_bounce_telemetry(:error)
+
           Ysc.Logging.error("SES webhook: failed to unsubscribe hard bounce",
             email: mask_email(email),
             error: inspect(reason)
@@ -207,6 +222,38 @@ defmodule YscWeb.SesWebhookController do
   end
 
   defp handle_event_side_effects(_event_type, _email, _ses_event), do: :ok
+
+  defp emit_hard_bounce_telemetry(outcome) do
+    :telemetry.execute(
+      [:ysc, :email, :hard_bounce],
+      %{count: 1},
+      %{outcome: outcome}
+    )
+  end
+
+  defp emit_ses_webhook_telemetry(event_type, outcome, started_at) do
+    duration =
+      System.monotonic_time()
+      |> Kernel.-(started_at)
+      |> System.convert_time_unit(:native, :millisecond)
+
+    :telemetry.execute(
+      [:ysc, :email, :ses_webhook],
+      %{count: 1, duration: duration},
+      %{event_type: metric_event_type(event_type), outcome: outcome}
+    )
+  end
+
+  defp get_event_type(ses_event) do
+    ses_event
+    |> Map.get("eventType", "")
+    |> String.downcase()
+  end
+
+  defp metric_event_type(event_type) when event_type in @ses_event_types,
+    do: event_type
+
+  defp metric_event_type(_event_type), do: "unknown"
 
   # SES tags come back as a map where each value is a list of strings.
   # e.g. %{"env" => ["prod"], "user_id" => ["abc123"]}

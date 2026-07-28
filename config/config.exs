@@ -48,6 +48,13 @@ config :ysc, YscWeb.Endpoint,
 # at the `config/runtime.exs`.
 config :ysc, Ysc.Mailer, adapter: Swoosh.Adapters.Local
 
+# Shared SES pacing defaults. Production may override these from its verified
+# SES sending quota in runtime.exs.
+config :ysc,
+  ses_max_send_rate: 10,
+  ses_rate_window_seconds: 1,
+  email_delivery_retry_window_seconds: 48 * 60 * 60
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.17.11",
@@ -113,7 +120,17 @@ config :argon2_elixir,
 config :ysc, Oban,
   repo: Ysc.Repo,
   notifier: Oban.Notifiers.PG,
-  queues: [default: 10, media: 5, exports: 3, mailers: 20, maintenance: 2],
+  queues: [
+    default: 10,
+    media: 5,
+    exports: 3,
+    transactional_mail: 10,
+    bulk_mail: 2,
+    sms: 3,
+    # Retained only to drain jobs created before queue prioritization.
+    mailers: 2,
+    maintenance: 2
+  ],
   log: false,
   plugins: [
     # Maintain for 5 days

@@ -12,6 +12,7 @@ defmodule Ysc.Newsletter do
   import Ecto.Query
 
   alias Ysc.Repo
+  alias Ysc.Email.Suppression
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Accounts.Email
   alias Ysc.Newsletter.Edition
@@ -839,6 +840,8 @@ defmodule Ysc.Newsletter do
   `{:error, changeset}` on update failure.
   """
   def handle_hard_bounce(email) when is_binary(email) do
+    :ok = Suppression.suppress_hard_bounce(email)
+
     case get_subscriber_by_email(email) do
       nil ->
         {:ok, :not_subscribed}
@@ -865,6 +868,17 @@ defmodule Ysc.Newsletter do
         |> Repo.update()
     end
   end
+
+  @doc """
+  Returns whether an email address has been suppressed after a hard bounce.
+
+  Hard-bounce suppression applies to every email category, not only newsletters.
+  """
+  def hard_bounced?(email) when is_binary(email) do
+    Suppression.hard_bounced?(email)
+  end
+
+  def hard_bounced?(_), do: false
 
   @doc """
   Returns email events for a given edition, ordered by most recent first.

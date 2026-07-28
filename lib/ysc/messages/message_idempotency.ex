@@ -25,6 +25,17 @@ defmodule Ysc.Messages.MessageIdempotency do
 
     field :rendered_message, :string
 
+    field :delivery_status, Ecto.Enum,
+      values: [:pending, :sending, :accepted, :suppressed, :terminal_failed],
+      default: :accepted
+
+    field :delivery_attempts, :integer, default: 0
+    field :delivery_lease_expires_at, :utc_datetime
+    field :last_delivery_error, :map
+    field :provider_message_id, :string
+    field :provider_request_id, :string
+    field :accepted_at, :utc_datetime
+
     timestamps()
   end
 
@@ -38,7 +49,14 @@ defmodule Ysc.Messages.MessageIdempotency do
       :email,
       :user_id,
       :phone_number,
-      :rendered_message
+      :rendered_message,
+      :delivery_status,
+      :delivery_attempts,
+      :delivery_lease_expires_at,
+      :last_delivery_error,
+      :provider_message_id,
+      :provider_request_id,
+      :accepted_at
     ])
     |> validate_required([:message_type, :idempotency_key, :message_template])
     |> unique_constraint(

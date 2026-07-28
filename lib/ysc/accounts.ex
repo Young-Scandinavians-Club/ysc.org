@@ -3392,6 +3392,12 @@ defmodule Ysc.Accounts do
             }
           )
         )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_removed_email,
+          fn _changes ->
+            family_member_removed_email_args(sub_account, primary_user)
+          end
+        )
         |> Repo.transaction()
 
       case result do
@@ -3408,7 +3414,6 @@ defmodule Ysc.Accounts do
             updated_sub_account
           )
 
-          send_family_member_removed_email(updated_sub_account, primary_user)
           {:ok, updated_sub_account}
 
         {:error, _, changeset, _} ->
@@ -3436,6 +3441,21 @@ defmodule Ysc.Accounts do
   end
 
   defp send_family_member_removed_email(removed_user, primary_user) do
+    attrs = family_member_removed_email_args(removed_user, primary_user)
+
+    YscWeb.Emails.Notifier.schedule_email(
+      attrs.recipient,
+      attrs.idempotency_key,
+      attrs.subject,
+      attrs.template,
+      attrs.variables,
+      attrs.text_body,
+      attrs.user_id,
+      attrs.opts
+    )
+  end
+
+  defp family_member_removed_email_args(removed_user, primary_user) do
     first_name = removed_user.first_name || "there"
     primary_name = primary_user.first_name || "the primary account holder"
 
@@ -3447,13 +3467,13 @@ defmodule Ysc.Accounts do
     idempotency_key =
       "family_member_removed_#{removed_user.id}_#{primary_user.id}"
 
-    YscWeb.Emails.Notifier.schedule_email(
-      removed_user.email,
-      idempotency_key,
-      "Removed from Family Membership - YSC",
-      "family_member_removed",
-      email_vars,
-      """
+    %{
+      recipient: removed_user.email,
+      idempotency_key: idempotency_key,
+      subject: "Removed from Family Membership - YSC",
+      template: "family_member_removed",
+      variables: email_vars,
+      text_body: """
       ==============================
 
       Hi #{first_name},
@@ -3466,8 +3486,9 @@ defmodule Ysc.Accounts do
 
       ==============================
       """,
-      removed_user.id
-    )
+      user_id: removed_user.id,
+      opts: []
+    }
   end
 
   ## Memberships (admin view)

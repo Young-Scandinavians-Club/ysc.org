@@ -20,7 +20,7 @@ defmodule YscWeb.Workers.EmailNotifierMailerFailureTest do
   end
 
   describe "perform/1 when Mailer.deliver fails" do
-    test "returns error tuple and does not create idempotency row", %{
+    test "returns error tuple and records a retryable delivery failure", %{
       mailer_config: mailer_config
     } do
       Application.put_env(
@@ -64,9 +64,10 @@ defmodule YscWeb.Workers.EmailNotifierMailerFailureTest do
                  "category" => "bookings"
                })
 
-      assert Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
-               idempotency_key: key
-             ) == nil
+      assert %Ysc.Messages.MessageIdempotency{delivery_status: :pending} =
+               Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+                 idempotency_key: key
+               )
     end
   end
 end

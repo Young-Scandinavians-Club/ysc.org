@@ -3471,6 +3471,7 @@ defmodule Ysc.EventsTest do
                  })
 
         assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.queue == "transactional_mail"
         assert job.args["template"] == "ticket_reservation_created"
         assert job.args["recipient"] == member.email
         assert job.args["user_id"] == member.id

@@ -631,10 +631,12 @@ defmodule Ysc.NewsletterTest do
     end
 
     test "handle_hard_bounce returns not_subscribed for unknown email" do
+      email = "nobody-#{System.unique_integer([:positive])}@example.com"
+
       assert {:ok, :not_subscribed} =
-               Newsletter.handle_hard_bounce(
-                 "nobody-#{System.unique_integer([:positive])}@example.com"
-               )
+               Newsletter.handle_hard_bounce(email)
+
+      assert Newsletter.hard_bounced?(email)
     end
 
     test "handle_hard_bounce returns not_subscribed when already unsubscribed" do
@@ -649,12 +651,15 @@ defmodule Ysc.NewsletterTest do
       {:ok, sub} =
         Newsletter.subscribe("hard-bounce@example.com", source: "public_signup")
 
+      refute Newsletter.hard_bounced?("hard-bounce@example.com")
+
       assert {:ok, updated} =
                Newsletter.handle_hard_bounce("hard-bounce@example.com")
 
       assert updated.id == sub.id
       refute updated.subscribed
       assert updated.metadata["unsubscribe_reason"] == "hard_bounce"
+      assert Newsletter.hard_bounced?("hard-bounce@example.com")
     end
   end
 
