@@ -19,12 +19,13 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
     setup [:create_admin]
 
     test "renders report form and summary placeholders", %{conn: conn} do
-      {_view, html} = live_report(conn)
+      {view, _html} = live_report(conn)
 
-      assert html =~ "Membership Report"
-      assert html =~ ~s(name="date_from")
-      assert html =~ ~s(name="date_to")
-      assert html =~ "Generate report"
+      assert has_element?(view, "h1", "Membership Report")
+      assert has_element?(view, "#membership-report-form")
+      assert has_element?(view, "#date_from")
+      assert has_element?(view, "#date_to")
+      assert has_element?(view, "#generate-report-button", "Generate report")
     end
 
     test "generates report for date range with pending applications", %{
@@ -41,11 +42,11 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
       from = Date.to_iso8601(%Date{today | day: 1})
       to = Date.to_iso8601(today)
 
-      {_view, html} =
+      {view, html} =
         live_report(conn, ~p"/admin/memberships/report?from=#{from}&to=#{to}")
 
       assert html =~ ~s(id="report-stat-applied")
-      assert html =~ ~s(id="report-pending")
+      assert has_element?(view, "#report-pending")
       assert html =~ user.email
     end
 
@@ -58,13 +59,13 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
         reviewed_at: ~U[2026-03-12 10:00:00Z]
       })
 
-      {_view, html} =
+      {view, html} =
         live_report(
           conn,
           ~p"/admin/memberships/report?from=2026-03-01&to=2026-03-31"
         )
 
-      assert html =~ ~s(id="report-accepted")
+      assert has_element?(view, "#report-accepted")
       assert html =~ user.email
     end
 
@@ -121,8 +122,7 @@ defmodule YscWeb.AdminMembershipReportLiveTest do
 
       render_click(view, "email_report")
 
-      flash = :sys.get_state(view.pid).socket.assigns.flash
-      assert Phoenix.Flash.get(flash, :info) =~ "emailed to the board"
+      assert has_element?(view, "#flash-mirror", "emailed to the board")
     end
 
     test "generate form patches to selected date range", %{conn: conn} do

@@ -9,6 +9,8 @@ defmodule YscWeb.AdminMembershipReportLive do
   """
   use YscWeb, :admin_live_view
 
+  require Ysc.Logging
+
   on_mount {YscWeb.UserAuth, :ensure_full_admin}
 
   alias Ysc.Accounts.{MembershipReport, SignupApplication}
@@ -72,7 +74,15 @@ defmodule YscWeb.AdminMembershipReportLive do
   end
 
   @impl true
-  def handle_async(:generate_report, {:exit, _reason}, socket) do
+  def handle_async(:generate_report, {:exit, reason}, socket) do
+    Ysc.Logging.error("Membership report generation failed",
+      error: reason,
+      extra: %{
+        date_from: socket.assigns.date_from,
+        date_to: socket.assigns.date_to
+      }
+    )
+
     {:noreply,
      socket
      |> assign(:generating?, false)
@@ -127,24 +137,37 @@ defmodule YscWeb.AdminMembershipReportLive do
         report_url = YscWeb.Endpoint.url() <> report_path
 
         Task.start(fn ->
-          YscWeb.Emails.Notifier.send_email_to_board(
-            "membership_report_#{report.date_from}_#{report.date_to}",
-            "Membership Report: #{Date.to_iso8601(report.date_from)} to #{Date.to_iso8601(report.date_to)}",
-            YscWeb.Emails.AdminMembershipReport,
-            %{
-              date_from: Date.to_iso8601(report.date_from),
-              date_to: Date.to_iso8601(report.date_to),
-              count_applied: report.counts.applied,
-              count_accepted: report.counts.accepted,
-              count_rejected: report.counts.rejected,
-              count_pending: report.counts.pending,
-              count_expired: report.counts.expired,
-              count_purchased: report.counts.purchased,
-              generated_by:
-                "#{current_user.first_name} #{current_user.last_name}",
-              report_url: report_url
-            }
-          )
+          try do
+            YscWeb.Emails.Notifier.send_email_to_board(
+              "membership_report_#{report.date_from}_#{report.date_to}",
+              "Membership Report: #{Date.to_iso8601(report.date_from)} to #{Date.to_iso8601(report.date_to)}",
+              YscWeb.Emails.AdminMembershipReport,
+              %{
+                date_from: Date.to_iso8601(report.date_from),
+                date_to: Date.to_iso8601(report.date_to),
+                count_applied: report.counts.applied,
+                count_accepted: report.counts.accepted,
+                count_rejected: report.counts.rejected,
+                count_pending: report.counts.pending,
+                count_expired: report.counts.expired,
+                count_purchased: report.counts.purchased,
+                generated_by:
+                  "#{current_user.first_name} #{current_user.last_name}",
+                report_url: report_url
+              }
+            )
+          rescue
+            exception ->
+              Ysc.Logging.error("Failed to email membership report to board",
+                error: exception,
+                stacktrace: __STACKTRACE__,
+                extra: %{
+                  date_from: report.date_from,
+                  date_to: report.date_to,
+                  generated_by_id: current_user.id
+                }
+              )
+          end
         end)
 
         {:noreply, put_flash(socket, :info, "Report emailed to the board.")}
@@ -176,6 +199,7 @@ defmodule YscWeb.AdminMembershipReportLive do
           </div>
           <div :if={@report} class="flex gap-2 shrink-0 mt-2 md:mt-0">
             <.button
+              id="email-report-button"
               phx-click="email_report"
               phx-disable-with="Sending..."
               variant="outline"
@@ -183,7 +207,12 @@ defmodule YscWeb.AdminMembershipReportLive do
             >
               <.icon name="hero-envelope" class="w-4 h-4" /> Email to board
             </.button>
-            <.button phx-click="download_csv" variant="outline" color="zinc">
+            <.button
+              id="download-csv-button"
+              phx-click="download_csv"
+              variant="outline"
+              color="zinc"
+            >
               <.icon name="hero-arrow-down-tray" class="w-4 h-4" /> Download CSV
             </.button>
           </div>
@@ -196,39 +225,23 @@ defmodule YscWeb.AdminMembershipReportLive do
             phx-submit="generate"
             class="flex flex-wrap items-end gap-4"
           >
-            <div>
-              <label
-                for="date_from"
-                class="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1"
-              >
-                From
-              </label>
-              <input
-                type="date"
-                id="date_from"
-                name="date_from"
-                value={Date.to_iso8601(@date_from)}
-                required
-                class="block rounded-md border-zinc-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label
-                for="date_to"
-                class="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1"
-              >
-                To
-              </label>
-              <input
-                type="date"
-                id="date_to"
-                name="date_to"
-                value={Date.to_iso8601(@date_to)}
-                required
-                class="block rounded-md border-zinc-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <.button type="submit" phx-disable-with="Generating…">
+            <.input
+              type="date"
+              name="date_from"
+              id="date_from"
+              value={Date.to_iso8601(@date_from)}
+              label="From"
+              required
+            />
+            <.input
+              type="date"
+              name="date_to"
+              id="date_to"
+              value={Date.to_iso8601(@date_to)}
+              label="To"
+              required
+            />
+            <.button id="generate-report-button" type="submit" phx-disable-with="Generating…">
               Generate report
             </.button>
           </form>

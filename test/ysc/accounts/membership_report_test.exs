@@ -165,6 +165,10 @@ defmodule Ysc.Accounts.MembershipReportTest do
 
       assert csv =~ "Purchased"
       assert csv =~ user.email
+      assert csv =~ "Family in Oslo"
+      assert csv =~ "Event"
+      assert csv =~ "Designer"
+      assert csv =~ "Portland"
     end
   end
 end

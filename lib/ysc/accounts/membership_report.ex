@@ -14,10 +14,12 @@ defmodule Ysc.Accounts.MembershipReport do
   alias Ysc.Accounts.{User, SignupApplication}
   alias Ysc.Subscriptions.Subscription
 
+  @report_timezone "America/Los_Angeles"
+
   @spec generate(Date.t(), Date.t()) :: map()
   def generate(date_from, date_to) do
-    start_dt = DateTime.new!(date_from, ~T[00:00:00], "Etc/UTC")
-    end_dt = DateTime.new!(date_to, ~T[23:59:59], "Etc/UTC")
+    start_dt = DateTime.new!(date_from, ~T[00:00:00], @report_timezone)
+    end_dt = DateTime.new!(date_to, ~T[23:59:59], @report_timezone)
 
     all_submitted = list_submitted(start_dt, end_dt)
     accepted = list_accepted(start_dt, end_dt)
@@ -204,20 +206,39 @@ defmodule Ysc.Accounts.MembershipReport do
 
   defp subscription_rows(category, subscriptions, date_field) do
     Enum.map(subscriptions, fn sub ->
-      [
-        category,
-        "#{sub.user.first_name} #{sub.user.last_name}",
-        sub.user.email,
-        format_date(Map.get(sub, date_field)),
-        "",
-        sub.stripe_status,
-        "",
-        "",
-        "",
-        "",
-        "",
-        ""
-      ]
+      case Map.get(sub, :signup_application) do
+        %SignupApplication{} = app ->
+          [
+            category,
+            "#{sub.user.first_name} #{sub.user.last_name}",
+            sub.user.email,
+            format_date(Map.get(sub, date_field)),
+            to_string(app.membership_type || ""),
+            sub.stripe_status,
+            format_eligibility(app.membership_eligibility),
+            app.link_to_scandinavia || "",
+            app.hear_about_the_club || "",
+            app.occupation || "",
+            app.city || "",
+            app.country || ""
+          ]
+
+        _ ->
+          [
+            category,
+            "#{sub.user.first_name} #{sub.user.last_name}",
+            sub.user.email,
+            format_date(Map.get(sub, date_field)),
+            "",
+            sub.stripe_status,
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+      end
     end)
   end
 
