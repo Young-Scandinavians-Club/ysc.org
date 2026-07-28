@@ -834,7 +834,7 @@ defmodule YscWeb.AccountSetupLive do
     is_owner = !!(current_user && current_user.id == user.id)
 
     {user, user_needs, activation_result} =
-      maybe_activate_membership_on_load(user)
+      maybe_activate_membership_on_load(user, is_owner)
 
     activation_attempted? = activation_result != :skipped
 
@@ -937,10 +937,10 @@ defmodule YscWeb.AccountSetupLive do
     end
   end
 
-  defp maybe_activate_membership_on_load(user) do
+  defp maybe_activate_membership_on_load(user, is_owner) do
     user_needs = compute_user_needs(user, check_payment?: true)
 
-    if user_needs.membership_activation do
+    if is_owner and user_needs.membership_activation do
       case Subscriptions.activate_membership_with_saved_payment_method(user,
              return_url: membership_return_url(user)
            ) do
@@ -966,11 +966,13 @@ defmodule YscWeb.AccountSetupLive do
   # a duplicate Stripe subscription create.
   defp maybe_activate_membership_on_params(socket, fresh_user, user_needs) do
     cond do
-      connected?(socket) and user_needs.membership_activation and
+      connected?(socket) and setup_owner?(socket) and
+        user_needs.membership_activation and
           socket.assigns[:activation_attempted?] ->
         assign(socket, :activation_attempted?, false)
 
-      connected?(socket) and user_needs.membership_activation ->
+      connected?(socket) and setup_owner?(socket) and
+          user_needs.membership_activation ->
         case Subscriptions.activate_membership_with_saved_payment_method(
                fresh_user,
                return_url: membership_return_url(fresh_user)
