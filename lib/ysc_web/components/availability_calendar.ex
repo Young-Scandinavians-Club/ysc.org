@@ -8,7 +8,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
 
   alias Ysc.Bookings
 
-  @week_start_at :sunday
+  @week_start_at :monday
 
   @impl true
   def render(assigns) do
