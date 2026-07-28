@@ -184,7 +184,10 @@ defmodule Ysc.Bookings.Booking do
   end
 
   defp generate_reference_id(changeset) do
-    case get_change(changeset, :reference_id) do
+    # Use get_field/2 so updates keep an existing reference_id (e.g. MIG-WP-*).
+    # get_change/2 is nil when the form omits reference_id, which previously
+    # regenerated a new BKG-* id on every admin edit/cancel status update.
+    case get_field(changeset, :reference_id) do
       nil ->
         put_change(
           changeset,

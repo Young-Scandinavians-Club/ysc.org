@@ -1603,6 +1603,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button
+                  type="button"
                   variant="outline"
                   phx-click={
                     JS.patch(
@@ -1792,6 +1793,7 @@ defmodule YscWeb.AdminBookingsLive do
               </div>
               <div class="flex gap-2">
                 <.button
+                  type="button"
                   variant="outline"
                   phx-click={
                     JS.patch(
@@ -5430,122 +5432,32 @@ defmodule YscWeb.AdminBookingsLive do
         []
       end
 
-    # Determine if this is a create or update operation
+    # Determine if this is a create or update operation.
+    # Only create when explicitly on the new-booking action — otherwise a Cancel
+    # click that accidentally submits (or races with patch navigation) can clear
+    # `:booking` and incorrectly create a duplicate BKG-* booking + confirmation email.
     existing_booking = socket.assigns[:booking]
+    creating? = socket.assigns.live_action == :new_booking
 
-    # Build changeset opts - include rooms for new bookings or when changing booking type
-    # When updating a booking with multiple rooms, do NOT pass rooms - the form only
-    # supports a single room_id and would incorrectly replace all rooms with one.
-    changeset_opts =
-      if existing_booking do
-        existing_rooms =
-          (Ecto.assoc_loaded?(existing_booking.rooms) && existing_booking.rooms) ||
-            []
-
-        has_multiple_rooms = length(existing_rooms) > 1
-
-        cond do
-          # Preserve existing rooms when booking has multiple - form can't represent them
-          has_multiple_rooms ->
-            [skip_validation: true]
-
-          # For single-room bookings, update rooms from form
-          room_id && booking_params["booking_mode"] == :room ->
-            [skip_validation: true, rooms: rooms]
-
-          # For buyout bookings, clear rooms so stale associations don't persist
-          booking_params["booking_mode"] == :buyout ->
-            [skip_validation: true, rooms: []]
-
-          true ->
-            [skip_validation: true]
-        end
-      else
-        # For new bookings, always include rooms (even if empty for buyouts)
-        [skip_validation: true, rooms: rooms]
-      end
-
-    result =
-      if existing_booking do
-        # Update existing booking with validation skipped (admin override)
-        Bookings.update_booking(
+    cond do
+      existing_booking ->
+        save_existing_admin_booking(
+          socket,
           existing_booking,
           booking_params,
-          changeset_opts
+          room_id,
+          rooms
         )
-      else
-        # Create new booking using BookingLocker which handles:
-        # - Setting status to :complete
-        # - Updating inventory
-        # - Sending confirmation email
-        # - Scheduling check-in/checkout reminders
-        alias Ysc.Bookings.BookingLocker
 
-        # Convert string keys to atoms for BookingLocker
-        attrs = %{
-          user_id: booking_params["user_id"],
-          property: booking_params["property"],
-          checkin_date: parse_date(booking_params["checkin_date"]),
-          checkout_date: parse_date(booking_params["checkout_date"]),
-          guests_count: parse_integer(booking_params["guests_count"], 1),
-          children_count: parse_integer(booking_params["children_count"], 0),
-          booking_mode: booking_params["booking_mode"]
-        }
+      creating? ->
+        save_new_admin_booking(socket, booking_params, rooms)
 
-        BookingLocker.create_admin_booking(attrs, rooms: rooms)
-      end
-
-    case result do
-      {:ok, _booking} ->
-        # Preserve date range if available
-        query_params = %{property: socket.assigns.selected_property}
-
-        query_params =
-          if socket.assigns[:calendar_start_date] &&
-               socket.assigns[:calendar_end_date] do
-            Map.merge(query_params, %{
-              from_date: Date.to_string(socket.assigns.calendar_start_date),
-              to_date: Date.to_string(socket.assigns.calendar_end_date)
-            })
-          else
-            query_params
-          end
-
-        action_word = if existing_booking, do: "updated", else: "created"
-
-        {:noreply,
-         socket
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "Booking #{action_word} successfully. Confirmation email sent to user."
-         )
-         |> push_patch(
-           to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
-         )
-         |> update_calendar_view(socket.assigns.selected_property)}
-
-      {:error, {:error, changeset}} when is_struct(changeset, Ecto.Changeset) ->
-        {:noreply,
-         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
-
-      {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
-        {:noreply,
-         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
-
-      {:error, :blackout_conflict} ->
+      true ->
         {:noreply,
          YscWeb.Flash.put_toast(
            socket,
            :error,
-           "Cannot create booking: selected dates overlap a blackout period."
-         )}
-
-      {:error, reason} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "Failed to create booking: #{inspect(reason)}"
+           "Could not update booking. Please reopen the booking and try again."
          )}
     end
   end
@@ -6321,6 +6233,137 @@ defmodule YscWeb.AdminBookingsLive do
        to:
          ~p"/admin/bookings?property=#{socket.assigns.selected_property}&section=#{socket.assigns.current_section}"
      )}
+  end
+
+  defp save_existing_admin_booking(
+         socket,
+         existing_booking,
+         booking_params,
+         room_id,
+         rooms
+       ) do
+    # Build changeset opts - include rooms for new bookings or when changing booking type
+    # When updating a booking with multiple rooms, do NOT pass rooms - the form only
+    # supports a single room_id and would incorrectly replace all rooms with one.
+    existing_rooms =
+      (Ecto.assoc_loaded?(existing_booking.rooms) && existing_booking.rooms) ||
+        []
+
+    has_multiple_rooms = length(existing_rooms) > 1
+
+    changeset_opts =
+      cond do
+        # Preserve existing rooms when booking has multiple - form can't represent them
+        has_multiple_rooms ->
+          [skip_validation: true]
+
+        # For single-room bookings, update rooms from form
+        room_id && booking_params["booking_mode"] == :room ->
+          [skip_validation: true, rooms: rooms]
+
+        # For buyout bookings, clear rooms so stale associations don't persist
+        booking_params["booking_mode"] == :buyout ->
+          [skip_validation: true, rooms: []]
+
+        true ->
+          [skip_validation: true]
+      end
+
+    case Bookings.update_booking(
+           existing_booking,
+           booking_params,
+           changeset_opts
+         ) do
+      {:ok, _booking} ->
+        {:noreply, admin_booking_save_success(socket, "updated")}
+
+      {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to update booking: #{inspect(reason)}"
+         )}
+    end
+  end
+
+  defp save_new_admin_booking(socket, booking_params, rooms) do
+    # Create new booking using BookingLocker which handles:
+    # - Setting status to :complete
+    # - Updating inventory
+    # - Sending confirmation email
+    # - Scheduling check-in/checkout reminders
+    alias Ysc.Bookings.BookingLocker
+
+    attrs = %{
+      user_id: booking_params["user_id"],
+      property: booking_params["property"],
+      checkin_date: parse_date(booking_params["checkin_date"]),
+      checkout_date: parse_date(booking_params["checkout_date"]),
+      guests_count: parse_integer(booking_params["guests_count"], 1),
+      children_count: parse_integer(booking_params["children_count"], 0),
+      booking_mode: booking_params["booking_mode"]
+    }
+
+    case BookingLocker.create_admin_booking(attrs, rooms: rooms) do
+      {:ok, _booking} ->
+        {:noreply,
+         admin_booking_save_success(
+           socket,
+           "created",
+           "Booking created successfully. Confirmation email sent to user."
+         )}
+
+      {:error, {:error, changeset}} when is_struct(changeset, Ecto.Changeset) ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, changeset} when is_struct(changeset, Ecto.Changeset) ->
+        {:noreply,
+         assign(socket, :booking_form, to_form(changeset, as: "booking"))}
+
+      {:error, :blackout_conflict} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Cannot create booking: selected dates overlap a blackout period."
+         )}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to create booking: #{inspect(reason)}"
+         )}
+    end
+  end
+
+  defp admin_booking_save_success(socket, action_word, message \\ nil) do
+    query_params = %{property: socket.assigns.selected_property}
+
+    query_params =
+      if socket.assigns[:calendar_start_date] &&
+           socket.assigns[:calendar_end_date] do
+        Map.merge(query_params, %{
+          from_date: Date.to_string(socket.assigns.calendar_start_date),
+          to_date: Date.to_string(socket.assigns.calendar_end_date)
+        })
+      else
+        query_params
+      end
+
+    message = message || "Booking #{action_word} successfully."
+
+    socket
+    |> YscWeb.Flash.put_toast(:info, message)
+    |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
+    |> update_calendar_view(socket.assigns.selected_property)
   end
 
   defp translate_errors(changeset) do

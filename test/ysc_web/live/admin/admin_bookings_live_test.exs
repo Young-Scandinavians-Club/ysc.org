@@ -5,11 +5,13 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
   """
   use YscWeb.ConnCase, async: false
 
+  import Ecto.Query
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
 
   alias Ysc.Bookings
+  alias Ysc.Bookings.Booking
   alias Ysc.Bookings.PendingRefund
   alias Ysc.Ledgers
   alias Ysc.Repo
@@ -882,6 +884,95 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
 
       assert html =~ "New Refund Policy"
       assert render(view) =~ "Refund Policy"
+    end
+  end
+
+  describe "edit booking form" do
+    setup [:create_admin]
+
+    test "cancel button dismisses without submitting the form", %{conn: conn} do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :buyout,
+          status: :complete,
+          reference_id: "MIG-WP-63892",
+          checkin_date: ~D[2030-07-31],
+          checkout_date: ~D[2030-08-02],
+          guests_count: 18
+        })
+
+      {:ok, view, html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=tahoe&from_date=2030-07-28&to_date=2030-08-10"
+        )
+
+      assert html =~ "MIG-WP-63892"
+      assert has_element?(view, "#booking-form")
+
+      # Cancel must be type=button so it does not submit and create a duplicate booking
+      assert has_element?(
+               view,
+               "#booking-form button[type=button]",
+               "Cancel"
+             )
+
+      view
+      |> element("#booking-form button[type=button]", "Cancel")
+      |> render_click()
+
+      refute has_element?(view, "#booking-form")
+
+      assert Bookings.get_booking!(booking.id).reference_id == "MIG-WP-63892"
+
+      assert Repo.aggregate(
+               from(b in Booking, where: b.user_id == ^user.id),
+               :count
+             ) ==
+               1
+    end
+
+    test "can cancel a migrated WP booking without changing its reference_id",
+         %{
+           conn: conn
+         } do
+      user = user_fixture()
+
+      booking =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :tahoe,
+          booking_mode: :buyout,
+          status: :complete,
+          reference_id: "MIG-WP-63892",
+          checkin_date: ~D[2030-07-31],
+          checkout_date: ~D[2030-08-02],
+          guests_count: 18
+        })
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/admin/bookings/bookings/#{booking.id}/edit?property=tahoe&from_date=2030-07-28&to_date=2030-08-10"
+        )
+
+      view
+      |> form("#booking-form", %{"booking" => %{"status" => "canceled"}})
+      |> render_submit()
+
+      updated = Bookings.get_booking!(booking.id)
+      assert updated.status == :canceled
+      assert updated.reference_id == "MIG-WP-63892"
+
+      assert Repo.aggregate(
+               from(b in Booking, where: b.user_id == ^user.id),
+               :count
+             ) ==
+               1
     end
   end
 
