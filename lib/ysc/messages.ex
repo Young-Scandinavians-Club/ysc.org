@@ -133,15 +133,19 @@ defmodule Ysc.Messages do
       |> Map.put(:delivery_status, :pending)
       |> Map.put(:delivery_attempts, 0)
 
-    case create_message_idempotency(delivery_attrs) do
-      {:ok, delivery} ->
-        {:ok, delivery}
-
-      {:error, _changeset} ->
+    case Repo.insert(
+           MessageIdempotency.changeset(%MessageIdempotency{}, delivery_attrs),
+           on_conflict: :nothing,
+           conflict_target: [:message_type, :idempotency_key, :message_template]
+         ) do
+      {:ok, _delivery} ->
         case find_email_delivery(attrs) do
           %MessageIdempotency{} = delivery -> {:ok, delivery}
           nil -> {:error, :delivery_record_not_found}
         end
+
+      {:error, changeset} ->
+        {:error, changeset}
     end
   end
 
