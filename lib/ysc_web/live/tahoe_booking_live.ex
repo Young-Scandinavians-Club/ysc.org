@@ -96,7 +96,7 @@ defmodule YscWeb.TahoeBookingLive do
     {user_with_subs, active_bookings, can_book, booking_error_title,
      booking_disabled_reason, active_tab, membership_type, restricted_min_date,
      restricted_max_date, dates_restricted, buyout_refund_policy,
-     room_refund_policy} =
+     room_refund_policy, family_user_ids} =
       if connected?(socket) do
         # Load user with subscriptions and subscription_items FIRST (to avoid multiple fetches)
         # This user_with_subs will be reused by check_booking_eligibility and get_membership_type
@@ -164,10 +164,13 @@ defmodule YscWeb.TahoeBookingLive do
 
         room_refund_policy = Bookings.get_active_refund_policy(:tahoe, :room)
 
+        family_user_ids =
+          if user, do: get_family_group_user_ids(user), else: []
+
         {user_with_subs, active_bookings, can_book, booking_error_title,
          booking_disabled_reason, active_tab, membership_type,
          restricted_min_date, restricted_max_date, dates_restricted,
-         buyout_refund_policy, room_refund_policy}
+         buyout_refund_policy, room_refund_policy, family_user_ids}
       else
         # Static render: use minimal data for fast initial paint
         user_with_subs = user
@@ -182,11 +185,12 @@ defmodule YscWeb.TahoeBookingLive do
         dates_restricted = false
         buyout_refund_policy = nil
         room_refund_policy = nil
+        family_user_ids = []
 
         {user_with_subs, active_bookings, can_book, booking_error_title,
          booking_disabled_reason, active_tab, membership_type,
          restricted_min_date, restricted_max_date, dates_restricted,
-         buyout_refund_policy, room_refund_policy}
+         buyout_refund_policy, room_refund_policy, family_user_ids}
       end
 
     property_rooms_snapshot =
@@ -231,6 +235,7 @@ defmodule YscWeb.TahoeBookingLive do
         date_validation_errors: %{},
         date_form: date_form,
         membership_type: membership_type,
+        family_user_ids: family_user_ids,
         active_tab: active_tab,
         can_book: can_book,
         booking_error_title: booking_error_title,
@@ -6659,7 +6664,7 @@ defmodule YscWeb.TahoeBookingLive do
               end)
 
             _ ->
-              family_user_ids = get_family_group_user_ids(user)
+              family_user_ids = socket.assigns.family_user_ids || []
 
               Repo.exists?(
                 from b in Booking,
@@ -6772,40 +6777,20 @@ defmodule YscWeb.TahoeBookingLive do
 
     if socket.assigns.checkin_date && socket.assigns.checkout_date &&
          socket.assigns.user do
-      user = socket.assigns.user
+      membership_type = socket.assigns.membership_type || :none
+      checkin = socket.assigns.checkin_date
+      checkout = socket.assigns.checkout_date
 
-      user_with_subs = Accounts.preload_user_subscriptions_for_booking(user)
-      membership_type = get_membership_type(user_with_subs)
-
-      # Get all user IDs in the family group
-      family_user_ids = get_family_group_user_ids(user)
+      overlapping_bookings =
+        overlapping_active_bookings(
+          socket.assigns.active_bookings || [],
+          checkin,
+          checkout
+        )
 
       # For family/lifetime members, check room count instead of just booking existence
       if membership_type in [:family, :lifetime] do
-        # Count rooms in overlapping bookings across entire family group
-        overlapping_query =
-          from b in Booking,
-            join: br in "booking_rooms",
-            on: br.booking_id == b.id,
-            where: b.user_id in ^family_user_ids,
-            where: b.property == :tahoe,
-            where: b.status in [:complete],
-            where:
-              fragment(
-                "? < ? AND ? > ?",
-                b.checkin_date,
-                ^socket.assigns.checkout_date,
-                b.checkout_date,
-                ^socket.assigns.checkin_date
-              )
-
-        room_count_query =
-          from br in "booking_rooms",
-            join: b in subquery(overlapping_query),
-            on: br.booking_id == b.id,
-            select: count(br.id)
-
-        existing_room_count = Repo.one(room_count_query) || 0
+        existing_room_count = count_rooms_in_active_bookings(overlapping_bookings)
 
         if existing_room_count >= 2 do
           Map.put(
@@ -6818,21 +6803,7 @@ defmodule YscWeb.TahoeBookingLive do
         end
       else
         # Single membership: only one booking at a time (check entire family group)
-        overlapping_query =
-          from b in Booking,
-            where: b.user_id in ^family_user_ids,
-            where: b.property == :tahoe,
-            where: b.status in [:complete],
-            where:
-              fragment(
-                "? < ? AND ? > ?",
-                b.checkin_date,
-                ^socket.assigns.checkout_date,
-                b.checkout_date,
-                ^socket.assigns.checkin_date
-              )
-
-        if Repo.exists?(overlapping_query) do
+        if overlapping_bookings != [] do
           Map.put(
             errors,
             :active_booking,
@@ -6845,6 +6816,18 @@ defmodule YscWeb.TahoeBookingLive do
     else
       errors
     end
+  end
+
+  defp overlapping_active_bookings(active_bookings, checkin, checkout) do
+    Enum.filter(active_bookings, fn booking ->
+      booking.status == :complete &&
+        Bookings.bookings_overlap?(
+          checkin,
+          checkout,
+          booking.checkin_date,
+          booking.checkout_date
+        )
+    end)
   end
 
   defp check_booking_eligibility(user, active_bookings, redirect_to)
@@ -7640,15 +7623,18 @@ defmodule YscWeb.TahoeBookingLive do
       |> MapSet.new()
 
     room_status_by_date =
-      Map.new(date_range, fn date ->
-        {date,
-         date_room_availability_status(
-           date,
-           all_rooms,
-           bookings,
-           total_people,
-           max_rooms
-         )}
+      build_booked_room_ids_by_night(bookings)
+      |> then(fn booked_room_ids_by_night ->
+        Map.new(date_range, fn date ->
+          {date,
+           date_room_availability_status(
+             date,
+             all_rooms,
+             booked_room_ids_by_night,
+             total_people,
+             max_rooms
+           )}
+        end)
       end)
 
     # Nights that cannot be stayed (check-in date of each night). Checkout on a
@@ -7796,11 +7782,12 @@ defmodule YscWeb.TahoeBookingLive do
   defp date_room_availability_status(
          checkin_date,
          all_rooms,
-         bookings,
+         booked_room_ids_by_night,
          total_people,
          max_rooms
        ) do
-    free_rooms = free_rooms_for_night(checkin_date, all_rooms, bookings)
+    free_rooms =
+      free_rooms_for_night(checkin_date, all_rooms, booked_room_ids_by_night)
 
     cond do
       free_rooms == [] ->
@@ -7814,35 +7801,52 @@ defmodule YscWeb.TahoeBookingLive do
     end
   end
 
-  defp free_rooms_for_night(checkin_date, all_rooms, bookings) do
-    if Enum.empty?(all_rooms) do
-      []
-    else
-      # For tooltip purposes, we check if a single night stay is possible
-      # (checkin_date to checkin_date + 1 day)
-      checkout_date = Date.add(checkin_date, 1)
-
-      overlapping_bookings =
-        Enum.filter(bookings, fn booking ->
-          booking.status in [:hold, :complete] &&
-            Bookings.bookings_overlap?(
-              checkin_date,
-              checkout_date,
-              booking.checkin_date,
-              booking.checkout_date
-            )
-        end)
-
-      booked_room_ids =
-        overlapping_bookings
-        |> Enum.flat_map(fn booking ->
+  defp build_booked_room_ids_by_night(bookings) do
+    Enum.reduce(bookings, %{}, fn booking, acc ->
+      if booking.status in [:hold, :complete] do
+        room_ids =
           if Ecto.assoc_loaded?(booking.rooms) do
             Enum.map(booking.rooms, & &1.id)
           else
             []
           end
-        end)
-        |> MapSet.new()
+
+        if room_ids == [] do
+          acc
+        else
+          add_booking_nights_to_index(acc, booking, room_ids)
+        end
+      else
+        acc
+      end
+    end)
+  end
+
+  defp add_booking_nights_to_index(acc, booking, room_ids) do
+    last_night = Date.add(booking.checkout_date, -1)
+
+    if Date.compare(booking.checkin_date, last_night) == :gt do
+      acc
+    else
+      booking.checkin_date
+      |> Date.range(last_night)
+      |> Enum.reduce(acc, fn night, inner_acc ->
+        booked_ids = Map.get(inner_acc, night, MapSet.new())
+
+        updated_ids =
+          Enum.reduce(room_ids, booked_ids, &MapSet.put(&2, &1))
+
+        Map.put(inner_acc, night, updated_ids)
+      end)
+    end
+  end
+
+  defp free_rooms_for_night(checkin_date, all_rooms, booked_room_ids_by_night) do
+    if Enum.empty?(all_rooms) do
+      []
+    else
+      booked_room_ids =
+        Map.get(booked_room_ids_by_night, checkin_date, MapSet.new())
 
       Enum.filter(all_rooms, fn room ->
         room_id = room[:id] || Map.get(room, :id)
@@ -7952,6 +7956,8 @@ defmodule YscWeb.TahoeBookingLive do
             statuses: [:hold, :complete]
           )
 
+        booked_room_ids_by_night = build_booked_room_ids_by_night(bookings)
+
         can_accommodate? =
           checkin_date
           |> Date.range(Date.add(checkout_date, -1))
@@ -7959,7 +7965,7 @@ defmodule YscWeb.TahoeBookingLive do
             date_room_availability_status(
               night,
               all_rooms,
-              bookings,
+              booked_room_ids_by_night,
               total_people,
               max_rooms
             ) == :available
