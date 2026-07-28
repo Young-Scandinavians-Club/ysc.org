@@ -151,7 +151,9 @@ defmodule YscWeb.AdminPostsLive do
                           Timex.format!(post.published_on, "%b %e, %Y", :strftime)
                         }
                       >
-                        <.badge type={AdminBadgeHelpers.post_state_badge_type(post.state)}>
+                        <.badge type={
+                          AdminBadgeHelpers.post_state_badge_type(post.state)
+                        }>
                           {String.capitalize("#{post.state}")}
                         </.badge>
                       </.tooltip>
@@ -229,7 +231,9 @@ defmodule YscWeb.AdminPostsLive do
                       Timex.format!(post.published_on, "%b %e, %Y", :strftime)
                     }
                   >
-                    <.badge type={AdminBadgeHelpers.post_state_badge_type(post.state)}>
+                    <.badge type={
+                      AdminBadgeHelpers.post_state_badge_type(post.state)
+                    }>
                       {String.capitalize("#{post.state}")}
                     </.badge>
                   </.tooltip>
