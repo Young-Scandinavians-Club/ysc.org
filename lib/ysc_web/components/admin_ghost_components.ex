@@ -407,7 +407,7 @@ defmodule YscWeb.AdminGhostComponents do
         <.admin_ghost_bar width="w-16" height="h-3" />
         <.admin_ghost_bar width="w-12" height="h-3" />
         <.admin_ghost_bar width="w-20" height="h-3" />
-        <.badge type={event_state_badge_type(row.state)}>{row.label}</.badge>
+        <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(row.state)}>{row.label}</.badge>
         <.admin_ghost_bar width="w-16" height="h-3" />
         <div class="relative flex justify-end">
           <button
@@ -1154,7 +1154,7 @@ defmodule YscWeb.AdminGhostComponents do
             <h1 class="text-xl font-semibold leading-8 text-zinc-800 sm:text-2xl break-words">
               {@event_title}
             </h1>
-            <.badge type={event_state_badge_type(@state)}>
+            <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(@state)}>
               {event_state_label(@state)}
             </.badge>
             <span
@@ -1990,10 +1990,6 @@ defmodule YscWeb.AdminGhostComponents do
   defp table_cols(5), do: "grid-cols-5"
   defp table_cols(6), do: "grid-cols-6"
   defp table_cols(_), do: "grid-cols-4"
-
-  defp event_state_badge_type(:draft), do: "sky"
-  defp event_state_badge_type(:scheduled), do: "yellow"
-  defp event_state_badge_type(:published), do: "green"
 
   defp event_state_label(:draft), do: "Draft"
   defp event_state_label(:scheduled), do: "Scheduled"

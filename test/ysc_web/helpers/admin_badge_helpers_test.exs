@@ -106,4 +106,16 @@ defmodule YscWeb.AdminBadgeHelpersTest do
       assert AdminBadgeHelpers.post_state_badge_type(:unknown) == "default"
     end
   end
+
+  describe "event_state_badge_type/1" do
+    test "maps known event states for admin views" do
+      assert AdminBadgeHelpers.event_state_badge_type(:draft) == "sky"
+      assert AdminBadgeHelpers.event_state_badge_type(:scheduled) == "yellow"
+      assert AdminBadgeHelpers.event_state_badge_type(:published) == "green"
+    end
+
+    test "defaults unknown states" do
+      assert AdminBadgeHelpers.event_state_badge_type(:unknown) == "default"
+    end
+  end
 end

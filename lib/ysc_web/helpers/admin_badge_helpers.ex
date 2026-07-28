@@ -94,4 +94,13 @@ defmodule YscWeb.AdminBadgeHelpers do
   def post_state_badge_type(:published), do: "green"
   def post_state_badge_type(:deleted), do: "red"
   def post_state_badge_type(_), do: "default"
+
+  @doc """
+  Badge `type` for `EventState` values in admin event previews and lists.
+  """
+  @spec event_state_badge_type(atom()) :: String.t()
+  def event_state_badge_type(:draft), do: "sky"
+  def event_state_badge_type(:scheduled), do: "yellow"
+  def event_state_badge_type(:published), do: "green"
+  def event_state_badge_type(_), do: "default"
 end
