@@ -12,7 +12,7 @@ defmodule YscWeb.AdminMembershipHelpersTest do
       assert AdminMembershipHelpers.membership_type_label("family", :short) == "Family"
       assert AdminMembershipHelpers.membership_type_label(:corporate, :short) == "Corporate"
       assert AdminMembershipHelpers.membership_type_label("corporate", :short) == "Corporate"
-      assert AdminMembershipHelpers.membership_type_label(:unknown, :short) == "Member"
+      assert AdminMembershipHelpers.membership_type_label(123, :short) == "Member"
     end
 
     test "full style for scanner and detail panels" do
@@ -28,7 +28,7 @@ defmodule YscWeb.AdminMembershipHelpersTest do
       assert AdminMembershipHelpers.membership_type_label(:corporate, :full) ==
                "Corporate Membership"
 
-      assert AdminMembershipHelpers.membership_type_label(:unknown, :full) == "Membership"
+      assert AdminMembershipHelpers.membership_type_label(123, :full) == "Membership"
     end
   end
 end
