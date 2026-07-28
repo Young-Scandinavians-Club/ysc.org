@@ -241,7 +241,11 @@ defmodule YscWeb.AdminMembershipReportLive do
               label="To"
               required
             />
-            <.button id="generate-report-button" type="submit" phx-disable-with="Generating…">
+            <.button
+              id="generate-report-button"
+              type="submit"
+              phx-disable-with="Generating…"
+            >
               Generate report
             </.button>
           </form>
