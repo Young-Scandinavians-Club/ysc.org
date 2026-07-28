@@ -31,6 +31,7 @@ defmodule Ysc.Email.RateLimiter do
             }
           )
         )
+        |> normalize_row_datetimes()
 
       cond do
         row && row.cooldown_until &&
@@ -109,4 +110,20 @@ defmodule Ysc.Email.RateLimiter do
 
     :ok
   end
+
+  defp normalize_row_datetimes(nil), do: nil
+
+  defp normalize_row_datetimes(row) do
+    %{
+      row
+      | window_started_at: to_utc_datetime(row.window_started_at),
+        cooldown_until: to_utc_datetime(row.cooldown_until)
+    }
+  end
+
+  defp to_utc_datetime(nil), do: nil
+  defp to_utc_datetime(%DateTime{} = datetime), do: datetime
+
+  defp to_utc_datetime(%NaiveDateTime{} = datetime),
+    do: DateTime.from_naive!(datetime, "Etc/UTC")
 end
