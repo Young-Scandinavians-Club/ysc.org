@@ -85,4 +85,13 @@ defmodule YscWeb.AdminBadgeHelpers do
   def ledger_payment_status_badge_type(:pending), do: "yellow"
   def ledger_payment_status_badge_type(:failed), do: "red"
   def ledger_payment_status_badge_type(_), do: "dark"
+
+  @doc """
+  Badge `type` for `PostState` values in admin posts list and editor views.
+  """
+  @spec post_state_badge_type(atom()) :: String.t()
+  def post_state_badge_type(:draft), do: "yellow"
+  def post_state_badge_type(:published), do: "green"
+  def post_state_badge_type(:deleted), do: "red"
+  def post_state_badge_type(_), do: "default"
 end

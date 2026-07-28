@@ -1730,33 +1730,26 @@ defmodule YscWeb.SecurityAuditTest do
   describe "Finding 22: kiosk check-in booking eligibility" do
     import Ysc.BookingsFixtures
 
-    setup do
-      original =
-        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
-
-      on_exit(fn ->
-        KioskAPIKeyHelper.restore_kiosk_api_key!(original)
-      end)
-
-      :ok
-    end
+    @kiosk_key "security-audit-kiosk-key"
 
     test "rejects draft bookings at the kiosk check-in API", %{conn: conn} do
-      booking = booking_fixture(%{status: :draft})
+      KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
+        booking = booking_fixture(%{status: :draft})
 
-      conn =
-        conn
-        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/api/v1/mobile/check-in", %{
-          property: "tahoe",
-          booking_ids: [to_string(booking.id)],
-          rules_agreed: true
-        })
+        conn =
+          conn
+          |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+          |> put_req_header("content-type", "application/json")
+          |> post(~p"/api/v1/mobile/check-in", %{
+            property: "tahoe",
+            booking_ids: [to_string(booking.id)],
+            rules_agreed: true
+          })
 
-      assert %{"error" => error} = json_response(conn, 422)
-      assert error =~ "not confirmed"
-      refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
+        assert %{"error" => error} = json_response(conn, 422)
+        assert error =~ "not confirmed"
+        refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
+      end)
     end
   end
 
@@ -1770,44 +1763,38 @@ defmodule YscWeb.SecurityAuditTest do
 
     alias Ysc.Bookings
 
-    setup do
-      original =
-        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
-
-      on_exit(fn ->
-        KioskAPIKeyHelper.restore_kiosk_api_key!(original)
-      end)
-
-      :ok
-    end
+    @kiosk_key "security-audit-kiosk-key"
 
     test "omitted dates exclude bookings outside the default window", %{
       conn: conn
     } do
-      {old_checkin, old_checkout} = past_booking_dates_outside_default_window()
+      KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
+        {old_checkin, old_checkout} =
+          past_booking_dates_outside_default_window()
 
-      {:ok, old_booking} =
-        %{
-          checkin_date: old_checkin,
-          checkout_date: old_checkout,
-          guests_count: 2,
-          property: :tahoe,
-          booking_mode: :buyout,
-          user_id: user_fixture().id,
-          status: :complete,
-          total_price: Money.new(200, :USD)
-        }
-        |> Ysc.Bookings.create_booking()
+        {:ok, old_booking} =
+          %{
+            checkin_date: old_checkin,
+            checkout_date: old_checkout,
+            guests_count: 2,
+            property: :tahoe,
+            booking_mode: :buyout,
+            user_id: user_fixture().id,
+            status: :complete,
+            total_price: Money.new(200, :USD)
+          }
+          |> Ysc.Bookings.create_booking()
 
-      conn =
-        conn
-        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
-        |> put_req_header("accept", "application/json")
+        conn =
+          conn
+          |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+          |> put_req_header("accept", "application/json")
 
-      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
-      assert %{"data" => bookings} = json_response(response, 200)
+        response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+        assert %{"data" => bookings} = json_response(response, 200)
 
-      refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+        refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+      end)
     end
   end
 

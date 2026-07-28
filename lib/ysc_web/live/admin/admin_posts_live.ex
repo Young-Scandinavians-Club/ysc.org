@@ -1,5 +1,6 @@
 defmodule YscWeb.AdminPostsLive do
   alias Ysc.Posts.Post
+  alias YscWeb.AdminBadgeHelpers
 
   use YscWeb, :admin_live_view
 
@@ -150,14 +151,16 @@ defmodule YscWeb.AdminPostsLive do
                           Timex.format!(post.published_on, "%b %e, %Y", :strftime)
                         }
                       >
-                        <.badge type={post_state_to_badge_style(post.state)}>
+                        <.badge type={
+                          AdminBadgeHelpers.post_state_badge_type(post.state)
+                        }>
                           {String.capitalize("#{post.state}")}
                         </.badge>
                       </.tooltip>
 
                       <.badge
                         :if={post.published_on == nil}
-                        type={post_state_to_badge_style(post.state)}
+                        type={AdminBadgeHelpers.post_state_badge_type(post.state)}
                       >
                         {String.capitalize("#{post.state}")}
                       </.badge>
@@ -228,14 +231,16 @@ defmodule YscWeb.AdminPostsLive do
                       Timex.format!(post.published_on, "%b %e, %Y", :strftime)
                     }
                   >
-                    <.badge type={post_state_to_badge_style(post.state)}>
+                    <.badge type={
+                      AdminBadgeHelpers.post_state_badge_type(post.state)
+                    }>
                       {String.capitalize("#{post.state}")}
                     </.badge>
                   </.tooltip>
 
                   <.badge
                     :if={post.published_on == nil}
-                    type={post_state_to_badge_style(post.state)}
+                    type={AdminBadgeHelpers.post_state_badge_type(post.state)}
                   >
                     {String.capitalize("#{post.state}")}
                   </.badge>
@@ -560,11 +565,6 @@ defmodule YscWeb.AdminPostsLive do
     do: Map.replace(filter, "value", "")
 
   defp maybe_update_filter(filter), do: filter
-
-  defp post_state_to_badge_style(:draft), do: "yellow"
-  defp post_state_to_badge_style(:published), do: "green"
-  defp post_state_to_badge_style(:deleted), do: "red"
-  defp post_state_to_badge_style(_), do: "default"
 
   defp maybe_stream_update_post(socket, nil), do: socket
 
