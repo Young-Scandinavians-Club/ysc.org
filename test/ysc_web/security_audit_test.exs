@@ -1690,7 +1690,8 @@ defmodule YscWeb.SecurityAuditTest do
       conn: conn
     } do
       KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
-        {old_checkin, old_checkout} = past_booking_dates_outside_default_window()
+        {old_checkin, old_checkout} =
+          past_booking_dates_outside_default_window()
 
         {:ok, old_booking} =
           %{
