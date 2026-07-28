@@ -21,6 +21,12 @@ defmodule Ysc.Application do
     Req.default_options(compressed: true)
 
     :logger.add_handler(:ysc_sentry_handler, Sentry.LoggerHandler, %{
+      filters: [
+        discard_chromic_pdf_protocol_timeouts:
+          {&Ysc.SentryLoggerFilter.discard_chromic_pdf_protocol_timeout/2, []},
+        discard_locus_rate_limits:
+          {&Ysc.SentryLoggerFilter.discard_locus_rate_limit/2, []}
+      ],
       config: %{
         # Explicit allowlist only — do not forward newly added Logger options
         # automatically. Keep scrubbed diagnostic identifiers used at error sites.
@@ -166,7 +172,13 @@ defmodule Ysc.Application do
   defp maybe_start_geo_ip_loader do
     if Ysc.GeoIP.configured?() and Ysc.Env.deployed?() and
          Code.ensure_loaded?(:locus) do
-      :locus.start_loader(:city, {:maxmind, "GeoLite2-City"})
+      # MaxMind's per-license request limit is shared by every production machine.
+      # Locus retries indefinitely; these intervals prevent a 429 response from
+      # becoming a fleet-wide retry loop while still refreshing the cached database.
+      :locus.start_loader(:city, {:maxmind, "GeoLite2-City"},
+        update_period: :timer.hours(24),
+        error_retries: {:backoff, :timer.hours(6)}
+      )
     end
   end
 
