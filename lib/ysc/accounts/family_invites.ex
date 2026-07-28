@@ -33,6 +33,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   - `family_member_id` - Optional ID of a family member from registration form to include in email
   - `relationship` - Required. Either :spouse or :child. Max 1 spouse per family.
   """
+  @dialyzer {:nowarn_function, create_invite: 3}
   def create_invite(primary_user, email, opts \\ []) do
     family_member_id = Keyword.get(opts, :family_member_id)
     relationship = Keyword.get(opts, :relationship, :child)
@@ -534,6 +535,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   Only the primary user who created the invite can revoke it.
   Sends a cancellation email to the invitee before deleting the invite.
   """
+  @dialyzer {:nowarn_function, revoke_invite: 2}
   def revoke_invite(invite_id, primary_user) do
     invite = Repo.get(FamilyInvite, invite_id)
 
