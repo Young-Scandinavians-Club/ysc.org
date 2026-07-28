@@ -1,4 +1,4 @@
-# cowlib 2.18.0 — no patched Hex release yet. Revisit by 2026-07-22.
+# cowlib still has open EEF advisories; no patched Hex release yet. Revisit by 2026-08-28.
 EEF-CVE-2026-43966
 EEF-CVE-2026-43969
 CVE-2026-43966
