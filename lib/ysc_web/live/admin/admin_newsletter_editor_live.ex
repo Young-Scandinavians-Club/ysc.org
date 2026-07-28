@@ -1115,20 +1115,22 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           Send this newsletter to all subscribers now? This cannot be undone.
         </p>
         <div class="mt-6 flex justify-end gap-2">
-          <button
+          <.button
             type="button"
-            class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+            variant="outline"
+            color="zinc"
             phx-click="close-send-modal"
           >
             Cancel
-          </button>
-          <button
+          </.button>
+          <.button
             type="button"
-            class="rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-semibold hover:bg-green-700"
+            color="green"
             phx-click="confirm-send"
+            phx-disable-with="Sending..."
           >
             Send now
-          </button>
+          </.button>
         </div>
       </.modal>
 
