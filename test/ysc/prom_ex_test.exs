@@ -14,7 +14,7 @@ defmodule Ysc.PromExTest do
       assert Plugins.PhoenixLiveView in plugins
       assert Plugins.Ecto in plugins
       assert Plugins.Beam in plugins
-      assert Plugins.Oban in plugins
+      assert Ysc.PromEx.Plugins.Oban in plugins
       assert Ysc.PromEx.Plugins.Ysc in plugins
     end
   end
@@ -85,6 +85,40 @@ defmodule Ysc.PromExTest do
       metric_names = Enum.map(event_group.metrics, & &1.name)
       assert [:ysc, :email, :sent, :total] in metric_names
       assert [:ysc, :email, :ses_webhook, :events, :total] in metric_names
+    end
+  end
+
+  describe "Ysc.PromEx.Plugins.Oban" do
+    test "polling metrics use the resilient queue metrics MFA" do
+      polling = Ysc.PromEx.Plugins.Oban.polling_metrics(otp_app: :ysc)
+
+      assert polling.group_name == :oban_queue_poll_metrics
+
+      assert {Ysc.PromEx.Plugins.Oban, :execute_queue_metrics, [_supervisors]} =
+               polling.measurements_mfa
+    end
+
+    test "execute_queue_metrics swallows transient DB connection errors" do
+      runner = fn _supervisors ->
+        raise DBConnection.ConnectionError, message: "tcp recv (idle): closed"
+      end
+
+      assert :ok =
+               Ysc.PromEx.Plugins.Oban.execute_queue_metrics(
+                 MapSet.new([Oban]),
+                 runner
+               )
+    end
+
+    test "execute_queue_metrics re-raises unexpected errors" do
+      runner = fn _supervisors -> raise "boom" end
+
+      assert_raise RuntimeError, "boom", fn ->
+        Ysc.PromEx.Plugins.Oban.execute_queue_metrics(
+          MapSet.new([Oban]),
+          runner
+        )
+      end
     end
   end
 end

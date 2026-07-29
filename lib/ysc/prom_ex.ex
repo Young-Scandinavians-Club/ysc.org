@@ -28,8 +28,8 @@ defmodule Ysc.PromEx do
       Plugins.Ecto,
       # BEAM VM metrics
       Plugins.Beam,
-      # Oban metrics
-      Plugins.Oban,
+      # Oban metrics (wrapper rescues transient DB blips during queue polling)
+      Ysc.PromEx.Plugins.Oban,
       # Custom YSC business metrics (required for Fly /metrics scrape)
       Ysc.PromEx.Plugins.Ysc
     ]

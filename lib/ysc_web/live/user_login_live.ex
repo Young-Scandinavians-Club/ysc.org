@@ -712,21 +712,31 @@ defmodule YscWeb.UserLoginLive do
     require Ysc.Logging
 
     user_cancelled? = error in ["NotAllowedError", "AbortError"]
+    expected_client_limitation? = error == "NotSupportedError"
 
-    if user_cancelled? do
-      Ysc.Logging.info(
-        "[UserLoginLive] Passkey authentication cancelled by user or timed out",
-        error: error
-      )
-    else
-      Ysc.Logging.warning(
-        "[UserLoginLive] Passkey authentication error from client",
-        error: error,
-        message: message,
-        user_agent: socket.assigns[:user_agent],
-        has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
-        auth_mode: socket.assigns[:passkey_auth_mode]
-      )
+    cond do
+      user_cancelled? ->
+        Ysc.Logging.info(
+          "[UserLoginLive] Passkey authentication cancelled by user or timed out",
+          error: error
+        )
+
+      expected_client_limitation? ->
+        Ysc.Logging.info(
+          "[UserLoginLive] Passkey authentication not supported by this browser/platform",
+          error: error,
+          message: message
+        )
+
+      true ->
+        Ysc.Logging.warning(
+          "[UserLoginLive] Passkey authentication error from client",
+          error: error,
+          message: message,
+          user_agent: socket.assigns[:user_agent],
+          has_challenge: !is_nil(socket.assigns[:passkey_challenge]),
+          auth_mode: socket.assigns[:passkey_auth_mode]
+        )
     end
 
     {toast_level, error_message} =
