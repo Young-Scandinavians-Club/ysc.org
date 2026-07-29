@@ -394,6 +394,153 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
     end
   end
 
+  describe "confirm membership selection" do
+    @onboarding_async_timeout 5_000
+
+    defp live_onboarding_ready!(conn) do
+      {:ok, view, _html} = live(conn, ~p"/onboarding")
+      render_async(view, @onboarding_async_timeout)
+      refute has_element?(view, "#onboarding-loading")
+      assert has_element?(view, "#onboarding-profile-form")
+      view
+    end
+
+    defp go_to_membership_selection!(view) do
+      assert has_element?(view, "button", "Membership Type")
+
+      membership_step_index =
+        0..10
+        |> Enum.find(fn idx ->
+          has_element?(
+            view,
+            ~s|button[phx-value-step="#{idx}"]|,
+            "Membership Type"
+          )
+        end)
+
+      assert membership_step_index,
+             "expected Membership Type step in onboarding stepper"
+
+      render_click(view, "set-step", %{
+        "step" => to_string(membership_step_index)
+      })
+
+      assert has_element?(view, "#membership-selection")
+      view
+    end
+
+    defp confirm_membership_plan!(view, plan)
+         when plan in ["single", "family"] do
+      view
+      |> form("#membership-selection", %{
+        "membership_selection" => %{"membership_plan" => plan}
+      })
+      |> render_change()
+
+      view
+      |> form("#membership-selection", %{
+        "membership_selection" => %{"membership_plan" => plan}
+      })
+      |> render_submit()
+
+      view
+    end
+
+    # Regression for Sentry ELIXIR-5H / Postgrex 23502: confirming membership
+    # previously inserted a signup_applications row with null birth_date and
+    # raised not_null_violation out of the LiveView.
+    test "confirming family plan without an existing application does not raise not_null_violation",
+         %{conn: conn} do
+      birth_date = ~D[1988-04-12]
+
+      user =
+        user_needing_post_migration_onboarding(%{date_of_birth: birth_date})
+
+      assert is_nil(
+               Repo.get_by(Ysc.Accounts.SignupApplication, user_id: user.id)
+             )
+
+      conn = log_in_user(conn, user)
+      view = live_onboarding_ready!(conn)
+      go_to_membership_selection!(view)
+      confirm_membership_plan!(view, "family")
+
+      # Survived confirm without crashing; advanced past membership selection.
+      refute has_element?(view, "#membership-selection")
+      assert has_element?(view, "#onboarding-payment-form")
+
+      application =
+        Repo.get_by!(Ysc.Accounts.SignupApplication, user_id: user.id)
+
+      assert application.membership_type == :family
+      assert application.birth_date == birth_date
+    end
+
+    test "copies billing address onto new application when available", %{
+      conn: conn
+    } do
+      birth_date = ~D[1988-04-12]
+
+      user =
+        user_needing_post_migration_onboarding(%{
+          date_of_birth: birth_date,
+          most_connected_country: "SE"
+        })
+
+      {:ok, _user} =
+        Accounts.update_billing_address(user, %{
+          "address" => "100 Nordic Ave",
+          "city" => "Seattle",
+          "region" => "WA",
+          "postal_code" => "98101",
+          "country" => "USA"
+        })
+
+      conn = log_in_user(conn, user)
+      view = live_onboarding_ready!(conn)
+      go_to_membership_selection!(view)
+      confirm_membership_plan!(view, "family")
+
+      application =
+        Repo.get_by!(Ysc.Accounts.SignupApplication, user_id: user.id)
+
+      assert application.birth_date == birth_date
+      assert application.address == "100 Nordic Ave"
+      assert application.city == "Seattle"
+      assert application.postal_code == "98101"
+      assert application.country == "USA"
+      assert application.most_connected_nordic_country == "SE"
+    end
+
+    test "does not insert signup application when date_of_birth is missing", %{
+      conn: conn
+    } do
+      user = user_needing_post_migration_onboarding(%{date_of_birth: nil})
+      assert is_nil(user.date_of_birth)
+
+      assert is_nil(
+               Repo.get_by(Ysc.Accounts.SignupApplication, user_id: user.id)
+             )
+
+      conn = log_in_user(conn, user)
+      view = live_onboarding_ready!(conn)
+      go_to_membership_selection!(view)
+      confirm_membership_plan!(view, "family")
+
+      assert is_nil(
+               Repo.get_by(Ysc.Accounts.SignupApplication, user_id: user.id)
+             )
+
+      assert has_element?(view, "#membership-selection")
+
+      assert has_element?(
+               view,
+               "[role=alert][data-kind=error]",
+               "date of birth"
+             )
+    end
+  end
+
   describe "inherited membership step" do
     @onboarding_async_timeout 5_000
 
