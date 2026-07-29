@@ -2197,6 +2197,158 @@ defmodule Ysc.LedgersTest do
     end
   end
 
+  describe "list_user_payments_paginated/4 filter option" do
+    setup do
+      user = user_fixture()
+      event = event_fixture()
+      tier = Ysc.EventsFixtures.ticket_tier_fixture(%{event_id: event.id})
+
+      Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      import Mox
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_default"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
+        {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+        {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
+      end)
+
+      tahoe_booking = booking_fixture(%{user_id: user.id, property: :tahoe})
+
+      clear_lake_booking =
+        booking_fixture(%{user_id: user.id, property: :clear_lake})
+
+      for {suffix, entity_type, entity_id, property} <- [
+            {"tahoe", :booking, tahoe_booking.id, :tahoe},
+            {"cl", :booking, clear_lake_booking.id, :clear_lake},
+            {"mem", :membership, Ecto.ULID.generate(), nil},
+            {"don", :donation, Ecto.ULID.generate(), nil},
+            {"evt", :event, Ecto.ULID.generate(), nil}
+          ] do
+        assert {:ok, {_payment, _, _}} =
+                 Ledgers.process_payment(%{
+                   user_id: user.id,
+                   amount: Money.new(5_000, :USD),
+                   entity_type: entity_type,
+                   entity_id: entity_id,
+                   external_payment_id:
+                     "pi_filter_#{suffix}_#{System.unique_integer([:positive])}",
+                   stripe_fee: Money.new(160, :USD),
+                   description: suffix,
+                   property: property,
+                   payment_method_id: nil
+                 })
+      end
+
+      _free_ticket_order =
+        ticket_order_fixture(%{
+          user: user,
+          event: event,
+          tier: tier,
+          status: :completed
+        })
+
+      %{user: user}
+    end
+
+    test "filter :all includes every payment type and free ticket orders", %{
+      user: user
+    } do
+      {items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20, filter: :all)
+
+      assert total == 6
+      assert length(items) == 6
+
+      assert Enum.any?(
+               items,
+               &(&1.type == :booking && &1.booking.property == :tahoe)
+             )
+
+      assert Enum.any?(
+               items,
+               &(&1.type == :booking && &1.booking.property == :clear_lake)
+             )
+
+      assert Enum.any?(items, &(&1.type == :membership))
+      assert Enum.any?(items, &(&1.type == :donation))
+      assert Enum.any?(items, &(&1.type == :ticket))
+    end
+
+    test "filter :tahoe returns only Tahoe booking payments", %{user: user} do
+      {items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20, filter: :tahoe)
+
+      assert total == 1
+      assert [%{type: :booking, booking: %{property: :tahoe}}] = items
+    end
+
+    test "filter :clear_lake returns only Clear Lake booking payments", %{
+      user: user
+    } do
+      {items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20,
+          filter: :clear_lake
+        )
+
+      assert total == 1
+      assert [%{type: :booking, booking: %{property: :clear_lake}}] = items
+    end
+
+    test "filter :membership returns only membership payments", %{user: user} do
+      {items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20,
+          filter: :membership
+        )
+
+      assert total == 1
+      assert [%{type: :membership}] = items
+    end
+
+    test "filter :donations returns only donation payments", %{user: user} do
+      {items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20, filter: :donations)
+
+      assert total == 1
+      assert [%{type: :donation}] = items
+    end
+
+    test "filter :events returns paid and free ticket rows", %{user: user} do
+      {items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20, filter: :events)
+
+      assert total == 2
+      assert length(items) == 2
+      assert Enum.all?(items, &(&1.type == :ticket))
+    end
+
+    test "unknown filter falls back to :all", %{user: user} do
+      {_items, total} =
+        Ledgers.list_user_payments_paginated(user.id, 1, 20, filter: :bogus)
+
+      assert total == 6
+    end
+  end
+
   describe "list_user_payments_paginated/3 with payment_method" do
     setup do
       user = user_fixture()

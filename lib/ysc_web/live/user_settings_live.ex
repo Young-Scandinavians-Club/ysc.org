@@ -4357,18 +4357,11 @@ defmodule YscWeb.UserSettingsLive do
   def handle_event("filter-payments", %{"filter" => filter}, socket) do
     filter_atom = String.to_existing_atom(filter)
 
-    filtered_payments =
-      apply_payment_filter(socket.assigns.all_payments, filter_atom)
-
     {:noreply,
      socket
      |> assign(:payment_filter, filter_atom)
-     |> assign(:filtered_payments_count, length(filtered_payments))
-     |> assign(:filtered_payments_list, filtered_payments)
-     |> stream(:payments, filtered_payments,
-       reset: true,
-       dom_id: &payment_dom_id/1
-     )}
+     |> assign(:payments_page, 1)
+     |> paginate_payments(1)}
   end
 
   def handle_event("change-membership", params, socket) do
@@ -5182,63 +5175,33 @@ defmodule YscWeb.UserSettingsLive do
     do: VerificationCodes.normalize_otp_input(code)
 
   defp paginate_payments(socket, new_page) when new_page >= 1 do
-    %{payments_per_page: per_page, payments_total: total_count, user: user} =
-      socket.assigns
-
-    {all_payments, _total_count} =
-      Ledgers.list_user_payments_paginated(user.id, new_page, per_page)
-
-    total_pages = div(total_count + per_page - 1, per_page)
-
-    # Apply current filter to new page
+    %{payments_per_page: per_page, user: user} = socket.assigns
     filter = socket.assigns[:payment_filter] || :all
-    filtered_payments = apply_payment_filter(all_payments, filter)
+
+    {payments, total_count} =
+      Ledgers.list_user_payments_paginated(user.id, new_page, per_page,
+        filter: filter
+      )
+
+    total_pages =
+      if total_count == 0 do
+        0
+      else
+        div(total_count + per_page - 1, per_page)
+      end
 
     socket
     |> assign(:payments_page, new_page)
+    |> assign(:payments_total, total_count)
     |> assign(:payments_total_pages, total_pages)
-    |> assign(:all_payments, all_payments)
-    |> assign(:filtered_payments_count, length(filtered_payments))
-    |> assign(:filtered_payments_list, filtered_payments)
-    |> stream(:payments, filtered_payments,
+    |> assign(:all_payments, payments)
+    |> assign(:filtered_payments_count, length(payments))
+    |> assign(:filtered_payments_list, payments)
+    |> stream(:payments, payments,
       reset: true,
       dom_id: &payment_dom_id/1
     )
   end
-
-  defp apply_payment_filter(payments, :all), do: payments
-
-  defp apply_payment_filter(payments, :tahoe) do
-    Enum.filter(payments, fn payment_info ->
-      payment_info.type == :booking &&
-        payment_info.booking &&
-        payment_info.booking.property == :tahoe
-    end)
-  end
-
-  defp apply_payment_filter(payments, :clear_lake) do
-    Enum.filter(payments, fn payment_info ->
-      payment_info.type == :booking &&
-        payment_info.booking &&
-        payment_info.booking.property == :clear_lake
-    end)
-  end
-
-  defp apply_payment_filter(payments, :events) do
-    Enum.filter(payments, fn payment_info -> payment_info.type == :ticket end)
-  end
-
-  defp apply_payment_filter(payments, :donations) do
-    Enum.filter(payments, fn payment_info -> payment_info.type == :donation end)
-  end
-
-  defp apply_payment_filter(payments, :membership) do
-    Enum.filter(payments, fn payment_info ->
-      payment_info.type == :membership
-    end)
-  end
-
-  defp apply_payment_filter(payments, _), do: payments
 
   defp get_price_id(memberhip_type) do
     plans = Application.get_env(:ysc, :membership_plans)
