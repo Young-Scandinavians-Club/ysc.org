@@ -371,7 +371,7 @@ defmodule YscWeb.AccountSetupLive do
           <.header class="text-left">
             Verify Your Phone Number
             <:subtitle>
-              We sent a verification code to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@user.phone_number) || @user.phone_number %></strong>. Please enter it below to continue.
+              We sent a 6-digit code to <strong><%= Ysc.Extensions.PhoneNumber.format_for_display(@user.phone_number) || @user.phone_number %></strong>. Enter it below to continue.
             </:subtitle>
           </.header>
 
@@ -393,7 +393,7 @@ defmodule YscWeb.AccountSetupLive do
             <.input
               field={@phone_verification_form[:verification_code]}
               type="otp"
-              label="Verification Code"
+              label="6-digit verification code"
               required
             />
             <p class="text-xs text-zinc-600 mt-1">

@@ -526,7 +526,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
       <.header class="text-left">
         Family Membership
         <:subtitle>
-          Your membership benefits are shared with you through the primary family member. You do not need to choose a plan or add a payment method.
+          Your membership benefits are shared with you by your family membership manager. You do not need to choose a plan or add a payment method.
         </:subtitle>
       </.header>
 
