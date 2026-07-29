@@ -15,6 +15,7 @@ defmodule Ysc.Tickets.AdminGrants do
   alias Ysc.Events.EventDateTime
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketTier
+  alias Ysc.Events.TicketTierHelpers
   alias Ysc.Repo
   alias Ysc.Tickets.BookingLocker
   alias Ysc.Tickets.CheckoutCancel
@@ -153,7 +154,7 @@ defmodule Ysc.Tickets.AdminGrants do
       if length(tiers) != length(tier_ids) do
         {:error, :invalid_ticket_tier}
       else
-        case Enum.find(tiers, &donation_tier?/1) do
+        case Enum.find(tiers, &TicketTierHelpers.donation_tier?/1) do
           nil ->
             case invalid_quantity?(ticket_selections) do
               true -> {:error, :invalid_quantity}
@@ -166,9 +167,6 @@ defmodule Ysc.Tickets.AdminGrants do
       end
     end
   end
-
-  defp donation_tier?(%TicketTier{type: type}),
-    do: type in [:donation, "donation"]
 
   defp invalid_quantity?(ticket_selections) do
     Enum.any?(ticket_selections, fn {_tier_id, quantity} ->

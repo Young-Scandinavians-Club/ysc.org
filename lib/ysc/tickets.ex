@@ -20,6 +20,7 @@ defmodule Ysc.Tickets do
   alias Ysc.Tickets.CheckoutCancel
   alias Ysc.Events.Ticket
   alias Ysc.Events.TicketTier
+  alias Ysc.Events.TicketTierHelpers
   alias Ysc.Events.Event
   alias Ysc.Accounts
   alias Ysc.Ledgers
@@ -1285,13 +1286,13 @@ defmodule Ysc.Tickets do
       tier = first_ticket.ticket_tier
       quantity = length(tier_tickets)
 
-      if tier.type in [:donation, "donation"] do
+      if TicketTierHelpers.donation_tier?(tier) do
         {_gross_event_amount, donation_amount, _discount_amount} =
           calculate_event_and_donation_amounts(ticket_order)
 
         donation_tickets_count =
           Enum.count(tickets, fn t ->
-            t.ticket_tier.type in [:donation, "donation"]
+            TicketTierHelpers.donation_tier?(t.ticket_tier)
           end)
 
         if donation_tickets_count > 0 do
@@ -1673,28 +1674,29 @@ defmodule Ysc.Tickets do
       nil ->
         :error
 
-      %{type: type} when type in [:donation, "donation"] ->
-        :ok
-
       tier ->
-        available = get_available_tier_quantity(tier, sold_counts)
-
-        if available == :unlimited or requested_quantity <= available do
+        if TicketTierHelpers.donation_tier?(tier) do
           :ok
         else
-          :error
+          available = get_available_tier_quantity(tier, sold_counts)
+
+          if available == :unlimited or requested_quantity <= available do
+            :ok
+          else
+            :error
+          end
         end
     end
   end
 
   defp non_donation_ticket_quantity(ticket_selections, tiers_by_id) do
     Enum.reduce(ticket_selections, 0, fn {tier_id, quantity}, acc ->
-      case Map.get(tiers_by_id, tier_id) do
-        %{type: type} when type in [:donation, "donation"] ->
-          acc
+      tier = Map.get(tiers_by_id, tier_id)
 
-        _ ->
-          acc + quantity
+      if TicketTierHelpers.donation_tier?(tier) do
+        acc
+      else
+        acc + quantity
       end
     end)
   end
