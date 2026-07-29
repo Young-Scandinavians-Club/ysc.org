@@ -84,6 +84,7 @@ defmodule YscWeb.AdminBadgeHelpers do
   def ledger_payment_status_badge_type(:completed), do: "green"
   def ledger_payment_status_badge_type(:pending), do: "yellow"
   def ledger_payment_status_badge_type(:failed), do: "red"
+  def ledger_payment_status_badge_type(:refunded), do: "zinc"
   def ledger_payment_status_badge_type(_), do: "dark"
 
   @doc """
