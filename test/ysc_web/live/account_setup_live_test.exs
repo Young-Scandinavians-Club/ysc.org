@@ -793,10 +793,12 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "shows the phone verification form", %{conn: conn, user: user} do
-      {:ok, view, _html} =
+      {:ok, view, html} =
         live(conn, account_setup_path(user, %{"step" => "4"}))
 
       assert has_element?(view, "#phone_verification_form")
+      assert html =~ "6-digit code"
+      assert html =~ "6-digit verification code"
     end
 
     test "invalid code shows error", %{conn: conn, user: user} do

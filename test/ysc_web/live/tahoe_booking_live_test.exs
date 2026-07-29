@@ -226,6 +226,7 @@ defmodule YscWeb.TahoeBookingLiveTest do
 
       socket = :sys.get_state(view.pid).socket
       refute socket.assigns.can_book
+
       assert socket.assigns.booking_error_title ==
                "Your family already has the entire cabin booked"
     end
