@@ -1747,10 +1747,14 @@ defmodule YscWeb.AdminMoneyLive do
                     Status
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    QuickBooks Sync Status
+                    <span class="block max-w-[7rem] whitespace-normal leading-tight">
+                      QuickBooks Sync Status
+                    </span>
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    QuickBooks Bill ID
+                    <span class="block max-w-[7rem] whitespace-normal leading-tight">
+                      QuickBooks Bill ID
+                    </span>
                   </th>
                   <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                     Submitted At
@@ -2147,7 +2151,13 @@ defmodule YscWeb.AdminMoneyLive do
             <strong>Amount:</strong> {Money.to_string!(@selected_payment.amount)}
           </p>
           <p :if={@selected_payment.user} class="text-sm text-zinc-600">
-            <strong>User:</strong> {@selected_payment.user.email}
+            <strong>User:</strong>
+            <.link
+              navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
+              class="text-blue-600 hover:underline"
+            >
+              {@selected_payment.user.email}
+            </.link>
           </p>
         </div>
 
@@ -2304,12 +2314,23 @@ defmodule YscWeb.AdminMoneyLive do
         </.form>
       </.modal>
       <!-- Credit Modal -->
-      <.modal :if={@show_credit_modal} id="credit-modal" show>
+      <.modal
+        :if={@show_credit_modal}
+        id="credit-modal"
+        show
+        on_cancel={JS.push("close_credit_modal")}
+      >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">Add Credit</h3>
 
         <div :if={@selected_user} class="mb-4">
           <p class="text-sm text-zinc-600">
-            <strong>User:</strong> {@selected_user.email}
+            <strong>User:</strong>
+            <.link
+              navigate={~p"/admin/users/#{@selected_user.id}/details"}
+              class="text-blue-600 hover:underline"
+            >
+              {@selected_user.email}
+            </.link>
           </p>
         </div>
 
@@ -2392,7 +2413,12 @@ defmodule YscWeb.AdminMoneyLive do
         </.form>
       </.modal>
       <!-- Webhook Details Modal -->
-      <.modal :if={@show_webhook_modal && @selected_webhook} id="webhook-modal" show>
+      <.modal
+        :if={@show_webhook_modal && @selected_webhook}
+        id="webhook-modal"
+        show
+        on_cancel={JS.push("close_webhook_modal")}
+      >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">
           Webhook Event Details
         </h3>
@@ -2487,9 +2513,24 @@ defmodule YscWeb.AdminMoneyLive do
           <div class="grid grid-cols-2 gap-4">
             <div>
               <p class="text-sm font-medium text-zinc-700">Stripe Payout ID</p>
-              <p class="text-sm text-zinc-900 font-mono">
-                {@selected_payout.stripe_payout_id}
-              </p>
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <a
+                  href={"https://dashboard.stripe.com/payouts/#{@selected_payout.stripe_payout_id}"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-sm text-zinc-900 hover:text-blue-600 font-mono transition-colors underline decoration-dotted break-all min-w-0"
+                  title="View in Stripe Dashboard"
+                >
+                  {@selected_payout.stripe_payout_id}
+                </a>
+                <.admin_clipboard_button
+                  id={"copy-stripe-payout-#{@selected_payout.id}"}
+                  variant={:icon}
+                  copy={@selected_payout.stripe_payout_id}
+                  title="Copy Stripe Payout ID"
+                  aria_label="Copy Stripe Payout ID"
+                />
+              </div>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
@@ -2650,14 +2691,17 @@ defmodule YscWeb.AdminMoneyLive do
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <%= if Ecto.assoc_loaded?(payment.user) && payment.user do %>
-                      <div class="flex flex-col">
-                        <span class="text-xs font-medium">
+                      <.link
+                        navigate={~p"/admin/users/#{payment.user.id}/details"}
+                        class="flex flex-col group"
+                      >
+                        <span class="text-xs font-medium text-blue-600 group-hover:underline">
                           {get_user_display_name(payment.user)}
                         </span>
-                        <span class="text-xs text-zinc-500">
+                        <span class="text-xs text-zinc-500 group-hover:underline">
                           {payment.user.email}
                         </span>
-                      </div>
+                      </.link>
                     <% else %>
                       <span class="text-xs text-zinc-400">System</span>
                     <% end %>
@@ -2756,14 +2800,17 @@ defmodule YscWeb.AdminMoneyLive do
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <%= if Ecto.assoc_loaded?(refund.user) && refund.user do %>
-                      <div class="flex flex-col">
-                        <span class="text-xs font-medium">
+                      <.link
+                        navigate={~p"/admin/users/#{refund.user.id}/details"}
+                        class="flex flex-col group"
+                      >
+                        <span class="text-xs font-medium text-blue-600 group-hover:underline">
                           {get_user_display_name(refund.user)}
                         </span>
-                        <span class="text-xs text-zinc-500">
+                        <span class="text-xs text-zinc-500 group-hover:underline">
                           {refund.user.email}
                         </span>
-                      </div>
+                      </.link>
                     <% else %>
                       <span class="text-xs text-zinc-400">System</span>
                     <% end %>
@@ -2973,14 +3020,17 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="text-sm font-medium text-zinc-700">User</p>
               <p class="text-sm text-zinc-900">
                 <%= if Ecto.assoc_loaded?(@selected_payment.user) && @selected_payment.user do %>
-                  <div class="flex flex-col">
-                    <span class="font-medium">
+                  <.link
+                    navigate={~p"/admin/users/#{@selected_payment.user.id}/details"}
+                    class="flex flex-col group"
+                  >
+                    <span class="font-medium text-blue-600 group-hover:underline">
                       {get_user_display_name(@selected_payment.user)}
                     </span>
-                    <span class="text-xs text-zinc-500">
+                    <span class="text-xs text-zinc-500 group-hover:underline">
                       {@selected_payment.user.email}
                     </span>
-                  </div>
+                  </.link>
                 <% else %>
                   <span class="text-zinc-400">System</span>
                 <% end %>
@@ -3005,9 +3055,24 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div :if={@selected_payment.external_payment_id}>
               <p class="text-sm font-medium text-zinc-700">Stripe Payment ID</p>
-              <p class="text-sm text-zinc-900 font-mono text-xs">
-                {String.slice(@selected_payment.external_payment_id, 0..20)}...
-              </p>
+              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                <a
+                  href={"https://dashboard.stripe.com/payments/#{@selected_payment.external_payment_id}"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-xs text-zinc-900 hover:text-blue-600 font-mono transition-colors underline decoration-dotted break-all min-w-0"
+                  title="View in Stripe Dashboard"
+                >
+                  {@selected_payment.external_payment_id}
+                </a>
+                <.admin_clipboard_button
+                  id={"copy-stripe-payment-#{@selected_payment.id}"}
+                  variant={:icon}
+                  copy={@selected_payment.external_payment_id}
+                  title="Copy Stripe Payment ID"
+                  aria_label="Copy Stripe Payment ID"
+                />
+              </div>
             </div>
           </div>
           <!-- QuickBooks Information -->
@@ -3290,6 +3355,7 @@ defmodule YscWeb.AdminMoneyLive do
         :if={@show_expense_report_modal && @selected_expense_report}
         id="expense-report-modal"
         show
+        on_cancel={JS.push("close_expense_report_modal")}
       >
         <h3 class="text-lg font-medium text-zinc-900 mb-4">
           Expense Report Details
@@ -3312,7 +3378,14 @@ defmodule YscWeb.AdminMoneyLive do
               <p class="font-medium text-zinc-700">User</p>
               <p class="text-zinc-900">
                 <%= if Ecto.assoc_loaded?(@selected_expense_report.user) && @selected_expense_report.user do %>
-                  {get_user_display_name(@selected_expense_report.user)} ({@selected_expense_report.user.email})
+                  <.link
+                    navigate={
+                      ~p"/admin/users/#{@selected_expense_report.user.id}/details"
+                    }
+                    class="text-blue-600 hover:underline"
+                  >
+                    {get_user_display_name(@selected_expense_report.user)} ({@selected_expense_report.user.email})
+                  </.link>
                 <% else %>
                   <span class="text-zinc-400">Unknown</span>
                 <% end %>

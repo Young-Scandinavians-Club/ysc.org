@@ -575,31 +575,44 @@ defmodule YscWeb.AdminBookingsLive do
               <label class="block text-sm font-semibold text-zinc-700 mb-2">
                 Guest Details
               </label>
-              <div class="flex items-center gap-3">
-                <.user_avatar_image
-                  user={@booking.user}
-                  class="w-10 h-10 rounded-full flex-shrink-0"
-                />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-zinc-900 truncate">
-                    {if @booking.user do
-                      if @booking.user.first_name && @booking.user.last_name do
+              <%= if @booking.user do %>
+                <.link
+                  navigate={~p"/admin/users/#{@booking.user.id}/details"}
+                  class="flex items-center gap-3 group min-w-0"
+                >
+                  <.user_avatar_image
+                    user={@booking.user}
+                    class="w-10 h-10 rounded-full flex-shrink-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-blue-600 group-hover:underline truncate">
+                      {if @booking.user.first_name && @booking.user.last_name do
                         "#{@booking.user.first_name} #{@booking.user.last_name}"
                       else
                         @booking.user.email || "Unknown User"
-                      end
-                    else
-                      "Unknown User"
-                    end}
-                  </p>
-                  <p
-                    :if={@booking.user && @booking.user.email}
-                    class="text-xs text-zinc-500 truncate"
-                  >
-                    {@booking.user.email}
-                  </p>
+                      end}
+                    </p>
+                    <p
+                      :if={@booking.user.email}
+                      class="text-xs text-zinc-500 group-hover:underline truncate"
+                    >
+                      {@booking.user.email}
+                    </p>
+                  </div>
+                </.link>
+              <% else %>
+                <div class="flex items-center gap-3">
+                  <.user_avatar_image
+                    user={nil}
+                    class="w-10 h-10 rounded-full flex-shrink-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-zinc-900 truncate">
+                      Unknown User
+                    </p>
+                  </div>
                 </div>
-              </div>
+              <% end %>
               <div class="mt-3 flex items-center gap-4 text-xs">
                 <div class="flex items-center gap-1.5">
                   <span class="font-semibold text-zinc-700">
@@ -636,9 +649,18 @@ defmodule YscWeb.AdminBookingsLive do
                       <div class="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 text-zinc-600 flex items-center justify-center font-medium text-xs">
                         {"#{String.first(guest.first_name)}#{String.first(guest.last_name)}"}
                       </div>
-                      <span class="text-zinc-900">
-                        {"#{guest.first_name} #{guest.last_name}"}
-                      </span>
+                      <%= if guest.is_booking_user && @booking.user do %>
+                        <.link
+                          navigate={~p"/admin/users/#{@booking.user.id}/details"}
+                          class="text-blue-600 hover:underline font-medium"
+                        >
+                          {"#{guest.first_name} #{guest.last_name}"}
+                        </.link>
+                      <% else %>
+                        <span class="text-zinc-900">
+                          {"#{guest.first_name} #{guest.last_name}"}
+                        </span>
+                      <% end %>
                       <span :if={guest.is_child} class="text-zinc-500">
                         (Child)
                       </span>
@@ -1022,7 +1044,13 @@ defmodule YscWeb.AdminBookingsLive do
             <strong>Booking:</strong> {@booking.reference_id || @booking.id}
           </p>
           <p :if={@booking.user} class="text-sm text-zinc-600">
-            <strong>User:</strong> {@booking.user.email}
+            <strong>User:</strong>
+            <.link
+              navigate={~p"/admin/users/#{@booking.user.id}/details"}
+              class="text-blue-600 hover:underline"
+            >
+              {@booking.user.email}
+            </.link>
           </p>
         </div>
 
@@ -1107,29 +1135,48 @@ defmodule YscWeb.AdminBookingsLive do
             <%= for booking <- @day_guests_bookings do %>
               <div class="bg-zinc-50 rounded-lg p-4 border border-zinc-200 hover:bg-zinc-100 transition-colors">
                 <div class="flex items-start justify-between gap-4">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <.user_avatar_image
-                      user={booking.user}
-                      class="w-9 h-9 rounded-full flex-shrink-0"
-                    />
-                    <div class="min-w-0">
-                      <p class="text-sm font-semibold text-zinc-900 truncate">
-                        {if booking.user do
-                          if booking.user.first_name && booking.user.last_name do
-                            "#{booking.user.first_name} #{booking.user.last_name}"
-                          else
-                            booking.user.email || "Unknown User"
-                          end
-                        else
-                          "Unknown User"
-                        end}
-                      </p>
-                      <p
-                        :if={booking.user && booking.user.email}
-                        class="text-xs text-zinc-500 truncate"
+                  <div class="flex items-start gap-3 min-w-0">
+                    <%= if booking.user do %>
+                      <.link
+                        navigate={~p"/admin/users/#{booking.user.id}/details"}
+                        class="flex-shrink-0"
                       >
-                        {booking.user.email}
-                      </p>
+                        <.user_avatar_image
+                          user={booking.user}
+                          class="w-9 h-9 rounded-full"
+                        />
+                      </.link>
+                    <% else %>
+                      <.user_avatar_image
+                        user={nil}
+                        class="w-9 h-9 rounded-full flex-shrink-0"
+                      />
+                    <% end %>
+                    <div class="min-w-0">
+                      <%= if booking.user do %>
+                        <.link
+                          navigate={~p"/admin/users/#{booking.user.id}/details"}
+                          class="block group min-w-0"
+                        >
+                          <p class="text-sm font-semibold text-blue-600 group-hover:underline truncate">
+                            {if booking.user.first_name && booking.user.last_name do
+                              "#{booking.user.first_name} #{booking.user.last_name}"
+                            else
+                              booking.user.email || "Unknown User"
+                            end}
+                          </p>
+                          <p
+                            :if={booking.user.email}
+                            class="text-xs text-zinc-500 group-hover:underline truncate"
+                          >
+                            {booking.user.email}
+                          </p>
+                        </.link>
+                      <% else %>
+                        <p class="text-sm font-semibold text-zinc-900 truncate">
+                          Unknown User
+                        </p>
+                      <% end %>
                       <div class="flex items-center gap-3 mt-1 text-xs text-zinc-600">
                         <span>
                           {Calendar.strftime(booking.checkin_date, "%b %d")} → {Calendar.strftime(
