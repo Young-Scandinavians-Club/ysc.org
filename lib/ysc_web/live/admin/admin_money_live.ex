@@ -1435,7 +1435,13 @@ defmodule YscWeb.AdminMoneyLive do
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-zinc-100">
-                  <tr :for={expense_report <- @expense_reports_inbox}>
+                  <tr
+                    :for={expense_report <- @expense_reports_inbox}
+                    id={"expense-inbox-row-#{expense_report.id}"}
+                    phx-click="show_expense_report_status_modal"
+                    phx-value-expense_report_id={expense_report.id}
+                    class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                  >
                     <td class="px-4 py-3 text-sm text-zinc-900">
                       <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
                         <div class="flex flex-col">
@@ -1462,7 +1468,10 @@ defmodule YscWeb.AdminMoneyLive do
                         "%Y-%m-%d"
                       )}
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
+                    <td
+                      class="px-4 py-3 whitespace-nowrap text-right text-sm"
+                      onclick="event.stopPropagation()"
+                    >
                       <button
                         type="button"
                         id={"expense-inbox-review-#{expense_report.id}"}
@@ -1600,7 +1609,18 @@ defmodule YscWeb.AdminMoneyLive do
                      @payments_empty?) && "hidden"
                 ]}
               >
-                <tr :for={{id, payment} <- @streams.payments} id={id}>
+                <tr
+                  :for={{id, payment} <- @streams.payments}
+                  id={id}
+                  phx-click={
+                    if(payment.payment_type_info.type == "Payout",
+                      do: "show_payout_modal",
+                      else: "show_payment_modal"
+                    )
+                  }
+                  phx-value-payment_id={payment.id}
+                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
                     {payment.reference_id}
                   </td>
@@ -1741,7 +1761,13 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={expense_report <- @expense_reports}>
+                <tr
+                  :for={expense_report <- @expense_reports}
+                  id={"expense-report-row-#{expense_report.id}"}
+                  phx-click="show_expense_report_status_modal"
+                  phx-value-expense_report_id={expense_report.id}
+                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
                     {String.slice(to_string(expense_report.id), 0..12)}...
                   </td>
@@ -1794,7 +1820,10 @@ defmodule YscWeb.AdminMoneyLive do
                       "%Y-%m-%d %H:%M"
                     )}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                    onclick="event.stopPropagation()"
+                  >
                     <button
                       type="button"
                       id={"expense-report-view-#{expense_report.id}"}
@@ -2038,7 +2067,13 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-zinc-200">
-                <tr :for={webhook <- @webhook_events}>
+                <tr
+                  :for={webhook <- @webhook_events}
+                  id={"webhook-row-#{webhook.id}"}
+                  phx-click="show_webhook_modal"
+                  phx-value-webhook_id={webhook.id}
+                  class="cursor-pointer hover:bg-zinc-50 transition-colors"
+                >
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
                     {String.slice(webhook.event_id, 0..20)}...
                   </td>
@@ -2057,7 +2092,10 @@ defmodule YscWeb.AdminMoneyLive do
                       "%Y-%m-%d %H:%M:%S"
                     )}
                   </td>
-                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right"
+                    onclick="event.stopPropagation()"
+                  >
                     <button
                       type="button"
                       id={"webhook-view-#{webhook.id}"}

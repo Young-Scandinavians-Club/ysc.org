@@ -3344,14 +3344,7 @@ defmodule YscWeb.TahoeBookingLive do
                       <div class="flex items-center justify-between p-4">
                         <div class="flex items-center gap-3">
                           <span class="text-xl">🎿</span>
-                          <a
-                            href="https://tahoexc.org/"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="font-semibold text-blue-600 hover:text-blue-800 underline"
-                          >
-                            Tahoe XC (Cross-country skiing)
-                          </a>
+                          <span class="font-semibold">Tahoe XC (Cross-country skiing)</span>
                         </div>
                         <span class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">
                           20 MINS
