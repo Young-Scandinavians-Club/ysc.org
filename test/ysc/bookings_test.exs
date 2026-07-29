@@ -3113,6 +3113,27 @@ defmodule Ysc.BookingsTest do
                  {:error, :inventory_update_failed}
                )
     end
+
+    test "refunds hold payments when confirmation email enqueue fails" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_email_enqueue_failed_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        latest_charge: "ch_test_email_enqueue_failed"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 {:booking_confirmation_email_enqueue_failed,
+                  :coverage_schedule_failed}
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
+    end
   end
 
   describe "maybe_refund_unfulfilled_modification_payment/3" do

@@ -1065,6 +1065,7 @@ defmodule Ysc.Bookings do
     payment_amount_mismatch
     entitlement_consume_failed
     booking_confirmation_failed
+    booking_confirmation_email_enqueue_failed
     inventory_update_failed
   )a
 
@@ -1134,6 +1135,11 @@ defmodule Ysc.Bookings do
 
   defp normalize_checkout_failure_reason({:error, reason}),
     do: normalize_checkout_failure_reason(reason)
+
+  defp normalize_checkout_failure_reason(
+         {:booking_confirmation_email_enqueue_failed, _reason}
+       ),
+       do: :booking_confirmation_email_enqueue_failed
 
   defp normalize_checkout_failure_reason(reason) when is_atom(reason),
     do: reason
