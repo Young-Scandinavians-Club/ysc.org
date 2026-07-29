@@ -8,7 +8,9 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
   - Ledger entries for mixed event/donation payments
   - QuickBooks sync with proper donation classification
   """
-  use Ysc.DataCase, async: true
+  # async: false — setup clears :ysc_cache globally; parallel tests can lose cache
+  # entries (SMS rate limits, QuickBooks tokens) mid-assertion under CI load.
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures
