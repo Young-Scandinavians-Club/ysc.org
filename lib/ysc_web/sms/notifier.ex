@@ -13,7 +13,8 @@ defmodule YscWeb.Sms.Notifier do
     "two_factor_verification" => YscWeb.Sms.TwoFactorVerification,
     "email_changed" => YscWeb.Sms.EmailChanged,
     "password_changed" => YscWeb.Sms.PasswordChanged,
-    "phone_verification" => YscWeb.Sms.PhoneVerification
+    "phone_verification" => YscWeb.Sms.PhoneVerification,
+    "event_update_notification" => YscWeb.Sms.EventUpdateNotification
   }
 
   @doc """

@@ -442,4 +442,179 @@ defmodule Ysc.EventUpdatesTest do
       assert marked.sent_at != nil
     end
   end
+
+  describe "list_event_update_sms_recipients/1" do
+    test "returns purchasers with phone and event SMS enabled", %{
+      event: event,
+      user: user
+    } do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          event_notifications_sms: true,
+          phone_number: user.phone_number || unique_user_phone()
+        )
+        |> Repo.update!()
+
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: user.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      recipients = Events.list_event_update_sms_recipients(event.id)
+      assert length(recipients) == 1
+      assert hd(recipients).user_id == user.id
+      assert hd(recipients).phone_number == user.phone_number
+      assert Events.count_event_update_sms_recipients(event.id) == 1
+    end
+
+    test "excludes users with event SMS disabled", %{event: event} do
+      opted_out =
+        user_fixture()
+        |> Ecto.Changeset.change(event_notifications_sms: false)
+        |> Repo.update!()
+
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: opted_out.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      assert Events.list_event_update_sms_recipients(event.id) == []
+      assert Events.count_event_update_sms_recipients(event.id) == 0
+    end
+
+    test "excludes donation tickets and users without phone", %{event: event} do
+      donor = user_fixture()
+
+      no_phone =
+        user_fixture()
+        |> Ecto.Changeset.change(phone_number: nil)
+        |> Repo.update!()
+
+      donation_tier =
+        ticket_tier_fixture(%{event_id: event.id, type: :donation})
+
+      paid_tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: donor.id,
+        ticket_tier_id: donation_tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: no_phone.id,
+        ticket_tier_id: paid_tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      assert Events.list_event_update_sms_recipients(event.id) == []
+    end
+
+    test "deduplicates by phone number", %{event: event} do
+      phone = unique_user_phone()
+
+      buyer1 =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          phone_number: phone,
+          event_notifications_sms: true
+        )
+        |> Repo.update!()
+
+      buyer2 =
+        user_fixture()
+        |> Ecto.Changeset.change(
+          phone_number: phone,
+          event_notifications_sms: true
+        )
+        |> Repo.update!()
+
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      for buyer <- [buyer1, buyer2] do
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+      end
+
+      recipients = Events.list_event_update_sms_recipients(event.id)
+      assert length(recipients) == 1
+      assert Events.count_event_update_sms_recipients(event.id) == 1
+    end
+  end
+
+  describe "create_event_update/2 with SMS fields" do
+    test "persists send_sms and sms_body", %{event: event, user: user} do
+      attrs = %{
+        title: "Gate",
+        raw_body: "<p>Code 1234</p>",
+        rendered_body: "<p>Code 1234</p>",
+        send_sms: true,
+        sms_body: "[YSC] Gate: Code 1234",
+        sent_by_id: user.id
+      }
+
+      assert {:ok, update} = Events.create_event_update(event, attrs)
+      assert update.send_sms == true
+      assert update.sms_body == "[YSC] Gate: Code 1234"
+    end
+  end
+
+  describe "mark_event_update_sms_sent/3" do
+    test "sets sms_recipient_count and sms_body", %{event: event, user: user} do
+      {:ok, update} =
+        Events.create_event_update(event, %{
+          title: "Test",
+          raw_body: "body",
+          rendered_body: "body",
+          send_sms: true,
+          sent_by_id: user.id
+        })
+
+      assert {:ok, marked} =
+               Events.mark_event_update_sms_sent(update, 7, "[YSC] Test: body")
+
+      assert marked.sms_recipient_count == 7
+      assert marked.sms_body == "[YSC] Test: body"
+    end
+  end
 end

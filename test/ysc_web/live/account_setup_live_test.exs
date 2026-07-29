@@ -716,6 +716,16 @@ defmodule YscWeb.AccountSetupLiveTest do
       assert has_element?(view, "#phone_form")
     end
 
+    test "defaults SMS opt-in checkbox to checked", %{conn: conn, user: user} do
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "3"}))
+
+      assert has_element?(
+               view,
+               "#phone_form input[name='user[sms_opt_in]'][type='checkbox'][checked]"
+             )
+    end
+
     test "shows skip button", %{conn: conn, user: user} do
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "3"}))

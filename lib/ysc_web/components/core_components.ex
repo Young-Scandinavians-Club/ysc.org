@@ -746,7 +746,7 @@ defmodule YscWeb.CoreComponents do
 
     ~H"""
     <div>
-      <label class="flex items-start gap-3 text-sm leading-6 text-zinc-600 cursor-pointer py-1">
+      <label class="flex items-center gap-3 text-sm leading-6 text-zinc-600 cursor-pointer py-1">
         <input type="hidden" name={@name} value="false" />
         <input
           type="checkbox"
@@ -754,7 +754,7 @@ defmodule YscWeb.CoreComponents do
           name={@name}
           value="true"
           checked={@checked}
-          class="mt-0.5 rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
+          class="rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-blue-500 focus:ring-offset-0 w-5 h-5 flex-shrink-0"
           {@rest}
         />
         <span class="flex-1">{@label}</span>

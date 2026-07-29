@@ -144,13 +144,46 @@ defmodule YscWeb.Components.Events.CommunicationTimeline do
       preview: preview,
       icon: "hero-paper-airplane",
       badges: event_update_badges(update),
-      recipient_label:
-        if(update.recipient_count,
-          do: "#{update.recipient_count} recipient(s)",
-          else: nil
-        ),
+      recipient_label: event_update_recipient_label(update),
       sent_by_name: sent_by_name(update.sent_by)
     }
+  end
+
+  defp event_update_recipient_label(%EventUpdate{} = update) do
+    email_part =
+      if update.recipient_count,
+        do: "#{update.recipient_count} email(s)",
+        else: nil
+
+    sms_part =
+      cond do
+        update.send_sms && update.sms_recipient_count != nil ->
+          "#{update.sms_recipient_count} SMS"
+
+        update.send_sms ->
+          "SMS pending"
+
+        true ->
+          nil
+      end
+
+    [email_part, sms_part]
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] -> nil
+      parts -> Enum.join(parts, " · ")
+    end
+  end
+
+  defp event_update_badges(%EventUpdate{
+         show_on_event_page: true,
+         send_sms: true
+       }) do
+    ["Email", "SMS", "Event Page"]
+  end
+
+  defp event_update_badges(%EventUpdate{send_sms: true}) do
+    ["Email", "SMS"]
   end
 
   defp event_update_badges(%EventUpdate{show_on_event_page: true}) do

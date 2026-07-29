@@ -18,6 +18,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias YscWeb.AdminEventsLive.TicketTierManagement
   alias YscWeb.Components.Events.CommunicationTimeline
   alias YscWeb.Emails.EventUpdateNotification
+  alias YscWeb.Sms.Segment
 
   alias HtmlSanitizeEx.Scrubber
 
@@ -867,7 +868,14 @@ defmodule YscWeb.AdminEventsNewLive do
                       This includes both ticket purchasers and registered attendees.
                     </p>
                     <p class="mt-2 text-sm font-medium text-blue-600">
-                      {@recipient_count} recipient(s) will receive this update
+                      {@recipient_count} email recipient(s) will receive this update
+                    </p>
+                    <p
+                      :if={sms_checked?(@update_form)}
+                      class="mt-1 text-sm font-medium text-blue-600"
+                      id="sms-recipient-count"
+                    >
+                      {@sms_recipient_count} SMS recipient(s) with event SMS notifications enabled
                     </p>
                   </div>
 
@@ -886,23 +894,34 @@ defmodule YscWeb.AdminEventsNewLive do
                     />
 
                     <div>
-                      <label class="block text-sm font-semibold leading-6 text-zinc-800 mb-2">
+                      <span
+                        id="update-message-label"
+                        class="block text-sm font-semibold leading-6 text-zinc-800 mb-2"
+                      >
                         Message
-                      </label>
-                      <.input
-                        type="hidden"
-                        id="update[raw_body]"
-                        field={@update_form[:raw_body]}
-                        phx-hook="TrixHook"
-                        phx-debounce={200}
-                      />
-                      <div id="update-richtext" phx-update="ignore">
-                        <trix-editor
-                          input="update[raw_body]"
-                          class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
-                          placeholder="Write the update message to send to all attendees..."
-                        >
-                        </trix-editor>
+                      </span>
+                      <div class="prose prose-zinc prose-base prose-a:text-blue-600 max-w-none">
+                        <.input
+                          type="hidden"
+                          id="update[raw_body]"
+                          field={@update_form[:raw_body]}
+                          phx-hook="TrixHook"
+                          phx-debounce={200}
+                        />
+                        <.live_component
+                          module={YscWeb.TrixImagePickerComponent}
+                          id={:event_update_body_image_picker}
+                          target_input_id="update[raw_body]"
+                        />
+                        <div id="update-richtext" phx-update="ignore">
+                          <trix-editor
+                            input="update[raw_body]"
+                            aria-labelledby="update-message-label"
+                            class="trix-content block px-4 py-2 bg-white border-zinc-200 focus:ring-1 focus:ring-blue-400 focus:border-blue-400 transition border rounded text-wrap min-h-[200px] max-h-[400px] overflow-y-auto resize-y"
+                            placeholder="Write the update message to send to all attendees..."
+                          >
+                          </trix-editor>
+                        </div>
                       </div>
                     </div>
 
@@ -914,12 +933,68 @@ defmodule YscWeb.AdminEventsNewLive do
                       />
                     </div>
 
+                    <div class="flex items-center gap-2">
+                      <.input
+                        field={@update_form[:send_sms]}
+                        type="checkbox"
+                        label="Also send SMS to attendees with SMS event notifications enabled"
+                      />
+                    </div>
+
+                    <div
+                      :if={sms_checked?(@update_form) and @sms_preview}
+                      id="event-update-sms-preview"
+                      class="rounded border border-zinc-200 bg-zinc-50 p-4 space-y-2"
+                    >
+                      <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="text-sm font-semibold text-zinc-800">
+                          SMS preview
+                        </h3>
+                        <p class="text-xs text-zinc-500">
+                          {@sms_preview.char_count}/{@sms_preview.single_limit} units · {@sms_preview.segment_count} SMS segment(s) · {sms_encoding_label(
+                            @sms_preview.encoding
+                          )}
+                        </p>
+                      </div>
+                      <pre
+                        id="event-update-sms-preview-body"
+                        class="whitespace-pre-wrap break-words text-sm font-mono text-zinc-800 bg-white border border-zinc-200 rounded p-3"
+                      >{@sms_preview.body}</pre>
+                      <p
+                        :if={@sms_preview.multi_segment?}
+                        id="event-update-sms-segment-warning"
+                        class="text-sm text-amber-700"
+                      >
+                        This message will send as {@sms_preview.segment_count} SMS messages per recipient (extra cost).
+                        <%= if @sms_preview.truncated? do %>
+                          It was truncated to fit a 2-segment limit.
+                        <% end %>
+                      </p>
+                      <p
+                        :if={
+                          @sms_preview.truncated? and
+                            not @sms_preview.multi_segment?
+                        }
+                        id="event-update-sms-truncated-note"
+                        class="text-sm text-amber-700"
+                      >
+                        The SMS body was truncated to fit the length limit.
+                      </p>
+                    </div>
+
                     <div class="flex flex-wrap items-center gap-4 pt-2">
                       <.button
                         type="submit"
                         phx-disable-with="Sending..."
                         class="bg-blue-600 hover:bg-blue-700"
-                        data-confirm={"Send this update to #{@recipient_count} recipient(s)? This cannot be undone."}
+                        data-confirm={
+                          event_update_confirm_message(
+                            @recipient_count,
+                            @sms_recipient_count,
+                            @update_form,
+                            @sms_preview
+                          )
+                        }
                       >
                         <.icon
                           name="hero-paper-airplane"
@@ -1093,7 +1168,8 @@ defmodule YscWeb.AdminEventsNewLive do
           "title" => "",
           "raw_body" => "",
           "rendered_body" => "",
-          "show_on_event_page" => false
+          "show_on_event_page" => false,
+          "send_sms" => false
         },
         as: "update"
       )
@@ -1140,6 +1216,8 @@ defmodule YscWeb.AdminEventsNewLive do
     socket
     |> assign(:event_updates, [])
     |> assign(:recipient_count, 0)
+    |> assign(:sms_recipient_count, 0)
+    |> assign(:sms_preview, nil)
     |> assign(:photo_collection, nil)
     |> assign(:photo_upload_url, nil)
     |> assign(:communication_timeline, [])
@@ -1162,6 +1240,11 @@ defmodule YscWeb.AdminEventsNewLive do
     socket
     |> assign(:event_updates, event_updates)
     |> assign(:recipient_count, Events.count_event_update_recipients(event.id))
+    |> assign(
+      :sms_recipient_count,
+      Events.count_event_update_sms_recipients(event.id)
+    )
+    |> assign_sms_preview()
     |> assign_photo_upload(event)
     |> then(fn socket ->
       assign_communication_timeline(
@@ -1500,6 +1583,7 @@ defmodule YscWeb.AdminEventsNewLive do
     socket =
       socket
       |> assign(:update_form, to_form(updated_params, as: "update"))
+      |> assign_sms_preview()
       |> maybe_refresh_update_preview()
 
     {:noreply, socket}
@@ -1546,6 +1630,7 @@ defmodule YscWeb.AdminEventsNewLive do
     socket =
       socket
       |> assign(:update_form, to_form(params, as: "update"))
+      |> assign_sms_preview()
       |> maybe_refresh_update_preview()
 
     {:noreply, socket}
@@ -1597,6 +1682,7 @@ defmodule YscWeb.AdminEventsNewLive do
     event = socket.assigns.event
     raw_body = params["raw_body"] || ""
     rendered_body = Scrubber.scrub(raw_body, Ysc.TrixScrubber)
+    send_sms = params["send_sms"] == "true"
 
     if String.trim(raw_body) == "" do
       {:noreply,
@@ -1605,11 +1691,24 @@ defmodule YscWeb.AdminEventsNewLive do
          title: "Update"
        )}
     else
+      sms_body =
+        if send_sms do
+          Segment.build_event_update_sms(
+            event.title || "",
+            params["title"],
+            rendered_body
+          ).body
+        else
+          nil
+        end
+
       attrs = %{
         title: params["title"],
         raw_body: raw_body,
         rendered_body: rendered_body,
         show_on_event_page: params["show_on_event_page"] == "true",
+        send_sms: send_sms,
+        sms_body: sms_body,
         sent_by_id: socket.assigns.current_user.id
       }
 
@@ -1623,10 +1722,17 @@ defmodule YscWeb.AdminEventsNewLive do
           socket =
             case oban_result do
               {:ok, _job} ->
+                flash_msg =
+                  if send_sms do
+                    "Update queued for #{socket.assigns.recipient_count} email(s) and #{socket.assigns.sms_recipient_count} SMS recipient(s)."
+                  else
+                    "Update queued for #{socket.assigns.recipient_count} recipient(s)."
+                  end
+
                 YscWeb.Flash.put_toast(
                   socket,
                   :info,
-                  "Update queued for #{socket.assigns.recipient_count} recipient(s).",
+                  flash_msg,
                   title: "Event Update"
                 )
 
@@ -1655,11 +1761,13 @@ defmodule YscWeb.AdminEventsNewLive do
                  "title" => "",
                  "raw_body" => "",
                  "rendered_body" => "",
-                 "show_on_event_page" => false
+                 "show_on_event_page" => false,
+                 "send_sms" => false
                },
                as: "update"
              )
            )
+           |> assign(:sms_preview, nil)
            |> assign_updates_tab_data(event)}
 
         {:error, changeset} ->
@@ -2072,15 +2180,21 @@ defmodule YscWeb.AdminEventsNewLive do
      socket |> assign_form(changeset) |> assign(:event, updated_event)}
   end
 
-  def handle_info({YscWeb.TrixImagePickerComponent, _id, image}, socket) do
+  def handle_info({YscWeb.TrixImagePickerComponent, id, image}, socket) do
     url = Image.display_path(image)
+
+    target_input_id =
+      case id do
+        :event_update_body_image_picker -> "update[raw_body]"
+        _ -> "post[raw_body]"
+      end
 
     {:noreply,
      push_event(socket, "insert-trix-image", %{
        url: url,
        href: "#{url}?content-disposition=attachment",
        alt: image.alt_text || image.title || "",
-       target_input_id: "post[raw_body]"
+       target_input_id: target_input_id
      })}
   end
 
@@ -2290,6 +2404,70 @@ defmodule YscWeb.AdminEventsNewLive do
       socket
     end
   end
+
+  defp assign_sms_preview(socket) do
+    form = socket.assigns[:update_form]
+    event = socket.assigns[:event]
+
+    if sms_checked?(form) and event do
+      params = form_params(form)
+      raw_body = params["raw_body"] || ""
+      rendered_body = params["rendered_body"] || raw_body
+
+      preview =
+        Segment.build_event_update_sms(
+          event.title || "",
+          params["title"],
+          rendered_body
+        )
+
+      assign(socket, :sms_preview, preview)
+    else
+      assign(socket, :sms_preview, nil)
+    end
+  end
+
+  defp sms_checked?(nil), do: false
+
+  defp sms_checked?(%Phoenix.HTML.Form{} = form) do
+    value =
+      case form[:send_sms] do
+        %{value: value} -> value
+        _ -> form_params(form)["send_sms"]
+      end
+
+    value in [true, "true"]
+  end
+
+  defp sms_checked?(_), do: false
+
+  defp form_params(%Phoenix.HTML.Form{params: params}) when is_map(params),
+    do: params
+
+  defp form_params(_), do: %{}
+
+  defp event_update_confirm_message(
+         recipient_count,
+         sms_recipient_count,
+         form,
+         sms_preview
+       ) do
+    if sms_checked?(form) do
+      segments =
+        case sms_preview do
+          %{segment_count: count} -> count
+          _ -> 1
+        end
+
+      "Send this update to #{recipient_count} email recipient(s) and #{sms_recipient_count} SMS recipient(s) (#{segments} SMS segment(s) each)? This cannot be undone."
+    else
+      "Send this update to #{recipient_count} recipient(s)? This cannot be undone."
+    end
+  end
+
+  defp sms_encoding_label(:gsm7), do: "GSM-7"
+  defp sms_encoding_label(:ucs2), do: "UCS-2"
+  defp sms_encoding_label(_), do: "SMS"
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do
     form = to_form(changeset, as: "event")
