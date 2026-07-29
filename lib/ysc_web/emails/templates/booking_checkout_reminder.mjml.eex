@@ -132,12 +132,12 @@
     <% end %>
     <%= if @cabin_master_email do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Email:</strong> <a href="mailto:<%= @cabin_master_email %>" class="email-link"><%= @cabin_master_email %></a>
+      <strong>Email:</strong>&nbsp;<a href="mailto:<%= @cabin_master_email %>" class="email-link"><%= @cabin_master_email %></a>
     </mj-text>
     <% end %>
     <%= if @cabin_master_phone do %>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      <strong>Phone:</strong> <a href="tel:<%= @cabin_master_phone %>" class="email-link"><%= @cabin_master_phone %></a>
+      <strong>Phone:</strong>&nbsp;<a href="tel:<%= @cabin_master_phone %>" class="email-link"><%= @cabin_master_phone %></a>
     </mj-text>
     <% end %>
     <mj-spacer height="24px"></mj-spacer>
