@@ -134,6 +134,7 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert report.checks.ledger_balance.balanced == true
       assert report.checks.orphaned_entries.status == :ok
       assert report.checks.entity_totals.status == :ok
+      assert report.checks.payouts.status == :ok
 
       # Verify report structure
       assert is_integer(report.duration_ms)
@@ -1569,6 +1570,141 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert text =~ "ORPHANED ENTRIES"
       assert text =~ "ENTITY TOTALS"
       assert text =~ "Memberships Match"
+      assert text =~ "PAYOUTS"
+    end
+  end
+
+  describe "reconcile_payouts/0" do
+    test "returns ok when no payouts exist" do
+      report = Reconciliation.reconcile_payouts()
+      assert report.status == :ok
+      assert report.total_payouts == 0
+      assert report.discrepancies_count == 0
+    end
+
+    test "passes when payments - refunds - fees equals payout amount", %{
+      user: user
+    } do
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "135.00"),
+          external_provider: :stripe,
+          external_payment_id: "pi_payout_recon_ok_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "4.83"),
+          description: "Charge in payout",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(:USD, "129.22"),
+                 stripe_payout_id: "po_recon_ok_#{System.unique_integer()}",
+                 description: "Balanced payout",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(:USD, "5.78")
+               })
+
+      assert {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      # Residual fee_total beyond linked payment fees ($5.78 - $4.83 = $0.95)
+      assert {:ok, _} =
+               Ledgers.book_payout_stripe_fees(
+                 payout,
+                 Money.new(:USD, "0.95")
+               )
+
+      report = Reconciliation.reconcile_payouts()
+      assert report.status == :ok
+      assert report.discrepancies_count == 0
+    end
+
+    test "detects understated fee_total like missing Billing Usage Fee", %{
+      user: user
+    } do
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "135.00"),
+          external_provider: :stripe,
+          external_payment_id: "pi_payout_recon_fee_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "4.83"),
+          description: "Charge in payout",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # fee_total understated: charge fees only, missing $0.95 usage fee
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(:USD, "129.22"),
+                 stripe_payout_id: "po_recon_fee_#{System.unique_integer()}",
+                 description: "Understated fees",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(:USD, "4.83")
+               })
+
+      assert {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      report = Reconciliation.reconcile_payouts()
+      assert report.status == :error
+      assert report.discrepancies_count == 1
+
+      [disc] = report.discrepancies
+      assert disc.stripe_payout_id == payout.stripe_payout_id
+
+      assert Enum.any?(disc.issues, fn issue ->
+               String.contains?(issue, "Payout composition mismatch")
+             end)
+    end
+
+    test "detects missing payout-time fee ledger booking", %{user: user} do
+      {:ok, {payment, _tx, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "135.00"),
+          external_provider: :stripe,
+          external_payment_id:
+            "pi_payout_recon_book_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "4.83"),
+          description: "Charge in payout",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      # Composition is correct, but residual $0.95 never booked to ledger
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(:USD, "129.22"),
+                 stripe_payout_id: "po_recon_book_#{System.unique_integer()}",
+                 description: "Missing fee booking",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(:USD, "5.78")
+               })
+
+      assert {:ok, _} = Ledgers.link_payment_to_payout(payout, payment)
+
+      report = Reconciliation.reconcile_payouts()
+      assert report.status == :error
+
+      [disc] = report.discrepancies
+
+      assert Enum.any?(disc.issues, fn issue ->
+               String.contains?(issue, "Payout-time Stripe fees not booked")
+             end)
     end
   end
 

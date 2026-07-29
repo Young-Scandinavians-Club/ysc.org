@@ -1474,6 +1474,61 @@ defmodule Ysc.LedgersTest do
       assert payout.stripe_payout_id == payout_attrs.stripe_payout_id
     end
 
+    test "book_payout_stripe_fees/2 books expense and stripe receivable reduction",
+         %{payment1: _p1} do
+      assert {:ok, {_payout_payment, _transaction, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(12_922, :USD),
+                 stripe_payout_id:
+                   "po_book_fee_#{System.unique_integer([:positive])}",
+                 description: "Payout needing usage fee",
+                 currency: "usd",
+                 status: "paid",
+                 arrival_date: DateTime.utc_now()
+               })
+
+      fee = Money.new(:USD, "0.95")
+
+      assert {:ok, [fee_expense, stripe_credit]} =
+               Ledgers.book_payout_stripe_fees(payout, fee)
+
+      assert fee_expense.debit_credit == :debit
+      assert fee_expense.amount == fee
+
+      assert String.contains?(
+               fee_expense.description,
+               "Stripe payout fee for #{payout.stripe_payout_id}"
+             )
+
+      assert stripe_credit.debit_credit == :credit
+      assert stripe_credit.amount == fee
+
+      fee_account = Ledgers.get_account_by_name("stripe_fees")
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+      assert fee_expense.account_id == fee_account.id
+      assert stripe_credit.account_id == stripe_account.id
+
+      # Idempotent on relink
+      assert {:ok, :already_booked} =
+               Ledgers.book_payout_stripe_fees(payout, fee)
+    end
+
+    test "book_payout_stripe_fees/2 no-ops for zero fee", %{payment1: _p1} do
+      assert {:ok, {_payout_payment, _transaction, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(1000, :USD),
+                 stripe_payout_id:
+                   "po_zero_fee_#{System.unique_integer([:positive])}",
+                 description: "No extra fee",
+                 currency: "usd",
+                 status: "paid",
+                 arrival_date: DateTime.utc_now()
+               })
+
+      assert {:ok, :no_fees} =
+               Ledgers.book_payout_stripe_fees(payout, Money.new(0, :USD))
+    end
+
     test "link_payment_to_payout/2 links payment to payout", %{
       payment1: payment1,
       payment2: payment2

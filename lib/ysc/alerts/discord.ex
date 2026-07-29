@@ -637,8 +637,28 @@ defmodule Ysc.Alerts.Discord do
         []
       end
 
+    payout_fields =
+      case Map.get(report.checks, :payouts) do
+        nil ->
+          []
+
+        payouts ->
+          [
+            %{
+              name: "Payouts",
+              value: """
+              Total: #{payouts.total_payouts}
+              Discrepancies: #{payouts.discrepancies_count}
+              Status: #{format_boolean(payouts.status == :ok)}
+              """,
+              inline: true
+            }
+          ]
+      end
+
     base_fields ++
-      payment_fields ++ refund_fields ++ balance_fields ++ entity_fields
+      payment_fields ++
+      refund_fields ++ balance_fields ++ entity_fields ++ payout_fields
   end
 
   defp format_status(:ok), do: "✅ PASS"

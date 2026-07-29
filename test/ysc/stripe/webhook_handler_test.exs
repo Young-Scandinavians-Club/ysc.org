@@ -2324,6 +2324,103 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert fee.currency == :USD
     end
 
+    test "sum_fee_cents_from_balance_transactions includes charge fees and stripe_fee amounts" do
+      # Mirrors a payout like po_1TyL7dIZd8GkARoBdw1Ipxew:
+      # 3 charges @ $1.61 fee each ($4.83) + Billing Usage Fee $0.95
+      balance_transactions = [
+        %{
+          type: "charge",
+          reporting_category: "charge",
+          fee: 161,
+          amount: 4500
+        },
+        %{
+          type: "charge",
+          reporting_category: "charge",
+          fee: 161,
+          amount: 4500
+        },
+        %{
+          type: "charge",
+          reporting_category: "charge",
+          fee: 161,
+          amount: 4500
+        },
+        %{
+          type: "stripe_fee",
+          reporting_category: "fee",
+          fee: 0,
+          amount: -95,
+          description: "Billing - Usage Fee (2026-07-27)"
+        },
+        %{
+          type: "payout",
+          reporting_category: "payout",
+          fee: 0,
+          amount: -12_922
+        }
+      ]
+
+      assert WebhookHandler.sum_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 483 + 95
+    end
+
+    test "sum_fee_cents_from_balance_transactions uses abs(amount) for fee reporting_category" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 100, amount: 2000},
+        %{
+          type: "stripe_fee",
+          reporting_category: "fee",
+          fee: 0,
+          amount: -50
+        }
+      ]
+
+      assert WebhookHandler.sum_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 150
+    end
+
+    test "sum_fee_cents_from_balance_transactions skips payout and ignores zero fees" do
+      balance_transactions = [
+        %{type: "payout", reporting_category: "payout", fee: 25, amount: -1000},
+        %{type: "charge", reporting_category: "charge", fee: 0, amount: 500}
+      ]
+
+      assert WebhookHandler.sum_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 0
+    end
+
+    test "sum_payout_time_fee_cents_from_balance_transactions excludes charge fees" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 161, amount: 4500},
+        %{
+          type: "stripe_fee",
+          reporting_category: "fee",
+          fee: 0,
+          amount: -95
+        },
+        %{type: "payout", reporting_category: "payout", fee: 0, amount: -12_922}
+      ]
+
+      assert WebhookHandler.sum_payout_time_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 95
+    end
+
+    test "sum_payout_time_fee_cents_from_balance_transactions includes payout BT fee" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 100, amount: 2000},
+        %{type: "payout", reporting_category: "payout", fee: 50, amount: -1900}
+      ]
+
+      assert WebhookHandler.sum_payout_time_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 50
+    end
+
     test "extract_stripe_fee_from_invoice reads cents from metadata" do
       invoice = %{
         "id" => "in_fee_#{System.unique_integer()}",
@@ -3293,6 +3390,421 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       extracted_id = WebhookHandler.extract_id_from_expandable(expanded_charge)
       assert extracted_id == charge_id
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Full mixed payout integration.
+  #
+  # Shape follows Stripe Dashboard payout po_1TyL7dIZd8GkARoBdw1Ipxew:
+  #   - per-charge processing fees on charge BTs (`fee`)
+  #   - standalone `stripe_fee` BT ("Billing - Usage Fee …", amount negative, fee 0)
+  #   - payout BT with fee 0
+  # Expanded to also cover membership (invoice lookup), event ticket, tahoe +
+  # clear-lake bookings, donation purchase, and a partial refund.
+  # ---------------------------------------------------------------------------
+  describe "mixed payout.paid end-to-end" do
+    import Mox
+
+    setup do
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      previous_payouts =
+        Application.get_env(:ysc, :process_stripe_payout_webhooks)
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      Application.put_env(:ysc, :process_stripe_payout_webhooks, true)
+
+      on_exit(fn ->
+        if previous_client do
+          Application.put_env(:ysc, :stripe_client, previous_client)
+        else
+          Application.delete_env(:ysc, :stripe_client)
+        end
+
+        if previous_payouts != nil do
+          Application.put_env(
+            :ysc,
+            :process_stripe_payout_webhooks,
+            previous_payouts
+          )
+        else
+          Application.delete_env(:ysc, :process_stripe_payout_webhooks)
+        end
+      end)
+
+      Ledgers.ensure_basic_accounts()
+      user = user_with_stripe_id()
+      %{user: user}
+    end
+
+    test "links mixed entity payments/refund, books usage fee, reconciles", %{
+      user: user
+    } do
+      uniq = System.unique_integer([:positive])
+      stripe_payout_id = "po_mixed_#{uniq}"
+
+      # Amounts mirror a rich Stripe payout summary (cents):
+      # membership $45 + ticket $50 + tahoe $200 + clear lake $80 + donation $25
+      # = $400 gross; refund $20; processing fees $13.11; usage fee $0.95
+      # → payout $365.94
+      membership_pi = "in_mixed_membership_#{uniq}"
+      ticket_pi = "pi_mixed_ticket_#{uniq}"
+      tahoe_pi = "pi_mixed_tahoe_#{uniq}"
+      clear_lake_pi = "pi_mixed_clear_lake_#{uniq}"
+      donation_pi = "pi_mixed_donation_#{uniq}"
+
+      membership_ch = "ch_mixed_membership_#{uniq}"
+      ticket_ch = "ch_mixed_ticket_#{uniq}"
+      tahoe_ch = "ch_mixed_tahoe_#{uniq}"
+      clear_lake_ch = "ch_mixed_clear_lake_#{uniq}"
+      donation_ch = "ch_mixed_donation_#{uniq}"
+      refund_id = "re_mixed_ticket_#{uniq}"
+
+      {:ok, {membership_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "45.00"),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: membership_pi,
+          stripe_fee: Money.new(:USD, "1.61"),
+          description: "Subscription creation - membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {ticket_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "50.00"),
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: ticket_pi,
+          stripe_fee: Money.new(:USD, "1.75"),
+          description: "Ticket purchase",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {tahoe_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "200.00"),
+          entity_type: :booking,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: tahoe_pi,
+          stripe_fee: Money.new(:USD, "6.10"),
+          description: "Tahoe booking purchase",
+          property: :tahoe,
+          payment_method_id: nil
+        })
+
+      {:ok, {clear_lake_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "80.00"),
+          entity_type: :booking,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: clear_lake_pi,
+          stripe_fee: Money.new(:USD, "2.62"),
+          description: "Clear Lake booking purchase",
+          property: :clear_lake,
+          payment_method_id: nil
+        })
+
+      {:ok, {donation_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "25.00"),
+          entity_type: :donation,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: donation_pi,
+          stripe_fee: Money.new(:USD, "1.03"),
+          description: "Donation purchase",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      {:ok, {ticket_refund, _, _}} =
+        Ledgers.process_refund(%{
+          payment_id: ticket_payment.id,
+          refund_amount: Money.new(:USD, "20.00"),
+          reason: "Partial ticket refund",
+          external_refund_id: refund_id
+        })
+
+      balance_transactions = [
+        %Stripe.BalanceTransaction{
+          id: "txn_usage_#{uniq}",
+          object: "balance_transaction",
+          type: "stripe_fee",
+          reporting_category: "fee",
+          amount: -95,
+          fee: 0,
+          net: -95,
+          currency: "usd",
+          description: "Billing - Usage Fee (2026-07-27)",
+          source: nil
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_membership_#{uniq}",
+          object: "balance_transaction",
+          type: "charge",
+          reporting_category: "charge",
+          amount: 4500,
+          fee: 161,
+          net: 4339,
+          currency: "usd",
+          description: "Subscription creation - membership",
+          # Maps: stripity_stripe Charge has no :invoice field; membership
+          # payments are looked up by invoice id (subscription path).
+          source: %{
+            id: membership_ch,
+            object: "charge",
+            amount: 4500,
+            payment_intent: nil,
+            invoice: membership_pi
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_ticket_#{uniq}",
+          object: "balance_transaction",
+          type: "charge",
+          reporting_category: "charge",
+          amount: 5000,
+          fee: 175,
+          net: 4825,
+          currency: "usd",
+          description: "Ticket purchase",
+          source: %{
+            id: ticket_ch,
+            object: "charge",
+            amount: 5000,
+            payment_intent: ticket_pi,
+            invoice: nil
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_tahoe_#{uniq}",
+          object: "balance_transaction",
+          type: "charge",
+          reporting_category: "charge",
+          amount: 20_000,
+          fee: 610,
+          net: 19_390,
+          currency: "usd",
+          description: "Tahoe booking purchase",
+          source: %{
+            id: tahoe_ch,
+            object: "charge",
+            amount: 20_000,
+            payment_intent: tahoe_pi,
+            invoice: nil
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_clear_lake_#{uniq}",
+          object: "balance_transaction",
+          type: "charge",
+          reporting_category: "charge",
+          amount: 8000,
+          fee: 262,
+          net: 7738,
+          currency: "usd",
+          description: "Clear Lake booking purchase",
+          source: %{
+            id: clear_lake_ch,
+            object: "charge",
+            amount: 8000,
+            payment_intent: clear_lake_pi,
+            invoice: nil
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_donation_#{uniq}",
+          object: "balance_transaction",
+          type: "charge",
+          reporting_category: "charge",
+          amount: 2500,
+          fee: 103,
+          net: 2397,
+          currency: "usd",
+          description: "Donation purchase",
+          source: %{
+            id: donation_ch,
+            object: "charge",
+            amount: 2500,
+            payment_intent: donation_pi,
+            invoice: nil
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_refund_#{uniq}",
+          object: "balance_transaction",
+          type: "refund",
+          reporting_category: "refund",
+          amount: -2000,
+          fee: 0,
+          net: -2000,
+          currency: "usd",
+          description: "Partial ticket refund",
+          source: %Stripe.Refund{
+            id: refund_id,
+            object: "refund",
+            amount: 2000,
+            charge: ticket_ch,
+            status: "succeeded"
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_payout_#{uniq}",
+          object: "balance_transaction",
+          type: "payout",
+          reporting_category: "payout",
+          amount: -36_594,
+          fee: 0,
+          net: -36_594,
+          currency: "usd",
+          description: "STRIPE PAYOUT",
+          source: stripe_payout_id
+        }
+      ]
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn ^stripe_payout_id, _opts ->
+        {:ok,
+         %Stripe.Payout{
+           id: stripe_payout_id,
+           object: "payout",
+           amount: 36_594,
+           currency: "usd",
+           status: "paid",
+           arrival_date: System.os_time(:second),
+           description: "STRIPE PAYOUT",
+           balance_transaction: %Stripe.BalanceTransaction{
+             id: "txn_payout_#{uniq}",
+             type: "payout",
+             fee: 0,
+             amount: -36_594,
+             net: -36_594,
+             currency: "usd"
+           }
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :list_balance_transactions, fn params, _opts ->
+        assert params.payout == stripe_payout_id
+
+        {:ok,
+         %Stripe.List{
+           object: "list",
+           data: balance_transactions,
+           has_more: false,
+           url: "/v1/balance_transactions"
+         }}
+      end)
+
+      # Refund linking expands charge via retrieve_charge
+      stub(Ysc.StripeMock, :retrieve_charge, fn charge_id, _opts ->
+        case charge_id do
+          ^ticket_ch ->
+            {:ok,
+             %Stripe.Charge{
+               id: ticket_ch,
+               payment_intent: ticket_pi,
+               amount: 5000
+             }}
+
+          _ ->
+            {:error, :unexpected_charge}
+        end
+      end)
+
+      payout_map = %{
+        "id" => stripe_payout_id,
+        "amount" => 36_594,
+        "currency" => "usd",
+        "status" => "paid",
+        "arrival_date" => System.os_time(:second),
+        "description" => "STRIPE PAYOUT",
+        "metadata" => %{},
+        "fees" => nil
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      payout =
+        Ledgers.get_payout_by_stripe_id(stripe_payout_id)
+        |> Ysc.Repo.preload([:payments, :refunds, :payment])
+
+      assert payout != nil
+      assert Money.equal?(payout.amount, Money.new(:USD, "365.94"))
+
+      # Processing fees ($13.11) + Billing Usage Fee ($0.95) = $14.06
+      assert Money.equal?(payout.fee_total, Money.new(:USD, "14.06"))
+
+      linked_payment_ids = MapSet.new(Enum.map(payout.payments, & &1.id))
+
+      assert MapSet.subset?(
+               MapSet.new([
+                 membership_payment.id,
+                 ticket_payment.id,
+                 tahoe_payment.id,
+                 clear_lake_payment.id,
+                 donation_payment.id
+               ]),
+               linked_payment_ids
+             )
+
+      assert length(payout.payments) == 5
+      assert Enum.map(payout.refunds, & &1.id) == [ticket_refund.id]
+
+      # Usage fee booked on the payout's virtual payment
+      payout_fee_entries =
+        Ledgers.get_entries_by_payment(payout.payment_id)
+        |> Enum.filter(fn entry ->
+          entry.account.name == "stripe_fees" and
+            entry.debit_credit == :debit and
+            String.starts_with?(
+              entry.description || "",
+              "Stripe payout fee for "
+            )
+        end)
+
+      assert length(payout_fee_entries) == 1
+
+      assert Money.equal?(
+               hd(payout_fee_entries).amount,
+               Money.new(:USD, "0.95")
+             )
+
+      # Full reconciliation must pass for this mixed payout
+      report = Ysc.Ledgers.Reconciliation.reconcile_payouts()
+      assert report.status == :ok, inspect(report.discrepancies)
+
+      refute Enum.any?(report.discrepancies, fn d ->
+               d.stripe_payout_id == stripe_payout_id
+             end)
+
+      # Understated fee_total (charge fees only) would fail composition —
+      # same class of bug as the original Billing Usage Fee gap.
+      understated =
+        payout
+        |> Ledgers.Payout.changeset(%{fee_total: Money.new(:USD, "13.11")})
+        |> Ysc.Repo.update!()
+        |> Ysc.Repo.preload([:payments, :refunds])
+
+      fail_report = Ysc.Ledgers.Reconciliation.reconcile_payouts()
+      assert fail_report.status == :error
+
+      assert Enum.any?(fail_report.discrepancies, fn d ->
+               d.stripe_payout_id == understated.stripe_payout_id and
+                 Enum.any?(
+                   d.issues,
+                   &String.contains?(&1, "composition mismatch")
+                 )
+             end)
     end
   end
 end

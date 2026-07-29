@@ -1620,6 +1620,110 @@ defmodule Ysc.Ledgers do
     entries
   end
 
+  @doc """
+  Books standalone Stripe fees deducted at payout time (e.g. Billing Usage Fee,
+  instant payout fee) to the internal ledger.
+
+  Per-charge processing fees are already booked when payments are recorded; this
+  only covers fee balance transactions that appear on the payout itself.
+
+  Creates:
+  - Debit `stripe_fees` (expense)
+  - Credit `stripe_account` (reduce receivable)
+
+  Idempotent: skips if payout-time fee entries already exist for the payout's
+  virtual payment.
+  """
+  def book_payout_stripe_fees(%Payout{} = payout, %Money{} = fee_amount) do
+    require Ysc.Logging
+
+    cond do
+      is_nil(payout.payment_id) ->
+        Ysc.Logging.warning(
+          "Cannot book payout Stripe fees: payout has no payment_id",
+          payout_id: payout.id,
+          stripe_payout_id: payout.stripe_payout_id
+        )
+
+        {:error, :missing_payment_id}
+
+      not Money.positive?(fee_amount) ->
+        {:ok, :no_fees}
+
+      payout_stripe_fees_already_booked?(payout.payment_id) ->
+        Ysc.Logging.debug(
+          "Payout Stripe fees already booked; skipping",
+          payout_id: payout.id,
+          stripe_payout_id: payout.stripe_payout_id
+        )
+
+        {:ok, :already_booked}
+
+      true ->
+        ensure_basic_accounts()
+
+        stripe_fee_account = get_account_by_name("stripe_fees")
+        stripe_account = get_account_by_name("stripe_account")
+
+        if is_nil(stripe_fee_account) or is_nil(stripe_account) do
+          {:error, :accounts_not_found}
+        else
+          description =
+            "Stripe payout fee for #{payout.stripe_payout_id}"
+
+          Repo.transaction(fn ->
+            {:ok, fee_expense_entry} =
+              create_entry(%{
+                account_id: stripe_fee_account.id,
+                payment_id: payout.payment_id,
+                amount: fee_amount,
+                debit_credit: :debit,
+                description: description,
+                related_entity_type: :administration,
+                related_entity_id: payout.payment_id
+              })
+
+            {:ok, stripe_fee_deduction_entry} =
+              create_entry(%{
+                account_id: stripe_account.id,
+                payment_id: payout.payment_id,
+                amount: fee_amount,
+                debit_credit: :credit,
+                description: description,
+                related_entity_type: :administration,
+                related_entity_id: payout.payment_id
+              })
+
+            Ysc.Logging.info(
+              "Booked payout-time Stripe fees to ledger",
+              payout_id: payout.id,
+              stripe_payout_id: payout.stripe_payout_id,
+              fee_amount: Money.to_string!(fee_amount)
+            )
+
+            [fee_expense_entry, stripe_fee_deduction_entry]
+          end)
+        end
+    end
+  end
+
+  defp payout_stripe_fees_already_booked?(payment_id)
+       when is_binary(payment_id) do
+    stripe_fee_account = get_account_by_name("stripe_fees")
+
+    if is_nil(stripe_fee_account) do
+      false
+    else
+      from(e in LedgerEntry,
+        where: e.payment_id == ^payment_id,
+        where: e.account_id == ^stripe_fee_account.id,
+        where: e.debit_credit == "debit",
+        where: like(e.description, "Stripe payout fee for %")
+      )
+      |> Repo.exists?()
+    end
+  end
+
   ## Payout Management
 
   @doc """
