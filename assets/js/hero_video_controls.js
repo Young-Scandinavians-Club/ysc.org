@@ -42,8 +42,12 @@ export default {
 
     safePlay() {
         if (!this.video) return;
-        // Promise.resolve handles browsers where play() returns undefined instead of a Promise.
-        Promise.resolve(this.video.play()).catch(() => {});
+        try {
+            // Promise.resolve handles browsers where play() returns undefined instead of a Promise.
+            Promise.resolve(this.video.play()).catch(() => {});
+        } catch (_) {
+            // Some browsers throw synchronously from play() instead of rejecting.
+        }
     },
 
     destroyed() {

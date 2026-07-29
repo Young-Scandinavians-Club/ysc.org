@@ -387,8 +387,11 @@ defmodule YscWeb.PasskeyAuthenticationTest do
           "Resident credentials or empty 'allowCredentials' lists are not supported at this time."
       })
 
-      html = render(lv)
-      assert html =~ "doesn't support" || html =~ "another sign-in method"
+      assert has_element?(
+               lv,
+               "#flash-mirror",
+               "Your device doesn't support this authentication method. Please use another sign-in method."
+             )
     end
 
     test "shows loading state during authentication", %{conn: conn} do
