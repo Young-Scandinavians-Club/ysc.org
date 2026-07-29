@@ -13,6 +13,8 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
   alias Ysc.Newsletter
   alias Ysc.Repo
 
+  import Ysc.AccountsFixtures
+
   describe "mount - invalid or missing token" do
     test "shows invalid link message for unknown token", %{conn: conn} do
       {:ok, _view, html} =
@@ -155,6 +157,44 @@ defmodule YscWeb.NewsletterUnsubscribeLiveTest do
       updated = Newsletter.get_subscriber_by_email("db-check@example.com")
       assert updated.subscribed == false
       assert updated.unsubscribed_at != nil
+    end
+
+    test "records confirmed unsubscribe when edition_id is present", %{
+      conn: conn
+    } do
+      admin = user_fixture(%{role: "admin"})
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Attributed", "subject" => "S"},
+          created_by_id: admin.id
+        )
+
+      {:ok, sub} =
+        Newsletter.subscribe("attr-unsub@example.com", source: "public_signup")
+
+      {:ok, view, _html} =
+        live(
+          conn,
+          ~p"/newsletter/unsubscribe/#{sub.subscription_token}?edition_id=#{edition.id}"
+        )
+
+      view |> element("button", "Unsubscribe") |> render_click()
+
+      assert Newsletter.count_confirmed_unsubscribes(edition.id) == 1
+    end
+
+    test "legacy links without edition_id still unsubscribe", %{conn: conn} do
+      {:ok, sub} =
+        Newsletter.subscribe("legacy-link@example.com", source: "public_signup")
+
+      {:ok, view, _html} =
+        live(conn, ~p"/newsletter/unsubscribe/#{sub.subscription_token}")
+
+      view |> element("button", "Unsubscribe") |> render_click()
+
+      updated = Newsletter.get_subscriber_by_email("legacy-link@example.com")
+      refute updated.subscribed
     end
 
     test "after success, UI shows confirmation and Return to home", %{

@@ -194,6 +194,20 @@ defmodule YscWeb.Emails.NewsletterEdition do
   def present_unsubscribe_url?("#"), do: false
   def present_unsubscribe_url?(_url), do: true
 
+  defp build_unsubscribe_url(token, _edition_id)
+       when not is_binary(token) or token == "",
+       do: "#"
+
+  defp build_unsubscribe_url(token, edition_id) when is_binary(edition_id) do
+    absolute_url(
+      "/newsletter/unsubscribe/" <> token <> "?edition_id=" <> edition_id
+    )
+  end
+
+  defp build_unsubscribe_url(token, _edition_id) do
+    absolute_url("/newsletter/unsubscribe/" <> token)
+  end
+
   @doc """
   Builds the assign map for the newsletter edition template.
 
@@ -206,10 +220,10 @@ defmodule YscWeb.Emails.NewsletterEdition do
     first_name = subscriber.first_name || "there"
 
     unsubscribe_url =
-      (subscriber.subscription_token &&
-         absolute_url(
-           "/newsletter/unsubscribe/" <> subscriber.subscription_token
-         )) || "#"
+      build_unsubscribe_url(
+        subscriber.subscription_token,
+        Map.get(edition, :id)
+      )
 
     intro_html = email_safe_html(edition.intro_text)
 
