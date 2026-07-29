@@ -21,10 +21,17 @@ defmodule YscWeb.AdminUserDetailsLive do
   alias Ysc.ExpenseReports
   alias Ysc.Ledgers
   alias Ysc.Messages
+  alias Ysc.Payments
   alias Ysc.Repo
   alias Ysc.Subscriptions
   alias Ysc.Tickets
-  alias YscWeb.{Admin.DateTimeDisplay, AdminBadgeHelpers}
+
+  alias YscWeb.{
+    Admin.DateTimeDisplay,
+    AdminBadgeHelpers,
+    PaymentMethodFormatter
+  }
+
   alias YscWeb.Workers.MembershipRenewalReminderWorker
 
   require Ysc.Logging
@@ -1356,6 +1363,32 @@ defmodule YscWeb.AdminUserDetailsLive do
                       </code>
                     <% end %>
                   </p>
+                  <p :if={@selected_user.stripe_id}>
+                    <span class="font-semibold">Stripe Customer ID:</span>
+                    <a
+                      href={"https://dashboard.stripe.com/customers/#{@selected_user.stripe_id}"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-xs bg-zinc-100 px-2 py-1 rounded font-mono text-zinc-800 hover:text-blue-600 underline decoration-dotted"
+                      title="View customer in Stripe Dashboard"
+                    >
+                      {@selected_user.stripe_id}
+                    </a>
+                  </p>
+                  <div>
+                    <p class="font-semibold mb-2">Auto-renewal payment method</p>
+                    <div
+                      :if={@default_payment_method}
+                      class="flex items-center p-4 bg-white border border-zinc-200 rounded-lg"
+                    >
+                      <.stored_payment_method_display payment_method={
+                        @default_payment_method
+                      } />
+                    </div>
+                    <p :if={!@default_payment_method} class="text-sm text-zinc-500">
+                      None on file
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1496,24 +1529,7 @@ defmodule YscWeb.AdminUserDetailsLive do
                         </td>
                         <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
                           {if payment.payment_method do
-                            case payment.payment_method.type do
-                              "card" ->
-                                if payment.payment_method.last4 do
-                                  "Card ending in #{payment.payment_method.last4}"
-                                else
-                                  "Card"
-                                end
-
-                              "us_bank_account" ->
-                                if payment.payment_method.last4 do
-                                  "Bank ending in #{payment.payment_method.last4}"
-                                else
-                                  "Bank account"
-                                end
-
-                              _ ->
-                                "Payment method"
-                            end
+                            format_stored_payment_method(payment.payment_method)
                           else
                             "N/A"
                           end}
@@ -3865,6 +3881,20 @@ defmodule YscWeb.AdminUserDetailsLive do
 
   defp real_stripe_subscription_id?(_), do: false
 
+  defp format_stored_payment_method(%{
+         type: type,
+         last_four: last_four,
+         display_brand: brand
+       }) do
+    PaymentMethodFormatter.format_payment_method_with_details(
+      type,
+      last_four,
+      brand
+    )
+  end
+
+  defp format_stored_payment_method(_), do: "Payment method"
+
   defp format_datetime_local(%DateTime{} = datetime) do
     # Convert UTC datetime to America/Los_Angeles for datetime-local input
     # datetime-local inputs expect a naive datetime string in local timezone
@@ -4396,6 +4426,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     |> assign(:selected_user_application, nil)
     |> assign(:active_subscription, nil)
     |> assign(:subscription_payments, [])
+    |> assign(:default_payment_method, nil)
     |> assign(:scheduled_downgrade_info, nil)
     |> assign(:has_lifetime_membership, false)
     |> assign(:membership_paused_by_board, nil)
@@ -4499,14 +4530,16 @@ defmodule YscWeb.AdminUserDetailsLive do
       has_lifetime,
       application,
       board_member,
-      {last_login_at, last_activity_at}
+      {last_login_at, last_activity_at},
+      default_payment_method
     ] =
       [
         fn -> fetch_subscription_data(selected_user) end,
         fn -> Accounts.has_lifetime_membership?(selected_user) end,
         fn -> fetch_application(id, current_user) end,
         fn -> Accounts.household_board_member(selected_user) end,
-        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end
+        fn -> Accounts.get_user_login_activity_datetimes(selected_user) end,
+        fn -> Payments.get_default_payment_method(selected_user) end
       ]
       |> async_stream_with_repo(& &1.(), timeout: :infinity, ordered: true)
       |> Enum.map(fn {:ok, result} -> result end)
@@ -4540,6 +4573,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       |> assign(:selected_user_application, application)
       |> assign(:active_subscription, active_subscription)
       |> assign(:subscription_payments, subscription_payments)
+      |> assign(:default_payment_method, default_payment_method)
       |> assign(:has_lifetime_membership, has_lifetime)
       |> assign(:membership_paused_by_board, board_member)
       |> assign(:membership_form, to_form(membership_cs, as: "membership"))

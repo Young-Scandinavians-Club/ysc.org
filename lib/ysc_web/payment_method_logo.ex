@@ -14,11 +14,17 @@ defmodule YscWeb.PaymentMethodLogo do
 
   def path_for_payment(_), do: nil
 
-  @spec path_for_payment_method(Ysc.Payments.PaymentMethod.t()) ::
+  @spec path_for_payment_method(Ysc.Payments.PaymentMethod.t() | map()) ::
           String.t() | nil
   def path_for_payment_method(%Ysc.Payments.PaymentMethod{} = pm) do
     path_for_db_payment_method(pm)
   end
+
+  def path_for_payment_method(%{type: _} = pm) do
+    path_for_db_payment_method(pm)
+  end
+
+  def path_for_payment_method(_), do: nil
 
   defp path_for_db_payment_method(pm) do
     type = pm.type

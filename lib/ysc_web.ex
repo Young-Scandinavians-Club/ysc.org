@@ -126,6 +126,7 @@ defmodule YscWeb do
       # Core UI components and translation
       import YscWeb.CoreComponents
       import YscWeb.Components.Autocomplete
+      import YscWeb.PaymentMethodComponents
       import YscWeb.Gettext
 
       # Shortcut for generating JS commands
