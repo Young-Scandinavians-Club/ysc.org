@@ -42,7 +42,7 @@ defmodule Ysc.Newsletter do
     Phoenix.PubSub.broadcast(
       Ysc.PubSub,
       @editions_topic,
-      {:edition_sent, edition}
+      {:edition_sent, preload_edition_creator(edition)}
     )
   end
 
@@ -51,8 +51,14 @@ defmodule Ysc.Newsletter do
     Phoenix.PubSub.broadcast(
       Ysc.PubSub,
       @editions_topic,
-      {:edition_delivery_progress, edition}
+      {:edition_delivery_progress, preload_edition_creator(edition)}
     )
+  end
+
+  defp preload_edition_creator(%Edition{} = edition) do
+    if Ecto.assoc_loaded?(edition.creator),
+      do: edition,
+      else: Repo.preload(edition, :creator)
   end
 
   # Fields fetched in list queries — excludes :archived_html (large text).
@@ -869,7 +875,7 @@ defmodule Ysc.Newsletter do
              %{edition_id: edition.id}
              |> YscWeb.Workers.NewsletterSender.new()
              |> Oban.insert() do
-        {:ok, sending_edition}
+        {:ok, preload_edition_creator(sending_edition)}
       else
         {:error, %Ecto.Changeset{}} = err ->
           err

@@ -436,7 +436,10 @@ defmodule YscWeb.AdminNewslettersLive do
                     >
                       {edition.sent_count} sent
                     </span>
-                    <span :if={edition.creator} class="text-sm text-zinc-500">
+                    <span
+                      :if={creator_assigned?(edition)}
+                      class="text-sm text-zinc-500"
+                    >
                       by {creator_name(edition.creator)}
                     </span>
                   </div>
@@ -529,7 +532,7 @@ defmodule YscWeb.AdminNewslettersLive do
                   <% end %>
                 </:col>
                 <:col :let={{_, edition}} label="Creator">
-                  <%= if edition.creator do %>
+                  <%= if creator_assigned?(edition) do %>
                     <span class="text-zinc-600">
                       {creator_name(edition.creator)}
                     </span>
@@ -864,7 +867,7 @@ defmodule YscWeb.AdminNewslettersLive do
                 </h3>
                 <p class="text-sm text-zinc-500 mt-1">
                   Updated {format_date(notice.updated_at)}
-                  <span :if={notice.creator}>
+                  <span :if={creator_assigned?(notice)}>
                     · by {creator_name(notice.creator)}
                   </span>
                 </p>
@@ -906,7 +909,7 @@ defmodule YscWeb.AdminNewslettersLive do
                     <span class="font-semibold text-zinc-900">{notice.name}</span>
                   </td>
                   <td>
-                    <%= if notice.creator do %>
+                    <%= if creator_assigned?(notice) do %>
                       <span class="text-zinc-600">
                         {creator_name(notice.creator)}
                       </span>
@@ -1476,6 +1479,11 @@ defmodule YscWeb.AdminNewslettersLive do
 
   defp format_date(nil), do: ""
   defp format_date(dt), do: DateDisplay.format_datetime_display(dt)
+
+  defp creator_assigned?(%{creator: creator}),
+    do: Ecto.assoc_loaded?(creator) && creator
+
+  defp creator_name(%Ecto.Association.NotLoaded{}), do: nil
 
   defp creator_name(creator) do
     [creator.first_name, creator.last_name]
