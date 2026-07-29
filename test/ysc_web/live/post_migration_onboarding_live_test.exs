@@ -587,6 +587,12 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert has_element?(
                view,
                "#inherited-membership-step",
+               "Your membership benefits are shared with you by your family membership manager"
+             )
+
+      assert has_element?(
+               view,
+               "#inherited-membership-step",
                primary.first_name
              )
 

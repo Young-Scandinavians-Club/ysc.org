@@ -6444,7 +6444,7 @@ defmodule YscWeb.EventDetailsLive do
               "You need an active, paid YSC membership to buy these tickets. Open Membership in your account menu to renew or activate, then try again."
 
             _ ->
-              "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening."
+              "We couldn't finish your ticket purchase. Please try again, or email info@ysc.org with the event name if this keeps happening."
           end
 
         {:noreply,
@@ -6465,7 +6465,7 @@ defmodule YscWeb.EventDetailsLive do
          socket
          |> YscWeb.Flash.put_toast(
            :error,
-           "We couldn't process your ticket order. Please try again, or email info@ysc.org with the event name if this keeps happening.",
+           "We couldn't finish your ticket purchase. Please try again, or email info@ysc.org with the event name if this keeps happening.",
            title: "Tickets"
          )
          |> assign(:show_ticket_modal, false)}

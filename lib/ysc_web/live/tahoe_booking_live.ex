@@ -6943,8 +6943,8 @@ defmodule YscWeb.TahoeBookingLive do
 
     {
       false,
-      "Full buyout active",
-      "Your family group already has a full buyout reservation. You can make a new reservation once that stay is complete (after #{formatted_date}) or if the buyout is cancelled."
+      "Your family already has the entire cabin booked",
+      "Someone in your family already has a reservation for the entire cabin. You can book again after checkout on #{formatted_date}, or if that reservation is cancelled."
     }
   end
 

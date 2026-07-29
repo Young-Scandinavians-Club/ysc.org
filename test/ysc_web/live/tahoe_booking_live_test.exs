@@ -219,14 +219,16 @@ defmodule YscWeb.TahoeBookingLiveTest do
       assert has_element?(
                view,
                "#tahoe-booking-eligibility-banner-public",
-               "Full buyout active"
+               "Your family already has the entire cabin booked"
              )
 
-      assert html =~ "full buyout reservation"
+      assert html =~ "reservation for the entire cabin"
 
       socket = :sys.get_state(view.pid).socket
       refute socket.assigns.can_book
-      assert socket.assigns.booking_error_title == "Full buyout active"
+
+      assert socket.assigns.booking_error_title ==
+               "Your family already has the entire cabin booked"
     end
 
     test "blocks another family member when primary has an active full buyout",

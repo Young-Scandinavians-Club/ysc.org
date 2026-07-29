@@ -65,6 +65,20 @@ defmodule YscWeb.UserTicketsLiveTest do
   end
 
   describe "event handlers" do
+    test "displays pending order actions with cancel checkout button", %{
+      conn: conn
+    } do
+      data = Ysc.TestDataFactory.complete_ticket_order(status: :pending)
+      conn = log_in_user(conn, data.user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/tickets")
+      html = render(view)
+
+      assert has_element?(view, "#ticket-orders-list")
+      assert html =~ data.event.title
+      assert has_element?(view, "button", "Cancel checkout")
+    end
+
     test "cancel-order event shows error when order not found", %{conn: conn} do
       user = user_fixture()
       conn = log_in_user(conn, user)
