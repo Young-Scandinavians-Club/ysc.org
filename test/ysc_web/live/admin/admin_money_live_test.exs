@@ -115,31 +115,30 @@ defmodule YscWeb.AdminMoneyLiveTest do
     setup [:create_admin]
 
     test "renders money management overview", %{conn: conn} do
-      {:ok, view, html} = live(conn, ~p"/admin/money")
-      assert html =~ "Money Management"
+      {:ok, view, _html} = live(conn, ~p"/admin/money")
       assert has_element?(view, "#money-date-range-form")
       assert has_element?(view, "#money-tabs")
       assert has_element?(view, "#expense-reports-inbox")
+      assert has_element?(view, "#expense-reports-inbox", "All caught up")
       assert has_element?(view, "#kpi-liquidity")
       assert has_element?(view, "#kpi-period-revenue")
       assert has_element?(view, "#kpi-period-expenses")
       assert has_element?(view, "#recent-payments-section")
-      assert html =~ "Recent Payments"
-      assert html =~ "All caught up"
+      assert has_element?(view, "#recent-payments-section", "Recent Payments")
     end
 
     test "loads ledger tab on demand", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/money")
 
       refute has_element?(view, "#money-ledger-tab")
-      refute render(view) =~ "Debit/Credit"
+      refute has_element?(view, "#money-ledger-tab th", "Debit/Credit")
 
-      {:ok, view, html} = live(conn, ~p"/admin/money?tab=ledger")
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=ledger")
 
       assert has_element?(view, "#money-ledger-tab")
-      assert html =~ "Account Balances"
-      assert html =~ "Ledger Entries"
-      assert html =~ "Debit/Credit"
+      assert has_element?(view, "#account-balances-grid")
+      assert has_element?(view, "#money-ledger-tab", "Ledger Entries")
+      assert has_element?(view, "#money-ledger-tab th", "Debit/Credit")
     end
 
     test "loads webhooks tab on demand", %{conn: conn} do
@@ -147,10 +146,10 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       refute has_element?(view, "#money-webhooks-tab")
 
-      {:ok, view, html} = live(conn, ~p"/admin/money?tab=webhooks")
+      {:ok, view, _html} = live(conn, ~p"/admin/money?tab=webhooks")
 
       assert has_element?(view, "#money-webhooks-tab")
-      assert html =~ "Stripe Webhook Events"
+      assert has_element?(view, "#money-webhooks-tab", "Stripe Webhook Events")
     end
 
     test "loads expenses tab with all expense reports", %{conn: conn} do
@@ -163,11 +162,21 @@ defmodule YscWeb.AdminMoneyLiveTest do
       |> element("#expense-inbox-view-all")
       |> render_click()
 
-      assert_patch(view)
+      year = DateTime.now!("America/Los_Angeles").year
+      # Match URI.encode_query key order used by money_index_path/2
+      expected =
+        "/admin/money?end_date=#{year}-12-31&start_date=#{year}-01-01&tab=expenses"
+
+      assert_patch(view, expected)
+
       assert has_element?(view, "#money-expenses-tab")
-      assert render(view) =~ "Expense Reports"
-      assert render(view) =~ "All reports in the selected date range"
-      assert render(view) =~ "tab=expenses"
+      assert has_element?(view, "#money-expenses-tab", "Expense Reports")
+
+      assert has_element?(
+               view,
+               "#money-expenses-tab",
+               "All reports in the selected date range"
+             )
     end
 
     test "switching tabs does not drift the date range", %{conn: conn} do
@@ -210,8 +219,10 @@ defmodule YscWeb.AdminMoneyLiveTest do
 
       view
       |> form("#money-date-range-form", %{
-        "start_date" => "2023-01-01",
-        "end_date" => "2023-12-31"
+        "date_range" => %{
+          "start_date" => "2023-01-01",
+          "end_date" => "2023-12-31"
+        }
       })
       |> render_submit()
 
@@ -227,20 +238,22 @@ defmodule YscWeb.AdminMoneyLiveTest do
     test "updates date range without loading ledger tab", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin/money")
 
-      refute render(view) =~ "Debit/Credit"
+      refute has_element?(view, "#money-ledger-tab")
 
       view
       |> form("#money-date-range-form", %{
-        "start_date" => "2023-01-01",
-        "end_date" => "2023-12-31"
+        "date_range" => %{
+          "start_date" => "2023-01-01",
+          "end_date" => "2023-12-31"
+        }
       })
       |> render_submit()
 
       assert render(view) =~
                "Showing data from January 01, 2023 to December 31, 2023"
 
-      refute render(view) =~ "Debit/Credit"
       refute has_element?(view, "#money-ledger-tab")
+      refute has_element?(view, "#money-ledger-tab th", "Debit/Credit")
     end
 
     test "payment rows use action dropdowns instead of primary buttons", %{

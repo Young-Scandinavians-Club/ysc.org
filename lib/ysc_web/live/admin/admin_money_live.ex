@@ -92,6 +92,7 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:expense_reports_end?, true)
       |> assign(:expense_reports_inbox, [])
       |> stream(:payments, [])
+      |> assign_date_range_form()
 
     # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do
@@ -103,11 +104,14 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def handle_info(:load_money_data, socket) do
+    socket = assign(socket, :loading_money_data, false)
+
     socket =
-      socket
-      |> assign(:loading_money_data, false)
-      |> load_overview_data()
-      |> ensure_tab_loaded(socket.assigns.active_tab)
+      if socket.assigns.active_tab == :overview do
+        load_overview_data(socket)
+      else
+        ensure_tab_loaded(socket, socket.assigns.active_tab)
+      end
 
     {:noreply, socket}
   end
@@ -335,27 +339,39 @@ defmodule YscWeb.AdminMoneyLive do
   defp parse_tab(_), do: :overview
 
   defp assign_dates_from_params(socket, params) do
-    if params["start_date"] && params["end_date"] do
-      try do
-        start_date = parse_date_to_datetime(params["start_date"], ~T[00:00:00])
-        end_date = parse_date_to_datetime(params["end_date"], ~T[23:59:59])
+    with start_str when is_binary(start_str) and start_str != "" <-
+           params["start_date"],
+         end_str when is_binary(end_str) and end_str != "" <- params["end_date"],
+         {:ok, start_date} <- parse_date_to_datetime(start_str, ~T[00:00:00]),
+         {:ok, end_date} <- parse_date_to_datetime(end_str, ~T[23:59:59]) do
+      dates_changed? =
+        socket.assigns.start_date != start_date or
+          socket.assigns.end_date != end_date
 
-        dates_changed? =
-          socket.assigns.start_date != start_date or
-            socket.assigns.end_date != end_date
-
-        {
-          socket
-          |> assign(:start_date, start_date)
-          |> assign(:end_date, end_date),
-          dates_changed?
-        }
-      rescue
-        _ -> {socket, false}
-      end
+      {
+        socket
+        |> assign(:start_date, start_date)
+        |> assign(:end_date, end_date)
+        |> assign_date_range_form(),
+        dates_changed?
+      }
     else
-      {socket, false}
+      _ -> {socket, false}
     end
+  end
+
+  defp assign_date_range_form(socket) do
+    assign(
+      socket,
+      :date_range_form,
+      to_form(
+        %{
+          "start_date" => format_date_param(socket.assigns.start_date),
+          "end_date" => format_date_param(socket.assigns.end_date)
+        },
+        as: :date_range
+      )
+    )
   end
 
   defp maybe_refresh_for_date_change(socket, false), do: socket
@@ -415,7 +431,8 @@ defmodule YscWeb.AdminMoneyLive do
   defp ensure_tab_loaded(socket, :overview) do
     cond do
       socket.assigns.tabs_loaded.overview ->
-        socket
+        # Re-stream the current page so rows survive Overview remount after tab switches
+        paginate_payments(socket, socket.assigns.payments_page)
 
       socket.assigns.loading_money_data ->
         # Wait for :load_money_data so the loading skeleton clears once
@@ -1166,7 +1183,12 @@ defmodule YscWeb.AdminMoneyLive do
   @impl true
   def handle_event(
         "update_date_range",
-        %{"start_date" => start_date_str, "end_date" => end_date_str},
+        %{
+          "date_range" => %{
+            "start_date" => start_date_str,
+            "end_date" => end_date_str
+          }
+        },
         socket
       ) do
     path =
@@ -1293,41 +1315,26 @@ defmodule YscWeb.AdminMoneyLive do
     >
       <div class="flex flex-col gap-4 py-6 sm:flex-row sm:items-end sm:justify-between">
         <.admin_page_title>Money Management</.admin_page_title>
-        <form
+        <.form
+          for={@date_range_form}
           id="money-date-range-form"
           phx-submit="update_date_range"
           class="flex flex-wrap items-end gap-3"
         >
-          <div>
-            <label
-              for="start_date"
-              class="block text-xs font-medium text-zinc-600 mb-1"
-            >
-              Start
-            </label>
-            <input
-              type="date"
-              id="start_date"
-              name="start_date"
-              value={format_date_param(@start_date)}
-              class="block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-          </div>
-          <div>
-            <label
-              for="end_date"
-              class="block text-xs font-medium text-zinc-600 mb-1"
-            >
-              End
-            </label>
-            <input
-              type="date"
-              id="end_date"
-              name="end_date"
-              value={format_date_param(@end_date)}
-              class="block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            />
-          </div>
+          <.input
+            field={@date_range_form[:start_date]}
+            type="date"
+            label="Start"
+            id="start_date"
+            class="mt-1 block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          />
+          <.input
+            field={@date_range_form[:end_date]}
+            type="date"
+            label="End"
+            id="end_date"
+            class="mt-1 block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+          />
           <.button
             type="submit"
             phx-disable-with="Updating..."
@@ -1335,7 +1342,7 @@ defmodule YscWeb.AdminMoneyLive do
           >
             Update
           </.button>
-        </form>
+        </.form>
       </div>
       <p class="text-sm text-zinc-500 -mt-2 mb-4">
         Showing data from {format_date_boundary(@start_date)} to {format_date_boundary(
@@ -1585,13 +1592,13 @@ defmodule YscWeb.AdminMoneyLive do
                 </tr>
               </tbody>
               <tbody
-                :if={
-                  @tabs_loaded.overview && !@loading_money_data &&
-                    !@payments_empty?
-                }
                 id="recent-payments"
                 phx-update="stream"
-                class="bg-white divide-y divide-zinc-200"
+                class={[
+                  "bg-white divide-y divide-zinc-200",
+                  (!@tabs_loaded.overview || @loading_money_data ||
+                     @payments_empty?) && "hidden"
+                ]}
               >
                 <tr :for={{id, payment} <- @streams.payments} id={id}>
                   <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
@@ -3628,8 +3635,8 @@ defmodule YscWeb.AdminMoneyLive do
   # Helper functions
   defp parse_date_to_datetime(date_string, time) do
     case Date.from_iso8601(date_string) do
-      {:ok, date} -> DateTime.new!(date, time)
-      {:error, _} -> DateTime.utc_now()
+      {:ok, date} -> {:ok, DateTime.new!(date, time)}
+      {:error, _} -> :error
     end
   end
 
