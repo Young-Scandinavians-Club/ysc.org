@@ -2324,6 +2324,103 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert fee.currency == :USD
     end
 
+    test "sum_fee_cents_from_balance_transactions includes charge fees and stripe_fee amounts" do
+      # Mirrors a payout like po_1TyL7dIZd8GkARoBdw1Ipxew:
+      # 3 charges @ $1.61 fee each ($4.83) + Billing Usage Fee $0.95
+      balance_transactions = [
+        %{
+          type: "charge",
+          reporting_category: "charge",
+          fee: 161,
+          amount: 4500
+        },
+        %{
+          type: "charge",
+          reporting_category: "charge",
+          fee: 161,
+          amount: 4500
+        },
+        %{
+          type: "charge",
+          reporting_category: "charge",
+          fee: 161,
+          amount: 4500
+        },
+        %{
+          type: "stripe_fee",
+          reporting_category: "fee",
+          fee: 0,
+          amount: -95,
+          description: "Billing - Usage Fee (2026-07-27)"
+        },
+        %{
+          type: "payout",
+          reporting_category: "payout",
+          fee: 0,
+          amount: -12_922
+        }
+      ]
+
+      assert WebhookHandler.sum_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 483 + 95
+    end
+
+    test "sum_fee_cents_from_balance_transactions uses abs(amount) for fee reporting_category" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 100, amount: 2000},
+        %{
+          type: "stripe_fee",
+          reporting_category: "fee",
+          fee: 0,
+          amount: -50
+        }
+      ]
+
+      assert WebhookHandler.sum_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 150
+    end
+
+    test "sum_fee_cents_from_balance_transactions skips payout and ignores zero fees" do
+      balance_transactions = [
+        %{type: "payout", reporting_category: "payout", fee: 25, amount: -1000},
+        %{type: "charge", reporting_category: "charge", fee: 0, amount: 500}
+      ]
+
+      assert WebhookHandler.sum_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 0
+    end
+
+    test "sum_payout_time_fee_cents_from_balance_transactions excludes charge fees" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 161, amount: 4500},
+        %{
+          type: "stripe_fee",
+          reporting_category: "fee",
+          fee: 0,
+          amount: -95
+        },
+        %{type: "payout", reporting_category: "payout", fee: 0, amount: -12_922}
+      ]
+
+      assert WebhookHandler.sum_payout_time_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 95
+    end
+
+    test "sum_payout_time_fee_cents_from_balance_transactions includes payout BT fee" do
+      balance_transactions = [
+        %{type: "charge", reporting_category: "charge", fee: 100, amount: 2000},
+        %{type: "payout", reporting_category: "payout", fee: 50, amount: -1900}
+      ]
+
+      assert WebhookHandler.sum_payout_time_fee_cents_from_balance_transactions(
+               balance_transactions
+             ) == 50
+    end
+
     test "extract_stripe_fee_from_invoice reads cents from metadata" do
       invoice = %{
         "id" => "in_fee_#{System.unique_integer()}",

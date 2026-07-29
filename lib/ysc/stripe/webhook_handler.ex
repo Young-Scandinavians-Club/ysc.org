@@ -3141,6 +3141,11 @@ defmodule Ysc.Stripe.WebhookHandler do
           updated_payout =
             Repo.reload!(updated_payout) |> Repo.preload([:payments, :refunds])
 
+          # Book standalone payout-time fees (Billing Usage Fee, instant payout
+          # fee, etc.) to the internal ledger. Per-charge fees were already
+          # booked when those payments were recorded.
+          book_payout_time_stripe_fees(updated_payout, balance_transactions)
+
           Ysc.Logging.info(
             "[Payout] Final payout transaction counts after linking",
             payout_id: stripe_payout_id,
@@ -3181,6 +3186,135 @@ defmodule Ysc.Stripe.WebhookHandler do
     end
   end
 
+  @doc false
+  # Sums fee cents across payout balance transactions for `fee_total`.
+  # Per-charge fees use BT `:fee`; standalone Stripe fees (Billing Usage Fee, etc.)
+  # use abs(BT `:amount`) because those rows typically have `fee: 0`.
+  def sum_fee_cents_from_balance_transactions(balance_transactions)
+      when is_list(balance_transactions) do
+    Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
+      try do
+        acc + fee_cents_contribution(balance_transaction)
+      rescue
+        error ->
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Error processing balance transaction for fee calculation",
+            error: Exception.message(error),
+            balance_transaction_id:
+              extract_balance_transaction_id(balance_transaction)
+          )
+
+          acc
+      end
+    end)
+  end
+
+  @doc false
+  # Fees that should be booked to the ledger at payout time (not already booked
+  # with individual payments): standalone stripe_fee rows and the payout BT's
+  # own `:fee` (e.g. instant payout fee).
+  def sum_payout_time_fee_cents_from_balance_transactions(balance_transactions)
+      when is_list(balance_transactions) do
+    Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
+      try do
+        acc + payout_time_fee_cents_contribution(balance_transaction)
+      rescue
+        error ->
+          require Ysc.Logging
+
+          Ysc.Logging.warning(
+            "Error processing balance transaction for payout-time fee calculation",
+            error: Exception.message(error),
+            balance_transaction_id:
+              extract_balance_transaction_id(balance_transaction)
+          )
+
+          acc
+      end
+    end)
+  end
+
+  defp fee_cents_contribution(balance_transaction) do
+    transaction_type = get_balance_transaction_field(balance_transaction, :type)
+
+    reporting_category =
+      get_balance_transaction_field(balance_transaction, :reporting_category)
+
+    cond do
+      transaction_type == "payout" ->
+        0
+
+      stripe_fee_balance_transaction?(transaction_type, reporting_category) ->
+        amount =
+          get_balance_transaction_field(balance_transaction, :amount, 0) || 0
+
+        abs(amount)
+
+      true ->
+        get_balance_transaction_field(balance_transaction, :fee, 0) || 0
+    end
+  end
+
+  defp payout_time_fee_cents_contribution(balance_transaction) do
+    transaction_type = get_balance_transaction_field(balance_transaction, :type)
+
+    reporting_category =
+      get_balance_transaction_field(balance_transaction, :reporting_category)
+
+    cond do
+      stripe_fee_balance_transaction?(transaction_type, reporting_category) ->
+        amount =
+          get_balance_transaction_field(balance_transaction, :amount, 0) || 0
+
+        abs(amount)
+
+      transaction_type == "payout" ->
+        get_balance_transaction_field(balance_transaction, :fee, 0) || 0
+
+      true ->
+        0
+    end
+  end
+
+  defp stripe_fee_balance_transaction?(type, reporting_category) do
+    type in ["stripe_fee"] or reporting_category in ["stripe_fee", "fee"]
+  end
+
+  defp book_payout_time_stripe_fees(payout, balance_transactions) do
+    require Ysc.Logging
+
+    fee_cents =
+      sum_payout_time_fee_cents_from_balance_transactions(balance_transactions)
+
+    if fee_cents > 0 do
+      currency = payout.currency || "usd"
+      currency_atom = normalize_currency(String.downcase(currency))
+
+      fee_amount =
+        Money.new(MoneyHelper.cents_to_dollars(fee_cents), currency_atom)
+
+      case Ledgers.book_payout_stripe_fees(payout, fee_amount) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to book payout-time Stripe fees to ledger",
+            payout_id: payout.id,
+            stripe_payout_id: payout.stripe_payout_id,
+            fee_amount: Money.to_string!(fee_amount),
+            error: inspect(reason)
+          )
+
+          :error
+      end
+    else
+      :ok
+    end
+  end
+
   # Fallback: Calculate fees from listing all balance transactions for the payout
   defp try_calculate_fees_from_balance_transactions(payout, stripe_payout_id) do
     require Ysc.Logging
@@ -3193,37 +3327,13 @@ defmodule Ysc.Stripe.WebhookHandler do
             payout_id: stripe_payout_id
           )
 
-          # Calculate total fees from balance transactions
-          # Skip the payout balance transaction itself (type: "payout")
+          # Calculate total fees from balance transactions:
+          # - charge/refund BTs: sum the `:fee` field (processing fees)
+          # - stripe_fee / reporting_category "fee" BTs: use abs(:amount)
+          #   (e.g. Billing - Usage Fee; these typically have fee: 0)
+          # - skip type "payout" (the payout itself)
           total_fee_cents =
-            Enum.reduce(balance_transactions, 0, fn balance_transaction, acc ->
-              try do
-                # Skip payout balance transactions
-                transaction_type =
-                  get_balance_transaction_field(balance_transaction, :type)
-
-                if transaction_type == "payout" do
-                  # Skip the payout transaction itself
-                  acc
-                else
-                  fee_cents =
-                    get_balance_transaction_field(balance_transaction, :fee, 0) ||
-                      0
-
-                  acc + fee_cents
-                end
-              rescue
-                error ->
-                  Ysc.Logging.warning(
-                    "Error processing balance transaction for fee calculation",
-                    error: Exception.message(error),
-                    balance_transaction_id:
-                      extract_balance_transaction_id(balance_transaction)
-                  )
-
-                  acc
-              end
-            end)
+            sum_fee_cents_from_balance_transactions(balance_transactions)
 
           if total_fee_cents > 0 do
             currency = payout.currency || "usd"

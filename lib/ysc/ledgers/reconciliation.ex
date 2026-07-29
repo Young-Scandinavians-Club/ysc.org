@@ -9,6 +9,8 @@ defmodule Ysc.Ledgers.Reconciliation do
   - Entity totals match ledger totals
   - No orphaned ledger entries exist
   - The ledger is balanced
+  - Stripe payouts reconcile: payments − refunds − fees == payout amount,
+    and residual payout-time fees are booked to the ledger
 
   ## Entity totals – known limitation (Events)
 
@@ -24,8 +26,9 @@ defmodule Ysc.Ledgers.Reconciliation do
       {:ok, report} = Reconciliation.run_full_reconciliation()
 
       # Run specific checks
-      {:ok, payment_report} = Reconciliation.reconcile_payments()
-      {:ok, refund_report} = Reconciliation.reconcile_refunds()
+      Reconciliation.reconcile_payments()
+      Reconciliation.reconcile_refunds()
+      Reconciliation.reconcile_payouts()
   """
   require Ysc.Logging
 
@@ -50,6 +53,7 @@ defmodule Ysc.Ledgers.Reconciliation do
     ledger_balance_check = check_ledger_balance()
     orphaned_entries_check = check_orphaned_entries()
     entity_totals_check = reconcile_entity_totals()
+    payout_check = reconcile_payouts()
 
     end_time = System.monotonic_time(:millisecond)
     duration_ms = end_time - start_time
@@ -64,14 +68,16 @@ defmodule Ysc.Ledgers.Reconciliation do
           refund_check,
           ledger_balance_check,
           orphaned_entries_check,
-          entity_totals_check
+          entity_totals_check,
+          payout_check
         ]),
       checks: %{
         payments: payment_check,
         refunds: refund_check,
         ledger_balance: ledger_balance_check,
         orphaned_entries: orphaned_entries_check,
-        entity_totals: entity_totals_check
+        entity_totals: entity_totals_check,
+        payouts: payout_check
       }
     }
 
@@ -215,6 +221,183 @@ defmodule Ysc.Ledgers.Reconciliation do
         match: amount_match
       }
     }
+  end
+
+  @doc """
+  Reconciles Stripe payouts against linked payments, refunds, and fees.
+
+  For each payout, verifies:
+
+      sum(linked payments) - sum(linked refunds) - fee_total == payout.amount
+
+  This catches understated `fee_total` (e.g. missing Billing Usage / `stripe_fee`
+  balance transactions), incomplete payment/refund linking, and amount drift.
+
+  Also verifies that residual fees (`fee_total` minus stripe_fees already booked
+  on linked customer payments) are booked on the payout's virtual payment via
+  `Ledgers.book_payout_stripe_fees/2`.
+  """
+  def reconcile_payouts do
+    Ysc.Logging.info(
+      "Reconciling payouts with linked payments, refunds, and fees"
+    )
+
+    payouts =
+      from(p in Payout, preload: [:payments, :refunds])
+      |> Repo.all()
+
+    total_payouts = length(payouts)
+
+    discrepancies =
+      Enum.reduce(payouts, [], fn payout, acc ->
+        case check_payout_consistency(payout) do
+          {:ok, _} ->
+            acc
+
+          {:error, issues} ->
+            [
+              %{
+                payout_id: payout.id,
+                stripe_payout_id: payout.stripe_payout_id,
+                issues: issues
+              }
+              | acc
+            ]
+        end
+      end)
+
+    %{
+      status: if(Enum.empty?(discrepancies), do: :ok, else: :error),
+      total_payouts: total_payouts,
+      discrepancies_count: length(discrepancies),
+      discrepancies: Enum.reverse(discrepancies)
+    }
+  end
+
+  defp check_payout_consistency(%Payout{} = payout) do
+    payments = payout.payments || []
+    refunds = payout.refunds || []
+    fee_total = payout.fee_total || Money.new(0, :USD)
+
+    payments_total =
+      Enum.reduce(payments, Money.new(0, :USD), fn payment, acc ->
+        case Money.add(acc, payment.amount) do
+          {:ok, sum} -> sum
+          {:error, _} -> acc
+        end
+      end)
+
+    refunds_total =
+      Enum.reduce(refunds, Money.new(0, :USD), fn refund, acc ->
+        case Money.add(acc, refund.amount) do
+          {:ok, sum} -> sum
+          {:error, _} -> acc
+        end
+      end)
+
+    computed_net =
+      with {:ok, after_refunds} <- Money.sub(payments_total, refunds_total),
+           {:ok, net} <- Money.sub(after_refunds, fee_total) do
+        net
+      else
+        _ -> nil
+      end
+
+    issues = []
+
+    issues =
+      cond do
+        is_nil(computed_net) ->
+          [
+            "Unable to compute payout net from payments/refunds/fees"
+            | issues
+          ]
+
+        Money.equal?(computed_net, payout.amount) ->
+          issues
+
+        true ->
+          [
+            "Payout composition mismatch: payments (#{Money.to_string!(payments_total)}) " <>
+              "- refunds (#{Money.to_string!(refunds_total)}) " <>
+              "- fees (#{Money.to_string!(fee_total)}) " <>
+              "= #{Money.to_string!(computed_net)}, " <>
+              "but payout.amount is #{Money.to_string!(payout.amount)}"
+            | issues
+          ]
+      end
+
+    issues =
+      issues ++ check_payout_fee_ledger_booking(payout, payments, fee_total)
+
+    if Enum.empty?(issues),
+      do: {:ok, :consistent},
+      else: {:error, Enum.reverse(issues)}
+  end
+
+  defp check_payout_fee_ledger_booking(payout, payments, fee_total) do
+    linked_payment_fees =
+      sum_stripe_fees_for_payment_ids(Enum.map(payments, & &1.id))
+
+    expected_payout_time_fees =
+      case Money.sub(fee_total, linked_payment_fees) do
+        {:ok, residual} -> residual
+        {:error, _} -> Money.new(0, :USD)
+      end
+
+    cond do
+      not Money.positive?(expected_payout_time_fees) ->
+        []
+
+      is_nil(payout.payment_id) ->
+        [
+          "Expected payout-time Stripe fees of #{Money.to_string!(expected_payout_time_fees)} " <>
+            "but payout has no virtual payment_id"
+        ]
+
+      true ->
+        booked = sum_payout_time_stripe_fees_booked(payout.payment_id)
+
+        if Money.equal?(booked, expected_payout_time_fees) do
+          []
+        else
+          [
+            "Payout-time Stripe fees not booked correctly: expected " <>
+              "#{Money.to_string!(expected_payout_time_fees)} on payout payment, " <>
+              "found #{Money.to_string!(booked)} " <>
+              "(fee_total #{Money.to_string!(fee_total)} minus linked payment fees " <>
+              "#{Money.to_string!(linked_payment_fees)})"
+          ]
+        end
+    end
+  end
+
+  defp sum_stripe_fees_for_payment_ids([]), do: Money.new(0, :USD)
+
+  defp sum_stripe_fees_for_payment_ids(payment_ids) when is_list(payment_ids) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id in ^payment_ids,
+      where: a.name == "stripe_fees",
+      where: e.debit_credit == "debit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> MoneyHelper.usd_from_db_sum()
+  end
+
+  defp sum_payout_time_stripe_fees_booked(payment_id)
+       when is_binary(payment_id) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id == ^payment_id,
+      where: a.name == "stripe_fees",
+      where: e.debit_credit == "debit",
+      where: like(e.description, "Stripe payout fee for %"),
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> MoneyHelper.usd_from_db_sum()
   end
 
   @doc """
@@ -733,6 +916,7 @@ defmodule Ysc.Ledgers.Reconciliation do
           timestamp: report.timestamp,
           payment_issues: report.checks.payments.discrepancies_count,
           refund_issues: report.checks.refunds.discrepancies_count,
+          payout_issues: report.checks.payouts.discrepancies_count,
           ledger_balanced: report.checks.ledger_balance.balanced,
           extra: %{
             duration_ms: report.duration_ms,
@@ -741,6 +925,8 @@ defmodule Ysc.Ledgers.Reconciliation do
               report.checks.payments.discrepancies_count,
             refund_discrepancies_count:
               report.checks.refunds.discrepancies_count,
+            payout_discrepancies_count:
+              report.checks.payouts.discrepancies_count,
             ledger_balanced: report.checks.ledger_balance.balanced,
             orphaned_entries_count:
               report.checks.orphaned_entries.orphaned_entries_count,
@@ -765,6 +951,7 @@ defmodule Ysc.Ledgers.Reconciliation do
             reconciliation: "full",
             has_payment_issues: report.checks.payments.discrepancies_count > 0,
             has_refund_issues: report.checks.refunds.discrepancies_count > 0,
+            has_payout_issues: report.checks.payouts.discrepancies_count > 0,
             ledger_imbalanced: !report.checks.ledger_balance.balanced,
             has_orphaned_entries:
               report.checks.orphaned_entries.orphaned_entries_count > 0
@@ -847,6 +1034,21 @@ defmodule Ysc.Ledgers.Reconciliation do
             tags: %{
               reconciliation: "orphaned_entries",
               discrepancy_type: "orphaned"
+            }
+          )
+        end
+
+        if report.checks.payouts.discrepancies_count > 0 do
+          Ysc.Logging.warning("Payout discrepancies found",
+            count: report.checks.payouts.discrepancies_count,
+            extra: %{
+              discrepancies_count: report.checks.payouts.discrepancies_count,
+              total_payouts: report.checks.payouts.total_payouts,
+              discrepancies: Enum.take(report.checks.payouts.discrepancies, 10)
+            },
+            tags: %{
+              reconciliation: "payouts",
+              discrepancy_type: "payout"
             }
           )
         end
@@ -1008,8 +1210,26 @@ defmodule Ysc.Ledgers.Reconciliation do
     #{format_entity_detail("Events", report.checks.entity_totals.events)}
     ║ Donations Match: #{format_boolean(report.checks.entity_totals.donations.match)}
     #{format_entity_detail("Donations", report.checks.entity_totals.donations)}
+    ╠══════════════════════════════════════════════════════════════════
+    ║ PAYOUTS
+    ╠══════════════════════════════════════════════════════════════════
+    ║ Total Payouts: #{report.checks.payouts.total_payouts}
+    ║ Discrepancies: #{report.checks.payouts.discrepancies_count}
+    #{format_payout_discrepancies(report.checks.payouts.discrepancies)}
     ╚══════════════════════════════════════════════════════════════════
     """
+  end
+
+  defp format_payout_discrepancies([]), do: ""
+
+  defp format_payout_discrepancies(discrepancies) do
+    discrepancies
+    |> Enum.take(5)
+    |> Enum.map_join("\n", fn disc ->
+      issues = Enum.join(disc.issues, "; ")
+
+      "║   #{disc.stripe_payout_id}: #{issues}"
+    end)
   end
 
   defp format_status(:ok), do: "✅ PASS"
