@@ -23,6 +23,20 @@ defmodule Ysc.Repo.Migrations.RelaxSignupApplicationNotNullForMigration do
   end
 
   def down do
+    # Stub / incomplete rows may have NULLs after up/0; backfill before NOT NULL.
+    execute("""
+    UPDATE signup_applications
+    SET
+      birth_date = COALESCE(birth_date, DATE '1900-01-01'),
+      address = COALESCE(address, ''),
+      country = COALESCE(country, ''),
+      city = COALESCE(city, ''),
+      postal_code = COALESCE(postal_code, ''),
+      place_of_birth = COALESCE(place_of_birth, ''),
+      citizenship = COALESCE(citizenship, ''),
+      most_connected_nordic_country = COALESCE(most_connected_nordic_country, '')
+    """)
+
     alter table(:signup_applications) do
       modify :birth_date, :date, null: false, from: {:date, null: true}
       modify :address, :text, null: false, from: {:text, null: true}

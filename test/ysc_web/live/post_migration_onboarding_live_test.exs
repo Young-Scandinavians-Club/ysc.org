@@ -484,7 +484,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       user =
         user_needing_post_migration_onboarding(%{
           date_of_birth: birth_date,
-          most_connected_country: "Sweden"
+          most_connected_country: "SE"
         })
 
       {:ok, _user} =
@@ -509,7 +509,7 @@ defmodule YscWeb.PostMigrationOnboardingLiveTest do
       assert application.city == "Seattle"
       assert application.postal_code == "98101"
       assert application.country == "USA"
-      assert application.most_connected_nordic_country == "Sweden"
+      assert application.most_connected_nordic_country == "SE"
     end
 
     test "does not insert signup application when date_of_birth is missing", %{
