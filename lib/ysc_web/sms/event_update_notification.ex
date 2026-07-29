@@ -5,8 +5,6 @@ defmodule YscWeb.Sms.EventUpdateNotification do
   Body is precomputed (HTML stripped + soft-capped) and passed as `:body`.
   """
 
-  alias YscWeb.Sms.Template
-
   @doc """
   Gets the template name.
   """
@@ -14,13 +12,14 @@ defmodule YscWeb.Sms.EventUpdateNotification do
 
   @doc """
   Renders the SMS message body.
+
+  The body is precomputed by `YscWeb.Sms.Segment` (including intentional
+  newlines). Do not re-normalize whitespace here or segment counts diverge
+  from the admin preview.
   """
   def render(variables) do
     body = Map.get(variables, :body) || Map.get(variables, "body") || ""
-
-    body
-    |> to_string()
-    |> Template.normalize_body()
+    to_string(body)
   end
 
   @doc """

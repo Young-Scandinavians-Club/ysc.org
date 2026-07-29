@@ -352,6 +352,28 @@ defmodule YscWeb.AdminEventsNewLiveTest do
         "value" => "<p>Short update</p>"
       })
 
+      view
+      |> form("#event-update-form", %{
+        "update" => %{
+          "send_sms" => "true",
+          "title" => "Update",
+          "raw_body" => "<p>Short update</p>"
+        }
+      })
+      |> render_change()
+
+      assert has_element?(view, "#event-update-sms-preview")
+
+      view
+      |> form("#event-update-form", %{
+        "update" => %{
+          "send_sms" => "false",
+          "title" => "Update",
+          "raw_body" => "<p>Short update</p>"
+        }
+      })
+      |> render_change()
+
       refute has_element?(view, "#event-update-sms-preview")
     end
   end

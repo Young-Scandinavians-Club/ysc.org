@@ -2984,17 +2984,19 @@ defmodule Ysc.Events do
   Creates an event update and enqueues the notification worker.
   """
   def create_event_update(event, attrs) do
-    result =
+    sms_body = Map.get(attrs, :sms_body) || Map.get(attrs, "sms_body")
+
+    changeset =
       %EventUpdate{}
       |> EventUpdate.changeset(attrs)
+      |> maybe_put_sms_body(sms_body)
       |> Ecto.Changeset.put_assoc(:event, event)
       |> Ecto.Changeset.put_change(
         :sent_by_id,
         attrs[:sent_by_id] || attrs["sent_by_id"]
       )
-      |> Repo.insert()
 
-    case result do
+    case Repo.insert(changeset) do
       {:ok, event_update} ->
         broadcast(%Ysc.MessagePassingEvents.EventUpdateCreated{
           event_update: event_update,
@@ -3007,6 +3009,12 @@ defmodule Ysc.Events do
         error
     end
   end
+
+  defp maybe_put_sms_body(changeset, sms_body) when is_binary(sms_body) do
+    Ecto.Changeset.put_change(changeset, :sms_body, sms_body)
+  end
+
+  defp maybe_put_sms_body(changeset, _), do: changeset
 
   @doc """
   Returns all updates for an event, newest first (admin view).

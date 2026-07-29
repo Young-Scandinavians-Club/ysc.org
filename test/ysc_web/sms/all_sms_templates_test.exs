@@ -128,7 +128,7 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
     end
 
     test "EventUpdateNotification renders precomputed body" do
-      body = "[YSC] Picnic: Tables in the back!"
+      body = "[YSC] Picnic: Tables in the back!\n\nSecond line"
       message = EventUpdateNotification.render(%{body: body})
       assert message == body
 

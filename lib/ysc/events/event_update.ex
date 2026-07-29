@@ -35,8 +35,7 @@ defmodule Ysc.Events.EventUpdate do
       :raw_body,
       :rendered_body,
       :show_on_event_page,
-      :send_sms,
-      :sms_body
+      :send_sms
     ])
     |> validate_required([:raw_body, :rendered_body])
     |> validate_length(:title, max: 200)

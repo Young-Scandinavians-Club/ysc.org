@@ -869,7 +869,8 @@ defmodule YscWeb.AccountSetupLive do
               user,
               %{
                 "phone_number" => user.phone_number,
-                "sms_opt_in" => "true"
+                "sms_opt_in" =>
+                  if(user.event_notifications_sms, do: "true", else: "false")
               },
               hash_password: false,
               validate_email: false
