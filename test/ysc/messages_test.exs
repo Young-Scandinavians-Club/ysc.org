@@ -355,6 +355,73 @@ defmodule Ysc.MessagesTest do
     end
   end
 
+  describe "run_send_message_idempotent/2 - delivery_retry path" do
+    test "persists rendered_message when delivery row was pre-created without it" do
+      key = "em_retry_render_#{System.unique_integer()}"
+      html = "<p>Check-in reminder body</p>"
+
+      # Mimic EmailNotifier: create the row before rendering/sending.
+      assert {:ok, _delivery} =
+               Messages.ensure_email_delivery(%{
+                 message_type: :email,
+                 idempotency_key: key,
+                 message_template: "booking_checkin_reminder",
+                 params: %{"door_code" => "1234"},
+                 email: "test@example.com",
+                 rendered_message: nil,
+                 delivery_retry: true
+               })
+
+      pre = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert pre.rendered_message == nil
+
+      email =
+        test_email()
+        |> Swoosh.Email.html_body(html)
+
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(
+                 email,
+                 %{
+                   message_type: :email,
+                   idempotency_key: key,
+                   message_template: "booking_checkin_reminder",
+                   params: %{"door_code" => "1234"},
+                   email: "test@example.com",
+                   rendered_message: html,
+                   delivery_retry: true
+                 }
+               )
+
+      assert_email_sent()
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.delivery_status == :accepted
+      assert record.rendered_message == html
+    end
+
+    test "persists rendered_message from email html_body when attrs omit it" do
+      key = "em_retry_html_#{System.unique_integer()}"
+      html = "<p>Body from email struct</p>"
+
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(
+                 test_email() |> Swoosh.Email.html_body(html),
+                 %{
+                   message_type: :email,
+                   idempotency_key: key,
+                   message_template: "booking_confirmation",
+                   params: %{},
+                   email: "test@example.com",
+                   delivery_retry: true
+                 }
+               )
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.rendered_message == html
+    end
+  end
+
   describe "run_send_message_idempotent/2 - duplicate handling" do
     test "duplicate send includes duplicate: true in email :sent telemetry metadata" do
       key = "em_dup_telemetry_#{System.unique_integer()}"
