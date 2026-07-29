@@ -203,7 +203,9 @@ defmodule Ysc.Email.RateLimiterTest do
                )
 
       assert %Ysc.Messages.MessageIdempotency{delivery_status: :pending} =
-               Repo.get_by(Ysc.Messages.MessageIdempotency, idempotency_key: key2)
+               Repo.get_by(Ysc.Messages.MessageIdempotency,
+                 idempotency_key: key2
+               )
     end
   end
 end
