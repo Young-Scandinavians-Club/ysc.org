@@ -1497,11 +1497,12 @@ defmodule Ysc.Bookings.BookingLocker do
             Repo.rollback({:error, changeset})
         end
 
-      schedule_booking_confirmation_email!(confirmed_booking)
       confirmed_booking
     end)
     |> case do
       {:ok, confirmed_booking} ->
+        schedule_booking_confirmation_email!(confirmed_booking)
+
         # Emit telemetry event for booking payment/confirmation
         :telemetry.execute(
           [:ysc, :bookings, :payment_processed],
@@ -1606,10 +1607,6 @@ defmodule Ysc.Bookings.BookingLocker do
           # Update inventory based on booking mode
           update_inventory_for_admin_booking(booking)
 
-          unless skip_email do
-            schedule_booking_confirmation_email!(booking)
-          end
-
           booking
 
         {:error, changeset} ->
@@ -1618,6 +1615,10 @@ defmodule Ysc.Bookings.BookingLocker do
     end)
     |> case do
       {:ok, booking} ->
+        unless skip_email do
+          schedule_booking_confirmation_email!(booking)
+        end
+
         # Schedule reminders (outside transaction)
         if !skip_reminders do
           schedule_checkin_reminder(booking)
@@ -1824,6 +1825,14 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
+  defp booking_confirmation_email_notifier do
+    Application.get_env(
+      :ysc,
+      :booking_confirmation_email_notifier,
+      YscWeb.Emails.Notifier
+    )
+  end
+
   defp schedule_booking_confirmation_email!(booking) do
     require Ysc.Logging
 
@@ -1843,7 +1852,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
         # Schedule email
         result =
-          YscWeb.Emails.Notifier.schedule_email(
+          booking_confirmation_email_notifier().schedule_email(
             booking.user.email,
             idempotency_key,
             YscWeb.Emails.BookingConfirmation.get_subject(),
@@ -1870,8 +1879,6 @@ defmodule Ysc.Bookings.BookingLocker do
               user_id: booking.user_id,
               error: reason
             )
-
-            Repo.rollback({:booking_confirmation_email_enqueue_failed, reason})
         end
       else
         Ysc.Logging.warning(
