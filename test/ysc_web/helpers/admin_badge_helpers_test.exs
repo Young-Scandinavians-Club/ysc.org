@@ -91,7 +91,7 @@ defmodule YscWeb.AdminBadgeHelpersTest do
                "red"
 
       assert AdminBadgeHelpers.ledger_payment_status_badge_type(:refunded) ==
-               "dark"
+               "zinc"
     end
   end
 

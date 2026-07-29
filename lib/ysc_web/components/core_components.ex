@@ -1991,7 +1991,7 @@ defmodule YscWeb.CoreComponents do
 
   attr :rest, :global,
     include:
-      ~w(phx-click phx-target phx-value-id phx-value-user_id phx-value-invite_id phx-value-tier-id phx-value-email data-confirm disabled target rel aria-label)
+      ~w(phx-click phx-target phx-value-id phx-value-payment_id phx-value-webhook_id phx-value-expense_report_id phx-value-user_id phx-value-invite_id phx-value-tier-id phx-value-email data-confirm disabled target rel aria-label)
 
   slot :inner_block, required: true
   slot :leading, doc: "Custom leading content instead of a hero icon"

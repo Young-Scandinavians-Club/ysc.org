@@ -13,10 +13,14 @@ defmodule YscWeb.AdminMoneyLive do
   alias Ysc.ExpenseReports
   alias Ysc.ExpenseReports.ExpenseReport
   alias Ysc.Repo
+  alias YscWeb.AdminBadgeHelpers
   alias YscWeb.DateDisplay
   import Ecto.Query
 
   require Ysc.Logging
+
+  @liquidity_account_names ["cash", "stripe_account"]
+  @expense_account_names ["stripe_fees", "discount_expense"]
 
   @impl true
   def mount(_params, _session, socket) do
@@ -35,9 +39,13 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:timezone, timezone)
       |> assign(:page_title, "Money")
       |> assign(:active_page, :money)
+      |> assign(:active_tab, :overview)
       |> assign(:loading_money_data, true)
-      # Placeholder values - will be populated when connected
       |> assign(:accounts_with_balances, [])
+      |> assign(:current_accounts_with_balances, [])
+      |> assign(:liquidity_total, Money.new(0, :USD))
+      |> assign(:period_revenue_total, Money.new(0, :USD))
+      |> assign(:period_expenses_total, Money.new(0, :USD))
       |> assign(:start_date, start_date)
       |> assign(:end_date, end_date)
       |> assign(:show_refund_modal, false)
@@ -56,21 +64,11 @@ defmodule YscWeb.AdminMoneyLive do
       |> assign(:payment_ledger_entries, [])
       |> assign(:payment_related_entity, nil)
       |> assign(:ledger_accounts, [])
-      |> assign(:sections_collapsed, %{
-        accounts: false,
-        quick_actions: false,
-        payments: false,
-        ledger_entries: true,
-        webhooks: true,
-        expense_reports: true
-      })
-      |> assign(:sections_loaded, %{
-        accounts: false,
-        quick_actions: false,
-        payments: false,
-        ledger_entries: false,
-        webhooks: false,
-        expense_reports: false
+      |> assign(:tabs_loaded, %{
+        overview: false,
+        expenses: false,
+        ledger: false,
+        webhooks: false
       })
       |> assign(:payments_page, 1)
       |> assign(:ledger_entries_page, 1)
@@ -83,15 +81,17 @@ defmodule YscWeb.AdminMoneyLive do
         :expense_report_status_form,
         to_form(%{}, as: :expense_report_status)
       )
-      # Placeholder values for paginated data
-      |> assign(:recent_payments, [])
       |> assign(:payments_end?, true)
+      |> assign(:payments_empty?, true)
+      |> assign(:payments_count, 0)
       |> assign(:ledger_entries, [])
       |> assign(:ledger_entries_end?, true)
       |> assign(:webhook_events, [])
       |> assign(:webhooks_end?, true)
       |> assign(:expense_reports, [])
       |> assign(:expense_reports_end?, true)
+      |> assign(:expense_reports_inbox, [])
+      |> stream(:payments, [])
 
     # Schedule data loading only when connected (stateful mount)
     if connected?(socket) do
@@ -103,66 +103,32 @@ defmodule YscWeb.AdminMoneyLive do
 
   @impl true
   def handle_info(:load_money_data, socket) do
-    start_date = socket.assigns.start_date
-    end_date = socket.assigns.end_date
-
-    accounts_with_balances =
-      Ledgers.get_accounts_with_balances(start_date, end_date)
-
-    ledger_accounts = Ledgers.list_accounts()
-
-    sections_loaded = Map.put(socket.assigns.sections_loaded, :accounts, true)
-
     socket =
       socket
       |> assign(:loading_money_data, false)
-      |> assign(:accounts_with_balances, accounts_with_balances)
-      |> assign(:ledger_accounts, ledger_accounts)
-      |> assign(:sections_loaded, sections_loaded)
-
-    # Only load data for sections that start expanded (payments)
-    # Collapsed sections (ledger_entries, webhooks, expense_reports) will load on demand
-    socket =
-      if socket.assigns.sections_collapsed[:payments] do
-        socket
-      else
-        updated_sections_loaded = Map.put(sections_loaded, :payments, true)
-
-        socket
-        |> paginate_payments(1)
-        |> assign(:sections_loaded, updated_sections_loaded)
-      end
+      |> load_overview_data()
+      |> ensure_tab_loaded(socket.assigns.active_tab)
 
     {:noreply, socket}
   end
 
   @impl true
   def handle_params(params, _uri, socket) do
-    # Preserve date range from params if provided
+    active_tab = parse_tab(Map.get(params, "tab", "overview"))
+
+    {socket, dates_changed?} = assign_dates_from_params(socket, params)
+
     socket =
-      if params["start_date"] && params["end_date"] do
-        try do
-          start_date =
-            parse_date_to_datetime(params["start_date"], ~T[00:00:00])
-
-          end_date = parse_date_to_datetime(params["end_date"], ~T[23:59:59])
-
-          socket
-          |> assign(:start_date, start_date)
-          |> assign(:end_date, end_date)
-        rescue
-          _ -> socket
-        end
-      else
-        socket
-      end
-
-    # Ensure live_action is set
-    socket = assign(socket, :live_action, socket.assigns.live_action || :index)
+      socket
+      |> assign(:active_tab, active_tab)
+      |> assign(:live_action, socket.assigns.live_action || :index)
 
     socket =
       if connected?(socket) do
-        apply_action(socket, socket.assigns.live_action, params)
+        socket
+        |> apply_action(socket.assigns.live_action, params)
+        |> maybe_refresh_for_date_change(dates_changed?)
+        |> ensure_tab_loaded(active_tab)
       else
         socket
       end
@@ -312,31 +278,271 @@ defmodule YscWeb.AdminMoneyLive do
     socket
   end
 
-  # Helper to build money path with date range preserved
+  # Helper to build money path with tab and date range preserved
   defp build_money_path(socket, sub_path \\ "") do
     base_path = ~p"/admin/money"
 
     full_path =
       if sub_path != "", do: "#{base_path}#{sub_path}", else: base_path
 
-    query_params =
-      if socket.assigns[:start_date] && socket.assigns[:end_date] do
-        tz = socket.assigns[:timezone] || "America/Los_Angeles"
-
-        %{
-          "start_date" =>
-            format_datetime(socket.assigns.start_date, tz, "%Y-%m-%d"),
-          "end_date" => format_datetime(socket.assigns.end_date, tz, "%Y-%m-%d")
-        }
-      else
-        %{}
-      end
+    query_params = money_query_params(socket)
 
     if map_size(query_params) > 0 do
       "#{full_path}?#{URI.encode_query(query_params)}"
     else
       full_path
     end
+  end
+
+  defp money_query_params(socket_or_assigns, overrides \\ %{})
+
+  defp money_query_params(%Phoenix.LiveView.Socket{} = socket, overrides) do
+    money_query_params(socket.assigns, overrides)
+  end
+
+  defp money_query_params(assigns, overrides) when is_map(assigns) do
+    base = %{
+      "tab" => to_string(assigns[:active_tab] || :overview)
+    }
+
+    base =
+      if assigns[:start_date] && assigns[:end_date] do
+        Map.merge(base, %{
+          # Use calendar dates as stored — do not shift into the browser TZ.
+          # Shifting UTC midnight into America/Los_Angeles turns Jan 1 into Dec 31
+          # and drifts the range by one day on every tab patch.
+          "start_date" => format_date_param(assigns[:start_date]),
+          "end_date" => format_date_param(assigns[:end_date])
+        })
+      else
+        base
+      end
+
+    Map.merge(base, stringify_query_overrides(overrides))
+  end
+
+  defp stringify_query_overrides(overrides) do
+    Map.new(overrides, fn {key, value} -> {to_string(key), to_string(value)} end)
+  end
+
+  defp money_index_path(socket_or_assigns, overrides) do
+    ~p"/admin/money?#{money_query_params(socket_or_assigns, overrides)}"
+  end
+
+  defp parse_tab("expenses"), do: :expenses
+  defp parse_tab("ledger"), do: :ledger
+  defp parse_tab("webhooks"), do: :webhooks
+  defp parse_tab(_), do: :overview
+
+  defp assign_dates_from_params(socket, params) do
+    if params["start_date"] && params["end_date"] do
+      try do
+        start_date = parse_date_to_datetime(params["start_date"], ~T[00:00:00])
+        end_date = parse_date_to_datetime(params["end_date"], ~T[23:59:59])
+
+        dates_changed? =
+          socket.assigns.start_date != start_date or
+            socket.assigns.end_date != end_date
+
+        {
+          socket
+          |> assign(:start_date, start_date)
+          |> assign(:end_date, end_date),
+          dates_changed?
+        }
+      rescue
+        _ -> {socket, false}
+      end
+    else
+      {socket, false}
+    end
+  end
+
+  defp maybe_refresh_for_date_change(socket, false), do: socket
+
+  defp maybe_refresh_for_date_change(socket, true) do
+    any_loaded? =
+      socket.assigns.tabs_loaded.overview or
+        socket.assigns.tabs_loaded.expenses or
+        socket.assigns.tabs_loaded.ledger or
+        socket.assigns.tabs_loaded.webhooks
+
+    if any_loaded? do
+      socket
+      |> assign(:payments_page, 1)
+      |> assign(:ledger_entries_page, 1)
+      |> assign(:webhooks_page, 1)
+      |> assign(:expense_reports_page, 1)
+      |> refresh_loaded_tab_data()
+    else
+      socket
+    end
+  end
+
+  defp refresh_loaded_tab_data(socket) do
+    tabs_loaded = socket.assigns.tabs_loaded
+
+    socket =
+      if tabs_loaded.overview do
+        load_overview_data(socket)
+      else
+        socket
+      end
+
+    socket =
+      if tabs_loaded.expenses do
+        paginate_expense_reports(socket, 1)
+      else
+        socket
+      end
+
+    socket =
+      if tabs_loaded.ledger do
+        socket
+        |> load_period_accounts()
+        |> paginate_ledger_entries(1)
+      else
+        socket
+      end
+
+    if tabs_loaded.webhooks do
+      paginate_webhooks(socket, 1)
+    else
+      socket
+    end
+  end
+
+  defp ensure_tab_loaded(socket, :overview) do
+    cond do
+      socket.assigns.tabs_loaded.overview ->
+        socket
+
+      socket.assigns.loading_money_data ->
+        # Wait for :load_money_data so the loading skeleton clears once
+        socket
+
+      true ->
+        load_overview_data(socket)
+    end
+  end
+
+  defp ensure_tab_loaded(socket, :expenses) do
+    if socket.assigns.tabs_loaded.expenses do
+      socket
+    else
+      socket
+      |> paginate_expense_reports(1)
+      |> assign(
+        :tabs_loaded,
+        Map.put(socket.assigns.tabs_loaded, :expenses, true)
+      )
+    end
+  end
+
+  defp ensure_tab_loaded(socket, :ledger) do
+    if socket.assigns.tabs_loaded.ledger do
+      socket
+    else
+      socket
+      |> load_period_accounts()
+      |> paginate_ledger_entries(1)
+      |> assign(
+        :tabs_loaded,
+        Map.put(socket.assigns.tabs_loaded, :ledger, true)
+      )
+    end
+  end
+
+  defp ensure_tab_loaded(socket, :webhooks) do
+    if socket.assigns.tabs_loaded.webhooks do
+      socket
+    else
+      socket
+      |> paginate_webhooks(1)
+      |> assign(
+        :tabs_loaded,
+        Map.put(socket.assigns.tabs_loaded, :webhooks, true)
+      )
+    end
+  end
+
+  defp load_overview_data(socket) do
+    start_date = socket.assigns.start_date
+    end_date = socket.assigns.end_date
+
+    period_accounts = Ledgers.get_accounts_with_balances(start_date, end_date)
+    current_accounts = Ledgers.get_accounts_with_balances()
+    ledger_accounts = Ledgers.list_accounts()
+
+    socket
+    |> assign(:accounts_with_balances, period_accounts)
+    |> assign(:current_accounts_with_balances, current_accounts)
+    |> assign(:ledger_accounts, ledger_accounts)
+    |> assign(
+      :liquidity_total,
+      sum_account_balances(current_accounts, @liquidity_account_names)
+    )
+    |> assign(
+      :period_revenue_total,
+      sum_balances_by_account_type(period_accounts, "revenue")
+    )
+    |> assign(
+      :period_expenses_total,
+      sum_account_balances(period_accounts, @expense_account_names)
+    )
+    |> load_expense_reports_inbox()
+    |> paginate_payments(1)
+    |> assign(
+      :tabs_loaded,
+      Map.put(socket.assigns.tabs_loaded, :overview, true)
+    )
+  end
+
+  defp load_period_accounts(socket) do
+    accounts_with_balances =
+      Ledgers.get_accounts_with_balances(
+        socket.assigns.start_date,
+        socket.assigns.end_date
+      )
+
+    assign(socket, :accounts_with_balances, accounts_with_balances)
+  end
+
+  defp load_expense_reports_inbox(socket) do
+    expense_reports =
+      from(er in ExpenseReport,
+        where: er.status == "submitted",
+        preload: [:user],
+        order_by: [asc: er.inserted_at],
+        limit: 50
+      )
+      |> Repo.all()
+
+    assign(socket, :expense_reports_inbox, expense_reports)
+  end
+
+  defp sum_account_balances(accounts_with_balances, account_names) do
+    accounts_with_balances
+    |> Enum.filter(fn %{account: account} -> account.name in account_names end)
+    |> sum_balances()
+  end
+
+  defp sum_balances_by_account_type(accounts_with_balances, account_type) do
+    accounts_with_balances
+    |> Enum.filter(fn %{account: account} ->
+      to_string(account.account_type) == account_type
+    end)
+    |> sum_balances()
+  end
+
+  defp sum_balances(account_data_list) do
+    Enum.reduce(account_data_list, Money.new(0, :USD), fn %{balance: balance},
+                                                          acc ->
+      case Money.add(acc, balance || Money.new(0, :USD)) do
+        {:ok, result} -> result
+        {:error, _reason} -> acc
+      end
+    end)
   end
 
   @impl true
@@ -776,38 +982,6 @@ defmodule YscWeb.AdminMoneyLive do
   end
 
   @impl true
-  def handle_event("toggle_section", %{"section" => section}, socket) do
-    section_atom = String.to_existing_atom(section)
-    current_state = socket.assigns.sections_collapsed[section_atom]
-    is_expanding = current_state == true
-    was_loaded = socket.assigns.sections_loaded[section_atom]
-
-    updated_sections =
-      Map.update!(socket.assigns.sections_collapsed, section_atom, fn _ ->
-        !current_state
-      end)
-
-    socket =
-      socket
-      |> assign(:sections_collapsed, updated_sections)
-
-    # Load data when expanding a section for the first time
-    socket =
-      if is_expanding and not was_loaded do
-        sections_loaded =
-          Map.put(socket.assigns.sections_loaded, section_atom, true)
-
-        socket
-        |> load_section_data(section_atom)
-        |> assign(:sections_loaded, sections_loaded)
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
-  @impl true
   def handle_event("payments_next-page", _, socket) do
     {:noreply, paginate_payments(socket, socket.assigns.payments_page + 1)}
   end
@@ -954,8 +1128,8 @@ defmodule YscWeb.AdminMoneyLive do
            )
            |> assign(:show_expense_report_modal, false)
            |> assign(:selected_expense_report, nil)
-           |> assign(:expense_reports_page, 1)
-           |> paginate_expense_reports(1)
+           |> load_expense_reports_inbox()
+           |> maybe_refresh_expense_reports_list()
            |> assign(
              :expense_report_status_form,
              to_form(%{}, as: :expense_report_status)
@@ -995,24 +1169,14 @@ defmodule YscWeb.AdminMoneyLive do
         %{"start_date" => start_date_str, "end_date" => end_date_str},
         socket
       ) do
-    # Parse the date strings and convert to DateTime
-    start_date = parse_date_to_datetime(start_date_str, ~T[00:00:00])
-    end_date = parse_date_to_datetime(end_date_str, ~T[23:59:59])
+    path =
+      money_index_path(socket, %{
+        "tab" => to_string(socket.assigns.active_tab),
+        "start_date" => start_date_str,
+        "end_date" => end_date_str
+      })
 
-    # Get updated data with new date range
-    accounts_with_balances =
-      Ledgers.get_accounts_with_balances(start_date, end_date)
-
-    {:noreply,
-     socket
-     |> assign(:accounts_with_balances, accounts_with_balances)
-     |> assign(:start_date, start_date)
-     |> assign(:end_date, end_date)
-     |> assign(:payments_page, 1)
-     |> assign(:ledger_entries_page, 1)
-     |> assign(:webhooks_page, 1)
-     |> assign(:expense_reports_page, 1)
-     |> paginate_loaded_sections()}
+    {:noreply, push_patch(socket, to: path)}
   end
 
   # Pagination helpers
@@ -1035,9 +1199,11 @@ defmodule YscWeb.AdminMoneyLive do
       |> Ledgers.add_payment_type_info_batch()
 
     socket
-    |> assign(:recent_payments, recent_payments)
+    |> stream(:payments, recent_payments, reset: true)
     |> assign(:payments_page, page)
     |> assign(:payments_end?, length(recent_payments) < per_page)
+    |> assign(:payments_empty?, recent_payments == [])
+    |> assign(:payments_count, length(recent_payments))
   end
 
   defp paginate_ledger_entries(socket, page) when page >= 1 do
@@ -1109,46 +1275,12 @@ defmodule YscWeb.AdminMoneyLive do
     |> assign(:expense_reports_end?, length(expense_reports) < per_page)
   end
 
-  defp load_section_data(socket, :ledger_entries) do
-    paginate_ledger_entries(socket, 1)
-  end
-
-  defp load_section_data(socket, :webhooks) do
-    paginate_webhooks(socket, 1)
-  end
-
-  defp load_section_data(socket, :expense_reports) do
-    paginate_expense_reports(socket, 1)
-  end
-
-  defp load_section_data(socket, :payments) do
-    paginate_payments(socket, 1)
-  end
-
-  defp load_section_data(socket, _section) do
-    socket
-  end
-
-  defp paginate_loaded_sections(socket) do
-    sections_loaded = socket.assigns.sections_loaded
-
-    socket
-    |> then(fn s ->
-      if sections_loaded[:payments], do: paginate_payments(s, 1), else: s
-    end)
-    |> then(fn s ->
-      if sections_loaded[:ledger_entries],
-        do: paginate_ledger_entries(s, 1),
-        else: s
-    end)
-    |> then(fn s ->
-      if sections_loaded[:webhooks], do: paginate_webhooks(s, 1), else: s
-    end)
-    |> then(fn s ->
-      if sections_loaded[:expense_reports],
-        do: paginate_expense_reports(s, 1),
-        else: s
-    end)
+  defp maybe_refresh_expense_reports_list(socket) do
+    if socket.assigns.tabs_loaded.expenses do
+      paginate_expense_reports(socket, socket.assigns.expense_reports_page)
+    else
+      socket
+    end
   end
 
   @impl true
@@ -1159,44 +1291,40 @@ defmodule YscWeb.AdminMoneyLive do
       user={@current_user}
       role={@admin_role}
     >
-      <div class="flex justify-between py-6">
+      <div class="flex flex-col gap-4 py-6 sm:flex-row sm:items-end sm:justify-between">
         <.admin_page_title>Money Management</.admin_page_title>
-      </div>
-      <!-- Date Range Filter -->
-      <div class="mb-6 bg-white p-4 rounded border">
-        <h3 class="text-lg font-medium text-zinc-900 mb-4">Date Range Filter</h3>
         <form
           id="money-date-range-form"
           phx-submit="update_date_range"
-          class="flex gap-4 items-end"
+          class="flex flex-wrap items-end gap-3"
         >
           <div>
             <label
               for="start_date"
-              class="block text-sm font-medium text-zinc-700 mb-1"
+              class="block text-xs font-medium text-zinc-600 mb-1"
             >
-              Start Date
+              Start
             </label>
             <input
               type="date"
               id="start_date"
               name="start_date"
-              value={format_datetime(@start_date, @timezone, "%Y-%m-%d")}
+              value={format_date_param(@start_date)}
               class="block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
           <div>
             <label
               for="end_date"
-              class="block text-sm font-medium text-zinc-700 mb-1"
+              class="block text-xs font-medium text-zinc-600 mb-1"
             >
-              End Date
+              End
             </label>
             <input
               type="date"
               id="end_date"
               name="end_date"
-              value={format_datetime(@end_date, @timezone, "%Y-%m-%d")}
+              value={format_date_param(@end_date)}
               class="block w-full rounded-md border-zinc-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
             />
           </div>
@@ -1208,510 +1336,755 @@ defmodule YscWeb.AdminMoneyLive do
             Update
           </.button>
         </form>
-        <p class="text-sm text-zinc-600 mt-2">
-          Showing data from {format_date_boundary(@start_date)} to {format_date_boundary(
-            @end_date
-          )}
-        </p>
       </div>
-      <!-- Account Balances -->
-      <.admin_collapsible_section
-        section="accounts"
-        title="Account Balances"
-        collapsed?={@sections_collapsed.accounts}
-        content_variant={:padded}
-      >
-        <div
-          :if={!@sections_loaded.accounts}
-          id="account-balances-loading"
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-          role="status"
-          aria-live="polite"
+      <p class="text-sm text-zinc-500 -mt-2 mb-4">
+        Showing data from {format_date_boundary(@start_date)} to {format_date_boundary(
+          @end_date
+        )}
+      </p>
+
+      <.admin_tabs id="money-tabs" aria_label="Money tabs">
+        <.admin_tab
+          active={@active_tab == :overview}
+          patch={money_index_path(assigns, %{"tab" => "overview"})}
         >
-          <span class="sr-only">Loading account balances…</span>
-          <div :for={_ <- 1..6} class="bg-white p-4 rounded border space-y-3">
-            <div class="flex justify-between items-start">
-              <.skeleton_block class="h-4 w-28 rounded" />
-              <.skeleton_block class="h-5 w-20 rounded" />
+          Overview
+        </.admin_tab>
+        <.admin_tab
+          active={@active_tab == :expenses}
+          patch={money_index_path(assigns, %{"tab" => "expenses"})}
+        >
+          Expenses
+        </.admin_tab>
+        <.admin_tab
+          active={@active_tab == :ledger}
+          patch={money_index_path(assigns, %{"tab" => "ledger"})}
+        >
+          Ledger
+        </.admin_tab>
+        <.admin_tab
+          active={@active_tab == :webhooks}
+          patch={money_index_path(assigns, %{"tab" => "webhooks"})}
+        >
+          Webhooks
+        </.admin_tab>
+      </.admin_tabs>
+
+      <div :if={@active_tab == :overview} id="money-overview-tab">
+        <div
+          id="expense-reports-inbox"
+          class={[
+            "mb-6 rounded-lg border shadow-sm px-5 py-4",
+            if(@expense_reports_inbox != [],
+              do: "bg-rose-50 border-rose-200",
+              else: "bg-emerald-50 border-emerald-200"
+            )
+          ]}
+        >
+          <%= if @expense_reports_inbox != [] do %>
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+              <div class="flex items-start gap-3">
+                <.icon
+                  name="hero-exclamation-triangle"
+                  class="w-6 h-6 text-rose-600 shrink-0 mt-0.5"
+                />
+                <div>
+                  <p class="text-sm font-semibold text-rose-900">
+                    Expense reports needing review
+                  </p>
+                  <p class="text-xs text-rose-700 mt-0.5">
+                    {length(@expense_reports_inbox)} submitted report{if length(
+                                                                           @expense_reports_inbox
+                                                                         ) == 1,
+                                                                         do: "",
+                                                                         else: "s"} awaiting action
+                  </p>
+                </div>
+              </div>
+              <.link
+                id="expense-inbox-view-all"
+                patch={money_index_path(assigns, %{"tab" => "expenses"})}
+                class="text-xs font-semibold text-rose-800 hover:underline shrink-0"
+              >
+                View all expense reports →
+              </.link>
             </div>
-            <.skeleton_block class="h-3 w-full rounded" />
-            <.skeleton_block class="h-6 w-24 rounded" />
-          </div>
+            <div class="overflow-x-auto rounded-md border border-rose-100 bg-white">
+              <table class="min-w-full divide-y divide-zinc-200">
+                <thead class="bg-zinc-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Purpose
+                    </th>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Submitted
+                    </th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  <tr :for={expense_report <- @expense_reports_inbox}>
+                    <td class="px-4 py-3 text-sm text-zinc-900">
+                      <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
+                        <div class="flex flex-col">
+                          <span class="font-medium">
+                            {get_user_display_name(expense_report.user)}
+                          </span>
+                          <span class="text-xs text-zinc-500">
+                            {expense_report.user.email}
+                          </span>
+                        </div>
+                      <% else %>
+                        <span class="text-zinc-400">Unknown</span>
+                      <% end %>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-zinc-900 max-w-xs">
+                      <div class="truncate" title={expense_report.purpose}>
+                        {expense_report.purpose}
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-zinc-600">
+                      {format_datetime(
+                        expense_report.inserted_at,
+                        @timezone,
+                        "%Y-%m-%d"
+                      )}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm">
+                      <button
+                        type="button"
+                        id={"expense-inbox-review-#{expense_report.id}"}
+                        phx-click="show_expense_report_status_modal"
+                        phx-value-expense_report_id={expense_report.id}
+                        class="text-zinc-400 hover:text-blue-600 transition-colors"
+                        aria-label="Review expense report"
+                      >
+                        <.icon name="hero-eye" class="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          <% else %>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <.icon
+                  name="hero-check-circle"
+                  class="w-7 h-7 text-emerald-600 shrink-0"
+                />
+                <div>
+                  <p class="text-sm font-semibold text-emerald-900">
+                    All caught up
+                  </p>
+                  <p class="text-xs text-emerald-700 mt-0.5">
+                    No expense reports waiting for review
+                  </p>
+                </div>
+              </div>
+              <.link
+                id="expense-inbox-view-all"
+                patch={money_index_path(assigns, %{"tab" => "expenses"})}
+                class="text-xs font-semibold text-emerald-800 hover:underline shrink-0"
+              >
+                View all expense reports →
+              </.link>
+            </div>
+          <% end %>
         </div>
+
         <div
-          :if={@sections_loaded.accounts}
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          id="money-kpi-cards"
+          class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
         >
+          <.admin_stat_card
+            id="kpi-liquidity"
+            label="Liquidity"
+            value={Money.to_string!(@liquidity_total)}
+            subtitle="Cash + Stripe (as of now)"
+          />
+          <.admin_stat_card
+            id="kpi-period-revenue"
+            label="Period Revenue"
+            value={Money.to_string!(@period_revenue_total)}
+            subtitle="Memberships, events, bookings, donations"
+          />
+          <.admin_stat_card
+            id="kpi-period-expenses"
+            label="Period Expenses"
+            value={Money.to_string!(@period_expenses_total)}
+            subtitle="Stripe fees + discounts"
+          />
+        </div>
+
+        <div
+          id="recent-payments-section"
+          class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8"
+        >
+          <div class="px-6 py-4 border-b border-zinc-100">
+            <h2 class="text-lg font-semibold text-zinc-900">Recent Payments</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-zinc-200">
+              <thead class="bg-zinc-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Reference
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Payment Type
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody
+                :if={@loading_money_data || !@tabs_loaded.overview}
+                id="recent-payments-loading"
+                role="status"
+                aria-live="polite"
+              >
+                <.table_rows_skeleton
+                  rows={5}
+                  colspan={7}
+                  label="Loading recent payments…"
+                />
+              </tbody>
+              <tbody
+                :if={
+                  @tabs_loaded.overview && !@loading_money_data &&
+                    @payments_empty?
+                }
+                id="recent-payments-empty"
+              >
+                <tr>
+                  <td
+                    colspan="7"
+                    class="px-6 py-8 text-center text-sm text-zinc-500"
+                  >
+                    No payments found for the selected date range.
+                  </td>
+                </tr>
+              </tbody>
+              <tbody
+                :if={
+                  @tabs_loaded.overview && !@loading_money_data &&
+                    !@payments_empty?
+                }
+                id="recent-payments"
+                phx-update="stream"
+                class="bg-white divide-y divide-zinc-200"
+              >
+                <tr :for={{id, payment} <- @streams.payments} id={id}>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
+                    {payment.reference_id}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <div class="flex flex-col">
+                      <span class="font-medium text-zinc-900">
+                        {if Ecto.assoc_loaded?(payment.user) && payment.user do
+                          get_user_display_name(payment.user)
+                        else
+                          "System Transaction"
+                        end}
+                      </span>
+                      <span class="text-xs text-zinc-500">
+                        {if Ecto.assoc_loaded?(payment.user) && payment.user do
+                          payment.user.email
+                        else
+                          "System Transaction"
+                        end}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <div class="flex flex-col">
+                      <span class={"font-medium #{get_payment_type_color(payment.payment_type_info.type)}"}>
+                        {payment.payment_type_info.type}
+                      </span>
+                      <span class="text-xs text-zinc-500">
+                        {payment.payment_type_info.details}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900 text-right tabular-nums">
+                    {Money.to_string!(payment.amount)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <.badge type={
+                      AdminBadgeHelpers.ledger_payment_status_badge_type(
+                        payment.status
+                      )
+                    }>
+                      {payment.status}
+                    </.badge>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {format_datetime(
+                      payment.payment_date,
+                      @timezone,
+                      "%Y-%m-%d %H:%M"
+                    )}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <.row_actions_dropdown
+                      id={"payment-actions-#{payment.id}"}
+                      label="Payment actions"
+                    >
+                      <.dropdown_menu_item
+                        :if={payment.payment_type_info.type != "Payout"}
+                        id={"payment-view-#{payment.id}"}
+                        icon="hero-eye"
+                        phx-click="show_payment_modal"
+                        phx-value-payment_id={payment.id}
+                      >
+                        View
+                      </.dropdown_menu_item>
+                      <.dropdown_menu_item
+                        :if={payment.payment_type_info.type != "Payout"}
+                        id={"payment-refund-#{payment.id}"}
+                        icon="hero-arrow-uturn-left"
+                        tone={:danger}
+                        phx-click="show_refund_modal"
+                        phx-value-payment_id={payment.id}
+                        disabled={payment.status == :refunded}
+                      >
+                        Refund
+                      </.dropdown_menu_item>
+                      <.dropdown_menu_item
+                        :if={payment.payment_type_info.type == "Payout"}
+                        id={"payment-payout-#{payment.id}"}
+                        icon="hero-banknotes"
+                        phx-click="show_payout_modal"
+                        phx-value-payment_id={payment.id}
+                      >
+                        Payout Details
+                      </.dropdown_menu_item>
+                    </.row_actions_dropdown>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <.admin_prev_next_pagination
+            page={@payments_page}
+            entry_count={@payments_count}
+            prev_event="payments_prev-page"
+            next_event="payments_next-page"
+            prev_disabled?={@payments_page == 1}
+            next_disabled?={@payments_end?}
+          />
+        </div>
+      </div>
+
+      <div :if={@active_tab == :expenses} id="money-expenses-tab">
+        <div class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8">
+          <div class="px-6 py-4 border-b border-zinc-100">
+            <h2 class="text-lg font-semibold text-zinc-900">Expense Reports</h2>
+            <p class="text-sm text-zinc-500 mt-1">
+              All reports in the selected date range
+            </p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-zinc-200">
+              <thead class="bg-zinc-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Purpose
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    QuickBooks Sync Status
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    QuickBooks Bill ID
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Submitted At
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-zinc-200">
+                <tr :for={expense_report <- @expense_reports}>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
+                    {String.slice(to_string(expense_report.id), 0..12)}...
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
+                      <div class="flex flex-col">
+                        <span class="font-medium text-zinc-900">
+                          {get_user_display_name(expense_report.user)}
+                        </span>
+                        <span class="text-xs text-zinc-500">
+                          {expense_report.user.email}
+                        </span>
+                      </div>
+                    <% else %>
+                      <span class="text-zinc-400">Unknown</span>
+                    <% end %>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
+                    <div class="truncate" title={expense_report.purpose}>
+                      {expense_report.purpose}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <.badge type={
+                      get_expense_report_status_badge_type(expense_report.status)
+                    }>
+                      {String.capitalize(expense_report.status || "unknown")}
+                    </.badge>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <.admin_quickbooks_sync_status
+                      status={expense_report.quickbooks_sync_status}
+                      error={expense_report.quickbooks_sync_error}
+                      default_label="unknown"
+                    />
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                    <%= if expense_report.quickbooks_bill_id do %>
+                      <span class="font-mono text-xs">
+                        {String.slice(expense_report.quickbooks_bill_id, 0..20)}...
+                      </span>
+                    <% else %>
+                      <span class="text-zinc-400">—</span>
+                    <% end %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {format_datetime(
+                      expense_report.inserted_at,
+                      @timezone,
+                      "%Y-%m-%d %H:%M"
+                    )}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <button
+                      type="button"
+                      id={"expense-report-view-#{expense_report.id}"}
+                      phx-click="show_expense_report_status_modal"
+                      phx-value-expense_report_id={expense_report.id}
+                      class="text-zinc-400 hover:text-blue-600 transition-colors"
+                      aria-label="View expense report"
+                    >
+                      <.icon name="hero-eye" class="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+                <tr :if={Enum.empty?(@expense_reports)}>
+                  <td
+                    colspan="8"
+                    class="px-6 py-4 text-center text-sm text-zinc-500"
+                  >
+                    No expense reports found for the selected date range.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <.admin_prev_next_pagination
+            page={@expense_reports_page}
+            entry_count={length(@expense_reports)}
+            prev_event="expense_reports_prev-page"
+            next_event="expense_reports_next-page"
+            prev_disabled?={@expense_reports_page == 1}
+            next_disabled?={@expense_reports_end?}
+          />
+        </div>
+      </div>
+
+      <div :if={@active_tab == :ledger} id="money-ledger-tab">
+        <div class="mb-8">
+          <h2 class="text-lg font-semibold text-zinc-900 mb-4">
+            Account Balances
+          </h2>
           <div
-            :for={account_data <- @accounts_with_balances}
-            class="bg-white p-4 rounded border"
-          >
-            <div class="flex justify-between items-start mb-2">
-              <h3 class="font-medium text-zinc-900">
-                {account_data.account.name}
-              </h3>
-              <span class={"px-2 py-1 text-xs font-semibold rounded #{get_normal_balance_badge_color(account_data.account.normal_balance)}"}>
-                {String.capitalize(
-                  to_string(account_data.account.normal_balance || "debit")
-                )}-normal
-              </span>
-            </div>
-            <p class="text-sm text-zinc-600 mb-2">
-              {account_data.account.description}
-            </p>
-            <p class={"text-lg font-semibold mt-2 #{get_balance_color(account_data.balance, account_data.account.normal_balance)}"}>
-              {Money.to_string!(account_data.balance || Money.new(0, :USD))}
-            </p>
-            <p class="text-xs text-zinc-500 capitalize mt-1">
-              {account_data.account.account_type}
-            </p>
-          </div>
-        </div>
-      </.admin_collapsible_section>
-      <!-- Recent Payments -->
-      <.admin_collapsible_section
-        section="payments"
-        title="Recent Payments"
-        collapsed?={@sections_collapsed.payments}
-      >
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Reference
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                User
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Payment Type
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Amount
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody
-            :if={!@sections_loaded.payments}
-            id="recent-payments-loading"
+            :if={!@tabs_loaded.ledger}
+            id="account-balances-loading"
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             role="status"
             aria-live="polite"
           >
-            <.table_rows_skeleton
-              rows={5}
-              colspan={7}
-              label="Loading recent payments…"
-            />
-          </tbody>
-          <tbody
-            :if={@sections_loaded.payments}
-            class="bg-white divide-y divide-zinc-200"
+            <span class="sr-only">Loading account balances…</span>
+            <div
+              :for={_ <- 1..6}
+              class="bg-white p-4 rounded-lg shadow-sm border border-zinc-100 space-y-3"
+            >
+              <div class="flex justify-between items-start">
+                <.skeleton_block class="h-4 w-28 rounded" />
+                <.skeleton_block class="h-3 w-16 rounded" />
+              </div>
+              <.skeleton_block class="h-3 w-full rounded" />
+              <.skeleton_block class="h-7 w-24 rounded" />
+            </div>
+          </div>
+          <div
+            :if={@tabs_loaded.ledger}
+            id="account-balances-grid"
+            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
           >
-            <tr :for={payment <- @recent_payments}>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-900">
-                {payment.reference_id}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                <div class="flex flex-col">
-                  <span class="font-medium text-zinc-900">
-                    {if Ecto.assoc_loaded?(payment.user) && payment.user do
-                      get_user_display_name(payment.user)
-                    else
-                      "System Transaction"
-                    end}
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    {if Ecto.assoc_loaded?(payment.user) && payment.user do
-                      payment.user.email
-                    else
-                      "System Transaction"
-                    end}
-                  </span>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                <div class="flex flex-col">
-                  <span class={"font-medium #{get_payment_type_color(payment.payment_type_info.type)}"}>
-                    {payment.payment_type_info.type}
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    {payment.payment_type_info.details}
-                  </span>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                {Money.to_string!(payment.amount)}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                  {payment.status}
+            <div
+              :for={account_data <- @accounts_with_balances}
+              class="bg-white p-4 rounded-lg shadow-sm border border-zinc-100"
+            >
+              <div class="flex justify-between items-start mb-2">
+                <h3 class="font-medium text-zinc-900">
+                  {account_data.account.name}
+                </h3>
+                <span class="text-[10px] text-zinc-400 uppercase tracking-wide">
+                  {String.capitalize(
+                    to_string(account_data.account.normal_balance || "debit")
+                  )}-normal
                 </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                {format_datetime(
-                  payment.payment_date,
-                  @timezone,
-                  "%Y-%m-%d %H:%M"
-                )}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <div class="flex gap-2">
-                  <.button
-                    :if={payment.payment_type_info.type != "Payout"}
-                    phx-click="show_payment_modal"
-                    phx-value-payment_id={payment.id}
-                    class="bg-blue-600 hover:bg-blue-700"
-                  >
-                    View
-                  </.button>
-                  <.button
-                    :if={payment.payment_type_info.type != "Payout"}
-                    phx-click="show_refund_modal"
-                    phx-value-payment_id={payment.id}
-                    class="bg-red-600 hover:bg-red-700"
-                    disabled={payment.status == :refunded}
-                  >
+              </div>
+              <p class="text-sm text-zinc-600 mb-3">
+                {account_data.account.description}
+              </p>
+              <p class={"text-2xl font-semibold #{get_balance_color(account_data.balance, account_data.account.normal_balance)}"}>
+                {Money.to_string!(account_data.balance || Money.new(0, :USD))}
+              </p>
+              <p class="text-xs text-zinc-500 capitalize mt-1">
+                {account_data.account.account_type}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8">
+          <div class="px-6 py-4 border-b border-zinc-100">
+            <h2 class="text-lg font-semibold text-zinc-900">Ledger Entries</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-zinc-200">
+              <thead class="bg-zinc-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Account
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Debit/Credit
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Payment
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                     Refund
-                  </.button>
-                  <.button
-                    :if={payment.payment_type_info.type == "Payout"}
-                    phx-click="show_payout_modal"
-                    phx-value-payment_id={payment.id}
-                    class="bg-green-600 hover:bg-green-700"
-                  >
-                    Payout Details
-                  </.button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <.admin_prev_next_pagination
-          page={@payments_page}
-          entry_count={length(@recent_payments)}
-          prev_event="payments_prev-page"
-          next_event="payments_next-page"
-          prev_disabled?={@payments_page == 1}
-          next_disabled?={@payments_end?}
-        />
-      </.admin_collapsible_section>
-      <!-- Ledger Entries -->
-      <.admin_collapsible_section
-        section="ledger_entries"
-        title="Ledger Entries"
-        collapsed?={@sections_collapsed.ledger_entries}
-        class="mb-8 rounded border"
-      >
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Account
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Debit/Credit
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Amount
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Payment
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Refund
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Entity
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-zinc-200">
-            <tr :for={entry <- @ledger_entries}>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                {format_datetime(
-                  entry.inserted_at,
-                  @timezone,
-                  "%Y-%m-%d %H:%M"
-                )}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                <div class="flex flex-col">
-                  <span class="font-medium text-zinc-900">
-                    {entry.account.name}
-                  </span>
-                  <span class="text-xs text-zinc-500">
-                    {String.capitalize(to_string(entry.account.account_type))}
-                  </span>
-                </div>
-              </td>
-              <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
-                <div class="truncate" title={entry.description}>
-                  {entry.description}
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_debit_credit_badge_color(entry.debit_credit)}"}>
-                  {String.capitalize(to_string(entry.debit_credit))}
-                </span>
-              </td>
-              <td class={"px-6 py-4 whitespace-nowrap text-sm font-medium #{get_debit_credit_amount_color(entry.debit_credit)}"}>
-                {Money.to_string!(entry.amount)}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                <%= if entry.payment do %>
-                  <span class="font-mono text-xs">
-                    {entry.payment.reference_id}
-                  </span>
-                <% else %>
-                  <span class="text-zinc-400">—</span>
-                <% end %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                <%= if entry.refund do %>
-                  <span class="font-mono text-xs">
-                    {entry.refund.reference_id}
-                  </span>
-                <% else %>
-                  <span class="text-zinc-400">—</span>
-                <% end %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                <%= if entry.related_entity_type do %>
-                  <div class="flex flex-col">
-                    <span class="text-xs font-medium text-zinc-700">
-                      {String.capitalize(to_string(entry.related_entity_type))}
-                    </span>
-                    <%= if entry.related_entity_id do %>
-                      <span class="text-xs font-mono text-zinc-500">
-                        {String.slice(to_string(entry.related_entity_id), 0..8)}...
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Entity
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-zinc-200">
+                <tr :for={entry <- @ledger_entries}>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {format_datetime(
+                      entry.inserted_at,
+                      @timezone,
+                      "%Y-%m-%d %H:%M"
+                    )}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <div class="flex flex-col">
+                      <span class="font-medium text-zinc-900">
+                        {entry.account.name}
                       </span>
+                      <span class="text-xs text-zinc-500">
+                        {String.capitalize(to_string(entry.account.account_type))}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
+                    <div class="truncate" title={entry.description}>
+                      {entry.description}
+                    </div>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_debit_credit_badge_color(entry.debit_credit)}"}>
+                      {String.capitalize(to_string(entry.debit_credit))}
+                    </span>
+                  </td>
+                  <td class={"px-6 py-4 whitespace-nowrap text-sm font-medium text-right tabular-nums #{get_debit_credit_amount_color(entry.debit_credit)}"}>
+                    {Money.to_string!(entry.amount)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                    <%= if entry.payment do %>
+                      <span class="font-mono text-xs">
+                        {entry.payment.reference_id}
+                      </span>
+                    <% else %>
+                      <span class="text-zinc-400">—</span>
                     <% end %>
-                  </div>
-                <% else %>
-                  <span class="text-zinc-400">—</span>
-                <% end %>
-              </td>
-            </tr>
-            <tr :if={Enum.empty?(@ledger_entries)}>
-              <td colspan="8" class="px-6 py-4 text-center text-sm text-zinc-500">
-                No ledger entries found for the selected date range.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <.admin_prev_next_pagination
-          page={@ledger_entries_page}
-          entry_count={length(@ledger_entries)}
-          prev_event="ledger_entries_prev-page"
-          next_event="ledger_entries_next-page"
-          prev_disabled?={@ledger_entries_page == 1}
-          next_disabled?={@ledger_entries_end?}
-        />
-      </.admin_collapsible_section>
-      <!-- Stripe Webhooks -->
-      <.admin_collapsible_section
-        section="webhooks"
-        title="Stripe Webhook Events"
-        collapsed?={@sections_collapsed.webhooks}
-        class="mb-8 rounded border"
-      >
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Event ID
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Event Type
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                State
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Received At
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-zinc-200">
-            <tr :for={webhook <- @webhook_events}>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                {String.slice(webhook.event_id, 0..20)}...
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                <span class="font-medium">{webhook.event_type}</span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_webhook_state_color(webhook.state)}"}>
-                  {webhook.state}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                {format_datetime(
-                  webhook.inserted_at,
-                  @timezone,
-                  "%Y-%m-%d %H:%M:%S"
-                )}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <.button
-                  phx-click="show_webhook_modal"
-                  phx-value-webhook_id={webhook.id}
-                  class="bg-blue-600 hover:bg-blue-700"
-                >
-                  View Details
-                </.button>
-              </td>
-            </tr>
-            <tr :if={Enum.empty?(@webhook_events)}>
-              <td colspan="5" class="px-6 py-4 text-center text-sm text-zinc-500">
-                No webhook events found for the selected date range.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <.admin_prev_next_pagination
-          page={@webhooks_page}
-          entry_count={length(@webhook_events)}
-          prev_event="webhooks_prev-page"
-          next_event="webhooks_next-page"
-          prev_disabled?={@webhooks_page == 1}
-          next_disabled?={@webhooks_end?}
-        />
-      </.admin_collapsible_section>
-      <!-- Expense Reports -->
-      <.admin_collapsible_section
-        section="expense_reports"
-        title="Expense Reports"
-        collapsed?={@sections_collapsed.expense_reports}
-        class="mb-8 rounded border"
-      >
-        <table class="min-w-full divide-y divide-zinc-200">
-          <thead class="bg-zinc-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                ID
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                User
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Purpose
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                QuickBooks Sync Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                QuickBooks Bill ID
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Submitted At
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-zinc-200">
-            <tr :for={expense_report <- @expense_reports}>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
-                {String.slice(to_string(expense_report.id), 0..12)}...
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                <%= if Ecto.assoc_loaded?(expense_report.user) && expense_report.user do %>
-                  <div class="flex flex-col">
-                    <span class="font-medium text-zinc-900">
-                      {get_user_display_name(expense_report.user)}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                    <%= if entry.refund do %>
+                      <span class="font-mono text-xs">
+                        {entry.refund.reference_id}
+                      </span>
+                    <% else %>
+                      <span class="text-zinc-400">—</span>
+                    <% end %>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                    <%= if entry.related_entity_type do %>
+                      <div class="flex flex-col">
+                        <span class="text-xs font-medium text-zinc-700">
+                          {String.capitalize(to_string(entry.related_entity_type))}
+                        </span>
+                        <%= if entry.related_entity_id do %>
+                          <span class="text-xs font-mono text-zinc-500">
+                            {String.slice(to_string(entry.related_entity_id), 0..8)}...
+                          </span>
+                        <% end %>
+                      </div>
+                    <% else %>
+                      <span class="text-zinc-400">—</span>
+                    <% end %>
+                  </td>
+                </tr>
+                <tr :if={Enum.empty?(@ledger_entries)}>
+                  <td
+                    colspan="8"
+                    class="px-6 py-4 text-center text-sm text-zinc-500"
+                  >
+                    No ledger entries found for the selected date range.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <.admin_prev_next_pagination
+            page={@ledger_entries_page}
+            entry_count={length(@ledger_entries)}
+            prev_event="ledger_entries_prev-page"
+            next_event="ledger_entries_next-page"
+            prev_disabled?={@ledger_entries_page == 1}
+            next_disabled?={@ledger_entries_end?}
+          />
+        </div>
+      </div>
+
+      <div :if={@active_tab == :webhooks} id="money-webhooks-tab">
+        <div class="bg-white shadow-sm border border-zinc-100 rounded-lg overflow-hidden mb-8">
+          <div class="px-6 py-4 border-b border-zinc-100">
+            <h2 class="text-lg font-semibold text-zinc-900">
+              Stripe Webhook Events
+            </h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-zinc-200">
+              <thead class="bg-zinc-50">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Event ID
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Event Type
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    State
+                  </th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Received At
+                  </th>
+                  <th class="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-zinc-200">
+                <tr :for={webhook <- @webhook_events}>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-zinc-900">
+                    {String.slice(webhook.event_id, 0..20)}...
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    <span class="font-medium">{webhook.event_type}</span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap">
+                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_webhook_state_color(webhook.state)}"}>
+                      {webhook.state}
                     </span>
-                    <span class="text-xs text-zinc-500">
-                      {expense_report.user.email}
-                    </span>
-                  </div>
-                <% else %>
-                  <span class="text-zinc-400">Unknown</span>
-                <% end %>
-              </td>
-              <td class="px-6 py-4 text-sm text-zinc-900 max-w-xs">
-                <div class="truncate" title={expense_report.purpose}>
-                  {expense_report.purpose}
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <.badge type={
-                  get_expense_report_status_badge_type(expense_report.status)
-                }>
-                  {String.capitalize(expense_report.status || "unknown")}
-                </.badge>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <.admin_quickbooks_sync_status
-                  status={expense_report.quickbooks_sync_status}
-                  error={expense_report.quickbooks_sync_error}
-                  default_label="unknown"
-                />
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                <%= if expense_report.quickbooks_bill_id do %>
-                  <span class="font-mono text-xs">
-                    {String.slice(expense_report.quickbooks_bill_id, 0..20)}...
-                  </span>
-                <% else %>
-                  <span class="text-zinc-400">—</span>
-                <% end %>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
-                {format_datetime(
-                  expense_report.inserted_at,
-                  @timezone,
-                  "%Y-%m-%d %H:%M"
-                )}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                <.button
-                  phx-click="show_expense_report_status_modal"
-                  phx-value-expense_report_id={expense_report.id}
-                  class="bg-blue-600 hover:bg-blue-700"
-                >
-                  View
-                </.button>
-              </td>
-            </tr>
-            <tr :if={Enum.empty?(@expense_reports)}>
-              <td colspan="8" class="px-6 py-4 text-center text-sm text-zinc-500">
-                No submitted expense reports found for the selected date range.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <.admin_prev_next_pagination
-          page={@expense_reports_page}
-          entry_count={length(@expense_reports)}
-          prev_event="expense_reports_prev-page"
-          next_event="expense_reports_next-page"
-          prev_disabled?={@expense_reports_page == 1}
-          next_disabled?={@expense_reports_end?}
-        />
-      </.admin_collapsible_section>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-zinc-900">
+                    {format_datetime(
+                      webhook.inserted_at,
+                      @timezone,
+                      "%Y-%m-%d %H:%M:%S"
+                    )}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
+                    <button
+                      type="button"
+                      id={"webhook-view-#{webhook.id}"}
+                      phx-click="show_webhook_modal"
+                      phx-value-webhook_id={webhook.id}
+                      class="text-zinc-400 hover:text-blue-600 transition-colors"
+                      aria-label="View webhook details"
+                    >
+                      <.icon name="hero-eye" class="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+                <tr :if={Enum.empty?(@webhook_events)}>
+                  <td
+                    colspan="5"
+                    class="px-6 py-4 text-center text-sm text-zinc-500"
+                  >
+                    No webhook events found for the selected date range.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <.admin_prev_next_pagination
+            page={@webhooks_page}
+            entry_count={length(@webhook_events)}
+            prev_event="webhooks_prev-page"
+            next_event="webhooks_next-page"
+            prev_disabled?={@webhooks_page == 1}
+            next_disabled?={@webhooks_end?}
+          />
+        </div>
+      </div>
+
       <!-- Refund Modal -->
       <.modal
         :if={@live_action == :refund_payment && @selected_payment}
@@ -3260,8 +3633,15 @@ defmodule YscWeb.AdminMoneyLive do
     end
   end
 
+  # Calendar date for filter inputs/URL params (no TZ shift).
+  defp format_date_param(%DateTime{} = datetime),
+    do: datetime |> DateTime.to_date() |> Date.to_iso8601()
+
+  defp format_date_param(%Date{} = date), do: Date.to_iso8601(date)
+  defp format_date_param(_), do: ""
+
   defp format_date_boundary(%DateTime{} = dt),
-    do: DateDisplay.format_date_long(dt, "—")
+    do: DateDisplay.format_date_long(DateTime.to_date(dt), "—")
 
   defp format_date_boundary(_), do: "—"
 
@@ -3385,18 +3765,6 @@ defmodule YscWeb.AdminMoneyLive do
       _ -> "bg-zinc-100 text-zinc-800"
     end
   end
-
-  defp get_normal_balance_badge_color("credit"), do: "bg-blue-100 text-blue-800"
-
-  defp get_normal_balance_badge_color("debit"),
-    do: "bg-purple-100 text-purple-800"
-
-  defp get_normal_balance_badge_color(:credit), do: "bg-blue-100 text-blue-800"
-
-  defp get_normal_balance_badge_color(:debit),
-    do: "bg-purple-100 text-purple-800"
-
-  defp get_normal_balance_badge_color(_), do: "bg-zinc-100 text-zinc-800"
 
   # Determine balance color based on whether it's positive or negative
   # For credit-normal accounts, positive is good (green)
