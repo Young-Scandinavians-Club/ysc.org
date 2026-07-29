@@ -170,5 +170,42 @@ defmodule Ysc.Accounts.MembershipReportTest do
       assert csv =~ "Designer"
       assert csv =~ "Portland"
     end
+
+    test "exports expired rows without attached application details" do
+      user = user_fixture()
+      period_end = ~U[2026-04-10 08:00:00Z]
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_csv_expired_#{System.unique_integer()}",
+          stripe_status: "canceled",
+          name: "Single Membership",
+          current_period_end: period_end
+        })
+
+      report = MembershipReport.generate(~D[2026-04-01], ~D[2026-04-30])
+      csv = MembershipReport.to_csv(report)
+
+      assert csv =~ "Expired"
+      assert csv =~ user.email
+      refute csv =~ "Family in Oslo"
+    end
+
+    test "formats eligibility values in csv rows" do
+      user = user_fixture()
+
+      signup_application_fixture(user, %{
+        completed: ~U[2026-04-01 09:00:00Z],
+        review_outcome: nil,
+        membership_eligibility: [:born_in_scandinavia, :citizen_of_scandinavia]
+      })
+
+      report = MembershipReport.generate(~D[2026-04-01], ~D[2026-04-30])
+      csv = MembershipReport.to_csv(report)
+
+      assert csv =~ "I was born in Scandinavia"
+      assert csv =~ "I am a citizen of a Scandinavian country"
+    end
   end
 end

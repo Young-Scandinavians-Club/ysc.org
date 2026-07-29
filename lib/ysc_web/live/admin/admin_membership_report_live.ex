@@ -569,7 +569,7 @@ defmodule YscWeb.AdminMembershipReportLive do
 
   defp format_datetime(%DateTime{} = dt) do
     local = DateTime.shift_zone!(dt, "America/Los_Angeles")
-    Timex.format!(local, "%b %d, %Y", :strftime)
+    Calendar.strftime(local, "%b %d, %Y")
   end
 
   defp format_eligibility(eligibility) do
