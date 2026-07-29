@@ -104,6 +104,7 @@ config :ysc,
   aws_access_key_id: "minioadmin",
   aws_secret_access_key: "minioadmin",
   expense_reports_s3_bucket: "expense-reports",
+  app_resources_s3_bucket: "app-resources",
   avatars_s3_bucket: "avatars",
   membership_plans: [
     %{

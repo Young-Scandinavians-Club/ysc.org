@@ -1153,7 +1153,7 @@ defmodule Ysc.Accounts.AuthServiceTest do
 
   describe "geo-IP enrichment in extract_auth_data/2" do
     test "returns auth data without geo fields when GeoIP is not configured" do
-      # GeoIP.configured?/0 returns false in the test env (no MAXMIND_LICENSE_KEY).
+      # GeoIP.configured?/0 returns false in the test env (not a deployed env).
       # The resulting map must still be valid and contain all expected base keys.
       conn = mock_conn()
       auth_data = AuthService.extract_auth_data(conn)

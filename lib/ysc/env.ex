@@ -82,7 +82,7 @@ defmodule Ysc.Env do
   Returns true if running in a deployed environment (sandbox or production).
 
   Used to gate behaviors that should only run on Fly deployments, such as
-  downloading the MaxMind GeoIP database.
+  loading the GeoIP database from the shared app-resources bucket.
   """
   @spec deployed?() :: boolean()
   def deployed? do

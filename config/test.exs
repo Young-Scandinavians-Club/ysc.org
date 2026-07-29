@@ -147,6 +147,7 @@ config :ysc, :discord_http_client, Ysc.Alerts.DiscordHttpMock
 
 config :ysc,
   expense_reports_s3_bucket: "expense-reports",
+  app_resources_s3_bucket: "app-resources",
   expense_reports_s3_upload: Ysc.ExpenseReports.S3UploadMock,
   environment: "test"
 

@@ -241,6 +241,14 @@ defmodule Ysc.S3ConfigTest do
     end
   end
 
+  describe "app_resources_bucket_name/0" do
+    test "returns app resources bucket name" do
+      bucket = S3Config.app_resources_bucket_name()
+      assert is_binary(bucket)
+      assert bucket != ""
+    end
+  end
+
   describe "base_url/0" do
     test "returns base URL" do
       url = S3Config.base_url()

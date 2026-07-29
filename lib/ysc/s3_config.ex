@@ -64,6 +64,18 @@ defmodule Ysc.S3Config do
   end
 
   @doc """
+  Returns the S3 bucket name for shared app resources (GeoIP DB, etc.).
+
+  SECURITY NOTE: This bucket is BACKEND-ONLY.
+  - No public base URL or CORS
+  - Populated by CI (e.g. weekly GeoIP sync); apps only read
+  - Uses backend credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+  """
+  def app_resources_bucket_name do
+    Application.get_env(:ysc, :app_resources_s3_bucket, "app-resources")
+  end
+
+  @doc """
   Optional HTTPS origin for the media bucket (e.g. Tigris custom domain).
   When set, `upload_url/0` and public `object_url/1` use this host instead of
   `*.fly.storage.tigris.dev`.
