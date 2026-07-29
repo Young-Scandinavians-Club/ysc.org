@@ -19,15 +19,25 @@ defmodule Ysc.Events.EventUpdate do
     field :raw_body, :string
     field :rendered_body, :string
     field :show_on_event_page, :boolean, default: false
+    field :send_sms, :boolean, default: false
+    field :sms_body, :string
     field :sent_at, :utc_datetime
     field :recipient_count, :integer
+    field :sms_recipient_count, :integer
 
     timestamps()
   end
 
   def changeset(event_update, attrs) do
     event_update
-    |> cast(attrs, [:title, :raw_body, :rendered_body, :show_on_event_page])
+    |> cast(attrs, [
+      :title,
+      :raw_body,
+      :rendered_body,
+      :show_on_event_page,
+      :send_sms,
+      :sms_body
+    ])
     |> validate_required([:raw_body, :rendered_body])
     |> validate_length(:title, max: 200)
     |> validate_rendered_body_has_content()

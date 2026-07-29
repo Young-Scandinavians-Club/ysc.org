@@ -149,5 +149,168 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorkerTest do
       updated = Repo.get!(Events.EventUpdate, update.id)
       assert updated.recipient_count == 0
     end
+
+    test "schedules SMS when send_sms is enabled", %{
+      event: event,
+      organizer: organizer
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        buyer =
+          user_fixture()
+          |> Ecto.Changeset.change(event_notifications_sms: true)
+          |> Repo.update!()
+
+        tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+        %Ticket{
+          id: Ecto.ULID.generate(),
+          event_id: event.id,
+          user_id: buyer.id,
+          ticket_tier_id: tier.id,
+          status: :confirmed,
+          expires_at:
+            DateTime.add(DateTime.utc_now(), 1, :day)
+            |> DateTime.truncate(:second)
+        }
+        |> Repo.insert!()
+
+        sms_body = "[YSC] Blast: Tables in the back"
+
+        {:ok, update} =
+          Events.create_event_update(event, %{
+            title: "Blast",
+            raw_body: "<p>Tables in the back</p>",
+            rendered_body: "<p>Tables in the back</p>",
+            send_sms: true,
+            sms_body: sms_body,
+            sent_by_id: organizer.id
+          })
+
+        job = %Oban.Job{
+          id: 1,
+          args: %{"event_update_id" => update.id},
+          worker: "YscWeb.Workers.EventUpdateNotificationWorker",
+          queue: "mailers",
+          state: "available",
+          attempt: 1
+        }
+
+        assert :ok = EventUpdateNotificationWorker.perform(job)
+
+        updated = Repo.get!(Events.EventUpdate, update.id)
+        assert updated.recipient_count == 1
+        assert updated.sms_recipient_count == 1
+        assert updated.sms_body == sms_body
+
+        assert_enqueued(
+          worker: YscWeb.Workers.SmsNotifier,
+          args: %{
+            "idempotency_key" =>
+              "event_update_sms_#{update.id}_#{buyer.phone_number}",
+            "template" => "event_update_notification"
+          }
+        )
+      end)
+    end
+
+    test "does not schedule SMS when send_sms is false", %{
+      event: event,
+      organizer: organizer
+    } do
+      buyer =
+        user_fixture()
+        |> Ecto.Changeset.change(event_notifications_sms: true)
+        |> Repo.update!()
+
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: buyer.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      {:ok, update} =
+        Events.create_event_update(event, %{
+          title: "Email only",
+          raw_body: "<p>Hello</p>",
+          rendered_body: "<p>Hello</p>",
+          send_sms: false,
+          sent_by_id: organizer.id
+        })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_update_id" => update.id},
+        worker: "YscWeb.Workers.EventUpdateNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = EventUpdateNotificationWorker.perform(job)
+
+      updated = Repo.get!(Events.EventUpdate, update.id)
+      assert updated.recipient_count == 1
+      assert is_nil(updated.sms_recipient_count)
+
+      refute_enqueued(worker: YscWeb.Workers.SmsNotifier)
+    end
+
+    test "skips SMS for opted-out purchasers", %{
+      event: event,
+      organizer: organizer
+    } do
+      buyer =
+        user_fixture()
+        |> Ecto.Changeset.change(event_notifications_sms: false)
+        |> Repo.update!()
+
+      tier = ticket_tier_fixture(%{event_id: event.id, type: :paid})
+
+      %Ticket{
+        id: Ecto.ULID.generate(),
+        event_id: event.id,
+        user_id: buyer.id,
+        ticket_tier_id: tier.id,
+        status: :confirmed,
+        expires_at:
+          DateTime.add(DateTime.utc_now(), 1, :day)
+          |> DateTime.truncate(:second)
+      }
+      |> Repo.insert!()
+
+      {:ok, update} =
+        Events.create_event_update(event, %{
+          title: "Blast",
+          raw_body: "<p>Hello</p>",
+          rendered_body: "<p>Hello</p>",
+          send_sms: true,
+          sms_body: "[YSC] Blast: Hello",
+          sent_by_id: organizer.id
+        })
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"event_update_id" => update.id},
+        worker: "YscWeb.Workers.EventUpdateNotificationWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = EventUpdateNotificationWorker.perform(job)
+
+      updated = Repo.get!(Events.EventUpdate, update.id)
+      assert updated.recipient_count == 1
+      assert updated.sms_recipient_count == 0
+      refute_enqueued(worker: YscWeb.Workers.SmsNotifier)
+    end
   end
 end

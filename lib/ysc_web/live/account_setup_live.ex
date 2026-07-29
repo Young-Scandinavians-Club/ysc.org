@@ -812,7 +812,7 @@ defmodule YscWeb.AccountSetupLive do
     )
     |> assign(
       :phone_form,
-      to_form(%{"phone_number" => "", "sms_opt_in" => "false"}, as: "user")
+      to_form(%{"phone_number" => "", "sms_opt_in" => "true"}, as: "user")
     )
     |> assign(:phone_verification_form, to_form(%{"verification_code" => ""}))
     |> assign(:code_valid, false)
@@ -858,14 +858,19 @@ defmodule YscWeb.AccountSetupLive do
 
         phone_changeset =
           if user_needs.phone_setup or is_nil(user.phone_number) do
-            Ysc.Accounts.User.registration_changeset(user, %{},
+            Ysc.Accounts.User.registration_changeset(
+              user,
+              %{"sms_opt_in" => "true"},
               hash_password: false,
               validate_email: false
             )
           else
             Ysc.Accounts.User.registration_changeset(
               user,
-              %{"phone_number" => user.phone_number},
+              %{
+                "phone_number" => user.phone_number,
+                "sms_opt_in" => "true"
+              },
               hash_password: false,
               validate_email: false
             )

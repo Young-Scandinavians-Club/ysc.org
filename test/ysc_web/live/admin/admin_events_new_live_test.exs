@@ -219,6 +219,19 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert has_element?(view, "#preview-event-update-btn")
     end
 
+    test "includes media library trigger for the update Trix editor", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      assert has_element?(
+               view,
+               ~s([data-trix-library-trigger="update[raw_body]"])
+             )
+    end
+
     test "shows event update in timeline after send", %{
       conn: conn,
       admin: admin
@@ -292,6 +305,54 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       view |> element("#preview-event-update-btn") |> render_click()
 
       refute has_element?(view, "#event-update-preview-modal")
+    end
+  end
+
+  describe "updates tab - SMS preview" do
+    setup [:create_admin]
+
+    test "shows SMS preview and segment warning when send_sms is checked", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      long_body = "<p>" <> String.duplicate("a", 200) <> "</p>"
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => long_body
+      })
+
+      view
+      |> form("#event-update-form", %{
+        "update" => %{
+          "send_sms" => "true",
+          "title" => "Update",
+          "raw_body" => long_body
+        }
+      })
+      |> render_change()
+
+      assert has_element?(view, "#event-update-sms-preview")
+      assert has_element?(view, "#sms-recipient-count")
+      assert has_element?(view, "#event-update-sms-segment-warning")
+    end
+
+    test "hides SMS preview when send_sms is unchecked", %{
+      conn: conn,
+      admin: admin
+    } do
+      event = event_fixture(%{organizer_id: admin.id, state: :published})
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/updates")
+
+      render_click(view, "editor-update", %{
+        "field" => "update[raw_body]",
+        "value" => "<p>Short update</p>"
+      })
+
+      refute has_element?(view, "#event-update-sms-preview")
     end
   end
 

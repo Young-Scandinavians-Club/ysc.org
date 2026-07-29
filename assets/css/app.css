@@ -733,12 +733,35 @@ body.overflow-hidden {
     padding-right: 0.6em;
 }
 
-.trix-content li {
+/* Restore list markers removed by Tailwind Preflight / .trix-content * reset */
+.trix-content ul {
+    list-style-type: disc;
     margin-left: 1em;
+    padding-left: 1em;
 }
 
-.trix-content [dir="rtl"] li {
+.trix-content ol {
+    list-style-type: decimal;
+    margin-left: 1em;
+    padding-left: 1em;
+}
+
+.trix-content li {
+    display: list-item;
+}
+
+.trix-content li+li {
+    margin-top: 0.25em;
+}
+
+.trix-content [dir="rtl"] ul,
+.trix-content [dir="rtl"] ol,
+.trix-content ul[dir="rtl"],
+.trix-content ol[dir="rtl"] {
+    margin-left: 0;
     margin-right: 1em;
+    padding-left: 0;
+    padding-right: 1em;
 }
 
 .trix-content pre {

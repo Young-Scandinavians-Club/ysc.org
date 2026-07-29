@@ -58,6 +58,16 @@ defmodule Ysc.Accounts.SmsCategoriesTest do
                %{event_notifications_sms: false},
                "event_notification"
              )
+
+      assert SmsCategories.should_send_sms?(
+               %{event_notifications_sms: true},
+               "event_update_notification"
+             )
+
+      refute SmsCategories.should_send_sms?(
+               %{event_notifications_sms: false},
+               "event_update_notification"
+             )
     end
 
     test "returns true when template name is not a binary" do

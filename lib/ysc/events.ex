@@ -3192,6 +3192,66 @@ defmodule Ysc.Events do
   end
 
   @doc """
+  Records SMS delivery stats on an event update after SMS fan-out completes.
+  """
+  def mark_event_update_sms_sent(event_update, sms_recipient_count, sms_body)
+      when is_integer(sms_recipient_count) and is_binary(sms_body) do
+    event_update
+    |> Ecto.Changeset.change(%{
+      sms_recipient_count: sms_recipient_count,
+      sms_body: sms_body
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Collects deduplicated SMS recipients for an event update blast.
+
+  Returns confirmed, non-donation ticket purchasers who have a phone number
+  and `event_notifications_sms` enabled, deduplicated by phone number.
+  """
+  def list_event_update_sms_recipients(event_id) do
+    event_id
+    |> event_update_sms_recipients_query()
+    |> Repo.all()
+  end
+
+  @doc """
+  Returns the count of unique SMS recipients for an event update blast.
+  """
+  def count_event_update_sms_recipients(event_id) do
+    from(r in subquery(event_update_sms_recipients_query(event_id)),
+      select: count(r.phone_number)
+    )
+    |> Repo.one()
+  end
+
+  defp event_update_sms_recipients_query(event_id) do
+    from t in Ticket,
+      join: tt in TicketTier,
+      on: t.ticket_tier_id == tt.id,
+      join: u in User,
+      on: t.user_id == u.id,
+      where:
+        t.event_id == ^event_id and t.status == :confirmed and
+          tt.type != :donation,
+      where: u.event_notifications_sms == true,
+      where: not is_nil(u.phone_number) and u.phone_number != "",
+      distinct: u.phone_number,
+      order_by: [asc: u.phone_number],
+      select: %{
+        user_id: u.id,
+        phone_number: u.phone_number,
+        first_name: u.first_name
+      }
+  end
+
+  @doc false
+  def ci_query_explain_event_update_sms_recipients_query do
+    event_update_sms_recipients_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  @doc """
   Marks an event's publication notification as sent with the given recipient count.
   """
   def mark_event_notification_sent(%Event{} = event, recipient_count) do

@@ -16,7 +16,8 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
     BookingCheckinReminder,
     TwoFactorVerification,
     EmailChanged,
-    PasswordChanged
+    PasswordChanged,
+    EventUpdateNotification
   }
 
   setup do
@@ -125,6 +126,15 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
       assert String.contains?(message, "[YSC]")
       assert PasswordChanged.get_template_name() == "password_changed"
     end
+
+    test "EventUpdateNotification renders precomputed body" do
+      body = "[YSC] Picnic: Tables in the back!"
+      message = EventUpdateNotification.render(%{body: body})
+      assert message == body
+
+      assert EventUpdateNotification.get_template_name() ==
+               "event_update_notification"
+    end
   end
 
   describe "SMS template prepare functions" do
@@ -189,7 +199,8 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
         "booking_checkin_reminder" => BookingCheckinReminder,
         "two_factor_verification" => TwoFactorVerification,
         "email_changed" => EmailChanged,
-        "password_changed" => PasswordChanged
+        "password_changed" => PasswordChanged,
+        "event_update_notification" => EventUpdateNotification
       }
 
       for {template_name, expected_module} <- template_mappings do
@@ -229,7 +240,9 @@ defmodule YscWeb.Sms.AllSmsTemplatesTest do
          }},
         {TwoFactorVerification, %{code: "123456"}},
         {EmailChanged, %{first_name: "Test", new_email: "test@example.com"}},
-        {PasswordChanged, %{first_name: "Test"}}
+        {PasswordChanged, %{first_name: "Test"}},
+        {EventUpdateNotification,
+         %{body: "[YSC] Picnic: Tables in the back corner!"}}
       ]
 
       for {template, variables} <- templates_with_variables do
