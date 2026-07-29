@@ -23,6 +23,51 @@ defmodule Ysc.SettingsTest do
       assert {:ok, _} = Cachex.get(:ysc_cache, "all-site-settings")
       assert Settings.get_setting(name) == "v"
     end
+
+    test "clears wp_migration_active when it is true" do
+      %SiteSetting{
+        name: "wp_migration_active",
+        value: "true",
+        group: "migration"
+      }
+      |> Repo.insert!()
+
+      Settings.clear_cache()
+
+      assert {:ok, %{}} = Settings.init(%{})
+      assert Settings.get_setting_safe("wp_migration_active") == "false"
+    end
+  end
+
+  describe "ensure_wp_migration_inactive/0" do
+    test "sets wp_migration_active to false when true" do
+      %SiteSetting{
+        name: "wp_migration_active",
+        value: "true",
+        group: "migration"
+      }
+      |> Repo.insert!()
+
+      assert :ok = Settings.ensure_wp_migration_inactive()
+      assert Settings.get_setting_safe("wp_migration_active") == "false"
+    end
+
+    test "is a no-op when already false" do
+      %SiteSetting{
+        name: "wp_migration_active",
+        value: "false",
+        group: "migration"
+      }
+      |> Repo.insert!()
+
+      assert :ok = Settings.ensure_wp_migration_inactive()
+      assert Settings.get_setting_safe("wp_migration_active") == "false"
+    end
+
+    test "is a no-op when unset" do
+      assert :ok = Settings.ensure_wp_migration_inactive()
+      assert Settings.get_setting_safe("wp_migration_active") == nil
+    end
   end
 
   describe "supervised Settings process" do

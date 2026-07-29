@@ -7,6 +7,7 @@ defmodule Ysc.Messages.Requeue do
   """
 
   alias Ysc.Repo
+  alias Ysc.Messages.MessageIdempotency
   alias Oban.Job
   import Ecto.Query
 
@@ -24,7 +25,8 @@ defmodule Ysc.Messages.Requeue do
     query =
       from(j in Job,
         where:
-          j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+          j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+            j.worker == "YscWeb.Workers.EmailNotifier",
         where: j.state in ["discarded", "retryable"],
         order_by: [
           desc: fragment("COALESCE(?, ?)", j.discarded_at, j.inserted_at),
@@ -55,7 +57,8 @@ defmodule Ysc.Messages.Requeue do
     total_failed =
       from(j in Job,
         where:
-          j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+          j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+            j.worker == "YscWeb.Workers.EmailNotifier",
         where: j.state in ["discarded", "retryable"],
         select: count()
       )
@@ -65,7 +68,8 @@ defmodule Ysc.Messages.Requeue do
     discarded =
       from(j in Job,
         where:
-          j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+          j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+            j.worker == "YscWeb.Workers.EmailNotifier",
         where: j.state == "discarded",
         select: count()
       )
@@ -75,7 +79,8 @@ defmodule Ysc.Messages.Requeue do
     retryable =
       from(j in Job,
         where:
-          j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+          j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+            j.worker == "YscWeb.Workers.EmailNotifier",
         where: j.state == "retryable",
         select: count()
       )
@@ -85,7 +90,8 @@ defmodule Ysc.Messages.Requeue do
     jobs_for_template_stats =
       from(j in Job,
         where:
-          j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+          j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+            j.worker == "YscWeb.Workers.EmailNotifier",
         where: j.state in ["discarded", "retryable"],
         select: j.args
       )
@@ -102,7 +108,8 @@ defmodule Ysc.Messages.Requeue do
     recent_failures =
       from(j in Job,
         where:
-          j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+          j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+            j.worker == "YscWeb.Workers.EmailNotifier",
         where: j.state in ["discarded", "retryable"],
         where:
           fragment("COALESCE(?, ?)", j.discarded_at, j.inserted_at) >=
@@ -180,10 +187,13 @@ defmodule Ysc.Messages.Requeue do
   end
 
   defp email_job?(job) do
-    job.queue == "mailers" && job.worker == "YscWeb.Workers.EmailNotifier"
+    job.queue in ["mailers", "transactional_mail", "bulk_mail"] &&
+      job.worker == "YscWeb.Workers.EmailNotifier"
   end
 
   defp requeue_job(job) do
+    reset_terminal_delivery(job.args)
+
     # Create a new job with the same args to re-queue it
     base_attrs = %{
       "recipient" => get_in(job.args, ["recipient"]),
@@ -217,13 +227,35 @@ defmodule Ysc.Messages.Requeue do
     end
   end
 
+  defp reset_terminal_delivery(%{
+         "idempotency_key" => idempotency_key,
+         "template" => template
+       }) do
+    from(m in MessageIdempotency,
+      where:
+        m.message_type == :email and m.idempotency_key == ^idempotency_key and
+          m.message_template == ^template and
+          m.delivery_status == :terminal_failed
+    )
+    |> Repo.update_all(
+      set: [
+        delivery_status: :pending,
+        delivery_lease_expires_at: nil,
+        last_delivery_error: nil
+      ]
+    )
+  end
+
+  defp reset_terminal_delivery(_args), do: {0, nil}
+
   @doc false
   def ci_query_explain_query do
     limit = 100
 
     from(j in Job,
       where:
-        j.queue == "mailers" and j.worker == "YscWeb.Workers.EmailNotifier",
+        j.queue in ["mailers", "transactional_mail", "bulk_mail"] and
+          j.worker == "YscWeb.Workers.EmailNotifier",
       where: j.state in ["discarded", "retryable"],
       order_by: [
         desc: fragment("COALESCE(?, ?)", j.discarded_at, j.inserted_at),

@@ -1461,43 +1461,48 @@ defmodule Ysc.Bookings.BookingLocker do
 
       # Update booking status
       # Pass existing rooms to avoid Ecto thinking we're removing them
-      case booking
-           |> Booking.changeset(
-             %{
-               status: :complete,
-               hold_expires_at: nil
-             },
-             rooms: booking.rooms,
-             skip_validation: true
-           )
-           |> Repo.update() do
-        {:ok, updated_booking} ->
-          if updated_booking.applied_booking_entitlement_id do
-            _ =
-              Entitlements.lock_entitlement_for_consume(
-                updated_booking.applied_booking_entitlement_id
-              )
+      confirmed_booking =
+        case booking
+             |> Booking.changeset(
+               %{
+                 status: :complete,
+                 hold_expires_at: nil
+               },
+               rooms: booking.rooms,
+               skip_validation: true
+             )
+             |> Repo.update() do
+          {:ok, updated_booking} ->
+            if updated_booking.applied_booking_entitlement_id do
+              _ =
+                Entitlements.lock_entitlement_for_consume(
+                  updated_booking.applied_booking_entitlement_id
+                )
 
-            case Entitlements.consume_for_booking!(
-                   updated_booking.applied_booking_entitlement_id,
-                   updated_booking.id
-                 ) do
-              :ok ->
-                updated_booking
+              case Entitlements.consume_for_booking!(
+                     updated_booking.applied_booking_entitlement_id,
+                     updated_booking.id
+                   ) do
+                :ok ->
+                  updated_booking
 
-              {:error, reason} ->
-                Repo.rollback({:error, reason})
+                {:error, reason} ->
+                  Repo.rollback({:error, reason})
+              end
+            else
+              updated_booking
             end
-          else
-            updated_booking
-          end
 
-        {:error, changeset} ->
-          Repo.rollback({:error, changeset})
-      end
+          {:error, changeset} ->
+            Repo.rollback({:error, changeset})
+        end
+
+      confirmed_booking
     end)
     |> case do
       {:ok, confirmed_booking} ->
+        schedule_booking_confirmation_email!(confirmed_booking)
+
         # Emit telemetry event for booking payment/confirmation
         :telemetry.execute(
           [:ysc, :bookings, :payment_processed],
@@ -1519,9 +1524,6 @@ defmodule Ysc.Bookings.BookingLocker do
           confirmed_booking.user_id,
           confirmed_booking.id
         )
-
-        # Send booking confirmation email
-        send_booking_confirmation_email(confirmed_booking)
 
         # Schedule check-in reminder email (3 days before check-in at 8:00 AM PST)
         schedule_checkin_reminder(confirmed_booking)
@@ -1613,9 +1615,8 @@ defmodule Ysc.Bookings.BookingLocker do
     end)
     |> case do
       {:ok, booking} ->
-        # Send confirmation email (outside transaction)
-        if !skip_email do
-          send_booking_confirmation_email(booking)
+        unless skip_email do
+          schedule_booking_confirmation_email!(booking)
         end
 
         # Schedule reminders (outside transaction)
@@ -1824,7 +1825,15 @@ defmodule Ysc.Bookings.BookingLocker do
     end
   end
 
-  defp send_booking_confirmation_email(booking) do
+  defp booking_confirmation_email_notifier do
+    Application.get_env(
+      :ysc,
+      :booking_confirmation_email_notifier,
+      YscWeb.Emails.Notifier
+    )
+  end
+
+  defp schedule_booking_confirmation_email!(booking) do
     require Ysc.Logging
 
     try do
@@ -1843,7 +1852,7 @@ defmodule Ysc.Bookings.BookingLocker do
 
         # Schedule email
         result =
-          YscWeb.Emails.Notifier.schedule_email(
+          booking_confirmation_email_notifier().schedule_email(
             booking.user.email,
             idempotency_key,
             YscWeb.Emails.BookingConfirmation.get_subject(),

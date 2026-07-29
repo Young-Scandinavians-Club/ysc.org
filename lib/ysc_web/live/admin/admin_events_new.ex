@@ -1268,7 +1268,10 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
+  # Compatibility for clients that loaded the former EmailPreview handshake.
   @impl true
+  def handle_event("preview-ready", _params, socket), do: {:noreply, socket}
+
   def handle_event("copy-event", _, socket) do
     event = socket.assigns.event
 

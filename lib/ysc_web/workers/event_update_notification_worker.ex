@@ -6,7 +6,7 @@ defmodule YscWeb.Workers.EventUpdateNotificationWorker do
   and schedules a branded email for each via the Notifier pipeline.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :mailers, max_attempts: 3
+  use Oban.Worker, queue: :bulk_mail, max_attempts: 3
 
   alias Ysc.Repo
   alias Ysc.Events

@@ -150,6 +150,16 @@ waitForSentry().then((available) => {
             integrations: integrations,
             // Performance Monitoring - capture 10% of transactions
             tracesSampleRate: 0.1,
+            // Discoverable-credential unsupported on some Chrome/platform setups (WebAuthn)
+            ignoreErrors: [
+                /Resident credentials or empty 'allowCredentials' lists are not supported/,
+            ],
+            beforeSend(event) {
+                if (isExpectedWebAuthnOrVideoNotAllowed(event)) {
+                    return null;
+                }
+                return event;
+            },
         });
 
         // Set user context if user is logged in
@@ -169,6 +179,31 @@ waitForSentry().then((available) => {
         console.warn("Sentry failed to load after multiple attempts - error monitoring will be disabled");
     }
 });
+
+// Ignore NotAllowedError only when it comes from WebAuthn or media playback — keep
+// other permission denials (geolocation, notifications, clipboard, etc.) visible.
+function isExpectedWebAuthnOrVideoNotAllowed(event) {
+    const exceptions = event?.exception?.values || [];
+
+    return exceptions.some((ex) => {
+        const type = ex.type || "";
+        const value = ex.value || "";
+        const isNotAllowed =
+            type === "NotAllowedError" ||
+            value.startsWith("NotAllowedError") ||
+            /not allowed by the user agent or the platform/i.test(value);
+
+        if (!isNotAllowed) return false;
+
+        const frames = ex.stacktrace?.frames || [];
+        return frames.some((frame) => {
+            const haystack = `${frame.function || ""} ${frame.filename || ""} ${frame.abs_path || ""}`;
+            return /(?:^|\W)play(?:\W|$)|HTMLVideoElement|hero_video|passkey|credentials\.(?:get|create)|WebAuthn|PublicKeyCredential/i.test(
+                haystack
+            );
+        });
+    });
+}
 
 let csrfToken = document
     .querySelector("meta[name='csrf-token']")

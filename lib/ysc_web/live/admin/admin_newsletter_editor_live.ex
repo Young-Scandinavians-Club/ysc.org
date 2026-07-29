@@ -18,6 +18,8 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: Newsletter.subscribe_to_edition_updates()
+
     {:ok,
      socket
      |> assign(:page_title, "Newsletter")
@@ -36,11 +38,14 @@ defmodule YscWeb.AdminNewsletterEditorLive do
      |> assign(:saving?, false)
      |> assign(:preview_cover_image_id, nil)
      |> assign(:preview_ready?, false)
+     |> assign(:_preview_html, nil)
      |> assign(:post_visible_count, 10)
      |> assign(:event_visible_count, 10)
      |> assign(:readonly?, false)
      |> assign(:email_stats, nil)
      |> assign(:click_stats, nil)
+     |> assign(:unsubscribe_link_clicks, nil)
+     |> assign(:confirmed_unsubscribes, nil)
      |> assign(:loading_edition?, false)
      |> assign(:saved_notices, [])
      |> assign(:show_notice_picker?, false)
@@ -123,7 +128,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     socket
     |> assign(:loading_edition?, false)
     |> assign(:edition, edition)
-    |> assign(:readonly?, edition.status == :sent)
+    |> assign(:readonly?, edition_readonly?(edition))
     |> assign(:selected_post_ids, edition.post_ids || [])
     |> assign(:selected_event_ids, edition.event_ids || [])
     |> assign_form_from_edition(edition)
@@ -137,7 +142,11 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       start_async(socket, :load_email_stats, fn ->
         %{
           by_type: Newsletter.count_email_events_by_type(edition_id),
-          by_link: Newsletter.count_clicks_by_link(edition_id)
+          by_link: Newsletter.count_clicks_by_link(edition_id),
+          unsubscribe_link_clicks:
+            Newsletter.count_unsubscribe_link_clicks(edition_id),
+          confirmed_unsubscribes:
+            Newsletter.count_confirmed_unsubscribes(edition_id)
         }
       end)
     else
@@ -276,20 +285,20 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           "<p style=\"padding: 1rem; color: #71717a;\">Preview unavailable.</p>"
       end
 
-    # Only push the HTML to the client when it actually changed.
-    prev_hash = Map.get(socket.assigns, :_preview_hash)
-    new_hash = :erlang.phash2(preview_html)
+    previous_hash = Map.get(socket.assigns, :_preview_hash)
+    preview_hash = :erlang.phash2(preview_html)
+    preview_already_ready? = socket.assigns.preview_ready?
 
     socket =
-      if new_hash != prev_hash do
-        socket
-        |> assign(:_preview_hash, new_hash)
-        |> push_event("preview-html", %{html: preview_html})
+      if preview_already_ready? and preview_hash != previous_hash do
+        push_event(socket, "preview-html", %{html: preview_html})
       else
         socket
       end
 
     socket
+    |> assign(:_preview_hash, preview_hash)
+    |> assign(:_preview_html, preview_html)
     |> assign(:preview_posts, preview_posts)
     |> assign(:preview_events, preview_events)
     |> assign(:preview_cover_image_id, cover_image_id)
@@ -370,6 +379,41 @@ defmodule YscWeb.AdminNewsletterEditorLive do
     |> Enum.join()
   end
 
+  attr :label, :string, required: true
+  attr :count, :integer, required: true
+  attr :total, :integer, default: 0
+  attr :id, :string, default: nil
+
+  defp stat_with_percentage(assigns) do
+    ~H"""
+    <div id={@id}>
+      <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
+        {@label}
+      </p>
+      <p class="text-sm font-semibold text-green-900 mt-0.5">
+        {format_count(@count)}
+        <%= if (@total || 0) > 0 do %>
+          <span class="font-normal text-green-700">
+            ({Float.round(@count / @total * 100, 1)}%)
+          </span>
+        <% end %>
+      </p>
+    </div>
+    """
+  end
+
+  defp newsletter_edition_status_label_with_progress(%Edition{
+         status: :sending,
+         sent_count: sent_count,
+         recipient_count: recipient_count
+       })
+       when is_integer(recipient_count) do
+    "Sending… #{format_count(sent_count || 0)} / #{format_count(recipient_count)}"
+  end
+
+  defp newsletter_edition_status_label_with_progress(%Edition{} = edition),
+    do: newsletter_edition_status_label(edition.status)
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -385,12 +429,20 @@ defmodule YscWeb.AdminNewsletterEditorLive do
         >
           <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to Newsletters
         </.link>
-        <.badge
-          :if={@edition}
-          type={newsletter_edition_status_badge_type(@edition.status)}
-        >
-          {newsletter_edition_status_label(@edition.status)}
-        </.badge>
+        <%= if @edition && @edition.status == :sending do %>
+          <span id="newsletter-sending-progress">
+            <.admin_sending_badge label={
+              newsletter_edition_status_label_with_progress(@edition)
+            } />
+          </span>
+        <% else %>
+          <.badge
+            :if={@edition}
+            type={newsletter_edition_status_badge_type(@edition.status)}
+          >
+            {newsletter_edition_status_label_with_progress(@edition)}
+          </.badge>
+        <% end %>
         <.badge :if={!@edition} type="yellow">Draft</.badge>
         <.admin_help_link
           topic="newsletters/compose"
@@ -455,57 +507,33 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 Stats could not be loaded
               </div>
             <% true -> %>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Unique opens
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(Map.get(@email_stats, "open", 0))}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        Map.get(@email_stats, "open", 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Unique clickers
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(Map.get(@email_stats, "click", 0))}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        Map.get(@email_stats, "click", 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
-              <div>
-                <p class="text-[11px] font-medium uppercase tracking-wide text-green-600">
-                  Bounces
-                </p>
-                <p class="text-sm font-semibold text-green-900 mt-0.5">
-                  {format_count(Map.get(@email_stats, "bounce", 0))}
-                  <%= if (@edition.sent_count || 0) > 0 do %>
-                    <span class="font-normal text-green-700">
-                      ({Float.round(
-                        Map.get(@email_stats, "bounce", 0) / @edition.sent_count *
-                          100,
-                        1
-                      )}%)
-                    </span>
-                  <% end %>
-                </p>
-              </div>
+              <.stat_with_percentage
+                label="Unique opens"
+                count={Map.get(@email_stats, "open", 0)}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                label="Unique clickers"
+                count={Map.get(@email_stats, "click", 0)}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                label="Bounces"
+                count={Map.get(@email_stats, "bounce", 0)}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                id="edition-unsubscribe-link-clicks"
+                label="Unsubscribe link clicks"
+                count={@unsubscribe_link_clicks || 0}
+                total={@edition.sent_count}
+              />
+              <.stat_with_percentage
+                id="edition-confirmed-unsubscribes"
+                label="Confirmed unsubscribes"
+                count={@confirmed_unsubscribes || 0}
+                total={@edition.sent_count}
+              />
           <% end %>
         </div>
         <%!-- Link click breakdown --%>
@@ -962,6 +990,13 @@ defmodule YscWeb.AdminNewsletterEditorLive do
               </div>
             </div>
             <div
+              :if={!@preview_ready?}
+              id="preview-loading"
+              class="flex-1 bg-white"
+            >
+            </div>
+            <div
+              :if={@preview_ready?}
               id="preview-scroll-container"
               class="flex-1 overflow-y-auto bg-white"
               phx-update="ignore"
@@ -972,6 +1007,7 @@ defmodule YscWeb.AdminNewsletterEditorLive do
                 style="height: 800px;"
                 title="Email preview"
                 phx-hook="EmailPreview"
+                srcdoc={@_preview_html || ""}
               ></iframe>
             </div>
           </div>
@@ -982,13 +1018,21 @@ defmodule YscWeb.AdminNewsletterEditorLive do
       <div class="sticky bottom-0 left-0 right-0 z-40 flex items-center justify-between gap-4 border-t border-zinc-200 bg-white/95 backdrop-blur-sm px-6 py-3">
         <%!-- Left: status badge + autosave indicator --%>
         <div class="flex items-center gap-3 min-w-0">
-          <.badge
-            :if={@edition}
-            type={newsletter_edition_status_badge_type(@edition.status)}
-            class="hidden sm:inline-block shrink-0"
-          >
-            {newsletter_edition_status_label(@edition.status)}
-          </.badge>
+          <%= if @edition && @edition.status == :sending do %>
+            <span class="hidden sm:inline-block shrink-0">
+              <.admin_sending_badge label={
+                newsletter_edition_status_label_with_progress(@edition)
+              } />
+            </span>
+          <% else %>
+            <.badge
+              :if={@edition}
+              type={newsletter_edition_status_badge_type(@edition.status)}
+              class="hidden sm:inline-block shrink-0"
+            >
+              {newsletter_edition_status_label_with_progress(@edition)}
+            </.badge>
+          <% end %>
 
           <%!-- Scheduled time indicator --%>
           <span
@@ -1076,20 +1120,22 @@ defmodule YscWeb.AdminNewsletterEditorLive do
           Send this newsletter to all subscribers now? This cannot be undone.
         </p>
         <div class="mt-6 flex justify-end gap-2">
-          <button
+          <.button
             type="button"
-            class="rounded-lg px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+            variant="outline"
+            color="zinc"
             phx-click="close-send-modal"
           >
             Cancel
-          </button>
-          <button
+          </.button>
+          <.button
             type="button"
-            class="rounded-lg bg-green-600 text-white px-4 py-2 text-sm font-semibold hover:bg-green-700"
+            color="green"
             phx-click="confirm-send"
+            phx-disable-with="Sending..."
           >
             Send now
-          </button>
+          </.button>
         </div>
       </.modal>
 
@@ -1313,7 +1359,10 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   defp event_image_url(%{cover_image: img}), do: image_url(img)
 
+  # Compatibility for clients that loaded the former EmailPreview handshake.
   @impl true
+  def handle_event("preview-ready", _params, socket), do: {:noreply, socket}
+
   def handle_event(
         "validate",
         _params,
@@ -1989,20 +2038,30 @@ defmodule YscWeb.AdminNewsletterEditorLive do
 
   def handle_async(
         :load_email_stats,
-        {:ok, %{by_type: by_type, by_link: by_link}},
+        {:ok,
+         %{
+           by_type: by_type,
+           by_link: by_link,
+           unsubscribe_link_clicks: unsubscribe_link_clicks,
+           confirmed_unsubscribes: confirmed_unsubscribes
+         }},
         socket
       ) do
     {:noreply,
      socket
      |> assign(:email_stats, by_type)
-     |> assign(:click_stats, by_link)}
+     |> assign(:click_stats, by_link)
+     |> assign(:unsubscribe_link_clicks, unsubscribe_link_clicks)
+     |> assign(:confirmed_unsubscribes, confirmed_unsubscribes)}
   end
 
   def handle_async(:load_email_stats, {:exit, _reason}, socket) do
     {:noreply,
      socket
      |> assign(:email_stats, :error)
-     |> assign(:click_stats, :error)}
+     |> assign(:click_stats, :error)
+     |> assign(:unsubscribe_link_clicks, :error)
+     |> assign(:confirmed_unsubscribes, :error)}
   end
 
   def handle_async(:load_saved_notices, {:ok, notices}, socket) do
@@ -2056,6 +2115,39 @@ defmodule YscWeb.AdminNewsletterEditorLive do
   defp wrap_plain_notice_body(_), do: ""
 
   @impl true
+  def handle_info(
+        {:edition_delivery_progress,
+         %Edition{id: edition_id} = updated_edition},
+        %{assigns: %{edition: %Edition{id: edition_id} = edition}} = socket
+      ) do
+    updated_edition = merge_edition_delivery_progress(edition, updated_edition)
+
+    {:noreply,
+     assign(
+       socket,
+       edition: updated_edition,
+       readonly?: edition_readonly?(updated_edition)
+     )}
+  end
+
+  def handle_info({:edition_delivery_progress, %Edition{}}, socket),
+    do: {:noreply, socket}
+
+  def handle_info(
+        {:edition_sent, %Edition{id: edition_id} = updated_edition},
+        %{assigns: %{edition: %Edition{id: edition_id} = edition}} = socket
+      ) do
+    updated_edition = merge_edition_delivery_progress(edition, updated_edition)
+
+    {:noreply,
+     socket
+     |> assign(:edition, updated_edition)
+     |> assign(:readonly?, edition_readonly?(updated_edition))
+     |> maybe_load_email_stats(updated_edition)}
+  end
+
+  def handle_info({:edition_sent, %Edition{}}, socket), do: {:noreply, socket}
+
   def handle_info(:auto_save, %{assigns: %{readonly?: true}} = socket),
     do: {:noreply, socket}
 
@@ -2114,4 +2206,17 @@ defmodule YscWeb.AdminNewsletterEditorLive do
        target_input_id: "edition_intro_text"
      })}
   end
+
+  defp merge_edition_delivery_progress(edition, updated_edition) do
+    %{
+      edition
+      | status: updated_edition.status,
+        sent_at: updated_edition.sent_at,
+        sent_count: updated_edition.sent_count,
+        recipient_count: updated_edition.recipient_count
+    }
+  end
+
+  defp edition_readonly?(%Edition{status: status}),
+    do: status in [:sending, :sent]
 end

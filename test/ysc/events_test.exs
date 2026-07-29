@@ -3471,6 +3471,7 @@ defmodule Ysc.EventsTest do
                  })
 
         assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.queue == "transactional_mail"
         assert job.args["template"] == "ticket_reservation_created"
         assert job.args["recipient"] == member.email
         assert job.args["user_id"] == member.id
@@ -3494,6 +3495,23 @@ defmodule Ysc.EventsTest do
       assert id == cancelled.id
 
       assert Events.get_public_event(draft.id) == nil
+    end
+
+    test "get_public_event/1 returns nil for invalid ULID values" do
+      assert Events.get_public_event("images.php") == nil
+      assert Events.get_public_event("invalid-id") == nil
+    end
+
+    test "get_event_for_page/2 returns nil for invalid ULID values" do
+      admin = user_fixture(%{role: :admin})
+      volunteer = user_fixture(%{role: :volunteer})
+
+      assert Events.get_event_for_page("images.php", nil) == nil
+      assert Events.get_event_for_page("invalid-id", nil) == nil
+      assert Events.get_event_for_page("images.php", admin) == nil
+      assert Events.get_event_for_page("invalid-id", admin) == nil
+      assert Events.get_event_for_page("images.php", volunteer) == nil
+      assert Events.get_event_for_page("invalid-id", volunteer) == nil
     end
 
     test "get_event_for_page/2 hides draft events from members but allows staff preview" do

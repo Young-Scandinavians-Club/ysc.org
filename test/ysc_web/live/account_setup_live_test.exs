@@ -5,9 +5,14 @@ defmodule YscWeb.AccountSetupLiveTest do
 
   import Phoenix.LiveViewTest
   import Ysc.AccountsFixtures
+  import Mox
+
+  setup :verify_on_exit!
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
   alias Ysc.Payments
+  alias Ysc.Subscriptions
 
   # ---------------------------------------------------------------------------
   # Shared helpers
@@ -27,6 +32,20 @@ defmodule YscWeb.AccountSetupLiveTest do
         is_default: true
       })
 
+    user
+  end
+
+  defp give_active_membership(user) do
+    {:ok, _sub} =
+      Subscriptions.create_subscription(%{
+        name: "Test Membership",
+        stripe_id: "sub_setup_#{System.unique_integer([:positive])}",
+        stripe_status: "active",
+        user_id: user.id,
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
+
+    _ = MembershipCache.invalidate_user(user.id)
     user
   end
 
@@ -69,7 +88,8 @@ defmodule YscWeb.AccountSetupLiveTest do
     user
   end
 
-  # Creates an active user who still needs to set a password (skips payment step).
+  # Creates an active member who still needs to set a password (has membership,
+  # so payment step is skipped).
   defp active_user_needing_password do
     user =
       user_fixture_fast(%{
@@ -79,10 +99,10 @@ defmodule YscWeb.AccountSetupLiveTest do
       })
 
     {:ok, user} = Accounts.mark_email_verified(user)
-    user
+    give_active_membership(user)
   end
 
-  # Creates an active user who needs password and has no phone stored.
+  # Creates an active member who needs password and has no phone stored.
   defp active_user_needing_password_no_phone do
     user =
       user_fixture_fast(%{
@@ -93,7 +113,72 @@ defmodule YscWeb.AccountSetupLiveTest do
       })
 
     {:ok, user} = Accounts.mark_email_verified(user)
+    give_active_membership(user)
+  end
+
+  defp unpaid_active_user_needing_payment(attrs \\ %{}) do
+    {password_set_at, attrs} =
+      Map.pop(attrs, :password_set_at, DateTime.utc_now())
+
+    user =
+      user_fixture_fast(
+        Map.merge(
+          %{
+            state: :active,
+            phone_number: "+12065551234"
+          },
+          attrs
+        )
+      )
+
+    {:ok, user} = Accounts.mark_email_verified(user)
+    {:ok, user} = Accounts.mark_phone_verified(user)
+
+    user =
+      if password_set_at do
+        {:ok, user} = Accounts.mark_password_set(user)
+        user
+      else
+        user
+      end
+
     user
+    |> Ysc.Accounts.User.update_user_changeset(%{
+      stripe_id: "cus_#{System.unique_integer([:positive])}"
+    })
+    |> Ysc.Repo.update!()
+  end
+
+  # Advances a user to the phone-verification step (step 4):
+  # email verified → password set → phone saved (not yet verified).
+  # Includes an active membership so the payment step is skipped.
+  defp user_at_phone_verify_step(phone_number \\ nil) do
+    phone_number = phone_number || unique_test_phone()
+
+    user =
+      user_fixture(%{
+        state: :active,
+        email_verified_at: nil,
+        password_set_at: nil
+      })
+
+    user = give_active_membership(user)
+
+    {:ok, u1} = Accounts.mark_email_verified(user)
+
+    {:ok, u2} =
+      Accounts.set_user_initial_password(u1, %{
+        "password" => valid_user_password(),
+        "password_confirmation" => valid_user_password()
+      })
+
+    {:ok, u3} =
+      Accounts.update_user_phone_and_sms(u2, %{
+        "phone_number" => phone_number,
+        "sms_opt_in" => "false"
+      })
+
+    u3
   end
 
   defp unique_test_phone do
@@ -111,35 +196,6 @@ defmodule YscWeb.AccountSetupLiveTest do
     |> String.graphemes()
     |> Enum.with_index()
     |> Map.new(fn {digit, index} -> {Integer.to_string(index), digit} end)
-  end
-
-  # Advances a user to the phone-verification step (step 4):
-  # email verified → password set → phone saved (not yet verified).
-  defp user_at_phone_verify_step(phone_number \\ nil) do
-    phone_number = phone_number || unique_test_phone()
-
-    user =
-      user_fixture(%{
-        state: :active,
-        email_verified_at: nil,
-        password_set_at: nil
-      })
-
-    {:ok, u1} = Accounts.mark_email_verified(user)
-
-    {:ok, u2} =
-      Accounts.set_user_initial_password(u1, %{
-        "password" => valid_user_password(),
-        "password_confirmation" => valid_user_password()
-      })
-
-    {:ok, u3} =
-      Accounts.update_user_phone_and_sms(u2, %{
-        "phone_number" => phone_number,
-        "sms_opt_in" => "false"
-      })
-
-    u3
   end
 
   # ---------------------------------------------------------------------------
@@ -256,6 +312,8 @@ defmodule YscWeb.AccountSetupLiveTest do
           email_verified_at: nil,
           password_set_at: nil
         })
+
+      _ = give_active_membership(user)
 
       {:ok, view, _html} = live(conn, account_setup_path(user))
 
@@ -495,12 +553,16 @@ defmodule YscWeb.AccountSetupLiveTest do
     end
 
     test "payment-method-set from wrong step shows error", %{
-      conn: conn,
-      user: user
+      conn: conn
     } do
-      # Navigate to step 2 (password) and then fire the payment event from there
+      # User already has a payment method so they can reach the password step
+      user = pending_user_with_default_payment()
+      conn = log_in_user(conn, user)
+
       {:ok, view, _html} =
         live(conn, account_setup_path(user, %{"step" => "2"}))
+
+      assert has_element?(view, "#password_form")
 
       render_click(view, "payment-method-set", %{
         "payment_method_id" => "pm_test_123"
@@ -1106,6 +1168,128 @@ defmodule YscWeb.AccountSetupLiveTest do
                  provider_type: "card",
                  is_default: true
                })
+
+      conn = log_in_user(conn, user)
+
+      assert {:error, {:redirect, %{to: "/"}}} =
+               live(conn, account_setup_path(user))
+    end
+  end
+
+  describe "unpaid active users stay in pay funnel" do
+    test "shows activate CTA when active with payment method but no membership",
+         %{
+           conn: conn
+         } do
+      user = unpaid_active_user_needing_payment()
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      conn = log_in_user(conn, user)
+
+      # Activation attempt on load fails via ConnCase Stripe.SubscriptionMock stub
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
+      html = render(view)
+
+      assert has_element?(view, "#retry-membership-activation")
+      assert html =~ "Activate Your Membership"
+    end
+
+    test "shows payment step when active without membership or payment method",
+         %{
+           conn: conn
+         } do
+      user = unpaid_active_user_needing_payment(%{password_set_at: nil})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
+      html = render(view)
+
+      assert html =~ "Activate Your Membership"
+      assert html =~ "Payment"
+
+      assert has_element?(view, "#setup-payment-form") or
+               has_element?(view, "[phx-click=\"retry_payment_setup\"]")
+    end
+
+    test "mid-flow approval without payment method routes to payment step", %{
+      conn: conn
+    } do
+      user =
+        verified_pending_user(%{
+          password_set_at: nil
+        })
+
+      user =
+        user
+        |> Ysc.Accounts.User.update_user_changeset(%{
+          stripe_id: "cus_#{System.unique_integer([:positive])}"
+        })
+        |> Ysc.Repo.update!()
+
+      conn = log_in_user(conn, user)
+
+      # Payment is still needed, so setup keeps them on step 1
+      {:ok, view, html} =
+        live(conn, account_setup_path(user, %{"step" => "1"}))
+
+      assert html =~ "not be charged until your application is approved"
+
+      assert has_element?(view, "#setup-payment-form") or
+               has_element?(view, "[phx-click=\"retry_payment_setup\"]")
+
+      # Simulate board approval while the LiveView is open
+      {:ok, _} =
+        user
+        |> Ecto.Changeset.change(%{state: :active})
+        |> Ysc.Repo.update()
+
+      # Next navigation recomputes needs and shows approved pay copy
+      {:ok, _view, html} =
+        live(conn, account_setup_path(user, %{"step" => "2"}))
+
+      assert html =~ "Activate Your Membership"
+    end
+
+    test "redirects home when membership activates on mount", %{conn: conn} do
+      user = unpaid_active_user_needing_payment()
+      {:ok, user} = Accounts.mark_password_set(user)
+      {:ok, user} = Accounts.mark_phone_verified(user)
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      stripe_sub_id = "sub_mount_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn _params ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
 
       conn = log_in_user(conn, user)
 

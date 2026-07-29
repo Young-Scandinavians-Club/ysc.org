@@ -118,7 +118,7 @@ defmodule Ysc.Accounts.FamilyMembers do
         %User{id: user_id},
         %FamilyMember{user_id: user_id} = member
       ) do
-    case Repo.delete(member) do
+    case Repo.delete(member, allow_stale: true) do
       {:ok, deleted} ->
         UserProfileCache.invalidate_user(user_id)
         {:ok, deleted}
@@ -141,7 +141,7 @@ defmodule Ysc.Accounts.FamilyMembers do
         if MapSet.member?(kept_ids, to_string(member.id)) do
           acc
         else
-          case Repo.delete(member) do
+          case Repo.delete(member, allow_stale: true) do
             {:ok, _} ->
               true
 

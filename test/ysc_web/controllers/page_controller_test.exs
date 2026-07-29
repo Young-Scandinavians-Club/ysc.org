@@ -53,11 +53,35 @@ defmodule YscWeb.PageControllerTest do
       %{conn: conn, user: user}
     end
 
-    test "redirects active users to the home page", %{conn: conn} do
+    test "redirects active users with membership to the home page", %{
+      conn: conn
+    } do
       active_user = user_fixture(%{country: "SE", state: :active})
+
+      {:ok, _sub} =
+        Ysc.Subscriptions.create_subscription(%{
+          name: "Test Membership",
+          stripe_id: "sub_pending_review_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: active_user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+        })
+
+      _ = Ysc.Accounts.MembershipCache.invalidate_user(active_user.id)
+
       conn = conn |> log_in_user(active_user) |> get(~p"/pending-review")
 
       assert redirected_to(conn) == ~p"/"
+    end
+
+    test "redirects unpaid active users to account setup payment step", %{
+      conn: conn
+    } do
+      active_user = user_fixture(%{country: "SE", state: :active})
+      conn = conn |> log_in_user(active_user) |> get(~p"/pending-review")
+
+      assert redirected_to(conn) ==
+               ~p"/account/setup/#{active_user.id}?step=1"
     end
 
     test "redirects rejected users to login when session is invalid", %{

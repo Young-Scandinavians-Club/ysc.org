@@ -85,6 +85,10 @@ defmodule YscWeb.Emails.Notifier do
 
   # Legacy call sites pass the configurable reply-to address as the 8th argument (binary).
   # New call sites pass keyword options (reply_to:, cc:, etc.).
+  #
+  # This standalone enqueue is appropriate for worker-originated fan-out and
+  # external events. State mutations must use `schedule_email_multi/3` in
+  # their existing Ecto.Multi so the state and Oban job commit together.
   def schedule_email(
         recipient,
         idempotency_key,
@@ -168,6 +172,46 @@ defmodule YscWeb.Emails.Notifier do
     )
   end
 
+  @doc """
+  Adds an email job to an `Ecto.Multi`.
+
+  The caller must execute the returned multi with the same repository
+  transaction as the business mutation that makes the email necessary.
+
+  Pass either a complete attributes map or a function that receives prior
+  multi changes and returns that attributes map.
+  """
+  def schedule_email_multi(multi, operation_name, attrs) when is_map(attrs) do
+    Oban.insert(multi, operation_name, email_job_from_attrs(attrs))
+  end
+
+  def schedule_email_multi(multi, operation_name, builder)
+      when is_function(builder, 1) do
+    Oban.insert(multi, operation_name, fn changes ->
+      changes |> builder.() |> email_job_from_attrs()
+    end)
+  end
+
+  defp email_job_from_attrs(attrs) do
+    template = Map.fetch!(attrs, :template)
+    opts = Map.get(attrs, :opts, [])
+
+    reply_to =
+      Keyword.get(opts, :reply_to) ||
+        Ysc.Accounts.EmailCategories.get_reply_to(template)
+
+    build_email_job(
+      Map.fetch!(attrs, :recipient),
+      Map.fetch!(attrs, :idempotency_key),
+      Map.fetch!(attrs, :subject),
+      template,
+      Map.fetch!(attrs, :variables),
+      Map.fetch!(attrs, :text_body),
+      Map.fetch!(attrs, :user_id),
+      %{reply_to: reply_to, cc: Keyword.get(opts, :cc)}
+    )
+  end
+
   defp do_schedule_email(
          recipient,
          idempotency_key,
@@ -178,25 +222,17 @@ defmodule YscWeb.Emails.Notifier do
          user_id,
          %{reply_to: reply_to, cc: cc}
        ) do
-    category = Ysc.Accounts.EmailCategories.get_category(template)
-
-    base_job_args = %{
-      "recipient" => recipient,
-      "idempotency_key" => idempotency_key,
-      "subject" => subject,
-      "template" => template,
-      "params" => variables,
-      "text_body" => text_body,
-      "user_id" => user_id,
-      "category" => category
-    }
-
-    job_args =
-      base_job_args
-      |> put_reply_to_job_arg(reply_to)
-      |> put_cc_job_arg(cc)
-
-    job = YscWeb.Workers.EmailNotifier.new(job_args)
+    job =
+      build_email_job(
+        recipient,
+        idempotency_key,
+        subject,
+        template,
+        variables,
+        text_body,
+        user_id,
+        %{reply_to: reply_to, cc: cc}
+      )
 
     case Oban.insert(job) do
       {:ok, %Oban.Job{} = inserted_job} ->
@@ -233,6 +269,37 @@ defmodule YscWeb.Emails.Notifier do
   defp put_cc_job_arg(args, ""), do: args
   defp put_cc_job_arg(args, cc) when is_binary(cc), do: Map.put(args, "cc", cc)
 
+  defp build_email_job(
+         recipient,
+         idempotency_key,
+         subject,
+         template,
+         variables,
+         text_body,
+         user_id,
+         %{reply_to: reply_to, cc: cc}
+       ) do
+    category = Ysc.Accounts.EmailCategories.get_category(template)
+
+    job_args =
+      %{
+        "recipient" => recipient,
+        "idempotency_key" => idempotency_key,
+        "subject" => subject,
+        "template" => template,
+        "params" => variables,
+        "text_body" => text_body,
+        "user_id" => user_id,
+        "category" => category
+      }
+      |> put_reply_to_job_arg(reply_to)
+      |> put_cc_job_arg(cc)
+
+    YscWeb.Workers.EmailNotifier.new(job_args,
+      queue: YscWeb.Workers.EmailNotifier.queue_for_category(category)
+    )
+  end
+
   def schedule_email_to_board(
         idempotency_key,
         subject,
@@ -254,6 +321,32 @@ defmodule YscWeb.Emails.Notifier do
     )
   end
 
+  @doc """
+  Adds a board-notification email job to an `Ecto.Multi`.
+  """
+  def schedule_email_to_board_multi(
+        multi,
+        operation_name,
+        idempotency_key,
+        subject,
+        template,
+        variables,
+        cc \\ nil
+      ) do
+    board_opts = if(cc, do: [cc: cc], else: [])
+
+    schedule_email_multi(multi, operation_name, %{
+      recipient: from_email(),
+      idempotency_key: idempotency_key,
+      subject: subject,
+      template: template,
+      variables: variables,
+      text_body: "",
+      user_id: nil,
+      opts: board_opts
+    })
+  end
+
   def send_email_idempotent(
         recipient,
         idempotency_key,
@@ -267,6 +360,7 @@ defmodule YscWeb.Emails.Notifier do
       when is_list(opts) do
     reply_to = Keyword.get(opts, :reply_to)
     cc = Keyword.get(opts, :cc)
+    delivery_retry = Keyword.get(opts, :delivery_retry, false)
 
     rendered = template.render(variables)
     template_name = template.get_template_name()
@@ -278,7 +372,8 @@ defmodule YscWeb.Emails.Notifier do
       params: variables,
       email: recipient,
       rendered_message: rendered,
-      user_id: user_id
+      user_id: user_id,
+      delivery_retry: delivery_retry
     }
 
     email =

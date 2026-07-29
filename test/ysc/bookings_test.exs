@@ -374,6 +374,57 @@ defmodule Ysc.BookingsTest do
       end
     end
 
+    test "list_active_clear_lake_bookings_for_user/2 returns only clear lake bookings" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      clear_lake =
+        insert_complete_booking(user, Date.add(today, 5), Date.add(today, 7))
+
+      _tahoe =
+        insert_complete_tahoe_booking(
+          user,
+          Date.add(today, 5),
+          Date.add(today, 7)
+        )
+
+      bookings = Bookings.list_active_clear_lake_bookings_for_user(user.id)
+      ids = Enum.map(bookings, & &1.id)
+
+      assert clear_lake.id in ids
+      assert Enum.all?(bookings, &(&1.property == :clear_lake))
+    end
+
+    test "list_active_clear_lake_bookings_for_user/2 applies checkout cutoff before limit" do
+      user = user_fixture()
+      today = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+
+      _stale_checkout_today =
+        insert_complete_booking(user, Date.add(today, -1), today)
+
+      future =
+        insert_complete_booking(user, Date.add(today, 7), Date.add(today, 9))
+
+      now_pst = DateTime.now!("America/Los_Angeles")
+
+      checkout_cutoff =
+        DateTime.new!(today, ~T[11:00:00], "America/Los_Angeles")
+
+      if DateTime.compare(now_pst, checkout_cutoff) == :gt do
+        bookings =
+          Bookings.list_active_clear_lake_bookings_for_user(user.id, limit: 1)
+
+        assert length(bookings) == 1
+        assert hd(bookings).id == future.id
+      else
+        bookings =
+          Bookings.list_active_clear_lake_bookings_for_user(user.id, limit: 2)
+
+        assert length(bookings) == 2
+        assert future.id in Enum.map(bookings, & &1.id)
+      end
+    end
+
     test "list_bookings/4 filters by statuses and exclude_statuses" do
       active =
         booking_fixture()
@@ -3061,6 +3112,27 @@ defmodule Ysc.BookingsTest do
                  payment_intent,
                  {:error, :inventory_update_failed}
                )
+    end
+
+    test "refunds hold payments when confirmation email enqueue fails" do
+      booking = booking_fixture(%{status: :hold})
+
+      payment_intent = %Stripe.PaymentIntent{
+        id: "pi_email_enqueue_failed_#{System.unique_integer([:positive])}",
+        status: "succeeded",
+        amount: 5000,
+        latest_charge: "ch_test_email_enqueue_failed"
+      }
+
+      assert {:ok, %Stripe.Refund{id: refund_id}} =
+               Bookings.maybe_refund_unfulfilled_checkout_payment(
+                 booking,
+                 payment_intent,
+                 {:booking_confirmation_email_enqueue_failed,
+                  :coverage_schedule_failed}
+               )
+
+      assert String.starts_with?(refund_id, "re_test")
     end
   end
 

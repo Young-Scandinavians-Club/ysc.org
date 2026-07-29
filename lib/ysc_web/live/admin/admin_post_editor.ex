@@ -10,6 +10,7 @@ defmodule YscWeb.AdminPostEditorLive do
   alias Ysc.Posts
   alias Ysc.Posts.Post
   alias Ysc.Posts.Slug
+  alias YscWeb.AdminBadgeHelpers
 
   @save_debounce_timeout 2000
   @new_post_debounce_key "new_post"
@@ -166,7 +167,7 @@ defmodule YscWeb.AdminPostEditorLive do
               </div>
 
               <.badge
-                type={post_state_to_badge_style(@post.state)}
+                type={AdminBadgeHelpers.post_state_badge_type(@post.state)}
                 class="shrink-0 self-center"
               >
                 {String.capitalize("#{@post.state}")}
@@ -1057,9 +1058,4 @@ defmodule YscWeb.AdminPostEditorLive do
     |> assign(:preview_device, :computer)
     |> assign(form: to_form(update_post_changeset, as: "post"))
   end
-
-  defp post_state_to_badge_style(:draft), do: "yellow"
-  defp post_state_to_badge_style(:published), do: "green"
-  defp post_state_to_badge_style(:deleted), do: "red"
-  defp post_state_to_badge_style(_), do: "default"
 end

@@ -7,6 +7,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   import Ecto.Query, warn: false
 
   alias Ysc.Repo
+  alias Ecto.Multi
   alias Ysc.Accounts.{Email, User, FamilyInvite, UserEvent, UserProfileCache}
   alias Ysc.Subscriptions.BoardVolunteerBilling
   alias YscWeb.Emails.Notifier
@@ -32,6 +33,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   - `family_member_id` - Optional ID of a family member from registration form to include in email
   - `relationship` - Required. Either :spouse or :child. Max 1 spouse per family.
   """
+  @dialyzer {:nowarn_function, create_invite: 3}
   def create_invite(primary_user, email, opts \\ []) do
     family_member_id = Keyword.get(opts, :family_member_id)
     relationship = Keyword.get(opts, :relationship, :child)
@@ -50,20 +52,26 @@ defmodule Ysc.Accounts.FamilyInvites do
         relationship: relationship
       }
 
-      case %FamilyInvite{}
-           |> FamilyInvite.changeset(attrs)
-           |> Repo.insert() do
-        {:ok, invite} ->
-          opts =
-            if family_member_id,
-              do: [family_member_id: family_member_id],
-              else: []
+      email_opts =
+        if family_member_id,
+          do: [family_member_id: family_member_id],
+          else: []
 
-          send_invite_email(invite, primary_user, opts)
+      Multi.new()
+      |> Multi.insert(:invite, FamilyInvite.changeset(%FamilyInvite{}, attrs))
+      |> Notifier.schedule_email_multi(:invite_email, fn %{invite: invite} ->
+        invite_email_attrs(invite, primary_user, email_opts)
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{invite: invite}} ->
           {:ok, invite}
 
-        {:error, changeset} ->
+        {:error, :invite, changeset, _changes} ->
           {:error, changeset}
+
+        {:error, _operation, reason, _changes} ->
+          {:error, reason}
       end
     end
   end
@@ -220,6 +228,8 @@ defmodule Ysc.Accounts.FamilyInvites do
                 end
               end)
 
+              schedule_invite_accepted_email!(invite, final_user)
+
               final_user
 
             {:error, changeset} ->
@@ -238,7 +248,6 @@ defmodule Ysc.Accounts.FamilyInvites do
               final_user.id
             )
 
-            notify_invite_accepted(invite, final_user)
             ok
 
           error ->
@@ -314,6 +323,8 @@ defmodule Ysc.Accounts.FamilyInvites do
           })
           |> Repo.insert!()
 
+          schedule_invite_accepted_email!(invite, updated_user)
+
           updated_user
         end)
         |> case do
@@ -330,7 +341,6 @@ defmodule Ysc.Accounts.FamilyInvites do
               updated_user.id
             )
 
-            notify_invite_accepted(invite, updated_user)
             ok
 
           error ->
@@ -363,6 +373,33 @@ defmodule Ysc.Accounts.FamilyInvites do
   Sends an email to the member who sent the invite when it is accepted.
   """
   def notify_invite_accepted(%FamilyInvite{} = invite, %User{} = accepted_user) do
+    attrs = invite_accepted_email_attrs(invite, accepted_user)
+
+    Notifier.schedule_email(
+      attrs.recipient,
+      attrs.idempotency_key,
+      attrs.subject,
+      attrs.template,
+      attrs.variables,
+      attrs.text_body,
+      attrs.user_id
+    )
+  end
+
+  defp schedule_invite_accepted_email!(invite, accepted_user) do
+    case notify_invite_accepted(invite, accepted_user) do
+      %Oban.Job{} ->
+        :ok
+
+      {:error, reason} ->
+        Repo.rollback({:invite_accepted_email_enqueue_failed, reason})
+    end
+  end
+
+  defp invite_accepted_email_attrs(
+         %FamilyInvite{} = invite,
+         %User{} = accepted_user
+       ) do
     invite =
       if Ecto.assoc_loaded?(invite.created_by_user) do
         invite
@@ -403,13 +440,13 @@ defmodule Ysc.Accounts.FamilyInvites do
 
     idempotency_key = "family_invite_accepted_#{invite.id}"
 
-    Notifier.schedule_email(
-      inviter.email,
-      idempotency_key,
-      subject,
-      "family_invite_accepted",
-      email_vars,
-      """
+    %{
+      recipient: inviter.email,
+      idempotency_key: idempotency_key,
+      subject: subject,
+      template: "family_invite_accepted",
+      variables: email_vars,
+      text_body: """
       ==============================
 
       Hi #{inviter_first_name},
@@ -422,8 +459,8 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       ==============================
       """,
-      inviter.id
-    )
+      user_id: inviter.id
+    }
   end
 
   defp format_invitee_name(%User{first_name: first_name, last_name: last_name})
@@ -498,6 +535,7 @@ defmodule Ysc.Accounts.FamilyInvites do
   Only the primary user who created the invite can revoke it.
   Sends a cancellation email to the invitee before deleting the invite.
   """
+  @dialyzer {:nowarn_function, revoke_invite: 2}
   def revoke_invite(invite_id, primary_user) do
     invite = Repo.get(FamilyInvite, invite_id)
 
@@ -512,14 +550,24 @@ defmodule Ysc.Accounts.FamilyInvites do
         {:error, :already_accepted}
 
       true ->
-        send_invite_cancellation_email(invite, primary_user)
-        Repo.delete(invite)
+        primary_user = ensure_primary_user_loaded(primary_user)
+
+        Multi.new()
+        |> Multi.delete(:invite, invite)
+        |> Notifier.schedule_email_multi(
+          :invite_cancellation_email,
+          invite_cancellation_email_attrs(invite, primary_user)
+        )
+        |> Repo.transaction()
+        |> case do
+          {:ok, %{invite: deleted_invite}} -> {:ok, deleted_invite}
+          {:error, :invite, changeset, _changes} -> {:error, changeset}
+          {:error, _operation, reason, _changes} -> {:error, reason}
+        end
     end
   end
 
-  defp send_invite_cancellation_email(invite, primary_user) do
-    primary_user = ensure_primary_user_loaded(primary_user)
-
+  defp invite_cancellation_email_attrs(invite, primary_user) do
     email_vars = %{
       primary_user_name: primary_user.first_name,
       invite_email: invite.email
@@ -527,13 +575,13 @@ defmodule Ysc.Accounts.FamilyInvites do
 
     idempotency_key = "family_invite_cancelled_#{invite.id}"
 
-    Notifier.schedule_email(
-      invite.email,
-      idempotency_key,
-      "Family Membership Invitation Cancelled - YSC",
-      "family_invite_cancelled",
-      email_vars,
-      """
+    %{
+      recipient: invite.email,
+      idempotency_key: idempotency_key,
+      subject: "Family Membership Invitation Cancelled - YSC",
+      template: "family_invite_cancelled",
+      variables: email_vars,
+      text_body: """
       ==============================
 
       Hi there,
@@ -546,8 +594,8 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       ==============================
       """,
-      primary_user.id
-    )
+      user_id: primary_user.id
+    }
   end
 
   defp ensure_primary_user_loaded(primary_user) do
@@ -724,7 +772,7 @@ defmodule Ysc.Accounts.FamilyInvites do
     end
   end
 
-  defp send_invite_email(invite, primary_user, opts) do
+  defp invite_email_attrs(invite, primary_user, opts) do
     family_member_id = Keyword.get(opts, :family_member_id)
 
     # Get family member info if provided
@@ -764,13 +812,14 @@ defmodule Ysc.Accounts.FamilyInvites do
       invite_button_text: invite_button_text
     }
 
-    Notifier.schedule_email(
-      invite.email,
-      idempotency_key,
-      "You're Invited to Join #{primary_user.first_name}'s Family Membership - YSC",
-      "family_invite",
-      email_vars,
-      """
+    %{
+      recipient: invite.email,
+      idempotency_key: idempotency_key,
+      subject:
+        "You're Invited to Join #{primary_user.first_name}'s Family Membership - YSC",
+      template: "family_invite",
+      variables: email_vars,
+      text_body: """
       ==============================
 
       Hi#{if family_member_name, do: " #{family_member_name}", else: " there"},
@@ -785,8 +834,8 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       ==============================
       """,
-      primary_user.id
-    )
+      user_id: primary_user.id
+    }
   end
 
   defp get_family_member_name(primary_user, family_member_id) do

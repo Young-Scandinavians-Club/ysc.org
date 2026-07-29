@@ -6,7 +6,7 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   Only sends if the event is still published at that time.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :mailers, max_attempts: 3
+  use Oban.Worker, queue: :bulk_mail, max_attempts: 3
 
   alias Ysc.Events
   alias Ysc.Repo

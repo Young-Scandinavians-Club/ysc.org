@@ -8,7 +8,7 @@ defmodule YscWeb.Workers.NewsletterStatsWorker do
   require Ysc.Logging
 
   use Oban.Worker,
-    queue: :mailers,
+    queue: :transactional_mail,
     max_attempts: 3,
     unique: [
       keys: [:edition_id],

@@ -538,7 +538,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           />
           <div>
             <h3 class="text-sm font-semibold text-blue-800">
-              Membership inherited from primary member
+              Membership shared through your family membership manager
             </h3>
             <p class="text-sm text-blue-700 mt-1">
               You are a family member. You share membership benefits from <strong>
@@ -822,7 +822,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
           <div class="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3 text-green-800">
             <.icon name="hero-check-circle" class="w-5 h-5 shrink-0" />
             <span class="text-sm font-medium">
-              Payment method saved. You're all set for automatic renewal.
+              Payment method saved. Click Continue to turn on automatic renewal for next year.
             </span>
           </div>
           <p class="mt-2 text-sm text-zinc-600">
@@ -840,9 +840,9 @@ defmodule YscWeb.PostMigrationOnboardingLive do
             </.button>
             <.button
               phx-click="confirm_payment_step"
-              phx-disable-with="Saving..."
+              phx-disable-with="Setting up renewal..."
             >
-              Save and continue
+              Turn on auto-renewal and continue
               <.icon name="hero-arrow-right" class="w-4 h-4 ms-1" />
             </.button>
           </div>
@@ -1258,6 +1258,15 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
           {:noreply, advance_to_next_step(socket, @step_address)}
 
+        {:error, :missing_birth_date} ->
+          YscWeb.Flash.send_toast(
+            :error,
+            "Please add your date of birth in the Profile step before choosing a membership type.",
+            title: "Date of Birth Required"
+          )
+
+          {:noreply, socket}
+
         {:error, reason} ->
           Ysc.Logging.error(
             "Failed to persist membership plan during onboarding",
@@ -1555,7 +1564,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
              |> advance_to_next_step(@step_payment)}
 
           {:error, :user_already_has_active_subscription} ->
-            Ysc.Logging.error(
+            Ysc.Logging.warning(
               "User already has active subscription during onboarding",
               user_id: user.id
             )
@@ -1564,6 +1573,20 @@ defmodule YscWeb.PostMigrationOnboardingLive do
               :error,
               "Your membership renewal is already set up. Click Continue to next step at the bottom of this page to finish updating your profile.",
               title: "Membership renewal"
+            )
+
+            {:noreply, socket}
+
+          {:error, :sub_accounts_cannot_create_subscriptions} ->
+            Ysc.Logging.warning(
+              "Sub-account cannot create subscription during onboarding",
+              user_id: user.id
+            )
+
+            YscWeb.Flash.send_toast(
+              :error,
+              "You're on a family membership and can't purchase a separate plan. Ask your family membership manager to make membership changes.",
+              title: "Membership"
             )
 
             {:noreply, socket}
@@ -2146,32 +2169,71 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
   # Persists the user-selected membership plan to the SignupApplication record so
   # resolve_membership_plan/1 finds it on any subsequent mount or process restart.
+  #
+  # Migrated users may have no signup_application row. When creating one, copy
+  # birth_date (and address fields when available) from the user profile so we
+  # do not insert an empty stub — and require date_of_birth before continuing.
   defp persist_membership_plan(user, plan) do
     membership_type = to_string(plan)
 
-    registration_form =
-      case user.registration_form do
-        %Ecto.Association.NotLoaded{} ->
-          Ysc.Repo.preload(user, :registration_form).registration_form
+    user =
+      case user do
+        %{registration_form: %Ecto.Association.NotLoaded{}} ->
+          Ysc.Repo.preload(user, [:registration_form, :billing_address])
 
-        form ->
-          form
+        %{billing_address: %Ecto.Association.NotLoaded{}} ->
+          Ysc.Repo.preload(user, :billing_address)
+
+        _ ->
+          user
       end
 
-    if is_nil(registration_form) do
-      %Ysc.Accounts.SignupApplication{user_id: user.id}
-      |> Ysc.Accounts.SignupApplication.migration_changeset(%{
-        membership_type: membership_type
-      })
-      |> Ysc.Repo.insert()
+    if is_nil(user.registration_form) do
+      case user.date_of_birth do
+        nil ->
+          {:error, :missing_birth_date}
+
+        birth_date ->
+          attrs =
+            %{membership_type: membership_type, birth_date: birth_date}
+            |> maybe_put_application_address(user)
+            |> maybe_put_application_nordic_country(user)
+
+          %Ysc.Accounts.SignupApplication{user_id: user.id}
+          |> Ysc.Accounts.SignupApplication.migration_changeset(attrs)
+          |> Ysc.Repo.insert()
+      end
     else
-      registration_form
+      user.registration_form
       |> Ysc.Accounts.SignupApplication.migration_changeset(%{
         membership_type: membership_type
       })
       |> Ysc.Repo.update()
     end
   end
+
+  defp maybe_put_application_address(attrs, %{
+         billing_address: %Ysc.Accounts.Address{} = address
+       }) do
+    Map.merge(attrs, %{
+      address: address.address,
+      city: address.city,
+      region: address.region,
+      postal_code: address.postal_code,
+      country: address.country
+    })
+  end
+
+  defp maybe_put_application_address(attrs, _user), do: attrs
+
+  defp maybe_put_application_nordic_country(attrs, %{
+         most_connected_country: country
+       })
+       when is_binary(country) and country != "" do
+    Map.put(attrs, :most_connected_nordic_country, country)
+  end
+
+  defp maybe_put_application_nordic_country(attrs, _user), do: attrs
 
   defp initial_family_members_forms(user) do
     members =
@@ -2536,7 +2598,7 @@ defmodule YscWeb.PostMigrationOnboardingLive do
 
     case FamilyMembers.find_by_id(user, id) do
       %FamilyMember{} = member ->
-        case Ysc.Repo.delete(member) do
+        case FamilyMembers.delete_family_member(user, member) do
           {:ok, _} ->
             socket
 

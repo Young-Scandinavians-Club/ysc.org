@@ -8,7 +8,7 @@ defmodule Ysc.PromEx do
   - Ecto (database queries)
   - BEAM VM (memory, processes, etc.)
   - Oban (background jobs)
-  - Custom application metrics (tickets, bookings, booking config caches, payments, ledger)
+  - Custom application metrics (tickets, bookings, booking config caches, payments, ledger, email)
   """
 
   use PromEx, otp_app: :ysc
@@ -28,8 +28,10 @@ defmodule Ysc.PromEx do
       Plugins.Ecto,
       # BEAM VM metrics
       Plugins.Beam,
-      # Oban metrics
-      Plugins.Oban
+      # Oban metrics (wrapper rescues transient DB blips during queue polling)
+      Ysc.PromEx.Plugins.Oban,
+      # Custom YSC business metrics (required for Fly /metrics scrape)
+      Ysc.PromEx.Plugins.Ysc
     ]
   end
 
@@ -70,14 +72,17 @@ defmodule Ysc.PromEx do
         tag_values: &extract_payment_tags/1,
         measurement: :count
       ),
-      summary("ysc.tickets.payment_processed.duration.milliseconds",
+      distribution("ysc.tickets.payment_processed.duration.milliseconds",
         event_name: [:ysc, :tickets, :payment_processed],
         description:
           "Duration of ticket order payment processing in milliseconds",
-        buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000],
+        reporter_options: [
+          buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000]
+        ],
         tags: [:event_id, :status],
         tag_values: &extract_payment_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       ),
       counter("ysc.tickets.timeout_expired.total",
         event_name: [:ysc, :tickets, :timeout_expired],
@@ -141,13 +146,17 @@ defmodule Ysc.PromEx do
         tags: [:event_type],
         tag_values: &extract_webhook_tags/1
       ),
-      summary("ysc.payments.stripe_webhook_processing.duration.milliseconds",
+      distribution(
+        "ysc.payments.stripe_webhook_processing.duration.milliseconds",
         event_name: [:ysc, :payments, :stripe_webhook_processing_duration],
         description: "Duration of Stripe webhook processing in milliseconds",
-        buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000],
+        reporter_options: [
+          buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000]
+        ],
         tags: [:event_type, :status],
         tag_values: &extract_webhook_processing_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       ),
 
       # Ledger Metrics
@@ -168,18 +177,88 @@ defmodule Ysc.PromEx do
         tags: [:status],
         tag_values: &extract_reconciliation_tags/1
       ),
-      summary("ysc.ledgers.reconciliation.duration.milliseconds",
+      distribution("ysc.ledgers.reconciliation.duration.milliseconds",
         event_name: [:ysc, :ledgers, :reconciliation_completed],
         description: "Duration of reconciliation checks in milliseconds",
-        buckets: [100, 500, 1000, 2500, 5000, 10_000, 30_000, 60_000],
+        reporter_options: [
+          buckets: [100, 500, 1000, 2500, 5000, 10_000, 30_000, 60_000]
+        ],
         tags: [:status],
         tag_values: &extract_reconciliation_tags/1,
-        measurement: :duration
+        measurement: :duration,
+        unit: :millisecond
       ),
       counter("ysc.ledgers.reconciliation_errors.total",
         event_name: [:ysc, :ledgers, :reconciliation_errors],
         description: "Total number of reconciliation errors",
         measurement: :count
+      ),
+      counter("ysc.email.accepted.total",
+        event_name: [:ysc, :email, :accepted],
+        description: "Email requests accepted by SES",
+        tags: [:template],
+        tag_values: &extract_email_tags/1
+      ),
+      counter("ysc.email.sent.total",
+        event_name: [:ysc, :email, :sent],
+        description: "Emails successfully delivered to the configured mailer",
+        tags: [:template],
+        tag_values: &extract_email_tags/1
+      ),
+      counter("ysc.email.send_failed.total",
+        event_name: [:ysc, :email, :send_failed],
+        description: "Email delivery attempts that failed",
+        tags: [:template],
+        tag_values: &extract_email_tags/1
+      ),
+      counter("ysc.email.rate_limited.total",
+        event_name: [:ysc, :email, :rate_limited],
+        description: "Email requests delayed by the shared SES limiter",
+        tags: [:template],
+        tag_values: &extract_email_tags/1
+      ),
+      counter("ysc.email.ses_throttled.total",
+        event_name: [:ysc, :email, :ses_throttled],
+        description: "SES throttle responses",
+        tags: [:template],
+        tag_values: &extract_email_tags/1
+      ),
+      counter("ysc.email.terminal_failed.total",
+        event_name: [:ysc, :email, :terminal_failed],
+        description: "Email deliveries that require manual action",
+        tags: [:template, :category],
+        tag_values: &extract_email_terminal_tags/1
+      ),
+      counter("ysc.email.hard_bounce.total",
+        event_name: [:ysc, :email, :hard_bounce],
+        description: "Permanent SES bounces handled by outcome",
+        tags: [:outcome],
+        tag_values: &extract_email_hard_bounce_tags/1
+      ),
+      counter("ysc.email.suppressed.total",
+        event_name: [:ysc, :email, :suppressed],
+        description: "Email deliveries skipped due to recipient suppression",
+        tags: [:reason, :template, :category],
+        tag_values: &extract_email_suppression_tags/1
+      ),
+      counter("ysc.email.ses_webhook.events.total",
+        event_name: [:ysc, :email, :ses_webhook],
+        description: "SES webhook events handled by event type and outcome",
+        tags: [:event_type, :outcome],
+        tag_values: &extract_ses_webhook_tags/1,
+        measurement: :count
+      ),
+      distribution(
+        "ysc.email.ses_webhook.processing.duration.milliseconds",
+        event_name: [:ysc, :email, :ses_webhook],
+        description: "SES webhook processing duration in milliseconds",
+        reporter_options: [
+          buckets: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10_000]
+        ],
+        tags: [:event_type, :outcome],
+        tag_values: &extract_ses_webhook_tags/1,
+        measurement: :duration,
+        unit: :millisecond
       )
     ]
   end
@@ -250,6 +329,40 @@ defmodule Ysc.PromEx do
 
   defp extract_config_cache_live_rebuild_tags(_),
     do: %{live_view: "unknown", cache: "unknown"}
+
+  defp email_tag(nil), do: "unknown"
+  defp email_tag(value), do: to_string(value)
+
+  defp extract_email_tags(%{template: template}),
+    do: %{template: email_tag(template)}
+
+  defp extract_email_tags(_), do: %{template: "unknown"}
+
+  defp extract_email_terminal_tags(%{template: template, category: category}),
+    do: %{template: email_tag(template), category: email_tag(category)}
+
+  defp extract_email_terminal_tags(metadata),
+    do: Map.put(extract_email_tags(metadata), :category, "unknown")
+
+  defp extract_email_hard_bounce_tags(%{outcome: outcome}),
+    do: %{outcome: email_tag(outcome)}
+
+  defp extract_email_hard_bounce_tags(_), do: %{outcome: "unknown"}
+
+  defp extract_email_suppression_tags(metadata) do
+    %{
+      reason: metadata |> Map.get(:reason, :unknown) |> email_tag(),
+      template: metadata |> Map.get(:template, :unknown) |> email_tag(),
+      category: metadata |> Map.get(:category, :unknown) |> email_tag()
+    }
+  end
+
+  defp extract_ses_webhook_tags(metadata) do
+    %{
+      event_type: metadata |> Map.get(:event_type, :unknown) |> to_string(),
+      outcome: metadata |> Map.get(:outcome, :unknown) |> to_string()
+    }
+  end
 
   defp extract_webhook_tags(%{event_type: event_type}) do
     %{event_type: to_string(event_type)}

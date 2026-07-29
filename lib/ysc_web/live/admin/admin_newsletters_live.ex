@@ -183,6 +183,10 @@ defmodule YscWeb.AdminNewslettersLive do
   end
 
   @impl true
+  def handle_info({:edition_delivery_progress, edition}, socket) do
+    {:noreply, stream_insert(socket, :editions, edition)}
+  end
+
   def handle_info({:edition_sent, edition}, socket) do
     {:noreply,
      socket

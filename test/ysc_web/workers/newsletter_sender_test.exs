@@ -98,6 +98,7 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.status == :sent
       assert reloaded.sent_count == expected_count
+      assert reloaded.recipient_count == expected_count
       assert reloaded.sent_at != nil
     end
 
@@ -142,6 +143,54 @@ defmodule YscWeb.Workers.NewsletterSenderTest do
 
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.status == :sent
+    end
+
+    test "snoozes on the limiter and resumes pending deliveries without duplicates",
+         %{
+           edition: edition
+         } do
+      subscribe("paced-alice@example.com")
+      subscribe("paced-bob@example.com")
+      expected_count = active_subscriber_count()
+
+      {:ok, sending_edition} =
+        Newsletter.update_edition(edition, %{"status" => :sending})
+
+      original_rate = Application.get_env(:ysc, :ses_max_send_rate)
+      original_window = Application.get_env(:ysc, :ses_rate_window_seconds)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :ses_max_send_rate, original_rate)
+        Application.put_env(:ysc, :ses_rate_window_seconds, original_window)
+      end)
+
+      # Keep the window open for the whole paced run so a slow CI second-boundary
+      # cannot reset the limiter between the first and second send.
+      Application.put_env(:ysc, :ses_max_send_rate, 1)
+      Application.put_env(:ysc, :ses_rate_window_seconds, 60)
+      Repo.query!("DELETE FROM email_rate_limits")
+
+      assert {:snooze, _} =
+               perform_job(NewsletterSender, %{edition_id: sending_edition.id})
+
+      partial_records = idempotency_records_for(sending_edition)
+
+      assert Enum.count(partial_records, &(&1.delivery_status == :accepted)) ==
+               1
+
+      assert Enum.count(partial_records, &(&1.delivery_status == :pending)) == 1
+      assert Newsletter.get_edition!(sending_edition.id).status == :sending
+
+      Application.put_env(:ysc, :ses_max_send_rate, 10)
+      Repo.query!("DELETE FROM email_rate_limits")
+
+      assert :ok =
+               perform_job(NewsletterSender, %{edition_id: sending_edition.id})
+
+      records = idempotency_records_for(sending_edition)
+      assert length(records) == expected_count
+      assert Enum.all?(records, &(&1.delivery_status == :accepted))
+      assert Newsletter.get_edition!(sending_edition.id).status == :sent
     end
 
     test "skips a :sent edition and does not double-send", %{edition: edition} do

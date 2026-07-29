@@ -16,6 +16,8 @@ defmodule Ysc.Ledgers do
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.Tickets.Display, as: TicketDisplay
 
+  alias Ysc.Bookings.Booking
+
   alias Ysc.Ledgers.{
     LedgerAccount,
     LedgerEntry,
@@ -24,6 +26,15 @@ defmodule Ysc.Ledgers do
     Refund,
     Payout
   }
+
+  @payment_tab_filters [
+    :all,
+    :tahoe,
+    :clear_lake,
+    :events,
+    :donations,
+    :membership
+  ]
 
   alias YscWeb.Workers.{
     QuickbooksSyncPaymentWorker,
@@ -2197,12 +2208,24 @@ defmodule Ysc.Ledgers do
   Returns items ordered by inserted_at (created date) descending.
 
   Optimized to batch load all related data to avoid N+1 queries.
+
+  ## Options
+
+    * `:filter` - Limits results to a payment tab filter (`:all`, `:tahoe`,
+      `:clear_lake`, `:events`, `:donations`, or `:membership`). Filtering happens
+      in SQL before enrichment so unrelated ledger rows are not loaded.
   """
-  def list_user_payments_paginated(user_id, page \\ 1, per_page \\ 20) do
+  def list_user_payments_paginated(
+        user_id,
+        page \\ 1,
+        per_page \\ 20,
+        opts \\ []
+      ) do
     alias Ysc.Tickets.TicketOrder
 
-    # Single round-trip for both counts (payments + completed free ticket orders)
-    total_count = count_user_payments_tab_total(user_id)
+    filter = normalize_payment_tab_filter(Keyword.get(opts, :filter, :all))
+
+    total_count = count_user_payments_tab_total(user_id, filter)
 
     # Calculate offset
     offset = (page - 1) * per_page
@@ -2213,24 +2236,27 @@ defmodule Ysc.Ledgers do
 
     # Get payments with pagination (don't preload user - we already have it)
     payments =
-      from(p in Payment,
-        where: p.user_id == ^user_id,
-        order_by: [desc: p.inserted_at],
-        limit: ^fetch_limit
-      )
+      user_id
+      |> payments_for_tab_query(filter)
+      |> order_by([p], desc: p.inserted_at)
+      |> limit(^fetch_limit)
       |> Repo.all()
 
-    # Get free ticket orders
+    # Get free ticket orders (only mixed into :all and :events tabs)
     free_ticket_orders =
-      from(to in TicketOrder,
-        where: to.user_id == ^user_id,
-        where: to.status == :completed,
-        where: is_nil(to.payment_id),
-        preload: [:event, tickets: :ticket_tier],
-        order_by: [desc: to.inserted_at],
-        limit: ^fetch_limit
-      )
-      |> Repo.all()
+      if include_free_ticket_orders_in_tab?(filter) do
+        from(to in TicketOrder,
+          where: to.user_id == ^user_id,
+          where: to.status == :completed,
+          where: is_nil(to.payment_id),
+          preload: [:event, tickets: :ticket_tier],
+          order_by: [desc: to.inserted_at],
+          limit: ^fetch_limit
+        )
+        |> Repo.all()
+      else
+        []
+      end
 
     # Batch enrich all payments at once (this will batch load payment_methods too)
     enriched_payments = batch_enrich_payments(payments)
@@ -2264,8 +2290,68 @@ defmodule Ysc.Ledgers do
     {paginated_items, total_count}
   end
 
+  defp normalize_payment_tab_filter(filter)
+       when filter in @payment_tab_filters,
+       do: filter
+
+  defp normalize_payment_tab_filter(_filter), do: :all
+
+  defp include_free_ticket_orders_in_tab?(filter)
+       when filter in [:all, :events],
+       do: true
+
+  defp include_free_ticket_orders_in_tab?(_filter), do: false
+
+  defp payments_for_tab_query(user_id, :all) do
+    from(p in Payment, where: p.user_id == ^user_id)
+  end
+
+  defp payments_for_tab_query(user_id, filter)
+       when filter in [:events, :donations, :membership] do
+    entity_type =
+      case filter do
+        :events -> :event
+        :donations -> :donation
+        :membership -> :membership
+      end
+
+    revenue_entity_payments_query(user_id, entity_type)
+  end
+
+  defp payments_for_tab_query(user_id, property)
+       when property in [:tahoe, :clear_lake] do
+    from(p in Payment,
+      where: p.user_id == ^user_id,
+      join: e in LedgerEntry,
+      on: e.payment_id == p.id,
+      join: a in LedgerAccount,
+      on: e.account_id == a.id,
+      where: a.account_type == ^"revenue",
+      where: e.debit_credit == ^:credit,
+      where: e.related_entity_type == ^:booking,
+      join: b in Booking,
+      on: b.id == e.related_entity_id,
+      where: b.property == ^property,
+      distinct: true
+    )
+  end
+
+  defp revenue_entity_payments_query(user_id, entity_type) do
+    from(p in Payment,
+      where: p.user_id == ^user_id,
+      join: e in LedgerEntry,
+      on: e.payment_id == p.id,
+      join: a in LedgerAccount,
+      on: e.account_id == a.id,
+      where: a.account_type == ^"revenue",
+      where: e.debit_credit == ^:credit,
+      where: e.related_entity_type == ^entity_type,
+      distinct: true
+    )
+  end
+
   # One DB round-trip instead of two separate count queries (member payments tab).
-  defp count_user_payments_tab_total(user_id) do
+  defp count_user_payments_tab_total(user_id, :all) do
     user_id_binary =
       case Ecto.ULID.dump(user_id) do
         {:ok, binary} -> binary
@@ -2288,6 +2374,37 @@ defmodule Ysc.Ledgers do
       %{rows: [[nil]]} -> 0
       %{rows: []} -> 0
     end
+  end
+
+  defp count_user_payments_tab_total(user_id, :events) do
+    count_filtered_payments(user_id, :events) +
+      count_free_ticket_orders_for_user(user_id)
+  end
+
+  defp count_user_payments_tab_total(user_id, filter) do
+    count_filtered_payments(user_id, filter)
+  end
+
+  defp count_filtered_payments(user_id, filter) do
+    user_id
+    |> payments_for_tab_query(filter)
+    |> subquery()
+    |> select([p], count(p.id))
+    |> Repo.one()
+    |> Kernel.||(0)
+  end
+
+  defp count_free_ticket_orders_for_user(user_id) do
+    alias Ysc.Tickets.TicketOrder
+
+    from(to in TicketOrder,
+      where: to.user_id == ^user_id,
+      where: to.status == :completed,
+      where: is_nil(to.payment_id),
+      select: count(to.id)
+    )
+    |> Repo.one()
+    |> Kernel.||(0)
   end
 
   # Batch enrich payments to avoid N+1 queries

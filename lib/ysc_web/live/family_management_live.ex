@@ -68,8 +68,7 @@ defmodule YscWeb.FamilyManagementLive do
         user =
           Accounts.get_user!(user.id, [
             :sub_accounts,
-            :family_members,
-            subscriptions: :subscription_items
+            :family_members
           ])
 
         socket

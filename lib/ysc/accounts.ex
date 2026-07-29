@@ -3311,7 +3311,7 @@ defmodule Ysc.Accounts do
       primary_user_id = user.primary_user_id
       primary_user = get_primary_user(user)
 
-      result =
+      multi =
         Ecto.Multi.new()
         |> Ecto.Multi.update(
           :sub_account,
@@ -3333,7 +3333,21 @@ defmodule Ysc.Accounts do
             }
           )
         )
-        |> Repo.transaction()
+
+      multi =
+        if primary_user do
+          YscWeb.Emails.Notifier.schedule_email_multi(
+            multi,
+            :family_member_removed_email,
+            fn _changes ->
+              family_member_removed_email_args(user, primary_user)
+            end
+          )
+        else
+          multi
+        end
+
+      result = Repo.transaction(multi)
 
       case result do
         {:ok, %{sub_account: updated_sub_account}} ->
@@ -3349,8 +3363,6 @@ defmodule Ysc.Accounts do
               primary_user,
               updated_sub_account
             )
-
-            send_family_member_removed_email(updated_sub_account, primary_user)
           end
 
           {:ok, updated_sub_account}
@@ -3392,6 +3404,12 @@ defmodule Ysc.Accounts do
             }
           )
         )
+        |> YscWeb.Emails.Notifier.schedule_email_multi(
+          :family_member_removed_email,
+          fn _changes ->
+            family_member_removed_email_args(sub_account, primary_user)
+          end
+        )
         |> Repo.transaction()
 
       case result do
@@ -3408,7 +3426,6 @@ defmodule Ysc.Accounts do
             updated_sub_account
           )
 
-          send_family_member_removed_email(updated_sub_account, primary_user)
           {:ok, updated_sub_account}
 
         {:error, _, changeset, _} ->
@@ -3435,7 +3452,7 @@ defmodule Ysc.Accounts do
     )
   end
 
-  defp send_family_member_removed_email(removed_user, primary_user) do
+  defp family_member_removed_email_args(removed_user, primary_user) do
     first_name = removed_user.first_name || "there"
     primary_name = primary_user.first_name || "the primary account holder"
 
@@ -3447,13 +3464,13 @@ defmodule Ysc.Accounts do
     idempotency_key =
       "family_member_removed_#{removed_user.id}_#{primary_user.id}"
 
-    YscWeb.Emails.Notifier.schedule_email(
-      removed_user.email,
-      idempotency_key,
-      "Removed from Family Membership - YSC",
-      "family_member_removed",
-      email_vars,
-      """
+    %{
+      recipient: removed_user.email,
+      idempotency_key: idempotency_key,
+      subject: "Removed from Family Membership - YSC",
+      template: "family_member_removed",
+      variables: email_vars,
+      text_body: """
       ==============================
 
       Hi #{first_name},
@@ -3466,8 +3483,9 @@ defmodule Ysc.Accounts do
 
       ==============================
       """,
-      removed_user.id
-    )
+      user_id: removed_user.id,
+      opts: []
+    }
   end
 
   ## Memberships (admin view)

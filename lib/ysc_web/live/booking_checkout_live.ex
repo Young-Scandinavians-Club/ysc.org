@@ -554,7 +554,9 @@ defmodule YscWeb.BookingCheckoutLive do
               :if={assigns[:is_expired] && @is_expired}
               class="p-6 bg-red-50 border border-red-200 rounded-lg"
             >
-              <p class="text-sm font-semibold text-red-800 mb-2">Booking Expired</p>
+              <p class="text-sm font-semibold text-red-800 mb-2">
+                Your reservation hold timed out
+              </p>
               <p class="text-sm text-red-700 mb-4">
                 {BookingUserMessages.checkout_hold_expired()}
               </p>
@@ -562,7 +564,7 @@ defmodule YscWeb.BookingCheckoutLive do
                 href={get_property_redirect_path(@booking.property)}
                 class="inline-block text-sm font-medium text-red-800 hover:text-red-900 underline"
               >
-                Create New Booking →
+                Start a new booking
               </a>
             </div>
           </div>

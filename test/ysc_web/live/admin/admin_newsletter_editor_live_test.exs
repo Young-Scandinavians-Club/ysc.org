@@ -125,6 +125,33 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       assert html =~ "Subj"
     end
 
+    test "shows live sending progress", %{conn: conn, admin: admin} do
+      edition = edition_fixture(admin)
+
+      {:ok, sending_edition} =
+        Newsletter.update_edition(edition, %{
+          "status" => :sending,
+          "sent_count" => 0,
+          "recipient_count" => 20
+        })
+
+      view = live_editing_edition(conn, sending_edition)
+
+      {:ok, progress_edition} =
+        Newsletter.update_edition(sending_edition, %{"sent_count" => 12})
+
+      Newsletter.broadcast_edition_delivery_progress(progress_edition)
+
+      assert has_element?(
+               view,
+               "#newsletter-sending-progress",
+               "Sending… 12 / 20"
+             )
+
+      assert has_element?(view, "#duplicate-edition-btn")
+      refute has_element?(view, "[phx-click='open-send-modal']")
+    end
+
     test "shows the Send test button for an existing edition", %{
       conn: conn,
       admin: admin
@@ -134,6 +161,49 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       view = live_editing_edition(conn, edition)
 
       assert has_element?(view, "[phx-click='send-test-email']")
+    end
+
+    test "renders a sent edition preview directly in the iframe srcdoc",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      edition = edition_fixture(admin, %{"title" => "Already Sent"})
+
+      {:ok, edition} =
+        Newsletter.update_edition(edition, %{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      view = live_editing_edition(conn, edition)
+
+      assert has_element?(
+               view,
+               "#newsletter-email-preview-iframe[srcdoc*='Already Sent']"
+             )
+
+      assert has_element?(
+               view,
+               "#preview-scroll-container[phx-update='ignore']"
+             )
+    end
+
+    test "pushes later preview changes without patching the iframe", %{
+      conn: conn,
+      admin: admin
+    } do
+      edition = edition_fixture(admin)
+      view = live_editing_edition(conn, edition)
+
+      view
+      |> form("#newsletter-editor-form", %{
+        "edition" => %{"title" => "Updated Preview", "subject" => "Subject"}
+      })
+      |> render_change()
+
+      assert_push_event(view, "preview-html", %{html: updated_html})
+      assert updated_html =~ "Updated Preview"
     end
 
     test "shows draft status badge", %{conn: conn, admin: admin} do
@@ -531,12 +601,11 @@ defmodule YscWeb.AdminNewsletterEditorLiveTest do
       view = live_editing_edition(conn, edition)
       assert has_element?(view, "#duplicate-edition-btn")
 
-      view
-      |> element("#duplicate-edition-btn")
-      |> render_click()
-
-      {path, _flash} = assert_redirect(view)
-      {:ok, new_view, _html} = live(conn, path)
+      {:ok, new_view, _html} =
+        view
+        |> element("#duplicate-edition-btn")
+        |> render_click()
+        |> follow_redirect(conn)
 
       render_async(new_view, 5000)
 

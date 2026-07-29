@@ -181,6 +181,42 @@ defmodule Ysc.Bookings.BookingTest do
       assert get_change(changeset, :reference_id) == "BKG-CUSTOM-123"
     end
 
+    test "does not regenerate reference_id on update when attrs omit it" do
+      user = user_fixture()
+
+      {:ok, booking} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            reference_id: "MIG-WP-63892",
+            user_id: user.id,
+            checkin_date: ~D[2024-08-05],
+            checkout_date: ~D[2024-08-07],
+            property: :tahoe,
+            booking_mode: :buyout,
+            guests_count: 18,
+            status: :complete
+          },
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      changeset =
+        Booking.changeset(
+          booking,
+          %{status: :canceled},
+          skip_validation: true
+        )
+
+      assert changeset.valid?
+      assert get_field(changeset, :reference_id) == "MIG-WP-63892"
+      refute Map.has_key?(changeset.changes, :reference_id)
+
+      {:ok, updated} = Repo.update(changeset)
+      assert updated.reference_id == "MIG-WP-63892"
+      assert updated.status == :canceled
+    end
+
     test "reference_id is unique in database" do
       user = user_fixture()
 

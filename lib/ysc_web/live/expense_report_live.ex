@@ -2162,7 +2162,6 @@ defmodule YscWeb.ExpenseReportLive do
                             <.live_file_input
                               upload={@uploads.receipt}
                               class="hidden"
-                              capture="environment"
                             />
                             <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
                               <.icon
@@ -2175,9 +2174,6 @@ defmodule YscWeb.ExpenseReportLive do
                               </p>
                               <p class="text-xs text-zinc-400">
                                 PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
-                              </p>
-                              <p class="text-xs text-zinc-400 mt-1">
-                                On mobile, this will open your camera
                               </p>
                             </div>
                           </label>
@@ -2519,7 +2515,6 @@ defmodule YscWeb.ExpenseReportLive do
                             <.live_file_input
                               upload={@uploads.proof}
                               class="hidden"
-                              capture="environment"
                             />
                             <div class="flex flex-col items-center justify-center pt-5 pb-6 px-4">
                               <.icon
@@ -2532,9 +2527,6 @@ defmodule YscWeb.ExpenseReportLive do
                               </p>
                               <p class="text-xs text-zinc-400">
                                 PDF, JPG, JPEG, PNG, WEBP (MAX. 10MB)
-                              </p>
-                              <p class="text-xs text-zinc-400 mt-1">
-                                On mobile, this will open your camera
                               </p>
                             </div>
                           </label>

@@ -6,7 +6,7 @@ defmodule YscWeb.Components.DateRangePicker do
   """
   use YscWeb, :live_component
 
-  @week_start_at :sunday
+  @week_start_at :monday
   @fsm %{
     set_start: :set_end,
     set_end: :reset,
@@ -123,7 +123,7 @@ defmodule YscWeb.Components.DateRangePicker do
 
           <div
             id={"calendar_days_#{String.replace(@current.month, " ", "-")}"}
-            class="isolate mt-2 grid grid-cols-7 gap-px text-sm overflow-visible relative"
+            class="relative z-20 isolate mt-2 grid grid-cols-7 gap-px text-sm overflow-visible"
             phx-hook="DaterangeHover"
             phx-target={@myself}
             data-component-id={@id}
@@ -254,7 +254,7 @@ defmodule YscWeb.Components.DateRangePicker do
             </div>
           </div>
 
-          <div class="flex w-full justify-end items-center mt-4 space-x-2">
+          <div class="relative z-0 flex w-full justify-end items-center mt-4 space-x-2">
             <button
               :if={@range_start || @range_end}
               type="button"

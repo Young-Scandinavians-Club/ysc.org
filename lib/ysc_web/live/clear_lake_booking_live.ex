@@ -5,7 +5,6 @@ defmodule YscWeb.ClearLakeBookingLive do
 
   alias Ysc.Bookings.{
     AvailabilityCache,
-    Booking,
     ConfigCacheTelemetry,
     Season,
     SeasonCache,
@@ -20,9 +19,7 @@ defmodule YscWeb.ClearLakeBookingLive do
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
   alias Ysc.Subscriptions
-  alias Ysc.Repo
   alias YscWeb.DateDisplay
-  import Ecto.Query
 
   @impl true
   def mount(params, _session, socket) do
@@ -112,7 +109,10 @@ defmodule YscWeb.ClearLakeBookingLive do
         # Load active bookings for the user
         active_bookings =
           if user_with_subs,
-            do: get_active_bookings(user_with_subs.id, today),
+            do:
+              Bookings.list_active_clear_lake_bookings_for_user(
+                user_with_subs.id
+              ),
             else: []
 
         {user_with_subs, can_book, booking_error_title, booking_disabled_reason,
@@ -246,7 +246,7 @@ defmodule YscWeb.ClearLakeBookingLive do
     active_bookings =
       if connected?(socket) && user_for_check &&
            is_nil(socket.assigns[:active_bookings]) do
-        get_active_bookings(user_for_check.id, socket.assigns.today)
+        Bookings.list_active_clear_lake_bookings_for_user(user_for_check.id)
       else
         socket.assigns[:active_bookings] || []
       end
@@ -3849,20 +3849,6 @@ defmodule YscWeb.ClearLakeBookingLive do
       day_booking_allowed: day_booking_allowed,
       buyout_booking_allowed: buyout_booking_allowed
     )
-  end
-
-  # Gets active bookings for a user (bookings that haven't ended yet)
-  defp get_active_bookings(user_id, today_date, limit \\ 10) do
-    query =
-      from b in Booking,
-        where: b.user_id == ^user_id,
-        where: b.property == :clear_lake,
-        where: b.status == :complete,
-        where: b.checkout_date >= ^today_date,
-        order_by: [asc: b.checkin_date],
-        limit: ^limit
-
-    Repo.all(query)
   end
 
   # Determines which booking modes are allowed based on season settings for the selected dates

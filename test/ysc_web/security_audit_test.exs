@@ -25,6 +25,7 @@ defmodule YscWeb.SecurityAuditTest do
   Finding 25 (MEDIUM)   User settings verification lacks attempt rate limits; phone change lacks step-up reauth
   Finding 26 (HIGH)     Auto-login magic links replayable across cluster nodes (ETS vs DB one-time tokens)
   Finding 27 (MEDIUM)   GET auto-login/passkey endpoints allowed login CSRF (session fixation to attacker account)
+  Finding 28 (CRITICAL) Account setup auto-activation charged saved cards without owner session
 
   Findings 3 (phone-verify token URL), 6 (remember-me), 8 (discoverable passkey loading),
   and 9 (registration email enumeration) are either covered by other existing test files
@@ -40,8 +41,11 @@ defmodule YscWeb.SecurityAuditTest do
   import Mox
 
   alias Ysc.Accounts
+  alias Ysc.Accounts.MembershipCache
+  alias Ysc.Payments
   alias Ysc.Tickets
   alias Ysc.Accounts.{FamilyInvites, FamilyMember, User}
+  alias Ysc.Subscriptions
   alias Ysc.Accounts.UserToken
   alias Ysc.Repo
   alias Ysc.Test.KioskAPIKeyHelper
@@ -119,21 +123,23 @@ defmodule YscWeb.SecurityAuditTest do
   describe "Finding 5: AccountSetupLive redirects when user has no pending setup" do
     test "active user who has completed all setup steps is redirected away from account setup",
          %{conn: conn} do
-      # Fully set up: email/password/phone verified, and an active membership
-      # (unpaid actives are intentionally kept in the pay funnel).
+      # Fully set up means verified credentials plus an active membership; unpaid
+      # active users remain in the setup funnel to collect payment/activation.
       user = user_fixture(%{state: :active})
       {:ok, user} = Accounts.mark_email_verified(user)
       {:ok, user} = Accounts.mark_password_set(user)
       {:ok, user} = Accounts.mark_phone_verified(user)
 
       {:ok, _sub} =
-        Ysc.Subscriptions.create_subscription(%{
+        Subscriptions.create_subscription(%{
           name: "Test Membership",
           stripe_id: "sub_audit_#{System.unique_integer([:positive])}",
           stripe_status: "active",
           user_id: user.id,
-          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
         })
+
+      _ = MembershipCache.invalidate_user(user.id)
 
       conn = log_in_user(conn, user)
 
@@ -959,6 +965,83 @@ defmodule YscWeb.SecurityAuditTest do
     end
   end
 
+  describe "Finding 28: Account setup auto-activation requires owner session" do
+    defp unpaid_active_user_with_payment_method do
+      user =
+        user_fixture(%{
+          state: :active,
+          phone_number: "+12065551234"
+        })
+
+      {:ok, user} = Accounts.mark_email_verified(user)
+      {:ok, user} = Accounts.mark_phone_verified(user)
+      {:ok, user} = Accounts.mark_password_set(user)
+
+      user =
+        user
+        |> User.update_user_changeset(%{
+          stripe_id: "cus_sec_#{System.unique_integer([:positive])}"
+        })
+        |> Repo.update!()
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_sec_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :card,
+          provider_type: "card",
+          is_default: true
+        })
+
+      user
+    end
+
+    test "unauthenticated mount does not create a Stripe subscription", %{
+      conn: conn
+    } do
+      user = unpaid_active_user_with_payment_method()
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+        flunk("unauthenticated mount should not create a Stripe subscription")
+      end)
+
+      assert {:ok, _view, _html} = live(conn, ~p"/account/setup/#{user.id}")
+
+      count =
+        Repo.aggregate(
+          from(s in Subscriptions.Subscription, where: s.user_id == ^user.id),
+          :count
+        )
+
+      assert count == 0
+      assert is_nil(MembershipCache.get_active_membership(user))
+    end
+
+    test "unauthenticated step navigation does not create a Stripe subscription",
+         %{
+           conn: conn
+         } do
+      user = unpaid_active_user_with_payment_method()
+
+      expect(Stripe.SubscriptionMock, :create, 0, fn _params ->
+        flunk("unauthenticated mount should not create a Stripe subscription")
+      end)
+
+      assert {:ok, _view, _html} =
+               live(conn, ~p"/account/setup/#{user.id}?step=1")
+
+      count =
+        Repo.aggregate(
+          from(s in Subscriptions.Subscription, where: s.user_id == ^user.id),
+          :count
+        )
+
+      assert count == 0
+    end
+  end
+
   defp security_registration_attrs(overrides) do
     email = "security_reg_#{System.unique_integer([:positive])}@example.com"
 
@@ -1647,33 +1730,26 @@ defmodule YscWeb.SecurityAuditTest do
   describe "Finding 22: kiosk check-in booking eligibility" do
     import Ysc.BookingsFixtures
 
-    setup do
-      original =
-        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
-
-      on_exit(fn ->
-        KioskAPIKeyHelper.restore_kiosk_api_key!(original)
-      end)
-
-      :ok
-    end
+    @kiosk_key "security-audit-kiosk-key"
 
     test "rejects draft bookings at the kiosk check-in API", %{conn: conn} do
-      booking = booking_fixture(%{status: :draft})
+      KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
+        booking = booking_fixture(%{status: :draft})
 
-      conn =
-        conn
-        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
-        |> put_req_header("content-type", "application/json")
-        |> post(~p"/api/v1/mobile/check-in", %{
-          property: "tahoe",
-          booking_ids: [to_string(booking.id)],
-          rules_agreed: true
-        })
+        conn =
+          conn
+          |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+          |> put_req_header("content-type", "application/json")
+          |> post(~p"/api/v1/mobile/check-in", %{
+            property: "tahoe",
+            booking_ids: [to_string(booking.id)],
+            rules_agreed: true
+          })
 
-      assert %{"error" => error} = json_response(conn, 422)
-      assert error =~ "not confirmed"
-      refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
+        assert %{"error" => error} = json_response(conn, 422)
+        assert error =~ "not confirmed"
+        refute Ysc.Repo.get!(Ysc.Bookings.Booking, booking.id).checked_in
+      end)
     end
   end
 
@@ -1687,44 +1763,38 @@ defmodule YscWeb.SecurityAuditTest do
 
     alias Ysc.Bookings
 
-    setup do
-      original =
-        KioskAPIKeyHelper.capture_kiosk_api_key!("security-audit-kiosk-key")
-
-      on_exit(fn ->
-        KioskAPIKeyHelper.restore_kiosk_api_key!(original)
-      end)
-
-      :ok
-    end
+    @kiosk_key "security-audit-kiosk-key"
 
     test "omitted dates exclude bookings outside the default window", %{
       conn: conn
     } do
-      {old_checkin, old_checkout} = past_booking_dates_outside_default_window()
+      KioskAPIKeyHelper.with_kiosk_api_key(@kiosk_key, fn ->
+        {old_checkin, old_checkout} =
+          past_booking_dates_outside_default_window()
 
-      {:ok, old_booking} =
-        %{
-          checkin_date: old_checkin,
-          checkout_date: old_checkout,
-          guests_count: 2,
-          property: :tahoe,
-          booking_mode: :buyout,
-          user_id: user_fixture().id,
-          status: :complete,
-          total_price: Money.new(200, :USD)
-        }
-        |> Ysc.Bookings.create_booking()
+        {:ok, old_booking} =
+          %{
+            checkin_date: old_checkin,
+            checkout_date: old_checkout,
+            guests_count: 2,
+            property: :tahoe,
+            booking_mode: :buyout,
+            user_id: user_fixture().id,
+            status: :complete,
+            total_price: Money.new(200, :USD)
+          }
+          |> Ysc.Bookings.create_booking()
 
-      conn =
-        conn
-        |> put_req_header("authorization", "Bearer security-audit-kiosk-key")
-        |> put_req_header("accept", "application/json")
+        conn =
+          conn
+          |> put_req_header("authorization", "Bearer #{@kiosk_key}")
+          |> put_req_header("accept", "application/json")
 
-      response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
-      assert %{"data" => bookings} = json_response(response, 200)
+        response = get(conn, ~p"/api/v1/mobile/bookings?property=tahoe")
+        assert %{"data" => bookings} = json_response(response, 200)
 
-      refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+        refute Enum.any?(bookings, &(&1["id"] == to_string(old_booking.id)))
+      end)
     end
   end
 

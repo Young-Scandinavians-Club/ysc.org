@@ -296,6 +296,9 @@ defmodule Ysc.WpMigration.Load do
 
       Ysc.Logging.info("[WP Load] Migration load finished successfully")
 
+      # Migration is complete in production; never leave comms suppression on.
+      Ysc.Settings.ensure_wp_migration_inactive()
+
       {:ok,
        %{
          user_map: user_map,

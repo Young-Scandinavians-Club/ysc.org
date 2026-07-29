@@ -9,12 +9,13 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
   alias Ysc.Newsletter
 
   @impl true
-  def mount(%{"token" => token}, _session, socket) do
+  def mount(%{"token" => token} = params, _session, socket) do
     # Only look up by token if it's a non-empty string (avoids crashes on nil/blank)
     subscriber = safe_get_subscriber_by_token(token)
 
     # Show success state if already unsubscribed (idempotent: safe to reload link)
     unsubscribed = subscriber != nil && !subscriber.subscribed
+    edition_id = normalize_edition_id(Map.get(params, "edition_id"))
 
     socket =
       socket
@@ -24,12 +25,25 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
         "Unsubscribe from the Young Scandinavians Club newsletter."
       )
       |> assign(:token, token || "")
+      |> assign(:edition_id, edition_id)
       |> assign(:subscriber, subscriber)
       |> assign(:unsubscribed, unsubscribed)
       |> assign(:error, nil)
 
     {:ok, socket}
   end
+
+  defp normalize_edition_id(edition_id) when is_binary(edition_id) do
+    trimmed = String.trim(edition_id)
+
+    if Newsletter.valid_ulid?(trimmed) do
+      trimmed
+    else
+      nil
+    end
+  end
+
+  defp normalize_edition_id(_), do: nil
 
   defp safe_get_subscriber_by_token(token) when is_binary(token) do
     if String.trim(token) == "" do
@@ -111,11 +125,13 @@ defmodule YscWeb.NewsletterUnsubscribeLive do
   @impl true
   def handle_event("unsubscribe", _params, socket) do
     token = socket.assigns.token
+    edition_id = socket.assigns.edition_id
 
     # Guard: only call context if we have a valid token string (never crash)
     result =
       if is_binary(token) && String.trim(token) != "" do
-        Newsletter.unsubscribe(token)
+        opts = if edition_id, do: [edition_id: edition_id], else: []
+        Newsletter.unsubscribe(token, opts)
       else
         {:error, :invalid_token}
       end

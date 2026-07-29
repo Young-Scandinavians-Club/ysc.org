@@ -1065,6 +1065,7 @@ defmodule Ysc.Bookings do
     payment_amount_mismatch
     entitlement_consume_failed
     booking_confirmation_failed
+    booking_confirmation_email_enqueue_failed
     inventory_update_failed
   )a
 
@@ -1134,6 +1135,11 @@ defmodule Ysc.Bookings do
 
   defp normalize_checkout_failure_reason({:error, reason}),
     do: normalize_checkout_failure_reason(reason)
+
+  defp normalize_checkout_failure_reason(
+         {:booking_confirmation_email_enqueue_failed, _reason}
+       ),
+       do: :booking_confirmation_email_enqueue_failed
 
   defp normalize_checkout_failure_reason(reason) when is_atom(reason),
     do: reason
@@ -4715,6 +4721,32 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Lists active Clear Lake bookings for a user.
+
+  Applies the same 11:00 AM PST checkout cutoff as
+  `list_upcoming_active_bookings_for_user/2` before `LIMIT`, so stale
+  checkout-today rows cannot hide future stays.
+
+  ## Options
+
+    * `:limit` - max rows (default `10`)
+  """
+  def list_active_clear_lake_bookings_for_user(user_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 10)
+    checkout_filter = checkout_still_active_dynamic()
+
+    from(b in Booking,
+      where: b.user_id == ^user_id,
+      where: b.property == :clear_lake,
+      where: b.status == :complete,
+      where: ^checkout_filter,
+      order_by: [asc: b.checkin_date],
+      limit: ^limit
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Returns pending refund counts for the admin dashboard: total and per property.
   """
   def pending_refunds_dashboard_summary do
@@ -5757,6 +5789,21 @@ defmodule Ysc.Bookings do
       order_by: [asc: b.checkin_date],
       limit: 10,
       preload: [:rooms, :user]
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_active_clear_lake_bookings_for_user_query do
+    user_id = Ysc.Ci.QueryExplain.Fixtures.user().id
+    checkout_filter = checkout_still_active_dynamic()
+
+    from(b in Booking,
+      where: b.user_id == ^user_id,
+      where: b.property == :clear_lake,
+      where: b.status == :complete,
+      where: ^checkout_filter,
+      order_by: [asc: b.checkin_date],
+      limit: 10
     )
   end
 end

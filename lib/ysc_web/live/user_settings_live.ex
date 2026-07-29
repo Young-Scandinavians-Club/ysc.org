@@ -3853,6 +3853,14 @@ defmodule YscWeb.UserSettingsLive do
                   updated_default =
                     Ysc.Payments.get_default_payment_method(updated_user)
 
+                  {socket, toast_message} =
+                    maybe_activate_membership_after_settings_pm(
+                      socket,
+                      updated_user
+                    )
+
+                  updated_user = Ysc.Accounts.get_user!(user.id)
+
                   {:noreply,
                    socket
                    |> assign(:user, updated_user)
@@ -3861,7 +3869,7 @@ defmodule YscWeb.UserSettingsLive do
                    |> assign(:show_new_payment_form, false)
                    |> YscWeb.Flash.put_toast(
                      :info,
-                     "Payment method updated and set as default.",
+                     toast_message,
                      title: "Payment",
                      icon: &YscWeb.CoreComponents.flash_toast_icon_payment/1
                    )
@@ -4349,18 +4357,11 @@ defmodule YscWeb.UserSettingsLive do
   def handle_event("filter-payments", %{"filter" => filter}, socket) do
     filter_atom = String.to_existing_atom(filter)
 
-    filtered_payments =
-      apply_payment_filter(socket.assigns.all_payments, filter_atom)
-
     {:noreply,
      socket
      |> assign(:payment_filter, filter_atom)
-     |> assign(:filtered_payments_count, length(filtered_payments))
-     |> assign(:filtered_payments_list, filtered_payments)
-     |> stream(:payments, filtered_payments,
-       reset: true,
-       dom_id: &payment_dom_id/1
-     )}
+     |> assign(:payments_page, 1)
+     |> paginate_payments(1)}
   end
 
   def handle_event("change-membership", params, socket) do
@@ -4716,6 +4717,44 @@ defmodule YscWeb.UserSettingsLive do
 
   defp validate_user_active(user) do
     if user.state == :active, do: :ok, else: {:error, :user_not_active}
+  end
+
+  defp maybe_activate_membership_after_settings_pm(socket, user) do
+    unpaid_primary? =
+      user.state == :active and not Accounts.sub_account?(user) and
+        is_nil(MembershipCache.get_active_membership(user))
+
+    if unpaid_primary? do
+      return_url = YscWeb.Endpoint.url() <> "/billing/user/#{user.id}/finalize"
+
+      case Subscriptions.activate_membership_with_saved_payment_method(user,
+             return_url: return_url
+           ) do
+        {:ok, status} when status in [:activated, :already_active] ->
+          YscWeb.Emails.ApplicationApprovedPaymentSuccess.maybe_schedule(
+            user,
+            status
+          )
+
+          _ = MembershipCache.invalidate_user(user.id)
+          refreshed = Accounts.get_user!(user.id)
+
+          membership = MembershipCache.get_active_membership(refreshed)
+          plan_type = YscWeb.UserAuth.get_membership_plan_type(membership)
+
+          {socket
+           |> assign(:user, refreshed)
+           |> assign(:current_membership, membership)
+           |> assign(:active_plan_type, plan_type),
+           "Payment method saved and your membership is now active!"}
+
+        {:error, _reason} ->
+          {socket,
+           "Payment method updated. We couldn't activate membership automatically — choose a plan below to finish."}
+      end
+    else
+      {socket, "Payment method updated and set as default."}
+    end
   end
 
   defp validate_user_active_for_membership(user) do
@@ -5136,63 +5175,33 @@ defmodule YscWeb.UserSettingsLive do
     do: VerificationCodes.normalize_otp_input(code)
 
   defp paginate_payments(socket, new_page) when new_page >= 1 do
-    %{payments_per_page: per_page, payments_total: total_count, user: user} =
-      socket.assigns
-
-    {all_payments, _total_count} =
-      Ledgers.list_user_payments_paginated(user.id, new_page, per_page)
-
-    total_pages = div(total_count + per_page - 1, per_page)
-
-    # Apply current filter to new page
+    %{payments_per_page: per_page, user: user} = socket.assigns
     filter = socket.assigns[:payment_filter] || :all
-    filtered_payments = apply_payment_filter(all_payments, filter)
+
+    {payments, total_count} =
+      Ledgers.list_user_payments_paginated(user.id, new_page, per_page,
+        filter: filter
+      )
+
+    total_pages =
+      if total_count == 0 do
+        0
+      else
+        div(total_count + per_page - 1, per_page)
+      end
 
     socket
     |> assign(:payments_page, new_page)
+    |> assign(:payments_total, total_count)
     |> assign(:payments_total_pages, total_pages)
-    |> assign(:all_payments, all_payments)
-    |> assign(:filtered_payments_count, length(filtered_payments))
-    |> assign(:filtered_payments_list, filtered_payments)
-    |> stream(:payments, filtered_payments,
+    |> assign(:all_payments, payments)
+    |> assign(:filtered_payments_count, length(payments))
+    |> assign(:filtered_payments_list, payments)
+    |> stream(:payments, payments,
       reset: true,
       dom_id: &payment_dom_id/1
     )
   end
-
-  defp apply_payment_filter(payments, :all), do: payments
-
-  defp apply_payment_filter(payments, :tahoe) do
-    Enum.filter(payments, fn payment_info ->
-      payment_info.type == :booking &&
-        payment_info.booking &&
-        payment_info.booking.property == :tahoe
-    end)
-  end
-
-  defp apply_payment_filter(payments, :clear_lake) do
-    Enum.filter(payments, fn payment_info ->
-      payment_info.type == :booking &&
-        payment_info.booking &&
-        payment_info.booking.property == :clear_lake
-    end)
-  end
-
-  defp apply_payment_filter(payments, :events) do
-    Enum.filter(payments, fn payment_info -> payment_info.type == :ticket end)
-  end
-
-  defp apply_payment_filter(payments, :donations) do
-    Enum.filter(payments, fn payment_info -> payment_info.type == :donation end)
-  end
-
-  defp apply_payment_filter(payments, :membership) do
-    Enum.filter(payments, fn payment_info ->
-      payment_info.type == :membership
-    end)
-  end
-
-  defp apply_payment_filter(payments, _), do: payments
 
   defp get_price_id(memberhip_type) do
     plans = Application.get_env(:ysc, :membership_plans)

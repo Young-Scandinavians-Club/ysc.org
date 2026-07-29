@@ -7,7 +7,7 @@ defmodule YscWeb.Workers.SaveTheDateNotificationWorker do
   finish other configuration before emails go out.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :mailers, max_attempts: 3
+  use Oban.Worker, queue: :bulk_mail, max_attempts: 3
 
   alias Ysc.Repo
   alias Ysc.Events

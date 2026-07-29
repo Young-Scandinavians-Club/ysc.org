@@ -21,6 +21,13 @@ defmodule YscWeb.AdminUserDetailsLiveTest do
       assert html =~ "Doe"
     end
 
+    test "ignores the legacy email preview handshake", %{conn: conn} do
+      user = user_fixture()
+      {:ok, view, _html} = live(conn, ~p"/admin/users/#{user.id}/details")
+
+      assert is_binary(render_hook(view, "preview-ready", %{}))
+    end
+
     test "static HTML shows loading shell before websocket connects", %{
       conn: conn
     } do

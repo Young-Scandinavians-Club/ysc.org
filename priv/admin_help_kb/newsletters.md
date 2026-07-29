@@ -64,9 +64,9 @@ Admin pages: `/admin/newsletters` (list with Editions, Subscribers, and Saved no
 
 ## Stats (sent editions)
 
-- The editor for a sent edition shows: **Sent at**, **Emails sent**, **Unique opens** and **Unique clickers** (distinct recipients, with percentage of sent), and **Bounces**.
-- A **Clicks by link** breakdown shows which links were clicked, labeled as the matching Event or Post when recognizable.
-- Data comes from the email provider's events (send, delivery, open, click, bounce, complaint) and accumulates over hours and days after sending.
+- The editor for a sent edition shows: **Sent at**, **Emails sent**, **Unique opens** and **Unique clickers** (distinct recipients, with percentage of sent), **Bounces**, **Unsubscribe link clicks** (historical; people who clicked the unsubscribe URL), and **Confirmed unsubscribes** (people who completed unsubscribe from that edition's email link).
+- A **Clicks by link** breakdown shows which links were clicked, labeled as the matching Event or Post when recognizable. Unsubscribe URLs are excluded from this list and shown in the unsubscribe metrics above.
+- Data comes from the email provider's events (send, delivery, open, click, bounce, complaint) and accumulates over hours and days after sending. Confirmed unsubscribes are recorded when a recipient finishes the unsubscribe flow from an edition email.
 
 ## Public archive
 

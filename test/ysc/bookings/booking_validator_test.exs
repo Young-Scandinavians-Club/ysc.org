@@ -155,6 +155,56 @@ defmodule Ysc.Bookings.BookingValidatorTest do
     |> Repo.preload(:subscriptions)
   end
 
+  defp family_with_sub_account(membership_type)
+       when membership_type in [:single, :family] do
+    primary = user_fixture() |> create_subscription(membership_type)
+
+    sub_account =
+      user_fixture(%{date_of_birth: ~D[2012-06-15]})
+      |> Ecto.Changeset.change(primary_user_id: primary.id)
+      |> Repo.update!()
+
+    %{primary: primary, sub_account: sub_account}
+  end
+
+  defp booking_dates_monday_wednesday(weeks_ahead) do
+    today = Date.utc_today()
+    days_to_monday = rem(8 - Date.day_of_week(today, :monday), 7)
+    next_monday = Date.add(today, days_to_monday + weeks_ahead * 7)
+    {next_monday, Date.add(next_monday, 2)}
+  end
+
+  defp insert_family_booking!(user, rooms, attrs) do
+    room = Map.get(attrs, :room, rooms.tahoe_room1)
+    attrs = Map.drop(attrs, [:room])
+
+    default_attrs = %{
+      property: :tahoe,
+      checkin_date: ~D[2024-08-05],
+      checkout_date: ~D[2024-08-07],
+      booking_mode: :room,
+      guests_count: 2,
+      status: :complete,
+      total_price: Money.new(400, :USD)
+    }
+
+    attrs =
+      default_attrs
+      |> Map.merge(attrs)
+      |> Map.put(:user_id, user.id)
+
+    {:ok, booking} =
+      %Booking{}
+      |> Booking.changeset(attrs,
+        rooms: [room],
+        user: user,
+        skip_validation: true
+      )
+      |> Repo.insert()
+
+    booking
+  end
+
   setup do
     create_test_seasons()
     rooms = create_test_rooms()
@@ -1076,6 +1126,155 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         )
 
       assert changeset.valid?
+    end
+  end
+
+  describe "family group limits across sub-accounts" do
+    test "single membership: sub-account cannot book while primary has active booking",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:single)
+      {checkin, checkout} = booking_dates_monday_wednesday(5)
+
+      _existing =
+        insert_family_booking!(primary, rooms, %{
+          checkin_date: checkin,
+          checkout_date: checkout
+        })
+
+      {new_checkin, new_checkout} = booking_dates_monday_wednesday(8)
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: sub.id,
+            property: :tahoe,
+            checkin_date: new_checkin,
+            checkout_date: new_checkout,
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room2],
+          user: sub
+        )
+
+      refute changeset.valid?
+
+      {message, _} = Keyword.fetch!(changeset.errors, :user_id)
+      assert message =~ "one active booking at a time"
+    end
+
+    test "family membership: rejects overlapping booking when family already has two",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
+
+      _booking1 =
+        insert_family_booking!(primary, rooms, %{
+          checkin_date: ~D[2024-07-08],
+          checkout_date: ~D[2024-07-10]
+        })
+
+      _booking2 =
+        insert_family_booking!(sub, rooms, %{
+          checkin_date: ~D[2024-07-09],
+          checkout_date: ~D[2024-07-11],
+          room: rooms.tahoe_room2
+        })
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: primary.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-07-09],
+            checkout_date: ~D[2024-07-11],
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: primary
+        )
+
+      refute changeset.valid?
+
+      {message, _} = Keyword.fetch!(changeset.errors, :checkin_date)
+      assert message =~ "2 cabin bookings at the same time"
+    end
+
+    test "buyout exclusivity: sub-account cannot book room while primary has active buyout",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:family)
+      {buyout_checkin, buyout_checkout} = booking_dates_monday_wednesday(5)
+      {room_checkin, room_checkout} = booking_dates_monday_wednesday(6)
+
+      {:ok, _buyout} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: primary.id,
+            property: :tahoe,
+            checkin_date: buyout_checkin,
+            checkout_date: buyout_checkout,
+            booking_mode: :buyout,
+            guests_count: 10,
+            status: :complete,
+            total_price: Money.new(2000, :USD)
+          },
+          user: primary,
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: sub.id,
+            property: :tahoe,
+            checkin_date: room_checkin,
+            checkout_date: room_checkout,
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: sub
+        )
+
+      refute changeset.valid?
+
+      {message, _} = Keyword.fetch!(changeset.errors, :booking_mode)
+
+      assert message =~
+               "You cannot book rooms while you have an active or future full buyout reservation"
+    end
+
+    test "single membership: sub-account cannot add room when primary already booked one on same dates",
+         %{rooms: rooms} do
+      %{primary: primary, sub_account: sub} = family_with_sub_account(:single)
+      _existing = insert_family_booking!(primary, rooms, %{})
+
+      changeset =
+        Booking.changeset(
+          %Booking{},
+          %{
+            user_id: sub.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-08-05],
+            checkout_date: ~D[2024-08-07],
+            booking_mode: :room,
+            guests_count: 2,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room2],
+          user: sub
+        )
+
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
     end
   end
 

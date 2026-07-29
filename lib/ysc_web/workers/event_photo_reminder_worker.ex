@@ -7,7 +7,7 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   require Ysc.Logging
 
   use Oban.Worker,
-    queue: :mailers,
+    queue: :bulk_mail,
     max_attempts: 3,
     unique: [
       fields: [:args],

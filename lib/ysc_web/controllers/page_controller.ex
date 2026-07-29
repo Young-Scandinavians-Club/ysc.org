@@ -226,6 +226,21 @@ defmodule YscWeb.PageController do
         |> assign(:page_title, "Account Pending Review")
         |> render(:pending_review)
 
+      :active ->
+        membership =
+          Ysc.Accounts.MembershipCache.get_active_membership(current_user)
+
+        if membership do
+          conn
+          |> put_flash(:info, "Your membership is active. Welcome!")
+          |> redirect(to: ~p"/")
+        else
+          # Keep unpaid actives in the account-setup pay/activation funnel
+          redirect(conn,
+            to: ~p"/account/setup/#{current_user.id}?step=1"
+          )
+        end
+
       _ ->
         redirect(conn, to: ~p"/")
     end

@@ -1594,6 +1594,53 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "confirm_booking/1 confirmation email scheduling" do
+    defmodule NotifierScheduleError do
+      @moduledoc false
+      def schedule_email(a, b, c, d, e, f, g),
+        do: schedule_email(a, b, c, d, e, f, g, nil)
+
+      def schedule_email(_, _, _, _, _, _, _, _),
+        do: {:error, :coverage_schedule_failed}
+    end
+
+    defp with_booking_confirmation_notifier(module, fun) do
+      prev = Application.get_env(:ysc, :booking_confirmation_email_notifier)
+      Application.put_env(:ysc, :booking_confirmation_email_notifier, module)
+
+      on_exit(fn ->
+        if prev do
+          Application.put_env(:ysc, :booking_confirmation_email_notifier, prev)
+        else
+          Application.delete_env(:ysc, :booking_confirmation_email_notifier)
+        end
+      end)
+
+      fun.()
+    end
+
+    test "keeps booking complete when confirmation email enqueue fails", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(415)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      with_booking_confirmation_notifier(NotifierScheduleError, fn ->
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
+        assert confirmed.status == :complete
+        assert Repo.get!(Booking, hold.id).status == :complete
+      end)
+    end
+  end
+
   describe "confirm_booking/1 other holds" do
     test "second confirm_booking is idempotent when booking is already complete",
          %{

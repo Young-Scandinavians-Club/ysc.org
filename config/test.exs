@@ -23,12 +23,16 @@ config :ysc, :sns_skip_signature_verification, true
 # Speed up QuickBooks tests by disabling rate limit backoff delays
 config :ysc,
   quickbooks_max_429_retries: 0,
-  quickbooks_default_429_backoff_seconds: 0
+  quickbooks_default_429_backoff_seconds: 0,
+  newsletter_send_interval_ms: 0
 
 # Speed up payment success retry delays
 config :ysc,
   payment_success_retry_delay_ms: 0,
   payment_success_total_timeout_ms: 1_000
+
+# Run Tahoe party-size availability refresh immediately in tests
+config :ysc, :tahoe_party_availability_debounce_ms, 0
 
 # Speed up Stripe customer database sync delays
 config :ysc,

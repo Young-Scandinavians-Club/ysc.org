@@ -91,7 +91,19 @@ defmodule YscWeb.AdminBadgeHelpersTest do
                "red"
 
       assert AdminBadgeHelpers.ledger_payment_status_badge_type(:refunded) ==
-               "dark"
+               "zinc"
+    end
+  end
+
+  describe "post_state_badge_type/1" do
+    test "maps known post states for admin views" do
+      assert AdminBadgeHelpers.post_state_badge_type(:draft) == "yellow"
+      assert AdminBadgeHelpers.post_state_badge_type(:published) == "green"
+      assert AdminBadgeHelpers.post_state_badge_type(:deleted) == "red"
+    end
+
+    test "defaults unknown states" do
+      assert AdminBadgeHelpers.post_state_badge_type(:unknown) == "default"
     end
   end
 end

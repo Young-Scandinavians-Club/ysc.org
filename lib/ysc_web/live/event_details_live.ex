@@ -353,7 +353,10 @@ defmodule YscWeb.EventDetailsLive do
             </div>
 
             <%!-- Meta Info Row - Magazine Style --%>
-            <% has_duration = @event.start_time != nil && @event.end_time != nil %>
+            <%!-- Duration only for single-day events; multi-day spans don't map cleanly to Time.diff --%>
+            <% has_duration =
+              @event.start_time != nil && @event.end_time != nil &&
+                not multi_day_event?(@event) %>
             <div class={[
               "grid gap-0 border border-zinc-100 rounded-xl overflow-hidden bg-white mb-12",
               if has_duration do
@@ -933,7 +936,7 @@ defmodule YscWeb.EventDetailsLive do
                           name="hero-exclamation-circle"
                           class="text-orange-500 w-6 h-6"
                         />
-                        Sign in to buy tickets. An active YSC membership is required.
+                        Sign in with your YSC account to buy tickets. An active, paid membership is required.
                       </div>
                       <.button
                         class="w-full py-4 uppercase tracking-widest"
@@ -941,7 +944,7 @@ defmodule YscWeb.EventDetailsLive do
                           ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                         }
                       >
-                        <.icon name="hero-ticket" class="w-6 h-6" />Sign In to Continue
+                        <.icon name="hero-ticket" class="w-6 h-6" />Sign in
                       </.button>
                     </div>
 
@@ -1083,7 +1086,7 @@ defmodule YscWeb.EventDetailsLive do
                   }
                   class="max-w-screen-md mx-auto mb-3 text-xs text-orange-700 text-center leading-snug"
                 >
-                  Sign in to buy tickets. An active YSC membership is required.
+                  Sign in with your YSC account to buy tickets. An active, paid membership is required.
                 </p>
                 <div class="max-w-screen-md mx-auto flex items-center justify-between gap-6">
                   <%= if event_in_past?(@event) do %>
@@ -1188,7 +1191,7 @@ defmodule YscWeb.EventDetailsLive do
                             ~p"/users/log-in?redirect_to=#{~p"/events/#{@event.id}"}"
                           }
                         >
-                          <.icon name="hero-ticket" class="w-5 h-5" />Sign In to Continue
+                          <.icon name="hero-ticket" class="w-5 h-5" />Sign in
                         </.button>
                       <% else %>
                         <%= if @has_ticket_tiers do %>
@@ -6506,6 +6509,19 @@ defmodule YscWeb.EventDetailsLive do
         else
           format_event_when_weekday_range(start, finish)
         end
+    end
+  end
+
+  defp multi_day_event?(event) do
+    start = event_calendar_date(event.start_date)
+    finish = event_calendar_date(event.end_date)
+
+    case {start, finish} do
+      {%Date{} = start, %Date{} = finish} ->
+        Date.compare(start, finish) != :eq
+
+      _ ->
+        false
     end
   end
 

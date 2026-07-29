@@ -210,11 +210,17 @@ const PasskeyAuth = {
                     }
                 }
             } catch (error) {
-                const isUserCancellation = error.name === "NotAllowedError" ||
-                    error.name === "AbortError";
+                // Expected UX outcomes: user cancel/timeout, or browser/platform
+                // lacking discoverable (resident) credential support.
+                const isExpectedAuthError = error.name === "NotAllowedError" ||
+                    error.name === "AbortError" ||
+                    error.name === "NotSupportedError";
 
-                if (isUserCancellation) {
-                    console.info("[PasskeyAuth] Authentication cancelled by user or timed out");
+                if (isExpectedAuthError) {
+                    console.info("[PasskeyAuth] Authentication ended without completion", {
+                        name: error.name,
+                        message: error.message
+                    });
                 } else {
                     console.error("[PasskeyAuth] Passkey authentication failed", error);
 
@@ -466,11 +472,15 @@ const PasskeyAuth = {
                     }
                 }
             } catch (error) {
-                const isUserCancellation = error.name === "NotAllowedError" ||
-                    error.name === "AbortError";
+                const isExpectedAuthError = error.name === "NotAllowedError" ||
+                    error.name === "AbortError" ||
+                    error.name === "NotSupportedError";
 
-                if (isUserCancellation) {
-                    console.info("[PasskeyAuth] Registration cancelled by user or timed out");
+                if (isExpectedAuthError) {
+                    console.info("[PasskeyAuth] Registration ended without completion", {
+                        name: error.name,
+                        message: error.message
+                    });
                 } else {
                     console.error("[PasskeyAuth] Passkey registration failed", error);
 

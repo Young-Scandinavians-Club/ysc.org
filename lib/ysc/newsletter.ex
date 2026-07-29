@@ -12,11 +12,14 @@ defmodule Ysc.Newsletter do
   import Ecto.Query
 
   alias Ysc.Repo
+  alias Ysc.Email.Suppression
   alias Ysc.Newsletter.Subscriber
   alias Ysc.Accounts.Email
   alias Ysc.Newsletter.Edition
   alias Ysc.Newsletter.EmailEvent
   alias Ysc.Newsletter.Notice
+  alias Ysc.Newsletter.UnsubscribeEvent
+  alias Ysc.Messages.MessageIdempotency
   alias Ysc.Events.Event
   alias Ysc.Posts.Post
 
@@ -25,7 +28,8 @@ defmodule Ysc.Newsletter do
   @doc """
   Subscribes the calling process to edition lifecycle broadcasts.
 
-  Broadcasted messages: `{:edition_sent, %Edition{}}`.
+  Broadcasted messages: `{:edition_delivery_progress, %Edition{}}` and
+  `{:edition_sent, %Edition{}}`.
   """
   def subscribe_to_edition_updates do
     Phoenix.PubSub.subscribe(Ysc.PubSub, @editions_topic)
@@ -39,6 +43,15 @@ defmodule Ysc.Newsletter do
       Ysc.PubSub,
       @editions_topic,
       {:edition_sent, edition}
+    )
+  end
+
+  @doc false
+  def broadcast_edition_delivery_progress(%Edition{} = edition) do
+    Phoenix.PubSub.broadcast(
+      Ysc.PubSub,
+      @editions_topic,
+      {:edition_delivery_progress, edition}
     )
   end
 
@@ -224,41 +237,116 @@ defmodule Ysc.Newsletter do
   @doc """
   Unsubscribes by email or by subscription token.
 
+  Options:
+  - `:edition_id` — when present and valid, records a confirmed
+    `UnsubscribeEvent` attributed to that edition (idempotent per
+    edition/subscriber pair).
+
   Returns `{:ok, subscriber}` or `{:error, :not_found}`.
   """
-  def unsubscribe(email_or_token) when is_binary(email_or_token) do
+  def unsubscribe(email_or_token, opts \\ [])
+      when is_binary(email_or_token) and is_list(opts) do
+    edition_id = Keyword.get(opts, :edition_id)
+
     cond do
       String.contains?(email_or_token, "@") ->
-        unsubscribe_by_email(email_or_token)
+        unsubscribe_by_email(email_or_token, edition_id)
 
       true ->
-        unsubscribe_by_token(email_or_token)
+        unsubscribe_by_token(email_or_token, edition_id)
     end
   end
 
-  defp unsubscribe_by_email(email) do
+  defp unsubscribe_by_email(email, edition_id) do
     case get_subscriber_by_email(email) do
       nil -> {:error, :not_found}
-      subscriber -> do_unsubscribe(subscriber)
+      subscriber -> do_unsubscribe(subscriber, edition_id)
     end
   end
 
-  defp unsubscribe_by_token(token) do
+  defp unsubscribe_by_token(token, edition_id) do
     case get_subscriber_by_token(token) do
       nil -> {:error, :not_found}
-      subscriber -> do_unsubscribe(subscriber)
+      subscriber -> do_unsubscribe(subscriber, edition_id)
     end
   end
 
-  defp do_unsubscribe(subscriber) do
+  defp do_unsubscribe(subscriber, edition_id) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    subscriber
-    |> Subscriber.update_changeset(%{
-      subscribed: false,
-      unsubscribed_at: now
-    })
-    |> Repo.update()
+    case subscriber
+         |> Subscriber.update_changeset(%{
+           subscribed: false,
+           unsubscribed_at: now
+         })
+         |> Repo.update() do
+      {:ok, updated} ->
+        maybe_record_unsubscribe_event(updated, edition_id, now)
+        {:ok, updated}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp maybe_record_unsubscribe_event(_subscriber, edition_id, _now)
+       when not is_binary(edition_id) or edition_id == "",
+       do: :ok
+
+  defp maybe_record_unsubscribe_event(subscriber, edition_id, now) do
+    if edition_exists?(edition_id) do
+      result =
+        try do
+          %UnsubscribeEvent{}
+          |> UnsubscribeEvent.changeset(%{
+            edition_id: edition_id,
+            subscriber_id: subscriber.id,
+            unsubscribed_at: now
+          })
+          |> Repo.insert(
+            on_conflict: :nothing,
+            conflict_target: [:edition_id, :subscriber_id]
+          )
+        rescue
+          error ->
+            Ysc.Logging.error(
+              "Newsletter: failed to record unsubscribe event",
+              error: error,
+              stacktrace: __STACKTRACE__,
+              extra: %{
+                edition_id: edition_id,
+                subscriber_id: subscriber.id
+              }
+            )
+
+            {:error, :insert_failed}
+        end
+
+      case result do
+        {:ok, _} ->
+          :ok
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          Ysc.Logging.warning(
+            "Newsletter: unsubscribe event changeset invalid",
+            edition_id: edition_id,
+            subscriber_id: subscriber.id,
+            errors: inspect(changeset.errors)
+          )
+
+          :ok
+
+        {:error, _reason} ->
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp edition_exists?(edition_id) when is_binary(edition_id) do
+    valid_ulid?(edition_id) and
+      Repo.exists?(from(e in Edition, where: e.id == ^edition_id))
   end
 
   @doc """
@@ -570,6 +658,78 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
+  Persists and broadcasts delivery progress for a sending newsletter edition.
+
+  The recipient count is set only once, when the sender loads its recipients.
+  Accepted deliveries are counted from the durable email delivery ledger.
+  """
+  def record_edition_delivery_progress(%Edition{} = edition, subscribers)
+      when is_list(subscribers) do
+    delivery_keys =
+      Enum.map(subscribers, fn subscriber ->
+        "newsletter_#{edition.id}_#{subscriber.id}"
+      end)
+
+    accepted_count =
+      from(m in MessageIdempotency,
+        where:
+          m.message_type == :email and
+            m.message_template == "newsletter_edition" and
+            m.delivery_status == :accepted and
+            m.idempotency_key in ^delivery_keys,
+        select: count(m.id)
+      )
+      |> Repo.one()
+
+    attrs =
+      %{sent_count: accepted_count}
+      |> maybe_put_recipient_count(edition, length(subscribers))
+
+    case update_edition(edition, attrs) do
+      {:ok, updated_edition} ->
+        broadcast_edition_delivery_progress(updated_edition)
+        {:ok, updated_edition}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp maybe_put_recipient_count(
+         attrs,
+         %Edition{recipient_count: nil},
+         recipient_count
+       ),
+       do: Map.put(attrs, :recipient_count, recipient_count)
+
+  defp maybe_put_recipient_count(attrs, %Edition{}, _recipient_count), do: attrs
+
+  @doc false
+  def subscribers_needing_newsletter_delivery(%Edition{} = edition, subscribers)
+      when is_list(subscribers) do
+    delivery_keys =
+      Enum.map(subscribers, fn subscriber ->
+        "newsletter_#{edition.id}_#{subscriber.id}"
+      end)
+
+    accepted_keys =
+      from(m in MessageIdempotency,
+        where:
+          m.message_type == :email and
+            m.message_template == "newsletter_edition" and
+            m.delivery_status == :accepted and
+            m.idempotency_key in ^delivery_keys,
+        select: m.idempotency_key
+      )
+      |> Repo.all()
+      |> MapSet.new()
+
+    Enum.reject(subscribers, fn subscriber ->
+      MapSet.member?(accepted_keys, "newsletter_#{edition.id}_#{subscriber.id}")
+    end)
+  end
+
+  @doc """
   Updates editorial newsletter fields from the admin editor draft save path.
   """
   def update_edition_draft(%Edition{} = edition, attrs) do
@@ -839,6 +999,8 @@ defmodule Ysc.Newsletter do
   `{:error, changeset}` on update failure.
   """
   def handle_hard_bounce(email) when is_binary(email) do
+    :ok = Suppression.suppress_hard_bounce(email)
+
     case get_subscriber_by_email(email) do
       nil ->
         {:ok, :not_subscribed}
@@ -865,6 +1027,17 @@ defmodule Ysc.Newsletter do
         |> Repo.update()
     end
   end
+
+  @doc """
+  Returns whether an email address has been suppressed after a hard bounce.
+
+  Hard-bounce suppression applies to every email category, not only newsletters.
+  """
+  def hard_bounced?(email) when is_binary(email) do
+    Suppression.hard_bounced?(email)
+  end
+
+  def hard_bounced?(_), do: false
 
   @doc """
   Returns email events for a given edition, ordered by most recent first.
@@ -1003,17 +1176,45 @@ defmodule Ysc.Newsletter do
   end
 
   @doc """
+  Counts unique recipients who clicked an unsubscribe link for an edition.
+
+  Uses SES click events whose `link_url` contains `/newsletter/unsubscribe/`.
+  This works for historical editions (no new tracking required).
+  """
+  def count_unsubscribe_link_clicks(edition_id) when is_binary(edition_id) do
+    edition_id
+    |> unsubscribe_link_clicks_query()
+    |> Repo.one()
+    |> Kernel.||(0)
+  end
+
+  @doc """
+  Counts confirmed unsubscribes attributed to an edition.
+
+  Only includes completions from email unsubscribe links that carried
+  an `edition_id` (forward-looking; historical editions will show 0).
+  """
+  def count_confirmed_unsubscribes(edition_id) when is_binary(edition_id) do
+    edition_id
+    |> confirmed_unsubscribes_query()
+    |> Repo.one()
+    |> Kernel.||(0)
+  end
+
+  @doc """
   Returns total click counts per link URL for a given edition,
   sorted by most clicked first, with resolved titles for event and post URLs.
 
-  Bare base-URL clicks (e.g. "https://ysc.org" or "https://ysc.org/") are
-  excluded as they don't provide meaningful engagement signal.
+  Bare base-URL clicks (e.g. "https://ysc.org" or "https://ysc.org/") and
+  unsubscribe links are excluded — unsubscribe engagement is reported
+  separately via `count_unsubscribe_link_clicks/1`.
 
   Each entry is a map:
     %{url: url, clicks: n, title: "Event/Post title" | nil, type: :event | :post | :other}
   """
   def count_clicks_by_link(edition_id) when is_binary(edition_id) do
     base_url = String.trim_trailing(YscWeb.Endpoint.url(), "/")
+    unsubscribe_pattern = unsubscribe_link_like_pattern()
 
     raw =
       EmailEvent
@@ -1023,6 +1224,7 @@ defmodule Ysc.Newsletter do
         [e],
         e.link_url != ^base_url and e.link_url != ^(base_url <> "/")
       )
+      |> where([e], not like(e.link_url, ^unsubscribe_pattern))
       |> group_by([e], e.link_url)
       |> select([e], {e.link_url, count(e.id)})
       |> order_by([e], desc: count(e.id))
@@ -1058,7 +1260,7 @@ defmodule Ysc.Newsletter do
         # matching column type — mixing slugs into the ULID-typed `id` binding
         # raises an Ecto.Query.CastError at runtime.
         {post_ids, post_slugs} =
-          Enum.split_with(post_identifiers, &ulid?/1)
+          Enum.split_with(post_identifiers, &valid_ulid?/1)
 
         rows =
           Repo.all(
@@ -1086,11 +1288,18 @@ defmodule Ysc.Newsletter do
     end)
   end
 
-  # Ecto.ULID values are 26-character Crockford base-32 strings.
-  defp ulid?(value) when is_binary(value),
+  @doc """
+  Returns true when `value` is a 26-character Crockford base-32 ULID string.
+  """
+  def valid_ulid?(value) when is_binary(value),
     do: String.match?(value, ~r/^[0-9A-HJKMNP-TV-Z]{26}$/i)
 
-  defp ulid?(_), do: false
+  def valid_ulid?(_), do: false
+
+  # Match absolute or relative unsubscribe paths (with or without query string).
+  @unsubscribe_link_like_pattern "%newsletter/unsubscribe%"
+
+  defp unsubscribe_link_like_pattern, do: @unsubscribe_link_like_pattern
 
   defp classify_link(url, base_url) do
     path =
@@ -1113,8 +1322,49 @@ defmodule Ysc.Newsletter do
   end
 
   @doc false
+  def unsubscribe_link_clicks_query(edition_id \\ nil)
+
+  def unsubscribe_link_clicks_query(nil) do
+    unsubscribe_link_clicks_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  def unsubscribe_link_clicks_query(edition_id) when is_binary(edition_id) do
+    unsubscribe_pattern = unsubscribe_link_like_pattern()
+
+    from(e in EmailEvent,
+      where: e.edition_id == ^edition_id,
+      where: e.event_type == "click",
+      where: not is_nil(e.link_url),
+      where: like(e.link_url, ^unsubscribe_pattern),
+      select: count(e.email, :distinct)
+    )
+  end
+
+  @doc false
+  def confirmed_unsubscribes_query(edition_id \\ nil)
+
+  def confirmed_unsubscribes_query(nil) do
+    confirmed_unsubscribes_query(Ysc.Ci.QueryExplain.Fixtures.ulid())
+  end
+
+  def confirmed_unsubscribes_query(edition_id) when is_binary(edition_id) do
+    from(e in UnsubscribeEvent,
+      where: e.edition_id == ^edition_id,
+      select: count(e.id)
+    )
+  end
+
+  @doc false
   def ci_query_explain_query, do: recent_sent_editions_query()
 
   @doc false
   def ci_query_explain_notices_query, do: list_notices_query()
+
+  @doc false
+  def ci_query_explain_unsubscribe_link_clicks_query,
+    do: unsubscribe_link_clicks_query()
+
+  @doc false
+  def ci_query_explain_confirmed_unsubscribes_query,
+    do: confirmed_unsubscribes_query()
 end
