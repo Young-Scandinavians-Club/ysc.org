@@ -242,10 +242,24 @@ defmodule Ysc.S3ConfigTest do
   end
 
   describe "app_resources_bucket_name/0" do
-    test "returns app resources bucket name" do
-      bucket = S3Config.app_resources_bucket_name()
-      assert is_binary(bucket)
-      assert bucket != ""
+    test "returns configured app resources bucket name" do
+      previous = Application.get_env(:ysc, :app_resources_s3_bucket)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :app_resources_s3_bucket)
+        else
+          Application.put_env(:ysc, :app_resources_s3_bucket, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :app_resources_s3_bucket,
+        "ysc-app-resources-test"
+      )
+
+      assert S3Config.app_resources_bucket_name() == "ysc-app-resources-test"
     end
   end
 

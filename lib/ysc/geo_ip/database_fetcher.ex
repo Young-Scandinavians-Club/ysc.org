@@ -26,12 +26,6 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
       database_is_stored_remotely: true,
       database_is_fetched_from: {:s3, bucket_name(), @object_key}
     }
-  rescue
-    _ ->
-      %{
-        database_is_stored_remotely: true,
-        database_is_fetched_from: {:s3, "app-resources", @object_key}
-      }
   end
 
   @impl true
@@ -114,9 +108,15 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
       {:error, {kind, reason}}
   end
 
+  # GeoLite2-City archives are tens of MB; use a longer download window than
+  # ExAws.Request.Req's 30s default. Override via `:ysc, :geo_ip_s3_req_opts`.
+  @default_receive_timeout 120_000
+
   defp request_from_s3 do
     bucket = bucket_name()
-    request_fn = Application.get_env(:ysc, :geo_ip_s3_request, &ExAws.request/1)
+
+    request_fn =
+      Application.get_env(:ysc, :geo_ip_s3_request, &default_s3_request/1)
 
     case bucket |> ExAws.S3.get_object(@object_key) |> request_fn.() do
       {:ok, %{body: body} = response} when is_binary(body) ->
@@ -137,6 +137,27 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
   catch
     kind, reason ->
       {:error, {kind, reason}}
+  end
+
+  defp default_s3_request(operation) do
+    ExAws.request(operation, http_opts: geo_ip_http_opts())
+  end
+
+  defp geo_ip_http_opts do
+    req_opts = Application.get_env(:ysc, :geo_ip_s3_req_opts, [])
+
+    receive_timeout =
+      Keyword.get(
+        req_opts,
+        :receive_timeout,
+        Keyword.get(req_opts, :recv_timeout, @default_receive_timeout)
+      )
+
+    # ExAws.Request.Req renames :recv_timeout → :receive_timeout and defaults
+    # missing :recv_timeout to 30s, which would clobber a bare :receive_timeout.
+    req_opts
+    |> Keyword.put(:recv_timeout, receive_timeout)
+    |> Keyword.put(:receive_timeout, receive_timeout)
   end
 
   defp bucket_name do

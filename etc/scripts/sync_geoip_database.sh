@@ -11,8 +11,10 @@
 #   AWS_ENDPOINT_URL_S3                 (optional)  default https://fly.storage.tigris.dev
 #   AWS_REGION                          (optional)  default auto
 #   APP_RESOURCES_BUCKET_NAME           (optional)  default ysc-app-resources
-#   GEOIP_S3_KEY                        (optional)  default geoip/GeoLite2-City.tar.gz
 #   DRY_RUN                             (optional)  if 1, download + checksum only (no upload)
+#
+# Object key is fixed to geoip/GeoLite2-City.tar.gz to match
+# Ysc.GeoIP.DatabaseFetcher.object_key/0 (single source of truth in the app).
 #
 # Usage:
 #   etc/scripts/sync_geoip_database.sh
@@ -23,7 +25,8 @@ MAXMIND_LICENSE_KEY="${MAXMIND_LICENSE_KEY:-}"
 AWS_ENDPOINT_URL_S3="${AWS_ENDPOINT_URL_S3:-https://fly.storage.tigris.dev}"
 AWS_REGION="${AWS_REGION:-auto}"
 APP_RESOURCES_BUCKET_NAME="${APP_RESOURCES_BUCKET_NAME:-ysc-app-resources}"
-GEOIP_S3_KEY="${GEOIP_S3_KEY:-geoip/GeoLite2-City.tar.gz}"
+# Keep in sync with Ysc.GeoIP.DatabaseFetcher.object_key/0
+GEOIP_S3_KEY="geoip/GeoLite2-City.tar.gz"
 DRY_RUN="${DRY_RUN:-0}"
 EDITION_ID="GeoLite2-City"
 
