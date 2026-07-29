@@ -1,0 +1,48 @@
+# Sync GeoLite2-City from MaxMind into the shared Tigris app-resources bucket.
+#
+# Deployed sandbox/prod machines load GeoIP only from this object; they never
+# contact MaxMind. Keep MAXMIND_LICENSE_KEY and Tigris write credentials in
+# GitHub Actions secrets (not Fly app secrets).
+#
+# Required secrets:
+#   MAXMIND_LICENSE_KEY
+#   TIGRIS_APP_RESOURCES_ACCESS_KEY_ID
+#   TIGRIS_APP_RESOURCES_SECRET_ACCESS_KEY
+
+name: Sync GeoIP database
+
+on:
+  schedule:
+    # Mondays 10:00 UTC — weekly refresh within GeoLite's 30-day update EULA
+    - cron: "0 10 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Download and verify checksum without uploading to Tigris
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync GeoLite2-City to ysc-app-resources
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          persist-credentials: false
+
+      - name: Sync GeoIP database
+        env:
+          MAXMIND_LICENSE_KEY: ${{ secrets.MAXMIND_LICENSE_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.TIGRIS_APP_RESOURCES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TIGRIS_APP_RESOURCES_SECRET_ACCESS_KEY }}
+          AWS_ENDPOINT_URL_S3: https://fly.storage.tigris.dev
+          AWS_REGION: auto
+          APP_RESOURCES_BUCKET_NAME: ysc-app-resources
+          DRY_RUN: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && '1' || '0' }}
+        run: bash etc/scripts/sync_geoip_database.sh

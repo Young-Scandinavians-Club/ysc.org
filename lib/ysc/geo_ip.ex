@@ -2,10 +2,11 @@ defmodule Ysc.GeoIP do
   @moduledoc """
   IP geolocation lookups using the locus library with MaxMind GeoLite2.
 
-  The loader is only started in deployed environments (sandbox or production)
-  when a non-empty MaxMind license key is configured. Local dev and test never
-  download the database. All functions degrade gracefully when the database
-  is unavailable.
+  The loader is only started in deployed environments (sandbox or production).
+  The GeoLite2-City database is published weekly by CI into the shared
+  `ysc-app-resources` bucket and loaded from S3 via `Ysc.GeoIP.DatabaseFetcher`.
+  Local dev and test never start the loader. All functions degrade gracefully
+  when the database is unavailable.
   """
 
   require Ysc.Logging
@@ -13,13 +14,10 @@ defmodule Ysc.GeoIP do
   @loader_name :city
 
   @doc """
-  Returns true if a MaxMind license key is configured.
+  Returns true when GeoIP lookups are enabled (deployed sandbox/production).
   """
   def configured? do
-    case Application.get_env(:locus, :license_key) do
-      key when is_binary(key) and byte_size(key) > 0 -> true
-      _ -> false
-    end
+    Ysc.Env.deployed?()
   end
 
   @doc """
@@ -69,11 +67,21 @@ defmodule Ysc.GeoIP do
         )
 
         %{}
+
+      _other ->
+        %{}
     end
   rescue
     error ->
       Ysc.Logging.debug("GeoIP lookup raised exception",
         extra: %{ip: ip_address, error: inspect(error)}
+      )
+
+      %{}
+  catch
+    _kind, reason ->
+      Ysc.Logging.debug("GeoIP lookup aborted",
+        extra: %{ip: ip_address, reason: inspect(reason)}
       )
 
       %{}

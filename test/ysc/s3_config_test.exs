@@ -241,6 +241,28 @@ defmodule Ysc.S3ConfigTest do
     end
   end
 
+  describe "app_resources_bucket_name/0" do
+    test "returns configured app resources bucket name" do
+      previous = Application.get_env(:ysc, :app_resources_s3_bucket)
+
+      on_exit(fn ->
+        if previous == nil do
+          Application.delete_env(:ysc, :app_resources_s3_bucket)
+        else
+          Application.put_env(:ysc, :app_resources_s3_bucket, previous)
+        end
+      end)
+
+      Application.put_env(
+        :ysc,
+        :app_resources_s3_bucket,
+        "ysc-app-resources-test"
+      )
+
+      assert S3Config.app_resources_bucket_name() == "ysc-app-resources-test"
+    end
+  end
+
   describe "base_url/0" do
     test "returns base URL" do
       url = S3Config.base_url()

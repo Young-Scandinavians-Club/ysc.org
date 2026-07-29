@@ -199,7 +199,7 @@ flowchart TB
 | **Google** | OAuth login (`email profile`) | Email, profile picture URL | US | Optional login method |
 | **Facebook** | OAuth login | Email, name, picture | US | Optional login method |
 | **Radar** | Address autocomplete, maps | Address search queries | US (Radar.io) | Used in registration/booking flows |
-| **MaxMind** | GeoIP | IP looked up locally after DB download | Local processing | No ongoing IP export to MaxMind |
+| **MaxMind** | GeoIP | Weekly CI download to shared S3; IPs looked up locally from that DB | Local processing | No ongoing IP export to MaxMind |
 | **Google Wallet / Apple Wallet** | Digital passes | Ticket/membership holder name, event details | Google/Apple | User-initiated pass download |
 | **Google Photos** | Admin event albums | OAuth tokens; uploaded photos | Google | Admin-only integration |
 | **OpenRouter** | Admin help LLM | Admin questions + public site snippets | Third-party LLM | No intentional member PII in prompts |

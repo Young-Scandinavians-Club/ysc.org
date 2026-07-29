@@ -5,6 +5,8 @@ defmodule Ysc.Application do
 
   use Application
 
+  require Ysc.Logging
+
   # Resolved at compile time; Mix is not available in releases.
   @env Mix.env()
 
@@ -170,16 +172,39 @@ defmodule Ysc.Application do
   end
 
   defp maybe_start_geo_ip_loader do
-    if Ysc.GeoIP.configured?() and Ysc.Env.deployed?() and
-         Code.ensure_loaded?(:locus) do
-      # MaxMind's per-license request limit is shared by every production machine.
-      # Locus retries indefinitely; these intervals prevent a 429 response from
-      # becoming a fleet-wide retry loop while still refreshing the cached database.
-      :locus.start_loader(:city, {:maxmind, "GeoLite2-City"},
-        update_period: :timer.hours(24),
-        error_retries: {:backoff, :timer.hours(6)}
-      )
+    if Ysc.Env.deployed?() and Code.ensure_loaded?(:locus) do
+      # GeoLite2-City is published weekly by CI into the shared app-resources
+      # bucket. Machines only load from S3 (never MaxMind) so cold starts and
+      # multi-machine fleets cannot burn the MaxMind daily download quota.
+      #
+      # Failures here must never prevent the app from booting: lookups already
+      # degrade to %{} when the database is unavailable.
+      case :locus.start_loader(
+             :city,
+             {:custom_fetcher, Ysc.GeoIP.DatabaseFetcher, []},
+             update_period: :timer.hours(24),
+             error_retries: {:backoff, :timer.hours(6)}
+           ) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.warning(
+            "GeoIP loader failed to start; continuing without geolocation",
+            extra: %{reason: inspect(reason)}
+          )
+
+          :ok
+      end
     end
+  rescue
+    error ->
+      Ysc.Logging.warning(
+        "GeoIP loader raised during start; continuing without geolocation",
+        extra: %{error: Exception.message(error)}
+      )
+
+      :ok
   end
 
   # Shuts down the application if no active HTTP connections are found.

@@ -293,6 +293,9 @@ if config_env() == :prod do
   expense_reports_bucket =
     System.get_env("EXPENSE_REPORTS_BUCKET_NAME") || "expense-reports"
 
+  app_resources_bucket =
+    System.get_env("APP_RESOURCES_BUCKET_NAME") || "app-resources"
+
   avatars_bucket =
     case System.get_env("AVATARS_BUCKET_NAME") do
       value when is_binary(value) and value != "" ->
@@ -316,6 +319,7 @@ if config_env() == :prod do
     s3_expense_reports_public_url: s3_expense_reports_public_url,
     s3_use_custom_domain: s3_use_custom_domain,
     expense_reports_s3_bucket: expense_reports_bucket,
+    app_resources_s3_bucket: app_resources_bucket,
     avatars_s3_bucket: avatars_bucket,
     aws_access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY")
@@ -611,14 +615,11 @@ if config_env() == :prod do
   end
 end
 
-# ## MaxMind GeoIP configuration
+# ## GeoIP configuration
 #
-# Set MAXMIND_LICENSE_KEY to enable IP geolocation for auth events.
-# When not set, geolocation is silently disabled and auth events will
-# be stored without location data.
-# The database is only downloaded in deployed environments (sandbox/production);
-# see Ysc.Application.maybe_start_geo_ip_loader/0.
-if license_key = System.get_env("MAXMIND_LICENSE_KEY") do
-  config :locus,
-    license_key: license_key
-end
+# Deployed environments (sandbox/production) load GeoLite2-City from the shared
+# `ysc-app-resources` S3 bucket via Ysc.GeoIP.DatabaseFetcher. The weekly GitHub
+# Actions workflow `.github/workflows/sync-geoip-database.yml` downloads from
+# MaxMind and uploads `geoip/GeoLite2-City.tar.gz`. Keep MAXMIND_LICENSE_KEY in
+# GitHub Actions secrets only — do not set it on Fly app machines.
+# See Ysc.Application.maybe_start_geo_ip_loader/0.
