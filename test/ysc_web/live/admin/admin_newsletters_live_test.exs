@@ -395,16 +395,20 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       assert html =~ "Broadcast Edition"
     end
 
-    test "renders edition when delivery progress is broadcast without preloaded creator", %{
-      conn: conn,
-      admin: admin
-    } do
+    test "renders edition when delivery progress is broadcast without preloaded creator",
+         %{
+           conn: conn,
+           admin: admin
+         } do
       edition = edition_fixture(admin, %{"title" => "Progress Edition"})
 
       {view, _html} = live_newsletters(conn)
 
       {:ok, progress_edition} =
-        Newsletter.update_edition(edition, %{"status" => :sending, "sent_count" => 1})
+        Newsletter.update_edition(edition, %{
+          "status" => :sending,
+          "sent_count" => 1
+        })
 
       :ok = Newsletter.broadcast_edition_delivery_progress(progress_edition)
 

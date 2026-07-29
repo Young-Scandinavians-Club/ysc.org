@@ -436,7 +436,10 @@ defmodule YscWeb.AdminNewslettersLive do
                     >
                       {edition.sent_count} sent
                     </span>
-                    <span :if={creator_assigned?(edition)} class="text-sm text-zinc-500">
+                    <span
+                      :if={creator_assigned?(edition)}
+                      class="text-sm text-zinc-500"
+                    >
                       by {creator_name(edition.creator)}
                     </span>
                   </div>
