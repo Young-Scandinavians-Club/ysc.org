@@ -4521,10 +4521,12 @@ defmodule YscWeb.CoreComponents do
         fetchpriority="high"
         loading="eager"
       />
+      <%!-- No HTML autoplay: LiveView morphdom calls video.play() on autoplay
+           nodes without catching NotAllowedError (common on iOS Safari). Playback
+           is started by HeroVideoControls with a caught promise instead. --%>
       <video
         :if={@video}
         id="hero-video"
-        autoplay
         muted
         loop
         playsinline

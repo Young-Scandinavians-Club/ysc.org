@@ -366,6 +366,31 @@ defmodule YscWeb.PasskeyAuthenticationTest do
       assert html =~ "cancelled" || html =~ "Authentication was cancelled"
     end
 
+    test "maps NotSupportedError to a friendly device-support message", %{
+      conn: conn
+    } do
+      {:ok, lv, _html} = live(conn, ~p"/users/log-in")
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_support_detected", %{"supported" => true})
+
+      lv
+      |> element("button[phx-click='sign_in_with_passkey']")
+      |> render_click()
+
+      lv
+      |> element("#auth-methods")
+      |> render_hook("passkey_auth_error", %{
+        "error" => "NotSupportedError",
+        "message" =>
+          "Resident credentials or empty 'allowCredentials' lists are not supported at this time."
+      })
+
+      html = render(lv)
+      assert html =~ "doesn't support" || html =~ "another sign-in method"
+    end
+
     test "shows loading state during authentication", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/log-in")
 

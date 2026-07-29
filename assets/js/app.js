@@ -150,6 +150,12 @@ waitForSentry().then((available) => {
             integrations: integrations,
             // Performance Monitoring - capture 10% of transactions
             tracesSampleRate: 0.1,
+            // Browser/platform denials (autoplay, WebAuthn cancel, etc.) are expected UX noise
+            ignoreErrors: [
+                /^NotAllowedError/,
+                /The request is not allowed by the user agent or the platform/,
+                /Resident credentials or empty 'allowCredentials' lists are not supported/,
+            ],
         });
 
         // Set user context if user is logged in

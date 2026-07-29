@@ -2,6 +2,10 @@
  * Pause/play control for the hero background video.
  * Mount on the hero section; expects a <video> and a button with data-hero-video-toggle.
  * Toggles video playback on button click and keeps the button icon in sync (pause when playing, play when paused).
+ *
+ * Intentionally does not rely on the HTML autoplay attribute: Phoenix LiveView's
+ * morphdom calls video.play() on autoplay nodes without catching rejections, which
+ * surfaces as unhandled NotAllowedError on iOS Safari.
  */
 export default {
     mounted() {
@@ -21,7 +25,7 @@ export default {
 
         this.toggle = () => {
             if (this.video.paused) {
-                Promise.resolve(this.video.play()).catch(() => {});
+                this.safePlay();
             } else {
                 this.video.pause();
             }
@@ -32,14 +36,14 @@ export default {
         this.video.addEventListener("play", this.updateButtonState);
         this.video.addEventListener("pause", this.updateButtonState);
 
-        // Suppress unhandled rejections from autoplay being interrupted by the browser
-        // (e.g. power-saving policies, tab backgrounded during LiveView navigation).
-        // Promise.resolve handles browsers where play() returns undefined instead of a Promise.
-        if (this.video.paused) {
-            Promise.resolve(this.video.play()).catch(() => {});
-        }
-
+        this.safePlay();
         this.updateButtonState();
+    },
+
+    safePlay() {
+        if (!this.video) return;
+        // Promise.resolve handles browsers where play() returns undefined instead of a Promise.
+        Promise.resolve(this.video.play()).catch(() => {});
     },
 
     destroyed() {
