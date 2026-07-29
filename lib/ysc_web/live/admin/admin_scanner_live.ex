@@ -1079,7 +1079,10 @@ defmodule YscWeb.AdminScannerLive do
         <div class="flex justify-between">
           <span class="text-emerald-100">Membership</span>
           <span class="font-semibold">
-            {AdminMembershipHelpers.membership_type_label(@scan_result.membership_type, :full)}
+            {AdminMembershipHelpers.membership_type_label(
+              @scan_result.membership_type,
+              :full
+            )}
           </span>
         </div>
         <div :if={@scan_result.member_since} class="flex justify-between">

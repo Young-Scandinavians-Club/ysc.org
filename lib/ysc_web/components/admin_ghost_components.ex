@@ -407,7 +407,9 @@ defmodule YscWeb.AdminGhostComponents do
         <.admin_ghost_bar width="w-16" height="h-3" />
         <.admin_ghost_bar width="w-12" height="h-3" />
         <.admin_ghost_bar width="w-20" height="h-3" />
-        <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(row.state)}>{row.label}</.badge>
+        <.badge type={YscWeb.AdminBadgeHelpers.event_state_badge_type(row.state)}>
+          {row.label}
+        </.badge>
         <.admin_ghost_bar width="w-16" height="h-3" />
         <div class="relative flex justify-end">
           <button
