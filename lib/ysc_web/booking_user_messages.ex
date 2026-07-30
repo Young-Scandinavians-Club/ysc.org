@@ -109,7 +109,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   def checkout_manage_booking_step do
-    "View or change your reservation anytime from My Bookings & Tickets in your account menu, or use the link in your confirmation email"
+    "View or change your reservation anytime from My Bookings & Payments in your account menu, or use the link in your confirmation email"
   end
 
   def checkout_pricing_load_failed do
@@ -216,7 +216,7 @@ defmodule YscWeb.BookingUserMessages do
   end
 
   defp modification_after_payment_recovery_body do
-    "Open this booking from My Bookings & Tickets (under your account menu) and check whether the dates updated. If they didn't, email info@ysc.org with #{booking_reference_support_phrase()}."
+    "Open this booking from My Bookings & Payments (under your account menu) and check whether the dates updated. If they didn't, email info@ysc.org with #{booking_reference_support_phrase()}."
   end
 
   defp trim(string), do: String.trim(string)

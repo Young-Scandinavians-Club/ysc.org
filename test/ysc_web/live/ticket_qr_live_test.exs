@@ -84,7 +84,7 @@ defmodule YscWeb.TicketQrLiveTest do
       flash = assert_redirect(view, "/users/tickets")
 
       assert flash["error"] =~ "couldn't find those tickets"
-      assert flash["error"] =~ "My Bookings & Tickets"
+      assert flash["error"] =~ "Your event tickets"
     end
   end
 

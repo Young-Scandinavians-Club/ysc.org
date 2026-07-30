@@ -3293,7 +3293,7 @@ defmodule YscWeb.CoreComponents do
   @account_settings_nav_keys [
     {:profile, "Profile", "hero-user"},
     {:membership, "Membership", "hero-heart"},
-    {:payments, "Bookings & Tickets", "hero-wallet"},
+    {:payments, "Bookings & Payments", "hero-wallet"},
     {:family, "Family", "hero-user-group"},
     {:security, "Security", "hero-shield-check"},
     {:notifications, "Notifications", "hero-bell-alert"}
@@ -4215,11 +4215,11 @@ defmodule YscWeb.CoreComponents do
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
-              </strong>, at which point you will no longer have access to the YSC membership features.
+              </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_ends_at(@current_membership)) %>
-              </strong>, at which point you will no longer have access to the YSC membership features.
+              </strong>, after which you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
         </div>
@@ -4323,11 +4323,11 @@ defmodule YscWeb.CoreComponents do
             <%= if @is_sub_account do %>
               You will still have access to membership benefits until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
-              </strong>. After that date, you will no longer have access to YSC membership features.
+              </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% else %>
               You are still an active member until <strong>
               <%= DateDisplay.format_pacific_date(get_membership_renewal_date(@current_membership)) %>
-              </strong>. After that date, you will no longer have access to YSC membership features.
+              </strong>. After that date, you won't be able to book cabins, buy member event tickets, or use other member-only benefits until you renew.
             <% end %>
           </p>
         </div>
