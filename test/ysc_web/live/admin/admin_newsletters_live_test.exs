@@ -206,10 +206,11 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       assert reloaded.status == :sent
     end
 
-    test "renders edition when edition_sent delivers edition without preloaded creator", %{
-      conn: conn,
-      admin: admin
-    } do
+    test "renders edition when edition_sent delivers edition without preloaded creator",
+         %{
+           conn: conn,
+           admin: admin
+         } do
       edition = edition_fixture(admin, %{"title" => "Raw Sent Edition"})
       edition = Newsletter.get_edition!(edition.id)
 
