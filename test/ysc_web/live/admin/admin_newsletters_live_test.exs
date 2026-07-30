@@ -197,9 +197,29 @@ defmodule YscWeb.AdminNewslettersLiveTest do
       |> element("#newsletter-actions-dt-#{edition.id}-send-now")
       |> render_click()
 
+      # Re-render after send-now: stream updates must not crash when :creator is NotLoaded.
+      html = render(view)
+      assert html =~ "Sent"
+
       # In inline Oban mode the sender fires synchronously; edition is :sent
       reloaded = Newsletter.get_edition!(edition.id)
       assert reloaded.status == :sent
+    end
+
+    test "renders edition when edition_sent delivers edition without preloaded creator",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      edition = edition_fixture(admin, %{"title" => "Raw Sent Edition"})
+      edition = Newsletter.get_edition!(edition.id)
+
+      {view, _html} = live_newsletters(conn)
+
+      send(view.pid, {:edition_sent, edition})
+
+      html = render(view)
+      assert html =~ "Raw Sent Edition"
     end
   end
 
