@@ -53,7 +53,8 @@ defmodule YscWeb.SEO do
   as the logo fallback.
   """
   def twitter_card_for_image(url) when is_binary(url) do
-    if url == default_og_image_url() or String.ends_with?(url, @default_og_image_path) do
+    if url == default_og_image_url() or
+         String.ends_with?(url, @default_og_image_path) do
       "summary"
     else
       "summary_large_image"

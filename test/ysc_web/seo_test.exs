@@ -71,9 +71,15 @@ defmodule YscWeb.SEOTest do
 
   describe "twitter_card_for_image/1" do
     test "uses summary for missing or default logo images" do
-      assert SEO.twitter_card_for_image(SEO.og_image_or_default(nil)) == "summary"
-      assert SEO.twitter_card_for_image(SEO.og_image_or_default("")) == "summary"
-      assert SEO.twitter_card_for_image(SEO.og_image_or_default("   ")) == "summary"
+      assert SEO.twitter_card_for_image(SEO.og_image_or_default(nil)) ==
+               "summary"
+
+      assert SEO.twitter_card_for_image(SEO.og_image_or_default("")) ==
+               "summary"
+
+      assert SEO.twitter_card_for_image(SEO.og_image_or_default("   ")) ==
+               "summary"
+
       assert SEO.twitter_card_for_image(SEO.default_og_image_url()) == "summary"
     end
 
