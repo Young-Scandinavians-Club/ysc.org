@@ -11,7 +11,16 @@ defmodule Ysc.Tickets.BookingLocker do
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Events
-  alias Ysc.Events.{Event, EventDateTime, TicketTier, Ticket, TicketReservation}
+
+  alias Ysc.Events.{
+    Event,
+    EventDateTime,
+    TicketTier,
+    Ticket,
+    TicketReservation,
+    TicketTierHelpers
+  }
+
   alias Ysc.Tickets.TicketOrder
 
   @doc """
@@ -277,13 +286,14 @@ defmodule Ysc.Tickets.BookingLocker do
           tier.event_id != event_id ->
             {:error, :tier_not_for_event}
 
-          not skip_sale_guards? and not tier_on_sale?(tier) ->
+          not skip_sale_guards? and
+              not TicketTierHelpers.tier_sale_started?(tier) ->
             {:error, :tier_not_on_sale}
 
           quantity <= 0 ->
             {:error, :invalid_quantity}
 
-          tier.type == :donation or tier.type == "donation" ->
+          TicketTierHelpers.donation_tier?(tier) ->
             :ok
 
           skip_capacity? ->
@@ -360,7 +370,7 @@ defmodule Ysc.Tickets.BookingLocker do
         tier = Enum.find(tiers, &(&1.id == tier_id))
 
         # Donations don't count toward event capacity
-        if tier && (tier.type == :donation || tier.type == "donation") do
+        if tier && TicketTierHelpers.donation_tier?(tier) do
           acc
         else
           acc + quantity
@@ -649,7 +659,7 @@ defmodule Ysc.Tickets.BookingLocker do
       total_quantity: tier.quantity,
       available: available,
       sold: get_sold_tier_quantity_locked(tier),
-      on_sale: tier_on_sale?(tier),
+      on_sale: TicketTierHelpers.tier_sale_started?(tier),
       start_date: tier.start_date,
       end_date: tier.end_date
     }
@@ -987,15 +997,7 @@ defmodule Ysc.Tickets.BookingLocker do
     end
   end
 
-  defp tier_on_sale?(%TicketTier{start_date: nil}), do: true
-
-  defp tier_on_sale?(%TicketTier{start_date: start_date}) do
-    now = DateTime.utc_now()
-    DateTime.compare(now, start_date) != :lt
-  end
-
-  @doc false
-  def active_reservations_for_event_ordered_query(user_id, event_id) do
+  defp active_reservations_for_event_ordered_query(user_id, event_id) do
     TicketReservation
     |> join(:inner, [tr], tt in TicketTier, on: tr.ticket_tier_id == tt.id)
     |> where([tr, tt], tr.user_id == ^user_id and tt.event_id == ^event_id)

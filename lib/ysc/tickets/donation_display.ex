@@ -8,6 +8,7 @@ defmodule Ysc.Tickets.DonationDisplay do
   """
 
   alias Ysc.MoneyHelper
+  alias Ysc.Events.TicketTierHelpers
 
   @doc """
   Returns `%{ticket_id => formatted_amount}` for donation tickets on the order.
@@ -17,7 +18,9 @@ defmodule Ysc.Tickets.DonationDisplay do
   """
   def amounts_by_ticket_id(%{tickets: tickets, total_amount: total_amount})
       when is_list(tickets) do
-    donation_tickets = Enum.filter(tickets, &donation_ticket?/1)
+    donation_tickets =
+      Enum.filter(tickets, &TicketTierHelpers.donation_ticket?/1)
+
     donation_count = length(donation_tickets)
 
     with true <- donation_count > 0,
@@ -50,7 +53,7 @@ defmodule Ysc.Tickets.DonationDisplay do
 
   defp non_donation_total(tickets) do
     Enum.reduce(tickets, Money.new(0, :USD), fn ticket, acc ->
-      if donation_ticket?(ticket) do
+      if TicketTierHelpers.donation_ticket?(ticket) do
         acc
       else
         add_ticket_net_price(acc, ticket)
@@ -81,12 +84,6 @@ defmodule Ysc.Tickets.DonationDisplay do
         acc
     end
   end
-
-  defp donation_ticket?(%{ticket_tier: %{type: type}})
-       when type in [:donation, "donation"],
-       do: true
-
-  defp donation_ticket?(_), do: false
 
   defp format_amount(%Money{} = amount) do
     MoneyHelper.format_money!(amount)
