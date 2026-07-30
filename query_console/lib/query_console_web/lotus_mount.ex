@@ -9,10 +9,10 @@ defmodule QueryConsoleWeb.LotusMount do
   @doc false
   defmacro lotus_dashboard(path, opts \\ []) do
     quote bind_quoted: binding() do
-      # Lotus.Web.Helpers.lotus_path/2 originally builds "#{prefix}/#{route}". Mounted at
-      # "/" that is either "//queries/new" (prefix "/") or empty home href (prefix "").
-      # We keep prefix "" here and redefine Helpers (lib/lotus_web/helpers.ex) to join
-      # root paths correctly: "" → "/", "queries/new" → "/queries/new".
+      # Upstream lotus_path does "#{prefix}/#{route}". At "/" that breaks either as
+      # "//queries/new" or empty home hrefs. Keep prefix "" and apply a runtime
+      # Helpers patch (QueryConsole.LotusWeb.HelpersPatch) so joins become
+      # "" → "/" and "queries/new" → "/queries/new".
       prefix =
         case Phoenix.Router.scoped_path(__MODULE__, path) do
           "/" -> ""
@@ -27,10 +27,18 @@ defmodule QueryConsoleWeb.LotusMount do
           Lotus.Web.Router.__options__(prefix, opts)
 
         session_opts =
-          Keyword.put(session_opts, :root_layout, {QueryConsoleWeb.Layouts, :lotus_root})
+          session_opts
+          |> Keyword.put(:root_layout, {QueryConsoleWeb.Layouts, :lotus_root})
+          |> Keyword.update(:on_mount, [QueryConsoleWeb.LotusPathFix], fn hooks ->
+            [QueryConsoleWeb.LotusPathFix | List.wrap(hooks)]
+          end)
 
         public_session_opts =
-          Keyword.put(public_session_opts, :root_layout, {QueryConsoleWeb.Layouts, :lotus_root})
+          public_session_opts
+          |> Keyword.put(:root_layout, {QueryConsoleWeb.Layouts, :lotus_root})
+          |> Keyword.update(:on_mount, [QueryConsoleWeb.LotusPathFix], fn hooks ->
+            [QueryConsoleWeb.LotusPathFix | List.wrap(hooks)]
+          end)
 
         get("/export/csv", Lotus.Web.ExportController, :csv)
 

@@ -1,25 +1,23 @@
 defmodule Lotus.Web.Helpers do
   @moduledoc false
 
-  # Queried as a module conflict with lotus_web's Helpers: we redefine it so mounting
-  # Lotus at "/" joins paths correctly. Upstream does "#{prefix}/#{route}", which is
-  # broken for both prefix "/" ("//queries/new") and prefix "" (empty home href).
+  # Loaded at runtime by QueryConsole.LotusWeb.HelpersPatch (not compiled into
+  # query_console) so mix release does not see a duplicate module with lotus_web.
+  # Fixes root-mounted path joins: "" → "/", "queries/new" → "/queries/new".
 
   alias Phoenix.VerifiedRoutes
 
   @pdict_key :__lotus_web_prefix__
 
   @doc false
+  def __query_console_patched__, do: true
+
+  @doc false
   def put_router_prefix(socket, prefix) do
     Process.put(@pdict_key, {socket, prefix})
   end
 
-  @doc """
-  Construct a path to a dashboard page with optional params.
-
-  Routing is based on a socket and prefix tuple stored in the process dictionary. Proper routing
-  can be disabled for testing by setting the value to `:nowhere`.
-  """
+  @doc false
   def lotus_path(route, params \\ %{})
 
   def lotus_path(route, params) when is_list(route) do
@@ -47,7 +45,6 @@ defmodule Lotus.Web.Helpers do
     end
   end
 
-  # Mounted at "/": empty route → "/"; nested → "/queries/new" (never "//…" or "").
   defp join_prefix(prefix, route) when route in ["", nil] do
     case prefix do
       p when p in ["", "/"] -> "/"
@@ -61,9 +58,6 @@ defmodule Lotus.Web.Helpers do
     String.trim_trailing(prefix, "/") <> "/" <> to_string(route)
   end
 
-  @doc """
-  Prepare parsed params for URI encoding.
-  """
   def encode_params(params) do
     for {key, val} <- params, val != nil, val != "" do
       case val do
@@ -79,9 +73,6 @@ defmodule Lotus.Web.Helpers do
     end
   end
 
-  @doc """
-  Restore params from URI encoding.
-  """
   def decode_params(params) do
     Map.new(params, fn
       {"limit", val} ->
@@ -103,8 +94,6 @@ defmodule Lotus.Web.Helpers do
     end)
   end
 
-  @doc """
-  """
   def active_filter?(params, :state, value) do
     params[:state] == value or (is_nil(params[:state]) and value == "executing")
   end
@@ -118,9 +107,6 @@ defmodule Lotus.Web.Helpers do
 
   require Logger
 
-  @doc """
-  Encodes data to JSON, returning `{:ok, json}` or `{:error, :encoding_failed}`.
-  """
   def safe_json_encode(data) do
     {:ok, Lotus.JSON.encode!(data)}
   rescue
@@ -129,9 +115,6 @@ defmodule Lotus.Web.Helpers do
       {:error, :encoding_failed}
   end
 
-  @doc """
-  Encodes data to JSON, returning `"{}"` on failure.
-  """
   def safe_json_encode_or_empty(data) do
     Lotus.JSON.encode!(data)
   rescue

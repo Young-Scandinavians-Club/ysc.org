@@ -7,8 +7,6 @@ defmodule QueryConsole.MixProject do
       version: "0.1.0",
       elixir: "~> 1.20",
       elixirc_paths: elixirc_paths(Mix.env()),
-      # We redefine Lotus.Web.Helpers so root-mounted Lotus path joins work (see lib/lotus_web/helpers.ex).
-      elixirc_options: [ignore_module_conflict: true],
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),

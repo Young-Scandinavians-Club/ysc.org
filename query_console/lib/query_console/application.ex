@@ -5,6 +5,8 @@ defmodule QueryConsole.Application do
 
   @impl true
   def start(_type, _args) do
+    QueryConsole.LotusWeb.HelpersPatch.install!()
+
     children =
       [
         QueryConsoleWeb.Telemetry,
