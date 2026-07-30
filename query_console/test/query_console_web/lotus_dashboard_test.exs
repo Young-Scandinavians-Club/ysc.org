@@ -28,13 +28,30 @@ defmodule QueryConsoleWeb.LotusDashboardTest do
     conn = log_in_user(conn, user)
 
     {:ok, view, _html} = live(conn, ~p"/")
+    html = render(view)
 
     # Root mount must not produce protocol-relative "//queries/new" links.
-    assert render(view) =~ ~s(href="/queries/new")
-    refute render(view) =~ ~s(href="//queries/new")
+    assert html =~ ~s(href="/queries/new")
+    refute html =~ ~s(href="//queries/new")
+    # Logo / home must be "/" (not empty href from prefix "").
+    assert html =~ ~s(title="Lotus Web")
+    assert html =~ ~s(href="/")
+    refute html =~ ~s(href="" title="Lotus Web")
 
-    {:ok, editor, html} = live(conn, "/queries/new")
-    assert html =~ "New Query"
+    {:ok, editor, editor_html} = live(conn, "/queries/new")
+    assert editor_html =~ "New Query"
     assert render(editor) =~ "New Query"
+    # Back to queries list
+    assert render(editor) =~ ~s(href="/")
+  end
+
+  test "dashboard editor back link goes to /?tab=dashboards", %{conn: conn} do
+    user = user_fixture()
+    conn = log_in_user(conn, user)
+
+    {:ok, view, _html} = live(conn, "/dashboards/new")
+    html = render(view)
+    assert html =~ ~s(href="/?tab=dashboards")
+    refute html =~ ~s(href="?tab=dashboards")
   end
 end

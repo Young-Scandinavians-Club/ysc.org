@@ -9,10 +9,10 @@ defmodule QueryConsoleWeb.LotusMount do
   @doc false
   defmacro lotus_dashboard(path, opts \\ []) do
     quote bind_quoted: binding() do
-      # Lotus.Web.Helpers.lotus_path/2 builds "#{prefix}/#{route}". When mounted at
-      # "/", scoped_path is "/" and that becomes "//queries/new", which URI-parses
-      # as host "queries" + path "/new" — so New → SQL Query never reaches the editor.
-      # Use "" for the root mount so paths stay "/queries/new".
+      # Lotus.Web.Helpers.lotus_path/2 originally builds "#{prefix}/#{route}". Mounted at
+      # "/" that is either "//queries/new" (prefix "/") or empty home href (prefix "").
+      # We keep prefix "" here and redefine Helpers (lib/lotus_web/helpers.ex) to join
+      # root paths correctly: "" → "/", "queries/new" → "/queries/new".
       prefix =
         case Phoenix.Router.scoped_path(__MODULE__, path) do
           "/" -> ""
