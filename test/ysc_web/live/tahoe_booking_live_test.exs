@@ -1531,7 +1531,18 @@ defmodule YscWeb.TahoeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live(conn, ~p"/bookings/tahoe")
+      {checkin, checkout} = tahoe_booking_dates(30)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "room"
+      }
+
+      {:ok, view, _html} =
+        live(conn, ~p"/bookings/tahoe?#{URI.encode_query(params)}")
+
       render_async(view, 2_000)
 
       render_click(view, "switch-tab", %{"tab" => "information"})

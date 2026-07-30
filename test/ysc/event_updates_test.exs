@@ -275,7 +275,8 @@ defmodule Ysc.EventUpdatesTest do
       {_recipients, query_count} =
         Ysc.QueryCounter.with_query_counter(
           fn -> Events.list_event_update_recipients(event.id) end,
-          pattern: recipient_pattern
+          pattern: recipient_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 1

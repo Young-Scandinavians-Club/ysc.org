@@ -153,10 +153,12 @@ defmodule YscWeb.AdminMembershipCheckInLiveTest do
             {:ok, view, html} =
               live(conn, ~p"/admin/membership-check-in/#{session.id}")
 
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render(view)
             {:ok, view, html}
           end,
-          pattern: check_ins_pattern
+          pattern: check_ins_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count <= 1

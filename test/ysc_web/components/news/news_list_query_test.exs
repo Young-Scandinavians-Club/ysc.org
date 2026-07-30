@@ -42,7 +42,8 @@ defmodule YscWeb.NewsListQueryTest do
     {_html, query_count} =
       Ysc.QueryCounter.with_query_counter(
         fn -> render_component(YscWeb.NewsListLive, %{id: "news-list"}) end,
-        pattern: images_pattern
+        pattern: images_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0

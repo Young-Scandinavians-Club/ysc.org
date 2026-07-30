@@ -52,7 +52,8 @@ defmodule YscWeb.AdminPostsQueryTest do
             |> form("#posts-search-form", q: "Author Cache")
             |> render_change()
           end,
-          pattern: author_filter_pattern
+          pattern: author_filter_pattern,
+          caller_pids: [view.pid]
         )
 
       assert author_queries == 0

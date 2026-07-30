@@ -489,7 +489,8 @@ defmodule Ysc.SettingsTest do
             assert Settings.get_setting_safe("instagram") != nil
             assert Settings.get_setting_safe("facebook") != nil
           end,
-          pattern: ~r/FROM "site_settings"/i
+          pattern: ~r/FROM "site_settings"/i,
+          caller_pids: [self()]
         )
 
       assert query_count == 0
