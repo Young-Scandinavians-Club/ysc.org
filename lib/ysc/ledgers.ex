@@ -3054,75 +3054,105 @@ defmodule Ysc.Ledgers do
   Gets all ledger accounts with their balances.
   """
   def get_accounts_with_balances do
-    # First get all accounts
     accounts = Repo.all(LedgerAccount)
+    account_ids = Enum.map(accounts, & &1.id)
 
-    # Then calculate balances for each account
-    # Note: get_account_balance already normalizes based on normal_balance
-    Enum.map(accounts, fn account ->
-      balance = get_account_balance(account.id)
-      %{account: account, balance: balance}
-    end)
+    accounts
+    |> accounts_with_balances_from_entries(entries_by_account_for_all(account_ids))
   end
 
   @doc """
   Gets all ledger accounts with their balances within a date range.
   """
   def get_accounts_with_balances(start_date, end_date) do
-    # First get all accounts
     accounts = Repo.all(LedgerAccount)
-
-    # Batch fetch all ledger entries for all accounts in one query
     account_ids = Enum.map(accounts, & &1.id)
 
-    entries_by_account =
-      from(e in LedgerEntry,
-        join: p in Payment,
-        on: e.payment_id == p.id,
-        where: e.account_id in ^account_ids,
-        where: p.payment_date >= ^start_date,
-        where: p.payment_date <= ^end_date,
-        select: {e.account_id, e.amount, e.debit_credit}
-      )
-      |> Repo.all()
-      |> Enum.group_by(fn {account_id, _amount, _debit_credit} ->
-        account_id
-      end)
+    accounts
+    |> accounts_with_balances_from_entries(
+      entries_by_account_for_date_range(account_ids, start_date, end_date)
+    )
+  end
 
-    # Calculate balance for each account using the pre-fetched entries
+  @doc """
+  Gets period and current balances for all accounts with a single accounts fetch.
+
+  Returns `{period_accounts, current_accounts, accounts}` for admin overview
+  screens that need both balance snapshots without redundant account queries.
+  """
+  def get_overview_accounts_with_balances(start_date, end_date) do
+    accounts = Repo.all(LedgerAccount)
+    account_ids = Enum.map(accounts, & &1.id)
+
+    current_entries_by_account = entries_by_account_for_all(account_ids)
+    period_entries_by_account =
+      entries_by_account_for_date_range(account_ids, start_date, end_date)
+
+    period_accounts =
+      accounts_with_balances_from_entries(accounts, period_entries_by_account)
+
+    current_accounts =
+      accounts_with_balances_from_entries(accounts, current_entries_by_account)
+
+    {period_accounts, current_accounts, accounts}
+  end
+
+  defp entries_by_account_for_all(account_ids) do
+    from(e in LedgerEntry,
+      where: e.account_id in ^account_ids,
+      select: {e.account_id, e.amount, e.debit_credit}
+    )
+    |> Repo.all()
+    |> Enum.group_by(fn {account_id, _amount, _debit_credit} -> account_id end)
+  end
+
+  defp entries_by_account_for_date_range(account_ids, start_date, end_date) do
+    from(e in LedgerEntry,
+      join: p in Payment,
+      on: e.payment_id == p.id,
+      where: e.account_id in ^account_ids,
+      where: p.payment_date >= ^start_date,
+      where: p.payment_date <= ^end_date,
+      select: {e.account_id, e.amount, e.debit_credit}
+    )
+    |> Repo.all()
+    |> Enum.group_by(fn {account_id, _amount, _debit_credit} -> account_id end)
+  end
+
+  defp accounts_with_balances_from_entries(accounts, entries_by_account) do
     Enum.map(accounts, fn account ->
       entries = Map.get(entries_by_account, account.id, [])
 
-      balance =
-        Enum.reduce(entries, Money.new(0, :USD), fn {_account_id, entry_amount,
-                                                     debit_credit},
-                                                    acc ->
-          normal_balance_str = to_string(account.normal_balance)
-          debit_credit_str = to_string(debit_credit)
+      %{account: account, balance: balance_from_entries(account, entries)}
+    end)
+  end
 
-          increases_balance? =
-            case {normal_balance_str, debit_credit_str} do
-              {"debit", "debit"} -> true
-              {"debit", "credit"} -> false
-              {"credit", "debit"} -> false
-              {"credit", "credit"} -> true
-              _ -> false
-            end
+  defp balance_from_entries(account, entries) do
+    Enum.reduce(entries, Money.new(0, :USD), fn {_account_id, entry_amount, debit_credit},
+                                                 acc ->
+      normal_balance_str = to_string(account.normal_balance)
+      debit_credit_str = to_string(debit_credit)
 
-          if increases_balance? do
-            case Money.add(acc, entry_amount) do
-              {:ok, result} -> result
-              {:error, _reason} -> acc
-            end
-          else
-            case Money.sub(acc, entry_amount) do
-              {:ok, result} -> result
-              {:error, _reason} -> acc
-            end
-          end
-        end)
+      increases_balance? =
+        case {normal_balance_str, debit_credit_str} do
+          {"debit", "debit"} -> true
+          {"debit", "credit"} -> false
+          {"credit", "debit"} -> false
+          {"credit", "credit"} -> true
+          _ -> false
+        end
 
-      %{account: account, balance: balance}
+      if increases_balance? do
+        case Money.add(acc, entry_amount) do
+          {:ok, result} -> result
+          {:error, _reason} -> acc
+        end
+      else
+        case Money.sub(acc, entry_amount) do
+          {:ok, result} -> result
+          {:error, _reason} -> acc
+        end
+      end
     end)
   end
 

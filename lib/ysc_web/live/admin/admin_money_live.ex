@@ -487,9 +487,8 @@ defmodule YscWeb.AdminMoneyLive do
     start_date = socket.assigns.start_date
     end_date = socket.assigns.end_date
 
-    period_accounts = Ledgers.get_accounts_with_balances(start_date, end_date)
-    current_accounts = Ledgers.get_accounts_with_balances()
-    ledger_accounts = Ledgers.list_accounts()
+    {period_accounts, current_accounts, ledger_accounts} =
+      Ledgers.get_overview_accounts_with_balances(start_date, end_date)
 
     socket
     |> assign(:accounts_with_balances, period_accounts)
