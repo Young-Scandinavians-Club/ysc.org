@@ -109,8 +109,12 @@ defmodule YscWeb.PaymentMethodLogoTest do
     end
 
     test "returns nil for bank account stripe summary types" do
-      assert PaymentMethodLogo.path_for_stripe_summary(:bank_account, nil) == nil
-      assert PaymentMethodLogo.path_for_stripe_summary(:us_bank_account, nil) == nil
+      assert PaymentMethodLogo.path_for_stripe_summary(:bank_account, nil) ==
+               nil
+
+      assert PaymentMethodLogo.path_for_stripe_summary(:us_bank_account, nil) ==
+               nil
+
       assert PaymentMethodLogo.path_for_stripe_summary(:sepa_debit, nil) == nil
     end
 
