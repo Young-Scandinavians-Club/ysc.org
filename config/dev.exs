@@ -163,6 +163,30 @@ config :ysc, :google_photos,
   redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI"),
   dev_stub: System.get_env("GOOGLE_PHOTOS_DEV_STUB", "true") in ~w(true 1 yes)
 
+# First-party OAuth clients (authorization-code + PKCE). Keyed by client_id.
+# Add another map entry to register a new app; roles/states gate who may authorize.
+config :ysc, :oauth_clients, %{
+  (System.get_env("QUERY_CONSOLE_SSO_CLIENT_ID") || "query_console_dev") => %{
+    client_secret:
+      System.get_env("QUERY_CONSOLE_SSO_CLIENT_SECRET") ||
+        "dev_secret_change_me",
+    redirect_uris:
+      (System.get_env("QUERY_CONSOLE_SSO_REDIRECT_URIS") ||
+         "http://localhost:4001/auth/ysc/callback")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == "")),
+    post_logout_redirect_uris:
+      (System.get_env("QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS") ||
+         "http://localhost:4001/auth/signed-out")
+      |> String.split(",", trim: true)
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == "")),
+    roles: [:admin],
+    states: [:active]
+  }
+}
+
 # Wax (WebAuthn) configuration for development
 #
 # RP ID: "localhost" (development only - each environment has separate passkeys)

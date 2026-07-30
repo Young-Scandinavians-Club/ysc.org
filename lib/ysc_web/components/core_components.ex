@@ -288,7 +288,7 @@ defmodule YscWeb.CoreComponents do
 
   attr :rest, :global,
     include:
-      ~w(autocomplete name rel action enctype method novalidate target multipart phx-change phx-submit phx-target phx-auto-recover phx-hook phx-update class),
+      ~w(autocomplete name rel action enctype method novalidate target multipart onsubmit phx-change phx-submit phx-target phx-auto-recover phx-hook phx-update class),
     doc: "the arbitrary HTML attributes to apply to the form tag"
 
   slot :inner_block, required: true

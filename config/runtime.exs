@@ -113,6 +113,36 @@ config :ysc, :google_photos,
   client_secret: System.get_env("GOOGLE_PHOTOS_CLIENT_SECRET"),
   redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI")
 
+# ## First-party OAuth clients (Query Console and future apps)
+# QUERY_CONSOLE_SSO_* registers the Query Console client into :oauth_clients.
+# Only override when QUERY_CONSOLE_SSO_CLIENT_ID is set so test/dev defaults remain.
+if System.get_env("QUERY_CONSOLE_SSO_CLIENT_ID") do
+  query_console_redirect_uris =
+    (System.get_env("QUERY_CONSOLE_SSO_REDIRECT_URIS") || "")
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  client_id = System.get_env("QUERY_CONSOLE_SSO_CLIENT_ID")
+
+  post_logout_redirect_uris =
+    (System.get_env("QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS") || "")
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+
+  clients =
+    Map.put(Application.get_env(:ysc, :oauth_clients, %{}), client_id, %{
+      client_secret: System.get_env("QUERY_CONSOLE_SSO_CLIENT_SECRET"),
+      redirect_uris: query_console_redirect_uris,
+      post_logout_redirect_uris: post_logout_redirect_uris,
+      roles: [:admin],
+      states: [:active]
+    })
+
+  config :ysc, :oauth_clients, clients
+end
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server

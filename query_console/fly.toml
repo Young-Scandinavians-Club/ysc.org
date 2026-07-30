@@ -1,0 +1,38 @@
+# Default config for local `fly deploy` from query_console/ (production app).
+# CI uses fly.sandbox.toml / fly.prod.toml explicitly.
+#
+# Prefer: fly deploy -c fly.sandbox.toml   or   fly deploy -c fly.prod.toml
+
+app = "ysc-query-console"
+primary_region = "sjc"
+
+[build]
+dockerfile = "Dockerfile"
+
+[deploy]
+release_command = "/app/bin/migrate"
+
+[env]
+PHX_HOST = "query.ysc.org"
+PORT = "4000"
+ECTO_IPV6 = "true"
+
+[http_service]
+internal_port = 4000
+force_https = true
+auto_stop_machines = "stop"
+auto_start_machines = true
+min_machines_running = 0
+processes = ["app"]
+
+[[http_service.checks]]
+interval = "15s"
+timeout = "2s"
+grace_period = "30s"
+method = "GET"
+path = "/up"
+
+[[vm]]
+memory = "512mb"
+cpu_kind = "shared"
+cpus = 1

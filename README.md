@@ -68,6 +68,7 @@ Architecture diagrams and ports: [DEVELOPMENT_ARCHITECTURE.md](docs/DEVELOPMENT_
 | **Content** | News/posts, media, member comments |
 | **Comms** | Newsletter subscriptions, transactional email (Swoosh), SMS alerts |
 | **Support** | Ticketing, search, admin tools |
+| **Query console** | Standalone LiveView SQL workbench under [`query_console/`](query_console/) (separate Fly app; YSC admin SSO) — see [`query_console/docs/DEPLOYMENT.md`](query_console/docs/DEPLOYMENT.md) |
 
 Deeper docs live under `docs/` (e.g. [LEDGER_SYSTEM_README.md](docs/LEDGER_SYSTEM_README.md), [TICKET_SYSTEM_README.md](docs/TICKET_SYSTEM_README.md)).
 

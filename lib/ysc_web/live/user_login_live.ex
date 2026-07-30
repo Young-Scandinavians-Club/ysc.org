@@ -219,8 +219,9 @@ defmodule YscWeb.UserLoginLive do
         id="login_form"
         action={~p"/users/log-in"}
         phx-update="ignore"
+        onsubmit="this.querySelector('[type=submit]')?.setAttribute('disabled','disabled')"
       >
-        <input type="hidden" name="redirect_to" value={@redirect_to} />
+        <input type="hidden" name="redirect_to" value={@redirect_to || ""} />
         <div class="space-y-4">
           <.input
             field={@form[:email]}
@@ -268,10 +269,12 @@ defmodule YscWeb.UserLoginLive do
       |> Kernel.||(Map.get(session, "failed_login_attempts"))
       |> Kernel.||(0)
 
-    # Capture redirect_to from URL params and validate it's an internal path
+    # Capture redirect_to from URL params, then fall back to session
+    # `:user_return_to` (set by require_authenticated_user, e.g. OAuth authorize).
     redirect_to =
       case params do
-        %{"redirect_to" => redirect_path} when is_binary(redirect_path) ->
+        %{"redirect_to" => redirect_path}
+        when is_binary(redirect_path) and redirect_path != "" ->
           if YscWeb.UserAuth.valid_internal_redirect?(redirect_path) do
             redirect_path
           else
@@ -279,7 +282,16 @@ defmodule YscWeb.UserLoginLive do
           end
 
         _ ->
-          nil
+          session_return_to =
+            Map.get(session, :user_return_to) ||
+              Map.get(session, "user_return_to")
+
+          if is_binary(session_return_to) and
+               YscWeb.UserAuth.valid_internal_redirect?(session_return_to) do
+            session_return_to
+          else
+            nil
+          end
       end
 
     # Show toast when redirected from auto_login with expired/invalid token (query param
