@@ -57,10 +57,8 @@ defmodule Ysc.OAuth do
   @spec validate_logout_request(map()) ::
           {:ok, String.t()} | {:error, :invalid_client | :invalid_redirect_uri}
   def validate_logout_request(params) when is_map(params) do
-    with {:ok, _client_id, client} <- fetch_registered_client(params),
-         {:ok, redirect_uri} <-
-           fetch_allowed_logout_redirect_uri(params, client) do
-      {:ok, redirect_uri}
+    with {:ok, _client_id, client} <- fetch_registered_client(params) do
+      fetch_allowed_logout_redirect_uri(params, client)
     end
   end
 
