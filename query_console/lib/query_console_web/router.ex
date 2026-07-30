@@ -11,6 +11,12 @@ defmodule QueryConsoleWeb.Router do
               true
             end)
 
+  # Fly machine health checks hit HTTP on the private IP without
+  # X-Forwarded-Proto. Keep this pipeline free of Plug.SSL so /up returns 200.
+  pipeline :health do
+    plug :accepts, ["html"]
+  end
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -33,9 +39,14 @@ defmodule QueryConsoleWeb.Router do
   end
 
   scope "/", QueryConsoleWeb do
-    pipe_through :browser
+    pipe_through :health
 
     get "/up", UpController, :index
+  end
+
+  scope "/", QueryConsoleWeb do
+    pipe_through :browser
+
     get "/auth/ysc", AuthController, :ysc
     get "/auth/ysc/callback", AuthController, :callback
     get "/auth/logout", AuthController, :delete

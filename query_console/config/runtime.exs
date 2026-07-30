@@ -48,7 +48,8 @@ if config_env() == :prod do
   config :query_console, QueryConsoleWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [
-      ip: {0, 0, 0, 0, 0, 0, 0, 0},
+      # Bind IPv4 any (0.0.0.0) so fly-proxy health checks can reach the app.
+      ip: {0, 0, 0, 0},
       port: port
     ],
     secret_key_base: secret_key_base
