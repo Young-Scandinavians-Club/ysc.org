@@ -48,8 +48,9 @@ YSC must be running on port 4000 with matching SSO config (`query_console_dev` /
 ### AI assistant (optional)
 
 Lotus AI is enabled when `OPENROUTER_API_KEY` is set (model defaults to
-`openrouter:moonshotai/kimi-k3`; override with `LOTUS_AI_MODEL`). In the editor use
-**Cmd/Ctrl+K**.
+`openrouter:moonshotai/kimi-k3`; override with `LOTUS_AI_MODEL`). Cap completion
+size with `LOTUS_AI_MAX_TOKENS` (default `4096`) so kimi-k3’s catalog output limit
+does not fill the entire context window. In the editor use **Cmd/Ctrl+K**.
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...

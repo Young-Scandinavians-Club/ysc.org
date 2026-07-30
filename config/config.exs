@@ -12,7 +12,9 @@ config :ysc,
   ecto_repos: [Ysc.Repo],
   environment: "dev",
   # Minimum disposable-domain rows expected after loading priv/disposable_domains.txt (tests use this as a floor).
-  disposable_domains_threshold: 10_000
+  disposable_domains_threshold: 10_000,
+  # Standalone Query Console base URL (admin sidebar link). Override per env / QUERY_CONSOLE_URL.
+  query_console_url: nil
 
 # Configure Elixir's Calendar to use Timex timezone database
 config :elixir, :time_zone_database, Timex.Timezone.Database

@@ -12,6 +12,27 @@ if api_key = System.get_env("OPENROUTER_API_KEY") do
       model: System.get_env("LOTUS_AI_MODEL") || "openrouter:moonshotai/kimi-k3",
       api_key: api_key
     ]
+
+  # kimi-k3 catalogs output == context (1_048_576). ReqLLM defaults max_tokens to
+  # limits.output when unset, so OpenRouter rejects any non-empty prompt. Cap output
+  # so reserved completion tokens leave headroom for input/tools/schema.
+  max_tokens =
+    case System.get_env("LOTUS_AI_MAX_TOKENS") do
+      nil -> 4096
+      "" -> 4096
+      value -> String.to_integer(value)
+    end
+
+  config :llm_db,
+    custom: %{
+      openrouter: [
+        models: %{
+          "moonshotai/kimi-k3" => %{
+            limits: %{output: max_tokens}
+          }
+        }
+      ]
+    }
 end
 
 if config_env() == :prod do

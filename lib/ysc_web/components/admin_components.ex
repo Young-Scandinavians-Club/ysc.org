@@ -2156,7 +2156,11 @@ defmodule YscWeb.AdminComponents do
   slot :inner_block, required: true
 
   def side_menu(assigns) do
-    assigns = derive_side_menu_user(assigns)
+    assigns =
+      assigns
+      |> derive_side_menu_user()
+      |> assign(:query_console_url, Ysc.QueryConsole.url())
+      |> assign(:query_console_host, Ysc.QueryConsole.host())
 
     ~H"""
     <button
@@ -2225,337 +2229,368 @@ defmodule YscWeb.AdminComponents do
             phx-hook="ScrollMoreIndicator"
             class="h-full overflow-y-auto px-5 pt-4 pb-4"
           >
-            <ul class="space-y-2 leading-6 font-medium">
-              <li>
-                <.link
-                  navigate="/admin"
-                  title="Overview"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :dashboard,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :dashboard}
-                >
-                  <.icon
-                    :if={@active_page == :dashboard}
-                    name="hero-chart-pie"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :dashboard}
-                    name="hero-chart-pie"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :dashboard && "font-semibold"
-                  ]}>
-                    Overview
-                  </span>
-                </.link>
-              </li>
+            <div class="min-h-full flex flex-col">
+              <ul class="space-y-2 leading-6 font-medium">
+                <li>
+                  <.link
+                    navigate="/admin"
+                    title="Overview"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :dashboard,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :dashboard}
+                  >
+                    <.icon
+                      :if={@active_page == :dashboard}
+                      name="hero-chart-pie"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :dashboard}
+                      name="hero-chart-pie"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :dashboard && "font-semibold"
+                    ]}>
+                      Overview
+                    </span>
+                  </.link>
+                </li>
 
-              <li>
-                <.link
-                  navigate="/admin/posts"
-                  title="Posts"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :news,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :news}
-                >
-                  <.icon
-                    :if={@active_page == :news}
-                    name="hero-document-text"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :news}
-                    name="hero-document-text"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :news && "font-semibold"
-                  ]}>
-                    Posts
-                  </span>
-                </.link>
-              </li>
+                <li>
+                  <.link
+                    navigate="/admin/posts"
+                    title="Posts"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :news,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :news}
+                  >
+                    <.icon
+                      :if={@active_page == :news}
+                      name="hero-document-text"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :news}
+                      name="hero-document-text"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :news && "font-semibold"
+                    ]}>
+                      Posts
+                    </span>
+                  </.link>
+                </li>
 
-              <li>
-                <.link
-                  navigate="/admin/events"
-                  title="Events"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :events,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :events}
-                >
-                  <.icon
-                    :if={@active_page == :events}
-                    name="hero-calendar"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :events}
-                    name="hero-calendar"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :events && "font-semibold"
-                  ]}>
-                    Events
-                  </span>
-                </.link>
-              </li>
+                <li>
+                  <.link
+                    navigate="/admin/events"
+                    title="Events"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :events,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :events}
+                  >
+                    <.icon
+                      :if={@active_page == :events}
+                      name="hero-calendar"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :events}
+                      name="hero-calendar"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :events && "font-semibold"
+                    ]}>
+                      Events
+                    </span>
+                  </.link>
+                </li>
 
-              <li>
-                <.link
-                  navigate="/admin/newsletters"
-                  title="Newsletters"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :newsletters,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :newsletters}
-                >
-                  <.icon
-                    :if={@active_page == :newsletters}
-                    name="hero-envelope"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :newsletters}
-                    name="hero-envelope"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :newsletters && "font-semibold"
-                  ]}>
-                    Newsletters
-                  </span>
-                </.link>
-              </li>
+                <li>
+                  <.link
+                    navigate="/admin/newsletters"
+                    title="Newsletters"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :newsletters,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :newsletters}
+                  >
+                    <.icon
+                      :if={@active_page == :newsletters}
+                      name="hero-envelope"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :newsletters}
+                      name="hero-envelope"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :newsletters && "font-semibold"
+                    ]}>
+                      Newsletters
+                    </span>
+                  </.link>
+                </li>
 
-              <li :if={@role == :admin}>
-                <.link
-                  navigate="/admin/bookings"
-                  title="Bookings"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :bookings,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :bookings}
-                >
-                  <.icon
-                    :if={@active_page == :bookings}
-                    name="hero-home"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :bookings}
-                    name="hero-home"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :bookings && "font-semibold"
-                  ]}>
-                    Bookings
-                  </span>
-                </.link>
-              </li>
+                <li :if={@role == :admin}>
+                  <.link
+                    navigate="/admin/bookings"
+                    title="Bookings"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :bookings,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :bookings}
+                  >
+                    <.icon
+                      :if={@active_page == :bookings}
+                      name="hero-home"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :bookings}
+                      name="hero-home"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :bookings && "font-semibold"
+                    ]}>
+                      Bookings
+                    </span>
+                  </.link>
+                </li>
 
-              <li :if={@role == :admin}>
-                <.link
-                  navigate="/admin/users"
-                  title="Users"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :members,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :members}
-                >
-                  <.icon
-                    :if={@active_page == :members}
-                    name="hero-users"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :members}
-                    name="hero-users"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :members && "font-semibold"
-                  ]}>
-                    Users
-                  </span>
-                </.link>
-              </li>
+                <li :if={@role == :admin}>
+                  <.link
+                    navigate="/admin/users"
+                    title="Users"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :members,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :members}
+                  >
+                    <.icon
+                      :if={@active_page == :members}
+                      name="hero-users"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :members}
+                      name="hero-users"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :members && "font-semibold"
+                    ]}>
+                      Users
+                    </span>
+                  </.link>
+                </li>
 
-              <li :if={@role == :admin && @board_position == :membership_director}>
-                <.link
-                  navigate="/admin/memberships"
-                  title="Memberships"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :memberships,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :memberships}
-                >
-                  <.icon
-                    :if={@active_page == :memberships}
-                    name="hero-identification"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :memberships}
-                    name="hero-identification"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :memberships && "font-semibold"
-                  ]}>
-                    Memberships
-                  </span>
-                </.link>
-              </li>
+                <li :if={@role == :admin && @board_position == :membership_director}>
+                  <.link
+                    navigate="/admin/memberships"
+                    title="Memberships"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :memberships,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :memberships}
+                  >
+                    <.icon
+                      :if={@active_page == :memberships}
+                      name="hero-identification"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :memberships}
+                      name="hero-identification"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :memberships && "font-semibold"
+                    ]}>
+                      Memberships
+                    </span>
+                  </.link>
+                </li>
 
-              <li :if={@role == :admin && @board_position == :treasurer}>
-                <.link
-                  navigate="/admin/money"
-                  title="Money"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :money,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :money}
-                >
-                  <.icon
-                    :if={@active_page == :money}
-                    name="hero-wallet"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :money}
-                    name="hero-wallet"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :money && "font-semibold"
-                  ]}>
-                    Money
-                  </span>
-                </.link>
-              </li>
+                <li :if={@role == :admin && @board_position == :treasurer}>
+                  <.link
+                    navigate="/admin/money"
+                    title="Money"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :money,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :money}
+                  >
+                    <.icon
+                      :if={@active_page == :money}
+                      name="hero-wallet"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :money}
+                      name="hero-wallet"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :money && "font-semibold"
+                    ]}>
+                      Money
+                    </span>
+                  </.link>
+                </li>
 
-              <li>
-                <.link
-                  navigate="/admin/media"
-                  title="Media"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :media,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :media}
-                >
-                  <.icon
-                    :if={@active_page == :media}
-                    name="hero-photo"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :media}
-                    name="hero-photo"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :media && "font-semibold"
-                  ]}>
-                    Media
-                  </span>
-                </.link>
-              </li>
+                <li>
+                  <.link
+                    navigate="/admin/media"
+                    title="Media"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :media,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :media}
+                  >
+                    <.icon
+                      :if={@active_page == :media}
+                      name="hero-photo"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :media}
+                      name="hero-photo"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :media && "font-semibold"
+                    ]}>
+                      Media
+                    </span>
+                  </.link>
+                </li>
 
-              <li>
-                <.link
-                  navigate="/admin/help"
-                  title="Help"
-                  class={[
-                    "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
-                    if(@active_page == :help,
-                      do:
-                        "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
-                      else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
-                    )
-                  ]}
-                  aria-current={@active_page == :help}
-                >
-                  <.icon
-                    :if={@active_page == :help}
-                    name="hero-question-mark-circle"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
-                  />
-                  <.icon
-                    :if={@active_page != :help}
-                    name="hero-question-mark-circle"
-                    class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
-                  />
-                  <span class={[
-                    "admin-nav-label ms-3",
-                    @active_page == :help && "font-semibold"
-                  ]}>
-                    Help
-                  </span>
-                </.link>
-              </li>
-            </ul>
+                <li>
+                  <.link
+                    navigate="/admin/help"
+                    title="Help"
+                    class={[
+                      "admin-nav-link flex items-center px-3 py-4 rounded group transition-colors",
+                      if(@active_page == :help,
+                        do:
+                          "bg-gradient-to-r from-blue-600/20 to-transparent border-l-4 border-blue-500 text-white",
+                        else: "text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                      )
+                    ]}
+                    aria-current={@active_page == :help}
+                  >
+                    <.icon
+                      :if={@active_page == :help}
+                      name="hero-question-mark-circle"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-400"
+                    />
+                    <.icon
+                      :if={@active_page != :help}
+                      name="hero-question-mark-circle"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class={[
+                      "admin-nav-label ms-3",
+                      @active_page == :help && "font-semibold"
+                    ]}>
+                      Help
+                    </span>
+                  </.link>
+                </li>
+              </ul>
+
+              <ul
+                :if={@role == :admin && @query_console_url}
+                id="admin-nav-query-console-list"
+                class="mt-auto pt-4 space-y-2 leading-6 font-medium"
+              >
+                <li>
+                  <.link
+                    id="admin-nav-query-console"
+                    href={@query_console_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={"Opens #{@query_console_host} in a new tab"}
+                    class="admin-nav-link flex items-center px-3 py-4 rounded group transition-colors text-zinc-300 hover:bg-zinc-800 hover:text-white"
+                  >
+                    <.icon
+                      name="hero-circle-stack"
+                      class="w-5 h-5 shrink-0 transition duration-75 text-blue-500"
+                    />
+                    <span class="admin-nav-label ms-3">
+                      Query Console
+                    </span>
+                    <.icon
+                      name="hero-arrow-top-right-on-square"
+                      class="admin-nav-label w-3.5 h-3.5 shrink-0 ms-1.5 opacity-70"
+                    />
+                  </.link>
+                </li>
+              </ul>
+            </div>
           </div>
           <div
             data-scroll-indicator

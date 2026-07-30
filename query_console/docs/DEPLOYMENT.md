@@ -69,6 +69,7 @@ Set these on **both** `ysc-query-console-sandbox` and `ysc-query-console` (value
 | `PHX_HOST` | Optional; already set in `fly.*.toml` `[env]` |
 | `OPENROUTER_API_KEY` | Optional; enables Lotus AI assistant (OpenRouter) |
 | `LOTUS_AI_MODEL` | Optional; ReqLLM model id (default `openrouter:moonshotai/kimi-k3`) |
+| `LOTUS_AI_MAX_TOKENS` | Optional; caps kimi-k3 output / ReqLLM `max_tokens` (default `4096`) |
 
 ### Sandbox example
 
@@ -122,6 +123,7 @@ Set on **`ysc-sandbox`** and **`ysc-prod`** so the provider accepts the query co
 | `QUERY_CONSOLE_SSO_CLIENT_SECRET` | Must match `YSC_SSO_CLIENT_SECRET` |
 | `QUERY_CONSOLE_SSO_REDIRECT_URIS` | Comma-separated exact callbacks (include the matching query-console callback) |
 | `QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS` | Comma-separated exact signed-out URLs allowlisted for front-channel logout |
+| `QUERY_CONSOLE_URL` | Public Query Console base URL for the admin sidebar link (opens in a new tab) |
 
 Sandbox YSC example:
 
@@ -130,7 +132,8 @@ fly secrets set -a ysc-sandbox \
   QUERY_CONSOLE_SSO_CLIENT_ID='query_console_sandbox' \
   QUERY_CONSOLE_SSO_CLIENT_SECRET='…' \
   QUERY_CONSOLE_SSO_REDIRECT_URIS='https://ysc-query-console-sandbox.fly.dev/auth/ysc/callback' \
-  QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS='https://ysc-query-console-sandbox.fly.dev/auth/signed-out'
+  QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS='https://ysc-query-console-sandbox.fly.dev/auth/signed-out' \
+  QUERY_CONSOLE_URL='https://ysc-query-console-sandbox.fly.dev'
 ```
 
 Production YSC example:
@@ -140,7 +143,8 @@ fly secrets set -a ysc-prod \
   QUERY_CONSOLE_SSO_CLIENT_ID='query_console_prod' \
   QUERY_CONSOLE_SSO_CLIENT_SECRET='…' \
   QUERY_CONSOLE_SSO_REDIRECT_URIS='https://query.ysc.org/auth/ysc/callback' \
-  QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS='https://query.ysc.org/auth/signed-out'
+  QUERY_CONSOLE_SSO_POST_LOGOUT_REDIRECT_URIS='https://query.ysc.org/auth/signed-out' \
+  QUERY_CONSOLE_URL='https://query.ysc.org'
 ```
 
 ## Reader role checklist

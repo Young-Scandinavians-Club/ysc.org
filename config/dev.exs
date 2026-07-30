@@ -163,6 +163,11 @@ config :ysc, :google_photos,
   redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI"),
   dev_stub: System.get_env("GOOGLE_PHOTOS_DEV_STUB", "true") in ~w(true 1 yes)
 
+# Standalone Query Console (admin sidebar → opens in a new tab).
+config :ysc,
+       :query_console_url,
+       System.get_env("QUERY_CONSOLE_URL") || "http://localhost:4001"
+
 # First-party OAuth clients (authorization-code + PKCE). Keyed by client_id.
 # Add another map entry to register a new app; roles/states gate who may authorize.
 config :ysc, :oauth_clients, %{

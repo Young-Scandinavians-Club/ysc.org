@@ -12,6 +12,8 @@ config :ysc, :google_photos,
   client_secret: "test_google_photos_client_secret",
   dev_stub: false
 
+config :ysc, :query_console_url, "http://localhost:4001"
+
 config :ysc, :oauth_clients, %{
   "query_console_test" => %{
     client_secret: "test_secret_change_me",

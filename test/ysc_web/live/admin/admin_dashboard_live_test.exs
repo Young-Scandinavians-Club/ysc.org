@@ -31,6 +31,20 @@ defmodule YscWeb.AdminDashboardLiveTest do
       assert html =~ "Financials"
     end
 
+    test "admin sidebar links to Query Console in a new tab", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/admin")
+
+      assert has_element?(
+               view,
+               "#admin-nav-query-console[href='http://localhost:4001'][target='_blank']"
+             )
+
+      assert has_element?(
+               view,
+               ~s|#admin-nav-query-console[title="Opens localhost in a new tab"]|
+             )
+    end
+
     test "shows admin stats row for admin users", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/admin")
       assert has_element?(view, "#admin-stats-row")

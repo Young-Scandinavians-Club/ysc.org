@@ -113,6 +113,13 @@ config :ysc, :google_photos,
   client_secret: System.get_env("GOOGLE_PHOTOS_CLIENT_SECRET"),
   redirect_uri: System.get_env("GOOGLE_PHOTOS_REDIRECT_URI")
 
+# Outbound admin link to the standalone Query Console app.
+if query_console_url = System.get_env("QUERY_CONSOLE_URL") do
+  if query_console_url != "" do
+    config :ysc, :query_console_url, query_console_url
+  end
+end
+
 # ## First-party OAuth clients (Query Console and future apps)
 # QUERY_CONSOLE_SSO_* registers the Query Console client into :oauth_clients.
 # Only override when QUERY_CONSOLE_SSO_CLIENT_ID is set so test/dev defaults remain.
