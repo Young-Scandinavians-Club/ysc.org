@@ -14,8 +14,8 @@ defmodule Ysc.Test.AvatarProcessor.MockS3Plug do
     dispatch(conn)
   end
 
-  # ExAws get_object: GET /{bucket}/{key} (path-style, e.g. MinIO / test config)
-  defp dispatch(%{method: "GET"} = conn) do
+  # ExAws get_object: GET /{bucket}/{key} (path-style). Req 0.7+ may use POST.
+  defp dispatch(%{method: method} = conn) when method in ["GET", "POST"] do
     path = conn.request_path |> String.trim_leading("/")
 
     cond do
