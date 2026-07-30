@@ -14,6 +14,8 @@ defmodule YscWeb.HomeLive do
     Tickets
   }
 
+  alias Ysc.Events.TicketTierHelpers
+
   alias Ysc.Accounts.{FamilyDisplay, UserProfileCache}
   alias Ysc.Bookings.{PropertyDisplay, Season}
   alias Ysc.Posts.Post
@@ -2446,10 +2448,7 @@ defmodule YscWeb.HomeLive do
 
     # Filter out donation tiers - donations don't count toward "sold out" status
     non_donation_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        tier_type = Map.get(tier, :type) || Map.get(tier, "type")
-        tier_type != "donation" && tier_type != :donation
-      end)
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
@@ -2461,7 +2460,8 @@ defmodule YscWeb.HomeLive do
         Enum.filter(non_donation_tiers, fn tier ->
           # Include tiers that are on sale OR have ended their sale
           # Exclude tiers that haven't started their sale yet (pre-sale)
-          tier_on_sale?(tier) || tier_sale_ended?(tier)
+          TicketTierHelpers.tier_on_sale?(tier) ||
+            TicketTierHelpers.tier_sale_ended?(tier)
         end)
 
       # If there are no relevant tiers (all are pre-sale), event is not sold out
@@ -2499,45 +2499,6 @@ defmodule YscWeb.HomeLive do
 
         all_tiers_sold_out || event_at_capacity
       end
-    end
-  end
-
-  defp tier_on_sale?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    start_date =
-      Map.get(ticket_tier, :start_date) || Map.get(ticket_tier, "start_date")
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    sale_started =
-      case start_date do
-        nil -> true
-        sd when is_struct(sd, DateTime) -> DateTime.compare(now, sd) != :lt
-        _ -> true
-      end
-
-    sale_ended =
-      case end_date do
-        nil -> false
-        ed when is_struct(ed, DateTime) -> DateTime.compare(now, ed) == :gt
-        _ -> false
-      end
-
-    sale_started && !sale_ended
-  end
-
-  defp tier_sale_ended?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    case end_date do
-      nil -> false
-      ed when is_struct(ed, DateTime) -> DateTime.compare(now, ed) == :gt
-      _ -> false
     end
   end
 

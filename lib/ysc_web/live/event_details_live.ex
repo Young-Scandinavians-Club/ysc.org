@@ -9,7 +9,7 @@ defmodule YscWeb.EventDetailsLive do
   alias HtmlSanitizeEx.Scrubber
 
   alias Ysc.Events
-  alias Ysc.Events.EventPricingCache
+  alias Ysc.Events.{EventPricingCache, TicketTierHelpers}
   alias Ysc.MoneyHelper
   alias Ysc.Repo
   alias Ysc.Tickets.DonationDisplay
@@ -1328,9 +1328,13 @@ defmodule YscWeb.EventDetailsLive do
                         user_has_event_reservation
                       ) %>
                 <% is_on_sale =
-                  if is_donation, do: true, else: tier_on_sale?(ticket_tier) %>
+                  if is_donation,
+                    do: true,
+                    else: TicketTierHelpers.tier_on_sale?(ticket_tier) %>
                 <% is_sale_ended =
-                  if is_donation, do: false, else: tier_sale_ended?(ticket_tier) %>
+                  if is_donation,
+                    do: false,
+                    else: TicketTierHelpers.tier_sale_ended?(ticket_tier) %>
                 <% days_until_sale =
                   if is_donation, do: nil, else: days_until_sale_starts(ticket_tier) %>
                 <% is_pre_sale =
@@ -3798,7 +3802,7 @@ defmodule YscWeb.EventDetailsLive do
             max(0, total_qty - sold - reserved)
           end
 
-        on_sale = tier_on_sale?(tier)
+        on_sale = TicketTierHelpers.tier_on_sale?(tier)
 
         %{
           tier_id: tier.id,
@@ -6694,8 +6698,8 @@ defmodule YscWeb.EventDetailsLive do
     ticket_tiers
     |> Enum.sort_by(fn tier ->
       available = get_public_available_quantity(tier, reserved_counts_by_tier)
-      on_sale = tier_on_sale?(tier)
-      sale_ended = tier_sale_ended?(tier)
+      on_sale = TicketTierHelpers.tier_on_sale?(tier)
+      sale_ended = TicketTierHelpers.tier_sale_ended?(tier)
 
       cond do
         on_sale and tier_has_availability?(available) ->
@@ -6766,10 +6770,7 @@ defmodule YscWeb.EventDetailsLive do
   defp compute_event_at_capacity(event, ticket_tiers, availability_data) do
     # Filter out donation tiers - donations don't count toward "sold out" status
     non_donation_tiers =
-      Enum.filter(ticket_tiers, fn tier ->
-        tier_type = Map.get(tier, :type) || Map.get(tier, "type")
-        tier_type != "donation" && tier_type != :donation
-      end)
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
@@ -6779,7 +6780,8 @@ defmodule YscWeb.EventDetailsLive do
       # We want to check tiers that are on sale OR have ended their sale
       relevant_tiers =
         Enum.filter(non_donation_tiers, fn tier ->
-          tier_on_sale?(tier) || tier_sale_ended?(tier)
+          TicketTierHelpers.tier_on_sale?(tier) ||
+            TicketTierHelpers.tier_sale_ended?(tier)
         end)
 
       # If there are no relevant tiers (all are pre-sale), check event capacity
@@ -7005,7 +7007,7 @@ defmodule YscWeb.EventDetailsLive do
 
   defp checkout_tiers_json(ticket_tiers) do
     ticket_tiers
-    |> Enum.reject(&donation_tier?/1)
+    |> Enum.reject(&TicketTierHelpers.donation_tier?/1)
     |> Enum.map(fn tier ->
       type =
         case tier.type do
@@ -7541,46 +7543,6 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp tier_on_sale?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    start_date =
-      Map.get(ticket_tier, :start_date) || Map.get(ticket_tier, "start_date")
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    # Check if sale has started
-    sale_started =
-      case start_date do
-        # No start date means sale has started
-        nil -> true
-        sd -> DateTime.compare(now, sd) != :lt
-      end
-
-    # Check if sale has ended
-    sale_ended =
-      case end_date do
-        # No end date means sale hasn't ended
-        nil -> false
-        ed -> DateTime.compare(now, ed) == :gt
-      end
-
-    sale_started && !sale_ended
-  end
-
-  defp tier_sale_ended?(ticket_tier) do
-    now = DateTime.utc_now()
-
-    end_date =
-      Map.get(ticket_tier, :end_date) || Map.get(ticket_tier, "end_date")
-
-    case end_date do
-      nil -> false
-      ed -> DateTime.compare(now, ed) == :gt
-    end
-  end
-
   defp days_until_sale_starts(ticket_tier) do
     case ticket_tier.start_date do
       nil ->
@@ -7612,8 +7574,8 @@ defmodule YscWeb.EventDetailsLive do
          reservations_by_tier,
          reserved_counts_by_tier
        ) do
-    if tier_on_sale?(ticket_tier) do
-      if donation_tier?(ticket_tier) do
+    if TicketTierHelpers.tier_on_sale?(ticket_tier) do
+      if TicketTierHelpers.donation_tier?(ticket_tier) do
         true
       else
         check_availability_cached(
@@ -7632,14 +7594,8 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp donation_tier?(ticket_tier) do
-    ticket_tier.type == "donation" || ticket_tier.type == :donation
-  end
-
-  defp donation_ticket?(%{ticket_tier: tier}), do: donation_tier?(tier)
-  defp donation_ticket?(_), do: false
-
-  defp event_tickets(tickets), do: Enum.reject(tickets, &donation_ticket?/1)
+  defp event_tickets(tickets),
+    do: Enum.reject(tickets, &TicketTierHelpers.donation_ticket?/1)
 
   defp check_availability_cached(
          availability,
