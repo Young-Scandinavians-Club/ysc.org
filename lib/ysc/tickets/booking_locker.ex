@@ -11,7 +11,16 @@ defmodule Ysc.Tickets.BookingLocker do
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Events
-  alias Ysc.Events.{Event, EventDateTime, TicketTier, Ticket, TicketReservation, TicketTierHelpers}
+
+  alias Ysc.Events.{
+    Event,
+    EventDateTime,
+    TicketTier,
+    Ticket,
+    TicketReservation,
+    TicketTierHelpers
+  }
+
   alias Ysc.Tickets.TicketOrder
 
   @doc """
@@ -277,7 +286,8 @@ defmodule Ysc.Tickets.BookingLocker do
           tier.event_id != event_id ->
             {:error, :tier_not_for_event}
 
-          not skip_sale_guards? and not TicketTierHelpers.tier_sale_started?(tier) ->
+          not skip_sale_guards? and
+              not TicketTierHelpers.tier_sale_started?(tier) ->
             {:error, :tier_not_on_sale}
 
           quantity <= 0 ->

@@ -29,7 +29,10 @@ defmodule Ysc.Events.TicketTierHelpersTest do
 
   describe "donation_ticket?/1" do
     test "checks nested ticket_tier" do
-      assert TicketTierHelpers.donation_ticket?(%{ticket_tier: %{type: :donation}})
+      assert TicketTierHelpers.donation_ticket?(%{
+               ticket_tier: %{type: :donation}
+             })
+
       refute TicketTierHelpers.donation_ticket?(%{ticket_tier: %{type: :paid}})
       refute TicketTierHelpers.donation_ticket?(%{})
     end
@@ -37,7 +40,11 @@ defmodule Ysc.Events.TicketTierHelpersTest do
 
   describe "tier_sale_started?/2" do
     test "nil start_date means sale has started" do
-      assert TicketTierHelpers.tier_sale_started?(%TicketTier{start_date: nil}, @now)
+      assert TicketTierHelpers.tier_sale_started?(
+               %TicketTier{start_date: nil},
+               @now
+             )
+
       assert TicketTierHelpers.tier_sale_started?(%{"start_date" => nil}, @now)
     end
 

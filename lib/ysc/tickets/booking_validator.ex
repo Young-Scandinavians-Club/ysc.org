@@ -13,6 +13,7 @@ defmodule Ysc.Tickets.BookingValidator do
   import Ecto.Query, warn: false
   alias Ysc.Repo
   alias Ysc.Events
+
   alias Ysc.Events.{
     Event,
     EventDateTime,
@@ -21,6 +22,7 @@ defmodule Ysc.Tickets.BookingValidator do
     TicketReservation,
     TicketTierHelpers
   }
+
   alias Ysc.Accounts
 
   @doc """

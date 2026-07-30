@@ -18,7 +18,9 @@ defmodule Ysc.Tickets.DonationDisplay do
   """
   def amounts_by_ticket_id(%{tickets: tickets, total_amount: total_amount})
       when is_list(tickets) do
-    donation_tickets = Enum.filter(tickets, &TicketTierHelpers.donation_ticket?/1)
+    donation_tickets =
+      Enum.filter(tickets, &TicketTierHelpers.donation_ticket?/1)
+
     donation_count = length(donation_tickets)
 
     with true <- donation_count > 0,
