@@ -12,7 +12,7 @@ defmodule YscWeb.SEO do
   alias Ysc.Posts.Post
 
   @default_description "Young Scandinavians Club — community, events, and cabins in California."
-  @default_og_image_path "/images/ysc_group_photo.webp"
+  @default_og_image_path "/images/ysc_logo.webp"
   @max_description_length 160
 
   @doc """
@@ -22,8 +22,39 @@ defmodule YscWeb.SEO do
 
   @doc """
   Default Open Graph image path (relative) when content has no featured/cover image.
+
+  Uses the YSC logo so link previews stay on-brand when a page has no special
+  share image (unlike events/posts with a cover or featured image).
   """
   def default_og_image_path, do: @default_og_image_path
+
+  @doc """
+  Absolute default Open Graph image URL (YSC logo).
+  """
+  def default_og_image_url, do: absolute_image_url(@default_og_image_path)
+
+  @doc """
+  Open Graph image URL for a page, falling back to the YSC logo.
+  """
+  def og_image_or_default(nil), do: default_og_image_url()
+  def og_image_or_default(""), do: default_og_image_url()
+  def og_image_or_default(url) when is_binary(url), do: url
+
+  @doc """
+  Twitter card type for an OG image URL.
+
+  Custom photos use `summary_large_image`; the square logo default uses `summary`.
+  """
+  def twitter_card_for_image(nil), do: "summary"
+
+  def twitter_card_for_image(url) when is_binary(url) do
+    if url == default_og_image_url() or
+         String.ends_with?(url, @default_og_image_path) do
+      "summary"
+    else
+      "summary_large_image"
+    end
+  end
 
   @doc """
   Builds an absolute public URL for a path that starts with `/`.
@@ -150,8 +181,6 @@ defmodule YscWeb.SEO do
       Phoenix.Component.assign(acc, key, value)
     end)
   end
-
-  defp default_og_image_url, do: absolute_image_url(@default_og_image_path)
 
   defp origin, do: String.trim_trailing(YscWeb.Endpoint.url(), "/")
 
