@@ -909,7 +909,8 @@ defmodule Ysc.ScanningTest do
       {_result, tier_preload_count} =
         Ysc.QueryCounter.with_query_counter(
           fn -> Scanning.check_in_order(session, order.id) end,
-          pattern: tier_preload_pattern
+          pattern: tier_preload_pattern,
+          caller_pids: [self()]
         )
 
       assert tier_preload_count == 1

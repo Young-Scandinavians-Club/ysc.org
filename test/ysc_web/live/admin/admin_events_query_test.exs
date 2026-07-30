@@ -38,7 +38,8 @@ defmodule YscWeb.AdminEventsQueryTest do
             |> form("#events-search-form", %{q: "Organizer Cache"})
             |> render_submit()
           end,
-          pattern: author_filter_pattern
+          pattern: author_filter_pattern,
+          caller_pids: [view.pid]
         )
 
       assert author_queries == 0
@@ -67,7 +68,8 @@ defmodule YscWeb.AdminEventsQueryTest do
             |> get(~p"/admin/events/#{event.id}/edit")
             |> html_response(200)
           end,
-          pattern: tier_count_pattern
+          pattern: tier_count_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 0

@@ -376,7 +376,8 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       {socket_after_first, first_entitlement_queries} =
         Ysc.QueryCounter.with_query_counter(
           fn -> PricingHelpers.calculate_price_if_ready(socket, :tahoe) end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       assert first_entitlement_queries == 2
@@ -389,7 +390,8 @@ defmodule Ysc.Bookings.PricingHelpersTest do
           fn ->
             PricingHelpers.calculate_price_if_ready(socket_after_first, :tahoe)
           end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       assert second_entitlement_queries == 0
@@ -432,7 +434,8 @@ defmodule Ysc.Bookings.PricingHelpersTest do
       {_socket, entitlement_queries} =
         Ysc.QueryCounter.with_query_counter(
           fn -> PricingHelpers.calculate_price_if_ready(socket, :tahoe) end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       assert entitlement_queries == 2

@@ -569,7 +569,8 @@ defmodule Ysc.BookingsTest do
               end_date
             )
           end,
-          pattern: ~r/FROM "bookings"/i
+          pattern: ~r/FROM "bookings"/i,
+          caller_pids: [self()]
         )
 
       assert queries_after >= 1
@@ -2007,9 +2008,12 @@ defmodule Ysc.BookingsTest do
       end
 
       {results, query_count} =
-        Ysc.QueryCounter.with_query_counter(fn ->
-          Bookings.search_bookings_by_last_name(last_name, :tahoe)
-        end)
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Bookings.search_bookings_by_last_name(last_name, :tahoe)
+          end,
+          caller_pids: [self()]
+        )
 
       assert length(results) == 3
 

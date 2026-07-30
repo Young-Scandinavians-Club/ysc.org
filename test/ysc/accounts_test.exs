@@ -2239,7 +2239,8 @@ defmodule Ysc.AccountsTest do
       {_stats, subscription_preload_count} =
         Ysc.QueryCounter.with_query_counter(
           fn -> Accounts.get_membership_stats() end,
-          pattern: subscription_preload_pattern
+          pattern: subscription_preload_pattern,
+          caller_pids: [self()]
         )
 
       assert subscription_preload_count == 0

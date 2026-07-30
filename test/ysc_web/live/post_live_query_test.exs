@@ -47,10 +47,12 @@ defmodule YscWeb.PostLiveQueryTest do
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, html} = live(conn, ~p"/posts/#{post.id}")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render_async(view)
             {:ok, view, html}
           end,
-          pattern: @post_query_pattern
+          pattern: @post_query_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 1
@@ -68,7 +70,8 @@ defmodule YscWeb.PostLiveQueryTest do
             |> get(~p"/posts/#{post.id}")
             |> html_response(200)
           end,
-          pattern: @post_query_pattern
+          pattern: @post_query_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 1

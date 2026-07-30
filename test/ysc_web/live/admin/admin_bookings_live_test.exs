@@ -181,10 +181,12 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
             {:ok, view, initial_html} =
               live(conn, ~p"/admin/bookings?property=tahoe")
 
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render(view)
             {:ok, view, initial_html}
           end,
-          pattern: seasons_pattern
+          pattern: seasons_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count <= 1
@@ -759,7 +761,8 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
             |> element("button", "View")
             |> render_click()
           end,
-          pattern: bookings_list_pattern
+          pattern: bookings_list_pattern,
+          caller_pids: [view.pid]
         )
 
       assert reservation_queries == 0
@@ -790,7 +793,8 @@ defmodule YscWeb.Admin.AdminBookingsLiveTest do
             |> element("button", "View")
             |> render_click()
           end,
-          pattern: pending_refund_pattern
+          pattern: pending_refund_pattern,
+          caller_pids: [view.pid]
         )
 
       assert badge_queries == 0
