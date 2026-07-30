@@ -2372,6 +2372,7 @@ defmodule Ysc.Accounts do
 
         base_multi =
           Ecto.Multi.new()
+          |> maybe_validate_family_invite_accept(invite)
           |> Ecto.Multi.update(
             :user,
             User.approve_user_changeset(user, user_approval_attrs)
@@ -2433,8 +2434,8 @@ defmodule Ysc.Accounts do
 
             {:ok, application}
 
-          {:error, _, changeset, _} ->
-            {:error, changeset}
+          {:error, _failed_operation, failed_value, _changes} ->
+            {:error, failed_value}
         end
       end
     end
@@ -2501,6 +2502,17 @@ defmodule Ysc.Accounts do
         end
       end
     end
+  end
+
+  defp maybe_validate_family_invite_accept(multi, nil), do: multi
+
+  defp maybe_validate_family_invite_accept(multi, invite) do
+    Ecto.Multi.run(multi, :family_invite_guard, fn repo, _changes ->
+      case Ysc.Accounts.FamilyInvites.validate_invite_acceptance(repo, invite) do
+        :ok -> {:ok, :ok}
+        {:error, reason} -> {:error, reason}
+      end
+    end)
   end
 
   ## Authentication Events

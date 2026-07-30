@@ -85,6 +85,35 @@ defmodule Ysc.Accounts.FamilyInvites do
   end
 
   @doc """
+  Locks the primary account and validates a family invite can still be accepted.
+
+  Must run inside the same database transaction as the accept/link update.
+  Returns `:ok` or `{:error, reason}`.
+  """
+  def validate_invite_acceptance(repo, %FamilyInvite{} = invite) do
+    primary_user_id = invite.primary_user_id
+    relationship = invite.relationship || :child
+
+    from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
+    |> repo.one!()
+
+    cond do
+      not FamilyInvite.valid?(invite) ->
+        {:error, :invite_expired_or_used}
+
+      count_sub_accounts_by_primary_id(primary_user_id) >= @max_sub_accounts ->
+        {:error, :max_sub_accounts_reached}
+
+      relationship in [:spouse, "spouse"] and
+          count_spouses(%User{id: primary_user_id}) >= @max_spouses ->
+        {:error, :max_spouses_reached}
+
+      true ->
+        :ok
+    end
+  end
+
+  @doc """
   Accepts a family invite and creates a sub-account user.
 
   Returns {:ok, user} or {:error, reason}
@@ -104,15 +133,9 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       true ->
         Repo.transaction(fn ->
-          primary_user_id = invite.primary_user_id
-
-          # Lock the primary account so concurrent accepts cannot exceed the cap.
-          from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
-          |> Repo.one!()
-
-          if count_sub_accounts_by_primary_id(primary_user_id) >=
-               @max_sub_accounts do
-            Repo.rollback(:max_sub_accounts_reached)
+          case validate_invite_acceptance(Repo, invite) do
+            :ok -> :ok
+            {:error, reason} -> Repo.rollback(reason)
           end
 
           # Create sub-account user
@@ -283,21 +306,12 @@ defmodule Ysc.Accounts.FamilyInvites do
 
       true ->
         Repo.transaction(fn ->
-          primary_user_id = invite.primary_user_id
           relationship = invite.relationship || :child
+          primary_user_id = invite.primary_user_id
 
-          # Lock the primary account so concurrent links cannot exceed the cap.
-          from(u in User, where: u.id == ^primary_user_id, lock: "FOR UPDATE")
-          |> Repo.one!()
-
-          if count_sub_accounts_by_primary_id(primary_user_id) >=
-               @max_sub_accounts do
-            Repo.rollback(:max_sub_accounts_reached)
-          end
-
-          if relationship in [:spouse, "spouse"] and
-               count_spouses(%User{id: primary_user_id}) >= @max_spouses do
-            Repo.rollback(:max_spouses_reached)
+          case validate_invite_acceptance(Repo, invite) do
+            :ok -> :ok
+            {:error, reason} -> Repo.rollback(reason)
           end
 
           updated_user =
