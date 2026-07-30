@@ -3058,7 +3058,9 @@ defmodule Ysc.Ledgers do
     account_ids = Enum.map(accounts, & &1.id)
 
     accounts
-    |> accounts_with_balances_from_entries(entries_by_account_for_all(account_ids))
+    |> accounts_with_balances_from_entries(
+      entries_by_account_for_all(account_ids)
+    )
   end
 
   @doc """
@@ -3085,6 +3087,7 @@ defmodule Ysc.Ledgers do
     account_ids = Enum.map(accounts, & &1.id)
 
     current_entries_by_account = entries_by_account_for_all(account_ids)
+
     period_entries_by_account =
       entries_by_account_for_date_range(account_ids, start_date, end_date)
 
@@ -3128,8 +3131,9 @@ defmodule Ysc.Ledgers do
   end
 
   defp balance_from_entries(account, entries) do
-    Enum.reduce(entries, Money.new(0, :USD), fn {_account_id, entry_amount, debit_credit},
-                                                 acc ->
+    Enum.reduce(entries, Money.new(0, :USD), fn {_account_id, entry_amount,
+                                                 debit_credit},
+                                                acc ->
       normal_balance_str = to_string(account.normal_balance)
       debit_credit_str = to_string(debit_credit)
 
