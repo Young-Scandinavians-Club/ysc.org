@@ -45,6 +45,17 @@ YSC must be running on port 4000 with matching SSO config (`query_console_dev` /
 - `YSC_SSO_REDIRECT_URI` (default `http://localhost:4001/auth/ysc/callback`)
 - `QUERY_CONSOLE_BASE_URL`
 
+### AI assistant (optional)
+
+Lotus AI is enabled when `OPENROUTER_API_KEY` is set (model defaults to
+`openrouter:moonshotai/kimi-k3`; override with `LOTUS_AI_MODEL`). In the editor use
+**Cmd/Ctrl+K**.
+
+```bash
+export OPENROUTER_API_KEY=sk-or-...
+mix phx.server
+```
+
 ### Tests
 
 ```bash

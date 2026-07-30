@@ -67,6 +67,8 @@ Set these on **both** `ysc-query-console-sandbox` and `ysc-query-console` (value
 | `QUERY_CONSOLE_BASE_URL` | Public base URL of this Fly app |
 | `SHUTDOWN_WHEN_INACTIVE_MS` | Optional idle exit (default `600000`; `0` disables) |
 | `PHX_HOST` | Optional; already set in `fly.*.toml` `[env]` |
+| `OPENROUTER_API_KEY` | Optional; enables Lotus AI assistant (OpenRouter) |
+| `LOTUS_AI_MODEL` | Optional; ReqLLM model id (default `openrouter:moonshotai/kimi-k3`) |
 
 ### Sandbox example
 

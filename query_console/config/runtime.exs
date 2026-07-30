@@ -4,6 +4,16 @@ if System.get_env("PHX_SERVER") do
   config :query_console, QueryConsoleWeb.Endpoint, server: true
 end
 
+# Lotus AI assistant (OpenRouter / ReqLLM). Off unless OPENROUTER_API_KEY is set.
+if api_key = System.get_env("OPENROUTER_API_KEY") do
+  config :lotus,
+    ai: [
+      enabled: true,
+      model: System.get_env("LOTUS_AI_MODEL") || "openrouter:moonshotai/kimi-k3",
+      api_key: api_key
+    ]
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
