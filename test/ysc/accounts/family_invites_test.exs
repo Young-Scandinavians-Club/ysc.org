@@ -539,6 +539,73 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       end)
     end
 
+    test "family-linked application approval enforces sub-account cap" do
+      primary_user = create_user_with_lifetime_membership()
+
+      for i <- 1..9 do
+        %User{}
+        |> User.sub_account_registration_changeset(
+          %{
+            email: "approval-cap-#{i}-#{System.unique_integer()}@example.com",
+            password: "password1234",
+            first_name: "Sub",
+            last_name: "User#{i}",
+            phone_number: "+14159098268",
+            date_of_birth: ~D[1990-01-01]
+          },
+          primary_user.id,
+          hash_password: true,
+          validate_email: true
+        )
+        |> Repo.insert!()
+      end
+
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      applicant =
+        oauth_user_fixture(%{
+          email: email,
+          phone_number: unique_user_phone(),
+          state: :pending_approval
+        })
+
+      application =
+        signup_application_fixture(applicant)
+        |> Ecto.Changeset.change(family_invite_id: invite.id)
+        |> Repo.update!()
+
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      # Another sub-account is linked before the pending invite is approved.
+      %User{}
+      |> User.sub_account_registration_changeset(
+        %{
+          email: "approval-cap-extra-#{System.unique_integer()}@example.com",
+          password: "password1234",
+          first_name: "Extra",
+          last_name: "Sub",
+          phone_number: "+14159098268",
+          date_of_birth: ~D[1990-01-01]
+        },
+        primary_user.id,
+        hash_password: true,
+        validate_email: true
+      )
+      |> Repo.insert!()
+
+      assert {:error, :max_sub_accounts_reached} =
+               Accounts.record_application_outcome(
+                 :approved,
+                 applicant,
+                 application,
+                 admin
+               )
+
+      assert Repo.get!(User, applicant.id).state == :pending_approval
+      assert is_nil(Repo.get!(FamilyInvite, invite.id).accepted_at)
+    end
+
     test "returns error when invite not found" do
       assert {:error, :invite_not_found} =
                FamilyInvites.accept_invite("invalid_token", %{
