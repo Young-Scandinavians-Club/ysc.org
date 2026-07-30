@@ -90,7 +90,8 @@ defmodule YscWeb.EventTvPosterController do
     now = DateTime.utc_now()
     ticket_tiers = Map.get(event, :ticket_tiers) || []
 
-    non_donation_tiers = Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
+    non_donation_tiers =
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     if non_donation_tiers == [] do
       false

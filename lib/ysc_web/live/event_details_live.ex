@@ -1328,9 +1328,13 @@ defmodule YscWeb.EventDetailsLive do
                         user_has_event_reservation
                       ) %>
                 <% is_on_sale =
-                  if is_donation, do: true, else: TicketTierHelpers.tier_on_sale?(ticket_tier) %>
+                  if is_donation,
+                    do: true,
+                    else: TicketTierHelpers.tier_on_sale?(ticket_tier) %>
                 <% is_sale_ended =
-                  if is_donation, do: false, else: TicketTierHelpers.tier_sale_ended?(ticket_tier) %>
+                  if is_donation,
+                    do: false,
+                    else: TicketTierHelpers.tier_sale_ended?(ticket_tier) %>
                 <% days_until_sale =
                   if is_donation, do: nil, else: days_until_sale_starts(ticket_tier) %>
                 <% is_pre_sale =
@@ -6765,7 +6769,8 @@ defmodule YscWeb.EventDetailsLive do
   # Pre-compute event at capacity using cached data
   defp compute_event_at_capacity(event, ticket_tiers, availability_data) do
     # Filter out donation tiers - donations don't count toward "sold out" status
-    non_donation_tiers = Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
+    non_donation_tiers =
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
@@ -7589,7 +7594,8 @@ defmodule YscWeb.EventDetailsLive do
     end
   end
 
-  defp event_tickets(tickets), do: Enum.reject(tickets, &TicketTierHelpers.donation_ticket?/1)
+  defp event_tickets(tickets),
+    do: Enum.reject(tickets, &TicketTierHelpers.donation_ticket?/1)
 
   defp check_availability_cached(
          availability,

@@ -2447,7 +2447,8 @@ defmodule YscWeb.HomeLive do
       end
 
     # Filter out donation tiers - donations don't count toward "sold out" status
-    non_donation_tiers = Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
+    non_donation_tiers =
+      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     # If there are no non-donation tiers, event is not sold out
     if Enum.empty?(non_donation_tiers) do
