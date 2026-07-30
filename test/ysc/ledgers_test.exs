@@ -175,6 +175,36 @@ defmodule Ysc.LedgersTest do
                Map.has_key?(acc, :account) && Map.has_key?(acc, :balance)
              end)
     end
+
+    test "get_accounts_with_balances/0 batches entry queries" do
+      {_accounts_with_balances, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.get_accounts_with_balances()
+          end,
+          caller_pids: [self()]
+        )
+
+      assert query_count == 2
+    end
+
+    test "get_overview_accounts_with_balances/2 fetches accounts once" do
+      today = Date.utc_today()
+      start_date = DateTime.new!(today, ~T[00:00:00], "Etc/UTC")
+      end_date = DateTime.new!(today, ~T[23:59:59], "Etc/UTC")
+
+      {{period_accounts, current_accounts, accounts}, query_count} =
+        Ysc.QueryCounter.with_query_counter(
+          fn ->
+            Ledgers.get_overview_accounts_with_balances(start_date, end_date)
+          end,
+          caller_pids: [self()]
+        )
+
+      assert length(period_accounts) == length(accounts)
+      assert length(current_accounts) == length(accounts)
+      assert query_count == 3
+    end
   end
 
   describe "payment processing" do
