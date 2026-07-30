@@ -1,6 +1,7 @@
 # YSC Query Console
 
-Standalone Phoenix LiveView SQL query console. Independently deployable; does not import any `Ysc.*` modules.
+Standalone Phoenix app that mounts **Lotus Web** as the SQL console UI, behind YSC SSO.
+Independently deployable; does not import any `Ysc.*` modules.
 
 ## Local setup
 
@@ -20,7 +21,9 @@ mix ecto.migrate
 mix phx.server
 ```
 
-The console listens on **http://localhost:4001** (YSC uses 4000).
+The app listens on **http://localhost:4001** (YSC uses 4000). After SSO, `/` is Lotus Web
+(queries, schema browser, saved queries). **Admin** links back to YSC `/admin`; **Sign out**
+clears the local session and ends the YSC OAuth session.
 
 ### Databases
 

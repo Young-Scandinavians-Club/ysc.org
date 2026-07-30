@@ -10,6 +10,7 @@ defmodule QueryConsole.Application do
         QueryConsoleWeb.Telemetry,
         QueryConsole.Repo,
         QueryConsole.AnalyticsRepo,
+        Lotus,
         {DNSCluster, query: Application.get_env(:query_console, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: QueryConsole.PubSub},
         {Registry, keys: :unique, name: QueryConsole.Runner.Registry},

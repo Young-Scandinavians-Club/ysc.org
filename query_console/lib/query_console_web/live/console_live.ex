@@ -96,7 +96,10 @@ defmodule QueryConsoleWeb.ConsoleLive do
   def handle_event("new_workbook", _params, socket) do
     user = socket.assigns.current_user
 
-    case Workbooks.create_workbook(user) do
+    case Workbooks.create_workbook(user, %{
+           title: "Untitled",
+           sql: "-- Write a SELECT query\n"
+         }) do
       {:ok, workbook} ->
         {:noreply,
          socket

@@ -46,7 +46,16 @@ config :lotus,
   data_repos: %{
     "analytics" => QueryConsole.AnalyticsRepo
   },
-  unique_names: false
+  unique_names: false,
+  read_only: true,
+  cache: %{
+    adapter: Lotus.Cache.ETS,
+    profiles: %{
+      results: [ttl_ms: 60_000],
+      schema: [ttl_ms: 3_600_000],
+      options: [ttl_ms: 300_000]
+    }
+  }
 
 # Configure esbuild (the version is required)
 config :esbuild,

@@ -58,6 +58,8 @@ defmodule QueryConsole.MixProject do
       {:bandit, "~> 1.5"},
       {:req, "~> 0.5"},
       {:lotus, "~> 0.16.6"},
+      {:lotus_web, "~> 0.14.1"},
+      {:cachex, "~> 4.0"},
       {:pg_query_ex, "~> 0.10.0"},
       {:ecto_ulid, "~> 0.3"}
     ]

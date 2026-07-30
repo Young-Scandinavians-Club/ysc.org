@@ -4,12 +4,21 @@ defmodule QueryConsoleWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
-  @session_options [
+  @base_session_options [
     store: :cookie,
     key: "_query_console_key",
     signing_salt: "CwUCRRhf",
-    same_site: "Lax"
+    same_site: "Lax",
+    http_only: true
   ]
+
+  # In production (no code reloader), require HTTPS for the session cookie.
+  # In development we omit :secure so local HTTP works.
+  @session_options (if code_reloading? do
+                      @base_session_options
+                    else
+                      Keyword.put(@base_session_options, :secure, true)
+                    end)
 
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options]],

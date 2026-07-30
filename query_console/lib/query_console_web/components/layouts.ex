@@ -142,4 +142,75 @@ defmodule QueryConsoleWeb.Layouts do
     </div>
     """
   end
+
+  @doc """
+  Root layout for Lotus Web with YSC Admin + Sign out chrome.
+
+  Chrome sits outside LiveView `@inner_content` so patches do not remove it.
+  """
+  def lotus_root(assigns) do
+    assigns =
+      assigns
+      |> assign_new(:csp_nonces, fn -> %{style: nil, script: nil} end)
+      |> assign_new(:current_user, fn -> nil end)
+      |> assign(:ysc_admin_url, QueryConsole.SSO.admin_url())
+
+    ~H"""
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="csrf-token" content={get_csrf_token()} />
+
+        <title>{assigns[:page_title] || "YSC Query Console"}</title>
+
+        <style phx-track-static nonce={@csp_nonces[:style]}>
+          <%= raw(Lotus.Web.Layouts.render("app.css")) %>
+        </style>
+        <script
+          src="https://cdn.jsdelivr.net/npm/@tailwindplus/elements@1"
+          type="module"
+          nonce={@csp_nonces[:script]}
+        >
+        </script>
+      </head>
+
+      <body class="h-full antialiased bg-gray-200 dark:bg-black text-text-light dark:text-text-dark transition-colors duration-200 ease-out">
+        <div class="flex items-center justify-between gap-3 px-4 py-2 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-sm">
+          <a
+            id="back-to-admin"
+            href={@ysc_admin_url}
+            class="inline-flex items-center gap-1 px-2 py-1 rounded-md font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            ← Admin
+          </a>
+          <div class="flex items-center gap-3">
+            <span
+              :if={@current_user}
+              id="signed-in-as"
+              class="text-gray-500 dark:text-gray-400 truncate max-w-xs"
+              title={@current_user.email}
+            >
+              {@current_user.display_name || @current_user.email}
+            </span>
+            <a
+              id="sign-out"
+              href={~p"/auth/logout"}
+              class="inline-flex items-center px-2 py-1 rounded-md font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              Sign out
+            </a>
+          </div>
+        </div>
+        {@inner_content}
+      </body>
+
+      <script phx-track-static type="text/javascript" nonce={@csp_nonces[:script]}>
+        <%= raw(Lotus.Web.Layouts.render("app.js")) %>
+      </script>
+    </html>
+    """
+  end
 end

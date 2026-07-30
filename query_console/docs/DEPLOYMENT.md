@@ -1,11 +1,12 @@
 # Query Console Deployment
 
-Standalone Phoenix LiveView SQL console deployed separately from the main YSC app.
+Standalone Phoenix app deployed separately from the main YSC app. The authenticated UI is
+**Lotus Web** (read-only SQL against analytics); YSC SSO (`/auth/*`) is unchanged.
 
 ## Topology (current)
 
-- **Metadata DB** (`DATABASE_URL`): writable database for shadow users, workbooks, run history, schema snapshots, and the global query lease.
-- **Analytics DB** (`ANALYTICS_DATABASE_URL` or preferred `ANALYTICS_REPLICA_DATABASE_URL`): read path for SQL execution and schema introspection.
+- **Metadata DB** (`DATABASE_URL`): writable database for shadow users, Lotus metadata (queries/dashboards), and leftover workbook/runner tables from the earlier custom console.
+- **Analytics DB** (`ANALYTICS_DATABASE_URL` or preferred `ANALYTICS_REPLICA_DATABASE_URL`): read path for Lotus SQL execution and schema introspection.
 
 **Do not** rewrite Postgres ports to `5433` to “find” a replica. Always set the analytics URL explicitly.
 

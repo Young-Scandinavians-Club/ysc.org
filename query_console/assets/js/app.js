@@ -9,13 +9,9 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/query_console"
 import topbar from "../vendor/topbar"
-import SqlEditor from "./hooks/sql_editor"
-import ResultsGrid from "./hooks/results_grid"
 
 const Hooks = {
-  ...colocatedHooks,
-  SqlEditor,
-  ResultsGrid
+  ...colocatedHooks
 }
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")

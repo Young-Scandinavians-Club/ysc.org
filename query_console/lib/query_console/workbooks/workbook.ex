@@ -18,7 +18,15 @@ defmodule QueryConsole.Workbooks.Workbook do
   def changeset(workbook, attrs) do
     workbook
     |> cast(attrs, [:title, :sql])
-    |> validate_required([:title, :sql])
+    |> validate_required([:title])
     |> validate_length(:title, max: 200)
+    |> maybe_default_sql()
+  end
+
+  defp maybe_default_sql(changeset) do
+    case get_field(changeset, :sql) do
+      nil -> put_change(changeset, :sql, "")
+      _ -> changeset
+    end
   end
 end
