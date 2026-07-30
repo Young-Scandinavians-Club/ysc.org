@@ -75,7 +75,7 @@ defmodule YscWeb.BookingUserMessagesTest do
              "cabin access details"
 
     assert BookingUserMessages.checkout_manage_booking_step() =~
-             "My Bookings & Tickets"
+             "My Bookings & Payments"
   end
 
   test "cabin availability error copy" do
@@ -150,7 +150,7 @@ defmodule YscWeb.BookingUserMessagesTest do
              "reservation hold"
 
     assert BookingUserMessages.modification_redirect_ledger_payment_failed() =~
-             "My Bookings & Tickets"
+             "My Bookings & Payments"
 
     assert BookingUserMessages.modification_redirect_update_failed() =~
              "couldn't update your reservation"

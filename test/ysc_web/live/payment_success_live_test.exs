@@ -468,7 +468,7 @@ defmodule YscWeb.PaymentSuccessLiveTest do
                |> live(~p"/payment/success?payment_intent=pi_test")
 
       assert flash["error"] =~
-               "We couldn't confirm your payment from this link. Check My Bookings & Tickets"
+               "We couldn't confirm your payment from this link. Check My Bookings & Payments"
     end
   end
 

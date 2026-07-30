@@ -1256,10 +1256,15 @@ defmodule YscWeb.Components.AvailabilityCalendar do
   end
 
   defp get_bookings_reason(day, assigns) do
-    if winter_buyout_blocked?(day, assigns) do
-      "Entire cabin is not available in winter"
-    else
-      "Booking already exists"
+    cond do
+      winter_buyout_blocked?(day, assigns) ->
+        "Entire cabin is not available in winter"
+
+      assigns[:selected_booking_mode] == :buyout ->
+        "Other members already have reservations on this date. Choose different dates or book a group or room stay instead."
+
+      true ->
+        "Booking already exists"
     end
   end
 
@@ -1574,7 +1579,7 @@ defmodule YscWeb.Components.AvailabilityCalendar do
           "Not available"
 
         mode == :buyout && !info.can_book_buyout ->
-          "Busy"
+          "Partially booked"
 
         mode == :day && !info.can_book_day ->
           "Unavailable"

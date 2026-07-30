@@ -411,7 +411,7 @@ defmodule YscWeb.TicketQrLive do
      socket
      |> put_flash(
        :error,
-       "We couldn't find those tickets. They may have expired or belong to another account. Open My Bookings & Tickets from your account menu, or browse events to buy tickets again."
+       "We couldn't find those tickets. They may have expired or belong to another account. Open Your event tickets from your account menu, or browse events to buy tickets again."
      )
      |> push_navigate(to: socket.assigns.return_to)}
   end
