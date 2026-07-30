@@ -264,7 +264,7 @@ defmodule Ysc.MixProject do
       {:postgrex, "~> 0.22"},
       {:prom_ex, "~> 1.12"},
       {:remote_ip, "~> 1.2"},
-      {:req, "~> 0.6"},
+      {:req, "~> 0.7"},
       {:retry_on, "~> 0.1"},
       {:sentry, "~> 13.3"},
       {:sobelow, "~> 0.14", only: [:dev, :test], runtime: false},
