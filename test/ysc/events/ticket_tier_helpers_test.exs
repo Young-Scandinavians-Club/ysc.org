@@ -82,5 +82,20 @@ defmodule Ysc.Events.TicketTierHelpersTest do
       refute TicketTierHelpers.tier_on_sale?(tier, @now)
       refute TicketTierHelpers.tier_sale_ended?(tier, @now)
     end
+
+    test "works with plain maps using atom or string date keys" do
+      tier = %{
+        "start_date" => @past,
+        "end_date" => @future
+      }
+
+      assert TicketTierHelpers.tier_on_sale?(tier, @now)
+      refute TicketTierHelpers.tier_sale_ended?(tier, @now)
+
+      ended_tier = %{start_date: @past, end_date: @past}
+
+      refute TicketTierHelpers.tier_on_sale?(ended_tier, @now)
+      assert TicketTierHelpers.tier_sale_ended?(ended_tier, @now)
+    end
   end
 end

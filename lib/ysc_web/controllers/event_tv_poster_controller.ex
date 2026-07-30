@@ -6,7 +6,7 @@ defmodule YscWeb.EventTvPosterController do
   use YscWeb, :controller
 
   alias Ysc.Events
-  alias Ysc.Events.TvPosterImage
+  alias Ysc.Events.{TicketTierHelpers, TvPosterImage}
   alias YscWeb.Emails.Helpers
 
   def show(conn, %{"id" => id}) do
@@ -90,17 +90,15 @@ defmodule YscWeb.EventTvPosterController do
     now = DateTime.utc_now()
     ticket_tiers = Map.get(event, :ticket_tiers) || []
 
-    non_donation_tiers =
-      Enum.reject(ticket_tiers, fn tier ->
-        Map.get(tier, :type) in [:donation, "donation"]
-      end)
+    non_donation_tiers = Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
 
     if non_donation_tiers == [] do
       false
     else
       relevant_tiers =
         Enum.filter(non_donation_tiers, fn tier ->
-          tier_on_sale?(tier, now) || tier_sale_ended?(tier, now)
+          TicketTierHelpers.tier_on_sale?(tier, now) ||
+            TicketTierHelpers.tier_sale_ended?(tier, now)
         end)
 
       if relevant_tiers == [] do
@@ -122,32 +120,6 @@ defmodule YscWeb.EventTvPosterController do
 
         all_tiers_sold_out || event_at_capacity
       end
-    end
-  end
-
-  defp tier_on_sale?(ticket_tier, now) do
-    start_date = Map.get(ticket_tier, :start_date)
-    end_date = Map.get(ticket_tier, :end_date)
-
-    sale_started =
-      case start_date do
-        nil -> true
-        sd -> DateTime.compare(now, sd) != :lt
-      end
-
-    sale_ended =
-      case end_date do
-        nil -> false
-        ed -> DateTime.compare(now, ed) == :gt
-      end
-
-    sale_started && !sale_ended
-  end
-
-  defp tier_sale_ended?(ticket_tier, now) do
-    case Map.get(ticket_tier, :end_date) do
-      nil -> false
-      ed -> DateTime.compare(now, ed) == :gt
     end
   end
 
