@@ -43,7 +43,11 @@
     />
     <meta
       name="twitter:card"
-      content={YscWeb.SEO.twitter_card_for_image(assigns[:og_image])}
+      content={
+        YscWeb.SEO.twitter_card_for_image(
+          YscWeb.SEO.og_image_or_default(assigns[:og_image])
+        )
+      }
     />
     <meta
       name="twitter:title"

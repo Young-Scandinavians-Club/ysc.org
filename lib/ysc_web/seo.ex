@@ -37,19 +37,23 @@ defmodule YscWeb.SEO do
   Open Graph image URL for a page, falling back to the YSC logo.
   """
   def og_image_or_default(nil), do: default_og_image_url()
-  def og_image_or_default(""), do: default_og_image_url()
-  def og_image_or_default(url) when is_binary(url), do: url
+
+  def og_image_or_default(url) when is_binary(url) do
+    case String.trim(url) do
+      "" -> default_og_image_url()
+      trimmed -> trimmed
+    end
+  end
 
   @doc """
-  Twitter card type for an OG image URL.
+  Twitter card type for a resolved OG image URL.
 
   Custom photos use `summary_large_image`; the square logo default uses `summary`.
+  Callers should pass `og_image_or_default/1` so empty/whitespace values classify
+  as the logo fallback.
   """
-  def twitter_card_for_image(nil), do: "summary"
-
   def twitter_card_for_image(url) when is_binary(url) do
-    if url == default_og_image_url() or
-         String.ends_with?(url, @default_og_image_path) do
+    if url == default_og_image_url() or String.ends_with?(url, @default_og_image_path) do
       "summary"
     else
       "summary_large_image"
