@@ -1177,8 +1177,25 @@ defmodule YscWeb.UserAuthTest do
     end
 
     test "rejects paths with embedded protocols" do
+      refute UserAuth.valid_internal_redirect?("/path://evil.com")
+      refute UserAuth.valid_internal_redirect?("/javascript:alert(1)")
+
       refute UserAuth.valid_internal_redirect?(
                "/path?redirect=https://evil.com"
+             )
+    end
+
+    test "allowlists OAuth authorize return_to with nested redirect_uri" do
+      assert UserAuth.valid_internal_redirect?(
+               "/oauth/authorize?client_id=query_console&redirect_uri=http://localhost:4001/auth/ysc/callback&state=abc&code_challenge=xyz&code_challenge_method=S256&response_type=code"
+             )
+
+      assert UserAuth.valid_internal_redirect?(
+               "/oauth/query-console/authorize?redirect_uri=https://query.ysc.org/auth/ysc/callback"
+             )
+
+      refute UserAuth.valid_internal_redirect?(
+               "/oauth/authorize/../admin?redirect=https://evil.com"
              )
     end
   end

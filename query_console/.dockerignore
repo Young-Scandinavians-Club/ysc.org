@@ -1,0 +1,26 @@
+# Local build artifacts (must not be uploaded as Docker build context)
+_build/
+deps/
+.doc/
+.elixir_ls/
+.lexical/
+.fetcher/
+cover/
+erl_crash.dump
+*.ez
+query_console-*.tar
+npm-debug.log
+assets/node_modules/
+assets/css/app.css.map
+test/
+tmp/
+.git/
+.gitignore
+.tool-versions
+AGENTS.md
+README.md
+docs/
+fly.toml
+fly.sandbox.toml
+fly.prod.toml
+.dockerignore

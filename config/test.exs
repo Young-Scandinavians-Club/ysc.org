@@ -12,6 +12,16 @@ config :ysc, :google_photos,
   client_secret: "test_google_photos_client_secret",
   dev_stub: false
 
+config :ysc, :oauth_clients, %{
+  "query_console_test" => %{
+    client_secret: "test_secret_change_me",
+    redirect_uris: ["http://localhost:4001/auth/ysc/callback"],
+    post_logout_redirect_uris: ["http://localhost:4001/auth/signed-out"],
+    roles: [:admin],
+    states: [:active]
+  }
+}
+
 config :ysc, :google_photos_req_opts,
   plug: {Req.Test, Ysc.GooglePhotos.Api.ReqStub}
 

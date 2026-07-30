@@ -170,13 +170,6 @@ defmodule YscWeb.UserAuth do
   It clears all session data for safety. See renew_session.
   """
   def log_out_user(conn, redirect_to \\ nil) do
-    user_token = get_session(conn, :user_token)
-    user_token && Accounts.delete_user_session_token(user_token)
-
-    if live_socket_id = get_session(conn, :live_socket_id) do
-      YscWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
-    end
-
     redirect_path =
       if redirect_to && valid_internal_redirect?(redirect_to) do
         redirect_to
@@ -185,9 +178,27 @@ defmodule YscWeb.UserAuth do
       end
 
     conn
+    |> drop_user_session()
+    |> redirect(to: redirect_path)
+  end
+
+  @doc """
+  Clears the authenticated session and remember-me cookie without redirecting.
+
+  Used by first-party OAuth logout where the browser is then sent to an
+  allowlisted external `post_logout_redirect_uri`.
+  """
+  def drop_user_session(conn) do
+    user_token = get_session(conn, :user_token)
+    user_token && Accounts.delete_user_session_token(user_token)
+
+    if live_socket_id = get_session(conn, :live_socket_id) do
+      YscWeb.Endpoint.broadcast(live_socket_id, "disconnect", %{})
+    end
+
+    conn
     |> renew_session()
     |> delete_resp_cookie(@remember_me_cookie)
-    |> redirect(to: redirect_path)
   end
 
   @doc """
@@ -650,11 +661,23 @@ defmodule YscWeb.UserAuth do
 
   defp not_approved_path(_conn), do: ~p"/pending-review"
 
+  # Paths that may include nested absolute URLs in the query string after login
+  # (e.g. OAuth authorize `redirect_uri=https://…`). Everything else still rejects
+  # `://` / `//` anywhere in the return_to value.
+  @return_to_paths_allowing_nested_urls [
+    "/oauth/authorize",
+    "/oauth/query-console/authorize"
+  ]
+
   @doc """
   Validates that a redirect URL is an internal path and not an external URL.
 
   This prevents open redirect vulnerabilities by ensuring redirects only go to
   paths within the application, not to external websites.
+
+  Nested absolute URLs in the query string are rejected by default. A small
+  allowlist of first-party OAuth authorize paths may include them (the
+  destination still validates `redirect_uri` against its own client allowlist).
 
   ## Examples
 
@@ -676,34 +699,50 @@ defmodule YscWeb.UserAuth do
   def valid_internal_redirect?(path) when is_binary(path) do
     normalized = repeatedly_percent_decode_redirect_target(path)
 
-    # Apply checks after decoding so bypasses like "/%2f%2fevil.com" cannot reach open redirects.
-    if String.contains?(normalized, [
-         "//",
-         "javascript:",
-         "data:",
-         "vbscript:",
-         "://"
-       ]) do
-      false
-    else
-      case URI.parse(normalized) do
-        %URI{scheme: nil, host: nil, path: path_part}
-        when is_binary(path_part) ->
-          String.starts_with?(path_part, "/")
+    case URI.parse(normalized) do
+      %URI{scheme: nil, host: nil, path: path_part} = uri
+      when is_binary(path_part) and path_part != "" ->
+        cond do
+          not String.starts_with?(path_part, "/") ->
+            false
 
-        %URI{scheme: scheme} when not is_nil(scheme) ->
-          false
+          path_part in @return_to_paths_allowing_nested_urls ->
+            # Allow nested URLs in the query; still forbid them in path/fragment.
+            not dangerous_redirect_path_or_fragment?(path_part, uri.fragment)
 
-        %URI{host: host} when not is_nil(host) ->
-          false
+          contains_dangerous_redirect_token?(normalized) ->
+            false
 
-        _ ->
-          false
-      end
+          true ->
+            true
+        end
+
+      %URI{scheme: scheme} when not is_nil(scheme) ->
+        false
+
+      %URI{host: host} when not is_nil(host) ->
+        false
+
+      _ ->
+        false
     end
   end
 
   def valid_internal_redirect?(_), do: false
+
+  defp contains_dangerous_redirect_token?(value) do
+    String.contains?(value, [
+      "//",
+      "javascript:",
+      "data:",
+      "vbscript:",
+      "://"
+    ])
+  end
+
+  defp dangerous_redirect_path_or_fragment?(path_part, fragment) do
+    contains_dangerous_redirect_token?(path_part <> (fragment || ""))
+  end
 
   @doc """
   Clears OAuth re-authentication flags from the plug session.
