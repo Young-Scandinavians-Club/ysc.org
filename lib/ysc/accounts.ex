@@ -2374,7 +2374,10 @@ defmodule Ysc.Accounts do
           Ecto.Multi.new()
           |> Ecto.Multi.run(:family_invite_guard, fn repo, _changes ->
             if invite do
-              case Ysc.Accounts.FamilyInvites.validate_invite_acceptance(repo, invite) do
+              case Ysc.Accounts.FamilyInvites.validate_invite_acceptance(
+                     repo,
+                     invite
+                   ) do
                 :ok -> {:ok, :ok}
                 {:error, reason} -> {:error, reason}
               end
