@@ -72,6 +72,45 @@ defmodule Ysc.Stripe.HttpClientTest do
              )
   end
 
+  test "request/5 encodes multipart bodies with string field names" do
+    Req.Test.stub(ReqStub, fn conn ->
+      assert conn.method == "POST"
+
+      assert {"content-type", "multipart/form-data; boundary=" <> _} =
+               List.keyfind(conn.req_headers, "content-type", 0)
+
+      assert conn.body_params == %{
+               "file" => "binary-payload",
+               "purpose" => "identity_document"
+             }
+
+      Req.Test.json(conn, %{"id" => "file_test", "object" => "file"})
+    end)
+
+    headers = [
+      {"Authorization", "Bearer #{@api_key}"},
+      {"Content-Type", "multipart/form-data"}
+    ]
+
+    multipart_body =
+      {:multipart,
+       [
+         {"file", "binary-payload"},
+         {"purpose", "identity_document"}
+       ]}
+
+    assert {:ok, 200, _headers, body} =
+             HttpClient.request(
+               :post,
+               "https://api.stripe.com/v1/files",
+               headers,
+               multipart_body,
+               []
+             )
+
+    assert Jason.decode!(body)["id"] == "file_test"
+  end
+
   test "request/5 keeps GET method when body is empty string" do
     list_url = "https://api.stripe.com/v1/balance_transactions?limit=1"
 
