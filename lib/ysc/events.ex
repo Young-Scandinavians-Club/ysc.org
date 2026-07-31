@@ -2055,7 +2055,8 @@ defmodule Ysc.Events do
 
     %{
       by_tier: by_tier,
-      total_revenue: Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
+      total_revenue:
+        Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
       total_tickets_sold: Enum.reduce(by_tier, 0, &(&1.tickets_sold + &2))
     }
   end
@@ -2078,7 +2079,11 @@ defmodule Ysc.Events do
         where:
           t.event_id == ^event_id and t.status == :confirmed and
             tt.type != :donation,
-        group_by: [fragment("date_trunc('day', ?)", t.inserted_at), tt.id, tt.name],
+        group_by: [
+          fragment("date_trunc('day', ?)", t.inserted_at),
+          tt.id,
+          tt.name
+        ],
         select: %{
           date: fragment("date_trunc('day', ?)", t.inserted_at),
           ticket_tier_id: tt.id,
@@ -2108,7 +2113,8 @@ defmodule Ysc.Events do
         %{
           date: date,
           tickets_sold: Enum.reduce(by_tier, 0, &(&1.tickets_sold + &2)),
-          revenue: Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
+          revenue:
+            Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
           by_tier: by_tier
         }
       end)
@@ -2201,8 +2207,11 @@ defmodule Ysc.Events do
 
   defp money_sub_floor_zero(%Money{} = a, %Money{} = b) do
     case Money.sub(a, b) do
-      {:ok, diff} -> if Money.negative?(diff), do: Money.new(0, :USD), else: diff
-      _ -> a
+      {:ok, diff} ->
+        if Money.negative?(diff), do: Money.new(0, :USD), else: diff
+
+      _ ->
+        a
     end
   end
 

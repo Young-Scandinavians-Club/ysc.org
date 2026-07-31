@@ -1277,14 +1277,18 @@ defmodule YscWeb.AdminEventsNewLive do
                       </.badge>
                     </td>
                     <td class="py-2 pr-4 text-zinc-800">
-                      {money_display(ExpenseReports.calculate_totals(report).net_total)}
+                      {money_display(
+                        ExpenseReports.calculate_totals(report).net_total
+                      )}
                     </td>
                   </tr>
                 </tbody>
               </table>
 
               <p class="text-sm font-medium text-zinc-700 pt-2 border-t border-zinc-100">
-                Net total (approved + paid): {money_display(@expense_report_totals.net_total)}
+                Net total (approved + paid): {money_display(
+                  @expense_report_totals.net_total
+                )}
               </p>
             </div>
           </div>
@@ -1540,15 +1544,25 @@ defmodule YscWeb.AdminEventsNewLive do
     # (e.g. cash collected at the door). Costs = Stripe fees plus the gross
     # expense total, so income isn't silently netted out of "costs" — it's
     # its own visible line item, and the two roll up to the same net figure.
-    total_revenue = money_add(sales_stats.total_revenue, expense_report_totals.income_total)
-    total_costs = money_add(stripe_fees_total, expense_report_totals.expense_total)
+    total_revenue =
+      money_add(sales_stats.total_revenue, expense_report_totals.income_total)
+
+    total_costs =
+      money_add(stripe_fees_total, expense_report_totals.expense_total)
+
     net_revenue = money_sub(total_revenue, total_costs)
 
     socket
     |> assign(:sales_stats, sales_stats)
     |> assign(:sales_over_time, sales_over_time)
-    |> assign(:sales_chart_max_revenue, sales_chart_max_revenue(sales_over_time))
-    |> assign(:ticket_sale_window, Events.get_event_ticket_sale_window(event.id))
+    |> assign(
+      :sales_chart_max_revenue,
+      sales_chart_max_revenue(sales_over_time)
+    )
+    |> assign(
+      :ticket_sale_window,
+      Events.get_event_ticket_sale_window(event.id)
+    )
     |> assign(:event_update_markers, event_update_markers(event.id))
     |> assign(:stripe_fees_total, stripe_fees_total)
     |> assign(:event_expense_reports, expense_reports)
@@ -1630,7 +1644,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
   defp sales_point_tooltip(point, event_update_markers) do
     header = Calendar.strftime(point.date, "%b %-d, %Y")
-    summary = "#{money_display(point.revenue)} · #{point.tickets_sold} ticket(s)"
+
+    summary =
+      "#{money_display(point.revenue)} · #{point.tickets_sold} ticket(s)"
 
     tier_lines =
       Enum.map(point.by_tier, fn tier ->
@@ -1652,7 +1668,8 @@ defmodule YscWeb.AdminEventsNewLive do
         nil
 
       updates ->
-        titles = updates |> Enum.map(&(&1.title || "Event update")) |> Enum.join(", ")
+        titles = Enum.map_join(updates, ", ", &(&1.title || "Event update"))
+
         "Update sent: #{titles} (#{Calendar.strftime(date, "%b %-d, %Y")})"
     end
   end

@@ -1850,7 +1850,8 @@ defmodule YscWeb.AdminComponents do
 
   attr :value_class, :any,
     default: nil,
-    doc: "Overrides the default value text color (e.g. for positive/negative amounts)"
+    doc:
+      "Overrides the default value text color (e.g. for positive/negative amounts)"
 
   def admin_stat_card(assigns) do
     ~H"""

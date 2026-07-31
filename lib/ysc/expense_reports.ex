@@ -85,7 +85,8 @@ defmodule Ysc.ExpenseReports do
         report_totals = calculate_totals(report)
 
         %{
-          expense_total: money_sum(acc.expense_total, report_totals.expense_total),
+          expense_total:
+            money_sum(acc.expense_total, report_totals.expense_total),
           income_total: money_sum(acc.income_total, report_totals.income_total),
           net_total: money_sum(acc.net_total, report_totals.net_total)
         }

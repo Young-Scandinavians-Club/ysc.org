@@ -2172,7 +2172,8 @@ if stats_demo_event do
       },
       %{
         title: "Early bird pricing ends soon",
-        body: "<p>Grab your VIP pass before early bird pricing ends this week.</p>",
+        body:
+          "<p>Grab your VIP pass before early bird pricing ends this week.</p>",
         days_ago: 14
       },
       %{
