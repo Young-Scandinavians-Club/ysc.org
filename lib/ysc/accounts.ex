@@ -3278,6 +3278,22 @@ defmodule Ysc.Accounts do
 
   defp do_admin_link_user(primary_user, user_to_link, relationship) do
     Repo.transaction(fn ->
+      # Serialize with invite acceptance/linking, which locks the primary row.
+      from(u in User, where: u.id == ^primary_user.id, lock: "FOR UPDATE")
+      |> Repo.one!()
+
+      case relationship do
+        rel when rel in [:spouse, "spouse"] ->
+          if count_spouses(primary_user) >= 1 do
+            Repo.rollback(:max_spouses_reached)
+          end
+
+        _ ->
+          if count_sub_accounts_for_primary(primary_user.id) >= 10 do
+            Repo.rollback(:max_sub_accounts_reached)
+          end
+      end
+
       updated_user =
         user_to_link
         |> Ecto.Changeset.change(%{
