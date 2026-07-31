@@ -3937,7 +3937,7 @@ defmodule YscWeb.AdminUserDetailsLive do
       user =
         Accounts.get_user!(selected_user.id, [
           :family_members,
-          {:primary_user, :current_avatar},
+          {:primary_user, [:current_avatar, :family_members]},
           {:sub_accounts, :current_avatar},
           :current_avatar
         ])
@@ -3949,7 +3949,7 @@ defmodule YscWeb.AdminUserDetailsLive do
 
       family_members =
         if primary_user do
-          case Accounts.get_user!(primary_user.id, [:family_members]).family_members do
+          case primary_user.family_members do
             %Ecto.Association.NotLoaded{} -> []
             members when is_list(members) -> members
             _ -> []
@@ -4079,7 +4079,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     selected_user =
       Accounts.get_user!(user_id, [
         :family_members,
-        {:primary_user, :current_avatar},
+        {:primary_user, [:current_avatar, :family_members]},
         {:sub_accounts, :current_avatar},
         :current_avatar
       ])
@@ -4102,11 +4102,7 @@ defmodule YscWeb.AdminUserDetailsLive do
     # Otherwise, show family_members from the selected user
     family_members =
       if primary_user do
-        # Load primary user with family_members
-        primary_user_with_members =
-          Accounts.get_user!(primary_user.id, [:family_members])
-
-        case primary_user_with_members.family_members do
+        case primary_user.family_members do
           %Ecto.Association.NotLoaded{} -> []
           members when is_list(members) -> members
           _ -> []

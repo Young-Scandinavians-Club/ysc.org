@@ -5105,14 +5105,9 @@ defmodule YscWeb.AdminBookingsLive do
     date = Date.from_iso8601!(date_str)
 
     bookings =
-      Bookings.list_bookings(:clear_lake, date, date,
-        preload: [user: :current_avatar],
-        exclude_statuses: [:canceled, :refunded]
+      Bookings.list_guests_staying_on_date(:clear_lake, date,
+        preload: [user: :current_avatar]
       )
-      |> Enum.filter(fn b ->
-        Date.compare(b.checkin_date, date) != :gt &&
-          Date.compare(b.checkout_date, date) == :gt
-      end)
 
     {:noreply,
      socket

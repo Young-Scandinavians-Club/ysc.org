@@ -444,6 +444,51 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Lists bookings with guests staying overnight on the given date.
+
+  A guest is considered staying on `date` when check-in is on or before `date`
+  and check-out is after `date` (checkout day is excluded — guests depart at 11 AM).
+
+  ## Options
+
+    * `:preload` - association preloads (default `[:rooms, :user]`)
+    * `:statuses` - include only bookings with these statuses
+    * `:exclude_statuses` - omit bookings with these statuses (default `[:canceled, :refunded]`)
+
+  ## Examples
+
+      # Guests staying at Clear Lake on a specific day
+      list_guests_staying_on_date(:clear_lake, ~D[2025-07-15])
+  """
+  def list_guests_staying_on_date(property, date, opts \\ []) do
+    preloads = Keyword.get(opts, :preload, [:rooms, :user])
+    statuses = Keyword.get(opts, :statuses)
+    exclude_statuses = Keyword.get(opts, :exclude_statuses, [:canceled, :refunded])
+
+    query =
+      from b in Booking,
+        where: b.property == ^property,
+        where: b.checkin_date <= ^date,
+        where: b.checkout_date > ^date,
+        order_by: [asc: b.checkin_date],
+        preload: ^preloads
+
+    query =
+      cond do
+        is_list(statuses) ->
+          from b in query, where: b.status in ^statuses
+
+        is_list(exclude_statuses) ->
+          from b in query, where: b.status not in ^exclude_statuses
+
+        true ->
+          query
+      end
+
+    Repo.all(query)
+  end
+
+  @doc """
   Lists bookings with pagination, filtering, and search support.
 
   Supports fuzzy search by user name, email, or booking reference.
@@ -5804,6 +5849,20 @@ defmodule Ysc.Bookings do
       where: ^checkout_filter,
       order_by: [asc: b.checkin_date],
       limit: 10
+    )
+  end
+
+  @doc false
+  def ci_query_explain_list_guests_staying_on_date_query do
+    today = Ysc.Ci.QueryExplain.Fixtures.today()
+
+    from(b in Booking,
+      where: b.property == :clear_lake,
+      where: b.checkin_date <= ^today,
+      where: b.checkout_date > ^today,
+      where: b.status not in [:canceled, :refunded],
+      order_by: [asc: b.checkin_date],
+      limit: 50
     )
   end
 end

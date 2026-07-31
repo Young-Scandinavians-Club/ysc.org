@@ -175,6 +175,58 @@ defmodule Ysc.BookingsTest do
       assert Enum.any?(bookings, &(&1.id == booking1.id))
     end
 
+    test "list_guests_staying_on_date/3 returns bookings staying overnight on date" do
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(30)
+      checkout = Date.add(checkin, 4)
+
+      staying =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :complete
+        })
+
+      _checkout_only =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: Date.add(checkin, -3),
+          checkout_date: checkin,
+          status: :complete
+        })
+
+      middle_night = Date.add(checkin, 2)
+
+      bookings =
+        Bookings.list_guests_staying_on_date(:clear_lake, middle_night,
+          preload: [:user]
+        )
+
+      assert Enum.any?(bookings, &(&1.id == staying.id))
+      refute Enum.any?(bookings, &(&1.checkout_date == middle_night))
+    end
+
+    test "list_guests_staying_on_date/3 excludes canceled and refunded by default" do
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(40)
+      checkout = Date.add(checkin, 3)
+
+      canceled =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :canceled
+        })
+
+      bookings = Bookings.list_guests_staying_on_date(:clear_lake, checkin)
+      refute Enum.any?(bookings, &(&1.id == canceled.id))
+    end
+
     test "admin_property_dashboard_stats/0 aggregates per-property buckets in one query" do
       today =
         "America/Los_Angeles"
