@@ -75,6 +75,7 @@ defmodule Ysc.Stripe.HttpClientTest do
   test "request/5 encodes multipart bodies with string field names" do
     Req.Test.stub(ReqStub, fn conn ->
       assert conn.method == "POST"
+
       assert {"content-type", "multipart/form-data; boundary=" <> _} =
                List.keyfind(conn.req_headers, "content-type", 0)
 
@@ -99,7 +100,13 @@ defmodule Ysc.Stripe.HttpClientTest do
        ]}
 
     assert {:ok, 200, _headers, body} =
-             HttpClient.request(:post, "https://api.stripe.com/v1/files", headers, multipart_body, [])
+             HttpClient.request(
+               :post,
+               "https://api.stripe.com/v1/files",
+               headers,
+               multipart_body,
+               []
+             )
 
     assert Jason.decode!(body)["id"] == "file_test"
   end
