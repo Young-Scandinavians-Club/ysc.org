@@ -3176,9 +3176,8 @@ defmodule Ysc.Stripe.WebhookHandler do
       error ->
         Ysc.Logging.error("Exception while linking balance transactions",
           payout_id: stripe_payout_id,
-          error: Exception.message(error),
-          error_type: error.__struct__,
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          error: error,
+          stacktrace: __STACKTRACE__
         )
 
         # Return the payout even if linking failed (caller can check status)
@@ -3539,21 +3538,16 @@ defmodule Ysc.Stripe.WebhookHandler do
       if charge do
         # Use extract_id_from_expandable/1 to handle both plain string IDs and
         # expanded Stripe objects (e.g. %Stripe.PaymentIntent{id: "pi_..."}).
+        # Prefer Map.get/2 over struct field access: stripity_stripe Charge structs
+        # omit some API fields (e.g. :invoice) depending on API version.
         payment_intent_id =
-          if is_struct(charge) do
-            extract_id_from_expandable(charge.payment_intent)
-          else
-            extract_id_from_expandable(
-              charge[:payment_intent] || charge["payment_intent"]
-            )
-          end
+          extract_id_from_expandable(
+            Map.get(charge, :payment_intent) ||
+              Map.get(charge, "payment_intent")
+          )
 
         invoice_id =
-          if is_struct(charge) do
-            extract_id_from_expandable(charge.invoice)
-          else
-            extract_id_from_expandable(charge[:invoice] || charge["invoice"])
-          end
+          resolve_charge_invoice_id(charge, charge_id)
 
         # Try payment_intent_id first (booking payments), then invoice_id
         # (subscription payments). Use sequential fallback rather than exclusive
@@ -3600,12 +3594,46 @@ defmodule Ysc.Stripe.WebhookHandler do
       error ->
         Ysc.Logging.error("Exception while linking charge to payout",
           charge_id: charge_id,
-          error: Exception.message(error),
-          error_type: error.__struct__,
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          error: error,
+          stacktrace: __STACKTRACE__
         )
 
         :skipped
+    end
+  end
+
+  # stripity_stripe Charge structs omit `:invoice` on current API versions even though
+  # Stripe still returns it. Fall back to a raw charge retrieve (map) when needed so
+  # subscription payments keyed by invoice id can be linked to payouts.
+  defp resolve_charge_invoice_id(charge, charge_id) do
+    extract_id_from_expandable(
+      Map.get(charge, :invoice) || Map.get(charge, "invoice")
+    ) || fetch_charge_invoice_id(charge_id)
+  end
+
+  defp fetch_charge_invoice_id(nil), do: nil
+
+  defp fetch_charge_invoice_id(charge_id) when is_binary(charge_id) do
+    # Prefer Req over stripity_stripe here: Charge OpenAPI structs omit `:invoice`,
+    # and even `response_as: :map` drops fields not in the generated schema.
+    api_key = Application.get_env(:stripity_stripe, :api_key)
+
+    base_url =
+      Application.get_env(
+        :stripity_stripe,
+        :api_base_url,
+        "https://api.stripe.com"
+      )
+
+    case Req.get("#{base_url}/v1/charges/#{charge_id}",
+           headers: [{"Authorization", "Bearer #{api_key}"}],
+           decode_body: true
+         ) do
+      {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
+        extract_id_from_expandable(body["invoice"])
+
+      _ ->
+        nil
     end
   end
 
@@ -3761,9 +3789,8 @@ defmodule Ysc.Stripe.WebhookHandler do
       error ->
         Ysc.Logging.error("Exception while linking refund to payout",
           stripe_refund_id: stripe_refund_id,
-          error: Exception.message(error),
-          error_type: error.__struct__,
-          stacktrace: Exception.format_stacktrace(__STACKTRACE__)
+          error: error,
+          stacktrace: __STACKTRACE__
         )
 
         :skipped

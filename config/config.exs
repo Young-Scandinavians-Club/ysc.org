@@ -355,6 +355,21 @@ config :ysc, :quickbooks,
   # QuickBooks Account IDs (required - cannot be auto-created)
   bank_account_id: System.get_env("QUICKBOOKS_BANK_ACCOUNT_ID"),
   stripe_account_id: System.get_env("QUICKBOOKS_STRIPE_ACCOUNT_ID"),
+  # Stripe fees expense account for payout Deposit fee lines.
+  # Prefer ID when known; otherwise Name or FullyQualifiedName (paths with ":").
+  stripe_fees_account_id: System.get_env("QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID"),
+  stripe_fees_account_name:
+    System.get_env(
+      "QUICKBOOKS_STRIPE_FEES_ACCOUNT_NAME",
+      "Administration:Bank Service Charges:Stripe"
+    ),
+  ticket_discounts_account_id:
+    System.get_env("QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_ID"),
+  ticket_discounts_account_name:
+    System.get_env(
+      "QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_NAME",
+      "Ticket Discounts"
+    ),
   # Optional: QuickBooks Customer ID for payments with no user (e.g. system/anonymous).
   # Set this to avoid :user_not_found when exporting payouts that include such payments.
   system_customer_id: System.get_env("QUICKBOOKS_SYSTEM_CUSTOMER_ID")

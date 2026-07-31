@@ -1450,6 +1450,11 @@ defmodule Ysc.Quickbooks.Client do
     |> String.replace("\\", "\\\\")
   end
 
+  # QuickBooks Account.Name is the leaf only. Paths with ":" are FullyQualifiedName.
+  defp account_name_query_field(name) when is_binary(name) do
+    if String.contains?(name, ":"), do: "FullyQualifiedName", else: "Name"
+  end
+
   defp get_cached_item_id(cache_key) do
     # Use application environment as a simple cache
     Application.get_env(:ysc, :quickbooks_item_cache, %{})[cache_key]
@@ -2619,7 +2624,11 @@ defmodule Ysc.Quickbooks.Client do
   end
 
   @doc """
-  Queries for a QuickBooks Account by name.
+  Queries for a QuickBooks Account by name or FullyQualifiedName.
+
+  Leaf names (no `:`) match `Account.Name`. Nested chart-of-accounts paths
+  containing `:` (e.g. `"Administration:Bank Service Charges:Stripe"`) match
+  `Account.FullyQualifiedName`.
 
   Returns {:ok, account_id} if found, {:error, :not_found} otherwise.
 
@@ -2649,9 +2658,12 @@ defmodule Ysc.Quickbooks.Client do
   defp query_account_by_name_from_api(name, cache_key) do
     with {:ok, access_token} <- get_access_token(),
          {:ok, company_id} <- get_company_id() do
-      # Query for account by name
+      # Nested chart-of-accounts paths (e.g. "Parent:Child:Leaf") must match
+      # FullyQualifiedName; leaf-only names match Name.
+      field = account_name_query_field(name)
+
       query =
-        "SELECT Id, Name FROM Account WHERE Name = '#{escape_query_string(name)}' AND Active = true"
+        "SELECT Id, Name, FullyQualifiedName FROM Account WHERE #{field} = '#{escape_query_string(name)}' AND Active = true"
 
       url = build_query_url(company_id, query)
       headers = build_headers(access_token)
@@ -2659,6 +2671,7 @@ defmodule Ysc.Quickbooks.Client do
       Ysc.Logging.debug(
         "[QB Client] query_account_by_name: Querying for account",
         name: name,
+        field: field,
         query: query
       )
 

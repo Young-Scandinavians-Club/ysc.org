@@ -71,4 +71,23 @@ defmodule Ysc.Stripe.HttpClientTest do
                []
              )
   end
+
+  test "request/5 keeps GET method when body is empty string" do
+    list_url = "https://api.stripe.com/v1/balance_transactions?limit=1"
+
+    Req.Test.stub(ReqStub, fn conn ->
+      assert conn.method == "GET"
+      Req.Test.json(conn, %{"object" => "list", "data" => []})
+    end)
+
+    headers = [
+      {"Authorization", "Bearer #{@api_key}"},
+      {"Content-Type", "application/x-www-form-urlencoded"}
+    ]
+
+    assert {:ok, 200, _headers, body} =
+             HttpClient.request(:get, list_url, headers, "", [])
+
+    assert Jason.decode!(body)["object"] == "list"
+  end
 end

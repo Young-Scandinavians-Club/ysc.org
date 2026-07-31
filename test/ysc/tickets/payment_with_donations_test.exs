@@ -114,7 +114,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
     # Set up default mocks for query functions (needed for automatic sync jobs)
     stub(ClientMock, :query_account_by_name, fn
       "Events Inc" -> {:ok, "events_account_default"}
-      "Donations" -> {:ok, "donations_account_default"}
+      "Special Project Fundraising" -> {:ok, "donations_account_default"}
       "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
       _ -> {:error, :not_found}
     end)
@@ -430,7 +430,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
       # Stub account and class queries
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         _ -> {:error, :not_found}
       end)
@@ -635,7 +635,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
         _ -> {:error, :not_found}
@@ -747,7 +747,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
         _ -> {:error, :not_found}
@@ -862,7 +862,7 @@ defmodule Ysc.Tickets.PaymentWithDonationsTest do
 
       stub(ClientMock, :query_account_by_name, fn
         "Events Inc" -> {:ok, "events_account_default"}
-        "Donations" -> {:ok, "donations_account_default"}
+        "Special Project Fundraising" -> {:ok, "donations_account_default"}
         "Undeposited Funds" -> {:ok, "undeposited_funds_account_default"}
         "Ticket Discounts" -> {:ok, "ticket_discounts_account_123"}
         _ -> {:error, :not_found}

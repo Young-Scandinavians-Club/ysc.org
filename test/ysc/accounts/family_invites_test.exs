@@ -32,33 +32,31 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
   defp create_user_with_family_membership(attrs \\ %{}) do
     user = user_fixture(attrs)
 
-    # Get family plan stripe_price_id from config
     membership_plans = Application.get_env(:ysc, :membership_plans, [])
     family_plan = Enum.find(membership_plans, &(&1.id == :family))
 
-    if family_plan do
-      {:ok, subscription} =
-        Subscriptions.create_subscription(%{
-          user_id: user.id,
-          stripe_id: "sub_test_#{System.unique_integer()}",
-          stripe_status: "active",
-          name: "Family Membership",
-          current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
-        })
+    assert family_plan,
+           "membership_plans must include :family (another test may have cleared Application env)"
 
-      {:ok, _subscription_item} =
-        Subscriptions.create_subscription_item(%{
-          subscription_id: subscription.id,
-          stripe_price_id: family_plan.stripe_price_id,
-          stripe_product_id: "prod_test_#{System.unique_integer()}",
-          stripe_id: "si_test_#{System.unique_integer()}",
-          quantity: 1
-        })
+    {:ok, subscription} =
+      Subscriptions.create_subscription(%{
+        user_id: user.id,
+        stripe_id: "sub_test_#{System.unique_integer()}",
+        stripe_status: "active",
+        name: "Family Membership",
+        current_period_end: DateTime.add(DateTime.utc_now(), 365, :day)
+      })
 
-      Accounts.get_user!(user.id, [:subscriptions])
-    else
-      user
-    end
+    {:ok, _subscription_item} =
+      Subscriptions.create_subscription_item(%{
+        subscription_id: subscription.id,
+        stripe_price_id: family_plan.stripe_price_id,
+        stripe_product_id: "prod_test_#{System.unique_integer()}",
+        stripe_id: "si_test_#{System.unique_integer()}",
+        quantity: 1
+      })
+
+    Accounts.get_user!(user.id, [:subscriptions])
   end
 
   describe "create_invite/3" do

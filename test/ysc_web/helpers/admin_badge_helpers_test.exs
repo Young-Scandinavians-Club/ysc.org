@@ -95,6 +95,20 @@ defmodule YscWeb.AdminBadgeHelpersTest do
     end
   end
 
+  describe "payout_status_badge_type/1" do
+    test "maps known Stripe payout statuses" do
+      assert AdminBadgeHelpers.payout_status_badge_type("paid") == "green"
+      assert AdminBadgeHelpers.payout_status_badge_type("pending") == "yellow"
+      assert AdminBadgeHelpers.payout_status_badge_type("failed") == "red"
+      assert AdminBadgeHelpers.payout_status_badge_type("canceled") == "zinc"
+    end
+
+    test "defaults unknown statuses" do
+      assert AdminBadgeHelpers.payout_status_badge_type(nil) == "dark"
+      assert AdminBadgeHelpers.payout_status_badge_type("unknown") == "dark"
+    end
+  end
+
   describe "post_state_badge_type/1" do
     test "maps known post states for admin views" do
       assert AdminBadgeHelpers.post_state_badge_type(:draft) == "yellow"

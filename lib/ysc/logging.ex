@@ -64,11 +64,16 @@ defmodule Ysc.Logging do
     base = Keyword.put(opts, :error, error_message)
 
     if stacktrace do
-      Keyword.put(base, :stacktrace, Exception.format_stacktrace(stacktrace))
+      Keyword.put(base, :stacktrace, format_stacktrace(stacktrace))
     else
       base
     end
   end
+
+  defp format_stacktrace(stacktrace) when is_binary(stacktrace), do: stacktrace
+
+  defp format_stacktrace(stacktrace),
+    do: Exception.format_stacktrace(stacktrace)
 
   @doc false
   def capture_sentry(
@@ -90,7 +95,13 @@ defmodule Ysc.Logging do
         opts
       ) do
     sentry_opts = []
-    sentry_opts = maybe_put_sentry_opt(sentry_opts, :stacktrace, stacktrace)
+
+    sentry_opts =
+      maybe_put_sentry_opt(
+        sentry_opts,
+        :stacktrace,
+        sentry_stacktrace(stacktrace)
+      )
 
     base_extra = %{log_message: message, metadata: Enum.into(opts, %{})}
     final_extra = maybe_merge_extra(base_extra, sentry_extra)
@@ -106,6 +117,10 @@ defmodule Ysc.Logging do
       )
     end
   end
+
+  # Sentry expects a raw stacktrace list; callers sometimes pass a formatted string.
+  defp sentry_stacktrace(stacktrace) when is_list(stacktrace), do: stacktrace
+  defp sentry_stacktrace(_), do: nil
 
   @doc """
   Log an error message and automatically send to Sentry if error/exception is present.

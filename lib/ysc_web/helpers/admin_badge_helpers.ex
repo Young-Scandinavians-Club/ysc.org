@@ -88,6 +88,20 @@ defmodule YscWeb.AdminBadgeHelpers do
   def ledger_payment_status_badge_type(_), do: "dark"
 
   @doc """
+  Badge `type` for Stripe payout status in admin money views.
+  """
+  @spec payout_status_badge_type(String.t() | atom() | nil) :: String.t()
+  def payout_status_badge_type(status) do
+    case String.downcase(to_string(status || "")) do
+      "paid" -> "green"
+      "pending" -> "yellow"
+      "failed" -> "red"
+      "canceled" -> "zinc"
+      _ -> "dark"
+    end
+  end
+
+  @doc """
   Badge `type` for `PostState` values in admin posts list and editor views.
   """
   @spec post_state_badge_type(atom()) :: String.t()

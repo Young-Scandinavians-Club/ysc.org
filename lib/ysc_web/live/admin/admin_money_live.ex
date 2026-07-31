@@ -2533,9 +2533,11 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
-              <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{get_payout_status_color(@selected_payout.status)}"}>
+              <.badge type={
+                AdminBadgeHelpers.payout_status_badge_type(@selected_payout.status)
+              }>
                 {String.capitalize(@selected_payout.status || "unknown")}
-              </span>
+              </.badge>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Payout Amount</p>
@@ -2709,9 +2711,13 @@ defmodule YscWeb.AdminMoneyLive do
                     {Money.to_string!(payment.amount)}
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                      {payment.status}
-                    </span>
+                    <.badge type={
+                      AdminBadgeHelpers.ledger_payment_status_badge_type(
+                        payment.status
+                      )
+                    }>
+                      {String.capitalize(to_string(payment.status))}
+                    </.badge>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <.admin_quickbooks_sync_status
@@ -2823,9 +2829,13 @@ defmodule YscWeb.AdminMoneyLive do
                     </div>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
-                    <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
-                      {refund.status}
-                    </span>
+                    <.badge type={
+                      AdminBadgeHelpers.ledger_payment_status_badge_type(
+                        refund.status
+                      )
+                    }>
+                      {String.capitalize(to_string(refund.status))}
+                    </.badge>
                   </td>
                   <td class="px-4 py-2 whitespace-nowrap">
                     <.admin_quickbooks_sync_status
@@ -2942,13 +2952,11 @@ defmodule YscWeb.AdminMoneyLive do
                 </span>
               </span>
               <%= if payout_reconciles? do %>
-                <span class="text-xs font-semibold text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                  Reconciled ✓
-                </span>
+                <.badge type="green">Reconciled ✓</.badge>
               <% else %>
-                <span class="text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded">
+                <.badge type="red">
                   Mismatch — some charges may not be linked yet
-                </span>
+                </.badge>
               <% end %>
             </div>
           </div>
@@ -2995,9 +3003,13 @@ defmodule YscWeb.AdminMoneyLive do
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Status</p>
-              <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if @selected_payment.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
+              <.badge type={
+                AdminBadgeHelpers.ledger_payment_status_badge_type(
+                  @selected_payment.status
+                )
+              }>
                 {String.capitalize(to_string(@selected_payment.status || "unknown"))}
-              </span>
+              </.badge>
             </div>
             <div>
               <p class="text-sm font-medium text-zinc-700">Amount</p>
@@ -3236,9 +3248,13 @@ defmodule YscWeb.AdminMoneyLive do
                       </div>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
-                      <span class={"px-2 inline-flex text-xs leading-5 font-semibold rounded-full #{if refund.status == :completed, do: "bg-green-100 text-green-800", else: "bg-yellow-100 text-yellow-800"}"}>
+                      <.badge type={
+                        AdminBadgeHelpers.ledger_payment_status_badge_type(
+                          refund.status
+                        )
+                      }>
                         {String.capitalize(to_string(refund.status || "unknown"))}
-                      </span>
+                      </.badge>
                     </td>
                     <td class="px-4 py-2 whitespace-nowrap">
                       <.admin_quickbooks_sync_status
@@ -3914,16 +3930,6 @@ defmodule YscWeb.AdminMoneyLive do
   defp get_debit_credit_amount_color(:debit), do: "text-purple-700"
   defp get_debit_credit_amount_color(:credit), do: "text-blue-700"
   defp get_debit_credit_amount_color(_), do: "text-zinc-900"
-
-  defp get_payout_status_color(status) do
-    case String.downcase(to_string(status || "")) do
-      "paid" -> "bg-green-100 text-green-800"
-      "pending" -> "bg-yellow-100 text-yellow-800"
-      "failed" -> "bg-red-100 text-red-800"
-      "canceled" -> "bg-zinc-100 text-zinc-800"
-      _ -> "bg-zinc-100 text-zinc-800"
-    end
-  end
 
   defp parse_amount_string(amount_str) when is_binary(amount_str) do
     # Try parsing as decimal first

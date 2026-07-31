@@ -38,25 +38,41 @@ defmodule Ysc.Quickbooks.Sync do
     do: "dep_payout_#{id}"
 
   # QuickBooks Account and Class mappings
+  # Account names match production chart of accounts (leaf Name or FullyQualifiedName).
   @account_class_mapping %{
     # Event tickets
     event: %{account: "Events Inc", class: "Events"},
     # Donations
-    donation: %{account: "Donations", class: "Administration"},
+    donation: %{
+      account: "Special Project Fundraising",
+      class: "Administration"
+    },
     # Clear Lake bookings
     clear_lake_booking: %{account: "Clear Lake Inc", class: "Clear Lake"},
     # Tahoe bookings
-    tahoe_booking: %{account: "Tahoe Inc", class: "Tahoe"},
+    tahoe_booking: %{account: "Tahoe Income", class: "Tahoe"},
     # Family membership
-    family_membership: %{account: "Family Membership", class: "Administration"},
+    family_membership: %{
+      account: "Administration Inc:Membership Dues:Family",
+      class: "Administration"
+    },
     # Single membership
-    single_membership: %{account: "Single Membership", class: "Administration"},
-    # Membership Inc
-    membership_inc: %{account: "Membership Inc", class: "Administration"},
-    # Stripe fees
-    stripe_fee: %{account: "Stripe Fees", class: "Administration"},
-    # Ticket discounts (expense account for reserved ticket discounts)
-    ticket_discount: %{account: "Ticket Discounts", class: "Administration"}
+    single_membership: %{
+      account: "Administration Inc:Membership Dues:Single",
+      class: "Administration"
+    },
+    # Generic / other membership
+    membership_inc: %{
+      account: "Administration Inc:Membership Dues",
+      class: "Administration"
+    },
+    # Stripe fees (expense). Prefer QUICKBOOKS_STRIPE_FEES_ACCOUNT_ID in config.
+    stripe_fee: %{
+      account: "Administration:Bank Service Charges:Stripe",
+      class: "Administration"
+    },
+    # Ticket discounts (contra-revenue). Prefer QUICKBOOKS_TICKET_DISCOUNTS_ACCOUNT_ID.
+    ticket_discount: %{account: "Ticket Discounts", class: "Events"}
   }
 
   @doc """
@@ -856,7 +872,7 @@ defmodule Ysc.Quickbooks.Sync do
         # Default to membership if no entity type found
         true ->
           Ysc.Logging.debug(
-            "[QB Sync] get_payment_entity_info: No entity type found, defaulting to Membership Inc",
+            "[QB Sync] get_payment_entity_info: No entity type found, defaulting to Membership Dues",
             payment_id: payment.id
           )
 
@@ -912,7 +928,7 @@ defmodule Ysc.Quickbooks.Sync do
 
       nil ->
         Ysc.Logging.debug(
-          "[QB Sync] get_membership_type_from_entity_id: Subscription not found, defaulting to Membership Inc",
+          "[QB Sync] get_membership_type_from_entity_id: Subscription not found, defaulting to Membership Dues",
           subscription_id: subscription_id
         )
 
@@ -1243,14 +1259,29 @@ defmodule Ysc.Quickbooks.Sync do
 
   defp determine_income_account_name(entity_type, property) do
     case {entity_type, property} do
-      {:event, _} -> "Events Inc"
-      {:donation, _} -> "Donations"
-      {:booking, :tahoe} -> "Tahoe Inc"
-      {:booking, :clear_lake} -> "Clear Lake Inc"
-      {:membership, :family} -> "Family Membership"
-      {:membership, :single} -> "Single Membership"
-      {:membership, _} -> "Membership Inc"
-      _ -> "General Revenue"
+      {:event, _} ->
+        @account_class_mapping[:event].account
+
+      {:donation, _} ->
+        @account_class_mapping[:donation].account
+
+      {:booking, :tahoe} ->
+        @account_class_mapping[:tahoe_booking].account
+
+      {:booking, :clear_lake} ->
+        @account_class_mapping[:clear_lake_booking].account
+
+      {:membership, :family} ->
+        @account_class_mapping[:family_membership].account
+
+      {:membership, :single} ->
+        @account_class_mapping[:single_membership].account
+
+      {:membership, _} ->
+        @account_class_mapping[:membership_inc].account
+
+      _ ->
+        "General Revenue"
     end
   end
 
@@ -1258,11 +1289,11 @@ defmodule Ysc.Quickbooks.Sync do
     # Try primary account first, then fallbacks (QB error 2390 if item has no income account)
     fallback_names = [
       income_account_name,
+      "Special Project Fundraising",
       "General Revenue",
       "Other Income",
       "Services",
-      "Events Inc",
-      "Donations"
+      "Events Inc"
     ]
 
     result =
@@ -1513,7 +1544,7 @@ defmodule Ysc.Quickbooks.Sync do
            get_or_create_item_with_fallback(
              "Donations",
              :donation_item_id,
-             "Donations"
+             "Special Project Fundraising"
            ) do
       Ysc.Logging.debug(
         "[QB Sync] create_mixed_payment_sales_receipt: Item IDs obtained",
@@ -1799,6 +1830,16 @@ defmodule Ysc.Quickbooks.Sync do
     end
   end
 
+  defp get_events_class_ref do
+    case client_module().query_class_by_name("Events") do
+      {:ok, class_id} ->
+        %{value: class_id, name: "Events"}
+
+      _ ->
+        get_administration_class_ref()
+    end
+  end
+
   defp get_payment_discount_amount(%Payment{id: payment_id}) do
     from(e in LedgerEntry,
       join: a in assoc(e, :account),
@@ -1817,16 +1858,26 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_ticket_discounts_account_ref do
-    account_name = @account_class_mapping[:ticket_discount].account
+    qb = Application.get_env(:ysc, :quickbooks, [])
 
-    case client_module().query_account_by_name(account_name) do
-      {:ok, account_id} -> {:ok, %{value: account_id}}
-      error -> error
+    cond do
+      id = present_config_string(qb[:ticket_discounts_account_id]) ->
+        {:ok, %{value: id}}
+
+      true ->
+        name =
+          present_config_string(qb[:ticket_discounts_account_name]) ||
+            @account_class_mapping[:ticket_discount].account
+
+        case client_module().query_account_by_name(name) do
+          {:ok, account_id} -> {:ok, %{value: account_id}}
+          error -> error
+        end
     end
   end
 
   defp build_discount_line_item(amount, description, discount_account_ref) do
-    class_ref = get_administration_class_ref()
+    class_ref = get_events_class_ref()
 
     %{
       amount: amount,
@@ -2699,14 +2750,35 @@ defmodule Ysc.Quickbooks.Sync do
   end
 
   defp get_stripe_fees_account_ref do
-    case client_module().query_account_by_name("Stripe Fees") do
-      {:ok, account_id} ->
-        {:ok, %{value: account_id}}
+    qb = Application.get_env(:ysc, :quickbooks, [])
 
-      _ ->
-        {:error, :stripe_fees_account_not_found}
+    cond do
+      id = present_config_string(qb[:stripe_fees_account_id]) ->
+        {:ok, %{value: id}}
+
+      true ->
+        name =
+          present_config_string(qb[:stripe_fees_account_name]) ||
+            @account_class_mapping[:stripe_fee].account
+
+        case client_module().query_account_by_name(name) do
+          {:ok, account_id} ->
+            {:ok, %{value: account_id}}
+
+          _ ->
+            {:error, :stripe_fees_account_not_found}
+        end
     end
   end
+
+  defp present_config_string(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp present_config_string(_), do: nil
 
   defp get_undeposited_funds_account_ref do
     case client_module().query_account_by_name("Undeposited Funds") do

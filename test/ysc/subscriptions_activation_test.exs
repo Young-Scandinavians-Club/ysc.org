@@ -1,5 +1,6 @@
 defmodule Ysc.SubscriptionsActivationTest do
-  use Ysc.DataCase, async: true
+  # async: false — mutates Application env `:membership_plans`
+  use Ysc.DataCase, async: false
 
   import Mox
   import Ysc.AccountsFixtures

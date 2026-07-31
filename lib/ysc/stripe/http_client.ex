@@ -44,6 +44,10 @@ defmodule Ysc.Stripe.HttpClient do
     Keyword.put(req_opts, :form_multipart, multipart_parts(parts))
   end
 
+  # stripity_stripe passes "" for GET bodies (params are already in the query
+  # string). Req rewrites GET/DELETE with a body into POST, which Stripe rejects.
+  defp put_body(req_opts, body) when body in [nil, ""], do: req_opts
+
   defp put_body(req_opts, body) do
     Keyword.put(req_opts, :body, body)
   end

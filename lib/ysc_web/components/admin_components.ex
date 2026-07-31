@@ -478,7 +478,7 @@ defmodule YscWeb.AdminComponents do
     <%= if @layout == :inline do %>
       <.badge type={@badge_type}>{@label}</.badge>
     <% else %>
-      <div class="flex flex-col">
+      <div class="flex flex-col items-start">
         <.badge type={@badge_type}>{@label}</.badge>
         <%= if @error do %>
           <.tooltip
