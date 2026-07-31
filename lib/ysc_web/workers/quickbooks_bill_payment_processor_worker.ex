@@ -16,7 +16,6 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
   alias Ysc.Webhooks
   alias Ysc.ExpenseReports
   alias Ysc.Repo
-  import Ecto.Query
 
   # Statuses an expense report may transition to "paid" from. A report that's
   # already paid is left alone (idempotent), and a report we didn't expect to
@@ -94,7 +93,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
               |> Map.get("Line", [])
               |> Enum.flat_map(fn line -> Map.get(line, "LinkedTxn", []) end)
 
-            case find_linked_bills(linked_txns) do
+            case linked_bill_ids(linked_txns) do
               [] ->
                 Ysc.Logging.warning("BillPayment has no linked Bill",
                   bill_payment_id: bill_payment_id
@@ -147,7 +146,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
   end
 
   defp process_linked_bill(bill_id, bill_payment_id) do
-    case find_expense_report_by_bill_id(bill_id) do
+    case ExpenseReports.get_expense_report_by_quickbooks_bill_id(bill_id) do
       {:ok, expense_report} ->
         Ysc.Logging.info("Found expense report for Bill",
           expense_report_id: expense_report.id,
@@ -158,7 +157,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
 
         case confirm_bill_fully_paid(bill_id) do
           {:ok, true} ->
-            maybe_mark_paid(expense_report, bill_id, bill_payment_id)
+            lock_and_maybe_mark_paid(bill_id, bill_payment_id)
 
           {:ok, false} ->
             Ysc.Logging.info(
@@ -207,6 +206,29 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
     end
   end
 
+  # Re-fetches the expense report with a row lock and applies the paid
+  # transition inside a transaction, so a concurrent Bill Delete/Void webhook
+  # for the same report (processed by
+  # YscWeb.Workers.QuickbooksBillDeletedProcessorWorker) can't interleave its
+  # own read-modify-write between our read and our write.
+  defp lock_and_maybe_mark_paid(bill_id, bill_payment_id) do
+    Repo.transaction(fn ->
+      case ExpenseReports.get_expense_report_by_quickbooks_bill_id(bill_id,
+             lock: true
+           ) do
+        {:ok, expense_report} ->
+          maybe_mark_paid(expense_report, bill_id, bill_payment_id)
+
+        {:error, :not_found} ->
+          :ok
+      end
+    end)
+    |> case do
+      {:ok, result} -> result
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp maybe_mark_paid(expense_report, bill_id, bill_payment_id) do
     cond do
       expense_report.status == "paid" ->
@@ -230,15 +252,6 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
         :ok
 
       true ->
-        # Preload expense_items association if not already loaded
-        # (required for changeset validation)
-        expense_report =
-          if Ecto.assoc_loaded?(expense_report.expense_items) do
-            expense_report
-          else
-            Repo.preload(expense_report, :expense_items)
-          end
-
         case ExpenseReports.mark_expense_report_as_paid(expense_report) do
           {:ok, updated_report} ->
             Ysc.Logging.info(
@@ -304,8 +317,8 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
 
   defp to_amount(amount) when is_binary(amount) do
     case Float.parse(amount) do
-      {value, _rest} -> value
-      :error -> nil
+      {value, ""} -> value
+      _ -> nil
     end
   end
 
@@ -314,26 +327,11 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorker do
   # Finds every linked Bill's TxnId from a list of LinkedTxn entries (as
   # gathered from each BillPayment Line item).
   # LinkedTxn format: [%{"TxnId" => "123", "TxnType" => "Bill"}]
-  defp find_linked_bills(linked_txns) when is_list(linked_txns) do
+  defp linked_bill_ids(linked_txns) do
     linked_txns
     |> Enum.filter(fn txn -> Map.get(txn, "TxnType") == "Bill" end)
     |> Enum.map(fn txn -> Map.get(txn, "TxnId") end)
     |> Enum.filter(& &1)
     |> Enum.uniq()
-  end
-
-  defp find_linked_bills(_), do: []
-
-  # Finds an expense report by its QuickBooks bill ID
-  defp find_expense_report_by_bill_id(bill_id) do
-    query =
-      from(er in ExpenseReports.ExpenseReport,
-        where: er.quickbooks_bill_id == ^bill_id
-      )
-
-    case Repo.one(query) do
-      nil -> {:error, :not_found}
-      expense_report -> {:ok, expense_report}
-    end
   end
 end

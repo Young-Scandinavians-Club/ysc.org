@@ -18,6 +18,32 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
     %{user: user}
   end
 
+  defp create_webhook_event(event_id, event_type, opts \\ []) do
+    %Ysc.Webhooks.WebhookEvent{}
+    |> Ysc.Webhooks.WebhookEvent.changeset(%{
+      provider: "quickbooks",
+      event_id: event_id,
+      event_type: event_type,
+      payload: %{},
+      state: Keyword.get(opts, :state, :pending)
+    })
+    |> Repo.insert!()
+  end
+
+  defp deletion_job(webhook_event_id, bill_id) do
+    %Oban.Job{
+      id: 1,
+      args: %{
+        "webhook_event_id" => webhook_event_id,
+        "bill_id" => bill_id
+      },
+      worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
+      queue: "default",
+      state: "available",
+      attempt: 1
+    }
+  end
+
   describe "perform/1" do
     test "successfully rejects expense report when Bill is deleted", %{
       user: user
@@ -33,27 +59,9 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
         |> Repo.insert!()
 
       webhook_event =
-        %Ysc.Webhooks.WebhookEvent{}
-        |> Ysc.Webhooks.WebhookEvent.changeset(%{
-          provider: "quickbooks",
-          event_id: "123456789:Bill:bill_123:Delete",
-          event_type: "Bill.Delete",
-          payload: %{},
-          state: :pending
-        })
-        |> Repo.insert!()
+        create_webhook_event("123456789:Bill:bill_123:Delete", "Bill.Delete")
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => webhook_event.id,
-          "bill_id" => "bill_123"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(webhook_event.id, "bill_123")
 
       assert :ok = QuickbooksBillDeletedProcessorWorker.perform(job)
 
@@ -79,27 +87,9 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
         |> Repo.insert!()
 
       webhook_event =
-        %Ysc.Webhooks.WebhookEvent{}
-        |> Ysc.Webhooks.WebhookEvent.changeset(%{
-          provider: "quickbooks",
-          event_id: "123456789:Bill:bill_456:Void",
-          event_type: "Bill.Void",
-          payload: %{},
-          state: :pending
-        })
-        |> Repo.insert!()
+        create_webhook_event("123456789:Bill:bill_456:Void", "Bill.Void")
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => webhook_event.id,
-          "bill_id" => "bill_456"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(webhook_event.id, "bill_456")
 
       assert :ok = QuickbooksBillDeletedProcessorWorker.perform(job)
 
@@ -111,17 +101,7 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
     end
 
     test "handles webhook event not found" do
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => Ecto.ULID.generate(),
-          "bill_id" => "bill_123"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(Ecto.ULID.generate(), "bill_123")
 
       assert {:error, :webhook_not_found} =
                QuickbooksBillDeletedProcessorWorker.perform(job)
@@ -139,27 +119,11 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
         |> Repo.insert!()
 
       webhook_event =
-        %Ysc.Webhooks.WebhookEvent{}
-        |> Ysc.Webhooks.WebhookEvent.changeset(%{
-          provider: "quickbooks",
-          event_id: "123456789:Bill:bill_123:Delete",
-          event_type: "Bill.Delete",
-          payload: %{},
+        create_webhook_event("123456789:Bill:bill_123:Delete", "Bill.Delete",
           state: :processing
-        })
-        |> Repo.insert!()
+        )
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => webhook_event.id,
-          "bill_id" => "bill_123"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(webhook_event.id, "bill_123")
 
       assert :ok = QuickbooksBillDeletedProcessorWorker.perform(job)
 
@@ -169,27 +133,12 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
 
     test "handles no expense report found for Bill ID" do
       webhook_event =
-        %Ysc.Webhooks.WebhookEvent{}
-        |> Ysc.Webhooks.WebhookEvent.changeset(%{
-          provider: "quickbooks",
-          event_id: "123456789:Bill:bill_nonexistent:Delete",
-          event_type: "Bill.Delete",
-          payload: %{},
-          state: :pending
-        })
-        |> Repo.insert!()
+        create_webhook_event(
+          "123456789:Bill:bill_nonexistent:Delete",
+          "Bill.Delete"
+        )
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => webhook_event.id,
-          "bill_id" => "bill_nonexistent"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(webhook_event.id, "bill_nonexistent")
 
       assert :ok = QuickbooksBillDeletedProcessorWorker.perform(job)
 
@@ -211,27 +160,12 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
         |> Repo.insert!()
 
       webhook_event =
-        %Ysc.Webhooks.WebhookEvent{}
-        |> Ysc.Webhooks.WebhookEvent.changeset(%{
-          provider: "quickbooks",
-          event_id: "123456789:Bill:bill_already_rejected:Delete",
-          event_type: "Bill.Delete",
-          payload: %{},
-          state: :pending
-        })
-        |> Repo.insert!()
+        create_webhook_event(
+          "123456789:Bill:bill_already_rejected:Delete",
+          "Bill.Delete"
+        )
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => webhook_event.id,
-          "bill_id" => "bill_already_rejected"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(webhook_event.id, "bill_already_rejected")
 
       assert :ok = QuickbooksBillDeletedProcessorWorker.perform(job)
 
@@ -256,27 +190,12 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorkerTest do
         |> Repo.insert!()
 
       webhook_event =
-        %Ysc.Webhooks.WebhookEvent{}
-        |> Ysc.Webhooks.WebhookEvent.changeset(%{
-          provider: "quickbooks",
-          event_id: "123456789:Bill:bill_already_paid:Delete",
-          event_type: "Bill.Delete",
-          payload: %{},
-          state: :pending
-        })
-        |> Repo.insert!()
+        create_webhook_event(
+          "123456789:Bill:bill_already_paid:Delete",
+          "Bill.Delete"
+        )
 
-      job = %Oban.Job{
-        id: 1,
-        args: %{
-          "webhook_event_id" => webhook_event.id,
-          "bill_id" => "bill_already_paid"
-        },
-        worker: "YscWeb.Workers.QuickbooksBillDeletedProcessorWorker",
-        queue: "default",
-        state: "available",
-        attempt: 1
-      }
+      job = deletion_job(webhook_event.id, "bill_already_paid")
 
       assert :ok = QuickbooksBillDeletedProcessorWorker.perform(job)
 

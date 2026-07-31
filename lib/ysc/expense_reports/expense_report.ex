@@ -96,11 +96,17 @@ defmodule Ysc.ExpenseReports.ExpenseReport do
   end
 
   @doc """
-  Changeset for admin status updates only.
+  Changeset for admin/system status updates.
+
+  Only casts `:status` and `:quickbooks_sync_error` - it deliberately skips
+  `cast_assoc/2` and the expense-item validations in `changeset/3`, since a
+  status-only transition (e.g. an automatic "paid" or "rejected" flip driven
+  by a QuickBooks webhook) shouldn't fail because of unrelated expense-item
+  data issues.
   """
   def status_changeset(expense_report, attrs) do
     expense_report
-    |> cast(attrs, [:status])
+    |> cast(attrs, [:status, :quickbooks_sync_error])
     |> validate_required([:status])
     |> validate_inclusion(:status, @all_statuses)
   end

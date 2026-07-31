@@ -164,7 +164,10 @@ defmodule YscWeb.QuickbooksWebhookController do
             # - Bill Delete/Void (the underlying Bill was removed/cancelled
             #   in QuickBooks, so the linked expense report should be
             #   rejected to keep things in sync)
-            if relevant_quickbooks_event?(entity_name, operation) do
+            if QuickbooksWebhookHandler.relevant_quickbooks_event?(
+                 entity_name,
+                 operation
+               ) do
               try do
                 webhook_event =
                   Webhooks.create_webhook_event!(%{
@@ -205,12 +208,4 @@ defmodule YscWeb.QuickbooksWebhookController do
         {:ok, :no_notifications}
     end
   end
-
-  defp relevant_quickbooks_event?("BillPayment", operation),
-    do: operation in ["Create", "Update"]
-
-  defp relevant_quickbooks_event?("Bill", operation),
-    do: operation in ["Delete", "Void"]
-
-  defp relevant_quickbooks_event?(_entity_name, _operation), do: false
 end

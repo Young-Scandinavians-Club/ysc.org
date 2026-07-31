@@ -265,6 +265,7 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
         {:ok,
          %{
            "Id" => "bp_nonexistent_123",
+           "TotalAmt" => 100.0,
            "Line" => [
              %{
                "Amount" => 100.0,

@@ -5412,6 +5412,14 @@ defmodule Ysc.Quickbooks.Client do
                       {:error, :invalid_response}
                   end
 
+                {:ok, %Finch.Response{status: 404, body: _retry_response_body}} ->
+                  Ysc.Logging.info(
+                    "QuickBooks Bill not found after token refresh (likely deleted)",
+                    bill_id: bill_id
+                  )
+
+                  {:error, :not_found}
+
                 {:ok,
                  %Finch.Response{status: status, body: retry_response_body}} ->
                   error = parse_error_response(retry_response_body)

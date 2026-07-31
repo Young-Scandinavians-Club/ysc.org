@@ -470,8 +470,8 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
       assert updated_report.status == "paid"
     end
 
-    test "handles expense report update failure", %{user: user} do
-      # Create expense report with invalid data that will cause update to fail
+    test "handles expense report deleted between webhook receipt and processing",
+         %{user: user} do
       expense_report =
         %ExpenseReport{
           user_id: user.id,
@@ -528,13 +528,13 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         attempt: 1
       }
 
-      # Should handle the error gracefully
-      result = QuickbooksBillPaymentProcessorWorker.perform(job)
-      assert result == :ok or match?({:error, _}, result)
+      # The report is gone by the time the job runs, so this hits the
+      # report-not-found branch and is treated as nothing to do (not an
+      # error) - there's no report left to leave in a stuck state.
+      assert :ok = QuickbooksBillPaymentProcessorWorker.perform(job)
 
-      # Verify webhook event was marked appropriately
       updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
-      assert updated_webhook.state in [:processed, :failed]
+      assert updated_webhook.state == :processed
     end
 
     test "does not mark expense report as paid when Bill still has a remaining balance (partial payment)",
@@ -713,12 +713,11 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
          }}
       end)
 
-      expect(ClientMock, :get_bill, fn "bill_a" ->
-        {:ok, %{"Id" => "bill_a", "Balance" => 0}}
-      end)
-
-      expect(ClientMock, :get_bill, fn "bill_b" ->
-        {:ok, %{"Id" => "bill_b", "Balance" => 0}}
+      # Order-independent: the worker doesn't guarantee it processes linked
+      # Bills in any particular order.
+      expect(ClientMock, :get_bill, 2, fn bill_id ->
+        assert bill_id in ["bill_a", "bill_b"]
+        {:ok, %{"Id" => bill_id, "Balance" => 0}}
       end)
 
       job = %Oban.Job{

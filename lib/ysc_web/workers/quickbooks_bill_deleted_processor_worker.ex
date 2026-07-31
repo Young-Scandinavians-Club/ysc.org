@@ -18,7 +18,6 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorker do
   alias Ysc.Webhooks
   alias Ysc.ExpenseReports
   alias Ysc.Repo
-  import Ecto.Query
 
   @impl Oban.Worker
   def perform(%Oban.Job{
@@ -52,26 +51,41 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorker do
     end
   end
 
+  # Locks the expense report row for the duration of the check-and-update so
+  # a concurrent BillPayment webhook for the same report (processed by
+  # YscWeb.Workers.QuickbooksBillPaymentProcessorWorker) can't interleave its
+  # own read-modify-write between our read and our write.
   defp process_bill_deletion(webhook_event, bill_id) do
-    case find_expense_report_by_bill_id(bill_id) do
-      {:ok, expense_report} ->
-        Ysc.Logging.info("Found expense report for deleted/voided Bill",
-          expense_report_id: expense_report.id,
-          bill_id: bill_id,
-          current_status: expense_report.status
-        )
+    Repo.transaction(fn ->
+      case ExpenseReports.get_expense_report_by_quickbooks_bill_id(bill_id,
+             lock: true
+           ) do
+        {:ok, expense_report} ->
+          Ysc.Logging.info("Found expense report for deleted/voided Bill",
+            expense_report_id: expense_report.id,
+            bill_id: bill_id,
+            current_status: expense_report.status
+          )
 
-        reject_expense_report(webhook_event, expense_report, bill_id)
+          # Not Repo.rollback/1 - reject_expense_report/3 already records the
+          # outcome (including a :failed webhook state on error), and that
+          # write must survive even when the overall result is an error.
+          reject_expense_report(webhook_event, expense_report, bill_id)
 
-      {:error, :not_found} ->
-        Ysc.Logging.warning(
-          "No expense report found for deleted/voided QuickBooks Bill",
-          bill_id: bill_id
-        )
+        {:error, :not_found} ->
+          Ysc.Logging.warning(
+            "No expense report found for deleted/voided QuickBooks Bill",
+            bill_id: bill_id
+          )
 
-        # Nothing to do - mark processed so we don't retry forever.
-        Webhooks.update_webhook_state(webhook_event, :processed)
-        :ok
+          # Nothing to do - mark processed so we don't retry forever.
+          Webhooks.update_webhook_state(webhook_event, :processed)
+          :ok
+      end
+    end)
+    |> case do
+      {:ok, result} -> result
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -95,20 +109,19 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorker do
         Ysc.Logging.error(
           "QuickBooks Bill deleted/voided for an expense report already marked paid - needs manual review",
           expense_report_id: expense_report.id,
-          bill_id: bill_id
+          bill_id: bill_id,
+          extra: %{
+            expense_report_id: expense_report.id,
+            bill_id: bill_id,
+            expense_report_status: expense_report.status
+          },
+          tags: %{quickbooks_operation: "bill_deleted_paid_conflict"}
         )
 
         Webhooks.update_webhook_state(webhook_event, :processed)
         :ok
 
       true ->
-        expense_report =
-          if Ecto.assoc_loaded?(expense_report.expense_items) do
-            expense_report
-          else
-            Repo.preload(expense_report, :expense_items)
-          end
-
         case ExpenseReports.mark_expense_report_as_rejected_due_to_quickbooks_deletion(
                expense_report,
                bill_id
@@ -128,24 +141,18 @@ defmodule YscWeb.Workers.QuickbooksBillDeletedProcessorWorker do
               "Failed to reject expense report following QuickBooks Bill deletion/void",
               expense_report_id: expense_report.id,
               bill_id: bill_id,
-              errors: inspect(changeset.errors)
+              errors: inspect(changeset.errors),
+              extra: %{
+                expense_report_id: expense_report.id,
+                bill_id: bill_id,
+                errors: inspect(changeset.errors)
+              },
+              tags: %{quickbooks_operation: "bill_deleted_reject_failed"}
             )
 
             Webhooks.update_webhook_state(webhook_event, :failed)
             {:error, :update_failed}
         end
-    end
-  end
-
-  defp find_expense_report_by_bill_id(bill_id) do
-    query =
-      from(er in ExpenseReports.ExpenseReport,
-        where: er.quickbooks_bill_id == ^bill_id
-      )
-
-    case Repo.one(query) do
-      nil -> {:error, :not_found}
-      expense_report -> {:ok, expense_report}
     end
   end
 end
