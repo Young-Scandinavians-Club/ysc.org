@@ -10,6 +10,7 @@ defmodule YscWeb.AdminBookingsLive do
 
   alias Ysc.Avatars
   alias Ysc.Bookings
+  alias Ysc.Bookings.BookingLocker
   alias Ysc.Bookings.PropertyDisplay
   alias Ysc.MoneyHelper
   alias Ysc.Accounts
@@ -6302,24 +6303,24 @@ defmodule YscWeb.AdminBookingsLive do
   # first leaves it permanently stuck as held/booked with no booking left to
   # explain it.
   defp release_inventory_before_delete(%{status: :hold} = booking) do
-    alias Ysc.Bookings.BookingLocker
-
-    case BookingLocker.release_hold(booking.id) do
-      {:ok, _booking} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+    normalize_release_result(BookingLocker.release_hold(booking.id))
   end
 
   defp release_inventory_before_delete(%{status: :complete} = booking) do
-    alias Ysc.Bookings.BookingLocker
-
-    case BookingLocker.cancel_complete_booking(booking.id) do
-      {:ok, _booking} -> :ok
-      {:error, reason} -> {:error, reason}
-    end
+    normalize_release_result(BookingLocker.cancel_complete_booking(booking.id))
   end
 
   defp release_inventory_before_delete(_booking), do: :ok
+
+  defp normalize_release_result({:ok, _booking}), do: :ok
+
+  # No matching PropertyInventory/RoomInventory rows for this booking's dates
+  # (e.g. WP-migrated bookings that were never given live inventory rows) -
+  # there's nothing to release, so let the delete proceed.
+  defp normalize_release_result({:error, {:error, :inventory_update_failed}}),
+    do: :ok
+
+  defp normalize_release_result({:error, reason}), do: {:error, reason}
 
   # Status transitions away from :hold/:complete hold real PropertyInventory /
   # RoomInventory reservations. Editing `status` via the plain changeset path
@@ -6412,8 +6413,6 @@ defmodule YscWeb.AdminBookingsLive do
          _room_id,
          _rooms
        ) do
-    alias Ysc.Bookings.BookingLocker
-
     BookingLocker.release_hold(booking.id)
     |> handle_admin_cancel_result(socket, booking, :canceled)
   end
@@ -6426,8 +6425,6 @@ defmodule YscWeb.AdminBookingsLive do
          _room_id,
          _rooms
        ) do
-    alias Ysc.Bookings.BookingLocker
-
     BookingLocker.cancel_complete_booking(booking.id)
     |> handle_admin_cancel_result(socket, booking, :canceled)
   end
@@ -6440,8 +6437,6 @@ defmodule YscWeb.AdminBookingsLive do
          _room_id,
          _rooms
        ) do
-    alias Ysc.Bookings.BookingLocker
-
     BookingLocker.refund_complete_booking(booking.id)
     |> handle_admin_cancel_result(socket, booking, :refunded)
   end
@@ -6496,7 +6491,14 @@ defmodule YscWeb.AdminBookingsLive do
     end
   end
 
-  defp handle_admin_cancel_result({:error, reason}, socket, _booking, _status) do
+  defp handle_admin_cancel_result({:error, reason}, socket, booking, status) do
+    Ysc.Logging.error(
+      "Failed to release inventory for admin booking status change",
+      booking_id: booking.id,
+      target_status: status,
+      reason: inspect(reason)
+    )
+
     {:noreply,
      YscWeb.Flash.put_toast(
        socket,
@@ -6511,8 +6513,6 @@ defmodule YscWeb.AdminBookingsLive do
     # - Updating inventory
     # - Sending confirmation email
     # - Scheduling check-in/checkout reminders
-    alias Ysc.Bookings.BookingLocker
-
     attrs = %{
       user_id: booking_params["user_id"],
       property: booking_params["property"],
