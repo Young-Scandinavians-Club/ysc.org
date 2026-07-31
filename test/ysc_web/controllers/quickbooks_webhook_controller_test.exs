@@ -159,6 +159,82 @@ defmodule YscWeb.QuickbooksWebhookControllerTest do
       assert webhook_event == nil
     end
 
+    test "creates webhook event for Bill Delete notification", %{conn: conn} do
+      payload =
+        build_quickbooks_webhook_payload(
+          realm_id: "123456789",
+          entity_name: "Bill",
+          entity_id: "bill_deleted_123",
+          operation: "Delete"
+        )
+
+      conn = signed_webhook_post(conn, payload)
+
+      assert conn.status == 200
+      assert conn.resp_body == "OK"
+
+      event_id = "123456789:Bill:bill_deleted_123:Delete"
+
+      webhook_event =
+        Webhooks.get_webhook_event_by_provider_and_event_id(
+          "quickbooks",
+          event_id
+        )
+
+      assert webhook_event != nil
+      assert webhook_event.event_type == "Bill.Delete"
+    end
+
+    test "creates webhook event for Bill Void notification", %{conn: conn} do
+      payload =
+        build_quickbooks_webhook_payload(
+          realm_id: "123456789",
+          entity_name: "Bill",
+          entity_id: "bill_voided_123",
+          operation: "Void"
+        )
+
+      conn = signed_webhook_post(conn, payload)
+
+      assert conn.status == 200
+
+      event_id = "123456789:Bill:bill_voided_123:Void"
+
+      webhook_event =
+        Webhooks.get_webhook_event_by_provider_and_event_id(
+          "quickbooks",
+          event_id
+        )
+
+      assert webhook_event != nil
+      assert webhook_event.event_type == "Bill.Void"
+    end
+
+    test "skips Bill Create/Update operations (only Delete/Void are handled)",
+         %{conn: conn} do
+      payload =
+        build_quickbooks_webhook_payload(
+          realm_id: "123456789",
+          entity_name: "Bill",
+          entity_id: "bill_created_123",
+          operation: "Create"
+        )
+
+      conn = signed_webhook_post(conn, payload)
+
+      assert conn.status == 200
+
+      event_id = "123456789:Bill:bill_created_123:Create"
+
+      webhook_event =
+        Webhooks.get_webhook_event_by_provider_and_event_id(
+          "quickbooks",
+          event_id
+        )
+
+      assert webhook_event == nil
+    end
+
     test "handles duplicate webhook events idempotently", %{conn: conn} do
       payload =
         build_quickbooks_webhook_payload(

@@ -7,8 +7,10 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandlerTest do
   use Ysc.DataCase, async: true
 
   import Mox
+  import Ysc.AccountsFixtures
 
   alias Ysc.ExpenseReports.QuickbooksWebhookHandler
+  alias Ysc.ExpenseReports.ExpenseReport
   alias Ysc.Quickbooks.ClientMock
   alias Ysc.Repo
 
@@ -109,6 +111,86 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandlerTest do
       assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
 
       # Verify no job was enqueued
+      refute_enqueued(
+        worker: YscWeb.Workers.QuickbooksBillPaymentProcessorWorker
+      )
+    end
+
+    test "enqueues Bill deletion processing job for Bill Delete operation" do
+      user = user_fixture()
+
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Test expense report",
+          status: "approved",
+          quickbooks_bill_id: "bill_123",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "123456789:Bill:bill_123:Delete",
+          event_type: "Bill.Delete",
+          payload: build_webhook_payload("Bill", "bill_123", "Delete")
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      # Oban runs inline in tests, so by the time handle_webhook_event/1
+      # returns, QuickbooksBillDeletedProcessorWorker has already run.
+      # Asserting the report was rejected proves the job was enqueued with
+      # the right bill_id, not just that the handler returned :ok.
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+      assert updated_webhook.state == :processed
+      assert Repo.get!(ExpenseReport, expense_report.id).status == "rejected"
+    end
+
+    test "enqueues Bill deletion processing job for Bill Void operation" do
+      user = user_fixture()
+
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Test expense report",
+          status: "approved",
+          quickbooks_bill_id: "bill_456",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "123456789:Bill:bill_456:Void",
+          event_type: "Bill.Void",
+          payload: build_webhook_payload("Bill", "bill_456", "Void")
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+      assert updated_webhook.state == :processed
+      assert Repo.get!(ExpenseReport, expense_report.id).status == "rejected"
+    end
+
+    test "skips Bill Create/Update operations" do
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "123456789:Bill:bill_789:Create",
+          event_type: "Bill.Create",
+          payload: build_webhook_payload("Bill", "bill_789", "Create")
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      refute_enqueued(
+        worker: YscWeb.Workers.QuickbooksBillDeletedProcessorWorker
+      )
+
       refute_enqueued(
         worker: YscWeb.Workers.QuickbooksBillPaymentProcessorWorker
       )

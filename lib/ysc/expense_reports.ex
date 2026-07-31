@@ -291,12 +291,56 @@ defmodule Ysc.ExpenseReports do
   @doc """
   Marks an expense report as paid.
 
-  This is called when a payment is initiated in QuickBooks (via webhook).
+  This is called when a payment is confirmed in QuickBooks (via webhook).
   """
   def mark_expense_report_as_paid(%ExpenseReport{} = expense_report) do
     expense_report
-    |> ExpenseReport.changeset(%{status: "paid"})
+    |> ExpenseReport.status_changeset(%{status: "paid"})
     |> Repo.update()
+  end
+
+  @doc """
+  Marks an expense report as rejected because its linked QuickBooks Bill was
+  deleted or voided in QuickBooks.
+
+  This is distinct from an admin rejection (`update_expense_report/2` via
+  `status_changeset`): it stamps `quickbooks_sync_error` with a
+  system-generated note so anyone looking at a "rejected" report can tell
+  whether a human rejected it or QuickBooks did, since the two mean very
+  different things for follow-up.
+  """
+  def mark_expense_report_as_rejected_due_to_quickbooks_deletion(
+        %ExpenseReport{} = expense_report,
+        bill_id
+      ) do
+    note =
+      "Automatically rejected: linked QuickBooks Bill #{bill_id} was deleted or voided in QuickBooks (detected #{DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()})."
+
+    expense_report
+    |> ExpenseReport.status_changeset(%{
+      status: "rejected",
+      quickbooks_sync_error: note
+    })
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets an expense report by its QuickBooks Bill ID.
+
+  Pass `lock: true` to select the row `FOR UPDATE` - callers that read the
+  report and then conditionally write a new status based on it (e.g. the
+  QuickBooks BillPayment and Bill-deletion webhook workers) should do so
+  inside a `Repo.transaction/1` with `lock: true` to serialize concurrent
+  webhook processing for the same report and avoid racing status updates.
+  """
+  def get_expense_report_by_quickbooks_bill_id(bill_id, opts \\ []) do
+    query = from(er in ExpenseReport, where: er.quickbooks_bill_id == ^bill_id)
+    query = if opts[:lock], do: lock(query, "FOR UPDATE"), else: query
+
+    case Repo.one(query) do
+      nil -> {:error, :not_found}
+      expense_report -> {:ok, expense_report}
+    end
   end
 
   def submit_expense_report(%ExpenseReport{} = expense_report) do

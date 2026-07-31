@@ -122,4 +122,10 @@ defmodule Ysc.Quickbooks.ClientBehaviour do
   """
   @callback get_bill_payment(String.t()) ::
               {:ok, map()} | {:error, atom() | String.t()}
+
+  @doc """
+  Gets a Bill by ID from QuickBooks.
+  """
+  @callback get_bill(String.t()) ::
+              {:ok, map()} | {:error, atom() | String.t()}
 end
