@@ -3819,8 +3819,13 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       Req.Test.set_req_test_from_context(context)
 
       previous_client = Application.get_env(:ysc, :stripe_client)
-      previous_payouts = Application.get_env(:ysc, :process_stripe_payout_webhooks)
-      previous_req_opts = Application.get_env(:ysc, :stripe_charge_fetch_req_opts)
+
+      previous_payouts =
+        Application.get_env(:ysc, :process_stripe_payout_webhooks)
+
+      previous_req_opts =
+        Application.get_env(:ysc, :stripe_charge_fetch_req_opts)
+
       previous_base_url = Application.get_env(:stripity_stripe, :api_base_url)
 
       Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
@@ -3949,7 +3954,8 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
         "fees" => nil
       }
 
-      assert :ok = WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
 
       payout =
         Ledgers.get_payout_by_stripe_id(stripe_payout_id)

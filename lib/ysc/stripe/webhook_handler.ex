@@ -3629,7 +3629,10 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     case Req.get(
            "#{base_url}/v1/charges/#{charge_id}",
-           [headers: [{"Authorization", "Bearer #{api_key}"}], decode_body: true] ++
+           [
+             headers: [{"Authorization", "Bearer #{api_key}"}],
+             decode_body: true
+           ] ++
              req_opts
          ) do
       {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
