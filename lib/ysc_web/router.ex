@@ -552,6 +552,7 @@ defmodule YscWeb.Router do
       live "/events/:id/edit", AdminEventsNewLive, :edit
       live "/events/:id/tickets", AdminEventsNewLive, :tickets
       live "/events/:id/updates", AdminEventsNewLive, :updates
+      live "/events/:id/statistics", AdminEventsNewLive, :statistics
 
       get "/events/:id/tv-poster/image", EventTvPosterController, :image
       get "/events/:id/tv-poster", EventTvPosterController, :show

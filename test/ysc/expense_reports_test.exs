@@ -2423,4 +2423,224 @@ defmodule Ysc.ExpenseReportsTest do
       assert report.status == "draft"
     end
   end
+
+  describe "list_expense_reports_for_event/1" do
+    test "lists reports for the given event, newest first, and excludes other events",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+      other_event = event_fixture()
+
+      {:ok, report1} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "First",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      {:ok, report2} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Second",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      {:ok, _other_event_report} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => other_event.id,
+            "status" => "draft",
+            "purpose" => "Other event",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id
+          },
+          user
+        )
+
+      results = ExpenseReports.list_expense_reports_for_event(event.id)
+
+      assert MapSet.new(Enum.map(results, & &1.id)) ==
+               MapSet.new([report1.id, report2.id])
+    end
+
+    test "returns empty list for an event with no expense reports" do
+      assert ExpenseReports.list_expense_reports_for_event(Ecto.ULID.generate()) ==
+               []
+    end
+  end
+
+  describe "total_for_event/2 and totals_for_event/2" do
+    test "only counts approved/paid reports by default, netting income against expenses",
+         %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+
+      {:ok, paid} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Venue",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Venue Co",
+                "description" => "Rental",
+                "amount" => "1200.00"
+              }
+            ]
+          },
+          user
+        )
+
+      {:ok, _paid} =
+        ExpenseReports.update_expense_report(paid, %{status: "paid"})
+
+      {:ok, approved} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Catering",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-16",
+                "vendor" => "Caterer",
+                "description" => "Food",
+                "amount" => "300.00"
+              }
+            ],
+            "income_items" => [
+              %{
+                "date" => "2024-01-16",
+                "description" => "Cash collected",
+                "amount" => "50.00"
+              }
+            ]
+          },
+          user
+        )
+
+      {:ok, _approved} =
+        ExpenseReports.update_expense_report(approved, %{status: "approved"})
+
+      {:ok, _still_draft} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Pending review",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-17",
+                "vendor" => "Vendor",
+                "description" => "Should not count",
+                "amount" => "9999.00"
+              }
+            ]
+          },
+          user
+        )
+
+      totals = ExpenseReports.totals_for_event(event.id)
+
+      assert Money.equal?(totals.expense_total, Money.new(1500, :USD))
+      assert Money.equal?(totals.income_total, Money.new(50, :USD))
+      assert Money.equal?(totals.net_total, Money.new(1450, :USD))
+
+      assert Money.equal?(
+               ExpenseReports.total_for_event(event.id),
+               Money.new(1450, :USD)
+             )
+    end
+
+    test "accepts a custom statuses list", %{user: user} do
+      {:ok, bank_account} =
+        ExpenseReports.create_bank_account(
+          %{
+            "routing_number" => "021000021",
+            "account_number" => "1234567890"
+          },
+          user
+        )
+
+      event = event_fixture()
+
+      {:ok, _draft} =
+        ExpenseReports.create_expense_report(
+          %{
+            "user_id" => user.id,
+            "event_id" => event.id,
+            "status" => "draft",
+            "purpose" => "Draft item",
+            "reimbursement_method" => "bank_transfer",
+            "bank_account_id" => bank_account.id,
+            "expense_items" => [
+              %{
+                "date" => "2024-01-15",
+                "vendor" => "Vendor",
+                "description" => "Draft",
+                "amount" => "42.00"
+              }
+            ]
+          },
+          user
+        )
+
+      assert Money.equal?(
+               ExpenseReports.total_for_event(event.id, ["draft"]),
+               Money.new(42, :USD)
+             )
+
+      assert Money.equal?(
+               ExpenseReports.total_for_event(event.id),
+               Money.new(0, :USD)
+             )
+    end
+
+    test "returns zero totals for an event with no expense reports" do
+      totals = ExpenseReports.totals_for_event(Ecto.ULID.generate())
+      assert Money.equal?(totals.expense_total, Money.new(0, :USD))
+      assert Money.equal?(totals.income_total, Money.new(0, :USD))
+      assert Money.equal?(totals.net_total, Money.new(0, :USD))
+    end
+  end
 end

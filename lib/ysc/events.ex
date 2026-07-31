@@ -21,6 +21,8 @@ defmodule Ysc.Events do
   alias Ysc.Accounts.User
   alias Ysc.StaffPreview
 
+  @max_sales_chart_days 120
+
   def subscribe() do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic())
   end
@@ -2005,6 +2007,212 @@ defmodule Ysc.Events do
       |> Map.put(:total_amount, total_amount)
       |> Map.delete(:ticket_tier_price)
     end)
+  end
+
+  @doc """
+  Get ticket sales revenue for an event, broken down by ticket tier.
+
+  Only counts confirmed tickets on non-donation tiers, net of any per-ticket
+  discount. Donation tiers are excluded: their amount is user-entered at
+  checkout rather than `ticket_tier.price` (which is typically `nil` for
+  donations), so they can't be priced this way — see
+  `get_event_donations_total/1` for the correct way to total donations.
+  Returns a map with `:by_tier` (one entry per tier with tickets sold and
+  revenue), plus `:total_revenue` and `:total_tickets_sold` across all tiers.
+  """
+  def get_event_sales_stats(event_id) do
+    rows =
+      from(t in Ticket,
+        join: tt in assoc(t, :ticket_tier),
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        group_by: [tt.id, tt.name, tt.price],
+        select: %{
+          ticket_tier_id: tt.id,
+          ticket_tier_name: tt.name,
+          ticket_tier_price: tt.price,
+          tickets_sold: count(t.id),
+          discount_total: sum(fragment("(?.discount_amount).amount", t))
+        },
+        order_by: [asc: tt.name]
+      )
+      |> Repo.all()
+
+    by_tier =
+      Enum.map(rows, fn row ->
+        {:ok, gross} = Money.mult(row.ticket_tier_price, row.tickets_sold)
+        discount = Ysc.MoneyHelper.usd_from_db_sum(row.discount_total)
+        revenue = money_sub_floor_zero(gross, discount)
+
+        %{
+          ticket_tier_id: row.ticket_tier_id,
+          name: row.ticket_tier_name,
+          tickets_sold: row.tickets_sold,
+          revenue: revenue
+        }
+      end)
+
+    %{
+      by_tier: by_tier,
+      total_revenue:
+        Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
+      total_tickets_sold: Enum.reduce(by_tier, 0, &(&1.tickets_sold + &2))
+    }
+  end
+
+  @doc """
+  Get daily ticket sales (net revenue and ticket count) for an event, ordered
+  oldest to newest. Only counts confirmed tickets on non-donation tiers (see
+  `get_event_sales_stats/1` for why donation tiers are excluded).
+
+  When the event's ticket tiers have a sale window (see
+  `get_event_ticket_sale_window/1`) and that window spans no more than
+  #{@max_sales_chart_days} days, the result is zero-filled across the whole
+  window so gaps in sales are visible rather than skipped. Otherwise only days
+  with actual sales are returned.
+  """
+  def get_event_sales_over_time(event_id) do
+    points =
+      from(t in Ticket,
+        join: tt in assoc(t, :ticket_tier),
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            tt.type != :donation,
+        group_by: [
+          fragment("date_trunc('day', ?)", t.inserted_at),
+          tt.id,
+          tt.name
+        ],
+        select: %{
+          date: fragment("date_trunc('day', ?)", t.inserted_at),
+          ticket_tier_id: tt.id,
+          ticket_tier_name: tt.name,
+          tickets_sold: count(t.id),
+          gross: sum(fragment("(?.price).amount", tt)),
+          discount_total: sum(fragment("(?.discount_amount).amount", t))
+        },
+        order_by: fragment("date_trunc('day', ?)", t.inserted_at)
+      )
+      |> Repo.all()
+      |> Enum.group_by(&NaiveDateTime.to_date(&1.date))
+      |> Enum.map(fn {date, tier_rows} ->
+        by_tier =
+          Enum.map(tier_rows, fn row ->
+            gross = Ysc.MoneyHelper.usd_from_db_sum(row.gross)
+            discount = Ysc.MoneyHelper.usd_from_db_sum(row.discount_total)
+
+            %{
+              ticket_tier_id: row.ticket_tier_id,
+              name: row.ticket_tier_name,
+              tickets_sold: row.tickets_sold,
+              revenue: money_sub_floor_zero(gross, discount)
+            }
+          end)
+
+        %{
+          date: date,
+          tickets_sold: Enum.reduce(by_tier, 0, &(&1.tickets_sold + &2)),
+          revenue:
+            Enum.reduce(by_tier, Money.new(0, :USD), &money_add(&1.revenue, &2)),
+          by_tier: by_tier
+        }
+      end)
+      |> Enum.sort_by(& &1.date, Date)
+
+    fill_sales_timeline(points, get_event_ticket_sale_window(event_id))
+  end
+
+  @doc """
+  The overall ticket sale window for an event: the earliest ticket tier
+  `start_date` and latest `end_date` across all its ticket tiers. Either value
+  is `nil` when no tier sets a sale window.
+  """
+  def get_event_ticket_sale_window(event_id) do
+    from(tt in TicketTier,
+      where: tt.event_id == ^event_id,
+      select: %{start_date: min(tt.start_date), end_date: max(tt.end_date)}
+    )
+    |> Repo.one() || %{start_date: nil, end_date: nil}
+  end
+
+  defp fill_sales_timeline(rows, window) do
+    window_dates =
+      [window.start_date, window.end_date]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&DateTime.to_date/1)
+
+    case window_dates ++ Enum.map(rows, & &1.date) do
+      [] ->
+        []
+
+      dates ->
+        first_date = Enum.min(dates, Date)
+        last_date = Enum.max(dates, Date)
+        span_days = Date.diff(last_date, first_date)
+
+        if span_days > 0 and span_days <= @max_sales_chart_days do
+          revenue_by_date = Map.new(rows, &{&1.date, &1})
+
+          Date.range(first_date, last_date)
+          |> Enum.map(fn date ->
+            Map.get(revenue_by_date, date, %{
+              date: date,
+              tickets_sold: 0,
+              revenue: Money.new(0, :USD),
+              by_tier: []
+            })
+          end)
+        else
+          rows
+        end
+    end
+  end
+
+  @doc """
+  Total Stripe processing fees booked against this event's confirmed ticket
+  payments.
+  """
+  def get_event_stripe_fees_total(event_id) do
+    payment_ids =
+      from(t in Ticket,
+        where:
+          t.event_id == ^event_id and t.status == :confirmed and
+            not is_nil(t.payment_id),
+        distinct: true,
+        select: t.payment_id
+      )
+      |> Repo.all()
+
+    Ysc.Ledgers.sum_stripe_fees_for_payments(payment_ids)
+  end
+
+  @doc """
+  Total collected via this event's donation ticket tiers.
+
+  Donations are treated as a bonus to the club as a whole, not event revenue,
+  so this is reported separately from `get_event_sales_stats/1` and is not
+  included in ticket sales totals.
+  """
+  def get_event_donations_total(event_id) do
+    Ysc.Ledgers.sum_donation_revenue_for_event(event_id)
+  end
+
+  defp money_add(%Money{} = a, %Money{} = b) do
+    case Money.add(a, b) do
+      {:ok, sum} -> sum
+      _ -> a
+    end
+  end
+
+  defp money_sub_floor_zero(%Money{} = a, %Money{} = b) do
+    case Money.sub(a, b) do
+      {:ok, diff} ->
+        if Money.negative?(diff), do: Money.new(0, :USD), else: diff
+
+      _ ->
+        a
+    end
   end
 
   @doc """

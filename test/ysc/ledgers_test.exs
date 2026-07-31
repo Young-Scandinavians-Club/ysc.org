@@ -6736,4 +6736,132 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
       end)
     end
   end
+
+  describe "sum_stripe_fees_for_payments/1" do
+    test "returns zero for an empty list" do
+      assert Money.equal?(
+               Ledgers.sum_stripe_fees_for_payments([]),
+               Money.new(0, :USD)
+             )
+    end
+
+    test "sums stripe fee debit entries for only the given payment ids" do
+      Ledgers.ensure_basic_accounts()
+      stripe_fees_account = Ledgers.get_account_by_name("stripe_fees")
+      user = user_fixture()
+
+      [payment1, payment2, other_payment] =
+        Ysc.LedgersFixtures.payment_rows!(user.id, 3)
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment1.id,
+          amount: Money.new(320, :USD),
+          debit_credit: :debit,
+          description: "fee 1"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment2.id,
+          amount: Money.new(150, :USD),
+          debit_credit: :debit,
+          description: "fee 2"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: other_payment.id,
+          amount: Money.new(999, :USD),
+          debit_credit: :debit,
+          description: "unrelated fee"
+        })
+
+      # A credit entry on a tracked payment (e.g. a fee reversal) shouldn't count.
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: stripe_fees_account.id,
+          payment_id: payment1.id,
+          amount: Money.new(5, :USD),
+          debit_credit: :credit,
+          description: "fee correction"
+        })
+
+      total =
+        Ledgers.sum_stripe_fees_for_payments([payment1.id, payment2.id])
+
+      assert Money.equal?(total, Money.new(470, :USD))
+    end
+  end
+
+  describe "sum_donation_revenue_for_event/1" do
+    test "returns zero when there are no donation entries for the event" do
+      assert Money.equal?(
+               Ledgers.sum_donation_revenue_for_event(Ecto.ULID.generate()),
+               Money.new(0, :USD)
+             )
+    end
+
+    test "sums donation_revenue credits tied to the event, ignoring debits and other events" do
+      Ledgers.ensure_basic_accounts()
+      donation_account = Ledgers.get_account_by_name("donation_revenue")
+      event_id = Ecto.ULID.generate()
+      other_event_id = Ecto.ULID.generate()
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: donation_account.id,
+          amount: Money.new(75, :USD),
+          debit_credit: :credit,
+          related_entity_type: :donation,
+          related_entity_id: event_id,
+          description: "Donation 1"
+        })
+
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: donation_account.id,
+          amount: Money.new(25, :USD),
+          debit_credit: :credit,
+          related_entity_type: :donation,
+          related_entity_id: event_id,
+          description: "Donation 2"
+        })
+
+      # A different event's donation shouldn't count toward this event's total.
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: donation_account.id,
+          amount: Money.new(500, :USD),
+          debit_credit: :credit,
+          related_entity_type: :donation,
+          related_entity_id: other_event_id,
+          description: "Other event donation"
+        })
+
+      # A debit against donation_revenue (e.g. a correction) shouldn't count.
+      {:ok, _} =
+        Ledgers.create_entry(%{
+          account_id: donation_account.id,
+          amount: Money.new(10, :USD),
+          debit_credit: :debit,
+          related_entity_type: :donation,
+          related_entity_id: event_id,
+          description: "Correction"
+        })
+
+      assert Money.equal?(
+               Ledgers.sum_donation_revenue_for_event(event_id),
+               Money.new(100, :USD)
+             )
+
+      assert Money.equal?(
+               Ledgers.sum_donation_revenue_for_event(other_event_id),
+               Money.new(500, :USD)
+             )
+    end
+  end
 end
