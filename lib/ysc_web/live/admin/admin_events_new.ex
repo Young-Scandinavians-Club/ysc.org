@@ -10,6 +10,7 @@ defmodule YscWeb.AdminEventsNewLive do
   alias Ysc.Events
   alias Ysc.Events.Event
   alias Ysc.Events.EventUpdate
+  alias Ysc.ExpenseReports
   alias YscWeb.AdminCheckInPaths
   alias Ysc.Media.Image
 
@@ -291,6 +292,12 @@ defmodule YscWeb.AdminEventsNewLive do
                 patch={~p"/admin/events/#{@event.id}/updates"}
               >
                 Updates
+              </.admin_tab>
+              <.admin_tab
+                active={@live_action == :statistics}
+                patch={~p"/admin/events/#{@event.id}/statistics"}
+              >
+                Statistics
               </.admin_tab>
             </.admin_tabs>
           </div>
@@ -1041,6 +1048,246 @@ defmodule YscWeb.AdminEventsNewLive do
               />
             </.modal>
           </div>
+
+          <div :if={@live_action == :statistics} class="relative py-8 space-y-8">
+            <div
+              id="event-stats-kpis"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            >
+              <.admin_stat_card
+                id="stat-net-revenue"
+                label="Net Revenue"
+                value={money_display(@net_event_revenue)}
+                value_class={
+                  if Money.negative?(@net_event_revenue),
+                    do: "text-red-600",
+                    else: "text-green-600"
+                }
+                subtitle="Ticket sales + other income − costs"
+                class="lg:col-span-3"
+              />
+              <.admin_stat_card
+                id="stat-ticket-sales"
+                label="Ticket Sales"
+                value={money_display(@sales_stats.total_revenue)}
+                subtitle={"#{@sales_stats.total_tickets_sold} ticket(s) sold"}
+              />
+              <.admin_stat_card
+                id="stat-other-income"
+                label="Other Income"
+                value={money_display(@expense_report_totals.income_total)}
+                subtitle="Income items on expense reports"
+              />
+              <.admin_stat_card
+                id="stat-total-revenue"
+                label="Total Revenue"
+                value={money_display(@total_event_revenue)}
+                subtitle="Ticket sales + other income"
+              />
+              <.admin_stat_card
+                id="stat-stripe-fees"
+                label="Stripe Fees"
+                value={money_display(@stripe_fees_total)}
+                subtitle="Processing fees on ticket payments"
+              />
+              <.admin_stat_card
+                id="stat-expense-reports"
+                label="Expense Reports"
+                value={money_display(@expense_report_totals.expense_total)}
+                subtitle="Gross costs (approved + paid)"
+              />
+              <.admin_stat_card
+                id="stat-total-costs"
+                label="Total Costs"
+                value={money_display(@total_event_costs)}
+                subtitle="Stripe fees + expense reports"
+              />
+            </div>
+
+            <div
+              :if={Money.positive?(@donations_total)}
+              id="stat-donations"
+              class="bg-purple-50 border border-purple-200 rounded-lg p-6"
+            >
+              <p class="text-xs font-black text-purple-400 uppercase tracking-[0.2em] mb-3">
+                Donations Collected
+              </p>
+              <p class="text-3xl font-black text-purple-900">
+                {money_display(@donations_total)}
+              </p>
+              <p class="text-xs text-purple-700 mt-1 font-medium">
+                Via donation ticket tiers — a bonus to the club as a whole, not counted in event revenue above.
+              </p>
+            </div>
+
+            <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div>
+                <h2 class="text-xl font-bold">Sales Over Time</h2>
+                <p class="text-zinc-600 text-sm">
+                  Confirmed ticket revenue by day.
+                  <span :if={ticket_sale_window_label(@ticket_sale_window)}>
+                    {ticket_sale_window_label(@ticket_sale_window)}.
+                  </span>
+                </p>
+                <p
+                  :if={@event_update_markers != %{}}
+                  class="text-xs text-amber-700 flex items-center gap-1 mt-1"
+                >
+                  <.icon name="hero-envelope" class="w-3.5 h-3.5" />
+                  marks a day an event update email was sent — hover a bar for details
+                </p>
+              </div>
+
+              <p :if={@sales_over_time == []} class="text-sm text-zinc-500">
+                No ticket sales yet.
+              </p>
+
+              <div :if={@sales_over_time != []} class="flex gap-2">
+                <div class="flex flex-col justify-between shrink-0 w-14 h-40 pb-6 text-right text-[10px] text-zinc-400 tabular-nums">
+                  <span>{money_display(@sales_chart_max_revenue)}</span>
+                  <span>{money_display(money_half(@sales_chart_max_revenue))}</span>
+                  <span>$0</span>
+                </div>
+
+                <div
+                  id="sales-over-time-chart"
+                  phx-hook="SalesChartTooltip"
+                  data-tooltip-target="sales-chart-tooltip-popup"
+                  class="flex-1 flex items-end gap-1 h-40 overflow-x-auto border-l border-zinc-100 pl-2 pb-2"
+                >
+                  <div
+                    :for={point <- @sales_over_time}
+                    class="flex flex-col items-center justify-end shrink-0 w-9 h-full cursor-default"
+                    data-tooltip={sales_point_tooltip(point, @event_update_markers)}
+                  >
+                    <.icon
+                      :if={Map.has_key?(@event_update_markers, point.date)}
+                      name="hero-envelope-solid"
+                      class="w-3 h-3 text-amber-500 mb-0.5 shrink-0 pointer-events-none"
+                    />
+                    <div
+                      class="w-5 bg-blue-500 hover:bg-blue-600 rounded-t transition-colors pointer-events-none"
+                      style={"height: #{sales_bar_height_pct(point, @sales_chart_max_revenue)}%"}
+                    />
+                    <span class="text-[10px] text-zinc-400 mt-1 whitespace-nowrap pointer-events-none">
+                      {Calendar.strftime(point.date, "%-m/%-d")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                id="sales-chart-tooltip-popup"
+                class="fixed z-50 hidden max-w-xs rounded-md bg-zinc-900 px-3 py-2 text-xs text-zinc-100 shadow-lg whitespace-pre-line"
+                style="display: none;"
+              >
+              </div>
+            </div>
+
+            <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div>
+                <h2 class="text-xl font-bold">Sales by Ticket Tier</h2>
+                <p class="text-zinc-600 text-sm">
+                  Confirmed tickets, net of discounts.
+                </p>
+              </div>
+
+              <p
+                :if={@sales_stats.by_tier == []}
+                class="text-sm text-zinc-500"
+              >
+                No ticket tiers with sales yet.
+              </p>
+
+              <table
+                :if={@sales_stats.by_tier != []}
+                class="min-w-full divide-y divide-zinc-200 text-sm"
+              >
+                <thead>
+                  <tr class="text-left text-zinc-500">
+                    <th class="py-2 pr-4 font-medium">Tier</th>
+                    <th class="py-2 pr-4 font-medium">Tickets Sold</th>
+                    <th class="py-2 pr-4 font-medium">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  <tr
+                    :for={tier <- @sales_stats.by_tier}
+                    id={"tier-sales-#{tier.ticket_tier_id}"}
+                  >
+                    <td class="py-2 pr-4 text-zinc-800">{tier.name}</td>
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {tier.tickets_sold}
+                    </td>
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {money_display(tier.revenue)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="border border-zinc-200 rounded bg-white py-6 px-4 space-y-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <h2 class="text-xl font-bold">Expense Reports</h2>
+                  <p class="text-zinc-600 text-sm">
+                    Costs linked to this event, net of any income items logged against the report. Only approved and paid reports count toward totals.
+                  </p>
+                </div>
+                <.link
+                  navigate={~p"/admin/money?tab=expenses"}
+                  class="text-sm font-medium text-blue-600 hover:text-blue-800 whitespace-nowrap"
+                >
+                  Open Money → Expenses
+                </.link>
+              </div>
+
+              <p
+                :if={@event_expense_reports == []}
+                class="text-sm text-zinc-500"
+              >
+                No expense reports linked to this event.
+              </p>
+
+              <table
+                :if={@event_expense_reports != []}
+                class="min-w-full divide-y divide-zinc-200 text-sm"
+              >
+                <thead>
+                  <tr class="text-left text-zinc-500">
+                    <th class="py-2 pr-4 font-medium">Submitted By</th>
+                    <th class="py-2 pr-4 font-medium">Purpose</th>
+                    <th class="py-2 pr-4 font-medium">Status</th>
+                    <th class="py-2 pr-4 font-medium">Net Cost</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-100">
+                  <tr
+                    :for={report <- @event_expense_reports}
+                    id={"expense-report-#{report.id}"}
+                  >
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {expense_report_submitter_name(report.user)}
+                    </td>
+                    <td class="py-2 pr-4 text-zinc-800">{report.purpose}</td>
+                    <td class="py-2 pr-4">
+                      <.badge type={expense_report_status_badge_type(report.status)}>
+                        {String.capitalize(report.status || "unknown")}
+                      </.badge>
+                    </td>
+                    <td class="py-2 pr-4 text-zinc-800">
+                      {money_display(ExpenseReports.calculate_totals(report).net_total)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <p class="text-sm font-medium text-zinc-700 pt-2 border-t border-zinc-100">
+                Net total (approved + paid): {money_display(@expense_report_totals.net_total)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </.side_menu>
@@ -1175,6 +1422,7 @@ defmodule YscWeb.AdminEventsNewLive do
       )
     )
     |> assign_updates_tab_defaults()
+    |> assign_statistics_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:location_presets, EventLocationConfig.presets())
@@ -1205,6 +1453,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:host_search_results, [])
     |> stream(:agendas, [], reset: true)
     |> assign_updates_tab_defaults()
+    |> assign_statistics_tab_defaults()
     |> assign(:show_update_preview_modal, false)
     |> assign(:update_preview_subject, nil)
     |> assign(:check_in_path, nil)
@@ -1222,6 +1471,30 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:photo_upload_url, nil)
     |> assign(:communication_timeline, [])
     |> assign(:dev_routes?, dev_routes?)
+  end
+
+  defp assign_statistics_tab_defaults(socket) do
+    socket
+    |> assign(:sales_stats, %{
+      by_tier: [],
+      total_revenue: Money.new(0, :USD),
+      total_tickets_sold: 0
+    })
+    |> assign(:sales_over_time, [])
+    |> assign(:sales_chart_max_revenue, Money.new(0, :USD))
+    |> assign(:ticket_sale_window, %{start_date: nil, end_date: nil})
+    |> assign(:event_update_markers, %{})
+    |> assign(:stripe_fees_total, Money.new(0, :USD))
+    |> assign(:event_expense_reports, [])
+    |> assign(:expense_report_totals, %{
+      expense_total: Money.new(0, :USD),
+      income_total: Money.new(0, :USD),
+      net_total: Money.new(0, :USD)
+    })
+    |> assign(:total_event_revenue, Money.new(0, :USD))
+    |> assign(:total_event_costs, Money.new(0, :USD))
+    |> assign(:net_event_revenue, Money.new(0, :USD))
+    |> assign(:donations_total, Money.new(0, :USD))
   end
 
   defp assign_edit_tab_data(socket, event) do
@@ -1255,6 +1528,151 @@ defmodule YscWeb.AdminEventsNewLive do
       )
     end)
   end
+
+  defp assign_statistics_tab_data(socket, event) do
+    sales_stats = Events.get_event_sales_stats(event.id)
+    sales_over_time = Events.get_event_sales_over_time(event.id)
+    stripe_fees_total = Events.get_event_stripe_fees_total(event.id)
+    expense_reports = ExpenseReports.list_expense_reports_for_event(event.id)
+    expense_report_totals = ExpenseReports.totals_for_event(event.id)
+
+    # Revenue = ticket sales plus any other income logged on expense reports
+    # (e.g. cash collected at the door). Costs = Stripe fees plus the gross
+    # expense total, so income isn't silently netted out of "costs" — it's
+    # its own visible line item, and the two roll up to the same net figure.
+    total_revenue = money_add(sales_stats.total_revenue, expense_report_totals.income_total)
+    total_costs = money_add(stripe_fees_total, expense_report_totals.expense_total)
+    net_revenue = money_sub(total_revenue, total_costs)
+
+    socket
+    |> assign(:sales_stats, sales_stats)
+    |> assign(:sales_over_time, sales_over_time)
+    |> assign(:sales_chart_max_revenue, sales_chart_max_revenue(sales_over_time))
+    |> assign(:ticket_sale_window, Events.get_event_ticket_sale_window(event.id))
+    |> assign(:event_update_markers, event_update_markers(event.id))
+    |> assign(:stripe_fees_total, stripe_fees_total)
+    |> assign(:event_expense_reports, expense_reports)
+    |> assign(:expense_report_totals, expense_report_totals)
+    |> assign(:total_event_revenue, total_revenue)
+    |> assign(:total_event_costs, total_costs)
+    |> assign(:net_event_revenue, net_revenue)
+    |> assign(:donations_total, Events.get_event_donations_total(event.id))
+  end
+
+  defp sales_chart_max_revenue(points) do
+    Enum.reduce(points, Money.new(0, :USD), fn point, max_so_far ->
+      if Decimal.compare(point.revenue.amount, max_so_far.amount) == :gt,
+        do: point.revenue,
+        else: max_so_far
+    end)
+  end
+
+  defp event_update_markers(event_id) do
+    event_id
+    |> Events.list_event_updates()
+    |> Enum.filter(& &1.sent_at)
+    |> Enum.group_by(&DateTime.to_date(&1.sent_at))
+  end
+
+  defp money_add(%Money{} = a, %Money{} = b) do
+    case Money.add(a, b) do
+      {:ok, sum} -> sum
+      _ -> a
+    end
+  end
+
+  defp money_sub(%Money{} = a, %Money{} = b) do
+    case Money.sub(a, b) do
+      {:ok, diff} -> diff
+      _ -> a
+    end
+  end
+
+  defp money_half(%Money{} = m) do
+    Money.new(Decimal.div(m.amount, Decimal.new(2)), :USD)
+  end
+
+  # Money.to_string!/1 renders negative amounts as "$-1.00"; this renders them
+  # the conventional way ("-$1.00") for anything shown to admins on this tab.
+  defp money_display(%Money{} = m), do: Ysc.MoneyHelper.format_money!(m)
+
+  defp sales_bar_height_pct(%{revenue: revenue}, %Money{} = max_revenue) do
+    if Decimal.compare(max_revenue.amount, Decimal.new(0)) == :gt do
+      pct =
+        revenue.amount
+        |> Decimal.div(max_revenue.amount)
+        |> Decimal.mult(100)
+        |> Decimal.to_float()
+
+      max(pct, 4.0)
+    else
+      4.0
+    end
+  end
+
+  defp ticket_sale_window_label(%{start_date: nil, end_date: nil}), do: nil
+
+  defp ticket_sale_window_label(%{start_date: start_date, end_date: end_date}) do
+    case {start_date, end_date} do
+      {%DateTime{}, %DateTime{}} ->
+        "Tickets on sale #{format_short_date(start_date)} – #{format_short_date(end_date)}"
+
+      {%DateTime{}, nil} ->
+        "Tickets on sale since #{format_short_date(start_date)}"
+
+      {nil, %DateTime{}} ->
+        "Ticket sales end #{format_short_date(end_date)}"
+    end
+  end
+
+  defp format_short_date(%DateTime{} = dt),
+    do: Calendar.strftime(dt, "%b %-d, %Y")
+
+  defp sales_point_tooltip(point, event_update_markers) do
+    header = Calendar.strftime(point.date, "%b %-d, %Y")
+    summary = "#{money_display(point.revenue)} · #{point.tickets_sold} ticket(s)"
+
+    tier_lines =
+      Enum.map(point.by_tier, fn tier ->
+        "  #{tier.name}: #{tier.tickets_sold} · #{money_display(tier.revenue)}"
+      end)
+
+    update_lines =
+      case event_update_marker_title(event_update_markers, point.date) do
+        nil -> []
+        title -> [title]
+      end
+
+    Enum.join([header, summary] ++ tier_lines ++ update_lines, "\n")
+  end
+
+  defp event_update_marker_title(event_update_markers, date) do
+    case Map.get(event_update_markers, date) do
+      nil ->
+        nil
+
+      updates ->
+        titles = updates |> Enum.map(&(&1.title || "Event update")) |> Enum.join(", ")
+        "Update sent: #{titles} (#{Calendar.strftime(date, "%b %-d, %Y")})"
+    end
+  end
+
+  defp expense_report_status_badge_type(status) do
+    case String.downcase(to_string(status || "")) do
+      "draft" -> "dark"
+      "submitted" -> "default"
+      "approved" -> "green"
+      "rejected" -> "red"
+      "paid" -> "sky"
+      _ -> "dark"
+    end
+  end
+
+  defp expense_report_submitter_name(%{first_name: first, last_name: last}) do
+    String.trim("#{first} #{last}")
+  end
+
+  defp expense_report_submitter_name(_), do: "—"
 
   defp host_ids_from(hosts), do: hosts |> Enum.map(& &1.id) |> MapSet.new()
 
@@ -1323,6 +1741,9 @@ defmodule YscWeb.AdminEventsNewLive do
 
             :edit ->
               assign_edit_tab_data(socket, event)
+
+            :statistics ->
+              assign_statistics_tab_data(socket, event)
 
             _ ->
               socket

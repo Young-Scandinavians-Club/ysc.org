@@ -1902,6 +1902,409 @@ else
   )
 end
 
+# --- Dev-only: ticket sales, Stripe fees, event updates, and expense reports
+# for one event, so the admin Event Statistics tab has real numbers to show
+# (sales over time, revenue per tier, Stripe fees, and event costs). Each
+# sub-step is safe to re-run: it's skipped once that event already has the
+# corresponding data.
+IO.puts("\n📊 Seeding event statistics demo data...")
+
+alias Ysc.Events.Ticket
+alias Ysc.Events.TicketTier
+alias Ysc.ExpenseReports.ExpenseReport
+alias Ysc.ExpenseReports.ExpenseReportItem
+alias Ysc.Ledgers
+
+stats_demo_event_title = "Summer Festival 2024"
+
+stats_demo_event =
+  Repo.one(from e in Event, where: e.title == ^stats_demo_event_title, limit: 1)
+
+if stats_demo_event do
+  stats_demo_buyers =
+    Repo.all(
+      from u in User,
+        where: u.state == :active,
+        order_by: fragment("RANDOM()"),
+        limit: 60
+    )
+
+  # --- Ticket sales + Stripe fees ---
+  existing_ticket_count =
+    Repo.aggregate(
+      from(t in Ticket, where: t.event_id == ^stats_demo_event.id),
+      :count,
+      :id
+    )
+
+  if existing_ticket_count > 0 do
+    IO.puts(
+      "  Ticket sales already seeded for '#{stats_demo_event.title}', skipping"
+    )
+  else
+    Ledgers.ensure_basic_accounts()
+
+    paid_tiers =
+      Repo.all(
+        from tt in TicketTier,
+          where: tt.event_id == ^stats_demo_event.id and tt.type == :paid
+      )
+
+    # Tickets went on sale ~45 days ago; the window runs through the event.
+    sale_start = DateTime.add(DateTime.utc_now(), -45, :day)
+    sale_end = stats_demo_event.start_date
+
+    Enum.each(paid_tiers, fn tier ->
+      Repo.update!(
+        TicketTier.changeset(tier, %{
+          start_date: sale_start,
+          end_date: sale_end
+        })
+      )
+    end)
+
+    if paid_tiers != [] and stats_demo_buyers != [] do
+      buyer_count = length(stats_demo_buyers)
+      window_days = max(DateTime.diff(DateTime.utc_now(), sale_start, :day), 1)
+
+      tickets_created =
+        Enum.reduce(1..90, 0, fn n, count ->
+          tier = Enum.random(paid_tiers)
+          buyer = Enum.at(stats_demo_buyers, rem(n, buyer_count))
+
+          # Weight purchases toward more recent days for a believable sales ramp.
+          days_ago = trunc(window_days * :math.pow(:rand.uniform(), 2))
+
+          purchased_at =
+            DateTime.utc_now()
+            |> DateTime.add(-days_ago, :day)
+            |> DateTime.truncate(:second)
+
+          stripe_fee =
+            tier.price.amount
+            |> Decimal.mult(Decimal.new("0.029"))
+            |> Decimal.add(Decimal.new("0.30"))
+            |> Decimal.round(2)
+            |> Money.new(:USD)
+
+          payment_result =
+            Ledgers.process_event_payment_with_donations_and_discounts(%{
+              user_id: buyer.id,
+              total_amount: tier.price,
+              gross_event_amount: tier.price,
+              event_amount: tier.price,
+              donation_amount: Money.new(0, :USD),
+              discount_amount: Money.new(0, :USD),
+              event_id: stats_demo_event.id,
+              external_payment_id: "seed_txn_#{stats_demo_event.id}_#{n}",
+              stripe_fee: stripe_fee,
+              description: "#{stats_demo_event.title} - #{tier.name}",
+              payment_method_id: nil,
+              ticket_order_id: nil
+            })
+
+          case payment_result do
+            {:ok, {payment, _transaction, _entries}} ->
+              %Ticket{
+                event_id: stats_demo_event.id,
+                ticket_tier_id: tier.id,
+                user_id: buyer.id,
+                status: :confirmed,
+                payment_id: payment.id,
+                expires_at: DateTime.add(purchased_at, 365, :day),
+                discount_amount: Money.new(0, :USD),
+                reference_id:
+                  Ysc.ReferenceGenerator.generate_reference_id("TKT"),
+                inserted_at: purchased_at,
+                updated_at: purchased_at
+              }
+              |> Repo.insert!()
+
+              count + 1
+
+            {:error, reason} ->
+              IO.puts(
+                "  Failed to seed ticket payment ##{n}: #{inspect(reason)}"
+              )
+
+              count
+          end
+        end)
+
+      IO.puts(
+        "  Seeded #{tickets_created} confirmed ticket(s) for '#{stats_demo_event.title}'"
+      )
+    else
+      IO.puts(
+        "  No paid ticket tiers or active users found, skipping ticket sales seed"
+      )
+    end
+  end
+
+  # --- Donations via a donation ticket tier ---
+  # Kept separate from ticket sales: donation amounts are user-entered at
+  # checkout (not tier.price, which is nil for :donation tiers) and are
+  # treated as a bonus to the club as a whole rather than event revenue.
+  existing_donation_ticket_count =
+    Repo.aggregate(
+      from(t in Ticket,
+        join: tt in TicketTier,
+        on: t.ticket_tier_id == tt.id,
+        where: t.event_id == ^stats_demo_event.id and tt.type == :donation
+      ),
+      :count,
+      :id
+    )
+
+  if existing_donation_ticket_count > 0 do
+    IO.puts(
+      "  Donations already seeded for '#{stats_demo_event.title}', skipping"
+    )
+  else
+    donation_tier =
+      Repo.one(
+        from tt in TicketTier,
+          where: tt.event_id == ^stats_demo_event.id and tt.type == :donation,
+          limit: 1
+      ) ||
+        case Events.create_ticket_tier(%{
+               event_id: stats_demo_event.id,
+               name: "Support the Club",
+               type: :donation,
+               quantity: 999
+             }) do
+          {:ok, tier} -> tier
+          {:error, _changeset} -> nil
+        end
+
+    donation_amounts = [
+      Money.new(25, :USD),
+      Money.new(50, :USD),
+      Money.new(100, :USD),
+      Money.new(30, :USD)
+    ]
+
+    if donation_tier && stats_demo_buyers != [] do
+      buyer_count = length(stats_demo_buyers)
+
+      donations_created =
+        donation_amounts
+        |> Enum.with_index(1)
+        |> Enum.reduce(0, fn {amount, n}, count ->
+          donor = Enum.at(stats_demo_buyers, rem(n, buyer_count))
+
+          payment_result =
+            Ledgers.process_event_payment_with_donations_and_discounts(%{
+              user_id: donor.id,
+              total_amount: amount,
+              gross_event_amount: Money.new(0, :USD),
+              event_amount: Money.new(0, :USD),
+              donation_amount: amount,
+              discount_amount: Money.new(0, :USD),
+              event_id: stats_demo_event.id,
+              external_payment_id: "seed_donation_#{stats_demo_event.id}_#{n}",
+              stripe_fee: nil,
+              description: "#{stats_demo_event.title} - donation",
+              payment_method_id: nil,
+              ticket_order_id: nil
+            })
+
+          case payment_result do
+            {:ok, {payment, _transaction, _entries}} ->
+              donated_at =
+                DateTime.utc_now()
+                |> DateTime.add(-Enum.random(1..40), :day)
+                |> DateTime.truncate(:second)
+
+              %Ticket{
+                event_id: stats_demo_event.id,
+                ticket_tier_id: donation_tier.id,
+                user_id: donor.id,
+                status: :confirmed,
+                payment_id: payment.id,
+                expires_at: DateTime.add(donated_at, 365, :day),
+                discount_amount: Money.new(0, :USD),
+                reference_id:
+                  Ysc.ReferenceGenerator.generate_reference_id("TKT"),
+                inserted_at: donated_at,
+                updated_at: donated_at
+              }
+              |> Repo.insert!()
+
+              count + 1
+
+            {:error, reason} ->
+              IO.puts("  Failed to seed donation ##{n}: #{inspect(reason)}")
+              count
+          end
+        end)
+
+      IO.puts(
+        "  Seeded #{donations_created} donation(s) for '#{stats_demo_event.title}'"
+      )
+    else
+      IO.puts(
+        "  No donation ticket tier or active users found, skipping donations seed"
+      )
+    end
+  end
+
+  # --- Event update emails (so the sales chart can mark send dates) ---
+  existing_update_count =
+    Repo.aggregate(
+      from(u in Ysc.Events.EventUpdate,
+        where: u.event_id == ^stats_demo_event.id
+      ),
+      :count,
+      :id
+    )
+
+  if existing_update_count > 0 do
+    IO.puts(
+      "  Event updates already seeded for '#{stats_demo_event.title}', skipping"
+    )
+  else
+    update_specs = [
+      %{
+        title: "Lineup announced!",
+        body: "<p>We're thrilled to announce this year's festival lineup.</p>",
+        days_ago: 30
+      },
+      %{
+        title: "Early bird pricing ends soon",
+        body: "<p>Grab your VIP pass before early bird pricing ends this week.</p>",
+        days_ago: 14
+      },
+      %{
+        title: "Final details before the big day",
+        body: "<p>Parking, schedule, and what to bring — see you there!</p>",
+        days_ago: 3
+      }
+    ]
+
+    Enum.each(update_specs, fn spec ->
+      case Events.create_event_update(stats_demo_event, %{
+             "title" => spec.title,
+             "raw_body" => spec.body,
+             "rendered_body" => spec.body,
+             "sent_by_id" => admin_user.id
+           }) do
+        {:ok, event_update} ->
+          {:ok, sent_update} = Events.mark_event_update_sent(event_update, 0)
+
+          sent_at =
+            DateTime.utc_now()
+            |> DateTime.add(-spec.days_ago, :day)
+            |> DateTime.truncate(:second)
+
+          sent_update
+          |> Ecto.Changeset.change(%{sent_at: sent_at})
+          |> Repo.update!()
+
+        {:error, changeset} ->
+          IO.puts(
+            "  Failed to seed event update '#{spec.title}': #{inspect(changeset.errors)}"
+          )
+      end
+    end)
+
+    IO.puts(
+      "  Seeded #{length(update_specs)} event update(s) for '#{stats_demo_event.title}'"
+    )
+  end
+
+  # --- Expense reports (venue, catering, entertainment) ---
+  existing_expense_report_count =
+    Repo.aggregate(
+      from(er in ExpenseReport, where: er.event_id == ^stats_demo_event.id),
+      :count,
+      :id
+    )
+
+  if existing_expense_report_count > 0 do
+    IO.puts(
+      "  Expense reports already seeded for '#{stats_demo_event.title}', skipping"
+    )
+  else
+    expense_submitter = List.first(stats_demo_buyers) || admin_user
+
+    expense_report_specs = [
+      %{
+        purpose: "Venue rental and permits for #{stats_demo_event.title}",
+        status: "paid",
+        items: [
+          %{
+            vendor: "Golden Gate Park Permits Office",
+            description: "Event permit and site fee",
+            amount: Money.new(1200, :USD),
+            date: Date.add(Date.utc_today(), -30)
+          },
+          %{
+            vendor: "SF Stage & Sound Rentals",
+            description: "Stage, PA system, and tent rental",
+            amount: Money.new(3400, :USD),
+            date: Date.add(Date.utc_today(), -25)
+          }
+        ]
+      },
+      %{
+        purpose: "Catering for #{stats_demo_event.title}",
+        status: "approved",
+        items: [
+          %{
+            vendor: "Nordic Bites Catering",
+            description: "Food and beverage service for 400 guests",
+            amount: Money.new(4800, :USD),
+            date: Date.add(Date.utc_today(), -14)
+          }
+        ]
+      },
+      %{
+        purpose: "Entertainment booking (pending review)",
+        status: "submitted",
+        items: [
+          %{
+            vendor: "Fjord Folk Band",
+            description: "Live music performance",
+            amount: Money.new(900, :USD),
+            date: Date.add(Date.utc_today(), -5)
+          }
+        ]
+      }
+    ]
+
+    Enum.each(expense_report_specs, fn spec ->
+      expense_report =
+        Repo.insert!(%ExpenseReport{
+          user_id: expense_submitter.id,
+          event_id: stats_demo_event.id,
+          purpose: spec.purpose,
+          reimbursement_method: "check",
+          status: spec.status,
+          certification_accepted: true
+        })
+
+      Enum.each(spec.items, fn item ->
+        Repo.insert!(%ExpenseReportItem{
+          expense_report_id: expense_report.id,
+          date: item.date,
+          vendor: item.vendor,
+          description: item.description,
+          amount: item.amount
+        })
+      end)
+    end)
+
+    IO.puts(
+      "  Seeded #{length(expense_report_specs)} expense report(s) for '#{stats_demo_event.title}'"
+    )
+  end
+else
+  IO.puts(
+    "  Event '#{stats_demo_event_title}' not found, skipping statistics demo data"
+  )
+end
+
 # Seed room images for Tahoe rooms
 IO.puts("\n🖼️  Seeding room images for Tahoe rooms...")
 

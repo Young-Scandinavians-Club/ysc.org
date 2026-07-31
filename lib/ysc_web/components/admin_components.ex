@@ -1848,6 +1848,10 @@ defmodule YscWeb.AdminComponents do
     default: nil,
     doc: "Additional classes on the card container"
 
+  attr :value_class, :any,
+    default: nil,
+    doc: "Overrides the default value text color (e.g. for positive/negative amounts)"
+
   def admin_stat_card(assigns) do
     ~H"""
     <div
@@ -1860,7 +1864,7 @@ defmodule YscWeb.AdminComponents do
       <p class="text-xs font-black text-zinc-400 uppercase tracking-[0.2em] mb-3">
         {@label}
       </p>
-      <p class="text-3xl font-black text-zinc-900">
+      <p class={["text-3xl font-black", @value_class || "text-zinc-900"]}>
         {@value}
       </p>
       <p :if={@subtitle} class="text-xs text-zinc-500 mt-1 font-medium">

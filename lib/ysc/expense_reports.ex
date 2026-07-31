@@ -42,6 +42,64 @@ defmodule Ysc.ExpenseReports do
     |> List.first()
   end
 
+  @doc """
+  List all expense reports for an event, newest first, with items and
+  submitter preloaded.
+  """
+  def list_expense_reports_for_event(event_id) do
+    from(er in ExpenseReport,
+      where: er.event_id == ^event_id,
+      order_by: [desc: :inserted_at],
+      preload: [:expense_items, :income_items, :user]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Total net cost (expenses minus income) of an event's expense reports.
+
+  Only reports in `statuses` (default `approved` and `paid`) are counted, so
+  drafts, pending submissions, and rejected reports don't inflate cost totals.
+  """
+  def total_for_event(event_id, statuses \\ ["approved", "paid"]) do
+    totals_for_event(event_id, statuses).net_total
+  end
+
+  @doc """
+  Aggregate expense, income, and net totals across an event's expense
+  reports, so callers can show gross costs and other income (e.g. cash
+  collected at the door) as separate line items rather than only a netted
+  figure.
+
+  Only reports in `statuses` (default `approved` and `paid`) are counted.
+  """
+  def totals_for_event(event_id, statuses \\ ["approved", "paid"]) do
+    zero = Money.new(0, :USD)
+
+    event_id
+    |> list_expense_reports_for_event()
+    |> Enum.filter(&(&1.status in statuses))
+    |> Enum.reduce(
+      %{expense_total: zero, income_total: zero, net_total: zero},
+      fn report, acc ->
+        report_totals = calculate_totals(report)
+
+        %{
+          expense_total: money_sum(acc.expense_total, report_totals.expense_total),
+          income_total: money_sum(acc.income_total, report_totals.income_total),
+          net_total: money_sum(acc.net_total, report_totals.net_total)
+        }
+      end
+    )
+  end
+
+  defp money_sum(%Money{} = a, %Money{} = b) do
+    case Money.add(a, b) do
+      {:ok, sum} -> sum
+      _ -> a
+    end
+  end
+
   defp expense_reports_query(user_id) do
     from er in ExpenseReport,
       where: er.user_id == ^user_id,

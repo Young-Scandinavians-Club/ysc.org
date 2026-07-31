@@ -27,6 +27,7 @@ import { applyPlatformKeyLabels } from "./platform_keys";
 import AdminHelpHotspots from "./admin_help_hotspots";
 import AdminHelpGhostFrame from "./admin_help_ghost_frame";
 import AdminHelpGhostScroll from "./admin_help_ghost_scroll";
+import SalesChartTooltip from "./sales_chart_tooltip";
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const SIDEBAR_COOKIE_NAME = "admin_sb_collapsed";
@@ -68,6 +69,7 @@ window.__adminHooks = {
     AdminHelpHotspots,
     AdminHelpGhostFrame,
     AdminHelpGhostScroll,
+    SalesChartTooltip,
 };
 
 // Apply platform-aware key labels on initial load and after every LiveView patch.

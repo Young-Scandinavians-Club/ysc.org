@@ -3274,6 +3274,49 @@ defmodule Ysc.Ledgers do
   end
 
   @doc """
+  Sums Stripe processing fees booked as debits against the given payment ids.
+
+  Used for per-event cost reporting (e.g. event statistics), where the caller
+  first resolves the relevant payment ids and passes them in here.
+  """
+  def sum_stripe_fees_for_payments([]), do: Money.new(0, :USD)
+
+  def sum_stripe_fees_for_payments(payment_ids) when is_list(payment_ids) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.payment_id in ^payment_ids,
+      where: a.name == "stripe_fees",
+      where: e.debit_credit == "debit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> Ysc.MoneyHelper.usd_from_db_sum()
+  end
+
+  @doc """
+  Total donation revenue booked against an event's donation ticket tiers.
+
+  Donation amounts are user-entered at checkout (not `ticket_tier.price`) and
+  recorded as ledger credits to the `donation_revenue` account tagged with
+  `related_entity_type: :donation, related_entity_id: event_id` — this is the
+  only reliable source for "how much was donated", since donation tiers don't
+  carry a fixed price and always create exactly one ticket regardless of the
+  amount given.
+  """
+  def sum_donation_revenue_for_event(event_id) do
+    from(e in LedgerEntry,
+      join: a in assoc(e, :account),
+      where: e.related_entity_type == ^:donation,
+      where: e.related_entity_id == ^event_id,
+      where: a.name == "donation_revenue",
+      where: e.debit_credit == "credit",
+      select: sum(fragment("(?.amount).amount", e))
+    )
+    |> Repo.one()
+    |> Ysc.MoneyHelper.usd_from_db_sum()
+  end
+
+  @doc """
   Adds payment type information to a payment struct.
   """
   def add_payment_type_info(payment) do
