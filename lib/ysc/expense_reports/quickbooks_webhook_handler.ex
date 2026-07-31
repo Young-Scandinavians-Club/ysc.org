@@ -3,7 +3,9 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
   Handles incoming webhook events from QuickBooks related to expense reports.
 
   Processes BillPayment webhooks to update expense report status to "paid"
-  when payments are initiated in QuickBooks.
+  when payments are confirmed in QuickBooks, and Bill Delete/Void webhooks to
+  reject the linked expense report when the underlying Bill is removed or
+  cancelled in QuickBooks.
   """
   require Ysc.Logging
 
@@ -34,17 +36,22 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
             entity_id = Map.get(entity, "id")
             operation = Map.get(entity, "operation")
 
-            if entity_name == "BillPayment" and
-                 operation in ["Create", "Update"] do
-              # Queue background job to process the payment
-              enqueue_bill_payment_processing(webhook_event.id, entity_id)
-            else
-              Ysc.Logging.debug("Skipping non-BillPayment webhook event",
-                entity_name: entity_name,
-                operation: operation
-              )
+            cond do
+              entity_name == "BillPayment" and operation in ["Create", "Update"] ->
+                # Queue background job to process the payment
+                enqueue_bill_payment_processing(webhook_event.id, entity_id)
 
-              :ok
+              entity_name == "Bill" and operation in ["Delete", "Void"] ->
+                # Queue background job to reject the linked expense report
+                enqueue_bill_deleted_processing(webhook_event.id, entity_id)
+
+              true ->
+                Ysc.Logging.debug("Skipping unhandled webhook event",
+                  entity_name: entity_name,
+                  operation: operation
+                )
+
+                :ok
             end
 
           [] ->
@@ -93,6 +100,43 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandler do
           extra: %{
             webhook_event_id: webhook_event_id,
             bill_payment_id: bill_payment_id,
+            error: inspect(reason)
+          }
+        )
+
+        {:error, reason}
+    end
+  end
+
+  # Enqueues a background job to reject the expense report linked to a
+  # deleted/voided Bill
+  defp enqueue_bill_deleted_processing(webhook_event_id, bill_id) do
+    job =
+      %{
+        "webhook_event_id" => webhook_event_id,
+        "bill_id" => bill_id
+      }
+      |> YscWeb.Workers.QuickbooksBillDeletedProcessorWorker.new()
+      |> Oban.insert()
+
+    case job do
+      {:ok, job} ->
+        Ysc.Logging.info("Enqueued Bill deletion processing job",
+          webhook_event_id: webhook_event_id,
+          bill_id: bill_id,
+          job_id: job.id
+        )
+
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to enqueue Bill deletion processing job",
+          webhook_event_id: webhook_event_id,
+          bill_id: bill_id,
+          error: inspect(reason),
+          extra: %{
+            webhook_event_id: webhook_event_id,
+            bill_id: bill_id,
             error: inspect(reason)
           }
         )

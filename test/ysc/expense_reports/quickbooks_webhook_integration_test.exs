@@ -92,13 +92,24 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
         {:ok,
          %{
            "Id" => "bp_integration_123",
-           "LinkedTxn" => [
+           "TotalAmt" => 100.0,
+           "Line" => [
              %{
-               "TxnId" => "bill_integration_123",
-               "TxnType" => "Bill"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "bill_integration_123",
+                   "TxnType" => "Bill"
+                 }
+               ]
              }
            ]
          }}
+      end)
+
+      # Worker confirms the Bill is fully paid (Balance == 0) before marking paid
+      expect(ClientMock, :get_bill, fn "bill_integration_123" ->
+        {:ok, %{"Id" => "bill_integration_123", "Balance" => 0}}
       end)
 
       # Simulate webhook receipt via controller
@@ -184,13 +195,23 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
         {:ok,
          %{
            "Id" => "bp_duplicate_123",
-           "LinkedTxn" => [
+           "TotalAmt" => 100.0,
+           "Line" => [
              %{
-               "TxnId" => "bill_duplicate_123",
-               "TxnType" => "Bill"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "bill_duplicate_123",
+                   "TxnType" => "Bill"
+                 }
+               ]
              }
            ]
          }}
+      end)
+
+      expect(ClientMock, :get_bill, fn "bill_duplicate_123" ->
+        {:ok, %{"Id" => "bill_duplicate_123", "Balance" => 0}}
       end)
 
       # First webhook
@@ -244,10 +265,15 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookIntegrationTest do
         {:ok,
          %{
            "Id" => "bp_nonexistent_123",
-           "LinkedTxn" => [
+           "Line" => [
              %{
-               "TxnId" => "bill_nonexistent_123",
-               "TxnType" => "Bill"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "bill_nonexistent_123",
+                   "TxnType" => "Bill"
+                 }
+               ]
              }
            ]
          }}

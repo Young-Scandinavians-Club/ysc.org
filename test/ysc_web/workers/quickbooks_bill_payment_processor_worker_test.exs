@@ -62,13 +62,25 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         {:ok,
          %{
            "Id" => "bp_123",
-           "LinkedTxn" => [
+           "TotalAmt" => 100.0,
+           "Line" => [
              %{
-               "TxnId" => "bill_123",
-               "TxnType" => "Bill"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "bill_123",
+                   "TxnType" => "Bill"
+                 }
+               ]
              }
            ]
          }}
+      end)
+
+      # Worker now confirms the Bill is fully paid (Balance == 0) before
+      # marking the expense report paid.
+      expect(ClientMock, :get_bill, fn "bill_123" ->
+        {:ok, %{"Id" => "bill_123", "Balance" => 0}}
       end)
 
       job = %Oban.Job{
@@ -239,7 +251,7 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         {:ok,
          %{
            "Id" => "bp_123",
-           "LinkedTxn" => []
+           "Line" => [%{"Amount" => 0.0, "LinkedTxn" => []}]
          }}
       end)
 
@@ -295,10 +307,15 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         {:ok,
          %{
            "Id" => "bp_123",
-           "LinkedTxn" => [
+           "Line" => [
              %{
-               "TxnId" => "inv_123",
-               "TxnType" => "Invoice"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "inv_123",
+                   "TxnType" => "Invoice"
+                 }
+               ]
              }
            ]
          }}
@@ -345,10 +362,15 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         {:ok,
          %{
            "Id" => "bp_123",
-           "LinkedTxn" => [
+           "Line" => [
              %{
-               "TxnId" => "bill_nonexistent",
-               "TxnType" => "Bill"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "bill_nonexistent",
+                   "TxnType" => "Bill"
+                 }
+               ]
              }
            ]
          }}
@@ -402,21 +424,31 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         {:ok,
          %{
            "Id" => "bp_123",
-           "LinkedTxn" => [
+           "TotalAmt" => 100.0,
+           "Line" => [
              %{
-               "TxnId" => "inv_456",
-               "TxnType" => "Invoice"
-             },
-             %{
-               "TxnId" => "bill_123",
-               "TxnType" => "Bill"
-             },
-             %{
-               "TxnId" => "check_789",
-               "TxnType" => "Check"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "inv_456",
+                   "TxnType" => "Invoice"
+                 },
+                 %{
+                   "TxnId" => "bill_123",
+                   "TxnType" => "Bill"
+                 },
+                 %{
+                   "TxnId" => "check_789",
+                   "TxnType" => "Check"
+                 }
+               ]
              }
            ]
          }}
+      end)
+
+      expect(ClientMock, :get_bill, fn "bill_123" ->
+        {:ok, %{"Id" => "bill_123", "Balance" => 0}}
       end)
 
       job = %Oban.Job{
@@ -467,10 +499,15 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
         {:ok,
          %{
            "Id" => "bp_123",
-           "LinkedTxn" => [
+           "Line" => [
              %{
-               "TxnId" => "bill_123",
-               "TxnType" => "Bill"
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{
+                   "TxnId" => "bill_123",
+                   "TxnType" => "Bill"
+                 }
+               ]
              }
            ]
          }}
@@ -498,6 +535,331 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
       # Verify webhook event was marked appropriately
       updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
       assert updated_webhook.state in [:processed, :failed]
+    end
+
+    test "does not mark expense report as paid when Bill still has a remaining balance (partial payment)",
+         %{user: user} do
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Partially paid report",
+          status: "submitted",
+          quickbooks_bill_id: "bill_partial",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        %Ysc.Webhooks.WebhookEvent{}
+        |> Ysc.Webhooks.WebhookEvent.changeset(%{
+          provider: "quickbooks",
+          event_id: "123456789:BillPayment:bp_partial:Create",
+          event_type: "BillPayment.Create",
+          payload: %{},
+          state: :pending
+        })
+        |> Repo.insert!()
+
+      expect(ClientMock, :get_bill_payment, fn "bp_partial" ->
+        {:ok,
+         %{
+           "Id" => "bp_partial",
+           "TotalAmt" => 50.0,
+           "Line" => [
+             %{
+               "Amount" => 50.0,
+               "LinkedTxn" => [%{"TxnId" => "bill_partial", "TxnType" => "Bill"}]
+             }
+           ]
+         }}
+      end)
+
+      # Bill still has an outstanding balance - only part of it was paid.
+      expect(ClientMock, :get_bill, fn "bill_partial" ->
+        {:ok, %{"Id" => "bill_partial", "Balance" => 100.0}}
+      end)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{
+          "webhook_event_id" => webhook_event.id,
+          "bill_payment_id" => "bp_partial"
+        },
+        worker: "YscWeb.Workers.QuickbooksBillPaymentProcessorWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksBillPaymentProcessorWorker.perform(job)
+
+      updated_report = Repo.get!(ExpenseReport, expense_report.id)
+      assert updated_report.status == "submitted"
+
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+      assert updated_webhook.state == :processed
+    end
+
+    test "does not mark expense report as paid when BillPayment is voided (TotalAmt zero)",
+         %{user: user} do
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Voided payment report",
+          status: "submitted",
+          quickbooks_bill_id: "bill_voided",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        %Ysc.Webhooks.WebhookEvent{}
+        |> Ysc.Webhooks.WebhookEvent.changeset(%{
+          provider: "quickbooks",
+          event_id: "123456789:BillPayment:bp_voided:Update",
+          event_type: "BillPayment.Update",
+          payload: %{},
+          state: :pending
+        })
+        |> Repo.insert!()
+
+      # QuickBooks returns a voided BillPayment with the same Id/LinkedTxn
+      # but TotalAmt reset to 0.
+      expect(ClientMock, :get_bill_payment, fn "bp_voided" ->
+        {:ok,
+         %{
+           "Id" => "bp_voided",
+           "TotalAmt" => 0,
+           "Line" => [
+             %{
+               "Amount" => 0,
+               "LinkedTxn" => [%{"TxnId" => "bill_voided", "TxnType" => "Bill"}]
+             }
+           ]
+         }}
+      end)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{
+          "webhook_event_id" => webhook_event.id,
+          "bill_payment_id" => "bp_voided"
+        },
+        worker: "YscWeb.Workers.QuickbooksBillPaymentProcessorWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksBillPaymentProcessorWorker.perform(job)
+
+      updated_report = Repo.get!(ExpenseReport, expense_report.id)
+      assert updated_report.status == "submitted"
+
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+      assert updated_webhook.state == :processed
+    end
+
+    test "marks multiple expense reports paid when one BillPayment settles multiple Bills",
+         %{user: user} do
+      report_a =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Report A",
+          status: "submitted",
+          quickbooks_bill_id: "bill_a",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      report_b =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Report B",
+          status: "approved",
+          quickbooks_bill_id: "bill_b",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        %Ysc.Webhooks.WebhookEvent{}
+        |> Ysc.Webhooks.WebhookEvent.changeset(%{
+          provider: "quickbooks",
+          event_id: "123456789:BillPayment:bp_split:Create",
+          event_type: "BillPayment.Create",
+          payload: %{},
+          state: :pending
+        })
+        |> Repo.insert!()
+
+      expect(ClientMock, :get_bill_payment, fn "bp_split" ->
+        {:ok,
+         %{
+           "Id" => "bp_split",
+           "TotalAmt" => 200.0,
+           "Line" => [
+             %{
+               "Amount" => 100.0,
+               "LinkedTxn" => [%{"TxnId" => "bill_a", "TxnType" => "Bill"}]
+             },
+             %{
+               "Amount" => 100.0,
+               "LinkedTxn" => [%{"TxnId" => "bill_b", "TxnType" => "Bill"}]
+             }
+           ]
+         }}
+      end)
+
+      expect(ClientMock, :get_bill, fn "bill_a" ->
+        {:ok, %{"Id" => "bill_a", "Balance" => 0}}
+      end)
+
+      expect(ClientMock, :get_bill, fn "bill_b" ->
+        {:ok, %{"Id" => "bill_b", "Balance" => 0}}
+      end)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{
+          "webhook_event_id" => webhook_event.id,
+          "bill_payment_id" => "bp_split"
+        },
+        worker: "YscWeb.Workers.QuickbooksBillPaymentProcessorWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksBillPaymentProcessorWorker.perform(job)
+
+      assert Repo.get!(ExpenseReport, report_a.id).status == "paid"
+      assert Repo.get!(ExpenseReport, report_b.id).status == "paid"
+    end
+
+    test "is idempotent when expense report is already marked paid", %{
+      user: user
+    } do
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Already paid report",
+          status: "paid",
+          quickbooks_bill_id: "bill_already_paid",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        %Ysc.Webhooks.WebhookEvent{}
+        |> Ysc.Webhooks.WebhookEvent.changeset(%{
+          provider: "quickbooks",
+          event_id: "123456789:BillPayment:bp_already_paid:Update",
+          event_type: "BillPayment.Update",
+          payload: %{},
+          state: :pending
+        })
+        |> Repo.insert!()
+
+      expect(ClientMock, :get_bill_payment, fn "bp_already_paid" ->
+        {:ok,
+         %{
+           "Id" => "bp_already_paid",
+           "TotalAmt" => 100.0,
+           "Line" => [
+             %{
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{"TxnId" => "bill_already_paid", "TxnType" => "Bill"}
+               ]
+             }
+           ]
+         }}
+      end)
+
+      expect(ClientMock, :get_bill, fn "bill_already_paid" ->
+        {:ok, %{"Id" => "bill_already_paid", "Balance" => 0}}
+      end)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{
+          "webhook_event_id" => webhook_event.id,
+          "bill_payment_id" => "bp_already_paid"
+        },
+        worker: "YscWeb.Workers.QuickbooksBillPaymentProcessorWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksBillPaymentProcessorWorker.perform(job)
+
+      assert Repo.get!(ExpenseReport, expense_report.id).status == "paid"
+
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+      assert updated_webhook.state == :processed
+    end
+
+    test "does not automatically flip a rejected report to paid", %{
+      user: user
+    } do
+      expense_report =
+        %ExpenseReport{
+          user_id: user.id,
+          purpose: "Rejected report",
+          status: "rejected",
+          quickbooks_bill_id: "bill_rejected",
+          reimbursement_method: "check"
+        }
+        |> Repo.insert!()
+
+      webhook_event =
+        %Ysc.Webhooks.WebhookEvent{}
+        |> Ysc.Webhooks.WebhookEvent.changeset(%{
+          provider: "quickbooks",
+          event_id: "123456789:BillPayment:bp_rejected:Create",
+          event_type: "BillPayment.Create",
+          payload: %{},
+          state: :pending
+        })
+        |> Repo.insert!()
+
+      expect(ClientMock, :get_bill_payment, fn "bp_rejected" ->
+        {:ok,
+         %{
+           "Id" => "bp_rejected",
+           "TotalAmt" => 100.0,
+           "Line" => [
+             %{
+               "Amount" => 100.0,
+               "LinkedTxn" => [
+                 %{"TxnId" => "bill_rejected", "TxnType" => "Bill"}
+               ]
+             }
+           ]
+         }}
+      end)
+
+      expect(ClientMock, :get_bill, fn "bill_rejected" ->
+        {:ok, %{"Id" => "bill_rejected", "Balance" => 0}}
+      end)
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{
+          "webhook_event_id" => webhook_event.id,
+          "bill_payment_id" => "bp_rejected"
+        },
+        worker: "YscWeb.Workers.QuickbooksBillPaymentProcessorWorker",
+        queue: "default",
+        state: "available",
+        attempt: 1
+      }
+
+      assert :ok = QuickbooksBillPaymentProcessorWorker.perform(job)
+
+      assert Repo.get!(ExpenseReport, expense_report.id).status == "rejected"
     end
   end
 end

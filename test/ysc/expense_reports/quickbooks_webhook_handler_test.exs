@@ -114,6 +114,68 @@ defmodule Ysc.ExpenseReports.QuickbooksWebhookHandlerTest do
       )
     end
 
+    test "enqueues Bill deletion processing job for Bill Delete operation" do
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "123456789:Bill:bill_123:Delete",
+          event_type: "Bill.Delete",
+          payload: build_webhook_payload("Bill", "bill_123", "Delete")
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+
+      assert updated_webhook.state in [
+               :processed,
+               :failed,
+               :pending,
+               :processing
+             ]
+    end
+
+    test "enqueues Bill deletion processing job for Bill Void operation" do
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "123456789:Bill:bill_456:Void",
+          event_type: "Bill.Void",
+          payload: build_webhook_payload("Bill", "bill_456", "Void")
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      updated_webhook = Repo.get!(Ysc.Webhooks.WebhookEvent, webhook_event.id)
+
+      assert updated_webhook.state in [
+               :processed,
+               :failed,
+               :pending,
+               :processing
+             ]
+    end
+
+    test "skips Bill Create/Update operations" do
+      webhook_event =
+        create_webhook_event(
+          provider: "quickbooks",
+          event_id: "123456789:Bill:bill_789:Create",
+          event_type: "Bill.Create",
+          payload: build_webhook_payload("Bill", "bill_789", "Create")
+        )
+
+      assert :ok = QuickbooksWebhookHandler.handle_webhook_event(webhook_event)
+
+      refute_enqueued(
+        worker: YscWeb.Workers.QuickbooksBillDeletedProcessorWorker
+      )
+
+      refute_enqueued(
+        worker: YscWeb.Workers.QuickbooksBillPaymentProcessorWorker
+      )
+    end
+
     test "handles webhook with no entities" do
       payload = %{
         "eventNotifications" => [

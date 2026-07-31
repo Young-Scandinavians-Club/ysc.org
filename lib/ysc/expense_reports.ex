@@ -299,6 +299,31 @@ defmodule Ysc.ExpenseReports do
     |> Repo.update()
   end
 
+  @doc """
+  Marks an expense report as rejected because its linked QuickBooks Bill was
+  deleted or voided in QuickBooks.
+
+  This is distinct from an admin rejection (`update_expense_report/2` via
+  `status_changeset`): it stamps `quickbooks_sync_error` with a
+  system-generated note so anyone looking at a "rejected" report can tell
+  whether a human rejected it or QuickBooks did, since the two mean very
+  different things for follow-up.
+  """
+  def mark_expense_report_as_rejected_due_to_quickbooks_deletion(
+        %ExpenseReport{} = expense_report,
+        bill_id
+      ) do
+    note =
+      "Automatically rejected: linked QuickBooks Bill #{bill_id} was deleted or voided in QuickBooks (detected #{DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()})."
+
+    expense_report
+    |> ExpenseReport.changeset(%{
+      status: "rejected",
+      quickbooks_sync_error: note
+    })
+    |> Repo.update()
+  end
+
   def submit_expense_report(%ExpenseReport{} = expense_report) do
     result =
       expense_report
