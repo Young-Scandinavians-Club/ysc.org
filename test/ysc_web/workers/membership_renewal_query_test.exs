@@ -56,7 +56,24 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
       assert hd(results).user.id == user.id
     end
 
-    test "excludes canceled, trialing, and scheduled-to-end subscriptions" do
+    test "includes trialing subscriptions renewing on the given day" do
+      user = user_fixture()
+      renewal_date = ~D[2026-08-01]
+
+      renewal_at =
+        DateTime.new!(renewal_date, ~T[09:30:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      matching =
+        insert_subscription(user, renewal_at, stripe_status: "trialing")
+
+      results =
+        MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
+
+      assert Enum.map(results, & &1.id) == [matching.id]
+    end
+
+    test "excludes canceled and scheduled-to-end subscriptions" do
       user = user_fixture()
       renewal_date = ~D[2026-08-01]
 
@@ -65,9 +82,6 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
         |> DateTime.truncate(:second)
 
       insert_subscription(user, renewal_at, stripe_status: "canceled")
-
-      trialing_user = user_fixture()
-      insert_subscription(trialing_user, renewal_at, stripe_status: "trialing")
 
       ending_user = user_fixture()
 
@@ -101,6 +115,43 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
                MembershipRenewalQuery.list_subscriptions_renewing_in_days(7),
                & &1.id
              ) == [matching.id]
+    end
+  end
+
+  describe "list_subscriptions_renewing_within_days/1" do
+    test "returns subscriptions renewing today through N days out" do
+      user_today = user_fixture()
+      user_soon = user_fixture()
+      user_far = user_fixture()
+
+      today = Date.utc_today()
+
+      today_sub =
+        insert_subscription(
+          user_today,
+          DateTime.new!(today, ~T[12:00:00], "Etc/UTC")
+          |> DateTime.truncate(:second)
+        )
+
+      soon_sub =
+        insert_subscription(
+          user_soon,
+          DateTime.new!(Date.add(today, 3), ~T[12:00:00], "Etc/UTC")
+          |> DateTime.truncate(:second)
+        )
+
+      insert_subscription(
+        user_far,
+        DateTime.new!(Date.add(today, 10), ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+      )
+
+      ids =
+        MembershipRenewalQuery.list_subscriptions_renewing_within_days(7)
+        |> Enum.map(& &1.id)
+        |> Enum.sort()
+
+      assert ids == Enum.sort([today_sub.id, soon_sub.id])
     end
   end
 

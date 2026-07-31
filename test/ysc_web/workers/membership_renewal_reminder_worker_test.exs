@@ -52,6 +52,40 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       assert_email_sent(subject: "Your YSC Membership Renews in 7 Days")
     end
 
+    test "sends reminder with Tomorrow subject when renewal is one day out" do
+      user = user_fixture()
+
+      renewal_at =
+        Date.utc_today()
+        |> Date.add(1)
+        |> then(&DateTime.new!(&1, ~T[12:00:00], "Etc/UTC"))
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at)
+      insert_payment_method(user)
+
+      assert :ok = MembershipRenewalReminderWorker.perform(job())
+
+      assert_email_sent(subject: "Your YSC Membership Renews Tomorrow")
+    end
+
+    test "sends reminder with N-day subject when renewal is three days out" do
+      user = user_fixture()
+
+      renewal_at =
+        Date.utc_today()
+        |> Date.add(3)
+        |> then(&DateTime.new!(&1, ~T[12:00:00], "Etc/UTC"))
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at)
+      insert_payment_method(user)
+
+      assert :ok = MembershipRenewalReminderWorker.perform(job())
+
+      assert_email_sent(subject: "Your YSC Membership Renews in 3 Days")
+    end
+
     test "still sends reminder when default card expiry date is in the past" do
       user = user_fixture()
 
@@ -122,25 +156,6 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       refute_email_sent(subject: "Your YSC Membership Renews in 7 Days")
     end
 
-    test "ignores trialing subscriptions (query only includes active status)" do
-      user = user_fixture()
-
-      seven_days_from_now =
-        DateTime.utc_now()
-        |> DateTime.add(7, :day)
-        |> DateTime.to_date()
-
-      renewal_at =
-        DateTime.new!(seven_days_from_now, ~T[12:00:00], "Etc/UTC")
-        |> DateTime.truncate(:second)
-
-      insert_subscription(user, renewal_at, stripe_status: "trialing")
-      insert_payment_method(user)
-
-      assert :ok = MembershipRenewalReminderWorker.perform(job())
-      refute_email_sent(subject: "Your YSC Membership Renews in 7 Days")
-    end
-
     test "perform completes when renewal reminder email job already exists (duplicate Oban insert)" do
       user = user_fixture()
 
@@ -166,7 +181,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
                Notifier.schedule_email(
                  user.email,
                  idempotency_key,
-                 MembershipRenewalReminder.get_subject(),
+                 MembershipRenewalReminder.get_subject(email_data),
                  MembershipRenewalReminder.get_template_name(),
                  email_data,
                  "",
@@ -199,6 +214,26 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       assert :ok = MembershipRenewalReminderWorker.perform(job())
       refute_email_sent(subject: "Your YSC Membership Renews in 7 Days")
     end
+
+    test "sends renewal reminder for trialing subscription renewing in 7 days" do
+      user = user_fixture()
+
+      seven_days_from_now =
+        DateTime.utc_now()
+        |> DateTime.add(7, :day)
+        |> DateTime.to_date()
+
+      renewal_at =
+        DateTime.new!(seven_days_from_now, ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at, stripe_status: "trialing")
+      insert_payment_method(user)
+
+      assert :ok = MembershipRenewalReminderWorker.perform(job())
+
+      assert_email_sent(subject: "Your YSC Membership Renews in 7 Days")
+    end
   end
 
   describe "schedule_reminder_if_within_window/2" do
@@ -220,7 +255,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
                )
     end
 
-    test "returns :skipped when subscription is not active" do
+    test "returns :skipped when subscription is not active or trialing" do
       user = user_fixture()
 
       renewal_at =
@@ -235,6 +270,26 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
                  user,
                  sub
                )
+    end
+
+    test "schedules email for trialing subscription within the window" do
+      user = user_fixture()
+      insert_payment_method(user)
+
+      renewal_at =
+        DateTime.utc_now()
+        |> DateTime.add(2, :day)
+        |> DateTime.truncate(:second)
+
+      sub = insert_subscription(user, renewal_at, stripe_status: "trialing")
+
+      assert :ok =
+               MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
+                 user,
+                 sub
+               )
+
+      assert_email_sent(subject: expected_renewal_subject(renewal_at))
     end
 
     test "returns :skipped when subscription has ends_at set (scheduled cancellation)" do
@@ -296,8 +351,36 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
         )
 
       assert result == :ok
-      assert_email_sent(subject: "Your YSC Membership Renews in 7 Days")
+      assert_email_sent(subject: expected_renewal_subject(renewal_at))
     end
+
+    test "subject says Tomorrow when renewal is one calendar day away" do
+      user = user_fixture()
+      insert_payment_method(user)
+
+      renewal_at =
+        Date.utc_today()
+        |> Date.add(1)
+        |> then(&DateTime.new!(&1, ~T[12:00:00], "Etc/UTC"))
+        |> DateTime.truncate(:second)
+
+      sub = insert_subscription(user, renewal_at)
+
+      assert :ok =
+               MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
+                 user,
+                 sub
+               )
+
+      assert_email_sent(subject: "Your YSC Membership Renews Tomorrow")
+    end
+  end
+
+  defp expected_renewal_subject(renewal_at) do
+    MembershipRenewalReminder.get_subject(%{
+      days_until_renewal:
+        MembershipRenewalReminder.days_until_renewal(renewal_at)
+    })
   end
 
   defp job do

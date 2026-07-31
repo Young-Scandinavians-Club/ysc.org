@@ -2,7 +2,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Your Membership Renews in 7 Days</strong>
+      <strong><%= @headline %></strong>
     </mj-text>
   </mj-column>
 </mj-section>

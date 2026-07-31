@@ -1,10 +1,12 @@
 defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
   @moduledoc """
   Oban worker that runs daily to send courtesy renewal reminder emails to members
-  whose membership will automatically renew in 7 days.
+  whose membership will automatically renew within the next 7 days.
 
   This gives members an opportunity to cancel before they are charged if they no
-  longer wish to continue their membership.
+  longer wish to continue their membership. Subject/headline copy reflects the
+  actual days remaining. Emails are idempotent per user and renewal date, so
+  re-running within the window does not send duplicates.
   """
   require Ysc.Logging
   use Oban.Worker, queue: :default, max_attempts: 3
@@ -17,20 +19,15 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{}) do
-    Ysc.Logging.info("Starting membership renewal reminder check (7-day)")
-
-    renewal_date =
-      MembershipRenewalQuery.renewal_date_from_now(@reminder_window_days)
-
-    Ysc.Logging.info("Checking for subscriptions renewing on #{renewal_date}")
+    Ysc.Logging.info("Starting membership renewal reminder check")
 
     subscriptions =
-      MembershipRenewalQuery.list_subscriptions_renewing_in_days(
+      MembershipRenewalQuery.list_subscriptions_renewing_within_days(
         @reminder_window_days
       )
 
     Ysc.Logging.info(
-      "Found #{length(subscriptions)} subscriptions renewing in 7 days"
+      "Found #{length(subscriptions)} subscriptions renewing within #{@reminder_window_days} days"
     )
 
     results =
@@ -64,18 +61,19 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
   calling this when a reminder was already sent for the same date is safe.
   """
   def schedule_reminder_if_within_window(user, subscription) do
-    now = DateTime.utc_now()
-
     days_until_renewal =
-      DateTime.diff(subscription.current_period_end, now, :day)
+      MembershipRenewalReminder.days_until_renewal(
+        subscription.current_period_end
+      )
 
     within_window? =
       days_until_renewal >= 0 and days_until_renewal <= @reminder_window_days
 
-    is_active? = subscription.stripe_status == "active"
+    # Include trialing: WP-migrated subs use trial_end until the renewal date.
+    renewing? = subscription.stripe_status in ["active", "trialing"]
     not_cancelling? = is_nil(subscription.ends_at)
 
-    if within_window? and is_active? and not_cancelling? do
+    if within_window? and renewing? and not_cancelling? do
       Ysc.Logging.info(
         "Billing anchor moved within reminder window — sending renewal reminder immediately",
         user_id: user.id,
@@ -109,7 +107,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
     email_data =
       MembershipRenewalReminder.prepare_email_data(user, subscription)
 
-    subject = MembershipRenewalReminder.get_subject()
+    subject = MembershipRenewalReminder.get_subject(email_data)
     template_name = MembershipRenewalReminder.get_template_name()
     renewal_date = DateTime.to_date(subscription.current_period_end)
     idempotency_key = "membership_renewal_reminder_#{user.id}_#{renewal_date}"
@@ -117,7 +115,8 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
     Ysc.Logging.info("Sending membership renewal reminder",
       user_id: user.id,
       email: user.email,
-      renewal_date: subscription.current_period_end
+      renewal_date: subscription.current_period_end,
+      days_until_renewal: email_data.days_until_renewal
     )
 
     case Notifier.schedule_email(

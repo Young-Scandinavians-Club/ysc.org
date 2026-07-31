@@ -141,6 +141,21 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
       assert :ok = MembershipRenewalPaymentMethodCheckerWorker.perform(job)
     end
 
+    test "enqueues reminder for trialing subscription renewing in 14 days" do
+      user = user_fixture()
+      renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
+      insert_subscription(user, renewal_date, stripe_status: "trialing")
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 MembershipRenewalPaymentMethodCheckerWorker.perform(
+                   build_job()
+                 )
+
+        assert_enqueued(worker: YscWeb.Workers.EmailNotifier)
+      end)
+    end
+
     test "handles subscription with nil current_period_end gracefully" do
       user = user_fixture()
 
