@@ -72,8 +72,8 @@ defmodule YscWeb.EventDetailsLive do
                   <div class="mb-4 p-4 bg-red-600 text-white rounded-xl shadow-lg">
                     <div class="flex items-center justify-center gap-3">
                       <.icon name="hero-x-circle-solid" class="w-5 h-5" />
-                      <p class="font-black text-base uppercase tracking-widest">
-                        This Event Has Been Cancelled
+                      <p class="font-semibold text-base">
+                        This event has been cancelled
                       </p>
                       <.icon name="hero-x-circle-solid" class="w-5 h-5" />
                     </div>

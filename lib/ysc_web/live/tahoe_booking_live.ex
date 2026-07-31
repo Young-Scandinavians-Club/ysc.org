@@ -4081,16 +4081,10 @@ defmodule YscWeb.TahoeBookingLive do
                                 Days Before Check-In
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                {if @buyout_refund_policy &&
-                                      @buyout_refund_policy.name,
-                                    do: @buyout_refund_policy.name,
-                                    else: "Full Cabin"}
+                                Entire cabin
                               </th>
                               <th class="px-4 py-3 text-center font-bold border-l border-zinc-200">
-                                {if @room_refund_policy &&
-                                      @room_refund_policy.name,
-                                    do: @room_refund_policy.name,
-                                    else: "Room Booking"}
+                                Individual room(s)
                               </th>
                             </tr>
                           </thead>
@@ -4180,9 +4174,7 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @buyout_refund_policy && @buyout_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              {if @buyout_refund_policy.name,
-                                do: @buyout_refund_policy.name,
-                                else: "Entire cabin"}:
+                              Entire cabin:
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@buyout_refund_policy.rules) do %>
@@ -4196,9 +4188,7 @@ defmodule YscWeb.TahoeBookingLive do
                         <%= if @room_refund_policy && @room_refund_policy.rules do %>
                           <div>
                             <p class="font-semibold mb-2">
-                              {if @room_refund_policy.name,
-                                do: @room_refund_policy.name,
-                                else: "Room Booking"}:
+                              Individual room(s):
                             </p>
                             <ul class="list-disc list-inside space-y-1 ml-2">
                               <%= for rule <- RefundPolicyDisplay.rules_sorted_desc(@room_refund_policy.rules) do %>
@@ -4312,7 +4302,7 @@ defmodule YscWeb.TahoeBookingLive do
                         />
                         <div>
                           <p class="font-bold text-red-900 text-lg mb-1">
-                            ⚠️ Critical: Linens and towels are NOT provided
+                            Important: Bring your own linens and towels
                           </p>
                           <p class="text-sm text-red-800">
                             You must bring your own bedding and towels for your stay.
