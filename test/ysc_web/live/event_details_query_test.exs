@@ -42,10 +42,12 @@ defmodule YscWeb.EventDetailsQueryTest do
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, html} = live(conn, ~p"/events/#{event.id}")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render_async(view)
             {:ok, view, html}
           end,
-          pattern: tier_list_pattern
+          pattern: tier_list_pattern,
+          caller_pids: [self()]
         )
 
       # Before: dead-render preload + async list_ticket_tiers_for_event (2 grouped queries).
@@ -72,7 +74,8 @@ defmodule YscWeb.EventDetailsQueryTest do
             |> get(~p"/events/#{event.id}")
             |> html_response(200)
           end,
-          pattern: @tier_list_pattern
+          pattern: @tier_list_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count == 1

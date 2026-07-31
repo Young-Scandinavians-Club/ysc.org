@@ -803,7 +803,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
               []
             )
           end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       {cached, cached_queries} =
@@ -820,7 +821,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
               pricing_context: context
             )
           end,
-          pattern: entitlement_query?
+          pattern: entitlement_query?,
+          caller_pids: [self()]
         )
 
       assert uncached_queries == 2

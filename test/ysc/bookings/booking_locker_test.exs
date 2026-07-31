@@ -2084,7 +2084,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
               checkout
             )
           end,
-          pattern: ~r/FROM "bookings"/i
+          pattern: ~r/FROM "bookings"/i,
+          caller_pids: [self()]
         )
 
       assert queries_before == 0
@@ -2113,7 +2114,8 @@ defmodule Ysc.Bookings.BookingLockerTest do
               checkout
             )
           end,
-          pattern: ~r/FROM "bookings"/i
+          pattern: ~r/FROM "bookings"/i,
+          caller_pids: [self()]
         )
 
       assert queries_after >= 1

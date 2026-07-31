@@ -36,7 +36,8 @@ defmodule Ysc.Bookings.TooltipSeasonQueriesTest do
                    ]
           end)
         end,
-        pattern: ~r/FROM "seasons"/i
+        pattern: ~r/FROM "seasons"/i,
+        caller_pids: [self()]
       )
 
     assert query_count == 0

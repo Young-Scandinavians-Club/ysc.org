@@ -707,8 +707,7 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
 
       render_click(view, "increase-guests", %{})
 
-      html = render(view)
-      assert html =~ "16 guests"
+      assert guests_count_assign(view) == 16
     end
 
     test "max_guests is not an assign (no hard cap enforced)", %{conn: conn} do
@@ -1447,7 +1446,20 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+      {checkin, checkout} = clear_lake_booking_dates(30, 3)
+
+      params = %{
+        "tab" => "booking",
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "booking_mode" => "day"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          "/bookings/clear-lake?" <> URI.encode_query(params)
+        )
 
       render_click(view, "switch-tab", %{"tab" => "information"})
       render_click(view, "switch-tab", %{"tab" => "booking"})

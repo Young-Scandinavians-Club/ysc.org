@@ -304,7 +304,8 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
                      availability_snapshot: snapshot
                    )
         end,
-        pattern: inventory_pattern
+        pattern: inventory_pattern,
+        caller_pids: [self()]
       )
 
     {_preview, without_snapshot} =
@@ -312,7 +313,8 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
         fn ->
           assert {:ok, _} = Bookings.prepare_modification(booking, attrs)
         end,
-        pattern: inventory_pattern
+        pattern: inventory_pattern,
+        caller_pids: [self()]
       )
 
     assert with_snapshot == 0
@@ -363,7 +365,8 @@ defmodule Ysc.Bookings.ModificationDateAvailabilityTest do
 
           assert Money.equal?(preview.amount_paid, amount_paid)
         end,
-        pattern: ledger_pattern
+        pattern: ledger_pattern,
+        caller_pids: [self()]
       )
 
     assert ledger_queries == 0

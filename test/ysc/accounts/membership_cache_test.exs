@@ -470,7 +470,8 @@ defmodule Ysc.Accounts.MembershipCacheTest do
           fn ->
             MembershipCache.batch_membership_data_for_users(users)
           end,
-          pattern: subscriptions_pattern
+          pattern: subscriptions_pattern,
+          caller_pids: [self()]
         )
 
       assert query_count <= 1

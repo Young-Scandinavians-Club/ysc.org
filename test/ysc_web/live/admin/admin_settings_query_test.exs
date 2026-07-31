@@ -36,7 +36,8 @@ defmodule YscWeb.AdminSettingsQueryTest do
             |> get(~p"/admin/settings")
             |> html_response(200)
           end,
-          pattern: settings_pattern
+          pattern: settings_pattern,
+          caller_pids: [self()]
         )
 
       {_html, google_photos_count} =
@@ -46,7 +47,8 @@ defmodule YscWeb.AdminSettingsQueryTest do
             |> get(~p"/admin/settings")
             |> html_response(200)
           end,
-          pattern: google_photos_pattern
+          pattern: google_photos_pattern,
+          caller_pids: [self()]
         )
 
       assert settings_count == 0
@@ -66,20 +68,24 @@ defmodule YscWeb.AdminSettingsQueryTest do
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, html} = live(conn, ~p"/admin/settings")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render_async(view)
             {:ok, view, html}
           end,
-          pattern: settings_pattern
+          pattern: settings_pattern,
+          caller_pids: [self()]
         )
 
       {_result, google_photos_count} =
         Ysc.QueryCounter.with_query_counter(
           fn ->
             {:ok, view, html} = live(conn, ~p"/admin/settings")
+            Ysc.QueryCounter.track_caller_pid(view.pid)
             render_async(view)
             {:ok, view, html}
           end,
-          pattern: google_photos_pattern
+          pattern: google_photos_pattern,
+          caller_pids: [self()]
         )
 
       assert settings_count <= 1

@@ -50,7 +50,8 @@ defmodule YscWeb.OrderConfirmationDeferredTest do
           |> get(~p"/orders/#{order.id}/confirmation")
           |> html_response(200)
         end,
-        pattern: ticket_orders_pattern
+        pattern: ticket_orders_pattern,
+        caller_pids: [self()]
       )
 
     assert query_count == 0
