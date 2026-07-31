@@ -10,6 +10,7 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
   use Ysc.DataCase, async: false
 
   alias YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker
+  alias Ysc.Newsletter.Subscriber
   alias Ysc.Subscriptions.Subscription
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Repo
@@ -141,8 +142,9 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
       assert :ok = MembershipRenewalPaymentMethodCheckerWorker.perform(job)
     end
 
-    test "enqueues reminder for trialing subscription renewing in 14 days" do
+    test "enqueues reminder for WP-migrated trialing subscription renewing in 14 days" do
       user = user_fixture()
+      mark_wp_migrated!(user)
       renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
       insert_subscription(user, renewal_date, stripe_status: "trialing")
 
@@ -153,6 +155,21 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
                  )
 
         assert_enqueued(worker: YscWeb.Workers.EmailNotifier)
+      end)
+    end
+
+    test "ignores organic trialing subscriptions without WP migration flag" do
+      user = user_fixture()
+      renewal_date = DateTime.utc_now() |> DateTime.add(14, :day)
+      insert_subscription(user, renewal_date, stripe_status: "trialing")
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert :ok =
+                 MembershipRenewalPaymentMethodCheckerWorker.perform(
+                   build_job()
+                 )
+
+        refute_enqueued(worker: YscWeb.Workers.EmailNotifier)
       end)
     end
 
@@ -235,5 +252,29 @@ defmodule YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorkerTest do
       is_default: is_default
     }
     |> Repo.insert!()
+  end
+
+  defp mark_wp_migrated!(user) do
+    case Repo.get_by(Subscriber, email: user.email) do
+      nil ->
+        %Subscriber{}
+        |> Subscriber.create_changeset(%{
+          email: user.email,
+          user_id: user.id,
+          source: "wp_migration",
+          subscribed: true,
+          subscribed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          subscription_token: Subscriber.generate_subscription_token()
+        })
+        |> Repo.insert!()
+
+      subscriber ->
+        subscriber
+        |> Subscriber.update_changeset(%{
+          user_id: user.id,
+          source: "wp_migration"
+        })
+        |> Repo.update!()
+    end
   end
 end

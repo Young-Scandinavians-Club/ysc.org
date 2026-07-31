@@ -69,8 +69,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorker do
     within_window? =
       days_until_renewal >= 0 and days_until_renewal <= @reminder_window_days
 
-    # Include trialing: WP-migrated subs use trial_end until the renewal date.
-    renewing? = subscription.stripe_status in ["active", "trialing"]
+    renewing? = MembershipRenewalQuery.renewal_status_eligible?(subscription)
     not_cancelling? = is_nil(subscription.ends_at)
 
     if within_window? and renewing? and not_cancelling? do

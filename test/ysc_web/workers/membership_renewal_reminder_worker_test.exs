@@ -7,6 +7,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
   import Swoosh.TestAssertions
   import Ysc.AccountsFixtures
 
+  alias Ysc.Newsletter.Subscriber
   alias Ysc.Payments.PaymentMethod
   alias Ysc.Repo
   alias Ysc.Subscriptions.Subscription
@@ -215,8 +216,9 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       refute_email_sent(subject: "Your YSC Membership Renews in 7 Days")
     end
 
-    test "sends renewal reminder for trialing subscription renewing in 7 days" do
+    test "sends renewal reminder for WP-migrated trialing subscription renewing in 7 days" do
       user = user_fixture()
+      mark_wp_migrated!(user)
 
       seven_days_from_now =
         DateTime.utc_now()
@@ -233,6 +235,25 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       assert :ok = MembershipRenewalReminderWorker.perform(job())
 
       assert_email_sent(subject: "Your YSC Membership Renews in 7 Days")
+    end
+
+    test "skips organic trialing subscriptions without WP migration flag" do
+      user = user_fixture()
+
+      seven_days_from_now =
+        DateTime.utc_now()
+        |> DateTime.add(7, :day)
+        |> DateTime.to_date()
+
+      renewal_at =
+        DateTime.new!(seven_days_from_now, ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at, stripe_status: "trialing")
+      insert_payment_method(user)
+
+      assert :ok = MembershipRenewalReminderWorker.perform(job())
+      refute_email_sent(subject: "Your YSC Membership Renews in 7 Days")
     end
   end
 
@@ -255,7 +276,7 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
                )
     end
 
-    test "returns :skipped when subscription is not active or trialing" do
+    test "returns :skipped when subscription is not eligible (canceled)" do
       user = user_fixture()
 
       renewal_at =
@@ -272,8 +293,27 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
                )
     end
 
-    test "schedules email for trialing subscription within the window" do
+    test "returns :skipped for organic trialing subscription" do
       user = user_fixture()
+      insert_payment_method(user)
+
+      renewal_at =
+        DateTime.utc_now()
+        |> DateTime.add(2, :day)
+        |> DateTime.truncate(:second)
+
+      sub = insert_subscription(user, renewal_at, stripe_status: "trialing")
+
+      assert :skipped =
+               MembershipRenewalReminderWorker.schedule_reminder_if_within_window(
+                 user,
+                 sub
+               )
+    end
+
+    test "schedules email for WP-migrated trialing subscription within the window" do
+      user = user_fixture()
+      mark_wp_migrated!(user)
       insert_payment_method(user)
 
       renewal_at =
@@ -381,6 +421,30 @@ defmodule YscWeb.Workers.MembershipRenewalReminderWorkerTest do
       days_until_renewal:
         MembershipRenewalReminder.days_until_renewal(renewal_at)
     })
+  end
+
+  defp mark_wp_migrated!(user) do
+    case Repo.get_by(Subscriber, email: user.email) do
+      nil ->
+        %Subscriber{}
+        |> Subscriber.create_changeset(%{
+          email: user.email,
+          user_id: user.id,
+          source: "wp_migration",
+          subscribed: true,
+          subscribed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          subscription_token: Subscriber.generate_subscription_token()
+        })
+        |> Repo.insert!()
+
+      subscriber ->
+        subscriber
+        |> Subscriber.update_changeset(%{
+          user_id: user.id,
+          source: "wp_migration"
+        })
+        |> Repo.update!()
+    end
   end
 
   defp job do

@@ -3,6 +3,7 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
 
   import Ysc.AccountsFixtures
 
+  alias Ysc.Newsletter.Subscriber
   alias Ysc.Repo
   alias Ysc.Subscriptions.Subscription
   alias YscWeb.Workers.MembershipRenewalQuery
@@ -56,8 +57,9 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
       assert hd(results).user.id == user.id
     end
 
-    test "includes trialing subscriptions renewing on the given day" do
+    test "includes WP-migrated trialing subscriptions renewing on the given day" do
       user = user_fixture()
+      mark_wp_migrated!(user)
       renewal_date = ~D[2026-08-01]
 
       renewal_at =
@@ -71,6 +73,20 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
         MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date)
 
       assert Enum.map(results, & &1.id) == [matching.id]
+    end
+
+    test "excludes organic trialing subscriptions without WP migration flag" do
+      user = user_fixture()
+      renewal_date = ~D[2026-08-01]
+
+      renewal_at =
+        DateTime.new!(renewal_date, ~T[09:30:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(user, renewal_at, stripe_status: "trialing")
+
+      assert MembershipRenewalQuery.list_subscriptions_renewing_on(renewal_date) ==
+               []
     end
 
     test "excludes canceled and scheduled-to-end subscriptions" do
@@ -152,6 +168,30 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
         |> Enum.sort()
 
       assert ids == Enum.sort([today_sub.id, soon_sub.id])
+    end
+  end
+
+  defp mark_wp_migrated!(user) do
+    case Repo.get_by(Subscriber, email: user.email) do
+      nil ->
+        %Subscriber{}
+        |> Subscriber.create_changeset(%{
+          email: user.email,
+          user_id: user.id,
+          source: "wp_migration",
+          subscribed: true,
+          subscribed_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          subscription_token: Subscriber.generate_subscription_token()
+        })
+        |> Repo.insert!()
+
+      subscriber ->
+        subscriber
+        |> Subscriber.update_changeset(%{
+          user_id: user.id,
+          source: "wp_migration"
+        })
+        |> Repo.update!()
     end
   end
 
