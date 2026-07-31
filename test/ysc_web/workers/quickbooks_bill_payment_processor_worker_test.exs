@@ -568,7 +568,9 @@ defmodule YscWeb.Workers.QuickbooksBillPaymentProcessorWorkerTest do
            "Line" => [
              %{
                "Amount" => 50.0,
-               "LinkedTxn" => [%{"TxnId" => "bill_partial", "TxnType" => "Bill"}]
+               "LinkedTxn" => [
+                 %{"TxnId" => "bill_partial", "TxnType" => "Bill"}
+               ]
              }
            ]
          }}
