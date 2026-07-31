@@ -169,6 +169,46 @@ defmodule YscWeb.Workers.MembershipRenewalQueryTest do
 
       assert ids == Enum.sort([today_sub.id, soon_sub.id])
     end
+
+    test "includes WP-migrated trialing subscriptions within the window" do
+      user = user_fixture()
+      mark_wp_migrated!(user)
+      today = Date.utc_today()
+
+      renewal_at =
+        DateTime.new!(Date.add(today, 2), ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      matching =
+        insert_subscription(user, renewal_at, stripe_status: "trialing")
+
+      ids =
+        MembershipRenewalQuery.list_subscriptions_renewing_within_days(7)
+        |> Enum.map(& &1.id)
+
+      assert ids == [matching.id]
+    end
+
+    test "excludes organic trialing and scheduled-to-end subscriptions within the window" do
+      trialing_user = user_fixture()
+      ending_user = user_fixture()
+      today = Date.utc_today()
+
+      renewal_at =
+        DateTime.new!(Date.add(today, 2), ~T[12:00:00], "Etc/UTC")
+        |> DateTime.truncate(:second)
+
+      insert_subscription(trialing_user, renewal_at, stripe_status: "trialing")
+
+      insert_subscription(ending_user, renewal_at,
+        ends_at:
+          DateTime.new!(today, ~T[12:00:00], "Etc/UTC")
+          |> DateTime.truncate(:second)
+      )
+
+      assert MembershipRenewalQuery.list_subscriptions_renewing_within_days(7) ==
+               []
+    end
   end
 
   defp mark_wp_migrated!(user) do

@@ -92,8 +92,11 @@ defmodule YscWeb.Workers.MembershipRenewalQuery do
   end
 
   @doc """
-  Lists subscriptions whose renewal falls on any calendar day from today
-  through `days` days from now (inclusive), UTC.
+  Lists eligible subscriptions (not scheduled to end) whose renewal falls on
+  any calendar day from today through `days` days from now (inclusive), UTC.
+
+  Same eligibility as `list_subscriptions_renewing_on/1`: `active`, or
+  `trialing` only for WP-migrated users.
   """
   def list_subscriptions_renewing_within_days(days)
       when is_integer(days) and days >= 0 do
