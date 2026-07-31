@@ -227,6 +227,37 @@ defmodule Ysc.BookingsTest do
       refute Enum.any?(bookings, &(&1.id == canceled.id))
     end
 
+    test "list_guests_staying_on_date/3 filters by statuses when provided" do
+      user = user_fixture()
+      checkin = Date.utc_today() |> Date.add(50)
+      checkout = Date.add(checkin, 3)
+
+      complete =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :complete
+        })
+
+      _pending =
+        booking_fixture(%{
+          user_id: user.id,
+          property: :clear_lake,
+          checkin_date: checkin,
+          checkout_date: checkout,
+          status: :pending
+        })
+
+      bookings =
+        Bookings.list_guests_staying_on_date(:clear_lake, checkin,
+          statuses: [:complete]
+        )
+
+      assert Enum.map(bookings, & &1.id) == [complete.id]
+    end
+
     test "admin_property_dashboard_stats/0 aggregates per-property buckets in one query" do
       today =
         "America/Los_Angeles"

@@ -463,7 +463,9 @@ defmodule Ysc.Bookings do
   def list_guests_staying_on_date(property, date, opts \\ []) do
     preloads = Keyword.get(opts, :preload, [:rooms, :user])
     statuses = Keyword.get(opts, :statuses)
-    exclude_statuses = Keyword.get(opts, :exclude_statuses, [:canceled, :refunded])
+
+    exclude_statuses =
+      Keyword.get(opts, :exclude_statuses, [:canceled, :refunded])
 
     query =
       from b in Booking,
