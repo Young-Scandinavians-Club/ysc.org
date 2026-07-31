@@ -4455,38 +4455,53 @@ defmodule YscWeb.AdminBookingsLive do
 
   def handle_event("delete-booking", %{"id" => id}, socket) do
     booking = Bookings.get_booking!(id)
-    Bookings.delete_booking(booking)
 
-    # Remove from stream if we're on the reservations section
-    socket =
-      if socket.assigns[:current_section] == :reservations do
-        socket
-        |> stream_delete(:reservations, booking)
-      else
-        # If not on reservations section, preserve date range and navigate
-        query_params = %{property: socket.assigns.selected_property}
+    case release_inventory_before_delete(booking) do
+      :ok ->
+        booking = Bookings.get_booking!(id)
+        Bookings.delete_booking(booking)
 
-        query_params =
-          if socket.assigns[:calendar_start_date] &&
-               socket.assigns[:calendar_end_date] do
-            Map.merge(query_params, %{
-              from_date: Date.to_string(socket.assigns.calendar_start_date),
-              to_date: Date.to_string(socket.assigns.calendar_end_date)
-            })
+        # Remove from stream if we're on the reservations section
+        socket =
+          if socket.assigns[:current_section] == :reservations do
+            socket
+            |> stream_delete(:reservations, booking)
           else
-            query_params
+            # If not on reservations section, preserve date range and navigate
+            query_params = %{property: socket.assigns.selected_property}
+
+            query_params =
+              if socket.assigns[:calendar_start_date] &&
+                   socket.assigns[:calendar_end_date] do
+                Map.merge(query_params, %{
+                  from_date: Date.to_string(socket.assigns.calendar_start_date),
+                  to_date: Date.to_string(socket.assigns.calendar_end_date)
+                })
+              else
+                query_params
+              end
+
+            socket
+            |> push_patch(
+              to: ~p"/admin/bookings?#{URI.encode_query(query_params)}"
+            )
+            |> update_calendar_view(socket.assigns.selected_property)
           end
 
-        socket
-        |> push_patch(to: ~p"/admin/bookings?#{URI.encode_query(query_params)}")
-        |> update_calendar_view(socket.assigns.selected_property)
-      end
+        {:noreply,
+         socket
+         |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
+           title: "Booking"
+         )}
 
-    {:noreply,
-     socket
-     |> YscWeb.Flash.put_toast(:info, "Booking deleted successfully",
-       title: "Booking"
-     )}
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to delete booking: #{inspect(reason)}"
+         )}
+    end
   end
 
   def handle_event("view-booking", %{"booking-id" => booking_id}, socket) do
@@ -6282,6 +6297,54 @@ defmodule YscWeb.AdminBookingsLive do
      )}
   end
 
+  # A :hold/:complete booking has reserved real PropertyInventory /
+  # RoomInventory. Hard-deleting the row without releasing that inventory
+  # first leaves it permanently stuck as held/booked with no booking left to
+  # explain it.
+  defp release_inventory_before_delete(%{status: :hold} = booking) do
+    alias Ysc.Bookings.BookingLocker
+
+    case BookingLocker.release_hold(booking.id) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp release_inventory_before_delete(%{status: :complete} = booking) do
+    alias Ysc.Bookings.BookingLocker
+
+    case BookingLocker.cancel_complete_booking(booking.id) do
+      {:ok, _booking} -> :ok
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp release_inventory_before_delete(_booking), do: :ok
+
+  # Status transitions away from :hold/:complete hold real PropertyInventory /
+  # RoomInventory reservations. Editing `status` via the plain changeset path
+  # below would leave that inventory permanently stuck as held/booked, so
+  # cancel/refund must go through BookingLocker instead, which releases it
+  # atomically with the status change.
+  defp save_existing_admin_booking(
+         socket,
+         %{status: current_status} = existing_booking,
+         %{"status" => new_status} = booking_params,
+         room_id,
+         rooms
+       )
+       when current_status in [:hold, :complete] and
+              new_status in [:canceled, :refunded] do
+    cancel_or_refund_existing_admin_booking(
+      socket,
+      existing_booking,
+      new_status,
+      booking_params,
+      room_id,
+      rooms
+    )
+  end
+
   defp save_existing_admin_booking(
          socket,
          existing_booking,
@@ -6336,6 +6399,110 @@ defmodule YscWeb.AdminBookingsLive do
            "Failed to update booking: #{inspect(reason)}"
          )}
     end
+  end
+
+  # Cancel/refund releases inventory for the booking's *current* dates, so any
+  # other field edits submitted in the same form (dates, guest counts, etc.)
+  # are discarded - they'd be meaningless on a booking that's being canceled.
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         %{status: :hold} = booking,
+         :canceled,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    alias Ysc.Bookings.BookingLocker
+
+    BookingLocker.release_hold(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :canceled)
+  end
+
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         %{status: :complete} = booking,
+         :canceled,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    alias Ysc.Bookings.BookingLocker
+
+    BookingLocker.cancel_complete_booking(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :canceled)
+  end
+
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         %{status: :complete} = booking,
+         :refunded,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    alias Ysc.Bookings.BookingLocker
+
+    BookingLocker.refund_complete_booking(booking.id)
+    |> handle_admin_cancel_result(socket, booking, :refunded)
+  end
+
+  defp cancel_or_refund_existing_admin_booking(
+         socket,
+         _booking,
+         :refunded,
+         _booking_params,
+         _room_id,
+         _rooms
+       ) do
+    {:noreply,
+     YscWeb.Flash.put_toast(
+       socket,
+       :error,
+       "Only a complete booking can be marked refunded."
+     )}
+  end
+
+  defp handle_admin_cancel_result(
+         {:ok, _booking},
+         socket,
+         _original_booking,
+         _status
+       ) do
+    {:noreply, admin_booking_save_success(socket, "updated")}
+  end
+
+  # No matching PropertyInventory/RoomInventory rows for this booking's dates
+  # (e.g. WP-migrated bookings that were never given live inventory rows) -
+  # there's nothing to release, so just flip the status directly.
+  defp handle_admin_cancel_result(
+         {:error, {:error, :inventory_update_failed}},
+         socket,
+         booking,
+         status
+       ) do
+    case Bookings.update_booking(booking, %{status: status},
+           skip_validation: true
+         ) do
+      {:ok, _booking} ->
+        {:noreply, admin_booking_save_success(socket, "updated")}
+
+      {:error, reason} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "Failed to update booking status: #{inspect(reason)}"
+         )}
+    end
+  end
+
+  defp handle_admin_cancel_result({:error, reason}, socket, _booking, _status) do
+    {:noreply,
+     YscWeb.Flash.put_toast(
+       socket,
+       :error,
+       "Failed to update booking status: #{inspect(reason)}"
+     )}
   end
 
   defp save_new_admin_booking(socket, booking_params, rooms) do
