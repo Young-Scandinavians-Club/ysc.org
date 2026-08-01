@@ -8,6 +8,7 @@ defmodule Ysc.Ci.QueryExplain.RegistryTest do
     # (~0.5–0.7s). Full discovery is exercised by the CI query-explain task.
     for {module, function} <- [
           {Ysc.Bookings, :ci_query_explain_query},
+          {Ysc.Bookings, :ci_query_explain_list_guests_staying_on_date_query},
           {Ysc.Events, :ci_query_explain_query},
           {Ysc.Events, :upcoming_events_with_preload_query}
         ] do
