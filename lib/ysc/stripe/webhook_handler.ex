@@ -3625,9 +3625,15 @@ defmodule Ysc.Stripe.WebhookHandler do
         "https://api.stripe.com"
       )
 
-    case Req.get("#{base_url}/v1/charges/#{charge_id}",
-           headers: [{"Authorization", "Bearer #{api_key}"}],
-           decode_body: true
+    req_opts = Application.get_env(:ysc, :stripe_charge_fetch_req_opts, [])
+
+    case Req.get(
+           "#{base_url}/v1/charges/#{charge_id}",
+           [
+             headers: [{"Authorization", "Bearer #{api_key}"}],
+             decode_body: true
+           ] ++
+             req_opts
          ) do
       {:ok, %Req.Response{status: 200, body: body}} when is_map(body) ->
         extract_id_from_expandable(body["invoice"])

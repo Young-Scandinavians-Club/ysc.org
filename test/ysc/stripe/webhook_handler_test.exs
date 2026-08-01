@@ -3807,4 +3807,170 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
              end)
     end
   end
+
+  # When stripity_stripe Charge structs omit :invoice (current API versions),
+  # subscription payments must still link via a raw Stripe charge retrieve.
+  describe "payout charge invoice Req fallback" do
+    import Mox
+
+    @charge_req_stub :stripe_charge_fetch
+
+    setup context do
+      Req.Test.set_req_test_from_context(context)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+
+      previous_payouts =
+        Application.get_env(:ysc, :process_stripe_payout_webhooks)
+
+      previous_req_opts =
+        Application.get_env(:ysc, :stripe_charge_fetch_req_opts)
+
+      previous_base_url = Application.get_env(:stripity_stripe, :api_base_url)
+
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+      Application.put_env(:ysc, :process_stripe_payout_webhooks, true)
+
+      Application.put_env(:ysc, :stripe_charge_fetch_req_opts,
+        plug: {Req.Test, @charge_req_stub}
+      )
+
+      Application.put_env(:stripity_stripe, :api_base_url, "http://stripe.test")
+
+      on_exit(fn ->
+        restore_env(:ysc, :stripe_client, previous_client)
+        restore_env(:ysc, :process_stripe_payout_webhooks, previous_payouts)
+        restore_env(:ysc, :stripe_charge_fetch_req_opts, previous_req_opts)
+        restore_env(:stripity_stripe, :api_base_url, previous_base_url)
+      end)
+
+      Ledgers.ensure_basic_accounts()
+      :ok
+    end
+
+    test "links subscription payment when Charge struct omits invoice field" do
+      uniq = System.unique_integer([:positive])
+      stripe_payout_id = "po_req_invoice_#{uniq}"
+      inv_id = "in_req_fallback_#{uniq}"
+      charge_id = "ch_req_fallback_#{uniq}"
+      user = user_with_stripe_id()
+
+      {:ok, {membership_payment, _, _}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "45.00"),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          external_payment_id: inv_id,
+          stripe_fee: Money.new(:USD, "1.61"),
+          description: "Subscription creation - membership",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      balance_transactions = [
+        %Stripe.BalanceTransaction{
+          id: "txn_membership_#{uniq}",
+          object: "balance_transaction",
+          type: "charge",
+          reporting_category: "charge",
+          amount: 4500,
+          fee: 161,
+          net: 4339,
+          currency: "usd",
+          description: "Subscription creation - membership",
+          source: %Stripe.Charge{
+            id: charge_id,
+            object: "charge",
+            amount: 4500,
+            payment_intent: nil
+          }
+        },
+        %Stripe.BalanceTransaction{
+          id: "txn_payout_#{uniq}",
+          object: "balance_transaction",
+          type: "payout",
+          reporting_category: "payout",
+          amount: -4339,
+          fee: 0,
+          net: -4339,
+          currency: "usd",
+          description: "STRIPE PAYOUT",
+          source: stripe_payout_id
+        }
+      ]
+
+      stub(Ysc.StripeMock, :retrieve_payout, fn ^stripe_payout_id, _opts ->
+        {:ok,
+         %Stripe.Payout{
+           id: stripe_payout_id,
+           object: "payout",
+           amount: 4339,
+           currency: "usd",
+           status: "paid",
+           arrival_date: System.os_time(:second),
+           description: "STRIPE PAYOUT",
+           balance_transaction: %Stripe.BalanceTransaction{
+             id: "txn_payout_#{uniq}",
+             type: "payout",
+             fee: 0,
+             amount: -4339,
+             net: -4339,
+             currency: "usd"
+           }
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :list_balance_transactions, fn params, _opts ->
+        assert params.payout == stripe_payout_id
+
+        {:ok,
+         %Stripe.List{
+           object: "list",
+           data: balance_transactions,
+           has_more: false,
+           url: "/v1/balance_transactions"
+         }}
+      end)
+
+      Req.Test.stub(@charge_req_stub, fn conn ->
+        assert conn.request_path == "/v1/charges/#{charge_id}"
+
+        Req.Test.json(conn, %{
+          "id" => charge_id,
+          "object" => "charge",
+          "invoice" => inv_id
+        })
+      end)
+
+      payout_map = %{
+        "id" => stripe_payout_id,
+        "amount" => 4339,
+        "currency" => "usd",
+        "status" => "paid",
+        "arrival_date" => System.os_time(:second),
+        "description" => "STRIPE PAYOUT",
+        "metadata" => %{},
+        "fees" => nil
+      }
+
+      assert :ok =
+               WebhookHandler.handle_webhook_event("payout.paid", payout_map)
+
+      payout =
+        Ledgers.get_payout_by_stripe_id(stripe_payout_id)
+        |> Ysc.Repo.preload(:payments)
+
+      assert payout != nil
+      assert Enum.any?(payout.payments, &(&1.id == membership_payment.id))
+    end
+  end
+
+  defp restore_env(app, key, value) do
+    if value != nil do
+      Application.put_env(app, key, value)
+    else
+      Application.delete_env(app, key)
+    end
+  end
 end
