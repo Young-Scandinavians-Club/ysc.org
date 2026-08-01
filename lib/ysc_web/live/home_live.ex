@@ -1889,29 +1889,34 @@ defmodule YscWeb.HomeLive do
 
               <%!-- Your Family Section (family/lifetime members with linked users) --%>
               <section :if={@async_data_loaded && @other_family_members != []}>
-                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
-                  Your Family
-                </h2>
-                <div class="rounded-xl border border-zinc-200 bg-white p-4 space-y-3 min-h-[7.5rem]">
+                <div class="flex items-center justify-between mb-6">
+                  <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest">
+                    Your Family
+                  </h2>
+                  <.link
+                    navigate={~p"/users/settings/family"}
+                    class="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Manage Family
+                  </.link>
+                </div>
+                <div class="flex flex-wrap gap-x-3 gap-y-4">
                   <%= for member <- @other_family_members do %>
-                    <div class="flex items-center justify-between text-sm">
-                      <span class="text-zinc-900 font-medium">
-                        {member.first_name} {member.last_name}
+                    <div
+                      class="flex flex-col items-center w-16 text-center"
+                      title={"#{member.first_name} #{member.last_name} · #{FamilyDisplay.relationship_label(member.family_relationship)}"}
+                    >
+                      <.user_avatar_image user={member} class="w-12 h-12" />
+                      <span class="mt-1.5 text-xs font-semibold text-zinc-900 truncate w-full">
+                        {member.first_name}
                       </span>
-                      <span class="text-zinc-500 text-xs">
+                      <span class="text-[11px] text-zinc-400 truncate w-full">
                         {FamilyDisplay.relationship_label(
                           member.family_relationship
                         )}
                       </span>
                     </div>
                   <% end %>
-                  <.link
-                    navigate={~p"/users/settings/family"}
-                    class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors duration-150"
-                  >
-                    Manage family
-                    <.icon name="hero-arrow-right" class="w-3.5 h-3.5" />
-                  </.link>
                 </div>
               </section>
 
