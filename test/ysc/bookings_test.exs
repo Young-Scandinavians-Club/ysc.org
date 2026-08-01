@@ -241,13 +241,13 @@ defmodule Ysc.BookingsTest do
           status: :complete
         })
 
-      _pending =
+      _hold =
         booking_fixture(%{
           user_id: user.id,
           property: :clear_lake,
           checkin_date: checkin,
           checkout_date: checkout,
-          status: :pending
+          status: :hold
         })
 
       bookings =
