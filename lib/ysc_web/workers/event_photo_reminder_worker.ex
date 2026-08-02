@@ -159,7 +159,9 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
     now = DateTime.utc_now()
 
     if DateTime.compare(scheduled_at, now) == :gt do
-      case %{"event_id" => event_id} |> new(scheduled_at: scheduled_at) |> Oban.insert() do
+      case %{"event_id" => event_id}
+           |> new(scheduled_at: scheduled_at)
+           |> Oban.insert() do
         {:ok, _job} ->
           Ysc.Logging.info("Scheduled event photo reminder",
             event_id: event_id,

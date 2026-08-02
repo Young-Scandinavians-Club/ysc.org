@@ -211,7 +211,9 @@ defmodule YscWeb.Workers.EventNotificationWorker do
 
     notification_datetime = DateTime.add(published_at, 3600, :second)
 
-    case %{"event_id" => event_id} |> new(scheduled_at: notification_datetime) |> Oban.insert() do
+    case %{"event_id" => event_id}
+         |> new(scheduled_at: notification_datetime)
+         |> Oban.insert() do
       {:ok, _job} ->
         Ysc.Logging.info("Scheduled event notification emails",
           event_id: event_id,
