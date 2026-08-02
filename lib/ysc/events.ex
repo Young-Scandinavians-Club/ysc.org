@@ -631,6 +631,7 @@ defmodule Ysc.Events do
         invalidate_event_caches()
         broadcast(%Ysc.MessagePassingEvents.EventUpdated{event: event})
         maybe_reschedule_event_photo_reminder(event)
+        maybe_reschedule_event_notification(event)
         {:ok, event}
 
       {:error, changeset} ->
@@ -1368,6 +1369,19 @@ defmodule Ysc.Events do
   end
 
   defp maybe_reschedule_event_photo_reminder(_event), do: :ok
+
+  defp maybe_reschedule_event_notification(
+         %Event{state: state, published_at: published_at} = event
+       )
+       when state in [:published, "published"] and not is_nil(published_at) do
+    if is_nil(event.notification_sent_at) do
+      schedule_event_notifications(event, published_at)
+    end
+
+    :ok
+  end
+
+  defp maybe_reschedule_event_notification(_event), do: :ok
 
   def unpublish_event(%Event{} = event) do
     event

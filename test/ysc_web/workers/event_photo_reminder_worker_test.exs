@@ -211,5 +211,38 @@ defmodule YscWeb.Workers.EventPhotoReminderWorkerTest do
       assert updated.reminder_sent_at != nil
       assert updated.reminder_recipient_count == 1
     end
+
+    test "cancels a previously scheduled job when event dates are cleared", %{
+      event: event
+    } do
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, future_event} =
+          Events.update_event(event, %{
+            start_date:
+              DateTime.add(DateTime.utc_now(), 30, :day)
+              |> DateTime.truncate(:second),
+            end_date:
+              DateTime.add(DateTime.utc_now(), 31, :day)
+              |> DateTime.truncate(:second)
+          })
+
+        assert :ok = EventPhotoReminderWorker.schedule_reminder(future_event)
+
+        assert_enqueued(
+          worker: EventPhotoReminderWorker,
+          args: %{"event_id" => future_event.id}
+        )
+
+        {:ok, cleared_event} =
+          Events.update_event(future_event, %{start_date: nil, end_date: nil})
+
+        assert :ok = EventPhotoReminderWorker.schedule_reminder(cleared_event)
+
+        refute_enqueued(
+          worker: EventPhotoReminderWorker,
+          args: %{"event_id" => cleared_event.id}
+        )
+      end)
+    end
   end
 end

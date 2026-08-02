@@ -37,9 +37,7 @@ defmodule Ysc.EventPhotosTest do
       expected =
         case single_day.start_date do
           %DateTime{} = dt ->
-            dt
-            |> DateTime.shift_zone!("America/Los_Angeles")
-            |> DateTime.to_date()
+            DateTime.to_date(dt)
 
           %Date{} = date ->
             date
@@ -47,6 +45,20 @@ defmodule Ysc.EventPhotosTest do
 
       assert EventPhotos.effective_end_date(single_day) == expected
       assert %Date{} = EventPhotos.effective_end_date(event)
+    end
+
+    test "reads the calendar date directly without shifting timezones, since start_date/end_date store a date placeholder (midnight UTC), not a real instant",
+         %{event: event} do
+      # This is how the admin date-range picker actually stores a picked calendar
+      # day (date_range_picker.ex: `Date.to_string(value) <> "T00:00:00Z"`) — the
+      # date component IS the intended calendar day, with no real timezone meaning.
+      {:ok, dated_event} =
+        Ysc.Events.update_event(event, %{
+          start_date: ~U[2026-08-15 00:00:00Z],
+          end_date: ~U[2026-08-15 00:00:00Z]
+        })
+
+      assert EventPhotos.effective_end_date(dated_event) == ~D[2026-08-15]
     end
   end
 
@@ -136,11 +148,9 @@ defmodule Ysc.EventPhotosTest do
     test "returns 9 AM America/Los_Angeles on the day after the event ends", %{
       event: event
     } do
-      end_date =
-        ~D[2026-06-10]
-        |> DateTime.new!(~T[18:00:00], "America/Los_Angeles")
-        |> DateTime.shift_zone!("Etc/UTC")
-        |> DateTime.truncate(:second)
+      # Matches how the admin date-range picker actually stores a picked calendar
+      # day: the literal date at midnight UTC (a placeholder, not a real instant).
+      end_date = ~U[2026-06-10 00:00:00Z]
 
       {:ok, dated_event} =
         Ysc.Events.update_event(event, %{

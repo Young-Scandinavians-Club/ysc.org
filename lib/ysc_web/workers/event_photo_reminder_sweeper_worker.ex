@@ -27,8 +27,7 @@ defmodule YscWeb.Workers.EventPhotoReminderSweeperWorker do
       where: is_nil(c.reminder_sent_at),
       where:
         fragment(
-          "(timezone(?, timezone('UTC', coalesce(?, ?))))::date <= ?",
-          ^@timezone,
+          "(timezone('UTC', coalesce(?, ?)))::date <= ?",
           e.end_date,
           e.start_date,
           type(^yesterday, :date)

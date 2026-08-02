@@ -100,16 +100,19 @@ defmodule Ysc.EventPhotos do
   end
 
   @doc """
-  Calendar date in America/Los_Angeles when the event ends (for scheduling).
+  Calendar date when the event ends (for scheduling).
+
+  `start_date`/`end_date` store the calendar date the admin picked, not a real
+  instant (time-of-day lives in the separate `start_time`/`end_time` fields), so
+  the date is read directly with no zone shift — matching how these dates are
+  displayed everywhere else (e.g. `EventDateTime.combine/2`, `format_start_date/1`).
   """
   def effective_end_date(%Event{} = event) do
     date_field = event.end_date || event.start_date
 
     case date_field do
       %DateTime{} = dt ->
-        dt
-        |> DateTime.shift_zone!(@timezone)
-        |> DateTime.to_date()
+        DateTime.to_date(dt)
 
       %Date{} = date ->
         date
@@ -192,7 +195,7 @@ defmodule Ysc.EventPhotos do
       case event.start_date do
         %DateTime{} = dt ->
           dt
-          |> DateTime.shift_zone!(@timezone)
+          |> DateTime.to_date()
           |> Calendar.strftime("%b %-d, %Y")
 
         %Date{} = date ->
