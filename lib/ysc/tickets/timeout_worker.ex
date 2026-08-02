@@ -27,7 +27,8 @@ defmodule Ysc.Tickets.TimeoutWorker do
     # instead of erroring. Recurring checks now come solely from Oban.Cron.
     {expired_count, failed_count} = expire_timed_out_orders()
 
-    {:ok, "Expired #{expired_count} timed out ticket orders (#{failed_count} failed)"}
+    {:ok,
+     "Expired #{expired_count} timed out ticket orders (#{failed_count} failed)"}
   end
 
   @impl Oban.Worker
