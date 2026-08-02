@@ -16,6 +16,8 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
       period: :infinity
     ]
 
+  import Ecto.Query
+
   alias Ysc.EventPhotos
   alias Ysc.EventPhotos.Collection
   alias Ysc.Events
@@ -146,6 +148,12 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   end
 
   defp schedule_or_send_now(event_id, scheduled_at) do
+    # Event dates may change after this is first scheduled (e.g. an admin edits
+    # a published event). Cancel any stale pending job so the new scheduled_at
+    # actually takes effect instead of being silently dropped by the unique
+    # constraint above.
+    cancel_pending_jobs(event_id)
+
     now = DateTime.utc_now()
 
     if DateTime.compare(scheduled_at, now) == :gt do
@@ -166,6 +174,20 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
         _ -> :ok
       end
     end
+  end
+
+  defp cancel_pending_jobs(event_id) do
+    from(j in Oban.Job,
+      where: j.worker == "YscWeb.Workers.EventPhotoReminderWorker",
+      where: fragment("?->>'event_id' = ?", j.args, ^event_id),
+      where: j.state in ["available", "scheduled", "retryable"]
+    )
+    |> Repo.update_all(
+      set: [
+        state: "cancelled",
+        cancelled_at: DateTime.utc_now() |> DateTime.truncate(:second)
+      ]
+    )
   end
 
   defp should_send?(%Event{}, %Collection{reminder_sent_at: sent_at})
