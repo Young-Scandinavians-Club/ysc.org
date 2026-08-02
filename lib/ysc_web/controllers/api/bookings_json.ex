@@ -61,6 +61,7 @@ defmodule YscWeb.Api.BookingsJSON do
       id: to_string(user.id),
       first_name: user.first_name,
       last_name: user.last_name,
+      most_connected_country: user.most_connected_country,
       avatar_url:
         UserAvatar.url(
           Ysc.Avatars.resolve_user_avatar_url(user),
