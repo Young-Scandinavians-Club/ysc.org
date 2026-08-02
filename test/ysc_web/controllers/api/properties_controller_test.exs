@@ -17,8 +17,8 @@ defmodule YscWeb.Api.PropertiesControllerTest do
   alias Ysc.Test.KioskAPIKeyHelper
 
   @test_token "test-kiosk-secret"
-  @expected_tab_ids ~w(welcome bears checkout emergency)
-  @expected_clear_lake_tab_ids ~w(welcome cleaning checkout emergency)
+  @expected_tab_ids ~w(welcome etiquette bears parking checkout emergency)
+  @expected_clear_lake_tab_ids ~w(welcome etiquette water parking cleaning checkout emergency)
 
   setup %{conn: conn} do
     original = KioskAPIKeyHelper.capture_kiosk_api_key!(@test_token)
@@ -187,7 +187,57 @@ defmodule YscWeb.Api.PropertiesControllerTest do
       section_titles = Enum.map(welcome_tab["sections"], & &1["title"])
       assert "The YSC Spirit" in section_titles
       assert "The Must-Bring List" in section_titles
+    end
+
+    test "etiquette tab covers quiet hours and pets", %{conn: conn} do
+      response = get(conn, ~p"/api/v1/mobile/properties/tahoe/info")
+
+      assert %{"data" => %{"tabs" => tabs}} = json_response(response, 200)
+      etiquette_tab = Enum.find(tabs, &(&1["id"] == "etiquette"))
+
+      sections_text =
+        etiquette_tab["sections"] |> Enum.map_join(" ", & &1["content"])
+
+      assert sections_text =~ "10:00 PM"
+      assert sections_text =~ "Pets"
+    end
+
+    test "parking tab has expected sections", %{conn: conn} do
+      response = get(conn, ~p"/api/v1/mobile/properties/tahoe/info")
+
+      assert %{"data" => %{"tabs" => tabs}} = json_response(response, 200)
+      parking_tab = Enum.find(tabs, &(&1["id"] == "parking"))
+
+      section_titles = Enum.map(parking_tab["sections"], & &1["title"])
       assert "Parking" in section_titles
+      assert "Winter Driving" in section_titles
+    end
+
+    test "clear_lake water tab covers dock access and mussel inspection", %{
+      conn: conn
+    } do
+      response = get(conn, ~p"/api/v1/mobile/properties/clear_lake/info")
+
+      assert %{"data" => %{"tabs" => tabs}} = json_response(response, 200)
+      water_tab = Enum.find(tabs, &(&1["id"] == "water"))
+
+      sections_text =
+        water_tab["sections"] |> Enum.map_join(" ", & &1["content"])
+
+      assert sections_text =~ "mooring"
+      assert sections_text =~ "Quagga"
+    end
+
+    test "clear_lake etiquette tab covers quiet hours", %{conn: conn} do
+      response = get(conn, ~p"/api/v1/mobile/properties/clear_lake/info")
+
+      assert %{"data" => %{"tabs" => tabs}} = json_response(response, 200)
+      etiquette_tab = Enum.find(tabs, &(&1["id"] == "etiquette"))
+
+      sections_text =
+        etiquette_tab["sections"] |> Enum.map_join(" ", & &1["content"])
+
+      assert sections_text =~ "midnight"
     end
 
     test "clear_lake returns tabs in correct order", %{conn: conn} do

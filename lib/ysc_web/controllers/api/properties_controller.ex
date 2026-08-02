@@ -85,7 +85,9 @@ defmodule YscWeb.Api.PropertiesController do
   defp tahoe_rule_categories do
     [
       %{id: "welcome", title: "Arrival"},
+      %{id: "etiquette", title: "House Rules"},
       %{id: "bears", title: "Bear & Wildlife"},
+      %{id: "parking", title: "Parking & Driving"},
       %{id: "checkout", title: "Departure"},
       %{id: "emergency", title: "Emergency"}
     ]
@@ -102,19 +104,48 @@ defmodule YscWeb.Api.PropertiesController do
         %{
           title: "The Must-Bring List",
           content:
-            "**Linens and towels are NOT provided.** You must bring:\n\n- Bedding (sheets, pillowcases, or sleeping bags)\n- Towels (for showers and the sauna)\n- Fire starters/kindling\n- Food and ingredients\n\n> **No pets** — no exceptions. **No smoking or vaping** indoors or on decks."
+            "**Linens and towels are NOT provided.** You must bring:\n\n- Bedding (sheets, pillowcases, or sleeping bags)\n- Towels (for showers and the sauna)\n- Fire starters/kindling — wood is provided but may be damp\n- Food and ingredients (kitchen is fully equipped)\n\n> **No pets** — no exceptions. **No smoking or vaping** indoors or on decks.\n\n**Pro tip:** Bring an extra layer — Tahoe nights get cold even in summer."
+        }
+      ],
+      "etiquette" => [
+        %{
+          title: "Quiet Hours & Respect",
+          content:
+            "Quiet hours are **10:00 PM – 7:00 AM.**\n\nTreat the cabin as your own — it's **not a hotel.** Stairs and hallways carry sound easily, so be considerate of other guests."
         },
         %{
-          title: "Parking",
+          title: "Shared Spaces & Storage",
           content:
-            "Parking is extremely limited. **Carpooling is strongly encouraged.**\n\n> **No street parking** allowed from November 1 through May 1."
+            "- Keep personal items out of shared spaces.\n- Store **ski boots** in the laundry room racks.\n- Store other gear in the **outside stairwell**."
+        },
+        %{
+          title: "Pets, Smoking & Children",
+          content:
+            "**Pets:** Not allowed — no exceptions.\n**Smoking & vaping:** Prohibited indoors and on decks.\n**Children:** For safety, children should not play on or near the stairs."
         }
       ],
       "bears" => [
         %{
           title: "Bear Safety & Electric Wire",
           content:
-            "The cabin is in bear country. **Always turn OFF the bear wire before entering/exiting.**\n\n1. **Turn OFF:** Unhook the **TOP** handle first.\n2. **Enter:** Wait 5 seconds and step inside.\n3. **Turn ON:** Re-hook wires from **BOTTOM to TOP**.\n\n> **Garbage:** Use bear-proof lids at all times to prevent a mess!"
+            "The deck is surrounded by an **electric bear wire** — it won't harm you, but must be handled in order.\n\n**To enter:**\n1. Grab the **top** black handle and disconnect it.\n2. Remove the second wire.\n3. Remove the third wire, then step inside.\n\n**When leaving or going to sleep** (reverse order):\n1. Connect the **lowest** wire first.\n2. Connect the middle wire.\n3. Connect the **top** wire last to reactivate the barrier.\n\n> Always secure garbage cans and remove all food waste from outdoor areas."
+        }
+      ],
+      "parking" => [
+        %{
+          title: "Parking",
+          content:
+            "Parking is extremely limited — **carpool if possible.**\n\n- You may need to move your vehicle to accommodate others.\n- Do not block driveways or neighbors' access.\n\n> **No street parking November 1 – May 1.** Towing is strictly enforced for snow removal and carries steep penalties."
+        },
+        %{
+          title: "Winter Driving",
+          content:
+            "- Carry **snow chains** or use a **4WD vehicle with snow tires**.\n- Check road and weather conditions before traveling.\n\n**Caltrans Road Info:** `(800) 427-7623`"
+        },
+        %{
+          title: "Local Transportation",
+          content:
+            "**Tahoe Bus Transit:** `(530) 581-6365`\n**Tahoe Taxi:** `(530) 546-3181`"
         }
       ],
       "checkout" => [
@@ -136,6 +167,9 @@ defmodule YscWeb.Api.PropertiesController do
   defp clear_lake_rule_categories do
     [
       %{id: "welcome", title: "Arrival"},
+      %{id: "etiquette", title: "House Rules"},
+      %{id: "water", title: "Dock & Water Safety"},
+      %{id: "parking", title: "Parking & Driving"},
       %{id: "cleaning", title: "Kitchen & Mats"},
       %{id: "checkout", title: "Locking Up"},
       %{id: "emergency", title: "Emergency"}
@@ -149,6 +183,52 @@ defmodule YscWeb.Api.PropertiesController do
           title: "Welcome to Clear Lake",
           content:
             "We hope you enjoy the pool and the lake! Please remember to sign the guest book upon arrival."
+        },
+        %{
+          title: "What's Here",
+          content:
+            "- **The Private Dock** — swimming, sunbathing, boat mooring.\n- **Social Hall** — cedar hall with a wood-burning fireplace and dance floor.\n- **Group Kitchen** — industrial stoves and ample fridge space.\n- **Sleeping:** Summer is a sleeping-lawn setup (bring a sleeping bag); winter has indoor beds (bring linens & a comforter)."
+        },
+        %{
+          title: "What to Bring",
+          content:
+            "- Linens & bedding (requirements differ by season — see the Winter Season note in Kitchen & Mats)\n- Bath & beach towels\n- Reusable water bottle\n- Sunscreen & swimsuit"
+        }
+      ],
+      "etiquette" => [
+        %{
+          title: "Quiet Hours",
+          content:
+            "Quiet hours start at **midnight** to keep the lake peaceful for everyone."
+        },
+        %{
+          title: "Pets & Smoking",
+          content:
+            "**No pets** are allowed on the property — this protects local wildlife and keeps the environment pristine.\n**Smoking & vaping:** Prohibited indoors and on decks."
+        }
+      ],
+      "water" => [
+        %{
+          title: "Boating & Dock Access",
+          content:
+            "Members enjoy free mooring at our private dock. Email the Cabin Master **in advance** to arrange it.\n\n> Trailers must be parked **off-site**."
+        },
+        %{
+          title: "Quagga Mussel Inspection",
+          content:
+            "A **mandatory Quagga mussel boat inspection** is required before launching. Violations result in a **$1,000 fine** from Lake County."
+        }
+      ],
+      "parking" => [
+        %{
+          title: "Parking",
+          content:
+            "Parking is limited — park as close to the next car as possible, and choose a spot based on your departure time.\n\n> **Pro tip:** Leaving early Sunday? Don't park in the back or you may find yourself blocked in.\n\nDo not block driveways or neighbors' access."
+        },
+        %{
+          title: "Getting Here",
+          content:
+            "Public transportation is very limited — **driving is essential**."
         }
       ],
       "cleaning" => [
@@ -156,6 +236,11 @@ defmodule YscWeb.Api.PropertiesController do
           title: "Kitchen & Sleeping Mats",
           content:
             "- **Deep Clean:** Sanitize range top, ovens, and countertops.\n- **Dishwasher:** Must be emptied **before** you depart.\n- **Sleeping Mats:** Sanitize, wipe down, and stack neatly in the storage room next to the pool toy room."
+        },
+        %{
+          title: "Winter Season (Oct–April)",
+          content:
+            "Indoor beds are set up in the cabin during winter months. Bring your own linens: sheets, pillowcases, a comforter or sleeping bag, and towels. An extra wool blanket and indoor slippers help keep you cozy in the Social Hall."
         }
       ],
       "checkout" => [
