@@ -6,7 +6,17 @@ defmodule YscWeb.Workers.EventNotificationWorker do
   Only sends if the event is still published at that time.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :bulk_mail, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :bulk_mail,
+    max_attempts: 3,
+    unique: [
+      fields: [:args],
+      keys: [:event_id],
+      states: :incomplete,
+      period: :infinity
+    ],
+    replace: [scheduled: [:scheduled_at]]
 
   alias Ysc.Events
   alias Ysc.Repo
@@ -26,6 +36,13 @@ defmodule YscWeb.Workers.EventNotificationWorker do
          |> Repo.preload([:organizer, :cover_image]) do
       nil ->
         Ysc.Logging.warning("Event not found for notification",
+          event_id: event_id
+        )
+
+        :ok
+
+      %Event{notification_sent_at: sent_at} when not is_nil(sent_at) ->
+        Ysc.Logging.info("Event notifications already sent, skipping",
           event_id: event_id
         )
 
@@ -194,17 +211,24 @@ defmodule YscWeb.Workers.EventNotificationWorker do
 
     notification_datetime = DateTime.add(published_at, 3600, :second)
 
-    %{"event_id" => event_id}
-    |> new(scheduled_at: notification_datetime)
-    |> Oban.insert()
+    case %{"event_id" => event_id} |> new(scheduled_at: notification_datetime) |> Oban.insert() do
+      {:ok, _job} ->
+        Ysc.Logging.info("Scheduled event notification emails",
+          event_id: event_id,
+          published_at: published_at,
+          scheduled_at: notification_datetime
+        )
 
-    Ysc.Logging.info("Scheduled event notification emails",
-      event_id: event_id,
-      published_at: published_at,
-      scheduled_at: notification_datetime
-    )
+        :ok
 
-    :ok
+      {:error, reason} ->
+        Ysc.Logging.error("Failed to schedule event notification emails",
+          event_id: event_id,
+          error: inspect(reason)
+        )
+
+        {:error, reason}
+    end
   end
 
   defp cancel_pending_jobs(event_id) do

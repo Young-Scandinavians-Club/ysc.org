@@ -14,7 +14,8 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
       keys: [:event_id],
       states: :incomplete,
       period: :infinity
-    ]
+    ],
+    replace: [scheduled: [:scheduled_at]]
 
   import Ecto.Query
 
@@ -126,6 +127,13 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   Schedules the photo reminder for an event, or sends immediately if the time has passed.
   """
   def schedule_reminder(%Event{} = event) do
+    # Event dates may change after this is first scheduled (e.g. an admin edits
+    # a published event, including clearing the dates entirely). Cancel any
+    # stale pending job up front so it can't fire on its old schedule — both
+    # when we're about to reschedule it below, and when the event no longer
+    # has dates to schedule against at all.
+    cancel_pending_jobs(event.id)
+
     case EventPhotos.photo_reminder_scheduled_at(event) do
       nil ->
         Ysc.Logging.warning(
@@ -148,23 +156,26 @@ defmodule YscWeb.Workers.EventPhotoReminderWorker do
   end
 
   defp schedule_or_send_now(event_id, scheduled_at) do
-    # Event dates may change after this is first scheduled (e.g. an admin edits
-    # a published event). Cancel any stale pending job so the new scheduled_at
-    # actually takes effect instead of being silently dropped by the unique
-    # constraint above.
-    cancel_pending_jobs(event_id)
-
     now = DateTime.utc_now()
 
     if DateTime.compare(scheduled_at, now) == :gt do
-      %{"event_id" => event_id}
-      |> new(scheduled_at: scheduled_at)
-      |> Oban.insert()
+      case %{"event_id" => event_id} |> new(scheduled_at: scheduled_at) |> Oban.insert() do
+        {:ok, _job} ->
+          Ysc.Logging.info("Scheduled event photo reminder",
+            event_id: event_id,
+            scheduled_at: scheduled_at
+          )
 
-      Ysc.Logging.info("Scheduled event photo reminder",
-        event_id: event_id,
-        scheduled_at: scheduled_at
-      )
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error("Failed to schedule event photo reminder",
+            event_id: event_id,
+            error: inspect(reason)
+          )
+
+          {:error, reason}
+      end
     else
       with %Event{} = event <- Repo.get(Event, event_id),
            %Collection{} = collection <- EventPhotos.get_by_event_id(event_id),
