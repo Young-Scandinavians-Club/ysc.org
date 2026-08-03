@@ -114,6 +114,51 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
     assert has_element?(view, "#submit-photos-btn[disabled]")
   end
 
+  test "shows a prominent banner if an unsupported file somehow reaches submit",
+       %{conn: conn, upload_path: path} do
+    {:ok, view, _html} = live(conn, path)
+
+    upload =
+      file_input(view, "#event-photo-upload-form", :photos, [
+        %{
+          last_modified: System.system_time(:millisecond),
+          name: "flags.avif",
+          content: @tiny_png,
+          type: "image/avif"
+        }
+      ])
+
+    render_upload(upload, "flags.avif")
+
+    # The submit button is disabled client-side once a file is flagged, but
+    # the "upload" handler is still the last line of defense — simulate a
+    # bypassed disabled attribute by submitting the form event directly.
+    html = render_submit(view, "upload")
+
+    assert html =~ "We couldn&#39;t upload everything"
+    assert html =~ "File type is not supported."
+  end
+
+  test "shows a too-many-files banner when the batch exceeds the max entry count",
+       %{conn: conn, upload_path: path} do
+    {:ok, view, _html} = live(conn, path)
+
+    entries =
+      for i <- 1..31 do
+        %{
+          last_modified: System.system_time(:millisecond),
+          name: "photo#{i}.png",
+          content: @tiny_png,
+          type: "image/png"
+        }
+      end
+
+    upload = file_input(view, "#event-photo-upload-form", :photos, entries)
+    html = render_upload(upload, "photo1.png")
+
+    assert html =~ "You can upload up to 30 files per batch"
+  end
+
   test "removing a flagged file clears its error and unblocks submit of the rest",
        %{conn: conn, upload_path: path} do
     {:ok, view, _html} = live(conn, path)
