@@ -59,6 +59,52 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   @doc """
+  Whether the (recurring) Winter season's current-or-next occurrence has
+  entered the bookable window yet, plus a "start year/end year" label for it
+  (e.g. `"2025/2026"`) derived from the resolved dates.
+
+  A season named `"Winter"` is treated as not buyout-eligible elsewhere
+  (`Season.buyout_allowed_on_date?/2`); this mirrors that convention to decide
+  when a "winter reservations are open" notice should be shown at all, so it
+  only appears once at least the season's start date is actually selectable
+  (given `max_booking_date`, e.g. from `calculate_max_booking_date/3`) and
+  disappears again once the season has passed and the next occurrence isn't
+  yet in reach.
+
+  `max_booking_date` reflects the *current* season's own advance rule (only
+  extended by the *next* season's rule when the current season has no limit
+  of its own — see `calculate_max_booking_date_no_limit/3`). If some other
+  season's numeric limit happens to reach past Winter's start, that alone
+  doesn't mean Winter's own booking window has opened, so Winter's own
+  `advance_booking_days` (when set) is checked independently as well.
+  """
+  def winter_booking_window(seasons, today, max_booking_date)
+      when is_list(seasons) do
+    case Enum.find(seasons, &(&1.name == "Winter")) do
+      nil ->
+        {false, nil}
+
+      winter ->
+        {winter_start, winter_end} = get_season_date_range(winter, today)
+
+        within_global_window? =
+          Date.compare(winter_start, max_booking_date) != :gt
+
+        within_winter_own_limit? =
+          if winter.advance_booking_days && winter.advance_booking_days > 0 do
+            winter_own_max = Date.add(today, winter.advance_booking_days)
+            Date.compare(winter_start, winter_own_max) != :gt
+          else
+            true
+          end
+
+        open? = within_global_window? and within_winter_own_limit?
+
+        {open?, "#{winter_start.year}/#{winter_end.year}"}
+    end
+  end
+
+  @doc """
   Gets the actual date range for a season based on a reference date.
 
   Handles year-spanning seasons (e.g., Nov 1 - Apr 30).

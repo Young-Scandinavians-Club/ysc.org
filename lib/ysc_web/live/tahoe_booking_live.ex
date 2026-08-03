@@ -61,6 +61,9 @@ defmodule YscWeb.TahoeBookingLive do
 
     max_booking_date = calculate_max_booking_date_cached(seasons, today)
 
+    {winter_booking_open?, winter_season_label} =
+      SeasonHelpers.winter_booking_window(seasons, today, max_booking_date)
+
     # Parse query parameters, handling malformed/double-encoded URLs
     parsed_params = parse_mount_params(params)
 
@@ -218,6 +221,8 @@ defmodule YscWeb.TahoeBookingLive do
         current_season: current_season,
         season_start_date: season_start_date,
         season_end_date: season_end_date,
+        winter_booking_open?: winter_booking_open?,
+        winter_season_label: winter_season_label,
         seasons: seasons,
         property_rooms_snapshot: property_rooms_snapshot,
         selected_room_id: nil,
@@ -347,6 +352,9 @@ defmodule YscWeb.TahoeBookingLive do
 
         max_booking_date = calculate_max_booking_date_cached(seasons, today)
 
+        {winter_booking_open?, winter_season_label} =
+          SeasonHelpers.winter_booking_window(seasons, today, max_booking_date)
+
         # Calculate restricted date range for family/lifetime members with 1 room booking
         {restricted_min_date, restricted_max_date, dates_restricted} =
           calculate_restricted_dates(socket, today, max_booking_date)
@@ -372,6 +380,8 @@ defmodule YscWeb.TahoeBookingLive do
               current_season: current_season,
               season_start_date: season_start_date,
               season_end_date: season_end_date,
+              winter_booking_open?: winter_booking_open?,
+              winter_season_label: winter_season_label,
               can_book: can_book,
               booking_error_title: booking_error_title,
               booking_disabled_reason: booking_disabled_reason,
@@ -963,6 +973,9 @@ defmodule YscWeb.TahoeBookingLive do
 
     max_booking_date = calculate_max_booking_date_cached(seasons, today)
 
+    {winter_booking_open?, winter_season_label} =
+      SeasonHelpers.winter_booking_window(seasons, today, max_booking_date)
+
     {restricted_min_date, restricted_max_date, dates_restricted} =
       recalculate_restricted_date_range(socket, max_booking_date)
 
@@ -972,6 +985,8 @@ defmodule YscWeb.TahoeBookingLive do
       current_season: current_season,
       season_start_date: season_start_date,
       season_end_date: season_end_date,
+      winter_booking_open?: winter_booking_open?,
+      winter_season_label: winter_season_label,
       max_booking_date: max_booking_date,
       restricted_min_date: restricted_min_date,
       restricted_max_date: restricted_max_date,
@@ -3740,8 +3755,11 @@ defmodule YscWeb.TahoeBookingLive do
                     </div>
                   </div>
                 </section>
-                <!-- Winter Season Reservations Notice -->
-                <section class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-12">
+                <!-- Winter Season Reservations Notice (only shown while winter reservations are open for booking) -->
+                <section
+                  :if={@winter_booking_open?}
+                  class="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-12"
+                >
                   <div class="flex items-start gap-3">
                     <.icon
                       name="hero-megaphone"
@@ -3749,20 +3767,30 @@ defmodule YscWeb.TahoeBookingLive do
                     />
                     <div class="flex-1">
                       <h2 class="text-xl font-bold text-blue-900 mb-2">
-                        Winter Season 2025/2026 Reservations
+                        Winter Season {@winter_season_label} Reservations
                       </h2>
                       <p class="text-blue-800 font-semibold mb-3">
-                        Reservations for winter season 2025/2026 are now open!
+                        Reservations for winter season {@winter_season_label} are open!
                       </p>
-                      <div class="bg-white rounded-xl p-4 border border-blue-200">
+                      <div class="bg-white rounded-xl p-4 border border-blue-200 space-y-3">
+                        <div class="flex items-start gap-2">
+                          <.icon
+                            name="hero-home-modern"
+                            class="w-5 h-5 text-green-700 flex-shrink-0 mt-0.5"
+                          />
+                          <p class="text-sm text-blue-900">
+                            <strong>Individual room bookings:</strong>
+                            Available all winter, year-round. Room limits per membership apply — see Winter Season Room Limits below.
+                          </p>
+                        </div>
                         <div class="flex items-start gap-2">
                           <.icon
                             name="hero-exclamation-triangle"
                             class="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5"
                           />
                           <p class="text-sm text-blue-900">
-                            <strong>Winter note:</strong>
-                            {buyout_mode_availability_copy(@seasons)} Individual rooms remain available year-round.
+                            <strong>Whole-cabin buyout:</strong>
+                            {buyout_mode_availability_copy(@seasons)}
                           </p>
                         </div>
                       </div>

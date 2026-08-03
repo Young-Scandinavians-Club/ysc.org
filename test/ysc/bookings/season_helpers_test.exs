@@ -353,4 +353,99 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
       refute SeasonHelpers.date_selectable?(:tahoe, outside, today, seasons)
     end
   end
+
+  describe "winter_booking_window/3" do
+    @winter %Season{
+      name: "Winter",
+      start_date: ~D[2024-11-01],
+      end_date: ~D[2025-04-30]
+    }
+
+    test "closed when winter's start date is beyond the bookable window" do
+      today = ~D[2026-08-02]
+      max_booking_date = ~D[2026-10-31]
+
+      assert SeasonHelpers.winter_booking_window(
+               [@winter],
+               today,
+               max_booking_date
+             ) == {false, "2026/2027"}
+    end
+
+    test "open once the advance-booking window reaches winter's start date" do
+      today = ~D[2026-09-20]
+      max_booking_date = ~D[2026-11-05]
+
+      assert SeasonHelpers.winter_booking_window(
+               [@winter],
+               today,
+               max_booking_date
+             ) == {true, "2026/2027"}
+    end
+
+    test "open while currently inside the winter season" do
+      today = ~D[2027-01-15]
+      max_booking_date = ~D[2027-03-01]
+
+      assert SeasonHelpers.winter_booking_window(
+               [@winter],
+               today,
+               max_booking_date
+             ) == {true, "2026/2027"}
+    end
+
+    test "closed with no Winter season configured" do
+      summer = %Season{
+        name: "Summer",
+        start_date: ~D[2024-05-01],
+        end_date: ~D[2024-10-31]
+      }
+
+      assert SeasonHelpers.winter_booking_window(
+               [summer],
+               ~D[2026-08-02],
+               ~D[2026-10-31]
+             ) == {false, nil}
+    end
+
+    test "closed when the global window reaches winter but winter's own advance limit does not" do
+      winter_with_limit = %Season{
+        name: "Winter",
+        start_date: ~D[2024-11-01],
+        end_date: ~D[2025-04-30],
+        advance_booking_days: 45
+      }
+
+      today = ~D[2026-08-02]
+      # Simulates another season's own (larger) advance limit pushing the
+      # global max_booking_date past winter's start, even though winter's
+      # own 45-day window (today + 45 = 2026-09-16) hasn't reached
+      # 2026-11-01 yet.
+      max_booking_date = ~D[2027-06-01]
+
+      assert SeasonHelpers.winter_booking_window(
+               [winter_with_limit],
+               today,
+               max_booking_date
+             ) == {false, "2026/2027"}
+    end
+
+    test "open when both the global window and winter's own advance limit reach winter's start" do
+      winter_with_limit = %Season{
+        name: "Winter",
+        start_date: ~D[2024-11-01],
+        end_date: ~D[2025-04-30],
+        advance_booking_days: 45
+      }
+
+      today = ~D[2026-09-20]
+      max_booking_date = ~D[2026-11-05]
+
+      assert SeasonHelpers.winter_booking_window(
+               [winter_with_limit],
+               today,
+               max_booking_date
+             ) == {true, "2026/2027"}
+    end
+  end
 end
