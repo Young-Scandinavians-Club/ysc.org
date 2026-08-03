@@ -121,13 +121,24 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
     result
   end
 
+  # ExAws.S3.download_file/3 issues ranged GETs (`range: "bytes=..."`), which
+  # our storage backend rejects with 405 in production — see incident notes.
+  # ExAws.S3.get_object/2 (no Range header) is the same plain-GET approach
+  # AvatarProcessor/ImageProcessor already use successfully in production, at
+  # the cost of buffering the whole object in memory before writing it out.
   # sobelow_skip ["Traversal.FileModule"]
   defp download_from_s3(s3_key, dest) do
     case S3Config.bucket_name()
-         |> ExAws.S3.download_file(s3_key, dest)
+         |> ExAws.S3.get_object(s3_key)
          |> ExAws.request() do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, {:s3_download_failed, reason}}
+      {:ok, %{body: body}} when is_binary(body) and byte_size(body) > 0 ->
+        File.write(dest, body)
+
+      {:ok, %{body: body}} ->
+        {:error, {:s3_download_empty, byte_size(body || "")}}
+
+      {:error, reason} ->
+        {:error, {:s3_download_failed, reason}}
     end
   end
 
