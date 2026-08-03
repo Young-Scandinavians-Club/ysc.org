@@ -308,6 +308,62 @@ defmodule YscWeb.Workers.EmailNotifierTest do
       assert job.args["reply_to"] == Ysc.EmailConfig.membership_email()
     end
 
+    test "schedules a welcome email for a new (non-migrated) member", %{
+      user: user
+    } do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      Notifier.deliver_membership_payment_confirmation(
+        user,
+        :single,
+        Money.new(50, :USD),
+        ~D[2024-12-01]
+      )
+
+      # Oban runs inline in tests, so both the confirmation and welcome emails
+      # are sent synchronously, in that order, by the time
+      # deliver_membership_payment_confirmation/5 returns. assert_email_sent
+      # pulls messages FIFO, so drain the confirmation email first.
+      assert_email_sent(
+        subject: YscWeb.Emails.MembershipPaymentConfirmation.get_subject()
+      )
+
+      assert_email_sent(subject: YscWeb.Emails.WelcomeEmail.get_subject())
+    end
+
+    test "does not schedule a welcome email for a WP-migrated member", %{
+      user: user
+    } do
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second),
+          post_migration_onboarding_completed_at: nil
+        )
+        |> Ysc.Repo.update!()
+
+      Notifier.deliver_membership_payment_confirmation(
+        user,
+        :single,
+        Money.new(50, :USD),
+        ~D[2024-12-01]
+      )
+
+      welcome_subject = YscWeb.Emails.WelcomeEmail.get_subject()
+
+      # refute_email_sent scans the whole mailbox (unlike assert_email_sent,
+      # which pops FIFO), so the confirmation email being sent first doesn't
+      # need to be drained first.
+      refute_email_sent(subject: ^welcome_subject)
+    end
+
     test "sets reply_to to memberships@ysc.org for membership emails", %{
       user: user
     } do
