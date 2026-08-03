@@ -20,7 +20,7 @@
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      You've been a member for a week now, so here's a quick orientation to help you get the most out of YSC.
+      You've been a member for a few days now, so here's a quick orientation to help you get the most out of YSC.
     </mj-text>
   </mj-column>
 </mj-section>

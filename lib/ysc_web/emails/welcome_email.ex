@@ -2,7 +2,7 @@ defmodule YscWeb.Emails.WelcomeEmail do
   @moduledoc """
   Email template for the new-member welcome email.
 
-  Sent once, 7 days after a member's first membership payment clears. Orients
+  Sent once, 3 days after a member's first membership payment clears. Orients
   new members with a few upcoming events, how Tahoe's seasonal booking rules
   work, and a nudge to book Clear Lake.
   """

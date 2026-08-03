@@ -1,7 +1,11 @@
 defmodule YscWeb.Workers.WelcomeEmailWorker do
   @moduledoc """
-  Oban worker for sending the new-member welcome email, 7 days after a
+  Oban worker for sending the new-member welcome email, 3 days after a
   member's first membership payment clears.
+
+  Only fires for genuinely new members: skips WP-migrated accounts
+  (`Accounts.wp_migrated?/1`) and re-checks that membership is still active
+  at send time, in case it was cancelled/refunded in the 3-day window.
   """
   require Ysc.Logging
   use Oban.Worker, queue: :mailers, max_attempts: 3
@@ -20,26 +24,35 @@ defmodule YscWeb.Workers.WelcomeEmailWorker do
         :ok
 
       user ->
-        if Accounts.has_active_membership?(user) do
-          Notifier.deliver_welcome_email(user)
-          :ok
-        else
-          Ysc.Logging.info(
-            "User no longer has an active membership, skipping welcome email",
-            user_id: user_id
-          )
+        cond do
+          Accounts.wp_migrated?(user) ->
+            Ysc.Logging.info("Skipping welcome email for WP-migrated user",
+              user_id: user_id
+            )
 
-          :ok
+            :ok
+
+          not Accounts.has_active_membership?(user) ->
+            Ysc.Logging.info(
+              "User no longer has an active membership, skipping welcome email",
+              user_id: user_id
+            )
+
+            :ok
+
+          true ->
+            Notifier.deliver_welcome_email(user)
+            :ok
         end
     end
   end
 
   @doc """
-  Schedules the welcome email for 7 days from now.
+  Schedules the welcome email for 3 days from now.
   """
   def schedule_welcome_email(user_id) do
     %{"user_id" => user_id}
-    |> new(schedule_in: 7 * 24 * 60 * 60)
+    |> new(schedule_in: 3 * 24 * 60 * 60)
     |> Oban.insert()
   end
 end

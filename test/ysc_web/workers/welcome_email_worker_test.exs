@@ -49,6 +49,29 @@ defmodule YscWeb.Workers.WelcomeEmailWorkerTest do
       assert WelcomeEmailWorker.perform(job) == :ok
     end
 
+    test "skips a WP-migrated user even with an active membership", %{
+      user: user
+    } do
+      user
+      |> Ecto.Changeset.change(
+        lifetime_membership_awarded_at:
+          DateTime.truncate(DateTime.utc_now(), :second),
+        post_migration_onboarding_completed_at: nil
+      )
+      |> Ysc.Repo.update!()
+
+      job = %Oban.Job{
+        id: 1,
+        args: %{"user_id" => user.id},
+        worker: "YscWeb.Workers.WelcomeEmailWorker",
+        queue: "mailers",
+        state: "available",
+        attempt: 1
+      }
+
+      assert WelcomeEmailWorker.perform(job) == :ok
+    end
+
     test "handles missing user gracefully" do
       job = %Oban.Job{
         id: 1,

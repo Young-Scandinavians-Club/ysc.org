@@ -441,11 +441,14 @@ defmodule YscWeb.Emails.Notifier do
   cash-paid membership). Use `paid_elsewhere: true` when the payment was received
   in person (cash, check, etc.) so the email copy reflects that.
 
-  Also schedules the new-member welcome email for 7 days out. This function is
-  only ever called for a member's first payment — renewals send a separate
-  `membership_renewal_success` email instead (see
-  `Ysc.Stripe.WebhookHandler.enqueue_membership_renewal_success_email/6`) — so
-  the welcome email is never scheduled for renewals.
+  Also schedules the new-member welcome email for 3 days out, for genuinely
+  new members only. This function is only ever called for a member's first
+  payment — renewals send a separate `membership_renewal_success` email
+  instead (see `Ysc.Stripe.WebhookHandler.enqueue_membership_renewal_success_email/6`)
+  — so the welcome email is never scheduled for renewals. WP-migrated members
+  (`Accounts.wp_migrated?/1`) are also excluded, since they applied and paid
+  long before this feature existed and a "getting started" email would be
+  irrelevant/confusing for them.
   """
   def deliver_membership_payment_confirmation(
         user,
@@ -489,7 +492,9 @@ defmodule YscWeb.Emails.Notifier do
         user.id
       )
 
-    YscWeb.Workers.WelcomeEmailWorker.schedule_welcome_email(user.id)
+    if not Ysc.Accounts.wp_migrated?(user) do
+      YscWeb.Workers.WelcomeEmailWorker.schedule_welcome_email(user.id)
+    end
 
     result
   end
@@ -497,7 +502,7 @@ defmodule YscWeb.Emails.Notifier do
   @doc """
   Sends the new-member welcome email immediately.
 
-  Called from `YscWeb.Workers.WelcomeEmailWorker`, 7 days after
+  Called from `YscWeb.Workers.WelcomeEmailWorker`, 3 days after
   `deliver_membership_payment_confirmation/5` scheduled it.
   """
   def deliver_welcome_email(user) do
