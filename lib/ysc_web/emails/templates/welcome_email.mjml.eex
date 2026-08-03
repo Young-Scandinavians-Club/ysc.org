@@ -1,0 +1,108 @@
+<mj-section
+  background-color="#fff"
+  border-radius="6px 6px 0px 0px"
+  padding="48px 48px 24px 48px"
+>
+  <mj-column padding="0">
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>Getting started at YSC 🏔️</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section
+  background-color="#fff"
+  border-radius="0px 0px 6px 6px"
+  padding="20px 48px 48px 48px"
+>
+  <mj-column padding="0">
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Hej <%= @first_name %>,
+    </mj-text>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      You've been a member for a week now, so here's a quick orientation to help you get the most out of YSC.
+    </mj-text>
+  </mj-column>
+</mj-section>
+
+<%= if @events && length(@events) > 0 do %>
+<mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px 8px 0 0">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="24px" font-weight="900" color="#18181b" padding="0 0 16px 0">
+      Upcoming events
+    </mj-text>
+  </mj-column>
+</mj-section>
+<%= for event <- @events do %>
+<mj-section background-color="#fff" border-radius="0" padding="0 48px 24px 48px">
+  <mj-column width="100%" padding="0">
+    <%= if event[:image_url] do %>
+    <mj-image src="<%= event[:image_url] %>" alt="" padding="0" width="100%" border-radius="8px" height="180px"></mj-image>
+    <% else %>
+    <mj-spacer height="8px"></mj-spacer>
+    <% end %>
+    <mj-text align="left" font-weight="bold" font-size="18px" color="#0f172a" padding="16px 0 4px 0" line-height="1.3"><%= event[:title] %></mj-text>
+    <mj-text align="left" font-size="14px" color="#475569" padding="0 0 4px 0"><%= event[:date_str] %></mj-text>
+    <%= if event[:location_name] && event[:location_name] != "" do %>
+    <mj-text align="left" font-size="13px" color="#64748b" padding="0 0 8px 0">📍 <%= event[:location_name] %></mj-text>
+    <% end %>
+    <mj-button href="<%= event[:url] %>" background-color="#1447e6" color="#ffffff" font-size="14px" padding="8px 0 0 0" border-radius="6px" align="left">
+      View event →
+    </mj-button>
+  </mj-column>
+</mj-section>
+<% end %>
+<mj-section background-color="#fff" padding="0 48px 8px 48px">
+  <mj-column padding="0">
+    <mj-text align="left" padding="0">
+      <a href="<%= @events_url %>" style="color: #1447e6; text-decoration: none; font-size: 14px; font-weight: bold;">See all upcoming events →</a>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<% end %>
+
+<mj-section background-color="#fff" padding="24px 48px 0 48px" border-radius="8px 8px 0 0">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="24px" font-weight="900" color="#18181b" padding="0 0 16px 0">
+      Booking Lake Tahoe
+    </mj-text>
+    <mj-text align="left" font-size="16px" line-height="1.6" color="#475569" padding="0 0 16px 0">
+      We're currently in <strong><%= @tahoe_season_name %></strong> season.
+      <%= if @tahoe_buyout_allowed do %>
+        That means the whole cabin is available to book, not just individual rooms — great for bringing a bigger group.
+      <% else %>
+        In winter, only individual room bookings are available — full-cabin buyouts open back up once summer season starts.
+      <% end %>
+    </mj-text>
+    <mj-button href="<%= @tahoe_url %>" background-color="#1447e6" color="#ffffff" font-size="14px" padding="0" border-radius="6px" align="left">
+      Book Tahoe →
+    </mj-button>
+    <mj-spacer height="32px"></mj-spacer>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#fff" padding="0 48px 48px 48px" border-radius="0 0 8px 8px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="24px" font-weight="900" color="#18181b" padding="0 0 16px 0">
+      Don't forget Clear Lake
+    </mj-text>
+    <mj-text align="left" font-size="16px" line-height="1.6" color="#475569" padding="0 0 16px 0">
+      Clear Lake tends to be much easier to book than Tahoe — there's almost always availability, aside from the occasional YSC event weekend. It's a great option if Tahoe is full or you just want to try somewhere new.
+    </mj-text>
+    <mj-button href="<%= @clear_lake_url %>" background-color="#1447e6" color="#ffffff" font-size="14px" padding="0" border-radius="6px" align="left">
+      Book Clear Lake →
+    </mj-button>
+  </mj-column>
+</mj-section>
+
+<mj-section background-color="#fff" padding="0 48px 48px 48px" border-radius="0 0 6px 6px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Vi ses snart! (See you soon!) 👋
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      Young Scandinavians Club
+    </mj-text>
+  </mj-column>
+</mj-section>
