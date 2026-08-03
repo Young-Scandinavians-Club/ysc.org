@@ -493,7 +493,17 @@ defmodule YscWeb.Emails.Notifier do
       )
 
     if not Ysc.Accounts.wp_migrated?(user) do
-      YscWeb.Workers.WelcomeEmailWorker.schedule_welcome_email(user.id)
+      case YscWeb.Workers.WelcomeEmailWorker.schedule_welcome_email(user.id) do
+        {:ok, %Oban.Job{}} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to schedule welcome email",
+            user_id: user.id,
+            error: inspect(reason)
+          )
+      end
     end
 
     result

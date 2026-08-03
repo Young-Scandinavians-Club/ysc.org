@@ -7,6 +7,7 @@ defmodule YscWeb.Workers.WelcomeEmailWorkerTest do
   alias YscWeb.Workers.WelcomeEmailWorker
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
+  import Swoosh.TestAssertions
 
   setup do
     Ysc.Ledgers.ensure_basic_accounts()
@@ -34,6 +35,7 @@ defmodule YscWeb.Workers.WelcomeEmailWorkerTest do
       }
 
       assert WelcomeEmailWorker.perform(job) == :ok
+      assert_email_sent(subject: YscWeb.Emails.WelcomeEmail.get_subject())
     end
 
     test "skips user without an active membership", %{user: user} do
@@ -47,6 +49,9 @@ defmodule YscWeb.Workers.WelcomeEmailWorkerTest do
       }
 
       assert WelcomeEmailWorker.perform(job) == :ok
+
+      welcome_subject = YscWeb.Emails.WelcomeEmail.get_subject()
+      refute_email_sent(subject: ^welcome_subject)
     end
 
     test "skips a WP-migrated user even with an active membership", %{

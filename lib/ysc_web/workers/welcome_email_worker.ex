@@ -8,7 +8,11 @@ defmodule YscWeb.Workers.WelcomeEmailWorker do
   at send time, in case it was cancelled/refunded in the 3-day window.
   """
   require Ysc.Logging
-  use Oban.Worker, queue: :mailers, max_attempts: 3
+
+  use Oban.Worker,
+    queue: :mailers,
+    max_attempts: 3,
+    unique: [fields: [:args], keys: [:user_id], period: :infinity]
 
   alias Ysc.Accounts
   alias YscWeb.Emails.Notifier
@@ -49,6 +53,10 @@ defmodule YscWeb.Workers.WelcomeEmailWorker do
 
   @doc """
   Schedules the welcome email for 3 days from now.
+
+  Unique per `user_id` (forever, not just while pending), so calling this
+  more than once for the same user — e.g. a retried webhook — only ever
+  schedules one job.
   """
   def schedule_welcome_email(user_id) do
     %{"user_id" => user_id}
