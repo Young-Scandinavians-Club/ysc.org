@@ -161,7 +161,13 @@ defmodule YscWeb.EventPhotoUploadLive do
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div
                   :for={entry <- @uploads.photos.entries}
-                  class="relative rounded-lg overflow-hidden border border-zinc-200 bg-zinc-100 aspect-square"
+                  class={[
+                    "relative rounded-lg overflow-hidden border-2 aspect-square",
+                    if(entry_has_errors?(@uploads.photos, entry),
+                      do: "border-red-400 bg-red-50",
+                      else: "border-zinc-200 bg-zinc-100"
+                    )
+                  ]}
                 >
                   <%= if video_entry?(entry) do %>
                     <div class="flex h-full w-full flex-col items-center justify-center gap-2 p-3">
@@ -183,14 +189,49 @@ defmodule YscWeb.EventPhotoUploadLive do
                   >
                     <.icon name="hero-x-mark" class="h-4 w-4" />
                   </button>
-                  <div class="absolute bottom-0 inset-x-0 bg-zinc-900/60 px-2 py-1">
+                  <div class="absolute bottom-0 inset-x-0 space-y-1 bg-zinc-900/70 px-2 py-1">
                     <p class="text-xs text-white truncate">{entry.client_name}</p>
+                    <%= cond do %>
+                      <% entry_has_errors?(@uploads.photos, entry) -> %>
+                        <p class="text-[11px] font-medium text-red-300">
+                          <%= for err <- upload_errors(@uploads.photos, entry) do %>
+                            {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
+                          <% end %>
+                        </p>
+                      <% entry.done? -> %>
+                        <p class="flex items-center gap-1 text-[11px] font-medium text-green-300">
+                          <.icon name="hero-check-circle" class="h-3 w-3 shrink-0" />
+                          Ready
+                        </p>
+                      <% true -> %>
+                        <div class="h-1.5 w-full overflow-hidden rounded-full bg-white/20">
+                          <div
+                            class="h-full rounded-full bg-blue-400 transition-all duration-150"
+                            style={"width: #{entry.progress}%"}
+                          />
+                        </div>
+                        <p class="text-[11px] text-zinc-200">
+                          Uploading… {entry.progress}%
+                        </p>
+                    <% end %>
                   </div>
                 </div>
               </div>
             </div>
 
             <div class="flex flex-col gap-2">
+              <p
+                :if={
+                  @uploads.photos.entries != [] and
+                    not uploads_ready?(@uploads.photos)
+                }
+                class="text-center text-sm text-zinc-500"
+                aria-live="polite"
+              >
+                Uploading {entries_ready_count(@uploads.photos)} of {length(
+                  @uploads.photos.entries
+                )} files… please keep this page open.
+              </p>
               <.button
                 type="submit"
                 id="submit-photos-btn"
@@ -201,7 +242,11 @@ defmodule YscWeb.EventPhotoUploadLive do
                 }
                 phx-disable-with="Uploading…"
               >
-                Upload
+                <%= if @uploads.photos.entries != [] and not uploads_ready?(@uploads.photos) do %>
+                  Waiting for files to finish uploading…
+                <% else %>
+                  Upload
+                <% end %>
               </.button>
               <p
                 :for={err <- collect_upload_errors(@uploads.photos)}
@@ -337,6 +382,14 @@ defmodule YscWeb.EventPhotoUploadLive do
 
   defp uploads_ready?(upload) do
     Enum.all?(upload.entries, fn e -> e.done? end)
+  end
+
+  defp entries_ready_count(upload) do
+    Enum.count(upload.entries, & &1.done?)
+  end
+
+  defp entry_has_errors?(upload, entry) do
+    upload_errors(upload, entry) != []
   end
 
   defp collect_upload_errors(%{entries: entries} = upload) do
