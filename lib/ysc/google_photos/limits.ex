@@ -60,6 +60,36 @@ defmodule Ysc.GooglePhotos.Limits do
     if video?(filename), do: max_video_bytes(), else: max_photo_bytes()
   end
 
+  @doc "MIME content type for a supported filename extension."
+  def content_type_for_filename(filename) do
+    case Path.extname(filename) |> String.downcase() do
+      ".png" -> "image/png"
+      ".webp" -> "image/webp"
+      ".heic" -> "image/heic"
+      ".heif" -> "image/heif"
+      ".gif" -> "image/gif"
+      ".bmp" -> "image/bmp"
+      ".tif" -> "image/tiff"
+      ".tiff" -> "image/tiff"
+      ".mp4" -> "video/mp4"
+      ".mov" -> "video/quicktime"
+      ".m4v" -> "video/x-m4v"
+      ".avi" -> "video/x-msvideo"
+      ".mkv" -> "video/x-matroska"
+      ".webm" -> "video/webm"
+      ".3gp" -> "video/3gpp"
+      ".3g2" -> "video/3gpp2"
+      ".mpeg" -> "video/mpeg"
+      ".mpg" -> "video/mpeg"
+      ".wmv" -> "video/x-ms-wmv"
+      ".asf" -> "video/x-ms-asf"
+      ".m2ts" -> "video/mp2t"
+      ".mts" -> "video/mp2t"
+      ext when ext in [".jpg", ".jpeg"] -> "image/jpeg"
+      _ -> "application/octet-stream"
+    end
+  end
+
   @doc "Maximum album title length in characters."
   def max_album_title_length, do: @max_album_title_length
 

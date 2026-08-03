@@ -140,6 +140,12 @@ config :ysc, Oban,
     {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 5},
     # Rebuild indexes concurrently nightly to prevent bloat and fragmentation
     Oban.Plugins.Reindexer,
+    # Rescue jobs left stuck `executing` when a node is killed/deployed mid-job
+    # (e.g. a large event video upload) back to `available` so they retry.
+    # rescue_after is generous because EventPhotoUploadWorker can legitimately
+    # run for a long time downloading + re-uploading multi-GB videos; a
+    # shorter window would rescue still-running jobs and cause duplicate work.
+    {Oban.Plugins.Lifeline, rescue_after: :timer.hours(3)},
     {Oban.Plugins.Cron,
      crontab: [
        {"0 * * * *", YscWeb.Workers.FileExportCleanUp},

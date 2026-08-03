@@ -11,7 +11,7 @@ defmodule YscWeb.EventPhotoUploadLive do
   alias Ysc.Events.Event
   alias Ysc.GooglePhotos
   alias Ysc.GooglePhotos.Limits
-  alias Ysc.SafeFile
+  alias Ysc.S3Config
   alias YscWeb.Workers.EventPhotoUploadWorker
 
   @impl true
@@ -28,7 +28,18 @@ defmodule YscWeb.EventPhotoUploadLive do
         accept: ~w(image/* video/*),
         max_entries: 30,
         max_file_size: Limits.max_upload_bytes(),
-        auto_upload: true
+        auto_upload: true,
+        # Direct-to-S3 upload: with files up to 20 GB, buffering through the
+        # LiveView socket onto local disk isn't viable, and a locally-staged
+        # file wouldn't be visible to the Oban job if it runs on a different
+        # app instance. S3 is durable and shared across every instance.
+        external: fn entry, socket ->
+          YscWeb.EventPhotoUpload.presign(
+            entry,
+            socket,
+            socket.assigns.collection.id
+          )
+        end
       )
 
     case EventPhotos.get_by_upload_token(upload_token) do
@@ -361,21 +372,13 @@ defmodule YscWeb.EventPhotoUploadLive do
     entry_count = length(socket.assigns.uploads.photos.entries)
 
     uploaded =
-      consume_uploaded_entries(socket, :photos, fn %{path: path}, entry ->
-        tmp_root = SafeFile.event_photo_tmp_root()
+      consume_uploaded_entries(socket, :photos, fn %{key: key}, entry ->
+        case enqueue_upload_job(collection, user, key, entry) do
+          {:ok, _job} ->
+            {:ok, key}
 
-        with {:ok, dest} <-
-               SafeFile.event_photo_tmp_path(
-                 collection.id,
-                 entry.uuid,
-                 entry.client_name
-               ),
-             {:ok, dest} <- SafeFile.copy_upload_to(path, tmp_root, dest),
-             {:ok, _job} <- enqueue_upload_job(collection, user, dest, entry) do
-          {:ok, dest}
-        else
           {:error, _} ->
-            cleanup_staged_upload(tmp_root, collection, entry)
+            delete_staged_upload(key)
             {:error, :upload_enqueue_failed}
         end
       end)
@@ -409,10 +412,10 @@ defmodule YscWeb.EventPhotoUploadLive do
     end
   end
 
-  defp enqueue_upload_job(collection, user, dest, entry) do
+  defp enqueue_upload_job(collection, user, s3_key, entry) do
     %{
       "collection_id" => collection.id,
-      "file_path" => dest,
+      "s3_key" => s3_key,
       "filename" => entry.client_name,
       "user_id" => user.id
     }
@@ -420,15 +423,14 @@ defmodule YscWeb.EventPhotoUploadLive do
     |> Oban.insert()
   end
 
-  defp cleanup_staged_upload(tmp_root, collection, entry) do
-    case SafeFile.event_photo_tmp_path(
-           collection.id,
-           entry.uuid,
-           entry.client_name
-         ) do
-      {:ok, dest} -> SafeFile.rm_under_root(tmp_root, dest)
-      :error -> :ok
-    end
+  # The Oban insert itself failed (e.g. DB hiccup) before any worker could run,
+  # so nothing else will ever clean up this orphaned upload — remove it here.
+  defp delete_staged_upload(s3_key) do
+    S3Config.bucket_name()
+    |> ExAws.S3.delete_object(s3_key)
+    |> ExAws.request()
+
+    :ok
   end
 
   defp uploads_ready?(upload) do
