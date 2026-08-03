@@ -48,7 +48,9 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     EventNotification,
     ExpenseReportConfirmation,
     ExpenseReportTreasurerNotification,
-    NewsletterStatsSnapshot
+    NewsletterStatsSnapshot,
+    TahoeWinterWeekendAvailable,
+    TahoeSummerBuyoutAvailable
   }
 
   setup do
@@ -978,6 +980,40 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       assert ExpenseReportTreasurerNotification.get_template_name() ==
                "expense_report_treasurer_notification"
     end
+
+    test "TahoeWinterWeekendAvailable renders", %{user: user} do
+      assigns =
+        TahoeWinterWeekendAvailable.prepare_email_data(
+          ~D[2026-11-06],
+          ~D[2026-11-08],
+          "2026/2027",
+          user
+        )
+
+      html = TahoeWinterWeekendAvailable.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+
+      assert TahoeWinterWeekendAvailable.get_template_name() ==
+               "tahoe_winter_weekend_available"
+    end
+
+    test "TahoeSummerBuyoutAvailable renders", %{user: user} do
+      assigns =
+        TahoeSummerBuyoutAvailable.prepare_email_data(
+          ~D[2027-05-07],
+          ~D[2027-05-09],
+          "2027",
+          user
+        )
+
+      html = TahoeSummerBuyoutAvailable.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+
+      assert TahoeSummerBuyoutAvailable.get_template_name() ==
+               "tahoe_summer_buyout_available"
+    end
   end
 
   describe "all email templates are registered in Notifier" do
@@ -1023,7 +1059,9 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           BookingCancellationCabinMasterNotification,
         "booking_cancellation_treasurer_notification" =>
           BookingCancellationTreasurerNotification,
-        "newsletter_stats_snapshot" => NewsletterStatsSnapshot
+        "newsletter_stats_snapshot" => NewsletterStatsSnapshot,
+        "tahoe_winter_weekend_available" => TahoeWinterWeekendAvailable,
+        "tahoe_summer_buyout_available" => TahoeSummerBuyoutAvailable
       }
 
       for {template_name, expected_module} <- template_mappings do

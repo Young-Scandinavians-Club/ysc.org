@@ -67,6 +67,9 @@ defmodule YscWeb.Emails.Notifier do
     "family_member_removed" => YscWeb.Emails.FamilyMemberRemoved,
     "booking_checkin_reminder" => YscWeb.Emails.BookingCheckinReminder,
     "booking_checkout_reminder" => YscWeb.Emails.BookingCheckoutReminder,
+    "tahoe_winter_weekend_available" =>
+      YscWeb.Emails.TahoeWinterWeekendAvailable,
+    "tahoe_summer_buyout_available" => YscWeb.Emails.TahoeSummerBuyoutAvailable,
     "event_notification" => YscWeb.Emails.EventNotification,
     "save_the_date_available" => YscWeb.Emails.SaveTheDateAvailable,
     "expense_report_confirmation" => YscWeb.Emails.ExpenseReportConfirmation,

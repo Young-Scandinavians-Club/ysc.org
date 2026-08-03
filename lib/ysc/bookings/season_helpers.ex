@@ -105,6 +105,64 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   @doc """
+  Finds the first "whole weekend" (Friday check-in, Sunday check-out — the
+  shape required by Tahoe's Saturday/Sunday rule, see
+  `Ysc.Bookings.BookingValidator.validate_weekend_requirement/1`) of the named
+  season's current-or-next occurrence, and whether it's actually bookable
+  right now.
+
+  "Bookable right now" requires both:
+  - The property's overall calendar reach (`calculate_max_booking_date/3`,
+    driven by *today's* current season) has extended far enough to include
+    the weekend's check-in date — this is what stops e.g. a Summer weekend
+    from being reported open while still deep in Winter, even though Summer
+    itself may have no advance-booking limit of its own.
+  - The weekend's own season doesn't independently restrict it further
+    (`date_selectable?/4`, checked for both check-in and check-out in case a
+    season boundary falls inside the weekend).
+
+  Returns `nil` when no season with that name is configured, otherwise a map
+  with `:season`, `:weekend_checkin`, `:weekend_checkout`, `:cycle_year`
+  (the resolved occurrence's start year — a stable dedup key across the
+  season's annual recurrence), and `:open?`.
+  """
+  def first_weekend_booking_window(property, seasons, today, season_name)
+      when is_list(seasons) do
+    case Enum.find(seasons, &(&1.name == season_name)) do
+      nil ->
+        nil
+
+      season ->
+        {season_start, _season_end} = get_season_date_range(season, today)
+        weekend_checkin = next_friday_on_or_after(season_start)
+        weekend_checkout = Date.add(weekend_checkin, 2)
+
+        max_booking_date = calculate_max_booking_date(property, today, seasons)
+
+        open? =
+          Date.compare(weekend_checkin, max_booking_date) != :gt and
+            date_selectable?(property, weekend_checkin, today, seasons) and
+            date_selectable?(property, weekend_checkout, today, seasons)
+
+        %{
+          season: season,
+          weekend_checkin: weekend_checkin,
+          weekend_checkout: weekend_checkout,
+          cycle_year: season_start.year,
+          open?: open?
+        }
+    end
+  end
+
+  defp next_friday_on_or_after(date) do
+    case Date.day_of_week(date, :monday) do
+      5 -> date
+      dow when dow < 5 -> Date.add(date, 5 - dow)
+      dow -> Date.add(date, 5 - dow + 7)
+    end
+  end
+
+  @doc """
   Gets the actual date range for a season based on a reference date.
 
   Handles year-spanning seasons (e.g., Nov 1 - Apr 30).
