@@ -378,7 +378,11 @@ if config_env() == :prod do
   # ExAws.S3 operation (get_object, delete_object, head_object, download_file)
   # fails against Tigris; S3Config's own upload-URL helpers already know this
   # (see tigris_bucket_virtual_host_url/1) but that never reached this config.
-  s3_virtual_host? = String.contains?(s3_host, "tigris.dev")
+  normalized_s3_host = s3_host |> String.downcase() |> String.trim_trailing(".")
+
+  s3_virtual_host? =
+    normalized_s3_host == "tigris.dev" or
+      String.ends_with?(normalized_s3_host, ".tigris.dev")
 
   ex_aws_s3_config =
     [

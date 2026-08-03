@@ -121,17 +121,36 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
     result
   end
 
+  @download_timeout :timer.minutes(30)
+
   # Streams the download in chunks instead of buffering the whole object in
   # memory — required for large video uploads. This needs `virtual_host: true`
   # in the :ex_aws, :s3 config (see config/runtime.exs) or every request 405s
   # against Tigris, which rejects path-style bucket addressing.
+  #
+  # ExAws.S3.download_file/3 fans each chunk out over Task.async_stream, whose
+  # tasks are *linked* to the caller by default. When a chunk request fails,
+  # the resulting crash is an EXIT signal, not a raised exception — the
+  # library's own try/rescue only catches synchronous raises in the same
+  # process, so a failed chunk crashes this job's process outright rather than
+  # returning {:error, _}. Running the download in an unlinked supervised task
+  # isolates that crash so it can be reported and retried like any other
+  # failure instead of taking the whole job down with it.
   # sobelow_skip ["Traversal.FileModule"]
   defp download_from_s3(s3_key, dest) do
-    case S3Config.bucket_name()
-         |> ExAws.S3.download_file(s3_key, dest)
-         |> ExAws.request() do
-      {:ok, _} -> :ok
-      {:error, reason} -> {:error, {:s3_download_failed, reason}}
+    task =
+      Task.Supervisor.async_nolink(Ysc.TaskSupervisor, fn ->
+        S3Config.bucket_name()
+        |> ExAws.S3.download_file(s3_key, dest)
+        |> ExAws.request()
+      end)
+
+    case Task.yield(task, @download_timeout) ||
+           Task.shutdown(task, :brutal_kill) do
+      {:ok, {:ok, _}} -> :ok
+      {:ok, {:error, reason}} -> {:error, {:s3_download_failed, reason}}
+      {:exit, reason} -> {:error, {:s3_download_crashed, reason}}
+      nil -> {:error, :s3_download_timeout}
     end
   end
 
