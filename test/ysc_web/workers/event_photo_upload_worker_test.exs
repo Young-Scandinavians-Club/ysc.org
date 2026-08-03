@@ -21,23 +21,32 @@ defmodule Ysc.Test.EventPhotoUploadWorker.MockS3Plug do
     if String.contains?(path, "missing") do
       send_resp(conn, 404, "")
     else
+      # Pass the real bytes (not "") so Plug/Cowboy compute a correct
+      # Content-Length — a HEAD response never sends the body over the wire,
+      # but the header is still derived from what's passed here. Passing ""
+      # forces Content-Length: 0, which makes download_file/3 compute zero
+      # chunks and "succeed" without ever issuing a GET.
       conn
       |> put_resp_content_type("image/png")
-      |> put_resp_header(
-        "content-length",
-        Integer.to_string(byte_size(@tiny_png))
-      )
-      |> send_resp(200, "")
+      |> send_resp(200, @tiny_png)
     end
   end
 
   def call(%{method: method} = conn, _opts) when method in ["GET", "POST"] do
     path = String.trim_leading(conn.request_path, "/")
+    ranged? = get_req_header(conn, "range") != []
 
-    if String.contains?(path, "missing") do
-      conn |> put_resp_content_type("application/xml") |> send_resp(404, "")
-    else
-      conn |> put_resp_content_type("image/png") |> send_resp(200, @tiny_png)
+    cond do
+      String.contains?(path, "missing") ->
+        conn |> put_resp_content_type("application/xml") |> send_resp(404, "")
+
+      # Simulates the production 405: the ranged GET download_file/3 issues
+      # for each chunk fails even though HEAD (content-length) succeeds.
+      String.contains?(path, "chunk-fail") and ranged? ->
+        send_resp(conn, 405, "")
+
+      true ->
+        conn |> put_resp_content_type("image/png") |> send_resp(200, @tiny_png)
     end
   end
 
@@ -181,5 +190,37 @@ defmodule YscWeb.Workers.EventPhotoUploadWorkerTest do
       )
 
     assert {:error, _reason} = EventPhotoUploadWorker.perform(job)
+  end
+
+  test "returns an error instead of crashing when a ranged chunk download fails",
+       %{collection: collection, user: user} do
+    job =
+      make_job(
+        %{
+          "collection_id" => collection.id,
+          "s3_key" => "event_photo_uploads/#{collection.id}/chunk-fail.png",
+          "filename" => "party.png",
+          "user_id" => user.id
+        },
+        attempt: 1,
+        max_attempts: 5
+      )
+
+    # download_file/3 streams each chunk via a ranged GET inside
+    # Task.async_stream; this asserts a failed chunk surfaces as a plain
+    # {:error, _} return from perform/1 (so Oban can retry it) instead of
+    # crashing the job process.
+    assert {:error, _reason} = EventPhotoUploadWorker.perform(job)
+
+    # The download never succeeded, so nothing ever reached the dev-stub
+    # "Google Photos" write step.
+    storage_dir =
+      Path.join(Ysc.SafeFile.dev_event_photos_root(), collection.event_id)
+
+    written? =
+      File.exists?(storage_dir) and
+        Enum.any?(File.ls!(storage_dir), &String.starts_with?(&1, "party"))
+
+    refute written?
   end
 end

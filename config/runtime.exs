@@ -371,6 +371,19 @@ if config_env() == :prod do
   s3_scheme = (uri.scheme || "https") <> "://"
   s3_host = uri.host || "fly.storage.tigris.dev"
 
+  # Tigris requires virtual-hosted-style addressing (https://<bucket>.<host>/<key>)
+  # and rejects path-style requests (https://<host>/<bucket>/<key>) with 405 —
+  # ExAws.Operation.S3 defaults to path-style unless `virtual_host: true` is set
+  # (see ExAws.Operation.S3.add_bucket_to_path/2). Without this, every plain
+  # ExAws.S3 operation (get_object, delete_object, head_object, download_file)
+  # fails against Tigris; S3Config's own upload-URL helpers already know this
+  # (see tigris_bucket_virtual_host_url/1) but that never reached this config.
+  normalized_s3_host = s3_host |> String.downcase() |> String.trim_trailing(".")
+
+  s3_virtual_host? =
+    normalized_s3_host == "tigris.dev" or
+      String.ends_with?(normalized_s3_host, ".tigris.dev")
+
   ex_aws_s3_config =
     [
       scheme: s3_scheme,
@@ -378,6 +391,7 @@ if config_env() == :prod do
       region: s3_region
     ]
     |> Enum.concat(if uri.port, do: [port: uri.port], else: [])
+    |> Enum.concat(if s3_virtual_host?, do: [virtual_host: true], else: [])
     |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
   config :ex_aws, :s3, ex_aws_s3_config
