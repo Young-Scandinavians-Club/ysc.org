@@ -70,6 +70,13 @@ defmodule Ysc.Bookings.SeasonHelpers do
   (given `max_booking_date`, e.g. from `calculate_max_booking_date/3`) and
   disappears again once the season has passed and the next occurrence isn't
   yet in reach.
+
+  `max_booking_date` reflects the *current* season's own advance rule (only
+  extended by the *next* season's rule when the current season has no limit
+  of its own — see `calculate_max_booking_date_no_limit/3`). If some other
+  season's numeric limit happens to reach past Winter's start, that alone
+  doesn't mean Winter's own booking window has opened, so Winter's own
+  `advance_booking_days` (when set) is checked independently as well.
   """
   def winter_booking_window(seasons, today, max_booking_date)
       when is_list(seasons) do
@@ -80,7 +87,18 @@ defmodule Ysc.Bookings.SeasonHelpers do
       winter ->
         {winter_start, winter_end} = get_season_date_range(winter, today)
 
-        open? = Date.compare(winter_start, max_booking_date) != :gt
+        within_global_window? =
+          Date.compare(winter_start, max_booking_date) != :gt
+
+        within_winter_own_limit? =
+          if winter.advance_booking_days && winter.advance_booking_days > 0 do
+            winter_own_max = Date.add(today, winter.advance_booking_days)
+            Date.compare(winter_start, winter_own_max) != :gt
+          else
+            true
+          end
+
+        open? = within_global_window? and within_winter_own_limit?
 
         {open?, "#{winter_start.year}/#{winter_end.year}"}
     end
