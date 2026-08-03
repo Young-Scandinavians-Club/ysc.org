@@ -53,6 +53,7 @@ defmodule YscWeb.Emails.Notifier do
     "membership_payment_failure" => YscWeb.Emails.MembershipPaymentFailure,
     "membership_payment_confirmation" =>
       YscWeb.Emails.MembershipPaymentConfirmation,
+    "welcome_email" => YscWeb.Emails.WelcomeEmail,
     "membership_renewal_success" => YscWeb.Emails.MembershipRenewalSuccess,
     "membership_payment_reminder_7day" =>
       YscWeb.Emails.MembershipPaymentReminder7Day,
@@ -442,6 +443,15 @@ defmodule YscWeb.Emails.Notifier do
   Used when a membership payment is recorded (e.g. Stripe webhook or admin-created
   cash-paid membership). Use `paid_elsewhere: true` when the payment was received
   in person (cash, check, etc.) so the email copy reflects that.
+
+  Also schedules the new-member welcome email for 3 days out, for genuinely
+  new members only. This function is only ever called for a member's first
+  payment — renewals send a separate `membership_renewal_success` email
+  instead (see `Ysc.Stripe.WebhookHandler.enqueue_membership_renewal_success_email/6`)
+  — so the welcome email is never scheduled for renewals. WP-migrated members
+  (`Accounts.wp_migrated?/1`) are also excluded, since they applied and paid
+  long before this feature existed and a "getting started" email would be
+  irrelevant/confusing for them.
   """
   def deliver_membership_payment_confirmation(
         user,
@@ -473,6 +483,47 @@ defmodule YscWeb.Emails.Notifier do
 
     idempotency_key =
       "membership_payment_confirmation_#{user.id}_#{payment_date_for_key}"
+
+    result =
+      schedule_email(
+        user.email,
+        idempotency_key,
+        subject,
+        template_name,
+        email_data,
+        "",
+        user.id
+      )
+
+    if not Ysc.Accounts.wp_migrated?(user) do
+      case YscWeb.Workers.WelcomeEmailWorker.schedule_welcome_email(user.id) do
+        {:ok, %Oban.Job{}} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.error(
+            "Failed to schedule welcome email",
+            user_id: user.id,
+            error: inspect(reason)
+          )
+      end
+    end
+
+    result
+  end
+
+  @doc """
+  Sends the new-member welcome email immediately.
+
+  Called from `YscWeb.Workers.WelcomeEmailWorker`, 3 days after
+  `deliver_membership_payment_confirmation/5` scheduled it.
+  """
+  def deliver_welcome_email(user) do
+    email_module = YscWeb.Emails.WelcomeEmail
+    email_data = email_module.prepare_email_data(user)
+    subject = email_module.get_subject()
+    template_name = email_module.get_template_name()
+    idempotency_key = "welcome_email_#{user.id}"
 
     schedule_email(
       user.email,

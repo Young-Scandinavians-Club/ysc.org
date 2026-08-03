@@ -1991,6 +1991,19 @@ defmodule Ysc.AccountsTest do
       assert done.post_migration_onboarding_completed_at
       refute Accounts.needs_post_migration_onboarding?(done)
     end
+
+    test "wp_migrated?/1" do
+      native_user = oauth_user_fixture(%{phone_number: "+14159098313"})
+      assert native_user.post_migration_onboarding_completed_at
+      refute Accounts.wp_migrated?(native_user)
+
+      {:ok, migrated_user} =
+        native_user
+        |> Ecto.Changeset.change(post_migration_onboarding_completed_at: nil)
+        |> Repo.update()
+
+      assert Accounts.wp_migrated?(migrated_user)
+    end
   end
 
   describe "user notes" do

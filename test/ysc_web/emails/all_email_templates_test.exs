@@ -50,7 +50,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
     ExpenseReportTreasurerNotification,
     NewsletterStatsSnapshot,
     TahoeWinterWeekendAvailable,
-    TahoeSummerBuyoutAvailable
+    TahoeSummerBuyoutAvailable,
+    WelcomeEmail
   }
 
   setup do
@@ -734,6 +735,32 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
                "membership_payment_confirmation"
     end
 
+    test "WelcomeEmail renders", %{user: user} do
+      assigns = %{
+        first_name: user.first_name,
+        events: [
+          %{
+            title: "Test Event",
+            date_str: "January 1, 2026",
+            location_name: "Tahoe Cabin",
+            url: "https://example.com/events/1",
+            image_url: nil
+          }
+        ],
+        events_url: "https://example.com/events",
+        tahoe_url: "https://example.com/bookings/tahoe",
+        clear_lake_url: "https://example.com/bookings/clear-lake",
+        tahoe_season_name: "Summer",
+        tahoe_buyout_allowed: true
+      }
+
+      html = WelcomeEmail.render(assigns)
+      assert is_binary(html)
+      assert String.length(html) > 0
+
+      assert WelcomeEmail.get_template_name() == "welcome_email"
+    end
+
     test "MembershipRenewalSuccess renders", %{user: user} do
       assigns = %{
         first_name: user.first_name,
@@ -1061,7 +1088,8 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
           BookingCancellationTreasurerNotification,
         "newsletter_stats_snapshot" => NewsletterStatsSnapshot,
         "tahoe_winter_weekend_available" => TahoeWinterWeekendAvailable,
-        "tahoe_summer_buyout_available" => TahoeSummerBuyoutAvailable
+        "tahoe_summer_buyout_available" => TahoeSummerBuyoutAvailable,
+        "welcome_email" => WelcomeEmail
       }
 
       for {template_name, expected_module} <- template_mappings do

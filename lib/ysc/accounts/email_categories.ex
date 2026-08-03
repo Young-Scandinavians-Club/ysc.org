@@ -23,7 +23,8 @@ defmodule Ysc.Accounts.EmailCategories do
                                    "membership_payment_reminder_30day",
                                    "membership_renewal_payment_method_reminder",
                                    "membership_renewal_reminder",
-                                   "membership_renewal_success"
+                                   "membership_renewal_success",
+                                   "welcome_email"
                                  ])
 
   # Map of email template names to their notification categories
@@ -47,6 +48,7 @@ defmodule Ysc.Accounts.EmailCategories do
     "membership_renewal_reminder" => :account,
     "membership_payment_reminder_7day" => :account,
     "membership_payment_reminder_30day" => :account,
+    "welcome_email" => :account,
     "booking_checkin_reminder" => :account,
     "expense_report_confirmation" => :account,
     # Board/admin notifications (always sent, no user preference check)

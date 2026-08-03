@@ -3929,6 +3929,20 @@ defmodule Ysc.Accounts do
     |> Repo.update()
   end
 
+  @doc """
+  Returns true when a user's account originated from the WordPress migration
+  rather than the normal application → registration flow.
+
+  `register_user/1` sets `post_migration_onboarding_completed_at` immediately
+  for every native sign-up; WP-migrated users are inserted directly via
+  `User.registration_changeset/2` and are left with this field `nil`, so its
+  absence is a permanent (not just migration-window) marker of a migrated
+  account.
+  """
+  def wp_migrated?(%User{} = user) do
+    is_nil(user.post_migration_onboarding_completed_at)
+  end
+
   @doc false
   def ci_query_explain_query do
     from(u in User,
