@@ -1,0 +1,38 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding="48px 48px 24px 48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
+      <strong>❄️ Winter <%= @cycle_label %> weekends are open!</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding="20px 48px 48px 48px">
+  <mj-column padding="0">
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Hej <%= @first_name %>,</mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
+      The booking window for the Tahoe cabin's Winter <%= @cycle_label %> season has opened — you can now reserve the first full weekend:
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="22px" line-height="1.4" padding="0px" font-weight="bold" color="#1447e6">
+      <%= @weekend_range %>
+    </mj-text>
+    <mj-spacer height="20px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.6" padding="0px" color="#444444">
+      Winter is room bookings only — the whole cabin isn't available to rent out during winter nights. Single membership holders can reserve 1 room per stay; family membership holders can reserve 2 rooms for the same dates.
+    </mj-text>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-button href="<%= @booking_url %>" css-class="btn_block" inner-padding="16px 32px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" font-weight="bold" border-radius="6px">
+      Book a Room →
+    </mj-button>
+    <mj-spacer height="32px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
+      Vi ses!
+    </mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+    <mj-text align="left" font-size="16px" line-height="1.5" padding="0px" color="#555555">
+      <strong>Young Scandinavians Club</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<%= render_dynamic_component YscWeb.Emails.NotificationSettingsFooter, url: @notification_settings_url, link_text: "Unsubscribe from event notifications" %>

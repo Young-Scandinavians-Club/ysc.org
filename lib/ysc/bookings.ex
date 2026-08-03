@@ -141,6 +141,28 @@ defmodule Ysc.Bookings do
   end
 
   @doc """
+  Marks the "first bookable weekend" notification as sent for a season's
+  current occurrence (see `Ysc.Bookings.SeasonWeekendAvailabilityWorker`).
+
+  Doesn't invalidate the season cache — these fields don't affect any
+  booking/date logic, only notification bookkeeping.
+  """
+  def mark_weekend_notification_sent(
+        %Season{} = season,
+        cycle_year,
+        recipient_count
+      ) do
+    season
+    |> Ecto.Changeset.change(%{
+      weekend_notification_sent_cycle_year: cycle_year,
+      weekend_notification_sent_at:
+        DateTime.truncate(DateTime.utc_now(), :second),
+      weekend_notification_recipient_count: recipient_count
+    })
+    |> Repo.update()
+  end
+
+  @doc """
   Deletes a season.
   """
   def delete_season(%Season{} = season) do

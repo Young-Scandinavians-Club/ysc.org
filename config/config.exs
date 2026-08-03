@@ -165,7 +165,9 @@ config :ysc, Oban,
         YscWeb.Workers.MembershipRenewalPaymentMethodCheckerWorker},
        # 04:00 UTC = 8:00 PM PST (UTC-8) / 9:00 PM PDT (UTC-7)
        {"0 4 * * *", YscWeb.Workers.MembershipRenewalReminderWorker},
-       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker}
+       {"0 10 * * *", YscWeb.Workers.EventPhotoReminderSweeperWorker},
+       # 17:00 UTC = 9:00 AM PST (UTC-8) / 10:00 AM PDT (UTC-7)
+       {"0 17 * * *", YscWeb.Workers.SeasonWeekendAvailabilityWorker}
      ]}
   ]
 

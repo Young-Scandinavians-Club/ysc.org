@@ -66,6 +66,8 @@ defmodule Ysc.Accounts.EmailCategories do
     "event_notification" => :event,
     "event_update_notification" => :event,
     "save_the_date_available" => :event,
+    "tahoe_winter_weekend_available" => :event,
+    "tahoe_summer_buyout_available" => :event,
     # Booking notifications (can be disabled)
     "booking_confirmation" => :account,
     "booking_entitlement_granted" => :account,

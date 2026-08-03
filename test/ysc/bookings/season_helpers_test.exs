@@ -448,4 +448,140 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
              ) == {true, "2026/2027"}
     end
   end
+
+  describe "first_weekend_booking_window/4" do
+    # get_next_season/3 filters candidates by `season.id != current_season.id`,
+    # so these need distinct (non-nil) ids or every season looks like "the
+    # current one" and the next-season lookup silently returns nil.
+    @winter %Season{
+      id: "winter-fixture",
+      name: "Winter",
+      property: :tahoe,
+      start_date: ~D[2024-11-01],
+      end_date: ~D[2025-04-30],
+      advance_booking_days: 45
+    }
+
+    @summer %Season{
+      id: "summer-fixture",
+      name: "Summer",
+      property: :tahoe,
+      start_date: ~D[2024-05-01],
+      end_date: ~D[2024-10-31],
+      advance_booking_days: nil
+    }
+
+    test "returns nil when the named season isn't configured" do
+      assert SeasonHelpers.first_weekend_booking_window(
+               :tahoe,
+               [@summer],
+               ~D[2026-08-02],
+               "Winter"
+             ) == nil
+    end
+
+    test "the computed weekend is the first Friday on/after the season's start, checking out Sunday" do
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2026-08-02],
+          "Winter"
+        )
+
+      assert %{weekend_checkin: checkin, weekend_checkout: checkout} = result
+      assert Date.day_of_week(checkin, :monday) == 5
+      assert Date.diff(checkout, checkin) == 2
+      assert Date.compare(checkin, ~D[2026-11-01]) != :lt
+      assert Date.diff(checkin, ~D[2026-11-01]) < 7
+    end
+
+    test "closed while the global calendar reach (driven by today's current season) hasn't extended far enough" do
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2026-08-02],
+          "Winter"
+        )
+
+      refute result.open?
+    end
+
+    test "open once the current season's advance window reaches the weekend" do
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2026-10-01],
+          "Winter"
+        )
+
+      assert result.open?
+    end
+
+    test "Summer stays closed while deep in Winter even though Summer itself has no advance limit" do
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2027-01-15],
+          "Summer"
+        )
+
+      refute result.open?
+    end
+
+    test "Summer opens once Winter's own advance window reaches the first summer weekend" do
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2027-04-10],
+          "Summer"
+        )
+
+      assert result.open?
+    end
+
+    test "closed for a season whose first weekend has already passed (e.g. shipping mid-season)" do
+      # Today is deep into the current Summer occurrence (May-Oct) — its first
+      # weekend, back in early May, is long gone. Without the "not in the
+      # past" guard this would report open (nothing else in the window math
+      # checks a lower bound), incorrectly announcing a stale weekend the
+      # moment this feature ships.
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2026-08-02],
+          "Summer"
+        )
+
+      assert Date.compare(result.weekend_checkin, ~D[2026-08-02]) == :lt
+      refute result.open?
+    end
+
+    test "cycle_year uses the resolved occurrence's start year" do
+      winter_result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2026-08-02],
+          "Winter"
+        )
+
+      assert winter_result.cycle_year == 2026
+
+      summer_result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2027-01-15],
+          "Summer"
+        )
+
+      assert summer_result.cycle_year == 2027
+    end
+  end
 end
