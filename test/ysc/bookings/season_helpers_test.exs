@@ -544,6 +544,24 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
       assert result.open?
     end
 
+    test "closed for a season whose first weekend has already passed (e.g. shipping mid-season)" do
+      # Today is deep into the current Summer occurrence (May-Oct) — its first
+      # weekend, back in early May, is long gone. Without the "not in the
+      # past" guard this would report open (nothing else in the window math
+      # checks a lower bound), incorrectly announcing a stale weekend the
+      # moment this feature ships.
+      result =
+        SeasonHelpers.first_weekend_booking_window(
+          :tahoe,
+          [@winter, @summer],
+          ~D[2026-08-02],
+          "Summer"
+        )
+
+      assert Date.compare(result.weekend_checkin, ~D[2026-08-02]) == :lt
+      refute result.open?
+    end
+
     test "cycle_year uses the resolved occurrence's start year" do
       winter_result =
         SeasonHelpers.first_weekend_booking_window(

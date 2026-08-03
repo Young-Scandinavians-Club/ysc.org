@@ -111,7 +111,15 @@ defmodule Ysc.Bookings.SeasonHelpers do
   season's current-or-next occurrence, and whether it's actually bookable
   right now.
 
-  "Bookable right now" requires both:
+  "Bookable right now" requires all of:
+  - The weekend hasn't already started (`weekend_checkin >= today`). Without
+    this, a season already well underway when this check first runs (e.g.
+    deploying partway through Summer) would compute a check-in date back near
+    the season's start — already in the past — which trivially satisfies both
+    checks below and would fire immediately for a weekend nobody can book
+    anymore. This also means a season occurrence that's already mostly over
+    by the time this ships is correctly skipped entirely rather than
+    misfiring — the next real notification is simply the *next* occurrence.
   - The property's overall calendar reach (`calculate_max_booking_date/3`,
     driven by *today's* current season) has extended far enough to include
     the weekend's check-in date — this is what stops e.g. a Summer weekend
@@ -140,7 +148,8 @@ defmodule Ysc.Bookings.SeasonHelpers do
         max_booking_date = calculate_max_booking_date(property, today, seasons)
 
         open? =
-          Date.compare(weekend_checkin, max_booking_date) != :gt and
+          Date.compare(weekend_checkin, today) != :lt and
+            Date.compare(weekend_checkin, max_booking_date) != :gt and
             date_selectable?(property, weekend_checkin, today, seasons) and
             date_selectable?(property, weekend_checkout, today, seasons)
 
