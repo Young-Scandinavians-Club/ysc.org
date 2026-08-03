@@ -21,6 +21,7 @@ defmodule YscWeb.EventPhotoUploadLive do
       |> assign(:page_title, "Share event photos & videos")
       |> assign(:upload_complete?, false)
       |> assign(:upload_errors, [])
+      |> assign(:extension_errors, %{})
       |> allow_upload(:photos,
         # Wildcards avoid per-extension MIME registration; Limits.validate_upload/2
         # enforces the supported photo/video extensions on the server.
@@ -150,9 +151,30 @@ defmodule YscWeb.EventPhotoUploadLive do
               <.live_file_input upload={@uploads.photos} class="hidden" />
             </label>
 
-            <ul :if={@upload_errors != []} class="text-sm text-red-600 space-y-1">
-              <li :for={msg <- @upload_errors}>{msg}</li>
-            </ul>
+            <div
+              :if={@upload_errors != [] or upload_errors(@uploads.photos) != []}
+              class="flex gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+              role="alert"
+            >
+              <.icon
+                name="hero-exclamation-triangle"
+                class="h-5 w-5 shrink-0 text-red-500"
+              />
+              <div class="space-y-1">
+                <p class="text-sm font-semibold text-red-800">
+                  We couldn't upload everything
+                </p>
+                <p
+                  :for={err <- upload_errors(@uploads.photos)}
+                  class="text-sm text-red-700"
+                >
+                  {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
+                </p>
+                <p :for={msg <- @upload_errors} class="text-sm text-red-700">
+                  {msg}
+                </p>
+              </div>
+            </div>
 
             <div :if={@uploads.photos.entries != []} class="space-y-3">
               <p class="text-sm font-medium text-zinc-700">
@@ -163,7 +185,7 @@ defmodule YscWeb.EventPhotoUploadLive do
                   :for={entry <- @uploads.photos.entries}
                   class={[
                     "relative rounded-lg overflow-hidden border-2 aspect-square",
-                    if(entry_has_errors?(@uploads.photos, entry),
+                    if(entry_has_errors?(@uploads.photos, entry, @extension_errors),
                       do: "border-red-400 bg-red-50",
                       else: "border-zinc-200 bg-zinc-100"
                     )
@@ -184,7 +206,7 @@ defmodule YscWeb.EventPhotoUploadLive do
                     type="button"
                     phx-click="cancel-upload"
                     phx-value-ref={entry.ref}
-                    class="absolute top-1 right-1 rounded-full bg-zinc-900/70 p-1 text-white hover:bg-zinc-900"
+                    class="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900/70 text-white hover:bg-zinc-900"
                     aria-label="Remove"
                   >
                     <.icon name="hero-x-mark" class="h-4 w-4" />
@@ -192,10 +214,10 @@ defmodule YscWeb.EventPhotoUploadLive do
                   <div class="absolute bottom-0 inset-x-0 space-y-1 bg-zinc-900/70 px-2 py-1">
                     <p class="text-xs text-white truncate">{entry.client_name}</p>
                     <%= cond do %>
-                      <% entry_has_errors?(@uploads.photos, entry) -> %>
+                      <% entry_has_errors?(@uploads.photos, entry, @extension_errors) -> %>
                         <p class="text-[11px] font-medium text-red-300">
-                          <%= for err <- upload_errors(@uploads.photos, entry) do %>
-                            {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
+                          <%= for msg <- entry_error_messages(@uploads.photos, entry, @extension_errors) do %>
+                            {msg}
                           <% end %>
                         </p>
                       <% entry.done? -> %>
@@ -219,10 +241,11 @@ defmodule YscWeb.EventPhotoUploadLive do
               </div>
             </div>
 
-            <div class="flex flex-col gap-2">
+            <div class="sticky bottom-0 z-10 -mx-4 flex flex-col gap-2 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
               <p
                 :if={
                   @uploads.photos.entries != [] and
+                    not has_blocking_errors?(@uploads.photos, @extension_errors) and
                     not uploads_ready?(@uploads.photos)
                 }
                 class="text-center text-sm text-zinc-500"
@@ -232,28 +255,35 @@ defmodule YscWeb.EventPhotoUploadLive do
                   @uploads.photos.entries
                 )} files… please keep this page open.
               </p>
+              <p
+                :if={has_blocking_errors?(@uploads.photos, @extension_errors)}
+                class="text-center text-sm text-red-600"
+                aria-live="polite"
+              >
+                Remove the file(s) marked in red above to continue.
+              </p>
               <.button
                 type="submit"
                 id="submit-photos-btn"
                 class="w-full"
                 disabled={
                   @uploads.photos.entries == [] or
-                    not uploads_ready?(@uploads.photos)
+                    not uploads_ready?(@uploads.photos) or
+                    has_blocking_errors?(@uploads.photos, @extension_errors)
                 }
                 phx-disable-with="Uploading…"
               >
-                <%= if @uploads.photos.entries != [] and not uploads_ready?(@uploads.photos) do %>
-                  Waiting for files to finish uploading…
-                <% else %>
-                  Upload
+                <%= cond do %>
+                  <% @uploads.photos.entries == [] -> %>
+                    Upload
+                  <% has_blocking_errors?(@uploads.photos, @extension_errors) -> %>
+                    Remove unsupported files to continue
+                  <% not uploads_ready?(@uploads.photos) -> %>
+                    Waiting for files to finish uploading…
+                  <% true -> %>
+                    Upload
                 <% end %>
               </.button>
-              <p
-                :for={err <- collect_upload_errors(@uploads.photos)}
-                class="text-sm text-red-600"
-              >
-                {YscWeb.UploadErrors.error_to_string(err, :event_photo)}
-              </p>
             </div>
           </form>
         <% end %>
@@ -264,18 +294,31 @@ defmodule YscWeb.EventPhotoUploadLive do
 
   @impl true
   def handle_event("validate", _params, socket) do
-    {:noreply, assign(socket, :upload_errors, [])}
+    {:noreply,
+     socket
+     |> assign(:upload_errors, [])
+     |> assign(
+       :extension_errors,
+       extension_errors(socket.assigns.uploads.photos)
+     )}
   end
 
   def handle_event("cancel-upload", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :photos, ref)}
+    {:noreply,
+     socket
+     |> cancel_upload(:photos, ref)
+     |> assign(
+       :extension_errors,
+       Map.delete(socket.assigns.extension_errors, ref)
+     )}
   end
 
   def handle_event("upload-more", _params, socket) do
     {:noreply,
      socket
      |> assign(:upload_complete?, false)
-     |> assign(:upload_errors, [])}
+     |> assign(:upload_errors, [])
+     |> assign(:extension_errors, %{})}
   end
 
   def handle_event("upload", _params, socket) do
@@ -302,6 +345,17 @@ defmodule YscWeb.EventPhotoUploadLive do
       {:noreply,
        put_flash(socket, :error, "Uploads are temporarily unavailable.")}
     end
+  end
+
+  defp extension_errors(upload) do
+    upload.entries
+    |> Enum.flat_map(fn entry ->
+      case Limits.validate_upload(entry.client_name, entry.client_size) do
+        :ok -> []
+        {:error, reason} -> [{entry.ref, Limits.error_message(reason)}]
+      end
+    end)
+    |> Map.new()
   end
 
   defp do_upload(socket) do
@@ -388,14 +442,25 @@ defmodule YscWeb.EventPhotoUploadLive do
     Enum.count(upload.entries, & &1.done?)
   end
 
-  defp entry_has_errors?(upload, entry) do
-    upload_errors(upload, entry) != []
+  defp entry_error_messages(upload, entry, extension_errors) do
+    phoenix_messages =
+      Enum.map(
+        upload_errors(upload, entry),
+        &YscWeb.UploadErrors.error_to_string(&1, :event_photo)
+      )
+
+    case Map.fetch(extension_errors, entry.ref) do
+      {:ok, message} -> phoenix_messages ++ [message]
+      :error -> phoenix_messages
+    end
   end
 
-  defp collect_upload_errors(%{entries: entries} = upload) do
-    Enum.flat_map(entries, fn entry ->
-      upload_errors(upload, entry)
-    end)
+  defp entry_has_errors?(upload, entry, extension_errors) do
+    entry_error_messages(upload, entry, extension_errors) != []
+  end
+
+  defp has_blocking_errors?(upload, extension_errors) do
+    Enum.any?(upload.entries, &entry_has_errors?(upload, &1, extension_errors))
   end
 
   defp video_entry?(entry) do

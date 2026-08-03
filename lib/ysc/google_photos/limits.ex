@@ -8,7 +8,7 @@ defmodule Ysc.GooglePhotos.Limits do
   @max_album_title_length 500
   @max_filename_length 255
 
-  @video_extensions ~w(.mp4 .mov .m4v .avi .mkv .webm .3gp .3g2 .mpeg .mpg .wmv .flv .asf .m2ts .mts .ogv)
+  @video_extensions ~w(.mp4 .mov .m4v .avi .mkv .webm .3gp .3g2 .mpeg .mpg .wmv .asf .m2ts .mts)
   @photo_extensions ~w(.jpg .jpeg .png .heic .heif .webp .gif .bmp .tif .tiff)
 
   @doc "Maximum photo upload size in bytes (200 MB)."
