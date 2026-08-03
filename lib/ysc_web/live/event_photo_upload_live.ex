@@ -183,6 +183,7 @@ defmodule YscWeb.EventPhotoUploadLive do
               <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div
                   :for={entry <- @uploads.photos.entries}
+                  data-filename={entry.client_name}
                   class={[
                     "relative rounded-lg overflow-hidden border-2 aspect-square",
                     if(entry_has_errors?(@uploads.photos, entry, @extension_errors),
@@ -324,22 +325,18 @@ defmodule YscWeb.EventPhotoUploadLive do
   def handle_event("upload", _params, socket) do
     if socket.assigns.uploads_available? do
       entries = socket.assigns.uploads.photos.entries
+      extension_errors = extension_errors(socket.assigns.uploads.photos)
+      socket = assign(socket, :extension_errors, extension_errors)
 
-      validation_errors =
-        Enum.flat_map(entries, fn entry ->
-          case Limits.validate_upload(entry.client_name, entry.client_size) do
-            :ok ->
-              []
-
-            {:error, reason} ->
-              ["#{entry.client_name}: #{Limits.error_message(reason)}"]
-          end
-        end)
-
-      if validation_errors != [] do
-        {:noreply, assign(socket, :upload_errors, validation_errors)}
-      else
+      if extension_errors == %{} do
         do_upload(socket)
+      else
+        validation_errors =
+          entries
+          |> Enum.filter(&Map.has_key?(extension_errors, &1.ref))
+          |> Enum.map(&"#{&1.client_name}: #{extension_errors[&1.ref]}")
+
+        {:noreply, assign(socket, :upload_errors, validation_errors)}
       end
     else
       {:noreply,

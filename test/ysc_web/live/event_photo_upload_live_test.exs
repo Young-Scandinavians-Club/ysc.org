@@ -108,9 +108,14 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
       ])
 
     render_upload(upload, "flags.avif")
-    html = render_change(view, "validate", %{})
+    render_change(view, "validate", %{})
 
-    assert html =~ "File type is not supported."
+    assert has_element?(
+             view,
+             "div[data-filename='flags.avif'].border-red-400",
+             "File type is not supported."
+           )
+
     assert has_element?(view, "#submit-photos-btn[disabled]")
   end
 
@@ -132,11 +137,19 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
 
     # The submit button is disabled client-side once a file is flagged, but
     # the "upload" handler is still the last line of defense — simulate a
-    # bypassed disabled attribute by submitting the form event directly.
+    # bypassed disabled attribute by submitting the form event directly,
+    # without ever firing "validate".
     html = render_submit(view, "upload")
 
     assert html =~ "We couldn&#39;t upload everything"
-    assert html =~ "File type is not supported."
+
+    assert has_element?(
+             view,
+             "div[data-filename='flags.avif'].border-red-400",
+             "File type is not supported."
+           )
+
+    assert has_element?(view, "#submit-photos-btn[disabled]")
   end
 
   test "shows a too-many-files banner when the batch exceeds the max entry count",
@@ -186,22 +199,24 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
       ])
 
     render_upload(bad, "bad.avif")
-    html = render_change(view, "validate", %{})
+    render_change(view, "validate", %{})
 
-    assert html =~ "File type is not supported."
+    assert has_element?(
+             view,
+             "div[data-filename='bad.avif'].border-red-400",
+             "File type is not supported."
+           )
+
     assert has_element?(view, "#submit-photos-btn[disabled]")
 
-    {:ok, doc} = Floki.parse_fragment(html)
-
-    [_good_ref, bad_ref] =
-      doc
-      |> Floki.find("button[aria-label='Remove']")
-      |> Floki.attribute("phx-value-ref")
-
-    html = render_click(view, "cancel-upload", %{"ref" => bad_ref})
+    html =
+      view
+      |> element("div[data-filename='bad.avif'] button[aria-label='Remove']")
+      |> render_click()
 
     refute html =~ "File type is not supported."
-    assert html =~ "good.png"
+    assert has_element?(view, "div[data-filename='good.png']")
+    refute has_element?(view, "div[data-filename='bad.avif']")
     refute has_element?(view, "#submit-photos-btn[disabled]")
   end
 
