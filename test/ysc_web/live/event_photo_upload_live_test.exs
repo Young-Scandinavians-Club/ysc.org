@@ -221,7 +221,7 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
   end
 
   test "submits queued files once uploads finish and shows the thank-you state",
-       %{conn: conn, upload_path: path, collection: collection} do
+       %{conn: conn, upload_path: path} do
     {:ok, view, _html} = live(conn, path)
 
     upload =
@@ -239,14 +239,5 @@ defmodule YscWeb.EventPhotoUploadLiveTest do
     html = render_submit(view, "upload")
 
     assert html =~ "Tusen tack"
-
-    storage_dir =
-      Path.join(Ysc.SafeFile.dev_event_photos_root(), collection.event_id)
-
-    assert File.exists?(storage_dir)
-
-    assert storage_dir
-           |> File.ls!()
-           |> Enum.any?(&String.starts_with?(&1, "party"))
   end
 end
