@@ -4,6 +4,8 @@ defmodule YscWeb.EventPhotoUploadLive do
   """
   use YscWeb, :live_view
 
+  require Ysc.Logging
+
   import YscWeb.CoreComponents
 
   alias Ysc.EventPhotos
@@ -371,19 +373,23 @@ defmodule YscWeb.EventPhotoUploadLive do
     user = socket.assigns.current_user
     entry_count = length(socket.assigns.uploads.photos.entries)
 
-    uploaded =
+    # consume_uploaded_entries requires every callback to return {:ok, value}
+    # (or {:postpone, value}) — an {:error, _} return isn't a supported shape,
+    # so success/failure has to be tagged inside the ok-tuple instead and
+    # unwrapped afterward.
+    results =
       consume_uploaded_entries(socket, :photos, fn %{key: key}, entry ->
         case enqueue_upload_job(collection, user, key, entry) do
           {:ok, _job} ->
-            {:ok, key}
+            {:ok, {:ok, key}}
 
           {:error, _} ->
             delete_staged_upload(key)
-            {:error, :upload_enqueue_failed}
+            {:ok, {:error, :upload_enqueue_failed}}
         end
       end)
 
-    uploaded_count = length(uploaded)
+    uploaded_count = Enum.count(results, &match?({:ok, _}, &1))
 
     cond do
       uploaded_count == 0 ->
@@ -426,11 +432,18 @@ defmodule YscWeb.EventPhotoUploadLive do
   # The Oban insert itself failed (e.g. DB hiccup) before any worker could run,
   # so nothing else will ever clean up this orphaned upload — remove it here.
   defp delete_staged_upload(s3_key) do
-    S3Config.bucket_name()
-    |> ExAws.S3.delete_object(s3_key)
-    |> ExAws.request()
+    case S3Config.bucket_name()
+         |> ExAws.S3.delete_object(s3_key)
+         |> ExAws.request() do
+      {:ok, _} ->
+        :ok
 
-    :ok
+      {:error, reason} ->
+        Ysc.Logging.warning("Event media S3 object cleanup failed",
+          s3_key: s3_key,
+          reason: inspect(reason)
+        )
+    end
   end
 
   defp uploads_ready?(upload) do

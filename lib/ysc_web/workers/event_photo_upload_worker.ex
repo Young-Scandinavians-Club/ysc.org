@@ -149,9 +149,18 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
     end
 
     if result == :ok or final_attempt? do
-      S3Config.bucket_name()
-      |> ExAws.S3.delete_object(s3_key)
-      |> ExAws.request()
+      case S3Config.bucket_name()
+           |> ExAws.S3.delete_object(s3_key)
+           |> ExAws.request() do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.warning("Event media S3 object cleanup failed",
+            s3_key: s3_key,
+            reason: inspect(reason)
+          )
+      end
     end
   end
 end
