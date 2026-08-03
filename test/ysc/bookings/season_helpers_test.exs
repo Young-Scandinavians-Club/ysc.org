@@ -353,4 +353,59 @@ defmodule Ysc.Bookings.SeasonHelpersTest do
       refute SeasonHelpers.date_selectable?(:tahoe, outside, today, seasons)
     end
   end
+
+  describe "winter_booking_window/3" do
+    @winter %Season{
+      name: "Winter",
+      start_date: ~D[2024-11-01],
+      end_date: ~D[2025-04-30]
+    }
+
+    test "closed when winter's start date is beyond the bookable window" do
+      today = ~D[2026-08-02]
+      max_booking_date = ~D[2026-10-31]
+
+      assert SeasonHelpers.winter_booking_window(
+               [@winter],
+               today,
+               max_booking_date
+             ) == {false, "2026/2027"}
+    end
+
+    test "open once the advance-booking window reaches winter's start date" do
+      today = ~D[2026-09-20]
+      max_booking_date = ~D[2026-11-05]
+
+      assert SeasonHelpers.winter_booking_window(
+               [@winter],
+               today,
+               max_booking_date
+             ) == {true, "2026/2027"}
+    end
+
+    test "open while currently inside the winter season" do
+      today = ~D[2027-01-15]
+      max_booking_date = ~D[2027-03-01]
+
+      assert SeasonHelpers.winter_booking_window(
+               [@winter],
+               today,
+               max_booking_date
+             ) == {true, "2026/2027"}
+    end
+
+    test "closed with no Winter season configured" do
+      summer = %Season{
+        name: "Summer",
+        start_date: ~D[2024-05-01],
+        end_date: ~D[2024-10-31]
+      }
+
+      assert SeasonHelpers.winter_booking_window(
+               [summer],
+               ~D[2026-08-02],
+               ~D[2026-10-31]
+             ) == {false, nil}
+    end
+  end
 end

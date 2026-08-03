@@ -59,6 +59,34 @@ defmodule Ysc.Bookings.SeasonHelpers do
   end
 
   @doc """
+  Whether the (recurring) Winter season's current-or-next occurrence has
+  entered the bookable window yet, plus a "start year/end year" label for it
+  (e.g. `"2025/2026"`) derived from the resolved dates.
+
+  A season named `"Winter"` is treated as not buyout-eligible elsewhere
+  (`Season.buyout_allowed_on_date?/2`); this mirrors that convention to decide
+  when a "winter reservations are open" notice should be shown at all, so it
+  only appears once at least the season's start date is actually selectable
+  (given `max_booking_date`, e.g. from `calculate_max_booking_date/3`) and
+  disappears again once the season has passed and the next occurrence isn't
+  yet in reach.
+  """
+  def winter_booking_window(seasons, today, max_booking_date)
+      when is_list(seasons) do
+    case Enum.find(seasons, &(&1.name == "Winter")) do
+      nil ->
+        {false, nil}
+
+      winter ->
+        {winter_start, winter_end} = get_season_date_range(winter, today)
+
+        open? = Date.compare(winter_start, max_booking_date) != :gt
+
+        {open?, "#{winter_start.year}/#{winter_end.year}"}
+    end
+  end
+
+  @doc """
   Gets the actual date range for a season based on a reference date.
 
   Handles year-spanning seasons (e.g., Nov 1 - Apr 30).
