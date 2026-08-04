@@ -853,9 +853,18 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
             end
         )
 
+        # A non-200 response still streams its error body to `temp_file`
+        # via Req's `into:` before download_via_presigned_url/2 detects the
+        # status and returns an error, so it must be cleaned up here.
+        File.rm(temp_file)
+
         {:error, :s3_download_failed}
     end
   end
+
+  @doc false
+  def download_from_s3_to_temp_for_test(s3_path),
+    do: download_from_s3_to_temp(s3_path)
 
   # sobelow_skip ["Traversal.FileModule"]
   defp download_via_presigned_url(key, dest) do
