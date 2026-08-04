@@ -182,8 +182,6 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
     end
   end
 
-  defp parse_http_date(nil), do: :unknown
-
   defp parse_http_date(value) when is_binary(value) do
     case :httpd_util.convert_request_date(String.to_charlist(value)) do
       {{year, month, day}, {hour, minute, second}} ->

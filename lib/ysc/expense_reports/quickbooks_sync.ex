@@ -846,7 +846,7 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
           access_key_id_configured: !is_nil(access_key_id),
           secret_access_key_configured: secret_access_key_configured,
           error_hint:
-            if match?({:error, %{code: :access_denied}}, reason) do
+            if match?({:http_status, 403}, reason) do
               "Check that AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY have read permissions for bucket: #{bucket}"
             else
               nil

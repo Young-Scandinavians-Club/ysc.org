@@ -217,6 +217,4 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
 
   defp safe_to_delete_s3?({:error, reason}),
     do: reason in @safe_to_delete_after_terminal_error
-
-  defp safe_to_delete_s3?(_), do: false
 end
