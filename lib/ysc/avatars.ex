@@ -108,6 +108,10 @@ defmodule Ysc.Avatars do
   Verifies the avatar belongs to the user before deleting. If it's the
   user's current avatar, `current_avatar_id` is cleared automatically by the
   `on_delete: :nilify_all` foreign key.
+
+  S3 cleanup is performed by an Oban job enqueued in the same transaction as
+  the database delete, so a transient S3 failure retries via Oban's backoff
+  instead of silently leaving the object accessible.
   """
   def delete_avatar(%User{} = user, avatar_id) do
     case from(a in Avatar, where: a.id == ^avatar_id and a.user_id == ^user.id)
@@ -116,38 +120,40 @@ defmodule Ysc.Avatars do
         {:error, :not_found}
 
       avatar ->
-        case Repo.delete(avatar) do
-          {:ok, deleted} ->
-            delete_avatar_s3_objects(deleted)
-            {:ok, deleted}
+        keys =
+          [
+            avatar.original_path,
+            avatar.thumb_path,
+            avatar.profile_path,
+            avatar.large_path
+          ]
+          |> Enum.map(&avatar_s3_key(&1, avatar.user_id))
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq()
 
-          {:error, reason} ->
-            {:error, reason}
-        end
+        Repo.transaction(fn ->
+          with {:ok, deleted} <- Repo.delete(avatar),
+               :ok <- enqueue_avatar_cleanup(deleted.id, keys) do
+            deleted
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
+        end)
     end
   end
 
-  defp delete_avatar_s3_objects(%Avatar{} = avatar) do
+  defp enqueue_avatar_cleanup(_avatar_id, []), do: :ok
+
+  defp enqueue_avatar_cleanup(avatar_id, keys) do
     bucket = S3Config.avatars_bucket_name()
 
-    [
-      avatar.original_path,
-      avatar.thumb_path,
-      avatar.profile_path,
-      avatar.large_path
-    ]
-    |> Enum.map(&avatar_s3_key(&1, avatar.user_id))
-    |> Enum.reject(&is_nil/1)
-    |> Enum.uniq()
-    |> Enum.each(fn key ->
-      case bucket |> ExAws.S3.delete_object(key) |> ExAws.request() do
-        {:ok, _} ->
-          :ok
-
-        {:error, reason} ->
-          Ysc.Logging.warning("Avatar S3 object cleanup failed",
-            extra: %{avatar_id: avatar.id, key: key, reason: inspect(reason)}
-          )
+    Enum.reduce_while(keys, :ok, fn key, :ok ->
+      %{"bucket" => bucket, "key" => key, "avatar_id" => avatar_id}
+      |> YscWeb.Workers.AvatarCleanupWorker.new()
+      |> Oban.insert()
+      |> case do
+        {:ok, _job} -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
   end
