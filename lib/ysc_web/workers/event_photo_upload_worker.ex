@@ -108,70 +108,78 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
           {:error, reason}
       end
 
-    cleanup(
-      tmp_root,
-      collection_id,
-      scratch_id,
-      filename,
-      s3_key,
-      result,
-      final_attempt?
-    )
+    cleanup(tmp_root, collection_id, scratch_id, filename, s3_key, result)
 
     result
   end
 
   @download_timeout :timer.minutes(30)
 
-  # Streams the download in chunks instead of buffering the whole object in
-  # memory — required for large video uploads. This needs `virtual_host: true`
-  # in the :ex_aws, :s3 config (see config/runtime.exs) or every request 405s
-  # against Tigris, which rejects path-style bucket addressing.
+  # Errors that can only occur *after* a successful download (Limits.validate_upload
+  # inspecting the real file). Safe to delete the S3 object for these — we've
+  # confirmed we could actually read it, it's just not a file we can use.
+  @safe_to_delete_after_terminal_error [
+    :photo_too_large,
+    :video_too_large,
+    :file_too_large,
+    :filename_too_long,
+    :empty_filename,
+    :unsupported_type
+  ]
+
+  # Fetches the object via its public URL with a plain HTTP GET instead of a
+  # signed ExAws.S3 GetObject request.
   #
-  # ExAws.S3.download_file/3 fans each chunk out over Task.async_stream, whose
-  # tasks are *linked* to the caller by default. When a chunk request fails,
-  # the resulting crash is an EXIT signal, not a raised exception — the
-  # library's own try/rescue only catches synchronous raises in the same
-  # process, so a failed chunk crashes this job's process outright rather than
-  # returning {:error, _}. Running the download in an unlinked supervised task
-  # isolates that crash so it can be reported and retried like any other
-  # failure instead of taking the whole job down with it.
+  # Every object this worker downloads was uploaded through a presigned POST
+  # that sets ACL: public-read (see YscWeb.EventPhotoUpload), so an unsigned
+  # GET is sufficient and requires no credentials.
+  #
+  # This isn't a style choice — signed GET requests to the raw Tigris endpoint
+  # return 405 in this environment (verified directly against production: PUT,
+  # HEAD, and DELETE via ExAws all succeed with normal Tigris responses; GET,
+  # signed, ranged or not, consistently 405s with bare, non-Tigris-shaped
+  # response headers, on every bucket — something in front of Tigris appears
+  # to specifically block signed reads while allowing unsigned public reads
+  # through the same virtual-hosted URL). ExAws.S3.download_file/3 also had a
+  # separate, real problem: it fans chunks out over Task.async_stream, whose
+  # tasks are linked to the caller by default, so a failed chunk crashed this
+  # job's process via an EXIT signal that no try/rescue (ExAws's or ours)
+  # could catch. Req streams to `dest` directly, so this avoids both issues at
+  # once — no signed GET, no linked background tasks.
   # sobelow_skip ["Traversal.FileModule"]
   defp download_from_s3(s3_key, dest) do
-    task =
-      Task.Supervisor.async_nolink(Ysc.TaskSupervisor, fn ->
-        S3Config.bucket_name()
-        |> ExAws.S3.download_file(s3_key, dest)
-        |> ExAws.request()
-      end)
+    url = S3Config.object_url(s3_key, S3Config.bucket_name())
 
-    case Task.yield(task, @download_timeout) ||
-           Task.shutdown(task, :brutal_kill) do
-      {:ok, {:ok, _}} -> :ok
-      {:ok, {:error, reason}} -> {:error, {:s3_download_failed, reason}}
-      {:exit, reason} -> {:error, {:s3_download_crashed, reason}}
-      nil -> {:error, :s3_download_timeout}
+    case Req.get(url,
+           into: File.stream!(dest),
+           receive_timeout: @download_timeout
+         ) do
+      {:ok, %{status: 200}} ->
+        :ok
+
+      {:ok, %{status: status}} ->
+        {:error, {:s3_download_failed, {:http_status, status}}}
+
+      {:error, reason} ->
+        {:error, {:s3_download_failed, reason}}
     end
+  rescue
+    e -> {:error, {:s3_download_crashed, e}}
   end
 
   # Always clears the local scratch file (cheap to re-download on retry).
-  # Only removes the S3 object once nothing will ever retry this job again —
-  # a job that will be retried needs the object to still be there.
-  defp cleanup(
-         tmp_root,
-         collection_id,
-         scratch_id,
-         filename,
-         s3_key,
-         result,
-         final_attempt?
-       ) do
+  # Only removes the S3 object when we know it was actually read (a
+  # successful upload, or a terminal validation rejection that only happens
+  # after reading the file) — never for a download failure, even on the
+  # final attempt, since that would permanently destroy a file we never
+  # actually got hold of. Those are left in S3 for manual recovery/cleanup.
+  defp cleanup(tmp_root, collection_id, scratch_id, filename, s3_key, result) do
     case SafeFile.event_photo_tmp_path(collection_id, scratch_id, filename) do
       {:ok, dest} -> SafeFile.rm_under_root(tmp_root, dest)
       :error -> :ok
     end
 
-    if result == :ok or final_attempt? do
+    if safe_to_delete_s3?(result) do
       case S3Config.bucket_name()
            |> ExAws.S3.delete_object(s3_key)
            |> ExAws.request() do
@@ -186,4 +194,11 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
       end
     end
   end
+
+  defp safe_to_delete_s3?(:ok), do: true
+
+  defp safe_to_delete_s3?({:error, reason}),
+    do: reason in @safe_to_delete_after_terminal_error
+
+  defp safe_to_delete_s3?(_), do: false
 end
