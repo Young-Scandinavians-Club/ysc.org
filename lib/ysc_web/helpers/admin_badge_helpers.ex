@@ -118,4 +118,37 @@ defmodule YscWeb.AdminBadgeHelpers do
   def event_state_badge_type(:scheduled), do: "yellow"
   def event_state_badge_type(:published), do: "green"
   def event_state_badge_type(_), do: "default"
+
+  @doc """
+  Badge `type` for a newsletter subscriber's `source` string (admin subscribers list).
+
+  Unrecognized sources fall back to `"default"` so new source values introduced
+  elsewhere in the app still render (just uncategorized by color).
+  """
+  @spec newsletter_source_badge_type(String.t() | nil) :: String.t()
+  def newsletter_source_badge_type("public_signup"), do: "green"
+  def newsletter_source_badge_type("newsletters_page"), do: "green"
+  def newsletter_source_badge_type("signup"), do: "green"
+  def newsletter_source_badge_type("user_registration"), do: "sky"
+  def newsletter_source_badge_type("user_registration_linked"), do: "sky"
+  def newsletter_source_badge_type("user_settings"), do: "sky"
+  def newsletter_source_badge_type("email_change"), do: "sky"
+  def newsletter_source_badge_type("admin_added"), do: "yellow"
+  def newsletter_source_badge_type("wp_migration"), do: "zinc"
+  def newsletter_source_badge_type("hard_bounce"), do: "red"
+  def newsletter_source_badge_type(_), do: "default"
+
+  @doc """
+  Human-readable label for a newsletter subscriber's `source` string,
+  e.g. `"public_signup"` -> `"Public signup"`. Returns `"Unknown"` for `nil`/empty.
+  """
+  @spec newsletter_source_label(String.t() | nil) :: String.t()
+  def newsletter_source_label(nil), do: "Unknown"
+  def newsletter_source_label(""), do: "Unknown"
+
+  def newsletter_source_label(source) when is_binary(source) do
+    source
+    |> String.replace("_", " ")
+    |> String.capitalize()
+  end
 end
