@@ -309,9 +309,15 @@ defmodule YscWeb.Emails.Notifier do
         subject,
         template,
         variables,
-        cc \\ nil
+        cc \\ nil,
+        reply_to \\ nil
       ) do
-    board_opts = if(cc, do: [cc: cc], else: [])
+    board_opts =
+      []
+      |> then(fn opts -> if(cc, do: Keyword.put(opts, :cc, cc), else: opts) end)
+      |> then(fn opts ->
+        if(reply_to, do: Keyword.put(opts, :reply_to, reply_to), else: opts)
+      end)
 
     schedule_email(
       from_email(),
