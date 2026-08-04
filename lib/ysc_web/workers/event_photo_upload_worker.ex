@@ -168,10 +168,13 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
   defp download_from_s3(s3_key, dest) do
     url = S3Config.object_url(s3_key, S3Config.bucket_name())
 
-    case Req.get(url,
-           into: File.stream!(dest),
-           receive_timeout: @download_timeout
-         ) do
+    opts =
+      Keyword.merge(
+        [into: File.stream!(dest), receive_timeout: @download_timeout],
+        Application.get_env(:ysc, :event_photo_s3_req_opts, [])
+      )
+
+    case Req.get(url, opts) do
       {:ok, %{status: 200}} ->
         :ok
 

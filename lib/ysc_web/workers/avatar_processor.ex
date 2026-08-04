@@ -205,8 +205,9 @@ defmodule YscWeb.Workers.AvatarProcessor do
   # sobelow_skip ["Traversal.FileModule"]
   defp download_original_from_s3!(key, dest_path) do
     url = S3Config.object_url(key, S3Config.avatars_bucket_name())
+    opts = Keyword.merge([into: File.stream!(dest_path)], s3_req_opts())
 
-    case Req.get(url, into: File.stream!(dest_path)) do
+    case Req.get(url, opts) do
       {:ok, %{status: 200}} ->
         :ok
 
@@ -217,6 +218,8 @@ defmodule YscWeb.Workers.AvatarProcessor do
         raise "Avatar S3 download failed: #{inspect(reason)} for key #{inspect(key)}"
     end
   end
+
+  defp s3_req_opts, do: Application.get_env(:ysc, :avatar_s3_req_opts, [])
 
   defp key_from_url(url) when is_binary(url) do
     path = URI.parse(url).path || ""

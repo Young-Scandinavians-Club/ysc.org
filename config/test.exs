@@ -120,6 +120,18 @@ config :ex_aws,
 
 config :ex_aws, :req_opts, connect_options: [protocols: [:http1]]
 
+# These workers issue plain Req.get/2 calls (not via ExAws), which have their
+# own default retry: up to 3 retries with exponential backoff (1s, 2s, 4s) on
+# transport errors — the same slow-connection-failure problem the ExAws
+# :retries override above addresses, but for Req directly. Tests that
+# deliberately point these at an unreachable host (e.g. port 1) would
+# otherwise take ~7s each waiting out the backoff.
+config :ysc,
+  geo_ip_s3_req_opts: [retry: false],
+  avatar_s3_req_opts: [retry: false],
+  event_photo_s3_req_opts: [retry: false],
+  image_processor_s3_req_opts: [retry: false]
+
 # Relax auth rate limits in test so login/forgot-password tests don't hit them
 config :ysc, Ysc.AuthRateLimit, ip_limit: 10_000, identifier_limit: 10_000
 
