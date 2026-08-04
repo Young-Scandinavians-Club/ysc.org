@@ -845,14 +845,16 @@ defmodule Ysc.FormsTest.NotifierSuccessAndPartialErrors do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: %Oban.Job{id: 11}
 
-    def schedule_email_to_board(_, _, _, _, _ \\ nil, _ \\ nil), do: %Oban.Job{id: 22}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil, _ \\ nil),
+      do: %Oban.Job{id: 22}
   end
 
   defmodule NotifierConfirmFailsBoardOk do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: {:error, :confirmation_failed}
 
-    def schedule_email_to_board(_, _, _, _, _ \\ nil, _ \\ nil), do: %Oban.Job{id: 33}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil, _ \\ nil),
+      do: %Oban.Job{id: 33}
   end
 
   defmodule NotifierConfirmOkBoardFails do
@@ -867,7 +869,8 @@ defmodule Ysc.FormsTest.NotifierSuccessAndPartialErrors do
     @moduledoc false
     def schedule_email(_, _, _, _, _, _), do: raise("notifier boom")
 
-    def schedule_email_to_board(_, _, _, _, _ \\ nil, _ \\ nil), do: %Oban.Job{id: 1}
+    def schedule_email_to_board(_, _, _, _, _ \\ nil, _ \\ nil),
+      do: %Oban.Job{id: 1}
   end
 
   defmodule NotifierRaisesOnBoardOnly do
