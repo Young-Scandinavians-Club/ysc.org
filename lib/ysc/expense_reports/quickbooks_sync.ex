@@ -815,20 +815,23 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
       System.tmp_dir!()
       |> Path.join("qb_upload_#{:rand.uniform(1_000_000_000)}")
 
-    # Download from S3 using ExAws
-    # ExAws will use credentials configured in runtime.exs:
-    # config :ex_aws,
-    #   access_key_id: {:system, "AWS_ACCESS_KEY_ID"},
-    #   secret_access_key: {:system, "AWS_SECRET_ACCESS_KEY"}
-    case ExAws.S3.get_object(bucket, key) |> ExAws.request() do
-      {:ok, %{body: body}} ->
-        File.write!(temp_file, body)
-
+    # Fetches via a short-lived presigned URL instead of a signed
+    # ExAws.S3.get_object request. The expense-reports bucket is private
+    # (no public ACL), so this can't use a plain public-URL GET the way
+    # avatars/media/event-photos do -- but presigned_url/5 only *builds* a
+    # URL (no HTTP request), so it's unaffected by the ExAws.Request.Req
+    # GET -> POST rewrite bug that breaks every signed ExAws GET in this
+    # environment (see YscWeb.Workers.EventPhotoUploadWorker.download_from_s3/2
+    # for the full story). This is the same technique
+    # YscWeb.ExpenseReportFileController already uses for browser downloads,
+    # just fetched server-side instead of redirecting the browser to it.
+    case download_via_presigned_url(key, temp_file) do
+      {:ok, temp_file} ->
         Ysc.Logging.debug(
           "[QB Expense Sync] download_from_s3_to_temp: Successfully downloaded file",
           bucket: bucket,
           key: key,
-          file_size: byte_size(body),
+          file_size: File.stat!(temp_file).size,
           temp_file: temp_file
         )
 
@@ -852,6 +855,29 @@ defmodule Ysc.ExpenseReports.QuickbooksSync do
 
         {:error, :s3_download_failed}
     end
+  end
+
+  # sobelow_skip ["Traversal.FileModule"]
+  defp download_via_presigned_url(key, dest) do
+    {config, method, bucket_or_host, object_key, presign_opts} =
+      S3Config.expense_report_file_presigned_url_args(key, 300)
+
+    with {:ok, url} <-
+           ExAws.S3.presigned_url(
+             config,
+             method,
+             bucket_or_host,
+             object_key,
+             presign_opts
+           ),
+         {:ok, %{status: 200}} <- Req.get(url, into: File.stream!(dest)) do
+      {:ok, dest}
+    else
+      {:ok, %{status: status}} -> {:error, {:http_status, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    e -> {:error, e}
   end
 
   defp extract_s3_key(s3_path) do
