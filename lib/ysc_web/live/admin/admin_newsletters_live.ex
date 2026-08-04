@@ -675,7 +675,11 @@ defmodule YscWeb.AdminNewslettersLive do
                     </.badge>
                     <.badge
                       :if={subscriber.source}
-                      type={AdminBadgeHelpers.newsletter_source_badge_type(subscriber.source)}
+                      type={
+                        AdminBadgeHelpers.newsletter_source_badge_type(
+                          subscriber.source
+                        )
+                      }
                       class="me-0"
                     >
                       {AdminBadgeHelpers.newsletter_source_label(subscriber.source)}
@@ -744,7 +748,9 @@ defmodule YscWeb.AdminNewslettersLive do
                 </:col>
                 <:col :let={{_, sub}} label="Source" field={:source}>
                   <%= if sub.source do %>
-                    <.badge type={AdminBadgeHelpers.newsletter_source_badge_type(sub.source)}>
+                    <.badge type={
+                      AdminBadgeHelpers.newsletter_source_badge_type(sub.source)
+                    }>
                       {AdminBadgeHelpers.newsletter_source_label(sub.source)}
                     </.badge>
                   <% else %>
