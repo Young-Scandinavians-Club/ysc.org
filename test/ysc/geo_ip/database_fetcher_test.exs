@@ -114,6 +114,49 @@ defmodule Ysc.GeoIP.DatabaseFetcherTest do
     end
   end
 
+  describe "request_from_s3/0 (real path, no :geo_ip_s3_get override)" do
+    test "fetches via a presigned URL against real S3" do
+      bucket = S3Config.app_resources_bucket_name()
+      key = DatabaseFetcher.object_key()
+
+      bucket
+      |> ExAws.S3.put_object(key, "real-tarball-bytes")
+      |> ExAws.request!()
+
+      on_exit(fn ->
+        bucket |> ExAws.S3.delete_object(key) |> ExAws.request()
+      end)
+
+      assert {:fetched, %{format: :tgz, content: "real-tarball-bytes"}} =
+               DatabaseFetcher.fetch([])
+    end
+
+    test "returns an error when the object doesn't exist" do
+      bucket = S3Config.app_resources_bucket_name()
+      key = DatabaseFetcher.object_key()
+
+      # Make sure nothing is left over from a previous run.
+      bucket |> ExAws.S3.delete_object(key) |> ExAws.request()
+
+      assert {:error, _reason} = DatabaseFetcher.fetch([])
+    end
+
+    test "returns an error when the S3 host is unreachable" do
+      original = Application.get_env(:ex_aws, :s3)
+
+      # Port 1 is a privileged port nothing listens on locally, so Req.get
+      # fails at the transport level -- exercising request_from_s3/0's
+      # {:error, reason} branch (as opposed to a non-200 HTTP response).
+      Application.put_env(:ex_aws, :s3, Keyword.put(original, :port, 1))
+
+      try do
+        assert {:error, _reason} = DatabaseFetcher.fetch([])
+      after
+        Application.put_env(:ex_aws, :s3, original)
+      end
+    end
+  end
+
   describe "failure resilience" do
     test "fetch/1 returns error when the S3 getter raises" do
       Application.put_env(:ysc, :geo_ip_s3_get, fn ->

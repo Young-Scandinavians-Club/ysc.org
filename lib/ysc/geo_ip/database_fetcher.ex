@@ -109,27 +109,35 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
   end
 
   # GeoLite2-City archives are tens of MB; use a longer download window than
-  # ExAws.Request.Req's 30s default. Override via `:ysc, :geo_ip_s3_req_opts`.
+  # Req's default timeout. Override via `:ysc, :geo_ip_s3_req_opts`.
   @default_receive_timeout 120_000
+  @presigned_url_expires_in 300
 
+  # Fetches via a short-lived presigned URL instead of a signed
+  # ExAws.S3.get_object request. ExAws.S3.presigned_url/5 only *builds* a
+  # URL (no HTTP request), so it's unaffected by the ExAws.Request.Req
+  # GET -> POST rewrite bug that breaks every signed ExAws GET in this
+  # environment (see
+  # YscWeb.Workers.EventPhotoUploadWorker.download_from_s3/2 for the full
+  # story) — this bucket is backend-only/private, so unlike avatars/media/
+  # event-photos there's no public URL to fall back to instead.
   defp request_from_s3 do
     bucket = bucket_name()
 
-    request_fn =
-      Application.get_env(:ysc, :geo_ip_s3_request, &default_s3_request/1)
-
-    case bucket |> ExAws.S3.get_object(@object_key) |> request_fn.() do
-      {:ok, %{body: body} = response} when is_binary(body) ->
-        {:ok, body, modified_on_from_response(response)}
-
-      {:ok, other} ->
-        {:error, {:unexpected_s3_response, other}}
-
-      {:error, reason} ->
-        {:error, reason}
-
-      other ->
-        {:error, {:unexpected_s3_request_result, other}}
+    with {:ok, url} <-
+           ExAws.S3.presigned_url(
+             ExAws.Config.new(:s3),
+             :get,
+             bucket,
+             @object_key,
+             expires_in: @presigned_url_expires_in
+           ),
+         {:ok, %Req.Response{status: 200} = resp} <-
+           Req.get(url, geo_ip_req_opts()) do
+      {:ok, resp.body, modified_on_from_response(resp)}
+    else
+      {:ok, %Req.Response{status: status}} -> {:error, {:http_status, status}}
+      {:error, reason} -> {:error, reason}
     end
   rescue
     error ->
@@ -139,25 +147,11 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
       {:error, {kind, reason}}
   end
 
-  defp default_s3_request(operation) do
-    ExAws.request(operation, http_opts: geo_ip_http_opts())
-  end
-
-  defp geo_ip_http_opts do
-    req_opts = Application.get_env(:ysc, :geo_ip_s3_req_opts, [])
-
-    receive_timeout =
-      Keyword.get(
-        req_opts,
-        :receive_timeout,
-        Keyword.get(req_opts, :recv_timeout, @default_receive_timeout)
-      )
-
-    # ExAws.Request.Req renames :recv_timeout → :receive_timeout and defaults
-    # missing :recv_timeout to 30s, which would clobber a bare :receive_timeout.
-    req_opts
-    |> Keyword.put(:recv_timeout, receive_timeout)
-    |> Keyword.put(:receive_timeout, receive_timeout)
+  defp geo_ip_req_opts do
+    Keyword.merge(
+      [receive_timeout: @default_receive_timeout],
+      Application.get_env(:ysc, :geo_ip_s3_req_opts, [])
+    )
   end
 
   defp bucket_name do
@@ -181,21 +175,12 @@ defmodule Ysc.GeoIP.DatabaseFetcher do
     _ -> :ok
   end
 
-  defp modified_on_from_response(%{headers: headers}) when is_list(headers) do
-    headers
-    |> Enum.find_value(fn
-      {key, value} when is_binary(key) and is_binary(value) ->
-        if String.downcase(key) == "last-modified", do: value
-
-      _ ->
-        nil
-    end)
-    |> parse_http_date()
+  defp modified_on_from_response(%Req.Response{} = resp) do
+    case Req.Response.get_header(resp, "last-modified") do
+      [value | _] -> parse_http_date(value)
+      _ -> :unknown
+    end
   end
-
-  defp modified_on_from_response(_), do: :unknown
-
-  defp parse_http_date(nil), do: :unknown
 
   defp parse_http_date(value) when is_binary(value) do
     case :httpd_util.convert_request_date(String.to_charlist(value)) do

@@ -82,14 +82,10 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
             filename: filename
           )
 
-          :ok
+          {:error, reason}
 
         {:error, reason} ->
-          log_opts = [
-            collection_id: collection_id,
-            s3_key: s3_key,
-            reason: inspect(reason)
-          ]
+          log_opts = log_opts_for(collection_id, s3_key, reason)
 
           # Sentry-visible only once retries are exhausted — a lone transient
           # blip that a retry clears up on its own shouldn't page anyone.
@@ -108,9 +104,31 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
           {:error, reason}
       end
 
+    # cleanup needs the specific terminal-error reason (e.g. to keep
+    # :invalid_path off the safe-to-delete list), so that distinction is
+    # only collapsed to :ok — telling Oban not to retry — after cleanup runs.
     cleanup(tmp_root, collection_id, scratch_id, filename, s3_key, result)
+    oban_result(result)
+  end
 
-    result
+  defp oban_result({:error, reason}) when reason in @terminal_errors, do: :ok
+  defp oban_result(result), do: result
+
+  defp log_opts_for(
+         collection_id,
+         s3_key,
+         {:s3_download_crashed, e, stacktrace}
+       ) do
+    [
+      collection_id: collection_id,
+      s3_key: s3_key,
+      error: e,
+      stacktrace: stacktrace
+    ]
+  end
+
+  defp log_opts_for(collection_id, s3_key, reason) do
+    [collection_id: collection_id, s3_key: s3_key, reason: inspect(reason)]
   end
 
   @download_timeout :timer.minutes(30)
@@ -164,7 +182,7 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
         {:error, {:s3_download_failed, reason}}
     end
   rescue
-    e -> {:error, {:s3_download_crashed, e}}
+    e -> {:error, {:s3_download_crashed, e, __STACKTRACE__}}
   end
 
   # Always clears the local scratch file (cheap to re-download on retry).
@@ -199,6 +217,4 @@ defmodule YscWeb.Workers.EventPhotoUploadWorker do
 
   defp safe_to_delete_s3?({:error, reason}),
     do: reason in @safe_to_delete_after_terminal_error
-
-  defp safe_to_delete_s3?(_), do: false
 end

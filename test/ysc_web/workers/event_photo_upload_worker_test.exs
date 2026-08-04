@@ -150,15 +150,11 @@ defmodule YscWeb.Workers.EventPhotoUploadWorkerTest do
     key = "event_photo_uploads/#{collection.id}/#{Ecto.UUID.generate()}.png"
     put_s3_object(key, @tiny_png)
 
-    # Point the job at a *different* key than what's actually in S3, so the
-    # download 404s (simulating a download failure) while a real object
-    # still exists under the original key — final attempt, so this is
-    # exactly the scenario that used to delete the source file unconditionally.
     job =
       make_job(
         %{
           "collection_id" => collection.id,
-          "s3_key" => key <> "-does-not-exist",
+          "s3_key" => key,
           "filename" => "party.png",
           "user_id" => user.id
         },
@@ -166,7 +162,29 @@ defmodule YscWeb.Workers.EventPhotoUploadWorkerTest do
         max_attempts: 5
       )
 
-    assert {:error, _reason} = EventPhotoUploadWorker.perform(job)
+    # Break just the download (S3Config.object_url/2's host resolution),
+    # not the object's actual existence in S3 — final attempt, so this is
+    # exactly the scenario that used to delete the source file unconditionally.
+    original_base_url = Application.get_env(:ysc, :s3_base_url)
+    Application.put_env(:ysc, :s3_base_url, "http://127.0.0.1:1")
+
+    on_exit(fn ->
+      if original_base_url do
+        Application.put_env(:ysc, :s3_base_url, original_base_url)
+      else
+        Application.delete_env(:ysc, :s3_base_url)
+      end
+    end)
+
+    result = EventPhotoUploadWorker.perform(job)
+
+    if original_base_url do
+      Application.put_env(:ysc, :s3_base_url, original_base_url)
+    else
+      Application.delete_env(:ysc, :s3_base_url)
+    end
+
+    assert {:error, _reason} = result
     assert s3_object_exists?(key)
   end
 end
