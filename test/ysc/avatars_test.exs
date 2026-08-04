@@ -482,6 +482,5 @@ defmodule Ysc.AvatarsTest do
 
       assert Avatars.list_user_avatars(user) == []
     end
-
   end
 end
