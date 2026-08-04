@@ -632,6 +632,30 @@ defmodule YscWeb.UserSettingsLive do
                               </path>
                             </svg>
                           </div>
+                          <button
+                            type="button"
+                            phx-click="delete_avatar"
+                            phx-value-id={avatar.id}
+                            data-confirm="Delete this photo? This cannot be undone."
+                            disabled={@deleting_avatar_id == avatar.id}
+                            aria-label="Delete photo"
+                            class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-zinc-700 text-white flex items-center justify-center shadow hover:bg-red-600 disabled:opacity-50"
+                          >
+                            <svg
+                              class="w-3 h-3"
+                              xmlns="http://www.w3.org/2000/svg"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              stroke-width="3"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                d="M6 18L18 6M6 6l12 12"
+                              />
+                            </svg>
+                          </button>
                           <%!-- Source badge for OAuth-synced avatars --%>
                           <%= cond do %>
                             <% avatar.source == :google -> %>
@@ -2724,6 +2748,7 @@ defmodule YscWeb.UserSettingsLive do
       |> assign(:current_avatar_url, nil)
       |> assign(:avatar_processing, false)
       |> assign(:selecting_avatar_id, nil)
+      |> assign(:deleting_avatar_id, nil)
       |> assign(:loading_avatars, true)
       |> assign(:loading_notification_preferences, true)
       |> allow_upload(:avatar,
@@ -3179,6 +3204,40 @@ defmodule YscWeb.UserSettingsLive do
          |> YscWeb.Flash.put_toast(
            :error,
            "Could not update profile picture.",
+           title: "Profile Picture"
+         )}
+    end
+  end
+
+  def handle_event("delete_avatar", %{"id" => avatar_id}, socket) do
+    user = socket.assigns.current_user
+    socket = assign(socket, :deleting_avatar_id, avatar_id)
+
+    case Avatars.delete_avatar(user, avatar_id) do
+      {:ok, _deleted} ->
+        updated_user =
+          Ysc.Repo.get!(Ysc.Accounts.User, user.id)
+          |> Ysc.Repo.preload(:current_avatar, force: true)
+
+        {:noreply,
+         socket
+         |> assign(:deleting_avatar_id, nil)
+         |> assign(:current_user, updated_user)
+         |> assign(:user, updated_user)
+         |> assign(:user_avatars, load_user_avatars(updated_user))
+         |> assign(
+           :current_avatar_url,
+           resolve_current_avatar_url(updated_user)
+         )
+         |> YscWeb.Flash.put_toast(:info, "Photo deleted.",
+           title: "Profile Picture"
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         socket
+         |> assign(:deleting_avatar_id, nil)
+         |> YscWeb.Flash.put_toast(:error, "Could not delete photo.",
            title: "Profile Picture"
          )}
     end

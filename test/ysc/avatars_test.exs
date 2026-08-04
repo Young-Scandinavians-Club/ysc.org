@@ -219,6 +219,79 @@ defmodule Ysc.AvatarsTest do
     end
   end
 
+  describe "delete_avatar/2" do
+    test "deletes an avatar owned by the user" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path:
+            "https://example.com/avatars/#{user.id}/a1/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          thumb_path: "https://example.com/avatars/#{user.id}/a1/thumb.webp",
+          profile_path:
+            "https://example.com/avatars/#{user.id}/a1/profile.webp",
+          large_path: "https://example.com/avatars/#{user.id}/a1/large.webp"
+        })
+
+      assert {:ok, deleted} = Avatars.delete_avatar(user, avatar.id)
+      assert deleted.id == avatar.id
+      assert is_nil(Avatars.get_avatar(avatar.id))
+    end
+
+    test "clears the user's current_avatar_id when deleting the current avatar" do
+      user = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user, %{
+          source: :upload,
+          original_path:
+            "https://example.com/avatars/#{user.id}/a1/original.webp"
+        })
+
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{
+          processing_state: :completed,
+          profile_path: "https://example.com/avatars/#{user.id}/a1/profile.webp"
+        })
+
+      {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
+      assert user.current_avatar_id == avatar.id
+
+      assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
+
+      reloaded = Repo.get!(User, user.id)
+      assert is_nil(reloaded.current_avatar_id)
+    end
+
+    test "rejects deleting another user's avatar" do
+      user1 = user_fixture()
+      user2 = user_fixture()
+
+      {:ok, avatar} =
+        Avatars.create_avatar(user1, %{
+          source: :upload,
+          original_path:
+            "https://example.com/avatars/#{user1.id}/a1/original.webp"
+        })
+
+      assert {:error, :not_found} = Avatars.delete_avatar(user2, avatar.id)
+      assert Avatars.get_avatar(avatar.id)
+    end
+
+    test "returns error for unknown avatar id" do
+      user = user_fixture()
+
+      assert {:error, :not_found} =
+               Avatars.delete_avatar(user, Ecto.ULID.generate())
+    end
+  end
+
   describe "avatar_url/2" do
     test "returns profile_path for completed avatar" do
       user = user_fixture()

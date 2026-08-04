@@ -103,6 +103,85 @@ defmodule Ysc.Avatars do
   end
 
   @doc """
+  Deletes an avatar owned by the given user, along with its S3 objects.
+
+  Verifies the avatar belongs to the user before deleting. If it's the
+  user's current avatar, `current_avatar_id` is cleared automatically by the
+  `on_delete: :nilify_all` foreign key.
+  """
+  def delete_avatar(%User{} = user, avatar_id) do
+    case from(a in Avatar, where: a.id == ^avatar_id and a.user_id == ^user.id)
+         |> Repo.one() do
+      nil ->
+        {:error, :not_found}
+
+      avatar ->
+        case Repo.delete(avatar) do
+          {:ok, deleted} ->
+            delete_avatar_s3_objects(deleted)
+            {:ok, deleted}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  end
+
+  defp delete_avatar_s3_objects(%Avatar{} = avatar) do
+    bucket = S3Config.avatars_bucket_name()
+
+    [
+      avatar.original_path,
+      avatar.thumb_path,
+      avatar.profile_path,
+      avatar.large_path
+    ]
+    |> Enum.map(&avatar_s3_key(&1, avatar.user_id))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+    |> Enum.each(fn key ->
+      case bucket |> ExAws.S3.delete_object(key) |> ExAws.request() do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Ysc.Logging.warning("Avatar S3 object cleanup failed",
+            extra: %{avatar_id: avatar.id, key: key, reason: inspect(reason)}
+          )
+      end
+    end)
+  end
+
+  # Extracts and validates the S3 key from a stored avatar URL, scoped to the
+  # owning user's prefix. Mirrors `YscWeb.Workers.AvatarProcessor.resolve_original_s3_key/1`.
+  defp avatar_s3_key(nil, _user_id), do: nil
+
+  defp avatar_s3_key(url, user_id) when is_binary(url) do
+    bucket_prefix = S3Config.avatars_bucket_name() <> "/"
+    prefix = "#{user_id}/"
+
+    key =
+      url
+      |> then(&(URI.parse(&1).path || ""))
+      |> String.trim_leading("/")
+      |> URI.decode()
+
+    key =
+      if String.starts_with?(key, bucket_prefix) do
+        String.replace_prefix(key, bucket_prefix, "")
+      else
+        key
+      end
+
+    cond do
+      key == "" -> nil
+      not String.starts_with?(key, prefix) -> nil
+      String.contains?(key, "..") or String.contains?(key, <<0>>) -> nil
+      true -> key
+    end
+  end
+
+  @doc """
   Updates the processing state and paths on an avatar after processing.
   """
   def update_processed_avatar(%Avatar{} = avatar, attrs) do
