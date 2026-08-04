@@ -297,10 +297,13 @@ defmodule YscWeb.Workers.ImageProcessor do
   defp download_s3_object_to_temp(%Media.Image{} = image, key, dest_path) do
     url = S3Config.object_url(key, S3Config.bucket_name())
 
-    case Req.get(url,
-           into: File.stream!(dest_path),
-           receive_timeout: @download_timeout_ms
-         ) do
+    opts =
+      Keyword.merge(
+        [into: File.stream!(dest_path), receive_timeout: @download_timeout_ms],
+        Application.get_env(:ysc, :image_processor_s3_req_opts, [])
+      )
+
+    case Req.get(url, opts) do
       {:ok, %{status: 200}} ->
         :ok
 
