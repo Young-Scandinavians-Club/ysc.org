@@ -480,8 +480,9 @@ defmodule Ysc.S3Config do
   defp encode_object_key(key) do
     key
     |> String.split("/")
-    |> Enum.map(fn segment -> URI.encode(segment, &URI.char_unreserved?/1) end)
-    |> Enum.join("/")
+    |> Enum.map_join("/", fn segment ->
+      URI.encode(segment, &URI.char_unreserved?/1)
+    end)
   end
 
   @doc """
