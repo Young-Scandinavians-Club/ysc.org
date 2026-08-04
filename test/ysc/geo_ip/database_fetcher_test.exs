@@ -140,6 +140,21 @@ defmodule Ysc.GeoIP.DatabaseFetcherTest do
 
       assert {:error, _reason} = DatabaseFetcher.fetch([])
     end
+
+    test "returns an error when the S3 host is unreachable" do
+      original = Application.get_env(:ex_aws, :s3)
+
+      # Port 1 is a privileged port nothing listens on locally, so Req.get
+      # fails at the transport level -- exercising request_from_s3/0's
+      # {:error, reason} branch (as opposed to a non-200 HTTP response).
+      Application.put_env(:ex_aws, :s3, Keyword.put(original, :port, 1))
+
+      try do
+        assert {:error, _reason} = DatabaseFetcher.fetch([])
+      after
+        Application.put_env(:ex_aws, :s3, original)
+      end
+    end
   end
 
   describe "failure resilience" do
