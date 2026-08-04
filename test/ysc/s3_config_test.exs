@@ -313,6 +313,15 @@ defmodule Ysc.S3ConfigTest do
       assert is_binary(url)
       assert String.contains?(url, key)
     end
+
+    test "percent-encodes unsafe characters in the key without touching '/' separators" do
+      key = "public/YSC LOGO 4 color straight text 091222.ai.webp"
+      url = S3Config.object_url(key, "custom-bucket")
+
+      refute String.contains?(url, " ")
+      assert String.contains?(url, "/public/YSC%20LOGO%204%20color")
+      assert URI.parse(url).path |> URI.decode() |> String.ends_with?(key)
+    end
   end
 
   describe "endpoint_config/0" do
