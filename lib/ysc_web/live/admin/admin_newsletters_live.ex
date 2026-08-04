@@ -4,6 +4,7 @@ defmodule YscWeb.AdminNewslettersLive do
   import YscWeb.CoreComponents
   alias Phoenix.LiveView.JS
   alias YscWeb.Admin.DateTimeDisplay
+  alias YscWeb.AdminBadgeHelpers
   alias YscWeb.DateDisplay
 
   alias Ysc.Newsletter
@@ -672,9 +673,17 @@ defmodule YscWeb.AdminNewslettersLive do
                     }>
                       {newsletter_subscriber_status_label(subscriber.subscribed)}
                     </.badge>
-                    <span :if={subscriber.source} class="text-xs text-zinc-400">
-                      {subscriber.source}
-                    </span>
+                    <.badge
+                      :if={subscriber.source}
+                      type={
+                        AdminBadgeHelpers.newsletter_source_badge_type(
+                          subscriber.source
+                        )
+                      }
+                      class="me-0"
+                    >
+                      {AdminBadgeHelpers.newsletter_source_label(subscriber.source)}
+                    </.badge>
                     <span
                       :if={subscriber.subscribed_at}
                       class="text-xs text-zinc-400"
@@ -738,7 +747,15 @@ defmodule YscWeb.AdminNewslettersLive do
                   </.badge>
                 </:col>
                 <:col :let={{_, sub}} label="Source" field={:source}>
-                  <span class="text-zinc-600">{sub.source || "—"}</span>
+                  <%= if sub.source do %>
+                    <.badge type={
+                      AdminBadgeHelpers.newsletter_source_badge_type(sub.source)
+                    }>
+                      {AdminBadgeHelpers.newsletter_source_label(sub.source)}
+                    </.badge>
+                  <% else %>
+                    <span class="text-zinc-400">—</span>
+                  <% end %>
                 </:col>
                 <:col :let={{_, sub}} label="Subscribed" field={:subscribed_at}>
                   <span class="text-zinc-600">
