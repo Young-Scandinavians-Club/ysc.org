@@ -8,7 +8,11 @@ defmodule Ysc.GeoIPTest do
   - Graceful handling of lookup failures and unexpected data shapes
   - The configured?/0 helper
   """
-  use ExUnit.Case, async: true
+  # async: false — configured?/0 tests mutate the process-global `:ysc, :environment`
+  # config via Ysc.Test.EnvHelper; running concurrently with other async suites doing
+  # the same risks races even under EnvHelper's global lock (see incident where "returns
+  # true in sandbox" flaked in CI).
+  use ExUnit.Case, async: false
 
   alias Ysc.GeoIP
   alias Ysc.Test.EnvHelper
