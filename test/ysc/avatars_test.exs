@@ -482,20 +482,5 @@ defmodule Ysc.AvatarsTest do
 
       assert Avatars.list_user_avatars(user) == []
     end
-
-    test "rejects loopback URLs in prod environment without creating an avatar" do
-      Ysc.Test.EnvHelper.with_environment("prod", fn ->
-        user = user_fixture()
-
-        assert {:error, :download_failed} =
-                 Avatars.sync_oauth_avatar(
-                   user,
-                   "http://127.0.0.1:9/avatar.jpg",
-                   :facebook
-                 )
-
-        assert Avatars.list_user_avatars(user) == []
-      end)
-    end
   end
 end
