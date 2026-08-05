@@ -131,6 +131,12 @@ defmodule YscWeb.AdminBookingEntitlementsLiveTest do
 
       view
       |> form("#grant-entitlement-form-org", %{
+        "entitlement" => %{"benefit_kind" => "fixed_amount_off"}
+      })
+      |> render_change()
+
+      view
+      |> form("#grant-entitlement-form-org", %{
         "entitlement" => %{
           "benefit_kind" => "fixed_amount_off",
           "amount_off" => "40.00",
