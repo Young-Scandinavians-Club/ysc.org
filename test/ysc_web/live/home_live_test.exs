@@ -117,9 +117,12 @@ defmodule YscWeb.HomeLiveTest do
       |> render_submit()
 
       html = render(view)
-      assert Newsletter.get_subscriber_by_email(email).subscribed
+      # Double opt-in: the anonymous signup form no longer subscribes
+      # immediately — it creates a pending record and sends a confirmation
+      # email instead.
+      refute Newsletter.get_subscriber_by_email(email).subscribed
       refute has_element?(view, "#newsletter-error")
-      assert html =~ "Thank you for subscribing"
+      assert html =~ "Check your email"
     end
 
     test "lists published news posts in the latest news section", %{conn: conn} do
@@ -944,10 +947,9 @@ defmodule YscWeb.HomeLiveTest do
       render_submit(view, "subscribe_newsletter", %{"email" => email})
 
       html = render(view)
-      assert Newsletter.get_subscriber_by_email(email).subscribed
+      refute Newsletter.get_subscriber_by_email(email).subscribed
 
-      assert html =~ "Thank you for subscribing" or
-               html =~ "Thank you for subscribing!"
+      assert html =~ "Check your email"
     end
   end
 
