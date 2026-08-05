@@ -17,16 +17,19 @@ defmodule Ysc.Test.EnvHelper do
   end
 
   @doc """
-  Sets `:ysc, :environment` to `value` under the global lock and returns the prior value.
+  Acquires the global lock and sets `:ysc, :environment` to `value`, returning
+  the prior value. The lock is held until `restore_environment!/1` releases
+  it, so it spans the whole test body (not just this call) — required
+  because code under test re-reads `Application.get_env` at call time, not
+  just at the moment this sets it.
 
   Pair with `restore_environment!/1` in `on_exit` when a whole test needs a non-default env.
   """
   def capture_environment!(value) do
-    trans(fn ->
-      original = Application.get_env(:ysc, :environment)
-      Application.put_env(:ysc, :environment, value)
-      original
-    end)
+    :global.set_lock(@lock, [Node.self()], :infinity)
+    original = Application.get_env(:ysc, :environment)
+    Application.put_env(:ysc, :environment, value)
+    original
   end
 
   @doc """
@@ -48,9 +51,13 @@ defmodule Ysc.Test.EnvHelper do
   defp restore(nil), do: Application.delete_env(:ysc, :environment)
   defp restore(value), do: Application.put_env(:ysc, :environment, value)
 
-  @doc false
+  @doc """
+  Restores the original value and releases the lock acquired by
+  `capture_environment!/1`.
+  """
   def restore_environment!(original) do
-    trans(fn -> restore(original) end)
+    restore(original)
+    :global.del_lock(@lock, [Node.self()])
   end
 
   defp trans(fun), do: :global.trans(@lock, fun, [Node.self()], :infinity)
