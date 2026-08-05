@@ -1,0 +1,23 @@
+<mj-section background-color="#fff" border-radius="6px 6px 0px 0px" padding-bottom="24px" padding-left="48px" padding-right="48px" padding-top="48px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text color="#000000" font-size="28px" line-height="1.25" padding="0px">
+      <strong>Confirm your subscription</strong>
+    </mj-text>
+  </mj-column>
+</mj-section>
+<mj-section background-color="#fff" border-radius="0px 0px 6px 6px" padding-bottom="48px" padding-left="48px" padding-right="48px" padding-top="20px" padding="48px">
+  <mj-column padding="0">
+    <mj-spacer height="12px"></mj-spacer>
+    <%= if @reminder do %>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Just checking in — we noticed you haven't confirmed your subscription to the YSC newsletter yet.</mj-text>
+    <% else %>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Please confirm your email address to start receiving the YSC newsletter.</mj-text>
+    <% end %>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-button href="<%= @url %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px"> Confirm subscription → </mj-button>
+    <mj-spacer height="24px"></mj-spacer>
+    <mj-text align="left" font-size="14px" line-height="1.5" color="#666666" padding="0px">If you didn't request this, you can safely ignore this email — you won't be subscribed unless you click the button above.</mj-text>
+    <mj-spacer height="12px"></mj-spacer>
+  </mj-column>
+</mj-section>

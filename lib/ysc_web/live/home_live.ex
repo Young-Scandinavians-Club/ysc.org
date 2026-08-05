@@ -1057,10 +1057,17 @@ defmodule YscWeb.HomeLive do
             </p>
             <div
               :if={@newsletter_submitted}
-              class="mt-3 flex items-center justify-center text-emerald-600"
+              class="mt-3 text-emerald-600"
             >
-              <.icon name="hero-check-circle" class="w-5 h-5 mr-2" />
-              <span>Thank you for subscribing!</span>
+              <div class="flex items-center justify-center">
+                <.icon name="hero-check-circle" class="w-5 h-5 mr-2 shrink-0" />
+                <span class="font-medium">
+                  You're one step away! Check your email right now to confirm your subscription.
+                </span>
+              </div>
+              <p class="mt-2 text-sm text-zinc-600">
+                Look for an email from YSC with the subject "Action Required: Please confirm your subscription." If you don't see it in a couple minutes, check your spam or promotions folder.
+              </p>
             </div>
             <p class="mt-4 text-sm text-zinc-600">
               We don't spam! Read our
@@ -2513,8 +2520,8 @@ defmodule YscWeb.HomeLive do
 
     opts = [source: "public_signup", metadata: metadata]
 
-    case Newsletter.subscribe(email, opts) do
-      {:ok, _subscriber} ->
+    case Newsletter.request_confirmation(email, opts) do
+      {:ok, status} when status in [:pending, :already_subscribed] ->
         {:noreply,
          socket
          |> assign(
@@ -2524,8 +2531,8 @@ defmodule YscWeb.HomeLive do
          )
          |> YscWeb.Flash.put_toast(
            :info,
-           "Thank you for subscribing to our newsletter!",
-           title: "You're subscribed",
+           "Check your email to confirm your subscription.",
+           title: "Almost there!",
            icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
          )}
 

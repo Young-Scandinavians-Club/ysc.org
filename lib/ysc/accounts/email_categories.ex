@@ -78,6 +78,9 @@ defmodule Ysc.Accounts.EmailCategories do
     "family_invite_accepted" => :account,
     "family_invite_cancelled" => :account,
     "family_member_removed" => :account,
+    # Double opt-in confirmation — must always send regardless of newsletter
+    # preference, since it's what grants that preference in the first place.
+    "newsletter_confirmation" => :account,
     # Newsletter (preference checked via newsletter_subscribers when sent through EmailNotifier)
     "newsletter_edition" => :newsletter
   }
