@@ -1109,6 +1109,34 @@ defmodule YscWeb.UserSettingsLiveTest do
       render_click(view, "confirm_cancel_phone_verification")
       assert_patched(view, ~p"/users/settings")
     end
+
+    test "changing to a non-US/CA phone number saves it directly, skipping SMS verification",
+         %{conn: conn} do
+      user = user_fixture(%{state: :active, phone_number: "+14159098268"})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live(conn, ~p"/users/settings")
+      render(view)
+
+      render_submit(view, "update_profile", %{
+        "user" =>
+          profile_form_attrs(user, %{
+            "phone_number" => "+46701234567"
+          })
+      })
+
+      assert has_element?(view, "#reauth-modal")
+
+      html = submit_reauth_password(view, valid_user_password())
+
+      refute html =~ "Verify Your Phone Number"
+      refute has_element?(view, "#phone_verification_form")
+      assert html =~ "SMS verification isn&#39;t available"
+
+      updated = Repo.get!(Ysc.Accounts.User, user.id)
+      assert updated.phone_number == "+46701234567"
+      assert updated.phone_verified_at == nil
+    end
   end
 
   describe "settings page — misc LiveView events" do

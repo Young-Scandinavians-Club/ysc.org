@@ -79,6 +79,35 @@ defmodule LivePhoneTest do
       assert updated_socket.assigns.value != nil
       assert updated_socket.assigns.formatted_value != nil
     end
+
+    test "derives country from an existing E.164 value when none is given" do
+      socket = new_socket(%{value: ""})
+
+      assigns = %{
+        preferred: ["US", "SE"],
+        id: "test-id",
+        value: "+46701234567"
+      }
+
+      {:ok, updated_socket} = LivePhone.update(assigns, socket)
+
+      assert updated_socket.assigns.country == "SE"
+    end
+
+    test "prefers an explicit country over one derived from the value" do
+      socket = new_socket(%{value: ""})
+
+      assigns = %{
+        country: "US",
+        preferred: ["US", "SE"],
+        id: "test-id",
+        value: "+46701234567"
+      }
+
+      {:ok, updated_socket} = LivePhone.update(assigns, socket)
+
+      assert updated_socket.assigns.country == "US"
+    end
   end
 
   describe "set_value/2" do
