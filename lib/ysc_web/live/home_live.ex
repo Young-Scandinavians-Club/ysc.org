@@ -1940,7 +1940,9 @@ defmodule YscWeb.HomeLive do
                     </div>
                     <div class="min-w-0">
                       <p class="font-semibold text-zinc-900 text-sm">
-                        {if @newsletter_subscribed, do: "Subscribed", else: "Not subscribed"}
+                        {if @newsletter_subscribed,
+                          do: "Subscribed",
+                          else: "Not subscribed"}
                       </p>
                       <p class="text-xs text-zinc-500 mt-0.5">
                         {if @newsletter_subscribed,
