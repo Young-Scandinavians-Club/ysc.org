@@ -3712,6 +3712,11 @@ defmodule Ysc.Accounts do
     end)
   end
 
+  # Below this, a YoY percent change is too noisy to be meaningful (e.g. a
+  # prior-period count of 1 turns any uptick into a four-or-five-digit swing)
+  # and is hidden in favor of the raw counts already shown alongside it.
+  @membership_joins_change_percent_min_baseline 5
+
   @doc """
   YTD comparison of **new membership joins** (not active headcount).
 
@@ -3719,7 +3724,9 @@ defmodule Ysc.Accounts do
 
   - had `lifetime_membership_awarded_at` fall in the half-open interval
     `[range_start, range_end)`, or
-  - had their **first** `Subscription` (by `inserted_at`) fall in that interval.
+  - had their **first** ever `Subscription` that reached a paid status
+    (i.e. excluding "incomplete"/"incomplete_expired" checkout attempts
+    that never converted) fall in that interval, by `inserted_at`.
 
   Used on the admin dashboard to compare this year-to-date with the same
   calendar-aligned span last year (Jan 1 through the same instant, shifted back one year).
@@ -3751,7 +3758,7 @@ defmodule Ysc.Accounts do
     prior_year_label = Integer.to_string(prior_year)
 
     change_percent =
-      if prior_count > 0 do
+      if prior_count >= @membership_joins_change_percent_min_baseline do
         round((current_count - prior_count) / prior_count * 100)
       else
         nil
@@ -3787,6 +3794,7 @@ defmodule Ysc.Accounts do
         on: s.user_id == u.id,
         where: is_nil(u.primary_user_id),
         where: u.state == :active,
+        where: s.stripe_status not in ["incomplete", "incomplete_expired"],
         group_by: u.id,
         select: %{user_id: u.id, first_at: min(s.inserted_at)}
       )
