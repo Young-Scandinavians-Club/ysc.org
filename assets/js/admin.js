@@ -9,6 +9,7 @@ import PanelResizer from "./panel_resizer";
 import YearScrubber from "./year_scrubber";
 import ScrollMoreIndicator from "./scroll_more_indicator";
 import CalendarHover from "./calendar_hover";
+import CalendarScrollSync from "./calendar_scroll_sync";
 import ScrollPreserver from "./scroll_preserver";
 import Autocomplete from "./autocomplete";
 import ClipboardCopy from "./clipboard_copy";
@@ -52,6 +53,7 @@ window.__adminHooks = {
     YearScrubber,
     ScrollMoreIndicator,
     CalendarHover,
+    CalendarScrollSync,
     ScrollPreserver,
     Autocomplete,
     ClipboardCopy,

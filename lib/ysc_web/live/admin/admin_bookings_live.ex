@@ -2073,7 +2073,11 @@ defmodule YscWeb.AdminBookingsLive do
               <% end %>
             </div>
             <!-- Scrollable Right Area: Date Columns -->
-            <div class="flex-1 overflow-x-scroll calendar-scroll-area">
+            <div
+              id="calendar-scroll-area"
+              phx-hook="CalendarScrollSync"
+              class="flex-1 overflow-x-scroll calendar-scroll-area"
+            >
               <!-- Header: Date columns -->
               <div>
                 <div
