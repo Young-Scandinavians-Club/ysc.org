@@ -2322,6 +2322,25 @@ defmodule Ysc.AccountsTest do
       assert pct == nil or is_integer(pct)
     end
 
+    test "get_membership_joins_ytd_comparison excludes subscriptions that never converted" do
+      before = Accounts.get_membership_joins_ytd_comparison().current_ytd_joins
+
+      user = user_fixture(%{phone_number: unique_user_phone()})
+
+      {:ok, _subscription} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: "sub_incomplete_#{System.unique_integer()}",
+          stripe_status: "incomplete_expired",
+          name: "Abandoned checkout"
+        })
+
+      after_count =
+        Accounts.get_membership_joins_ytd_comparison().current_ytd_joins
+
+      assert after_count == before
+    end
+
     test "get_membership_stats and list_memberships include lifetime and family primaries" do
       lifetime_primary =
         user_with_lifetime_membership(%{phone_number: unique_user_phone()})
