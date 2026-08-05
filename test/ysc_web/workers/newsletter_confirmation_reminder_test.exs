@@ -13,7 +13,8 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
             source: "public_signup"
           )
 
-        subscriber = Newsletter.get_subscriber_by_email("worker-pending@example.com")
+        subscriber =
+          Newsletter.get_subscriber_by_email("worker-pending@example.com")
 
         assert :ok =
                  perform_job(NewsletterConfirmationReminder, %{
@@ -24,7 +25,8 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
           worker: YscWeb.Workers.EmailNotifier,
           args: %{
             "recipient" => subscriber.email,
-            "idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}",
+            "idempotency_key" =>
+              "newsletter_confirmation_reminder_#{subscriber.id}",
             "template" => "newsletter_confirmation"
           }
         )
@@ -38,8 +40,11 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
             source: "public_signup"
           )
 
-        subscriber = Newsletter.get_subscriber_by_email("worker-confirmed@example.com")
-        {:ok, _} = Newsletter.confirm_subscription(subscriber.confirmation_token)
+        subscriber =
+          Newsletter.get_subscriber_by_email("worker-confirmed@example.com")
+
+        {:ok, _} =
+          Newsletter.confirm_subscription(subscriber.confirmation_token)
 
         assert :ok =
                  perform_job(NewsletterConfirmationReminder, %{
@@ -51,7 +56,8 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
         refute_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
           args: %{
-            "idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}"
+            "idempotency_key" =>
+              "newsletter_confirmation_reminder_#{subscriber.id}"
           }
         )
       end)
@@ -64,7 +70,9 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
             source: "public_signup"
           )
 
-        subscriber = Newsletter.get_subscriber_by_email("worker-deleted@example.com")
+        subscriber =
+          Newsletter.get_subscriber_by_email("worker-deleted@example.com")
+
         Repo.delete!(subscriber)
 
         assert :ok =
@@ -75,7 +83,8 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
         refute_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
           args: %{
-            "idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}"
+            "idempotency_key" =>
+              "newsletter_confirmation_reminder_#{subscriber.id}"
           }
         )
       end)
@@ -90,7 +99,8 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
             source: "public_signup"
           )
 
-        subscriber = Newsletter.get_subscriber_by_email("worker-schedule@example.com")
+        subscriber =
+          Newsletter.get_subscriber_by_email("worker-schedule@example.com")
 
         assert_enqueued(
           worker: NewsletterConfirmationReminder,
@@ -103,7 +113,8 @@ defmodule YscWeb.Workers.NewsletterConfirmationReminderTest do
             args: %{"subscriber_id" => subscriber.id}
           )
 
-        assert DateTime.diff(job.scheduled_at, DateTime.utc_now(), :second) > 23 * 60 * 60
+        assert DateTime.diff(job.scheduled_at, DateTime.utc_now(), :second) >
+                 23 * 60 * 60
       end)
     end
 

@@ -35,7 +35,8 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
     test "does not create or mutate any subscriber for an unknown token", %{
       conn: conn
     } do
-      {:ok, _view, _html} = live(conn, ~p"/newsletter/confirm/unknown-token-abc")
+      {:ok, _view, _html} =
+        live(conn, ~p"/newsletter/confirm/unknown-token-abc")
 
       refute Newsletter.get_subscriber_by_email("unknown-token-abc@example.com")
     end
@@ -44,7 +45,10 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
   describe "mount - valid pending token" do
     test "confirms the subscription and shows success", %{conn: conn} do
       email = "confirm-page@example.com"
-      {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+
+      {:ok, :pending} =
+        Newsletter.request_confirmation(email, source: "public_signup")
+
       pending = Newsletter.get_subscriber_by_email(email)
 
       {:ok, view, html} =
@@ -62,7 +66,10 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
 
     test "page has predictable id for accessibility and testing", %{conn: conn} do
       email = "confirm-id@example.com"
-      {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+
+      {:ok, :pending} =
+        Newsletter.request_confirmation(email, source: "public_signup")
+
       pending = Newsletter.get_subscriber_by_email(email)
 
       {:ok, _view, html} =
@@ -77,20 +84,26 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
       conn: conn
     } do
       email = "confirm-again@example.com"
-      {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+
+      {:ok, :pending} =
+        Newsletter.request_confirmation(email, source: "public_signup")
+
       pending = Newsletter.get_subscriber_by_email(email)
 
       {:ok, _view, _html} =
         live(conn, ~p"/newsletter/confirm/#{pending.confirmation_token}")
 
-      first_confirmed_at = Newsletter.get_subscriber_by_email(email).confirmed_at
+      first_confirmed_at =
+        Newsletter.get_subscriber_by_email(email).confirmed_at
 
       {:ok, _view2, html2} =
         live(conn, ~p"/newsletter/confirm/#{pending.confirmation_token}")
 
       assert html2 =~ "You&#39;re subscribed!"
 
-      second_confirmed_at = Newsletter.get_subscriber_by_email(email).confirmed_at
+      second_confirmed_at =
+        Newsletter.get_subscriber_by_email(email).confirmed_at
+
       assert DateTime.compare(second_confirmed_at, first_confirmed_at) == :eq
     end
   end
@@ -98,7 +111,10 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
   describe "access without authentication" do
     test "confirm page is public and does not require login", %{conn: conn} do
       email = "confirm-public@example.com"
-      {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+
+      {:ok, :pending} =
+        Newsletter.request_confirmation(email, source: "public_signup")
+
       pending = Newsletter.get_subscriber_by_email(email)
 
       conn = get(conn, ~p"/newsletter/confirm/#{pending.confirmation_token}")
@@ -118,7 +134,8 @@ defmodule YscWeb.NewsletterConfirmLiveTest do
     test "token with special characters does not crash", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/newsletter/confirm/abc%2B%2F%3Ddef")
 
-      assert html =~ "Invalid or expired link" or html =~ "You&#39;re subscribed!"
+      assert html =~ "Invalid or expired link" or
+               html =~ "You&#39;re subscribed!"
     end
   end
 end

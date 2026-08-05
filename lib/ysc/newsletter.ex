@@ -359,7 +359,8 @@ defmodule Ysc.Newsletter do
     idempotency_key =
       if reminder,
         do: "newsletter_confirmation_reminder_#{subscriber.id}",
-        else: "newsletter_confirmation_#{subscriber.id}_#{subscriber.confirmation_token}"
+        else:
+          "newsletter_confirmation_#{subscriber.id}_#{subscriber.confirmation_token}"
 
     case YscWeb.Emails.Notifier.schedule_email(
            subscriber.email,

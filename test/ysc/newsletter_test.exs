@@ -170,7 +170,10 @@ defmodule Ysc.NewsletterTest do
     end
 
     test "auto-confirms new subscribers (trusted/immediate path)" do
-      {:ok, s} = Newsletter.subscribe("auto-confirm@example.com", source: "public_signup")
+      {:ok, s} =
+        Newsletter.subscribe("auto-confirm@example.com",
+          source: "public_signup"
+        )
 
       assert s.confirmed_at != nil
       assert DateTime.compare(s.confirmed_at, s.subscribed_at) == :eq
@@ -183,12 +186,15 @@ defmodule Ysc.NewsletterTest do
         )
 
       assert pending == :pending
+
       refute Newsletter.get_subscriber_by_email("was-pending@example.com").subscribed
 
       # An authenticated/trusted path (e.g. account settings) subscribing the
       # same email should immediately confirm it, bypassing double opt-in.
       assert {:ok, updated} =
-               Newsletter.subscribe("was-pending@example.com", source: "user_settings")
+               Newsletter.subscribe("was-pending@example.com",
+                 source: "user_settings"
+               )
 
       assert updated.subscribed == true
       assert updated.confirmed_at != nil
@@ -260,10 +266,14 @@ defmodule Ysc.NewsletterTest do
       email = "resend@example.com"
 
       Oban.Testing.with_testing_mode(:manual, fn ->
-        {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+        {:ok, :pending} =
+          Newsletter.request_confirmation(email, source: "public_signup")
+
         first = Newsletter.get_subscriber_by_email(email)
 
-        {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+        {:ok, :pending} =
+          Newsletter.request_confirmation(email, source: "public_signup")
+
         second = Newsletter.get_subscriber_by_email(email)
 
         assert second.id == first.id
@@ -282,7 +292,11 @@ defmodule Ysc.NewsletterTest do
                  Newsletter.request_confirmation(email, source: "public_signup")
 
         assert [] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
-        assert [] = all_enqueued(worker: YscWeb.Workers.NewsletterConfirmationReminder)
+
+        assert [] =
+                 all_enqueued(
+                   worker: YscWeb.Workers.NewsletterConfirmationReminder
+                 )
       end)
     end
 
@@ -300,7 +314,10 @@ defmodule Ysc.NewsletterTest do
 
     test "returns error for invalid email" do
       assert {:error, :invalid_email} = Newsletter.request_confirmation("")
-      assert {:error, :invalid_email} = Newsletter.request_confirmation("no-at-sign")
+
+      assert {:error, :invalid_email} =
+               Newsletter.request_confirmation("no-at-sign")
+
       assert {:error, :invalid_email} = Newsletter.request_confirmation(nil)
     end
 
@@ -321,7 +338,10 @@ defmodule Ysc.NewsletterTest do
   describe "confirm_subscription/1" do
     test "confirms a pending subscriber and activates the subscription" do
       email = "confirm-me@example.com"
-      {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+
+      {:ok, :pending} =
+        Newsletter.request_confirmation(email, source: "public_signup")
+
       pending = Newsletter.get_subscriber_by_email(email)
 
       assert {:ok, confirmed} =
@@ -334,18 +354,24 @@ defmodule Ysc.NewsletterTest do
 
     test "is idempotent — replaying the same token after confirming succeeds" do
       email = "confirm-twice@example.com"
-      {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+
+      {:ok, :pending} =
+        Newsletter.request_confirmation(email, source: "public_signup")
+
       pending = Newsletter.get_subscriber_by_email(email)
 
       {:ok, first} = Newsletter.confirm_subscription(pending.confirmation_token)
-      {:ok, second} = Newsletter.confirm_subscription(pending.confirmation_token)
+
+      {:ok, second} =
+        Newsletter.confirm_subscription(pending.confirmation_token)
 
       assert second.id == first.id
       assert second.confirmed_at == first.confirmed_at
     end
 
     test "returns not_found for an unknown token" do
-      assert {:error, :not_found} = Newsletter.confirm_subscription("unknown-token")
+      assert {:error, :not_found} =
+               Newsletter.confirm_subscription("unknown-token")
     end
   end
 
@@ -354,7 +380,9 @@ defmodule Ysc.NewsletterTest do
       email = "reminder-needed@example.com"
 
       Oban.Testing.with_testing_mode(:manual, fn ->
-        {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+        {:ok, :pending} =
+          Newsletter.request_confirmation(email, source: "public_signup")
+
         subscriber = Newsletter.get_subscriber_by_email(email)
 
         assert :ok = Newsletter.deliver_confirmation_reminder(subscriber.id)
@@ -363,7 +391,8 @@ defmodule Ysc.NewsletterTest do
           worker: YscWeb.Workers.EmailNotifier,
           args: %{
             "recipient" => email,
-            "idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}",
+            "idempotency_key" =>
+              "newsletter_confirmation_reminder_#{subscriber.id}",
             "template" => "newsletter_confirmation"
           }
         )
@@ -371,7 +400,10 @@ defmodule Ysc.NewsletterTest do
         [reminder_job] =
           all_enqueued(
             worker: YscWeb.Workers.EmailNotifier,
-            args: %{"idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}"}
+            args: %{
+              "idempotency_key" =>
+                "newsletter_confirmation_reminder_#{subscriber.id}"
+            }
           )
 
         assert reminder_job.args["params"]["reminder"] == true
@@ -382,15 +414,22 @@ defmodule Ysc.NewsletterTest do
       email = "reminder-not-needed@example.com"
 
       Oban.Testing.with_testing_mode(:manual, fn ->
-        {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+        {:ok, :pending} =
+          Newsletter.request_confirmation(email, source: "public_signup")
+
         subscriber = Newsletter.get_subscriber_by_email(email)
-        {:ok, _} = Newsletter.confirm_subscription(subscriber.confirmation_token)
+
+        {:ok, _} =
+          Newsletter.confirm_subscription(subscriber.confirmation_token)
 
         assert :ok = Newsletter.deliver_confirmation_reminder(subscriber.id)
 
         refute_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
-          args: %{"idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}"}
+          args: %{
+            "idempotency_key" =>
+              "newsletter_confirmation_reminder_#{subscriber.id}"
+          }
         )
       end)
     end
@@ -399,7 +438,9 @@ defmodule Ysc.NewsletterTest do
       email = "reminder-deleted@example.com"
 
       Oban.Testing.with_testing_mode(:manual, fn ->
-        {:ok, :pending} = Newsletter.request_confirmation(email, source: "public_signup")
+        {:ok, :pending} =
+          Newsletter.request_confirmation(email, source: "public_signup")
+
         subscriber = Newsletter.get_subscriber_by_email(email)
         Repo.delete!(subscriber)
 
@@ -407,7 +448,10 @@ defmodule Ysc.NewsletterTest do
 
         refute_enqueued(
           worker: YscWeb.Workers.EmailNotifier,
-          args: %{"idempotency_key" => "newsletter_confirmation_reminder_#{subscriber.id}"}
+          args: %{
+            "idempotency_key" =>
+              "newsletter_confirmation_reminder_#{subscriber.id}"
+          }
         )
       end)
     end
