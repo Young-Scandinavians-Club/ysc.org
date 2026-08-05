@@ -2091,7 +2091,21 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("send-photo-reminder", _params, socket) do
     event = socket.assigns.event
 
-    case EventPhotos.deliver_reminder_now(event, force: true) do
+    if not Application.get_env(:ysc, :dev_routes, false) do
+      {:noreply,
+       YscWeb.Flash.put_toast(
+         socket,
+         :error,
+         "This dev-only action is not available in this environment.",
+         title: "Event photos"
+       )}
+    else
+      do_send_photo_reminder(event, socket)
+    end
+  end
+
+  defp do_send_photo_reminder(event, socket) do
+    case EventPhotos.deliver_reminder_now(event, force: true, allow_future: true) do
       :ok ->
         event = Events.get_event!(event.id)
         collection = EventPhotos.get_by_event_id(event.id)
@@ -2111,6 +2125,15 @@ defmodule YscWeb.AdminEventsNewLive do
       {:error, :not_found} ->
         {:noreply,
          YscWeb.Flash.put_toast(socket, :error, "Event not found.",
+           title: "Event photos"
+         )}
+
+      {:error, :event_not_ended} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "This event hasn't ended yet, so there won't be any photos to remind attendees about.",
            title: "Event photos"
          )}
     end

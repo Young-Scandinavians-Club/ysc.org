@@ -143,26 +143,34 @@ defmodule Ysc.EventPhotos do
   Sends photo reminder emails immediately (dev helper or forced resend).
 
   When `force: true`, clears `reminder_sent_at` and `reminder_recipient_count` before sending.
+
+  Refuses to send while the event hasn't ended yet (in `@timezone`), since attendees
+  can't have photos to upload — pass `allow_future: true` to override.
   """
   def deliver_reminder_now(event_or_id, opts \\ [])
 
   def deliver_reminder_now(%Event{} = event, opts) do
     force = Keyword.get(opts, :force, false)
+    allow_future = Keyword.get(opts, :allow_future, false)
 
-    with {:ok, collection} <- ensure_collection_for_event(event) do
-      collection =
-        if force do
-          collection
-          |> Collection.changeset(%{
-            reminder_sent_at: nil,
-            reminder_recipient_count: nil
-          })
-          |> Repo.update!()
-        else
-          collection
-        end
+    if not allow_future and event_not_ended_yet?(event) do
+      {:error, :event_not_ended}
+    else
+      with {:ok, collection} <- ensure_collection_for_event(event) do
+        collection =
+          if force do
+            collection
+            |> Collection.changeset(%{
+              reminder_sent_at: nil,
+              reminder_recipient_count: nil
+            })
+            |> Repo.update!()
+          else
+            collection
+          end
 
-      YscWeb.Workers.EventPhotoReminderWorker.send_reminders(event, collection)
+        YscWeb.Workers.EventPhotoReminderWorker.send_reminders(event, collection)
+      end
     end
   end
 
@@ -170,6 +178,17 @@ defmodule Ysc.EventPhotos do
     case Repo.get(Event, event_id) do
       nil -> {:error, :not_found}
       event -> deliver_reminder_now(event, opts)
+    end
+  end
+
+  defp event_not_ended_yet?(%Event{} = event) do
+    case effective_end_date(event) do
+      nil ->
+        false
+
+      end_date ->
+        today = DateTime.utc_now() |> DateTime.shift_zone!(@timezone) |> DateTime.to_date()
+        Date.compare(end_date, today) == :gt
     end
   end
 
