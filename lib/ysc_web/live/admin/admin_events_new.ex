@@ -2104,44 +2104,6 @@ defmodule YscWeb.AdminEventsNewLive do
     end
   end
 
-  defp do_send_photo_reminder(event, socket) do
-    case EventPhotos.deliver_reminder_now(event,
-           force: true,
-           allow_future: true
-         ) do
-      :ok ->
-        event = Events.get_event!(event.id)
-        collection = EventPhotos.get_by_event_id(event.id)
-        event_updates = Events.list_event_updates(event.id)
-
-        {:noreply,
-         socket
-         |> assign(:event, event)
-         |> assign(:photo_collection, collection)
-         |> assign_communication_timeline(event, event_updates, collection)
-         |> YscWeb.Flash.put_toast(
-           :info,
-           "Photo reminder emails have been queued.",
-           title: "Event photos"
-         )}
-
-      {:error, :not_found} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(socket, :error, "Event not found.",
-           title: "Event photos"
-         )}
-
-      {:error, :event_not_ended} ->
-        {:noreply,
-         YscWeb.Flash.put_toast(
-           socket,
-           :error,
-           "This event hasn't ended yet, so there won't be any photos to remind attendees about.",
-           title: "Event photos"
-         )}
-    end
-  end
-
   def handle_event("send-event-update", %{"update" => params}, socket) do
     event = socket.assigns.event
     raw_body = params["raw_body"] || ""
@@ -2855,6 +2817,44 @@ defmodule YscWeb.AdminEventsNewLive do
         end
 
       {:ok, socket}
+    end
+  end
+
+  defp do_send_photo_reminder(event, socket) do
+    case EventPhotos.deliver_reminder_now(event,
+           force: true,
+           allow_future: true
+         ) do
+      :ok ->
+        event = Events.get_event!(event.id)
+        collection = EventPhotos.get_by_event_id(event.id)
+        event_updates = Events.list_event_updates(event.id)
+
+        {:noreply,
+         socket
+         |> assign(:event, event)
+         |> assign(:photo_collection, collection)
+         |> assign_communication_timeline(event, event_updates, collection)
+         |> YscWeb.Flash.put_toast(
+           :info,
+           "Photo reminder emails have been queued.",
+           title: "Event photos"
+         )}
+
+      {:error, :not_found} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(socket, :error, "Event not found.",
+           title: "Event photos"
+         )}
+
+      {:error, :event_not_ended} ->
+        {:noreply,
+         YscWeb.Flash.put_toast(
+           socket,
+           :error,
+           "This event hasn't ended yet, so there won't be any photos to remind attendees about.",
+           title: "Event photos"
+         )}
     end
   end
 
