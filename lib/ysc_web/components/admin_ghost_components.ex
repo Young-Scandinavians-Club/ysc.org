@@ -1136,7 +1136,6 @@ defmodule YscWeb.AdminGhostComponents do
     default: :details,
     values: [:details, :tickets, :updates]
 
-  attr :partiful?, :boolean, default: false
   attr :date_line, :string, default: "Sat, Jun 21 · 5:00 PM – 9:00 PM"
 
   @doc """
@@ -1249,11 +1248,8 @@ defmodule YscWeb.AdminGhostComponents do
         <span class={event_tab_class(@active_tab == :details)}>
           Event Details
         </span>
-        <span class={[
-          event_tab_class(@active_tab == :tickets),
-          @partiful? && "opacity-50"
-        ]}>
-          Tickets{if @partiful?, do: " (Disabled - Using Partiful)"}
+        <span class={event_tab_class(@active_tab == :tickets)}>
+          Tickets
         </span>
         <span class={event_tab_class(@active_tab == :updates)}>
           Updates

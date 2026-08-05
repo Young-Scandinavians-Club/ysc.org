@@ -1588,6 +1588,29 @@ defmodule YscWeb.EventDetailsLiveTest do
       assert html =~ "No Tickets Event"
       refute html =~ "RSVP on"
     end
+
+    test "event with both tickets and partiful_link shows Get Tickets CTA and the Partiful spotlight section",
+         %{
+           conn: conn
+         } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          state: :upcoming,
+          event_attrs: %{
+            partiful_link: "https://partiful.com/e/both-tickets-and-partiful"
+          }
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "Get Tickets" or html =~ "ticket"
+      assert html =~ "RSVP on"
+      assert html =~ "https://partiful.com/e/both-tickets-and-partiful"
+    end
   end
 
   describe "event with agenda" do

@@ -272,20 +272,10 @@ defmodule YscWeb.AdminEventsNewLive do
                 Event Details
               </.admin_tab>
               <.admin_tab
-                active={!@partiful_link_present && @live_action == :tickets}
-                patch={
-                  if @partiful_link_present,
-                    do: "#",
-                    else: ~p"/admin/events/#{@event.id}/tickets"
-                }
-                class={
-                  if @partiful_link_present,
-                    do: "opacity-50 cursor-not-allowed pointer-events-none",
-                    else: nil
-                }
+                active={@live_action == :tickets}
+                patch={~p"/admin/events/#{@event.id}/tickets"}
               >
-                Tickets {if @partiful_link_present,
-                  do: "(Disabled - Using Partiful)"}
+                Tickets
               </.admin_tab>
               <.admin_tab
                 active={@live_action == :updates}
@@ -357,23 +347,12 @@ defmodule YscWeb.AdminEventsNewLive do
                   label="Partiful Link (Optional)"
                   placeholder="https://partiful.com/e/..."
                   phx-debounce="300"
-                  disabled={@ticket_tier_count > 0}
                 />
                 <p
-                  :if={@ticket_tier_count > 0}
-                  class="text-xs text-amber-700 -mt-2 flex items-start gap-1.5"
-                >
-                  <.icon
-                    name="hero-information-circle"
-                    class="w-4 h-4 flex-shrink-0"
-                  />
-                  Partiful cannot be used when this event has ticket tiers. Remove all ticket tiers on the Tickets tab to add a Partiful link.
-                </p>
-                <p
-                  :if={@ticket_tier_count == 0 && @partiful_link_present}
+                  :if={@partiful_link_present}
                   class="text-xs text-zinc-500 -mt-2"
                 >
-                  Using Partiful for registration. When a Partiful link is set, ticket tiers cannot be added.
+                  Shown to attendees as an RSVP callout on the event page, alongside any ticket tiers.
                 </p>
               </div>
 
@@ -1354,7 +1333,6 @@ defmodule YscWeb.AdminEventsNewLive do
             end
           end)
           |> maybe_refresh_tab_data()
-          |> maybe_assign_ticket_tier_count()
         else
           socket
         end
@@ -1368,7 +1346,6 @@ defmodule YscWeb.AdminEventsNewLive do
       socket
       |> assign(:list_params, Map.drop(params, ["id"]))
       |> maybe_refresh_tab_data()
-      |> maybe_assign_ticket_tier_count()
 
     {:noreply, socket}
   end
@@ -1403,7 +1380,6 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:start_time, event.start_time)
     |> assign(:end_time, event.end_time)
     |> assign(:can_publish, can_publish?(event.start_date, event.title))
-    |> assign(:ticket_tier_count, 0)
     |> assign(:partiful_link_present, event.partiful_link not in [nil, ""])
     |> assign(trigger_submit: false, check_errors: false)
     |> assign(:hosts, [])
@@ -1448,7 +1424,6 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:start_time, nil)
     |> assign(:end_time, nil)
     |> assign(:can_publish, false)
-    |> assign(:ticket_tier_count, 0)
     |> assign(:partiful_link_present, false)
     |> assign(trigger_submit: false, check_errors: false)
     |> assign(:hosts, [])
@@ -1765,24 +1740,6 @@ defmodule YscWeb.AdminEventsNewLive do
             _ ->
               socket
           end
-      end
-    else
-      socket
-    end
-  end
-
-  defp maybe_assign_ticket_tier_count(socket) do
-    if connected?(socket) do
-      case socket.assigns[:event] do
-        %{id: event_id} ->
-          assign(
-            socket,
-            :ticket_tier_count,
-            Events.count_ticket_tiers_for_event(event_id)
-          )
-
-        _ ->
-          socket
       end
     else
       socket
@@ -2507,38 +2464,18 @@ defmodule YscWeb.AdminEventsNewLive do
 
   @impl true
   def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketTierAdded{ticket_tier: ticket_tier}},
+        {Ysc.Events, %Ysc.MessagePassingEvents.TicketTierAdded{}},
         socket
       ) do
-    if ticket_tier.event_id == socket.assigns[:event].id do
-      {:noreply,
-       assign(
-         socket,
-         :ticket_tier_count,
-         Events.count_ticket_tiers_for_event(socket.assigns.event.id)
-       )}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   @impl true
   def handle_info(
-        {Ysc.Events,
-         %Ysc.MessagePassingEvents.TicketTierDeleted{ticket_tier: ticket_tier}},
+        {Ysc.Events, %Ysc.MessagePassingEvents.TicketTierDeleted{}},
         socket
       ) do
-    if ticket_tier.event_id == socket.assigns[:event].id do
-      {:noreply,
-       assign(
-         socket,
-         :ticket_tier_count,
-         Events.count_ticket_tiers_for_event(socket.assigns.event.id)
-       )}
-    else
-      {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   @impl true

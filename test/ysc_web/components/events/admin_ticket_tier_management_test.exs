@@ -265,8 +265,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
     end
   end
 
-  describe "Partiful - external registration" do
-    test "displays External Registration via Partiful when event has partiful_link" do
+  describe "Partiful - coexists with ticket tiers" do
+    test "shows a Partiful note but still displays ticket tier management when event has partiful_link" do
       event =
         event_fixture(%{
           partiful_link: "https://partiful.com/e/test-event-xyz"
@@ -281,18 +281,13 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
           current_user: user
         })
 
-      assert html =~ "External Registration via Partiful"
-      assert html =~ "Partiful for registration"
-      assert html =~ "View Partiful Event"
+      assert html =~ "Partiful link"
       assert html =~ "https://partiful.com/e/test-event-xyz"
+      assert html =~ "Add Ticket Tier"
     end
 
-    test "does not display ticket tier list when event has partiful_link" do
-      event =
-        event_fixture(%{
-          partiful_link: "https://partiful.com/e/another"
-        })
-
+    test "does not show the Partiful note when event has no partiful_link" do
+      event = event_fixture()
       user = user_fixture()
 
       html =
@@ -302,8 +297,8 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
           current_user: user
         })
 
-      refute html =~ "Add Ticket Tier"
-      assert html =~ "External Registration via Partiful"
+      refute html =~ "Partiful link"
+      assert html =~ "Add Ticket Tier"
     end
   end
 
