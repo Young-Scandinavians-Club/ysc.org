@@ -726,7 +726,10 @@ defmodule YscWeb.AdminDashboardLive do
                   <.icon
                     name={get_revenue_change_icon(@revenue_change_direction)}
                     class="w-3 h-3 mr-0.5"
-                  /> MoM {@revenue_change_text} <span class="text-zinc-400 font-normal ml-1">vs {format_money(@last_month_revenue)}</span>
+                  /> MoM {@revenue_change_text}
+                  <span class="text-zinc-400 font-normal ml-1">vs {format_money(
+                    @last_month_revenue
+                  )}</span>
                 </span>
                 <span class={[
                   "inline-flex items-center",
