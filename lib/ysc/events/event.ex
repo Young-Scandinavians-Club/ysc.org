@@ -118,7 +118,7 @@ defmodule Ysc.Events.Event do
     # Optional: External ID from a mapping service (e.g., Google Place ID)
     field :place_id, :string
 
-    # Optional: Partiful event URL for external RSVP (when set, ticket tiers cannot be used)
+    # Optional: Partiful event URL for external RSVP, shown alongside any ticket tiers
     field :partiful_link, :string
 
     # When true, show "Tickets Coming Soon" until first ticket tier is added

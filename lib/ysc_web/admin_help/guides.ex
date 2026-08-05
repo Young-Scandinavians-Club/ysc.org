@@ -707,7 +707,7 @@ defmodule YscWeb.AdminHelp.Guides do
         {"Can I copy last year's event instead of starting fresh?",
          "Yes — find the old event in the list, open its ⋮ menu, and choose Copy. The copy is a new draft with the ticket tiers, agenda, and FAQs duplicated. Update the dates and details before publishing."},
         {"What is the Partiful link for?",
-         "If the event is organised on Partiful instead of our own ticketing, paste its link on the Details tab. The public page then sends people to Partiful — and the Tickets tab is disabled, since registration happens externally. Choose one approach, not both."},
+         "If the event is also organised on Partiful, paste its link on the Details tab. The public page then shows a prominent RSVP callout linking to Partiful, alongside any ticket tiers you've set up on the Tickets tab. If you only use Partiful for registration, just leave the Tickets tab empty."},
         {"Why is the summary limited to 200 characters?",
          "The summary is the teaser on event cards across the site and newsletter. The full description belongs in the Overview section, which has no limit."}
       ]
@@ -716,7 +716,7 @@ defmodule YscWeb.AdminHelp.Guides do
     @impl true
     def troubleshooting do
       [
-        "Tickets tab is greyed out — a Partiful link is set on Details; remove it to use built-in ticketing.",
+        "Not sure whether to use Partiful or ticket tiers — you can use both; the Partiful link shows as an RSVP callout alongside any ticket tiers.",
         "Publish button disabled — a title and start date are required before an event can be published.",
         "Host not found in search — hosts must have a member account; check the spelling of their name.",
         "Closed the tab mid-edit — no problem, the draft is saved; reopen it from the Drafts tab on the events list."
@@ -743,7 +743,7 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Cover image, title, and summary",
           body:
-            "Pick a **cover image** from the media library — it headlines the public event page, the events listing, and newsletter cards.\n\nWrite a clear **title** and a **summary** of at most 200 characters. The summary is the teaser members see on cards, so make it sell the event: \"Sauna, swimming and BBQ at Clear Lake — members and guests welcome.\"\n\nIf the event is organised on **Partiful**, paste the link here instead of using the Tickets tab — the two are mutually exclusive.",
+            "Pick a **cover image** from the media library — it headlines the public event page, the events listing, and newsletter cards.\n\nWrite a clear **title** and a **summary** of at most 200 characters. The summary is the teaser members see on cards, so make it sell the event: \"Sauna, swimming and BBQ at Clear Lake — members and guests welcome.\"\n\nIf the event is also organised on **Partiful**, paste the link here — it shows as an RSVP callout on the public page alongside any ticket tiers from the Tickets tab.",
           image: "ghost:events-edit",
           image_scroll: "ghost-event-cover-section",
           hotspots: [
@@ -898,7 +898,7 @@ defmodule YscWeb.AdminHelp.Guides do
     @impl true
     def troubleshooting do
       [
-        "Whole Tickets tab disabled — a Partiful link is set on the Details tab; registration is external for this event.",
+        "Wondering if Partiful blocks ticket tiers — it doesn't; a Partiful link on the Details tab and ticket tiers here can both be set at once.",
         "Members report they can't buy tickets — check the tier's sales window dates and whether the tier or event capacity has sold out.",
         "Need to hold seats for the board — use a reservation rather than buying tickets yourself; reservations can be cancelled to free the seats.",
         "Sold/reserved counts look off — counts include reservations, which hold capacity just like sales."
@@ -911,7 +911,7 @@ defmodule YscWeb.AdminHelp.Guides do
         %{
           title: "Open the Tickets tab",
           body:
-            "From the event editor, switch to the **Tickets** tab.\n\nIf it's greyed out, the event has a Partiful link on the Details tab — built-in ticketing and Partiful are mutually exclusive. Remove the link if you want to sell tickets here.",
+            "From the event editor, switch to the **Tickets** tab.\n\nThis works the same whether or not the event also has a Partiful link on the Details tab — the two aren't mutually exclusive. If a Partiful link is set, a note reminds you it's also shown to attendees, but ticket tiers can still be added here.",
           image: "ghost:events-tickets",
           hotspots: [
             %{x: 26, y: 6, w: 44, h: 18, label: "Editor header and tabs"}

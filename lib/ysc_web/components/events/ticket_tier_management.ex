@@ -7,508 +7,503 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
   def render(assigns) do
     ~H"""
     <div class="space-y-6">
-      <%= if @event.partiful_link not in [nil, ""] do %>
-        <div class="border border-amber-200 rounded-lg p-6 bg-amber-50">
-          <div class="flex items-center gap-3 mb-3">
-            <.icon name="hero-information-circle" class="w-6 h-6 text-amber-600" />
-            <h3 class="text-lg font-semibold text-amber-900">
-              External Registration via Partiful
-            </h3>
-          </div>
-          <p class="text-sm text-amber-800 mb-3">
-            This event uses Partiful for registration. Ticket tiers cannot be managed here.
-          </p>
+      <div
+        :if={@event.partiful_link not in [nil, ""]}
+        class="border border-blue-100 rounded-lg p-4 bg-blue-50 flex items-center gap-3"
+      >
+        <.icon
+          name="hero-information-circle"
+          class="w-5 h-5 text-blue-600 flex-shrink-0"
+        />
+        <p class="text-sm text-blue-800">
+          This event also has a
           <a
             href={@event.partiful_link}
             target="_blank"
             rel="noopener noreferrer"
-            class="text-sm text-blue-600 hover:text-blue-800 underline"
+            class="font-semibold underline"
           >
-            View Partiful Event →
+            Partiful link
           </a>
-        </div>
-      <% else %>
-        <!-- Ticket Tiers List -->
-        <div class="border border-zinc-200 rounded p-4 sm:p-6">
-          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
-            <h3 class="text-lg font-semibold">Ticket Tiers</h3>
-            <div class="flex items-center">
-              <.button
-                phx-click="open-add-ticket-tier-modal"
-                phx-target={@myself}
-                class="w-full sm:w-auto"
-              >
-                <.icon name="hero-plus" class="w-5 h-5" /> Add Ticket Tier
-              </.button>
-            </div>
-          </div>
-
-          <%= if length(@ticket_tiers) == 0 do %>
-            <div class="flex items-center gap-2 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <.icon
-                name="hero-information-circle"
-                class="w-5 h-5 text-amber-600 flex-shrink-0"
-              />
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-amber-900">
-                  Tickets Coming Soon
-                </p>
-                <p class="text-xs text-amber-700">
-                  Enable this to show users that tickets will be available but details are not ready yet.
-                  The flag will automatically clear when you add your first ticket tier.
-                </p>
-              </div>
-              <.toggle
-                id="tickets-tbd-toggle"
-                checked={@event.tickets_tbd}
-                label={if @event.tickets_tbd, do: "TBD Enabled", else: "Set as TBD"}
-                phx-click="toggle-tickets-tbd"
-                phx-target={@myself}
-                class="flex-shrink-0"
-              />
-            </div>
-          <% end %>
-
-          <div
-            :if={length(@ticket_tiers) == 0}
-            class="text-center py-8 text-zinc-500"
-          >
-            <p class="font-semibold">No ticket tiers created yet.</p>
-            <p class="text-sm">
-              Click "Add Ticket Tier" to create your first ticket tier.
-            </p>
-          </div>
-
-          <div :if={length(@ticket_tiers) > 0} class="space-y-3 sm:space-y-4">
-            <%= for ticket_tier <- @ticket_tiers do %>
-              <% is_donation =
-                ticket_tier.type == "donation" || ticket_tier.type == :donation %>
-              <div class="group border border-zinc-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
-                <div class="flex flex-col lg:flex-row lg:items-center gap-4">
-                  <div class="flex-1">
-                    <div class="flex items-center gap-3 mb-1">
-                      <h4 class="font-bold text-zinc-900 text-lg">
-                        {ticket_tier.name}
-                      </h4>
-                      <.badge
-                        type={tier_status_badge_type(ticket_tier)}
-                        class="text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
-                      >
-                        {tier_status_text(ticket_tier)}
-                      </.badge>
-                    </div>
-                    <p
-                      :if={ticket_tier.description}
-                      class="text-zinc-500 text-sm mb-3 min-h-[2.5rem] lg:min-h-[1.25rem]"
-                    >
-                      {ticket_tier.description}
-                      <span class="text-zinc-400 italic text-xs">
-                        — {String.capitalize(to_string(ticket_tier.type))} Tier
-                      </span>
-                    </p>
-                    <p
-                      :if={!ticket_tier.description}
-                      class="text-zinc-400 text-sm italic mb-3 min-h-[2.5rem] lg:min-h-[1.25rem]"
-                    >
-                      {String.capitalize(to_string(ticket_tier.type))} Tier
-                    </p>
-
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                      <div>
-                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
-                          Price
-                        </p>
-                        <p class="text-sm font-bold text-zinc-800">
-                          <%= case ticket_tier.type do %>
-                            <% "free" -> %>
-                              Free
-                            <% "donation" -> %>
-                              User sets amount
-                            <% :donation -> %>
-                              User sets amount
-                            <% _ -> %>
-                              {format_money_safe(ticket_tier.price)}
-                          <% end %>
-                        </p>
-                      </div>
-
-                      <div>
-                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
-                          Sold
-                        </p>
-                        <div class="flex items-center gap-2">
-                          <p class="text-sm font-bold text-zinc-800">
-                            <%= case ticket_tier.quantity do %>
-                              <% nil -> %>
-                                {ticket_tier.sold_tickets_count} /
-                                <span class="text-zinc-400">∞</span>
-                              <% 0 -> %>
-                                {ticket_tier.sold_tickets_count} /
-                                <span class="text-zinc-400">∞</span>
-                              <% quantity -> %>
-                                {"#{ticket_tier.sold_tickets_count}/#{quantity}"}
-                            <% end %>
-                          </p>
-                          <div
-                            :if={ticket_tier.quantity && ticket_tier.quantity > 0}
-                            class="hidden sm:block w-16 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0"
-                          >
-                            <div
-                              class={[
-                                "h-full rounded-full transition-all",
-                                tier_progress_bar_classes(ticket_tier)
-                              ]}
-                              style={"width: #{tier_progress_percentage(ticket_tier)}%"}
-                            >
-                            </div>
-                          </div>
-                        </div>
-                        <%= if !is_donation do %>
-                          <% reserved_count =
-                            get_reserved_count(
-                              ticket_tier.id,
-                              @reservations_by_tier
-                            ) %>
-                          <%= if reserved_count > 0 do %>
-                            <p class="text-xs text-amber-600 mt-1">
-                              {reserved_count} reserved
-                            </p>
-                          <% end %>
-                        <% end %>
-                      </div>
-
-                      <div>
-                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
-                          Sales Period
-                        </p>
-                        <p class="text-sm text-zinc-700 leading-tight">
-                          {format_sales_period(
-                            ticket_tier.start_date,
-                            ticket_tier.end_date
-                          )}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
-                          Registration
-                        </p>
-                        <p class="text-sm text-zinc-700">
-                          {if ticket_tier.requires_registration,
-                            do: "Required",
-                            else: "Not Required"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="flex justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
-                    <.row_actions_dropdown
-                      id={"ticket-tier-actions-#{ticket_tier.id}"}
-                      label={"Actions for #{ticket_tier.name}"}
-                    >
-                      <.dropdown_menu_item
-                        :if={!is_donation}
-                        id={"ticket-tier-actions-#{ticket_tier.id}-grant"}
-                        icon="hero-gift"
-                        tone={:success}
-                        phx-click="grant-tickets"
-                        phx-value-id={ticket_tier.id}
-                        phx-target={@myself}
-                      >
-                        Grant tickets
-                      </.dropdown_menu_item>
-                      <.dropdown_menu_item
-                        :if={!is_donation}
-                        id={"ticket-tier-actions-#{ticket_tier.id}-reserve"}
-                        icon="hero-ticket"
-                        tone={:info}
-                        phx-click="reserve-tickets"
-                        phx-value-id={ticket_tier.id}
-                        phx-target={@myself}
-                      >
-                        Reserve tickets
-                      </.dropdown_menu_item>
-                      <.dropdown_menu_item
-                        id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
-                        icon="hero-pencil-square"
-                        phx-click="edit-ticket-tier"
-                        phx-value-id={ticket_tier.id}
-                        phx-target={@myself}
-                      >
-                        Edit tier
-                      </.dropdown_menu_item>
-                      <.dropdown_menu_item
-                        id={"ticket-tier-actions-#{ticket_tier.id}-delete"}
-                        icon="hero-trash"
-                        tone={:danger}
-                        phx-click="delete-ticket-tier"
-                        phx-value-id={ticket_tier.id}
-                        phx-target={@myself}
-                        data-confirm="Are you sure you want to delete this ticket tier? This action cannot be undone."
-                        disabled={ticket_tier.sold_tickets_count > 0}
-                        class={
-                          if ticket_tier.sold_tickets_count > 0,
-                            do: "opacity-50 cursor-not-allowed hover:bg-transparent"
-                        }
-                      >
-                        Delete tier
-                      </.dropdown_menu_item>
-                    </.row_actions_dropdown>
-                  </div>
-                </div>
-                <!-- Reservations Section -->
-                <%= if !is_donation do %>
-                  <% reservations =
-                    Map.get(@reservations_by_tier, ticket_tier.id, []) %>
-                  <% expired_reservations =
-                    Map.get(@expired_reservations_by_tier, ticket_tier.id, []) %>
-                  <%= if length(reservations) > 0 do %>
-                    <div class="mt-4 pt-4 border-t border-zinc-200">
-                      <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
-                        Active Reservations
-                      </p>
-                      <div class="space-y-2">
-                        <%= for reservation <- reservations do %>
-                          <div class="flex items-start justify-between gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                            <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium text-zinc-900 truncate">
-                                {reservation.user.first_name} {reservation.user.last_name}
-                              </p>
-                              <p class="text-xs text-zinc-600 truncate">
-                                {reservation.user.email}
-                              </p>
-                              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-zinc-600">
-                                <span>
-                                  {reservation.quantity} ticket{if reservation.quantity !=
-                                                                     1,
-                                                                   do: "s"}
-                                </span>
-                                <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
-                                  <span class="text-green-600 font-medium">
-                                    {Decimal.to_float(
-                                      reservation.discount_percentage
-                                    )
-                                    |> Float.round(2)}% off
-                                  </span>
-                                <% end %>
-                                <span
-                                  :if={reservation.expires_at}
-                                  class="text-amber-600"
-                                >
-                                  Expires {format_date(reservation.expires_at)}
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              phx-click="cancel-reservation"
-                              phx-value-id={reservation.id}
-                              phx-target={@myself}
-                              phx-disable-with="Cancelling..."
-                              data-confirm="Are you sure you want to cancel this reservation?"
-                              class="shrink-0 p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <.icon name="hero-x-mark" class="w-4 h-4" />
-                            </button>
-                          </div>
-                        <% end %>
-                      </div>
-                    </div>
-                  <% end %>
-                  <%= if length(expired_reservations) > 0 do %>
-                    <div class="mt-4 pt-4 border-t border-zinc-200">
-                      <p class="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">
-                        Expired Reservations
-                      </p>
-                      <p class="text-xs text-zinc-500 mb-2">
-                        Past end date — no checkout discount until cancelled or reissued.
-                      </p>
-                      <div class="space-y-2">
-                        <%= for reservation <- expired_reservations do %>
-                          <div class="flex items-start justify-between gap-3 p-3 bg-zinc-100 rounded-lg border border-zinc-300">
-                            <div class="flex-1 min-w-0">
-                              <p class="text-sm font-medium text-zinc-900 truncate">
-                                {reservation.user.first_name} {reservation.user.last_name}
-                              </p>
-                              <p class="text-xs text-zinc-600 truncate">
-                                {reservation.user.email}
-                              </p>
-                              <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-zinc-600">
-                                <span>
-                                  {reservation.quantity} ticket{if reservation.quantity !=
-                                                                     1,
-                                                                   do: "s"}
-                                </span>
-                                <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
-                                  <span class="text-green-600 font-medium">
-                                    {Decimal.to_float(
-                                      reservation.discount_percentage
-                                    )
-                                    |> Float.round(2)}% off
-                                  </span>
-                                <% end %>
-                                <span class="text-red-700 font-medium">
-                                  Ended {format_date(reservation.expires_at)}
-                                </span>
-                              </div>
-                            </div>
-                            <button
-                              phx-click="cancel-reservation"
-                              phx-value-id={reservation.id}
-                              phx-target={@myself}
-                              phx-disable-with="Cancelling..."
-                              data-confirm="Are you sure you want to cancel this reservation?"
-                              class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                            >
-                              <.icon name="hero-x-mark" class="w-4 h-4" />
-                            </button>
-                          </div>
-                        <% end %>
-                      </div>
-                    </div>
-                  <% end %>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
-        </div>
-        <!-- Ticket Purchases Summary -->
-        <div class="border border-zinc-200 rounded p-4 sm:p-6">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div class="flex items-baseline gap-2 min-w-0">
-              <h3 class="text-lg font-semibold">Ticket Purchases</h3>
-              <span class="text-sm text-zinc-600">
-                {length(@ticket_purchases)} purchase{if length(@ticket_purchases) !=
-                                                          1,
-                                                        do: "s"}
-              </span>
-            </div>
+          set on the Details tab. It's shown to attendees alongside these ticket tiers.
+        </p>
+      </div>
+      <%!-- Ticket Tiers List --%>
+      <div class="border border-zinc-200 rounded p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
+          <h3 class="text-lg font-semibold">Ticket Tiers</h3>
+          <div class="flex items-center">
             <.button
-              phx-click="export-tickets-csv"
+              phx-click="open-add-ticket-tier-modal"
               phx-target={@myself}
-              phx-disable-with="Exporting..."
-              color="blue"
-              class="w-full sm:w-auto shrink-0"
+              class="w-full sm:w-auto"
             >
-              <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
+              <.icon name="hero-plus" class="w-5 h-5" /> Add Ticket Tier
             </.button>
           </div>
+        </div>
 
-          <div
-            :if={length(@ticket_purchases) == 0}
-            class="text-center py-8 text-zinc-500"
-          >
-            <p class="font-semibold">No tickets purchased yet.</p>
-            <p class="text-sm">
-              Ticket purchases will appear here once users start buying tickets.
-            </p>
+        <%= if length(@ticket_tiers) == 0 do %>
+          <div class="flex items-center gap-2 mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <.icon
+              name="hero-information-circle"
+              class="w-5 h-5 text-amber-600 flex-shrink-0"
+            />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium text-amber-900">
+                Tickets Coming Soon
+              </p>
+              <p class="text-xs text-amber-700">
+                Enable this to show users that tickets will be available but details are not ready yet.
+                The flag will automatically clear when you add your first ticket tier.
+              </p>
+            </div>
+            <.toggle
+              id="tickets-tbd-toggle"
+              checked={@event.tickets_tbd}
+              label={if @event.tickets_tbd, do: "TBD Enabled", else: "Set as TBD"}
+              phx-click="toggle-tickets-tbd"
+              phx-target={@myself}
+              class="flex-shrink-0"
+            />
           </div>
+        <% end %>
 
-          <div :if={length(@ticket_purchases) > 0} class="space-y-3 sm:space-y-4">
-            <%= for purchase <- @ticket_purchases do %>
-              <div
-                id={"ticket-purchase-#{purchase.user_id}"}
-                class="border border-zinc-200 rounded p-3 sm:p-4"
-              >
-                <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0">
-                  <div class="flex-1">
-                    <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-2">
-                      <h4 class="font-semibold">{purchase.user_name}</h4>
-                      <span class="text-sm text-zinc-600">
-                        {purchase.user_email}
-                      </span>
+        <div
+          :if={length(@ticket_tiers) == 0}
+          class="text-center py-8 text-zinc-500"
+        >
+          <p class="font-semibold">No ticket tiers created yet.</p>
+          <p class="text-sm">
+            Click "Add Ticket Tier" to create your first ticket tier.
+          </p>
+        </div>
+
+        <div :if={length(@ticket_tiers) > 0} class="space-y-3 sm:space-y-4">
+          <%= for ticket_tier <- @ticket_tiers do %>
+            <% is_donation =
+              ticket_tier.type == "donation" || ticket_tier.type == :donation %>
+            <div class="group border border-zinc-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-sm transition-all bg-white">
+              <div class="flex flex-col lg:flex-row lg:items-center gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-3 mb-1">
+                    <h4 class="font-bold text-zinc-900 text-lg">
+                      {ticket_tier.name}
+                    </h4>
+                    <.badge
+                      type={tier_status_badge_type(ticket_tier)}
+                      class="text-xs uppercase tracking-wider font-bold rounded-full px-2 py-0.5 me-0"
+                    >
+                      {tier_status_text(ticket_tier)}
+                    </.badge>
+                  </div>
+                  <p
+                    :if={ticket_tier.description}
+                    class="text-zinc-500 text-sm mb-3 min-h-[2.5rem] lg:min-h-[1.25rem]"
+                  >
+                    {ticket_tier.description}
+                    <span class="text-zinc-400 italic text-xs">
+                      — {String.capitalize(to_string(ticket_tier.type))} Tier
+                    </span>
+                  </p>
+                  <p
+                    :if={!ticket_tier.description}
+                    class="text-zinc-400 text-sm italic mb-3 min-h-[2.5rem] lg:min-h-[1.25rem]"
+                  >
+                    {String.capitalize(to_string(ticket_tier.type))} Tier
+                  </p>
+
+                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        Price
+                      </p>
+                      <p class="text-sm font-bold text-zinc-800">
+                        <%= case ticket_tier.type do %>
+                          <% "free" -> %>
+                            Free
+                          <% "donation" -> %>
+                            User sets amount
+                          <% :donation -> %>
+                            User sets amount
+                          <% _ -> %>
+                            {format_money_safe(ticket_tier.price)}
+                        <% end %>
+                      </p>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm">
-                      <div>
-                        <span class="font-medium text-zinc-700">Ticket Tier:</span>
-                        <span class="ml-1">{purchase.ticket_tier_name}</span>
-                      </div>
-
-                      <div>
-                        <span class="font-medium text-zinc-700">Quantity:</span>
-                        <span class="ml-1">{purchase.ticket_count}</span>
-                      </div>
-
-                      <div>
-                        <span class="font-medium text-zinc-700">Total:</span>
-                        <span class="ml-1">
-                          <%= case purchase.total_amount do %>
-                            <% %Money{amount: 0} -> %>
-                              Free
-                            <% amount -> %>
-                              {format_money_safe(amount)}
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        Sold
+                      </p>
+                      <div class="flex items-center gap-2">
+                        <p class="text-sm font-bold text-zinc-800">
+                          <%= case ticket_tier.quantity do %>
+                            <% nil -> %>
+                              {ticket_tier.sold_tickets_count} /
+                              <span class="text-zinc-400">∞</span>
+                            <% 0 -> %>
+                              {ticket_tier.sold_tickets_count} /
+                              <span class="text-zinc-400">∞</span>
+                            <% quantity -> %>
+                              {"#{ticket_tier.sold_tickets_count}/#{quantity}"}
                           <% end %>
-                        </span>
+                        </p>
+                        <div
+                          :if={ticket_tier.quantity && ticket_tier.quantity > 0}
+                          class="hidden sm:block w-16 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0"
+                        >
+                          <div
+                            class={[
+                              "h-full rounded-full transition-all",
+                              tier_progress_bar_classes(ticket_tier)
+                            ]}
+                            style={"width: #{tier_progress_percentage(ticket_tier)}%"}
+                          >
+                          </div>
+                        </div>
                       </div>
+                      <%= if !is_donation do %>
+                        <% reserved_count =
+                          get_reserved_count(
+                            ticket_tier.id,
+                            @reservations_by_tier
+                          ) %>
+                        <%= if reserved_count > 0 do %>
+                          <p class="text-xs text-amber-600 mt-1">
+                            {reserved_count} reserved
+                          </p>
+                        <% end %>
+                      <% end %>
+                    </div>
+
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        Sales Period
+                      </p>
+                      <p class="text-sm text-zinc-700 leading-tight">
+                        {format_sales_period(
+                          ticket_tier.start_date,
+                          ticket_tier.end_date
+                        )}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p class="text-xs uppercase tracking-wide text-zinc-400 font-semibold mb-1">
+                        Registration
+                      </p>
+                      <p class="text-sm text-zinc-700">
+                        {if ticket_tier.requires_registration,
+                          do: "Required",
+                          else: "Not Required"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end pt-4 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
+                  <.row_actions_dropdown
+                    id={"ticket-tier-actions-#{ticket_tier.id}"}
+                    label={"Actions for #{ticket_tier.name}"}
+                  >
+                    <.dropdown_menu_item
+                      :if={!is_donation}
+                      id={"ticket-tier-actions-#{ticket_tier.id}-grant"}
+                      icon="hero-gift"
+                      tone={:success}
+                      phx-click="grant-tickets"
+                      phx-value-id={ticket_tier.id}
+                      phx-target={@myself}
+                    >
+                      Grant tickets
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      :if={!is_donation}
+                      id={"ticket-tier-actions-#{ticket_tier.id}-reserve"}
+                      icon="hero-ticket"
+                      tone={:info}
+                      phx-click="reserve-tickets"
+                      phx-value-id={ticket_tier.id}
+                      phx-target={@myself}
+                    >
+                      Reserve tickets
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      id={"ticket-tier-actions-#{ticket_tier.id}-edit"}
+                      icon="hero-pencil-square"
+                      phx-click="edit-ticket-tier"
+                      phx-value-id={ticket_tier.id}
+                      phx-target={@myself}
+                    >
+                      Edit tier
+                    </.dropdown_menu_item>
+                    <.dropdown_menu_item
+                      id={"ticket-tier-actions-#{ticket_tier.id}-delete"}
+                      icon="hero-trash"
+                      tone={:danger}
+                      phx-click="delete-ticket-tier"
+                      phx-value-id={ticket_tier.id}
+                      phx-target={@myself}
+                      data-confirm="Are you sure you want to delete this ticket tier? This action cannot be undone."
+                      disabled={ticket_tier.sold_tickets_count > 0}
+                      class={
+                        if ticket_tier.sold_tickets_count > 0,
+                          do: "opacity-50 cursor-not-allowed hover:bg-transparent"
+                      }
+                    >
+                      Delete tier
+                    </.dropdown_menu_item>
+                  </.row_actions_dropdown>
+                </div>
+              </div>
+              <%!-- Reservations Section --%>
+              <%= if !is_donation do %>
+                <% reservations =
+                  Map.get(@reservations_by_tier, ticket_tier.id, []) %>
+                <% expired_reservations =
+                  Map.get(@expired_reservations_by_tier, ticket_tier.id, []) %>
+                <%= if length(reservations) > 0 do %>
+                  <div class="mt-4 pt-4 border-t border-zinc-200">
+                    <p class="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">
+                      Active Reservations
+                    </p>
+                    <div class="space-y-2">
+                      <%= for reservation <- reservations do %>
+                        <div class="flex items-start justify-between gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-zinc-900 truncate">
+                              {reservation.user.first_name} {reservation.user.last_name}
+                            </p>
+                            <p class="text-xs text-zinc-600 truncate">
+                              {reservation.user.email}
+                            </p>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-zinc-600">
+                              <span>
+                                {reservation.quantity} ticket{if reservation.quantity !=
+                                                                   1,
+                                                                 do: "s"}
+                              </span>
+                              <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
+                                <span class="text-green-600 font-medium">
+                                  {Decimal.to_float(reservation.discount_percentage)
+                                  |> Float.round(2)}% off
+                                </span>
+                              <% end %>
+                              <span
+                                :if={reservation.expires_at}
+                                class="text-amber-600"
+                              >
+                                Expires {format_date(reservation.expires_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            phx-click="cancel-reservation"
+                            phx-value-id={reservation.id}
+                            phx-target={@myself}
+                            phx-disable-with="Cancelling..."
+                            data-confirm="Are you sure you want to cancel this reservation?"
+                            class="shrink-0 p-1.5 text-amber-600 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <.icon name="hero-x-mark" class="w-4 h-4" />
+                          </button>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+                <%= if length(expired_reservations) > 0 do %>
+                  <div class="mt-4 pt-4 border-t border-zinc-200">
+                    <p class="text-xs font-semibold text-red-800 uppercase tracking-wide mb-1">
+                      Expired Reservations
+                    </p>
+                    <p class="text-xs text-zinc-500 mb-2">
+                      Past end date — no checkout discount until cancelled or reissued.
+                    </p>
+                    <div class="space-y-2">
+                      <%= for reservation <- expired_reservations do %>
+                        <div class="flex items-start justify-between gap-3 p-3 bg-zinc-100 rounded-lg border border-zinc-300">
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-zinc-900 truncate">
+                              {reservation.user.first_name} {reservation.user.last_name}
+                            </p>
+                            <p class="text-xs text-zinc-600 truncate">
+                              {reservation.user.email}
+                            </p>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-zinc-600">
+                              <span>
+                                {reservation.quantity} ticket{if reservation.quantity !=
+                                                                   1,
+                                                                 do: "s"}
+                              </span>
+                              <%= if reservation.discount_percentage && Decimal.gt?(reservation.discount_percentage, 0) do %>
+                                <span class="text-green-600 font-medium">
+                                  {Decimal.to_float(reservation.discount_percentage)
+                                  |> Float.round(2)}% off
+                                </span>
+                              <% end %>
+                              <span class="text-red-700 font-medium">
+                                Ended {format_date(reservation.expires_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            phx-click="cancel-reservation"
+                            phx-value-id={reservation.id}
+                            phx-target={@myself}
+                            phx-disable-with="Cancelling..."
+                            data-confirm="Are you sure you want to cancel this reservation?"
+                            class="shrink-0 p-1.5 text-zinc-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <.icon name="hero-x-mark" class="w-4 h-4" />
+                          </button>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <%!-- Ticket Purchases Summary --%>
+      <div class="border border-zinc-200 rounded p-4 sm:p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div class="flex items-baseline gap-2 min-w-0">
+            <h3 class="text-lg font-semibold">Ticket Purchases</h3>
+            <span class="text-sm text-zinc-600">
+              {length(@ticket_purchases)} purchase{if length(@ticket_purchases) !=
+                                                        1,
+                                                      do: "s"}
+            </span>
+          </div>
+          <.button
+            phx-click="export-tickets-csv"
+            phx-target={@myself}
+            phx-disable-with="Exporting..."
+            color="blue"
+            class="w-full sm:w-auto shrink-0"
+          >
+            <.icon name="hero-arrow-down-tray" class="w-5 h-5" /> Export CSV
+          </.button>
+        </div>
+
+        <div
+          :if={length(@ticket_purchases) == 0}
+          class="text-center py-8 text-zinc-500"
+        >
+          <p class="font-semibold">No tickets purchased yet.</p>
+          <p class="text-sm">
+            Ticket purchases will appear here once users start buying tickets.
+          </p>
+        </div>
+
+        <div :if={length(@ticket_purchases) > 0} class="space-y-3 sm:space-y-4">
+          <%= for purchase <- @ticket_purchases do %>
+            <div
+              id={"ticket-purchase-#{purchase.user_id}"}
+              class="border border-zinc-200 rounded p-3 sm:p-4"
+            >
+              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0">
+                <div class="flex-1">
+                  <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mb-2">
+                    <h4 class="font-semibold">{purchase.user_name}</h4>
+                    <span class="text-sm text-zinc-600">
+                      {purchase.user_email}
+                    </span>
+                  </div>
+
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-sm">
+                    <div>
+                      <span class="font-medium text-zinc-700">Ticket Tier:</span>
+                      <span class="ml-1">{purchase.ticket_tier_name}</span>
+                    </div>
+
+                    <div>
+                      <span class="font-medium text-zinc-700">Quantity:</span>
+                      <span class="ml-1">{purchase.ticket_count}</span>
+                    </div>
+
+                    <div>
+                      <span class="font-medium text-zinc-700">Total:</span>
+                      <span class="ml-1">
+                        <%= case purchase.total_amount do %>
+                          <% %Money{amount: 0} -> %>
+                            Free
+                          <% amount -> %>
+                            {format_money_safe(amount)}
+                        <% end %>
+                      </span>
                     </div>
                   </div>
                 </div>
               </div>
-            <% end %>
-          </div>
+            </div>
+          <% end %>
         </div>
-        <!-- Add Ticket Tier Modal -->
-        <.modal
-          :if={@show_add_modal}
-          id="add-ticket-tier-modal"
-          show
-          on_cancel={JS.push("close-add-ticket-tier-modal", target: @myself)}
-        >
-          <.live_component
-            id={"ticket-tier-form-#{@event_id}"}
-            module={YscWeb.AdminEventsLive.TicketTierForm}
-            event_id={@event_id}
-          />
-        </.modal>
-        <!-- Edit Ticket Tier Modal -->
-        <.modal
-          :if={@show_edit_modal}
-          id="edit-ticket-tier-modal"
-          show
-          on_cancel={JS.push("close-edit-ticket-tier-modal", target: @myself)}
-        >
-          <.live_component
-            :if={@editing_ticket_tier}
-            id={"edit-ticket-tier-form-#{@editing_ticket_tier.id}"}
-            module={YscWeb.AdminEventsLive.TicketTierForm}
-            event_id={@event_id}
-            ticket_tier={@editing_ticket_tier}
-          />
-        </.modal>
-        <!-- Reserve Tickets Modal -->
-        <.modal
-          :if={@show_reserve_modal && @reserving_tier}
-          id="reserve-tickets-modal"
-          show
-          on_cancel={JS.push("close-reserve-tickets-modal", target: @myself)}
-        >
-          <.live_component
-            id={"ticket-reservation-form-#{@reserving_tier.id}"}
-            module={YscWeb.AdminEventsLive.TicketReservationForm}
-            ticket_tier={@reserving_tier}
-            ticket_tier_id={@reserving_tier.id}
-            event_id={@event_id}
-            current_user={@current_user}
-          />
-        </.modal>
-        <!-- Grant Tickets Modal -->
-        <.modal
-          :if={@show_grant_modal && @granting_tier}
-          id="grant-tickets-modal"
-          show
-          on_cancel={JS.push("close-grant-tickets-modal", target: @myself)}
-        >
-          <.live_component
-            id={"ticket-grant-form-#{@granting_tier.id}"}
-            module={YscWeb.AdminEventsLive.TicketGrantForm}
-            ticket_tier={@granting_tier}
-            ticket_tier_id={@granting_tier.id}
-            event_id={@event_id}
-            current_user={@current_user}
-          />
-        </.modal>
-      <% end %>
+      </div>
+      <%!-- Add Ticket Tier Modal --%>
+      <.modal
+        :if={@show_add_modal}
+        id="add-ticket-tier-modal"
+        show
+        on_cancel={JS.push("close-add-ticket-tier-modal", target: @myself)}
+      >
+        <.live_component
+          id={"ticket-tier-form-#{@event_id}"}
+          module={YscWeb.AdminEventsLive.TicketTierForm}
+          event_id={@event_id}
+        />
+      </.modal>
+      <%!-- Edit Ticket Tier Modal --%>
+      <.modal
+        :if={@show_edit_modal}
+        id="edit-ticket-tier-modal"
+        show
+        on_cancel={JS.push("close-edit-ticket-tier-modal", target: @myself)}
+      >
+        <.live_component
+          :if={@editing_ticket_tier}
+          id={"edit-ticket-tier-form-#{@editing_ticket_tier.id}"}
+          module={YscWeb.AdminEventsLive.TicketTierForm}
+          event_id={@event_id}
+          ticket_tier={@editing_ticket_tier}
+        />
+      </.modal>
+      <%!-- Reserve Tickets Modal --%>
+      <.modal
+        :if={@show_reserve_modal && @reserving_tier}
+        id="reserve-tickets-modal"
+        show
+        on_cancel={JS.push("close-reserve-tickets-modal", target: @myself)}
+      >
+        <.live_component
+          id={"ticket-reservation-form-#{@reserving_tier.id}"}
+          module={YscWeb.AdminEventsLive.TicketReservationForm}
+          ticket_tier={@reserving_tier}
+          ticket_tier_id={@reserving_tier.id}
+          event_id={@event_id}
+          current_user={@current_user}
+        />
+      </.modal>
+      <%!-- Grant Tickets Modal --%>
+      <.modal
+        :if={@show_grant_modal && @granting_tier}
+        id="grant-tickets-modal"
+        show
+        on_cancel={JS.push("close-grant-tickets-modal", target: @myself)}
+      >
+        <.live_component
+          id={"ticket-grant-form-#{@granting_tier.id}"}
+          module={YscWeb.AdminEventsLive.TicketGrantForm}
+          ticket_tier={@granting_tier}
+          ticket_tier_id={@granting_tier.id}
+          event_id={@event_id}
+          current_user={@current_user}
+        />
+      </.modal>
     </div>
     """
   end

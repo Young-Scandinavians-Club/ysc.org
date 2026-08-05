@@ -373,7 +373,9 @@ defmodule YscWeb.CoreComponents do
   attr :patch, :string, default: nil
   attr :href, :string, default: nil
   attr :loading_text, :string, default: nil
-  attr :rest, :global, include: ~w(disabled form name value method rel replace)
+
+  attr :rest, :global,
+    include: ~w(disabled form name value method rel replace target)
 
   slot :inner_block, required: true
 
