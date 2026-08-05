@@ -94,6 +94,10 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
      |> assign(:grant_user_results, [])}
   end
 
+  def handle_event("validate_entitlement_form", %{"entitlement" => p}, socket) do
+    {:noreply, assign(socket, :entitlement_form, to_form(p, as: :entitlement))}
+  end
+
   def handle_event("grant_booking_entitlement", %{"entitlement" => p}, socket) do
     admin_id = socket.assigns.current_user.id
     attrs = Entitlements.grant_attrs_from_entitlement_form(p, admin_id, nil)
@@ -217,6 +221,7 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
           <.form
             for={@entitlement_form}
             id="grant-entitlement-form-org"
+            phx-change="validate_entitlement_form"
             phx-submit="grant_booking_entitlement"
           >
             <.autocomplete
@@ -235,17 +240,44 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
               required
             />
 
+            <fieldset class="mt-4">
+              <legend class="text-sm font-medium text-zinc-700 mb-2">
+                Benefit type
+              </legend>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <label
+                  :for={
+                    {value, title, description} <- [
+                      {"percent_off", "Percent off stay",
+                       "e.g. 50% off, capped at a max $ discount"},
+                      {"free_nights", "Free nights",
+                       "A number of nights covered for free"},
+                      {"fixed_amount_off", "Fixed amount off",
+                       "A flat $ discount off the stay"}
+                    ]
+                  }
+                  class={[
+                    "flex flex-col gap-0.5 rounded-md border p-3 cursor-pointer transition-colors",
+                    if(benefit_kind_value(@entitlement_form) == value,
+                      do: "border-zinc-800 bg-zinc-50 ring-1 ring-zinc-800",
+                      else: "border-zinc-200 hover:border-zinc-300"
+                    )
+                  ]}
+                >
+                  <input
+                    type="radio"
+                    name="entitlement[benefit_kind]"
+                    value={value}
+                    checked={benefit_kind_value(@entitlement_form) == value}
+                    class="sr-only"
+                  />
+                  <span class="text-sm font-semibold text-zinc-800">{title}</span>
+                  <span class="text-xs text-zinc-500">{description}</span>
+                </label>
+              </div>
+            </fieldset>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-              <.input
-                field={@entitlement_form[:benefit_kind]}
-                type="select"
-                label="Benefit type"
-                options={[
-                  {"Percent off stay", "percent_off"},
-                  {"Free nights (proportional)", "free_nights"},
-                  {"Fixed amount off", "fixed_amount_off"}
-                ]}
-              />
               <.input
                 field={@entitlement_form[:property]}
                 type="select"
@@ -257,35 +289,44 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
                 ]}
               />
               <.input
-                field={@entitlement_form[:max_guests]}
-                type="number"
-                label="Max guests (optional)"
-              />
-              <.input
-                field={@entitlement_form[:free_nights]}
-                type="number"
-                label="Free nights count"
-              />
-              <.input
-                field={@entitlement_form[:percent_off]}
-                type="text"
-                label="Percent off (e.g. 50)"
-              />
-              <.input
-                field={@entitlement_form[:buyout_max_discount]}
-                type="text"
-                label="Buyout max discount (USD)"
-              />
-              <.input
-                field={@entitlement_form[:amount_off]}
-                type="text"
-                label="Fixed amount off (USD)"
-              />
-              <.input
                 field={@entitlement_form[:expires_on]}
                 type="date"
                 label="Expires (optional)"
               />
+
+              <%= if benefit_kind_value(@entitlement_form) == "free_nights" do %>
+                <.input
+                  field={@entitlement_form[:free_nights]}
+                  type="number"
+                  label="Free nights count"
+                />
+                <.input
+                  field={@entitlement_form[:max_guests]}
+                  type="number"
+                  label="Max guests (optional)"
+                />
+              <% end %>
+
+              <%= if benefit_kind_value(@entitlement_form) == "percent_off" do %>
+                <.input
+                  field={@entitlement_form[:percent_off]}
+                  type="text"
+                  label="Percent off (e.g. 50)"
+                />
+                <.input
+                  field={@entitlement_form[:buyout_max_discount]}
+                  type="text"
+                  label="Buyout max discount (USD)"
+                />
+              <% end %>
+
+              <%= if benefit_kind_value(@entitlement_form) == "fixed_amount_off" do %>
+                <.input
+                  field={@entitlement_form[:amount_off]}
+                  type="text"
+                  label="Fixed amount off (USD)"
+                />
+              <% end %>
             </div>
             <.input
               field={@entitlement_form[:internal_note]}
@@ -426,6 +467,13 @@ defmodule YscWeb.AdminBookingEntitlementsLive do
 
   defp entitlement_form do
     to_form(Entitlements.entitlement_grant_default_params(), as: :entitlement)
+  end
+
+  defp benefit_kind_value(form) do
+    case form[:benefit_kind].value do
+      nil -> "percent_off"
+      value -> to_string(value)
+    end
   end
 
   defp format_changeset_errors(changeset) do
