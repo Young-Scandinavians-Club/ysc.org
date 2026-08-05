@@ -2105,7 +2105,10 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   defp do_send_photo_reminder(event, socket) do
-    case EventPhotos.deliver_reminder_now(event, force: true, allow_future: true) do
+    case EventPhotos.deliver_reminder_now(event,
+           force: true,
+           allow_future: true
+         ) do
       :ok ->
         event = Events.get_event!(event.id)
         collection = EventPhotos.get_by_event_id(event.id)

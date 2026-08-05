@@ -169,7 +169,10 @@ defmodule Ysc.EventPhotos do
             collection
           end
 
-        YscWeb.Workers.EventPhotoReminderWorker.send_reminders(event, collection)
+        YscWeb.Workers.EventPhotoReminderWorker.send_reminders(
+          event,
+          collection
+        )
       end
     end
   end
@@ -187,7 +190,11 @@ defmodule Ysc.EventPhotos do
         false
 
       end_date ->
-        today = DateTime.utc_now() |> DateTime.shift_zone!(@timezone) |> DateTime.to_date()
+        today =
+          DateTime.utc_now()
+          |> DateTime.shift_zone!(@timezone)
+          |> DateTime.to_date()
+
         Date.compare(end_date, today) == :gt
     end
   end
