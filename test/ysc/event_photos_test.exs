@@ -205,7 +205,11 @@ defmodule Ysc.EventPhotosTest do
       {:ok, collection} = EventPhotos.ensure_collection_for_event(event)
       {:ok, _} = EventPhotos.mark_reminder_sent(collection, 99)
 
-      assert :ok = EventPhotos.deliver_reminder_now(event, force: true)
+      assert :ok =
+               EventPhotos.deliver_reminder_now(event,
+                 force: true,
+                 allow_future: true
+               )
 
       updated = EventPhotos.get_by_event_id(event.id)
       assert updated.reminder_recipient_count == 1

@@ -49,37 +49,53 @@ defmodule YscWeb.Workers.EventNotificationWorker do
         :ok
 
       event ->
-        # Only send if event is still published
-        if event.state == "published" or event.state == :published do
-          # Only send if event date is in the future (not retroactive)
-          if EventDateTime.in_future?(event) do
-            send_event_notifications(event)
-          else
-            Ysc.Logging.info(
-              "Event is retroactive (past date), skipping notifications",
-              event_id: event_id,
-              start_date: event.start_date,
-              start_time: event.start_time
-            )
-
-            :ok
-          end
-        else
-          Ysc.Logging.info(
-            "Event is no longer published, skipping notifications",
-            event_id: event_id,
-            state: event.state
-          )
-
-          :ok
-        end
+        send_event_notifications(event)
     end
   end
 
   @doc """
   Send event notification emails to all users with event notifications enabled.
+
+  Guards against already-sent, unpublished, and retroactive (past-date) events itself
+  — not just via `perform/1` — so a direct call (e.g. from a console) can't bypass
+  those checks the way a scheduled job would.
   """
-  def send_event_notifications(event) do
+  def send_event_notifications(%Event{} = event) do
+    require Ysc.Logging
+
+    cond do
+      not is_nil(event.notification_sent_at) ->
+        Ysc.Logging.info("Event notifications already sent, skipping",
+          event_id: event.id
+        )
+
+        :ok
+
+      event.state not in [:published, "published"] ->
+        Ysc.Logging.info(
+          "Event is no longer published, skipping notifications",
+          event_id: event.id,
+          state: event.state
+        )
+
+        :ok
+
+      not EventDateTime.in_future?(event) ->
+        Ysc.Logging.info(
+          "Event is retroactive (past date), skipping notifications",
+          event_id: event.id,
+          start_date: event.start_date,
+          start_time: event.start_time
+        )
+
+        :ok
+
+      true ->
+        do_send_event_notifications(event)
+    end
+  end
+
+  defp do_send_event_notifications(event) do
     require Ysc.Logging
 
     try do

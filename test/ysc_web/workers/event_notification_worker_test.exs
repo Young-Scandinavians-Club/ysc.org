@@ -373,7 +373,7 @@ defmodule YscWeb.Workers.EventNotificationWorkerTest do
 
       event =
         event
-        |> Event.changeset(%{state: :published})
+        |> Event.changeset(%{state: :published, start_time: ~T[09:00:00]})
         |> Ysc.Repo.update!()
 
       assert :ok = EventNotificationWorker.send_event_notifications(event)
