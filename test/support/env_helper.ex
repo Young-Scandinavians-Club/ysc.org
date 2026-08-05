@@ -18,18 +18,20 @@ defmodule Ysc.Test.EnvHelper do
 
   @doc """
   Acquires the global lock and sets `:ysc, :environment` to `value`, returning
-  the prior value. The lock is held until `restore_environment!/1` releases
-  it, so it spans the whole test body (not just this call) — required
-  because code under test re-reads `Application.get_env` at call time, not
-  just at the moment this sets it.
+  an opaque token for `restore_environment!/1`. The lock is held (by a
+  dedicated process — see `Ysc.Test.GlobalLock`, since the test process
+  itself may exit before `on_exit` runs) until `restore_environment!/1`
+  releases it, so it spans the whole test body (not just this call) —
+  required because code under test re-reads `Application.get_env` at call
+  time, not just at the moment this sets it.
 
   Pair with `restore_environment!/1` in `on_exit` when a whole test needs a non-default env.
   """
   def capture_environment!(value) do
-    :global.set_lock(@lock, [Node.self()], :infinity)
+    owner = Ysc.Test.GlobalLock.acquire!(@lock)
     original = Application.get_env(:ysc, :environment)
     Application.put_env(:ysc, :environment, value)
-    original
+    {owner, original}
   end
 
   @doc """
@@ -53,12 +55,16 @@ defmodule Ysc.Test.EnvHelper do
 
   @doc """
   Restores the original value and releases the lock acquired by
-  `capture_environment!/1`.
+  `capture_environment!/1`. Also accepts a plain (non-tuple) value for
+  callers that captured `Application.get_env/2` directly without acquiring
+  the lock (e.g. as a belt-and-suspenders reset alongside `with_environment/2`,
+  which manages its own lock).
   """
-  def restore_environment!(original) do
-    restore(original)
-    :global.del_lock(@lock, [Node.self()])
+  def restore_environment!({owner, original}) when is_pid(owner) do
+    Ysc.Test.GlobalLock.release!(owner, fn -> restore(original) end)
   end
+
+  def restore_environment!(original), do: restore(original)
 
   defp trans(fun), do: :global.trans(@lock, fun, [Node.self()], :infinity)
 end

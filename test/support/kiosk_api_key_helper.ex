@@ -17,22 +17,23 @@ defmodule Ysc.Test.KioskAPIKeyHelper do
   @doc """
   Acquires the global lock and sets `:ysc, :kiosk_api_key`. Pair with
   `restore_kiosk_api_key!/1` in `on_exit` — the lock isn't released until
-  then, so it covers the whole test body in between.
+  then, so it covers the whole test body in between. Held by a dedicated
+  process (see `Ysc.Test.GlobalLock`), since the test process itself may
+  exit before `on_exit` runs.
   """
   def capture_kiosk_api_key!(value) do
-    :global.set_lock(@lock, [Node.self()], :infinity)
+    owner = Ysc.Test.GlobalLock.acquire!(@lock)
     original = Application.get_env(:ysc, :kiosk_api_key)
     Application.put_env(:ysc, :kiosk_api_key, value)
-    original
+    {owner, original}
   end
 
   @doc """
   Restores the original value and releases the lock acquired by
   `capture_kiosk_api_key!/1`.
   """
-  def restore_kiosk_api_key!(original) do
-    restore(original)
-    :global.del_lock(@lock, [Node.self()])
+  def restore_kiosk_api_key!({owner, original}) do
+    Ysc.Test.GlobalLock.release!(owner, fn -> restore(original) end)
   end
 
   @doc """
