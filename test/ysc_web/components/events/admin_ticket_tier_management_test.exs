@@ -266,11 +266,14 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
   end
 
   describe "Partiful - coexists with ticket tiers" do
-    test "shows a Partiful note but still displays ticket tier management when event has partiful_link" do
+    test "shows a Partiful note but still displays configured ticket tiers when event has partiful_link" do
       event =
         event_fixture(%{
           partiful_link: "https://partiful.com/e/test-event-xyz"
         })
+
+      _tier =
+        ticket_tier_fixture(%{event_id: event.id, name: "General Admission"})
 
       user = user_fixture()
 
@@ -283,6 +286,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagementTest do
 
       assert html =~ "Partiful link"
       assert html =~ "https://partiful.com/e/test-event-xyz"
+      assert html =~ "General Admission"
       assert html =~ "Add Ticket Tier"
     end
 

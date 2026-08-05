@@ -37,21 +37,25 @@ defmodule YscWeb.EventDetailsLive do
     """
   end
 
+  attr :id, :string, required: true
   attr :href, :string, required: true
-  attr :wrapper_class, :string, default: "block w-full"
-  attr :button_class, :string, default: "w-full py-4"
+  attr :class, :string, default: "w-full py-4"
   attr :logo_class, :string, default: "h-4 w-auto"
   attr :icon_class, :string, default: "w-5 h-5"
 
   defp partiful_rsvp_button(assigns) do
     ~H"""
-    <a href={@href} target="_blank" rel="noopener noreferrer" class={@wrapper_class}>
-      <.button class={"flex items-center justify-center gap-2 #{@button_class}"}>
-        <span class="uppercase tracking-widest">RSVP on</span>
-        <.partiful_logo class={@logo_class} />
-        <.icon name="hero-arrow-top-right-on-square" class={@icon_class} />
-      </.button>
-    </a>
+    <.button
+      id={@id}
+      href={@href}
+      target="_blank"
+      rel="noopener noreferrer"
+      class={"flex items-center justify-center gap-2 #{@class}"}
+    >
+      <span class="uppercase tracking-widest">RSVP on</span>
+      <.partiful_logo class={@logo_class} />
+      <.icon name="hero-arrow-top-right-on-square" class={@icon_class} />
+    </.button>
     """
   end
 
@@ -510,9 +514,9 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 </div>
                 <.partiful_rsvp_button
+                  id="partiful-rsvp-spotlight"
                   href={@event.partiful_link}
-                  wrapper_class="flex-shrink-0 w-full sm:w-auto"
-                  button_class="w-full sm:w-auto px-6 py-3.5"
+                  class="flex-shrink-0 w-full sm:w-auto px-6 py-3.5"
                   icon_class="w-4 h-4"
                 />
               </div>
@@ -1045,7 +1049,10 @@ defmodule YscWeb.EventDetailsLive do
                     </div>
 
                     <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
-                      <.partiful_rsvp_button href={@event.partiful_link} />
+                      <.partiful_rsvp_button
+                        id="partiful-rsvp-sidebar"
+                        href={@event.partiful_link}
+                      />
                     <% else %>
                       <%= if @has_ticket_tiers do %>
                         <%= if @event_sold_out_for_user do %>
@@ -1198,9 +1205,9 @@ defmodule YscWeb.EventDetailsLive do
                   <% else %>
                     <%= if @event.partiful_link not in [nil, ""] && !@has_ticket_tiers do %>
                       <.partiful_rsvp_button
+                        id="partiful-rsvp-mobile-bar"
                         href={@event.partiful_link}
-                        wrapper_class="flex-shrink-0"
-                        button_class="px-8 py-3.5"
+                        class="flex-shrink-0 px-8 py-3.5"
                         icon_class="w-4 h-4"
                       />
                     <% else %>

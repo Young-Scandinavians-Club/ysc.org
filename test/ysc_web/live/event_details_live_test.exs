@@ -1570,7 +1570,7 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       assert html =~ event.title
       refute html =~ "RSVP on"
-      assert html =~ "Get Tickets" or html =~ "ticket"
+      assert html =~ "Get Tickets"
     end
 
     test "event with no tickets and no partiful_link shows no registration or Get Tickets",
@@ -1607,9 +1607,30 @@ defmodule YscWeb.EventDetailsLiveTest do
 
       {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
 
-      assert html =~ "Get Tickets" or html =~ "ticket"
+      assert html =~ "Get Tickets"
       assert html =~ "RSVP on"
       assert html =~ "https://partiful.com/e/both-tickets-and-partiful"
+    end
+
+    test "anonymous visitor sees the Partiful spotlight and a gated ticket CTA when event has both tickets and partiful_link",
+         %{
+           conn: conn
+         } do
+      event =
+        event_with_tickets(
+          tier_count: 1,
+          state: :upcoming,
+          event_attrs: %{
+            partiful_link: "https://partiful.com/e/anon-both"
+          }
+        )
+
+      {:ok, _view, html} = live(conn, ~p"/events/#{event.id}")
+
+      assert html =~ "RSVP on"
+      assert html =~ "https://partiful.com/e/anon-both"
+      assert html =~ "Sign in with your YSC account to buy tickets"
+      refute html =~ "Get Tickets"
     end
   end
 

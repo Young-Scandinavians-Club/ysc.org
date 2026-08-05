@@ -28,7 +28,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           set on the Details tab. It's shown to attendees alongside these ticket tiers.
         </p>
       </div>
-      <!-- Ticket Tiers List -->
+      <%!-- Ticket Tiers List --%>
       <div class="border border-zinc-200 rounded p-4 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4">
           <h3 class="text-lg font-semibold">Ticket Tiers</h3>
@@ -257,7 +257,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
                   </.row_actions_dropdown>
                 </div>
               </div>
-              <!-- Reservations Section -->
+              <%!-- Reservations Section --%>
               <%= if !is_donation do %>
                 <% reservations =
                   Map.get(@reservations_by_tier, ticket_tier.id, []) %>
@@ -368,7 +368,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <% end %>
         </div>
       </div>
-      <!-- Ticket Purchases Summary -->
+      <%!-- Ticket Purchases Summary --%>
       <div class="border border-zinc-200 rounded p-4 sm:p-6">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
           <div class="flex items-baseline gap-2 min-w-0">
@@ -444,7 +444,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           <% end %>
         </div>
       </div>
-      <!-- Add Ticket Tier Modal -->
+      <%!-- Add Ticket Tier Modal --%>
       <.modal
         :if={@show_add_modal}
         id="add-ticket-tier-modal"
@@ -457,7 +457,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           event_id={@event_id}
         />
       </.modal>
-      <!-- Edit Ticket Tier Modal -->
+      <%!-- Edit Ticket Tier Modal --%>
       <.modal
         :if={@show_edit_modal}
         id="edit-ticket-tier-modal"
@@ -472,7 +472,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           ticket_tier={@editing_ticket_tier}
         />
       </.modal>
-      <!-- Reserve Tickets Modal -->
+      <%!-- Reserve Tickets Modal --%>
       <.modal
         :if={@show_reserve_modal && @reserving_tier}
         id="reserve-tickets-modal"
@@ -488,7 +488,7 @@ defmodule YscWeb.AdminEventsLive.TicketTierManagement do
           current_user={@current_user}
         />
       </.modal>
-      <!-- Grant Tickets Modal -->
+      <%!-- Grant Tickets Modal --%>
       <.modal
         :if={@show_grant_modal && @granting_tier}
         id="grant-tickets-modal"
