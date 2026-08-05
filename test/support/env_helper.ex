@@ -17,16 +17,21 @@ defmodule Ysc.Test.EnvHelper do
   end
 
   @doc """
-  Sets `:ysc, :environment` to `value` under the global lock and returns the prior value.
+  Acquires the global lock and sets `:ysc, :environment` to `value`, returning
+  an opaque token for `restore_environment!/1`. The lock is held (by a
+  dedicated process — see `Ysc.Test.GlobalLock`, since the test process
+  itself may exit before `on_exit` runs) until `restore_environment!/1`
+  releases it, so it spans the whole test body (not just this call) —
+  required because code under test re-reads `Application.get_env` at call
+  time, not just at the moment this sets it.
 
   Pair with `restore_environment!/1` in `on_exit` when a whole test needs a non-default env.
   """
   def capture_environment!(value) do
-    trans(fn ->
-      original = Application.get_env(:ysc, :environment)
-      Application.put_env(:ysc, :environment, value)
-      original
-    end)
+    owner = Ysc.Test.GlobalLock.acquire!(@lock)
+    original = Application.get_env(:ysc, :environment)
+    Application.put_env(:ysc, :environment, value)
+    {owner, original}
   end
 
   @doc """
@@ -48,10 +53,18 @@ defmodule Ysc.Test.EnvHelper do
   defp restore(nil), do: Application.delete_env(:ysc, :environment)
   defp restore(value), do: Application.put_env(:ysc, :environment, value)
 
-  @doc false
-  def restore_environment!(original) do
-    trans(fn -> restore(original) end)
+  @doc """
+  Restores the original value and releases the lock acquired by
+  `capture_environment!/1`. Also accepts a plain (non-tuple) value for
+  callers that captured `Application.get_env/2` directly without acquiring
+  the lock (e.g. as a belt-and-suspenders reset alongside `with_environment/2`,
+  which manages its own lock).
+  """
+  def restore_environment!({owner, original}) when is_pid(owner) do
+    Ysc.Test.GlobalLock.release!(owner, fn -> restore(original) end)
   end
+
+  def restore_environment!(original), do: restore(original)
 
   defp trans(fun), do: :global.trans(@lock, fun, [Node.self()], :infinity)
 end
