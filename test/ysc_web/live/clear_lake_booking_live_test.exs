@@ -411,7 +411,11 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
 
-      # Explicitly request day mode so the day section is rendered regardless of pricing rules
+      # A ?booking_mode=day request only actually resolves to day mode if a
+      # :day pricing rule exists for the current season (see resolve_booking_mode/3
+      # and allowed_booking_modes/5) — otherwise it silently falls back to buyout.
+      ensure_clear_lake_pricing_rules!()
+
       {:ok, view, _html} =
         live_clear_lake(conn, ~p"/bookings/clear-lake?booking_mode=day")
 
@@ -426,6 +430,8 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
          %{conn: conn} do
       user = user_with_membership(:lifetime)
       conn = log_in_user(conn, user)
+
+      ensure_clear_lake_pricing_rules!()
 
       {:ok, view, _html} =
         live_clear_lake(conn, ~p"/bookings/clear-lake?booking_mode=day")
