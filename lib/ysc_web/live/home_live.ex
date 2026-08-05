@@ -96,7 +96,8 @@ defmodule YscWeb.HomeLive do
       google_wallet_membership_enabled?: GoogleWallet.configured?(:membership),
       google_wallet_membership_url: nil,
       wallet_platform: wallet_platform_from_params(socket),
-      show_passkey_prompt: false
+      show_passkey_prompt: false,
+      newsletter_subscribed: false
     )
   end
 
@@ -169,18 +170,19 @@ defmodule YscWeb.HomeLive do
     just_logged_in = socket.assigns.just_logged_in
 
     start_async(socket, :load_home_data, fn ->
-      load_logged_in_user_data(user.id, just_logged_in)
+      load_logged_in_user_data(user.id, user.email, just_logged_in)
     end)
   end
 
   # Background task to load logged-in user's home page data in parallel
-  defp load_logged_in_user_data(user_id, just_logged_in) do
+  defp load_logged_in_user_data(user_id, email, just_logged_in) do
     tasks = [
       {:user_data,
        fn -> load_user_with_subscriptions(user_id, just_logged_in) end},
       {:tickets, fn -> get_upcoming_tickets(user_id) end},
       {:bookings,
-       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end}
+       fn -> Bookings.list_upcoming_active_bookings_for_user(user_id) end},
+      {:newsletter_subscribed, fn -> newsletter_subscribed?(email) end}
     ]
 
     tasks
@@ -259,6 +261,7 @@ defmodule YscWeb.HomeLive do
 
     upcoming_tickets = Map.get(results, :tickets, [])
     future_bookings = Map.get(results, :bookings, [])
+    newsletter_subscribed = Map.get(results, :newsletter_subscribed, false)
 
     socket =
       socket
@@ -270,6 +273,7 @@ defmodule YscWeb.HomeLive do
         upcoming_tickets: upcoming_tickets,
         future_bookings: future_bookings,
         show_passkey_prompt: show_passkey_prompt,
+        newsletter_subscribed: newsletter_subscribed,
         async_data_loaded: true
       )
       |> assign_public_content_slices()
@@ -1887,6 +1891,89 @@ defmodule YscWeb.HomeLive do
                 </div>
               </.modal>
 
+              <%!-- Newsletter Subscription --%>
+              <section>
+                <h2 class="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-6">
+                  Newsletter
+                </h2>
+
+                <div
+                  :if={!@async_data_loaded}
+                  class="rounded-xl border border-zinc-200 bg-white px-5 py-5 animate-pulse"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-zinc-200 shrink-0"></div>
+                    <div class="space-y-2 flex-1">
+                      <div class="h-4 w-32 bg-zinc-200 rounded"></div>
+                      <div class="h-3 w-40 bg-zinc-100 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  :if={@async_data_loaded}
+                  class="rounded-xl border border-zinc-200 bg-white px-5 py-5"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class={[
+                      "flex items-center justify-center w-10 h-10 rounded-full shrink-0",
+                      if(@newsletter_subscribed,
+                        do: "bg-emerald-100",
+                        else: "bg-zinc-100"
+                      )
+                    ]}>
+                      <.icon
+                        name={
+                          if(@newsletter_subscribed,
+                            do: "hero-check",
+                            else: "hero-envelope"
+                          )
+                        }
+                        class={[
+                          "w-5 h-5",
+                          if(@newsletter_subscribed,
+                            do: "text-emerald-600",
+                            else: "text-zinc-500"
+                          )
+                        ]}
+                      />
+                    </div>
+                    <div class="min-w-0">
+                      <p class="font-semibold text-zinc-900 text-sm">
+                        {if @newsletter_subscribed,
+                          do: "Subscribed",
+                          else: "Not subscribed"}
+                      </p>
+                      <p class="text-xs text-zinc-500 mt-0.5">
+                        {if @newsletter_subscribed,
+                          do: "You'll get new newsletters in your inbox.",
+                          else: "Get news & updates in your inbox."}
+                      </p>
+                    </div>
+                  </div>
+                  <.button
+                    phx-click="toggle_newsletter_subscription"
+                    class={
+                      if(@newsletter_subscribed,
+                        do:
+                          "w-full mt-4 !bg-white !text-zinc-700 border border-zinc-300 hover:!bg-zinc-100",
+                        else: "w-full mt-4"
+                      )
+                    }
+                    phx-disable-with="Saving..."
+                  >
+                    {if @newsletter_subscribed, do: "Unsubscribe", else: "Subscribe"}
+                  </.button>
+                  <.link
+                    navigate={~p"/newsletters"}
+                    class="mt-3 flex items-center justify-center gap-1 text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Browse newsletter archive
+                    <.icon name="hero-arrow-right" class="w-3 h-3" />
+                  </.link>
+                </div>
+              </section>
+
               <%!-- Your Family Section (family/lifetime members with linked users) --%>
               <section :if={@async_data_loaded && @other_family_members != []}>
                 <div class="flex items-center justify-between mb-6">
@@ -2352,6 +2439,50 @@ defmodule YscWeb.HomeLive do
     end
   end
 
+  def handle_event("toggle_newsletter_subscription", _params, socket) do
+    user = socket.assigns.current_user
+
+    result =
+      if socket.assigns.newsletter_subscribed do
+        Newsletter.unsubscribe(user.email)
+      else
+        Newsletter.subscribe(user.email,
+          user_id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          source: "home_dashboard"
+        )
+      end
+
+    case result do
+      {:ok, _} ->
+        now_subscribed = !socket.assigns.newsletter_subscribed
+
+        {title, body} =
+          if now_subscribed,
+            do:
+              {"Subscribed!",
+               "You'll receive future newsletters in your inbox."},
+            else: {"Unsubscribed", "You won't receive newsletters anymore."}
+
+        {:noreply,
+         socket
+         |> assign(:newsletter_subscribed, now_subscribed)
+         |> YscWeb.Flash.put_toast(:info, body,
+           title: title,
+           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+         )}
+
+      {:error, _} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "We couldn't update your newsletter subscription. Please try again, or email info@ysc.org if this keeps happening."
+         )}
+    end
+  end
+
   defp verify_and_subscribe(params, email, socket) do
     # Verify Turnstile for spam protection
     # Only verify if the token is present (interaction-only mode may not always generate one)
@@ -2437,6 +2568,13 @@ defmodule YscWeb.HomeLive do
            newsletter_email: email,
            newsletter_error: error_message
          )}
+    end
+  end
+
+  defp newsletter_subscribed?(email) do
+    case Newsletter.get_subscriber_by_email(email) do
+      %{subscribed: true} -> true
+      _ -> false
     end
   end
 
