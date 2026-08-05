@@ -130,4 +130,30 @@ defmodule Ysc.Extensions.PhoneNumberTest do
       assert String.starts_with?(formatted, "tel:")
     end
   end
+
+  describe "sms_supported?/1" do
+    test "returns false for nil" do
+      assert PhoneNumber.sms_supported?(nil) == false
+    end
+
+    test "returns false for empty string" do
+      assert PhoneNumber.sms_supported?("") == false
+    end
+
+    test "returns true for a US number" do
+      assert PhoneNumber.sms_supported?("+14155551234") == true
+    end
+
+    test "returns true for a Canadian number" do
+      assert PhoneNumber.sms_supported?("+16135551234") == true
+    end
+
+    test "returns false for a Swedish number" do
+      assert PhoneNumber.sms_supported?("+46701234567") == false
+    end
+
+    test "returns false for an unparseable number" do
+      assert PhoneNumber.sms_supported?("not-a-phone") == false
+    end
+  end
 end

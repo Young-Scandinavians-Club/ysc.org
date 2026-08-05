@@ -4629,47 +4629,102 @@ defmodule YscWeb.UserSettingsLive do
 
     case Accounts.update_user_profile(user, other_params) do
       {:ok, updated_user} ->
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-
-        {:ok, _} =
-          VerificationCodes.issue(updated_user, :phone,
-            to: new_phone,
-            suffix: "settings_change_#{timestamp}"
-          )
-
-        user_params = Map.put(other_params, "phone_number", new_phone)
-
-        profile_form =
-          Accounts.change_user_profile(updated_user, user_params) |> to_form()
-
-        token =
-          Phoenix.Token.sign(
-            YscWeb.Endpoint,
-            @phone_verification_token_salt,
+        if Ysc.Extensions.PhoneNumber.sms_supported?(new_phone) do
+          send_phone_verification_code(
+            socket,
+            updated_user,
             new_phone,
-            max_age: @phone_verification_token_max_age
+            other_params
           )
+        else
+          save_unverifiable_phone_change(socket, updated_user, new_phone)
+        end
 
-        path =
-          ~p"/users/settings/phone-verification"
-          |> URI.parse()
-          |> Map.put(:query, URI.encode_query(%{"token" => token}))
-          |> URI.to_string()
-
+      {:error, changeset} ->
         socket
-        |> assign(:user, updated_user)
-        |> assign(:profile_form, profile_form)
-        |> assign(:pending_phone_number, new_phone)
+        |> assign(:profile_form, to_form(changeset))
+        |> assign(:show_reauth_modal, false)
         |> assign(:pending_phone_change, nil)
         |> assign(:pending_profile_params, nil)
-        |> assign(:phone_verification_code_state, %{})
+        |> assign(:reauth_purpose, nil)
+    end
+  end
+
+  defp send_phone_verification_code(
+         socket,
+         updated_user,
+         new_phone,
+         other_params
+       ) do
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+
+    {:ok, _} =
+      VerificationCodes.issue(updated_user, :phone,
+        to: new_phone,
+        suffix: "settings_change_#{timestamp}"
+      )
+
+    user_params = Map.put(other_params, "phone_number", new_phone)
+
+    profile_form =
+      Accounts.change_user_profile(updated_user, user_params) |> to_form()
+
+    token =
+      Phoenix.Token.sign(
+        YscWeb.Endpoint,
+        @phone_verification_token_salt,
+        new_phone,
+        max_age: @phone_verification_token_max_age
+      )
+
+    path =
+      ~p"/users/settings/phone-verification"
+      |> URI.parse()
+      |> Map.put(:query, URI.encode_query(%{"token" => token}))
+      |> URI.to_string()
+
+    socket
+    |> assign(:user, updated_user)
+    |> assign(:profile_form, profile_form)
+    |> assign(:pending_phone_number, new_phone)
+    |> assign(:pending_phone_change, nil)
+    |> assign(:pending_profile_params, nil)
+    |> assign(:phone_verification_code_state, %{})
+    |> assign(:show_reauth_modal, false)
+    |> assign(:reauth_purpose, nil)
+    |> assign(:reauth_verified_at, DateTime.utc_now())
+    |> push_patch(to: path)
+    |> YscWeb.Flash.put_toast(
+      :info,
+      "Phone number update initiated. Please verify the code sent to your new number.",
+      title: "Phone",
+      icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
+    )
+  end
+
+  # FlowRoute (our SMS provider) can't verify numbers outside the US/Canada,
+  # so save the number directly instead of routing through the OTP step.
+  defp save_unverifiable_phone_change(socket, updated_user, new_phone) do
+    case Accounts.update_user_phone_and_sms(updated_user, %{
+           "phone_number" => new_phone
+         }) do
+      {:ok, phone_updated_user} ->
+        profile_form =
+          Accounts.change_user_profile(phone_updated_user) |> to_form()
+
+        socket
+        |> assign(:user, phone_updated_user)
+        |> assign(:current_user, phone_updated_user)
+        |> assign(:profile_form, profile_form)
+        |> assign(:pending_phone_change, nil)
+        |> assign(:pending_profile_params, nil)
         |> assign(:show_reauth_modal, false)
         |> assign(:reauth_purpose, nil)
         |> assign(:reauth_verified_at, DateTime.utc_now())
-        |> push_patch(to: path)
+        |> push_patch(to: ~p"/users/settings")
         |> YscWeb.Flash.put_toast(
           :info,
-          "Phone number update initiated. Please verify the code sent to your new number.",
+          "Phone number updated. SMS verification isn't available for this number, so we've skipped that step.",
           title: "Phone",
           icon: &YscWeb.CoreComponents.flash_toast_icon_success/1
         )
