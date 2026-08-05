@@ -718,14 +718,6 @@ defmodule YscWeb.AdminDashboardLive do
                   />
                 </svg>
               </div>
-              <div class="flex items-baseline gap-2 mt-1.5 mb-1">
-                <p class="text-xs font-bold text-zinc-400 uppercase">
-                  YTD {@ytd_revenue_label}
-                </p>
-                <p class="text-sm font-black font-mono text-zinc-700 tabular-nums">
-                  {format_money(@ytd_revenue)}
-                </p>
-              </div>
               <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs font-bold">
                 <span class={[
                   "inline-flex items-center",
@@ -735,6 +727,9 @@ defmodule YscWeb.AdminDashboardLive do
                     name={get_revenue_change_icon(@revenue_change_direction)}
                     class="w-3 h-3 mr-0.5"
                   /> MoM {@revenue_change_text}
+                  <span class="text-zinc-400 font-normal ml-1">vs {format_money(
+                    @last_month_revenue
+                  )}</span>
                 </span>
                 <span class={[
                   "inline-flex items-center",
@@ -746,29 +741,19 @@ defmodule YscWeb.AdminDashboardLive do
                   /> YoY {@revenue_yoy_change_text}
                 </span>
               </div>
-              <div class="grid grid-cols-2 gap-3 mt-3 text-xs">
-                <div class="rounded bg-zinc-50 p-2 border border-zinc-100">
-                  <p class="font-bold text-zinc-400 uppercase">Prev. month</p>
-                  <p class="font-black font-mono text-zinc-800 mt-0.5">
-                    {format_money(@last_month_revenue)}
-                  </p>
-                </div>
-                <div class="rounded bg-zinc-50 p-2 border border-zinc-100">
-                  <p class="font-bold text-zinc-400 uppercase">
-                    {@comparison_month_year_pretty}
-                  </p>
-                  <p class="font-black font-mono text-zinc-800 mt-0.5">
-                    {format_money(@last_year_month_revenue)}
-                  </p>
-                </div>
-              </div>
+              <p class="text-xs font-bold text-zinc-400 uppercase mt-3 pt-2 border-t border-zinc-100">
+                YTD ({@ytd_revenue_label})
+                <span class="text-zinc-700 font-mono normal-case ml-1">
+                  {format_money(@ytd_revenue)}
+                </span>
+              </p>
             </div>
 
             <div>
               <p class="text-xs font-black text-zinc-500 uppercase mb-2">
                 Revenue mix · this month
               </p>
-              <div class="w-full bg-zinc-100 h-2.5 rounded-full overflow-hidden flex mb-3">
+              <div class="w-full bg-zinc-100 h-2.5 rounded-full overflow-hidden flex mb-2">
                 <div
                   class="bg-blue-600 h-full"
                   style={"width: #{@revenue_mix_bookings_percent}%"}
@@ -785,76 +770,31 @@ defmodule YscWeb.AdminDashboardLive do
                 >
                 </div>
               </div>
-              <p class="text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                Last month
-              </p>
-              <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden flex mb-3 opacity-90">
-                <div
-                  class="bg-blue-500 h-full"
-                  style={"width: #{@prev_revenue_mix_bookings_percent}%"}
-                >
-                </div>
-                <div
-                  class="bg-purple-400 h-full"
-                  style={"width: #{@prev_revenue_mix_events_percent}%"}
-                >
-                </div>
-                <div
-                  class="bg-emerald-400 h-full"
-                  style={"width: #{@prev_revenue_mix_membership_percent}%"}
-                >
-                </div>
-              </div>
-              <p class="text-[10px] font-bold text-zinc-400 uppercase mb-1">
-                Same month prior year
-              </p>
-              <div class="w-full bg-zinc-100 h-1.5 rounded-full overflow-hidden flex mb-3 opacity-90">
-                <div
-                  class="bg-blue-400 h-full"
-                  style={"width: #{@last_year_revenue_mix_bookings_percent}%"}
-                >
-                </div>
-                <div
-                  class="bg-purple-300 h-full"
-                  style={"width: #{@last_year_revenue_mix_events_percent}%"}
-                >
-                </div>
-                <div
-                  class="bg-emerald-300 h-full"
-                  style={"width: #{@last_year_revenue_mix_membership_percent}%"}
-                >
-                </div>
-              </div>
-              <div class="flex items-center gap-3 mb-3">
-                <span class="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span class="inline-block w-2 h-2 rounded-sm bg-blue-600 shrink-0"></span>
-                  Bookings
-                </span>
-                <span class="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span class="inline-block w-2 h-2 rounded-sm bg-purple-500 shrink-0"></span>
-                  Events
-                </span>
-                <span class="flex items-center gap-1 text-[10px] text-zinc-500">
-                  <span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 shrink-0"></span>
-                  Memberships
-                </span>
-              </div>
               <div class="space-y-1.5 text-xs">
-                <div class="flex justify-between">
-                  <span class="text-zinc-500">Bookings</span>
-                  <span class="font-bold text-zinc-800">
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-1.5 text-zinc-500">
+                    <span class="inline-block w-2 h-2 rounded-sm bg-blue-600 shrink-0"></span>
+                    Bookings
+                  </span>
+                  <span class="font-bold font-mono text-zinc-800">
                     {format_money(@revenue_bookings)}
                   </span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-zinc-500">Events</span>
-                  <span class="font-bold text-zinc-800">
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-1.5 text-zinc-500">
+                    <span class="inline-block w-2 h-2 rounded-sm bg-purple-500 shrink-0"></span>
+                    Events
+                  </span>
+                  <span class="font-bold font-mono text-zinc-800">
                     {format_money(@revenue_events)}
                   </span>
                 </div>
-                <div class="flex justify-between">
-                  <span class="text-zinc-500">Membership</span>
-                  <span class="font-bold text-zinc-800">
+                <div class="flex items-center justify-between">
+                  <span class="flex items-center gap-1.5 text-zinc-500">
+                    <span class="inline-block w-2 h-2 rounded-sm bg-emerald-500 shrink-0"></span>
+                    Membership
+                  </span>
+                  <span class="font-bold font-mono text-zinc-800">
                     {format_money(@revenue_membership)}
                   </span>
                 </div>
@@ -2169,7 +2109,7 @@ defmodule YscWeb.AdminDashboardLive do
       end)
 
     label =
-      year_start
+      now
       |> DateTime.shift_zone!("America/Los_Angeles")
       |> Timex.format!("Jan–{Mshort} {YYYY}")
 
