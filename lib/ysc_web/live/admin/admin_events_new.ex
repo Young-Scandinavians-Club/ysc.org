@@ -2091,7 +2091,9 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_event("send-photo-reminder", _params, socket) do
     event = socket.assigns.event
 
-    if not Application.get_env(:ysc, :dev_routes, false) do
+    if Application.get_env(:ysc, :dev_routes, false) do
+      do_send_photo_reminder(event, socket)
+    else
       {:noreply,
        YscWeb.Flash.put_toast(
          socket,
@@ -2099,8 +2101,6 @@ defmodule YscWeb.AdminEventsNewLive do
          "This dev-only action is not available in this environment.",
          title: "Event photos"
        )}
-    else
-      do_send_photo_reminder(event, socket)
     end
   end
 
