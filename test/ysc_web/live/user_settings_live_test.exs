@@ -579,11 +579,19 @@ defmodule YscWeb.UserSettingsLiveTest do
       {:ok, view, _html} = live(conn, ~p"/users/settings")
       render(view)
 
-      render_hook(view, "wallet_platform_detected", %{"platform" => "apple_only"})
-      assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :apple_only
+      render_hook(view, "wallet_platform_detected", %{
+        "platform" => "apple_only"
+      })
 
-      render_hook(view, "wallet_platform_detected", %{"platform" => "google_only"})
-      assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :google_only
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform ==
+               :apple_only
+
+      render_hook(view, "wallet_platform_detected", %{
+        "platform" => "google_only"
+      })
+
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform ==
+               :google_only
 
       render_hook(view, "wallet_platform_detected", %{"platform" => "unknown"})
       assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :both

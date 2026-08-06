@@ -27,7 +27,9 @@ defmodule YscWeb.PaymentMethodFormatterTest do
       assert PaymentMethodFormatter.normalize_payment_type("paypal") == :paypal
       assert PaymentMethodFormatter.normalize_payment_type("affirm") == :affirm
       assert PaymentMethodFormatter.normalize_payment_type("klarna") == :klarna
-      assert PaymentMethodFormatter.normalize_payment_type("cashapp") == :cashapp
+
+      assert PaymentMethodFormatter.normalize_payment_type("cashapp") ==
+               :cashapp
 
       assert PaymentMethodFormatter.normalize_payment_type("amazon_pay") ==
                :amazon_pay
@@ -327,12 +329,16 @@ defmodule YscWeb.PaymentMethodFormatterTest do
     end
 
     test "returns nils when charge has no payment_method_details" do
-      assert PaymentMethodFormatter.extract_payment_method_details_from_charge(%{}) ==
+      assert PaymentMethodFormatter.extract_payment_method_details_from_charge(
+               %{}
+             ) ==
                {nil, nil, nil}
     end
 
     test "returns nils for a non-map charge" do
-      assert PaymentMethodFormatter.extract_payment_method_details_from_charge(nil) ==
+      assert PaymentMethodFormatter.extract_payment_method_details_from_charge(
+               nil
+             ) ==
                {nil, nil, nil}
 
       assert PaymentMethodFormatter.extract_payment_method_details_from_charge(
@@ -494,7 +500,10 @@ defmodule YscWeb.PaymentMethodFormatterTest do
                %{last_four: "1234"}
              ) == "Klarna ending in 1234"
 
-      assert PaymentMethodFormatter.format_alternative_payment_method(:klarna, nil) ==
+      assert PaymentMethodFormatter.format_alternative_payment_method(
+               :klarna,
+               nil
+             ) ==
                "Klarna"
     end
 
@@ -511,12 +520,18 @@ defmodule YscWeb.PaymentMethodFormatterTest do
                %{last_four: "5678"}
              ) == "Cash App ending in 5678"
 
-      assert PaymentMethodFormatter.format_alternative_payment_method(:cashapp, nil) ==
+      assert PaymentMethodFormatter.format_alternative_payment_method(
+               :cashapp,
+               nil
+             ) ==
                "Cash App"
     end
 
     test "formats paypal" do
-      assert PaymentMethodFormatter.format_alternative_payment_method(:paypal, nil) ==
+      assert PaymentMethodFormatter.format_alternative_payment_method(
+               :paypal,
+               nil
+             ) ==
                "PayPal"
     end
 
@@ -581,7 +596,10 @@ defmodule YscWeb.PaymentMethodFormatterTest do
                %{last_four: "1234", display_brand: "mastercard"}
              ) == "Mastercard ending in 1234"
 
-      assert PaymentMethodFormatter.format_alternative_payment_method(:card, nil) ==
+      assert PaymentMethodFormatter.format_alternative_payment_method(
+               :card,
+               nil
+             ) ==
                "Credit Card"
     end
 
@@ -629,7 +647,8 @@ defmodule YscWeb.PaymentMethodFormatterTest do
     end
 
     test "falls back to bare Link when brand and last four are missing" do
-      assert PaymentMethodFormatter.format_link_payment_method(nil, nil) == "Link"
+      assert PaymentMethodFormatter.format_link_payment_method(nil, nil) ==
+               "Link"
     end
   end
 
@@ -644,7 +663,8 @@ defmodule YscWeb.PaymentMethodFormatterTest do
     end
 
     test "maps mastercard" do
-      assert PaymentMethodFormatter.payment_brand_label("mastercard") == "Mastercard"
+      assert PaymentMethodFormatter.payment_brand_label("mastercard") ==
+               "Mastercard"
     end
   end
 

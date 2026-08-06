@@ -962,7 +962,11 @@ defmodule YscWeb.BookingChangeLiveTest do
 
     assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
 
-    send(view.pid, {:season_cache_invalidated, System.unique_integer([:positive])})
+    send(
+      view.pid,
+      {:season_cache_invalidated, System.unique_integer([:positive])}
+    )
+
     _ = render_async(view, @change_async_timeout)
     assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
 

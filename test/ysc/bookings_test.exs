@@ -1455,7 +1455,9 @@ defmodule Ysc.BookingsTest do
 
     test "falls back to booking id in error messages when reference_id is nil" do
       id = Ecto.ULID.generate()
-      booking = check_in_booking(%{status: :canceled, reference_id: nil, id: id})
+
+      booking =
+        check_in_booking(%{status: :canceled, reference_id: nil, id: id})
 
       assert {:error, message} =
                Bookings.validate_bookings_for_check_in([booking])
@@ -1775,7 +1777,11 @@ defmodule Ysc.BookingsTest do
 
     test "blackout_occupied_nights/1 returns [] for missing keys or reversed range" do
       assert Bookings.blackout_occupied_nights(%{}) == []
-      assert Bookings.blackout_occupied_nights(%{start_date: nil, end_date: nil}) == []
+
+      assert Bookings.blackout_occupied_nights(%{
+               start_date: nil,
+               end_date: nil
+             }) == []
 
       assert Bookings.blackout_occupied_nights(%{
                start_date: ~D[2026-07-29],
@@ -5261,7 +5267,8 @@ defmodule Ysc.BookingsTest do
 
       %{pending_refund: pr, admin: admin} = pending_refund_fixture(:rejected)
 
-      assert {:error, {:refund_failed, "Pending refund is not awaiting approval"}} =
+      assert {:error,
+              {:refund_failed, "Pending refund is not awaiting approval"}} =
                Bookings.approve_pending_refund(
                  pr,
                  Money.new(2000, :USD),

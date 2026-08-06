@@ -2592,7 +2592,10 @@ defmodule YscWeb.UserSettingsLive do
     # LiveView forbids issuing a live patch while a view is still mounting.
     socket =
       if socket.assigns[:live_action] == :confirm_email && connected?(socket) do
-        case Accounts.update_user_email(socket.assigns.current_user, params["token"]) do
+        case Accounts.update_user_email(
+               socket.assigns.current_user,
+               params["token"]
+             ) do
           {:ok, updated_user, new_email} ->
             old_email = socket.assigns.current_user.email
 
@@ -2609,7 +2612,10 @@ defmodule YscWeb.UserSettingsLive do
             |> assign(:current_user, updated_user)
             |> assign(:user, updated_user)
             |> assign(:current_email, updated_user.email)
-            |> assign(:email_form, updated_user |> Accounts.change_user_email() |> to_form())
+            |> assign(
+              :email_form,
+              updated_user |> Accounts.change_user_email() |> to_form()
+            )
             |> push_patch(to: ~p"/users/settings")
             |> YscWeb.Flash.put_toast(:info, "Email changed successfully.",
               title: "Email",

@@ -6943,7 +6943,8 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
     test "returns {:error, :missing_payment_id} when payout has no linked payment" do
       {:ok, payout} =
         Ledgers.create_payout(%{
-          stripe_payout_id: "po_no_payment_#{System.unique_integer([:positive])}",
+          stripe_payout_id:
+            "po_no_payment_#{System.unique_integer([:positive])}",
           amount: Money.new(5_000, :USD),
           currency: "usd",
           status: "paid",
@@ -7036,7 +7037,9 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
       payment_with_info = Ledgers.add_payment_type_info(payment)
 
       assert payment_with_info.payment_type_info.type == "Membership"
-      assert payment_with_info.payment_type_info.details == "#{plan.name} Membership"
+
+      assert payment_with_info.payment_type_info.details ==
+               "#{plan.name} Membership"
     end
 
     test "returns generic 'Membership' details when the subscription has no items",

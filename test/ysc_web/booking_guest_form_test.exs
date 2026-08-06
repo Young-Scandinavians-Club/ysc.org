@@ -388,7 +388,12 @@ defmodule YscWeb.BookingGuestFormTest do
       }
 
       merged =
-        BookingGuestForm.merge_guest_params(guest_info_form, guest_params, %{}, [])
+        BookingGuestForm.merge_guest_params(
+          guest_info_form,
+          guest_params,
+          %{},
+          []
+        )
 
       assert merged["0"]["first_name"] == "New"
       assert merged["0"]["is_child"] == true
@@ -497,7 +502,12 @@ defmodule YscWeb.BookingGuestFormTest do
       }
 
       merged =
-        BookingGuestForm.merge_guest_params(guest_info_form, guest_params, nil, nil)
+        BookingGuestForm.merge_guest_params(
+          guest_info_form,
+          guest_params,
+          nil,
+          nil
+        )
 
       assert merged["0"]["first_name"] == "Same"
     end
@@ -505,7 +515,11 @@ defmodule YscWeb.BookingGuestFormTest do
 
   describe "validate_guest_params/2" do
     test "returns :ok with no errors when all guest changesets are valid" do
-      booking = %Booking{id: Ecto.ULID.generate(), guests_count: 1, children_count: 0}
+      booking = %Booking{
+        id: Ecto.ULID.generate(),
+        guests_count: 1,
+        children_count: 0
+      }
 
       guest_params = %{
         "0" => %{
@@ -524,7 +538,11 @@ defmodule YscWeb.BookingGuestFormTest do
     end
 
     test "returns per-guest changeset errors when a guest is missing required fields" do
-      booking = %Booking{id: Ecto.ULID.generate(), guests_count: 2, children_count: 0}
+      booking = %Booking{
+        id: Ecto.ULID.generate(),
+        guests_count: 2,
+        children_count: 0
+      }
 
       guest_params = %{
         "0" => %{
@@ -553,7 +571,11 @@ defmodule YscWeb.BookingGuestFormTest do
     end
 
     test "returns a general error when guest count does not match booking" do
-      booking = %Booking{id: Ecto.ULID.generate(), guests_count: 2, children_count: 0}
+      booking = %Booking{
+        id: Ecto.ULID.generate(),
+        guests_count: 2,
+        children_count: 0
+      }
 
       guest_params = %{
         "0" => %{
@@ -572,7 +594,11 @@ defmodule YscWeb.BookingGuestFormTest do
     end
 
     test "returns a general error when no guest is marked as the booking user" do
-      booking = %Booking{id: Ecto.ULID.generate(), guests_count: 1, children_count: 0}
+      booking = %Booking{
+        id: Ecto.ULID.generate(),
+        guests_count: 1,
+        children_count: 0
+      }
 
       guest_params = %{
         "0" => %{
@@ -591,7 +617,11 @@ defmodule YscWeb.BookingGuestFormTest do
     end
 
     test "returns a general error when the child count does not match" do
-      booking = %Booking{id: Ecto.ULID.generate(), guests_count: 1, children_count: 1}
+      booking = %Booking{
+        id: Ecto.ULID.generate(),
+        guests_count: 1,
+        children_count: 1
+      }
 
       guest_params = %{
         "0" => %{
@@ -695,13 +725,19 @@ defmodule YscWeb.BookingGuestFormTest do
 
       assert :ok = BookingGuestForm.save_guests(inserted, guest_params)
 
-      guests = Repo.all(from g in BookingGuest, where: g.booking_id == ^inserted.id)
+      guests =
+        Repo.all(from g in BookingGuest, where: g.booking_id == ^inserted.id)
+
       assert length(guests) == 1
       assert hd(guests).first_name == "Ada"
     end
 
     test "returns an error tuple without persisting when params are invalid" do
-      booking = %Booking{id: Ecto.ULID.generate(), guests_count: 1, children_count: 0}
+      booking = %Booking{
+        id: Ecto.ULID.generate(),
+        guests_count: 1,
+        children_count: 0
+      }
 
       guest_params = %{
         "0" => %{
@@ -753,7 +789,9 @@ defmodule YscWeb.BookingGuestFormTest do
 
       assert :ok = BookingGuestForm.trim_guests_to_counts(inserted.id, 1, 0)
 
-      guests = Repo.all(from g in BookingGuest, where: g.booking_id == ^inserted.id)
+      guests =
+        Repo.all(from g in BookingGuest, where: g.booking_id == ^inserted.id)
+
       assert length(guests) == 1
       assert hd(guests).first_name == "Ada"
     end
@@ -784,7 +822,12 @@ defmodule YscWeb.BookingGuestFormTest do
         )
 
       {updated_form, selected_update} =
-        BookingGuestForm.select_guest_attendee(guest_info_form, "1", "other", [])
+        BookingGuestForm.select_guest_attendee(
+          guest_info_form,
+          "1",
+          "other",
+          []
+        )
 
       assert updated_form.source["1"]["first_name"] == ""
       assert updated_form.source["1"]["is_child"] == true
