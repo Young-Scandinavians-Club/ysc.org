@@ -41,12 +41,33 @@ defmodule Ysc.Customers do
     user = Repo.preload(user, :billing_address)
     customer_params = stripe_customer_params(user, include_address: true)
 
+    # Stable (not per-attempt) idempotency key scoped to this user, so Stripe
+    # itself dedupes duplicate "create the customer for this user" calls
+    # within its 24h idempotency window - belt and suspenders alongside the
+    # advisory lock in ensure_stripe_customer/1, and it also makes retries
+    # from stripe_retry/1 safe (each retry reruns this closure, and without
+    # an explicit key the client would otherwise generate a fresh random one
+    # per attempt, defeating retry idempotency).
+    idempotency_key = Ysc.Stripe.Idempotency.key("customer_create_#{user.id}")
+
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           stripe_customer_module().create(customer_params)
+           stripe_customer_module().create(customer_params,
+             idempotency_key: idempotency_key
+           )
          end) do
       {:ok, stripe_customer} ->
-        persist_user_stripe_id(user.id, stripe_customer.id)
-        {:ok, stripe_customer}
+        case persist_user_stripe_id(user.id, stripe_customer.id) do
+          {:ok, _updated_user} ->
+            {:ok, stripe_customer}
+
+          {:error, reason} ->
+            # A Stripe customer now exists but isn't linked to the user -
+            # don't report success, or callers (and the advisory lock in
+            # ensure_stripe_customer/1) will treat this as done when it
+            # isn't. The idempotency key above means a retry reuses this
+            # same Stripe customer instead of creating another one.
+            {:error, reason}
+        end
 
       {:error, error} ->
         {:error, error}
@@ -58,19 +79,47 @@ defmodule Ysc.Customers do
 
   Returns the user (reloaded when a customer was created). On Stripe failure,
   returns the original user unchanged.
+
+  Callers sometimes pass a `user` struct that's gone stale (e.g. a LiveView's
+  `socket.assigns.user` across a reconnect), which can otherwise race: two
+  calls both see `stripe_id: nil`, both create a Stripe customer, and
+  whichever `persist_user_stripe_id/2` write lands last silently orphans the
+  other customer - leaving the user's `stripe_id` pointing at a Stripe
+  customer with no subscription or payment method on it. To prevent that, we
+  take a per-user Postgres advisory lock and re-check `stripe_id` from the
+  database before deciding to create, so concurrent callers serialize instead
+  of racing. The lock is transaction-scoped (`pg_advisory_xact_lock`) so it
+  always releases when the transaction ends, even on crash, and is safe to
+  reuse from the connection pool. This only runs on the (rare, one-time)
+  path where `stripe_id` looks nil, so holding the transaction open across
+  the Stripe API call here is an acceptable tradeoff.
   """
   @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
   def ensure_stripe_customer(%User{stripe_id: nil} = user) do
-    case create_stripe_customer(user) do
-      {:ok, _stripe_customer} ->
-        Ysc.Accounts.get_user!(user.id)
+    {:ok, result} =
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [
+          advisory_lock_key(user.id)
+        ])
 
-      {:error, _error} ->
-        user
-    end
+        case Repo.get!(User, user.id) do
+          %User{stripe_id: nil} = fresh_user ->
+            case create_stripe_customer(fresh_user) do
+              {:ok, _stripe_customer} -> Ysc.Accounts.get_user!(fresh_user.id)
+              {:error, _error} -> fresh_user
+            end
+
+          fresh_user ->
+            fresh_user
+        end
+      end)
+
+    result
   end
 
   def ensure_stripe_customer(%User{} = user), do: user
+
+  defp advisory_lock_key(user_id), do: :erlang.phash2(user_id, 2_147_483_647)
 
   @doc """
   Builds Stripe Payment Element `defaultValues.billingDetails` from a user.
@@ -183,6 +232,11 @@ defmodule Ysc.Customers do
   """
   def customer_from_stripe_id(stripe_id) do
     Repo.get_by(User, stripe_id: stripe_id)
+  end
+
+  @doc false
+  def ci_query_explain_query do
+    from(u in User, where: u.stripe_id == "cus_ci_explain_fixture")
   end
 
   @doc """
@@ -388,12 +442,12 @@ defmodule Ysc.Customers do
 
     try do
       case Repo.update(changeset) do
-        {:ok, _updated_user} ->
-          :ok
+        {:ok, updated_user} ->
+          {:ok, updated_user}
 
         {:error, changeset} ->
           log_stripe_id_update_failure(user_id, stripe_customer_id, changeset)
-          :ok
+          {:error, changeset}
       end
     rescue
       e in Ecto.StaleEntryError ->

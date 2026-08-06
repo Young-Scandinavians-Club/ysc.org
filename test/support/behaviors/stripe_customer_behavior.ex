@@ -4,7 +4,7 @@ defmodule Stripe.CustomerBehaviour do
 
   Defines callbacks for mocking Stripe customer operations in test scenarios.
   """
-  @callback create(map()) ::
+  @callback create(map(), keyword()) ::
               {:ok, Stripe.Customer.t()} | {:error, Stripe.Error.t()}
   @callback retrieve(String.t(), keyword()) ::
               {:ok, Stripe.Customer.t()} | {:error, Stripe.Error.t()}

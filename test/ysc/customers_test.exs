@@ -548,8 +548,8 @@ defmodule Ysc.CustomersTest do
 
       parent = self()
 
-      Mox.expect(Stripe.CustomerMock, :create, fn params ->
-        send(parent, {:create_params, params})
+      Mox.expect(Stripe.CustomerMock, :create, fn params, opts ->
+        send(parent, {:create_params, params, opts})
 
         {:ok,
          %Stripe.Customer{
@@ -560,9 +560,10 @@ defmodule Ysc.CustomersTest do
 
       assert {:ok, _} = Customers.create_stripe_customer(user)
 
-      assert_receive {:create_params, params}
+      assert_receive {:create_params, params, opts}
       assert params.address.line1 == "123 Main St"
       assert params.address.state == "CA"
+      assert opts[:idempotency_key] == "customer_create_#{user.id}"
     end
 
     test "update_stripe_customer returns error when user has no stripe_id" do

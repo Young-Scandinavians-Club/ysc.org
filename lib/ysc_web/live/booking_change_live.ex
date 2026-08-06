@@ -1494,7 +1494,9 @@ defmodule YscWeb.BookingChangeLive do
     attempt_id = System.unique_integer([:positive])
 
     idempotency_key =
-      "booking_modification_#{booking.id}_#{amount_cents}_#{attempt_id}"
+      Ysc.Stripe.Idempotency.key(
+        "booking_modification_#{booking.id}_#{amount_cents}_#{attempt_id}"
+      )
 
     stripe_client.create_payment_intent(payment_intent_params,
       idempotency_key: idempotency_key
