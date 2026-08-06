@@ -494,15 +494,15 @@ defmodule YscWeb.EventDetailsLive do
               <% end %>
             </div>
 
-            <%!-- Partiful RSVP Spotlight --%>
+            <%!-- Partiful RSVP --%>
             <div
               :if={@event.partiful_link not in [nil, ""]}
-              class="rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-6 sm:p-8"
+              class="rounded-xl border border-zinc-100 bg-white p-6 sm:p-8"
             >
               <div class="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
-                <div class="flex items-start gap-4 flex-1 min-w-0">
-                  <div class="w-11 h-11 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                    <.icon name="hero-bolt" class="w-5 h-5 text-white" />
+                <div class="flex items-start gap-3 flex-1 min-w-0">
+                  <div class="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <.icon name="hero-bolt" class="w-4 h-4 text-blue-600" />
                   </div>
                   <div class="min-w-0">
                     <p class="text-xs font-black text-blue-600 uppercase tracking-[0.2em] mb-1">
