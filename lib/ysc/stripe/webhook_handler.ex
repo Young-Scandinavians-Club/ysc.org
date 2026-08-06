@@ -778,7 +778,23 @@ defmodule Ysc.Stripe.WebhookHandler do
           resolve_user_for_customer(event.customer, event.metadata["user_id"])
 
         if customer do
-          Subscriptions.create_subscription_from_stripe(customer, event)
+          case Subscriptions.create_subscription_from_stripe(customer, event) do
+            {:ok, _subscription} ->
+              :ok
+
+            {:error, reason} ->
+              Ysc.Logging.error(
+                "Failed to create subscription from customer.subscription.created",
+                stripe_customer_id: event.customer,
+                stripe_subscription_id: event.id,
+                error: inspect(reason)
+              )
+
+              # Raise to mark webhook as failed and rollback - a silently
+              # dropped subscription create is the same class of bug this
+              # module exists to prevent (see the nil-customer raise below).
+              raise "Failed to create subscription: #{inspect(reason)}"
+          end
         else
           Ysc.Logging.error(
             "No user found for customer.subscription.created (checked customer_id and metadata.user_id)",

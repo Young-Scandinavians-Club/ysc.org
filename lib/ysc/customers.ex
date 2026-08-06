@@ -224,6 +224,11 @@ defmodule Ysc.Customers do
     Repo.get_by(User, stripe_id: stripe_id)
   end
 
+  @doc false
+  def ci_query_explain_query do
+    from(u in User, where: u.stripe_id == "cus_ci_explain_fixture")
+  end
+
   @doc """
   Gets all subscriptions for a user.
 
