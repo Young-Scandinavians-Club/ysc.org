@@ -1444,21 +1444,23 @@ defmodule Ysc.BookingsTest do
     end
 
     test "falls back to booking id in error messages when reference_id is blank" do
-      booking = check_in_booking(%{status: :canceled, reference_id: ""})
+      id = Ecto.ULID.generate()
+      booking = check_in_booking(%{status: :canceled, reference_id: "", id: id})
 
       assert {:error, message} =
                Bookings.validate_bookings_for_check_in([booking])
 
-      assert message =~ to_string(booking.id)
+      assert message =~ id
     end
 
     test "falls back to booking id in error messages when reference_id is nil" do
-      booking = check_in_booking(%{status: :canceled, reference_id: nil})
+      id = Ecto.ULID.generate()
+      booking = check_in_booking(%{status: :canceled, reference_id: nil, id: id})
 
       assert {:error, message} =
                Bookings.validate_bookings_for_check_in([booking])
 
-      assert message =~ to_string(booking.id)
+      assert message =~ id
     end
   end
 

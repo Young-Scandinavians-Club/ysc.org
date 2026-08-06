@@ -2602,7 +2602,14 @@ defmodule YscWeb.UserSettingsLive do
               new_email
             )
 
+            # push_patch doesn't re-run mount/3, so the stale :current_user
+            # (and everything derived from it) would otherwise still show
+            # the old email until the browser reloads.
             socket
+            |> assign(:current_user, updated_user)
+            |> assign(:user, updated_user)
+            |> assign(:current_email, updated_user.email)
+            |> assign(:email_form, updated_user |> Accounts.change_user_email() |> to_form())
             |> push_patch(to: ~p"/users/settings")
             |> YscWeb.Flash.put_toast(:info, "Email changed successfully.",
               title: "Email",

@@ -1595,15 +1595,6 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "confirm_booking/1 confirmation email scheduling" do
-    defmodule NotifierScheduleError do
-      @moduledoc false
-      def schedule_email(a, b, c, d, e, f, g),
-        do: schedule_email(a, b, c, d, e, f, g, nil)
-
-      def schedule_email(_, _, _, _, _, _, _, _),
-        do: {:error, :coverage_schedule_failed}
-    end
-
     defp with_booking_confirmation_notifier(module, fun) do
       prev = Application.get_env(:ysc, :booking_confirmation_email_notifier)
       Application.put_env(:ysc, :booking_confirmation_email_notifier, module)
@@ -1633,7 +1624,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           4
         )
 
-      with_booking_confirmation_notifier(NotifierScheduleError, fn ->
+      with_booking_confirmation_notifier(Ysc.TestNotifiers.ScheduleError, fn ->
         assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
         assert confirmed.status == :complete
         assert Repo.get!(Booking, hold.id).status == :complete
@@ -2447,13 +2438,6 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "confirm_booking/1 confirmation email rescue branch" do
-    defmodule NotifierRaises do
-      @moduledoc false
-      def schedule_email(_, _, _, _, _, _, _, _) do
-        raise "boom - coverage test"
-      end
-    end
-
     test "keeps booking complete when the notifier raises", %{user: user} do
       {checkin, checkout} = locker_buyout_dates(604)
 
@@ -2466,20 +2450,11 @@ defmodule Ysc.Bookings.BookingLockerTest do
           4
         )
 
-      prev = Application.get_env(:ysc, :booking_confirmation_email_notifier)
-      Application.put_env(:ysc, :booking_confirmation_email_notifier, NotifierRaises)
-
-      try do
+      with_booking_confirmation_notifier(Ysc.TestNotifiers.Raising, fn ->
         assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
         assert confirmed.status == :complete
         assert Repo.get!(Booking, hold.id).status == :complete
-      after
-        if prev do
-          Application.put_env(:ysc, :booking_confirmation_email_notifier, prev)
-        else
-          Application.delete_env(:ysc, :booking_confirmation_email_notifier)
-        end
-      end
+      end)
     end
   end
 

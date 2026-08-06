@@ -1009,14 +1009,62 @@ defmodule YscWeb.BookingChangeLiveTest do
   test "select-guest-attendee without a target key is a no-op", %{conn: conn} do
     user = user_fixture() |> active_user(conn)
     conn = log_in_user(conn, user)
-    booking = complete_booking!(user)
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(100, :USD),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe,
+        season_id: nil
+      })
+
+    room = create_test_room!()
+    {checkin, checkout} = tahoe_booking_dates(36)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    assert {:ok, _} =
+             Bookings.create_booking_guests(booking.id, [
+               {0,
+                %{
+                  "first_name" => user.first_name || "Test",
+                  "last_name" => user.last_name || "User",
+                  "is_child" => false,
+                  "is_booking_user" => true
+                }},
+               {1,
+                %{
+                  "first_name" => "Guest",
+                  "last_name" => "Two",
+                  "is_child" => false,
+                  "is_booking_user" => false
+                }}
+             ])
 
     {view, _html} = live_change(conn, booking)
 
-    # `render/1` (root document, wrapped) and `render_click/3` (diff only,
-    # unwrapped) are never byte-identical even for a true no-op, so assert
-    # on the assigns the handler would touch instead of raw html equality.
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    checkout_str = date_to_datetime_string(booking.checkout_date)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    # Increasing guests_count enters the :guest_info step, which is the only
+    # place guest_info_form/selected_family_members_for_guests get populated
+    # — without this, both assigns would just be nil before and after,
+    # making the no-op assertion below vacuous.
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => "3",
+        "children_count" => "0"
+      }
+    })
+    |> render_submit()
+
     assigns_before = :sys.get_state(view.pid).socket.assigns
+    assert assigns_before.guest_info_form
 
     render_click(view, "select-guest-attendee", %{"foo" => "bar"})
 
@@ -1186,8 +1234,8 @@ defmodule YscWeb.BookingChangeLiveTest do
         }
       })
 
-    # Phoenix HTML-escapes the apostrophe to &#39; in rendered output.
-    assert html =~ "couldn&#39;t start the payment form"
+    # Avoid asserting across the apostrophe Phoenix HTML-escapes to &#39;.
+    assert html =~ "start the payment form"
     refute has_element?(view, "#modification-payment-step")
     assert has_element?(view, "#modification-dates")
   end

@@ -868,7 +868,7 @@ defmodule YscWeb.BookingGuestFormTest do
       {family_members, other_family_members} =
         BookingGuestForm.load_family_members(user)
 
-      assert user in family_members
+      assert user.id in Enum.map(family_members, & &1.id)
       refute user.id in Enum.map(other_family_members, & &1.id)
     end
   end

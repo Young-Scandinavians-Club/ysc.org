@@ -580,13 +580,13 @@ defmodule YscWeb.UserSettingsLiveTest do
       render(view)
 
       render_hook(view, "wallet_platform_detected", %{"platform" => "apple_only"})
-      assert view |> element("#user-settings-page") |> has_element?()
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :apple_only
 
       render_hook(view, "wallet_platform_detected", %{"platform" => "google_only"})
-      assert view |> element("#user-settings-page") |> has_element?()
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :google_only
 
       render_hook(view, "wallet_platform_detected", %{"platform" => "unknown"})
-      assert view |> element("#user-settings-page") |> has_element?()
+      assert :sys.get_state(view.pid).socket.assigns.wallet_platform == :both
     end
 
     test "update_profile shows validation errors for invalid first name", %{
@@ -2790,6 +2790,11 @@ defmodule YscWeb.UserSettingsLiveTest do
       # — assert on the resulting rendered state and URL instead.
       assert render(view) =~ "Email changed successfully"
       assert Accounts.get_user!(user.id).email == new_email
+
+      # Regression check: push_patch doesn't re-run mount/3, so the socket's
+      # :current_user/:email_form must be refreshed explicitly or the
+      # settings page would keep showing the old email until reload.
+      assert has_element?(view, "#email_form input[value='#{new_email}']")
     end
 
     test "invalid or expired token shows an error and redirects to settings",

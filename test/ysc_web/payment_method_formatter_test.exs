@@ -649,10 +649,7 @@ defmodule YscWeb.PaymentMethodFormatterTest do
   end
 
   describe "payment_details_from_payment_intent/2 richer-details tie-breaking" do
-    defmodule RankStripeClientStub do
-      def retrieve_payment_method("pm_unknown"), do: {:error, :not_found}
-      def retrieve_charge("ch_unknown", _opts), do: {:error, :not_found}
-    end
+    alias Ysc.RankStripeClientStub
 
     test "prefers charge details when charge rank exceeds payment method rank" do
       payment_intent = %{
