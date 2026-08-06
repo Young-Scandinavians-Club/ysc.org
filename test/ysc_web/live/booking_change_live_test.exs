@@ -952,6 +952,348 @@ defmodule YscWeb.BookingChangeLiveTest do
     assert is_list(:sys.get_state(view.pid).socket.assigns.seasons)
   end
 
+  test "reloads change data after season and rooms list cache invalidation",
+       %{conn: conn} do
+    user = user_fixture()
+    booking = complete_booking!(user)
+    conn = log_in_user(conn, user)
+
+    {view, _html} = live_change(conn, booking)
+
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+
+    send(view.pid, {:season_cache_invalidated, System.unique_integer([:positive])})
+    _ = render_async(view, @change_async_timeout)
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+
+    send(
+      view.pid,
+      {:rooms_list_cache_invalidated, System.unique_integer([:positive])}
+    )
+
+    _ = render_async(view, @change_async_timeout)
+    assert :sys.get_state(view.pid).socket.assigns.change_data_loaded?
+  end
+
+  test "back-to-modification without pending changes restores the current form",
+       %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    html = view |> render_click("back-to-modification", %{})
+
+    assert has_element?(view, "#modification-dates")
+    assert html =~ date_to_datetime_string(booking.checkin_date)
+  end
+
+  test "stripe payment element loading and ready events toggle the assign",
+       %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    render_click(view, "stripe-payment-element-ready", %{})
+
+    assert :sys.get_state(view.pid).socket.assigns.stripe_payment_element_ready
+
+    render_click(view, "stripe-payment-element-loading", %{})
+
+    refute :sys.get_state(view.pid).socket.assigns.stripe_payment_element_ready
+  end
+
+  test "select-guest-attendee without a target key is a no-op", %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    # `render/1` (root document, wrapped) and `render_click/3` (diff only,
+    # unwrapped) are never byte-identical even for a true no-op, so assert
+    # on the assigns the handler would touch instead of raw html equality.
+    assigns_before = :sys.get_state(view.pid).socket.assigns
+
+    render_click(view, "select-guest-attendee", %{"foo" => "bar"})
+
+    assigns_after = :sys.get_state(view.pid).socket.assigns
+    assert assigns_after.guest_info_form == assigns_before.guest_info_form
+
+    assert assigns_after.selected_family_members_for_guests ==
+             assigns_before.selected_family_members_for_guests
+  end
+
+  test "submit-modification shows toast when no changes were made", %{
+    conn: conn
+  } do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    html =
+      view
+      |> form("#booking-change-form", %{
+        "modification" => %{
+          "checkin_date" => date_to_datetime_string(booking.checkin_date),
+          "checkout_date" => date_to_datetime_string(booking.checkout_date)
+        }
+      })
+      |> render_submit()
+
+    assert html =~ "No changes were made to your reservation."
+  end
+
+  test "submit-modification shows a validation error for an invalid date range",
+       %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    invalid_checkout = Date.add(booking.checkin_date, -1)
+
+    # Submitted directly via render_submit (bypassing the `form/2` DOM
+    # helper) because the date-range picker's rendered hidden inputs only
+    # allow the currently-selectable dates — submitting a date outside that
+    # rendered range is exactly the invalid-input case under test here, and
+    # `form/2` would reject it client-side before the server ever saw it.
+    html =
+      render_submit(view, "submit-modification", %{
+        "modification" => %{
+          "checkin_date" => date_to_datetime_string(booking.checkin_date),
+          "checkout_date" => date_to_datetime_string(invalid_checkout)
+        }
+      })
+
+    assert html =~ "modification-preview-error"
+    assert html =~ "must be on or after check-in date"
+  end
+
+  test "submit-modification shows friendly error when check-in date is in the past",
+       %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    past_checkin = Date.add(Date.utc_today(), -3)
+    past_checkout = Date.add(past_checkin, 1)
+
+    # See the invalid-date-range test above for why render_submit is used
+    # directly instead of the `form/2` DOM helper.
+    html =
+      render_submit(view, "submit-modification", %{
+        "modification" => %{
+          "checkin_date" => date_to_datetime_string(past_checkin),
+          "checkout_date" => date_to_datetime_string(past_checkout)
+        }
+      })
+
+    assert html =~ "modification-preview-error"
+    assert html =~ "Check-in date cannot be in the past."
+  end
+
+  test "submit-modification applies immediately when the change requires no additional payment",
+       %{conn: conn} do
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    {view, _html} = live_change(conn, booking)
+
+    shorter_checkout = Date.add(booking.checkout_date, -1)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, shorter_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => date_to_datetime_string(booking.checkin_date),
+        "checkout_date" => date_to_datetime_string(shorter_checkout)
+      }
+    })
+    |> render_submit()
+
+    {path, flash} = assert_redirect(view, @change_async_timeout)
+
+    assert path =~ "/bookings/#{booking.id}/receipt"
+    assert path =~ "updated=true"
+    assert flash["info"] =~ "Your booking has been updated."
+
+    updated = Repo.get!(Booking, booking.id)
+    assert updated.checkout_date == shorter_checkout
+  end
+
+  test "submit-modification shows an error when payment intent creation fails",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+      {:error, "stripe is down"}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+    booking = complete_booking!(user)
+
+    extended_checkout = Date.add(booking.checkout_date, 1)
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    extended_checkout_str = date_to_datetime_string(extended_checkout)
+
+    {view, _html} = live_change(conn, booking)
+
+    send(
+      view.pid,
+      {:updated_event, updated_event(booking.checkin_date, extended_checkout)}
+    )
+
+    render(view)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    html =
+      render_submit(view, "submit-modification", %{
+        "modification" => %{
+          "checkin_date" => checkin_str,
+          "checkout_date" => extended_checkout_str
+        }
+      })
+
+    # Phoenix HTML-escapes the apostrophe to &#39; in rendered output.
+    assert html =~ "couldn&#39;t start the payment form"
+    refute has_element?(view, "#modification-payment-step")
+    assert has_element?(view, "#modification-dates")
+  end
+
+  test "guest info flow: validate, select attendee, and save completes to payment",
+       %{conn: conn} do
+    original_stripe_client = Application.get_env(:ysc, :stripe_client)
+
+    on_exit(fn ->
+      Application.put_env(:ysc, :stripe_client, original_stripe_client)
+    end)
+
+    Application.put_env(:ysc, :stripe_client, StripeMock)
+
+    stub(StripeMock, :create_payment_intent, fn _params, _opts ->
+      {:ok,
+       %Stripe.PaymentIntent{
+         id: "pi_change_guest_flow",
+         client_secret: "pi_change_guest_flow_secret",
+         status: "requires_payment_method"
+       }}
+    end)
+
+    user = user_fixture() |> active_user(conn)
+    conn = log_in_user(conn, user)
+
+    {:ok, _} =
+      Bookings.create_pricing_rule(%{
+        amount: Money.new(100, :USD),
+        booking_mode: :room,
+        price_unit: :per_person_per_night,
+        property: :tahoe,
+        season_id: nil
+      })
+
+    room = create_test_room!()
+    {checkin, checkout} = tahoe_booking_dates(35)
+    booking = complete_room_booking!(user, room, checkin, checkout)
+
+    assert {:ok, _} =
+             Bookings.create_booking_guests(booking.id, [
+               {0,
+                %{
+                  "first_name" => user.first_name || "Test",
+                  "last_name" => user.last_name || "User",
+                  "is_child" => false,
+                  "is_booking_user" => true
+                }},
+               {1,
+                %{
+                  "first_name" => "Guest",
+                  "last_name" => "Two",
+                  "is_child" => false,
+                  "is_booking_user" => false
+                }}
+             ])
+
+    {view, _html} = live_change(conn, booking)
+
+    checkin_str = date_to_datetime_string(booking.checkin_date)
+    checkout_str = date_to_datetime_string(booking.checkout_date)
+
+    view |> element("#acknowledge-forfeiture") |> render_click()
+
+    view
+    |> form("#booking-change-form", %{
+      "modification" => %{
+        "checkin_date" => checkin_str,
+        "checkout_date" => checkout_str,
+        "guests_count" => "3",
+        "children_count" => "0"
+      }
+    })
+    |> render_submit()
+
+    assert has_element?(view, "#modification-guest-info-form")
+
+    # select-guest-attendee with a target key exercises the handled branch.
+    render_click(view, "select-guest-attendee", %{
+      "guest-2-attendee-select" => "other"
+    })
+
+    # validate-guest-info without a "guests" key is a no-op clause.
+    render_change(view, "validate-guest-info", %{})
+
+    # save-guest-info without a "guests" key shows the general error clause.
+    html_missing = render_submit(view, "save-guest-info", %{})
+    assert html_missing =~ "Please complete guest information"
+
+    view
+    |> form("#modification-guest-info-form", %{
+      "guests" => %{"2" => %{"first_name" => "New", "last_name" => "Guest"}}
+    })
+    |> render_change()
+
+    html =
+      view
+      |> form("#modification-guest-info-form", %{
+        "guests" => %{"2" => %{"first_name" => "New", "last_name" => "Guest"}}
+      })
+      |> render_submit()
+
+    assert html =~ "Complete payment"
+    assert has_element?(view, "#modification-payment-step")
+  end
+
   defp navigate_calendar_to_month!(view, %Date{} = target) do
     Enum.reduce_while(1..24, nil, fn _, _ ->
       html = render(view)

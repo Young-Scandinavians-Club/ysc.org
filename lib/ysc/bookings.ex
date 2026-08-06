@@ -5794,13 +5794,18 @@ defmodule Ysc.Bookings do
         b.checkin_date <= ^two_weeks_out and b.checkout_date >= ^today
       )
 
-    from(b in Booking,
-      where: b.status == :complete,
-      where:
+    rows_filter =
+      dynamic(
+        [b],
         ^staying or
           b.checkin_date == ^today or
           b.checkout_date == ^today or
-          ^upcoming,
+          ^upcoming
+      )
+
+    from(b in Booking,
+      where: b.status == :complete,
+      where: ^rows_filter,
       group_by: b.property,
       select: %{
         property: b.property,
