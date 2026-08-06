@@ -58,19 +58,47 @@ defmodule Ysc.Customers do
 
   Returns the user (reloaded when a customer was created). On Stripe failure,
   returns the original user unchanged.
+
+  Callers sometimes pass a `user` struct that's gone stale (e.g. a LiveView's
+  `socket.assigns.user` across a reconnect), which can otherwise race: two
+  calls both see `stripe_id: nil`, both create a Stripe customer, and
+  whichever `persist_user_stripe_id/2` write lands last silently orphans the
+  other customer - leaving the user's `stripe_id` pointing at a Stripe
+  customer with no subscription or payment method on it. To prevent that, we
+  take a per-user Postgres advisory lock and re-check `stripe_id` from the
+  database before deciding to create, so concurrent callers serialize instead
+  of racing. The lock is transaction-scoped (`pg_advisory_xact_lock`) so it
+  always releases when the transaction ends, even on crash, and is safe to
+  reuse from the connection pool. This only runs on the (rare, one-time)
+  path where `stripe_id` looks nil, so holding the transaction open across
+  the Stripe API call here is an acceptable tradeoff.
   """
   @dialyzer {:nowarn_function, ensure_stripe_customer: 1}
   def ensure_stripe_customer(%User{stripe_id: nil} = user) do
-    case create_stripe_customer(user) do
-      {:ok, _stripe_customer} ->
-        Ysc.Accounts.get_user!(user.id)
+    {:ok, result} =
+      Repo.transaction(fn ->
+        Repo.query!("SELECT pg_advisory_xact_lock($1)", [
+          advisory_lock_key(user.id)
+        ])
 
-      {:error, _error} ->
-        user
-    end
+        case Repo.get!(User, user.id) do
+          %User{stripe_id: nil} = fresh_user ->
+            case create_stripe_customer(fresh_user) do
+              {:ok, _stripe_customer} -> Ysc.Accounts.get_user!(fresh_user.id)
+              {:error, _error} -> fresh_user
+            end
+
+          fresh_user ->
+            fresh_user
+        end
+      end)
+
+    result
   end
 
   def ensure_stripe_customer(%User{} = user), do: user
+
+  defp advisory_lock_key(user_id), do: :erlang.phash2(user_id, 2_147_483_647)
 
   @doc """
   Builds Stripe Payment Element `defaultValues.billingDetails` from a user.

@@ -774,8 +774,21 @@ defmodule Ysc.Stripe.WebhookHandler do
       :ok
     else
       if event.status in ["active", "trialing"] do
-        customer = Ysc.Accounts.get_user_from_stripe_id(event.customer)
-        Subscriptions.create_subscription_from_stripe(customer, event)
+        customer =
+          resolve_user_for_customer(event.customer, event.metadata["user_id"])
+
+        if customer do
+          Subscriptions.create_subscription_from_stripe(customer, event)
+        else
+          Ysc.Logging.error(
+            "No user found for customer.subscription.created (checked customer_id and metadata.user_id)",
+            stripe_customer_id: event.customer,
+            stripe_subscription_id: event.id
+          )
+
+          # Raise to mark webhook as failed and rollback - missing user is a critical error
+          raise "No user found for customer_id: #{event.customer}"
+        end
       end
 
       :ok
@@ -1254,10 +1267,24 @@ defmodule Ysc.Stripe.WebhookHandler do
         :ok
 
       subscription_id ->
-        # Get the user from the customer ID
+        # Get the user from the customer ID. Falls back to the local
+        # subscription's user_id when the customer_id doesn't match any
+        # user's stripe_id (e.g. the user has a stray duplicate Stripe
+        # customer) - the subscription's user_id FK is authoritative
+        # regardless of which customer Stripe happens to have billed.
         customer_id = invoice[:customer] || invoice["customer"]
         invoice_id = invoice[:id] || invoice["id"]
-        user = Ysc.Accounts.get_user_from_stripe_id(customer_id)
+
+        user =
+          resolve_user_for_customer(
+            customer_id,
+            subscription_id
+            |> Subscriptions.get_subscription_by_stripe_id()
+            |> case do
+              %{user_id: user_id} -> user_id
+              nil -> nil
+            end
+          )
 
         if user do
           # Check if we already have a payment record for this invoice
@@ -2185,6 +2212,26 @@ defmodule Ysc.Stripe.WebhookHandler do
 
     # Return Money directly with the fee in dollars (no need to convert back to cents)
     Money.new(estimated_fee, :USD)
+  end
+
+  # Looks up a user by Stripe customer_id, falling back to a known user_id
+  # (from Stripe object metadata, or from a local record like a subscription)
+  # when the customer_id doesn't match any user. A user should only ever
+  # have one Stripe customer, but if that ever drifts (see
+  # Customers.ensure_stripe_customer/1), the fallback keeps webhook
+  # processing working instead of hard-failing on a lookup we know how to
+  # route around.
+  defp resolve_user_for_customer(customer_id, fallback_user_id) do
+    case Ysc.Accounts.get_user_from_stripe_id(customer_id) do
+      nil when is_binary(fallback_user_id) ->
+        Ysc.Accounts.get_user(fallback_user_id)
+
+      nil ->
+        nil
+
+      user ->
+        user
+    end
   end
 
   # Helper function to resolve subscription ID from invoice
