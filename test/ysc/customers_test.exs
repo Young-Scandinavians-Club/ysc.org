@@ -548,7 +548,7 @@ defmodule Ysc.CustomersTest do
 
       parent = self()
 
-      Mox.expect(Stripe.CustomerMock, :create, fn params ->
+      Mox.expect(Stripe.CustomerMock, :create, fn params, _opts ->
         send(parent, {:create_params, params})
 
         {:ok,

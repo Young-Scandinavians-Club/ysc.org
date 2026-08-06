@@ -41,8 +41,19 @@ defmodule Ysc.Customers do
     user = Repo.preload(user, :billing_address)
     customer_params = stripe_customer_params(user, include_address: true)
 
+    # Stable (not per-attempt) idempotency key scoped to this user, so Stripe
+    # itself dedupes duplicate "create the customer for this user" calls
+    # within its 24h idempotency window - belt and suspenders alongside the
+    # advisory lock in ensure_stripe_customer/1, and it also makes retries
+    # from stripe_retry/1 safe (each retry reruns this closure, and without
+    # an explicit key the client would otherwise generate a fresh random one
+    # per attempt, defeating retry idempotency).
+    idempotency_key = "customer_create_#{user.id}"
+
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-           stripe_customer_module().create(customer_params)
+           stripe_customer_module().create(customer_params,
+             idempotency_key: idempotency_key
+           )
          end) do
       {:ok, stripe_customer} ->
         persist_user_stripe_id(user.id, stripe_customer.id)
