@@ -2634,6 +2634,261 @@ defmodule YscWeb.ClearLakeBookingLiveTest do
     end
   end
 
+  describe "coverage gap: eligibility CTAs and info tab" do
+    test "unauthenticated user sees sign-in CTA on the information tab", %{
+      conn: conn
+    } do
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      assert :sys.get_state(view.pid).socket.assigns.booking_error_title ==
+               "Sign In Required"
+
+      assert has_element?(view, "a", "Sign In to Book")
+    end
+
+    test "user pending board approval sees application-status CTA", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime, %{state: :pending_approval})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      assert :sys.get_state(view.pid).socket.assigns.booking_error_title ==
+               "Application under review"
+
+      assert has_element?(view, "a", "View application status")
+    end
+  end
+
+  describe "coverage gap: dates_changed? nil transitions" do
+    test "clearing dates via URL patch is detected as a change (new nil, old set)",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = clear_lake_booking_dates(90, 3)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
+        )
+
+      assert :sys.get_state(view.pid).socket.assigns.checkin_date == checkin
+
+      render_patch(view, "/bookings/clear-lake?tab=booking")
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.checkin_date == nil
+      assert state.socket.assigns.checkout_date == nil
+    end
+
+    test "setting dates via URL patch is detected as a change (new set, old nil)",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      assert :sys.get_state(view.pid).socket.assigns.checkin_date == nil
+
+      {checkin, checkout} = clear_lake_booking_dates(90, 3)
+
+      render_patch(
+        view,
+        "/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
+      )
+
+      state = :sys.get_state(view.pid)
+      assert state.socket.assigns.checkin_date == checkin
+      assert state.socket.assigns.checkout_date == checkout
+    end
+  end
+
+  describe "coverage gap: switching to booking tab refreshes availability" do
+    test "patching from information to booking tab bumps availability_cache_version",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(conn, ~p"/bookings/clear-lake?tab=information")
+
+      before_version =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      render_patch(view, "/bookings/clear-lake?tab=booking")
+
+      after_version =
+        :sys.get_state(view.pid).socket.assigns.availability_cache_version
+
+      assert after_version != before_version
+
+      assert :sys.get_state(view.pid).socket.assigns.active_tab == :booking
+    end
+  end
+
+  describe "coverage gap: config cache handle_info clauses" do
+    test "handles pricing_rule_cache_invalidated message without crashing", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      send(view.pid, {:pricing_rule_cache_invalidated, 1})
+
+      html = render(view)
+      assert html =~ "Clear Lake"
+    end
+
+    test "handles refund_policy_cache_invalidated message without crashing", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      send(view.pid, {:refund_policy_cache_invalidated, 1})
+
+      html = render(view)
+      assert html =~ "Clear Lake"
+    end
+  end
+
+  describe "coverage gap: parse_date/parse_guests edge clauses" do
+    test "date-changed with an empty checkin string clears the date", %{
+      conn: conn
+    } do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = clear_lake_booking_dates(90, 3)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?checkin_date=#{Date.to_string(checkin)}&checkout_date=#{Date.to_string(checkout)}"
+        )
+
+      render_change(view, "date-changed", %{
+        "checkin_date" => "",
+        "checkout_date" => Date.to_string(checkout)
+      })
+
+      assert :sys.get_state(view.pid).socket.assigns.checkin_date == nil
+    end
+
+    test "loading the page with a non-numeric guests_count URL param defaults to 1",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?guests_count=not-a-number"
+        )
+
+      assert guests_count_assign(view) == 1
+    end
+  end
+
+  describe "coverage gap: create-booking error branches" do
+    test "shows property-unavailable message when buyout conflicts with an existing per-guest hold",
+         %{conn: conn} do
+      alias Ysc.Bookings.BookingLocker
+
+      ensure_clear_lake_pricing_rules!()
+
+      host = user_with_membership(:lifetime)
+      other_user = user_with_membership(:lifetime)
+
+      checkin = clear_lake_test_date(150)
+      checkout = Date.add(checkin, 2)
+
+      assert {:ok, _} =
+               BookingLocker.create_per_guest_booking(
+                 host.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 4
+               )
+
+      conn = log_in_user(conn, other_user)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests" => "6",
+        "booking_mode" => "buyout"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+        )
+
+      click_create_booking(view)
+      state = :sys.get_state(view.pid)
+
+      assert state.socket.assigns.form_errors.general ==
+               "The cabin isn't available for those dates. Try different dates or reserve the whole cabin."
+    end
+
+    test "shows application-pending message when a pending-approval user attempts to book",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime, %{state: :pending_approval})
+      conn = log_in_user(conn, user)
+
+      {:ok, view, _html} = live_clear_lake(conn, ~p"/bookings/clear-lake")
+
+      click_create_booking(view)
+      state = :sys.get_state(view.pid)
+
+      assert state.socket.assigns.form_errors.general ==
+               "Your membership application is still being reviewed by the board. You'll be able to make bookings after your application is approved and your membership is active."
+    end
+
+    test "shows an invalid-booking-mode message when the booking mode assign is corrupted",
+         %{conn: conn} do
+      user = user_with_membership(:lifetime)
+      conn = log_in_user(conn, user)
+
+      {checkin, checkout} = clear_lake_booking_dates(30, 3)
+
+      params = %{
+        "checkin_date" => Date.to_string(checkin),
+        "checkout_date" => Date.to_string(checkout),
+        "guests_count" => "2"
+      }
+
+      {:ok, view, _html} =
+        live_clear_lake(
+          conn,
+          ~p"/bookings/clear-lake?#{URI.encode_query(params)}"
+        )
+
+      # Force an unreachable-in-practice booking mode value onto the socket to
+      # exercise the defensive `_ -> {:error, :invalid_booking_mode}` clause in
+      # do_validate_and_create_booking/1, which the public UI can never select.
+      :sys.replace_state(view.pid, fn state ->
+        put_in(state.socket.assigns.selected_booking_mode, :neither)
+      end)
+
+      click_create_booking(view)
+      state = :sys.get_state(view.pid)
+
+      assert state.socket.assigns.form_errors.general =~
+               "couldn't book with the option you selected"
+    end
+  end
+
   # Helper function for finding next weekday
   defp find_next_weekday(date, target_day_of_week) do
     current_day = Date.day_of_week(date)

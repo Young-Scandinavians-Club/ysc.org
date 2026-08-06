@@ -2584,21 +2584,18 @@ defmodule YscWeb.UserSettingsLive do
         socket
       end
 
-    # After OAuth reauth, restore the pending email/phone change and continue
-    # (or re-open the reauth modal if verification failed).
-    socket = maybe_resume_oauth_reauth(socket, params)
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def mount(%{"token" => token}, _session, socket) do
+    # Confirm a pending email change from the link sent to the new address.
     # Only process the token on WebSocket connection, not on the dead render.
     # If processed on both, the token is consumed on the dead render and the
-    # WebSocket mount would always see it as expired, showing two conflicting toasts.
+    # WebSocket mount would always see it as expired, showing two conflicting
+    # toasts. push_patch must happen here (handle_params), not in mount/3 —
+    # LiveView forbids issuing a live patch while a view is still mounting.
     socket =
-      if connected?(socket) do
-        case Accounts.update_user_email(socket.assigns.current_user, token) do
+      if socket.assigns[:live_action] == :confirm_email && connected?(socket) do
+        case Accounts.update_user_email(
+               socket.assigns.current_user,
+               params["token"]
+             ) do
           {:ok, updated_user, new_email} ->
             old_email = socket.assigns.current_user.email
 
@@ -2608,14 +2605,27 @@ defmodule YscWeb.UserSettingsLive do
               new_email
             )
 
-            YscWeb.Flash.put_toast(socket, :info, "Email changed successfully.",
+            # push_patch doesn't re-run mount/3, so the stale :current_user
+            # (and everything derived from it) would otherwise still show
+            # the old email until the browser reloads.
+            socket
+            |> assign(:current_user, updated_user)
+            |> assign(:user, updated_user)
+            |> assign(:current_email, updated_user.email)
+            |> assign(
+              :email_form,
+              updated_user |> Accounts.change_user_email() |> to_form()
+            )
+            |> push_patch(to: ~p"/users/settings")
+            |> YscWeb.Flash.put_toast(:info, "Email changed successfully.",
               title: "Email",
               icon: &YscWeb.CoreComponents.flash_toast_icon_mail/1
             )
 
           :error ->
-            YscWeb.Flash.put_toast(
-              socket,
+            socket
+            |> push_patch(to: ~p"/users/settings")
+            |> YscWeb.Flash.put_toast(
               :error,
               "Email change link is invalid or it has expired.",
               title: "Email"
@@ -2625,7 +2635,11 @@ defmodule YscWeb.UserSettingsLive do
         socket
       end
 
-    {:ok, push_patch(socket, to: ~p"/users/settings")}
+    # After OAuth reauth, restore the pending email/phone change and continue
+    # (or re-open the reauth modal if verification failed).
+    socket = maybe_resume_oauth_reauth(socket, params)
+
+    {:noreply, socket}
   end
 
   @impl true

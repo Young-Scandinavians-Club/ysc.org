@@ -6864,4 +6864,223 @@ defmodule Ysc.LedgersTest.LedgerRefundEmailNotifierCoverage do
              )
     end
   end
+
+  describe "coverage: process_event_payment_with_donations error branches" do
+    setup do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      import Mox
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_default"}}
+      end)
+
+      %{user: user}
+    end
+
+    test "returns the underlying changeset error (not a duplicate) and logs it",
+         %{user: user} do
+      # external_payment_id longer than 255 chars fails validate_length, which
+      # is a genuine changeset error distinct from the "already taken" unique
+      # constraint error - this exercises the non-duplicate rollback/error path.
+      too_long_id = String.duplicate("x", 300)
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Ledgers.process_event_payment_with_donations(%{
+                 user_id: user.id,
+                 total_amount: Money.new(10_000, :USD),
+                 event_amount: Money.new(6_000, :USD),
+                 donation_amount: Money.new(4_000, :USD),
+                 event_id: Ecto.ULID.generate(),
+                 external_payment_id: too_long_id,
+                 stripe_fee: Money.new(320, :USD),
+                 description: "Too long external id",
+                 payment_method_id: nil
+               })
+
+      assert changeset.errors[:external_payment_id]
+    end
+
+    test "process_event_payment_with_donations_and_discounts/1 returns the underlying changeset error",
+         %{user: user} do
+      too_long_id = String.duplicate("y", 300)
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Ledgers.process_event_payment_with_donations_and_discounts(%{
+                 user_id: user.id,
+                 total_amount: Money.new(10_000, :USD),
+                 gross_event_amount: Money.new(6_000, :USD),
+                 event_amount: Money.new(6_000, :USD),
+                 donation_amount: Money.new(4_000, :USD),
+                 discount_amount: Money.new(1_000, :USD),
+                 event_id: Ecto.ULID.generate(),
+                 external_payment_id: too_long_id,
+                 stripe_fee: Money.new(320, :USD),
+                 description: "Too long external id",
+                 payment_method_id: nil,
+                 ticket_order_id: Ecto.ULID.generate()
+               })
+
+      assert changeset.errors[:external_payment_id]
+    end
+  end
+
+  describe "coverage: book_payout_stripe_fees/2 missing payment_id" do
+    test "returns {:error, :missing_payment_id} when payout has no linked payment" do
+      {:ok, payout} =
+        Ledgers.create_payout(%{
+          stripe_payout_id:
+            "po_no_payment_#{System.unique_integer([:positive])}",
+          amount: Money.new(5_000, :USD),
+          currency: "usd",
+          status: "paid",
+          arrival_date: DateTime.utc_now() |> DateTime.truncate(:second)
+        })
+
+      assert is_nil(payout.payment_id)
+
+      assert {:error, :missing_payment_id} =
+               Ledgers.book_payout_stripe_fees(payout, Money.new(95, :USD))
+    end
+  end
+
+  describe "coverage: add_payment_type_info/1 membership with real subscription" do
+    setup do
+      user = user_fixture()
+
+      Application.put_env(:ysc, :quickbooks_client, Ysc.Quickbooks.ClientMock)
+
+      Application.put_env(:ysc, :quickbooks,
+        client_id: "test_client_id",
+        client_secret: "test_client_secret",
+        company_id: "test_company_id",
+        access_token: "test_access_token",
+        refresh_token: "test_refresh_token",
+        event_item_id: "event_item_123",
+        donation_item_id: "donation_item_123",
+        bank_account_id: "bank_account_123",
+        stripe_account_id: "stripe_account_123"
+      )
+
+      import Mox
+
+      stub(Ysc.Quickbooks.ClientMock, :create_customer, fn _params ->
+        {:ok, %{"Id" => "qb_customer_default"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_sales_receipt, fn _params,
+                                                                _opts ->
+        {:ok, %{"Id" => "qb_sr_default", "TotalAmt" => "0.00"}}
+      end)
+
+      stub(Ysc.Quickbooks.ClientMock, :create_deposit, fn _params ->
+        {:ok, %{"Id" => "qb_deposit_default", "TotalAmt" => "0.00"}}
+      end)
+
+      %{user: user}
+    end
+
+    test "returns the plan name when the subscription has a matching price id",
+         %{user: user} do
+      alias Ysc.Subscriptions.{Subscription, SubscriptionItem}
+
+      [plan | _] = Application.get_env(:ysc, :membership_plans)
+
+      subscription =
+        %Subscription{}
+        |> Subscription.changeset(%{
+          name: "Test Plan Subscription",
+          stripe_id: "sub_test_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id
+        })
+        |> Repo.insert!()
+
+      %SubscriptionItem{}
+      |> SubscriptionItem.changeset(%{
+        stripe_id: "si_test_#{System.unique_integer([:positive])}",
+        stripe_product_id: "prod_test",
+        stripe_price_id: plan.stripe_price_id,
+        quantity: 1,
+        subscription_id: subscription.id
+      })
+      |> Repo.insert!()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(4_500, :USD),
+          entity_type: :membership,
+          entity_id: subscription.id,
+          external_payment_id:
+            "pi_membership_plan_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(150, :USD),
+          description: "Membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment_with_info = Ledgers.add_payment_type_info(payment)
+
+      assert payment_with_info.payment_type_info.type == "Membership"
+
+      assert payment_with_info.payment_type_info.details ==
+               "#{plan.name} Membership"
+    end
+
+    test "returns generic 'Membership' details when the subscription has no items",
+         %{user: user} do
+      alias Ysc.Subscriptions.Subscription
+
+      subscription =
+        %Subscription{}
+        |> Subscription.changeset(%{
+          name: "No Items Subscription",
+          stripe_id: "sub_no_items_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id
+        })
+        |> Repo.insert!()
+
+      {:ok, {payment, _transaction, _entries}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(4_500, :USD),
+          entity_type: :membership,
+          entity_id: subscription.id,
+          external_payment_id:
+            "pi_membership_no_items_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(150, :USD),
+          description: "Membership payment",
+          property: nil,
+          payment_method_id: nil
+        })
+
+      payment_with_info = Ledgers.add_payment_type_info(payment)
+
+      assert payment_with_info.payment_type_info.type == "Membership"
+      assert payment_with_info.payment_type_info.details == "Membership"
+    end
+  end
+
+  describe "coverage: ci_query_explain_query/0" do
+    test "returns a well-formed Ecto query for CI query-plan checks" do
+      query = Ledgers.ci_query_explain_query()
+      assert %Ecto.Query{} = query
+    end
+  end
 end

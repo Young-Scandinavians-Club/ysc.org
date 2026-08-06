@@ -1595,15 +1595,6 @@ defmodule Ysc.Bookings.BookingLockerTest do
   end
 
   describe "confirm_booking/1 confirmation email scheduling" do
-    defmodule NotifierScheduleError do
-      @moduledoc false
-      def schedule_email(a, b, c, d, e, f, g),
-        do: schedule_email(a, b, c, d, e, f, g, nil)
-
-      def schedule_email(_, _, _, _, _, _, _, _),
-        do: {:error, :coverage_schedule_failed}
-    end
-
     defp with_booking_confirmation_notifier(module, fun) do
       prev = Application.get_env(:ysc, :booking_confirmation_email_notifier)
       Application.put_env(:ysc, :booking_confirmation_email_notifier, module)
@@ -1633,7 +1624,7 @@ defmodule Ysc.Bookings.BookingLockerTest do
           4
         )
 
-      with_booking_confirmation_notifier(NotifierScheduleError, fn ->
+      with_booking_confirmation_notifier(Ysc.TestNotifiers.ScheduleError, fn ->
         assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
         assert confirmed.status == :complete
         assert Repo.get!(Booking, hold.id).status == :complete
@@ -2314,6 +2305,277 @@ defmodule Ysc.Bookings.BookingLockerTest do
                  0,
                  children_count: 0
                )
+    end
+  end
+
+  describe "create_buyout_booking/6 invalid date range" do
+    test "returns pricing_calculation_failed when checkin equals checkout", %{
+      user: user
+    } do
+      {checkin, _checkout} = locker_buyout_dates(600)
+
+      assert {:error, :pricing_calculation_failed} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkin,
+                 4
+               )
+    end
+  end
+
+  describe "create_per_guest_booking/6 invalid date range" do
+    test "returns pricing_calculation_failed when checkin equals checkout", %{
+      user: user
+    } do
+      {checkin, _checkout} = locker_room_dates(601, 2)
+
+      assert {:error, :pricing_calculation_failed} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkin,
+                 2
+               )
+    end
+  end
+
+  describe "confirm_booking/1 invalid status" do
+    test "returns invalid_status when booking is neither hold nor canceled", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(602)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      booking = Ysc.Repo.preload(booking, :rooms)
+
+      booking =
+        booking
+        |> Booking.changeset(%{status: :refunded},
+          rooms: booking.rooms,
+          skip_validation: true
+        )
+        |> Ysc.Repo.update!()
+
+      assert {:error, {:error, :invalid_status}} =
+               BookingLocker.confirm_booking(booking.id)
+    end
+  end
+
+  describe "create_admin_booking/2 changeset error" do
+    test "returns the changeset error when required attrs are missing" do
+      {checkin, checkout} = locker_buyout_dates(603)
+
+      attrs = %{
+        property: :tahoe,
+        checkin_date: checkin,
+        checkout_date: checkout,
+        booking_mode: :buyout,
+        guests_count: 4,
+        total_price: Money.new(:USD, "500.00")
+      }
+
+      assert {:error, {:error, %Ecto.Changeset{valid?: false}}} =
+               BookingLocker.create_admin_booking(attrs,
+                 skip_email: true,
+                 skip_reminders: true
+               )
+    end
+  end
+
+  describe "confirm_booking/1 other holds error handling" do
+    test "logs and continues when releasing a sibling hold fails", %{
+      user: user
+    } do
+      {week1_in, week1_out} = locker_buyout_dates(20)
+      {week2_in, week2_out} = locker_buyout_dates_after(week1_out)
+
+      assert {:ok, first_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week1_in,
+                 week1_out,
+                 4
+               )
+
+      assert {:ok, second_hold} =
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 week2_in,
+                 week2_out,
+                 4
+               )
+
+      # Remove the second hold's property inventory rows so that when
+      # confirm_booking tries to release it as a sibling hold, release_hold
+      # fails with :inventory_update_failed instead of succeeding.
+      from(pi in PropertyInventory,
+        where:
+          pi.property == :tahoe and pi.day >= ^week2_in and pi.day < ^week2_out
+      )
+      |> Repo.delete_all()
+
+      assert {:ok, confirmed} = BookingLocker.confirm_booking(first_hold.id)
+      assert confirmed.status == :complete
+
+      # The sibling hold should remain untouched (still :hold) since release
+      # failed and cancel_other_hold_bookings swallows the error.
+      second = Ysc.Repo.reload!(second_hold)
+      assert second.status == :hold
+    end
+  end
+
+  describe "confirm_booking/1 confirmation email rescue branch" do
+    test "keeps booking complete when the notifier raises", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(604)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      with_booking_confirmation_notifier(Ysc.TestNotifiers.Raising, fn ->
+        assert {:ok, confirmed} = BookingLocker.confirm_booking(hold.id)
+        assert confirmed.status == :complete
+        assert Repo.get!(Booking, hold.id).status == :complete
+      end)
+    end
+  end
+
+  describe "modify_complete_booking/3 error branches" do
+    defp complete_buyout_booking_for_modify!(user, checkin, checkout) do
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 500),
+          booking_mode: :buyout,
+          price_unit: :buyout_fixed,
+          property: :tahoe,
+          season_id: nil
+        })
+
+      {:ok, total, _} =
+        Bookings.calculate_booking_price(
+          :tahoe,
+          checkin,
+          checkout,
+          :buyout,
+          guests_count: 4
+        )
+
+      {:ok, booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: checkin,
+            checkout_date: checkout,
+            booking_mode: :buyout,
+            guests_count: 4,
+            total_price: total
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      {:ok, _} =
+        Ysc.Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: total,
+          entity_type: :booking,
+          entity_id: booking.id,
+          external_payment_id:
+            "pi_locker_modify_#{System.unique_integer([:positive])}",
+          stripe_fee: Money.new(:USD, 1),
+          description: "Booking payment",
+          property: booking.property,
+          payment_method_id: nil
+        })
+
+      Ysc.Repo.preload(booking, [:rooms, :user])
+    end
+
+    test "returns invalid_status when booking is not complete", %{user: user} do
+      {checkin, checkout} = locker_buyout_dates(605)
+
+      {:ok, hold} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      hold = Ysc.Repo.preload(hold, [:rooms, :user])
+
+      assert {:error, {:error, :invalid_status}} =
+               BookingLocker.modify_complete_booking(hold, %{
+                 checkin_date: checkin,
+                 checkout_date: Date.add(checkout, 1),
+                 guests_count: 4,
+                 children_count: 0
+               })
+    end
+
+    test "returns no_changes when attrs match the existing booking", %{
+      user: user
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      {checkin, checkout} = locker_buyout_dates(606)
+
+      booking = complete_buyout_booking_for_modify!(user, checkin, checkout)
+
+      assert {:error, {:error, :no_changes}} =
+               BookingLocker.modify_complete_booking(booking, %{
+                 checkin_date: booking.checkin_date,
+                 checkout_date: booking.checkout_date,
+                 guests_count: booking.guests_count,
+                 children_count: booking.children_count || 0
+               })
+    end
+
+    test "returns blackout_conflict when new dates overlap a blackout", %{
+      user: user
+    } do
+      Ysc.Ledgers.ensure_basic_accounts()
+      {checkin, checkout} = locker_buyout_dates(607)
+
+      booking = complete_buyout_booking_for_modify!(user, checkin, checkout)
+
+      new_checkin = Date.add(checkout, 7)
+      new_checkout = Date.add(new_checkin, 3)
+
+      assert {:ok, _} =
+               Bookings.create_blackout(%{
+                 property: :tahoe,
+                 start_date: new_checkin,
+                 end_date: new_checkout,
+                 reason: "Modify blackout conflict"
+               })
+
+      assert {:error, {:error, :blackout_conflict}} =
+               BookingLocker.modify_complete_booking(booking, %{
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
+                 guests_count: 4,
+                 children_count: 0
+               })
     end
   end
 
