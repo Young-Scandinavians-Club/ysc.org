@@ -48,7 +48,7 @@ defmodule Ysc.Customers do
     # from stripe_retry/1 safe (each retry reruns this closure, and without
     # an explicit key the client would otherwise generate a fresh random one
     # per attempt, defeating retry idempotency).
-    idempotency_key = "customer_create_#{user.id}"
+    idempotency_key = Ysc.Stripe.Idempotency.key("customer_create_#{user.id}")
 
     case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
            stripe_customer_module().create(customer_params,
@@ -56,8 +56,18 @@ defmodule Ysc.Customers do
            )
          end) do
       {:ok, stripe_customer} ->
-        persist_user_stripe_id(user.id, stripe_customer.id)
-        {:ok, stripe_customer}
+        case persist_user_stripe_id(user.id, stripe_customer.id) do
+          {:ok, _updated_user} ->
+            {:ok, stripe_customer}
+
+          {:error, reason} ->
+            # A Stripe customer now exists but isn't linked to the user -
+            # don't report success, or callers (and the advisory lock in
+            # ensure_stripe_customer/1) will treat this as done when it
+            # isn't. The idempotency key above means a retry reuses this
+            # same Stripe customer instead of creating another one.
+            {:error, reason}
+        end
 
       {:error, error} ->
         {:error, error}
@@ -432,12 +442,12 @@ defmodule Ysc.Customers do
 
     try do
       case Repo.update(changeset) do
-        {:ok, _updated_user} ->
-          :ok
+        {:ok, updated_user} ->
+          {:ok, updated_user}
 
         {:error, changeset} ->
           log_stripe_id_update_failure(user_id, stripe_customer_id, changeset)
-          :ok
+          {:error, changeset}
       end
     rescue
       e in Ecto.StaleEntryError ->
