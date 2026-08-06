@@ -1317,7 +1317,9 @@ defmodule Ysc.Subscriptions do
         if idempotency_key do
           Ysc.Stripe.RetryHelper.stripe_retry(fn ->
             stripe_subscription_module().create(stripe_params,
-              headers: %{"Idempotency-Key" => idempotency_key}
+              headers: %{
+                "Idempotency-Key" => Ysc.Stripe.Idempotency.key(idempotency_key)
+              }
             )
           end)
         else

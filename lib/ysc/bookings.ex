@@ -5724,7 +5724,7 @@ defmodule Ysc.Bookings do
       stripe_opts =
         case idempotency_key do
           nil -> []
-          key -> [idempotency_key: key]
+          key -> [idempotency_key: Ysc.Stripe.Idempotency.key(key)]
         end
 
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->

@@ -1945,7 +1945,8 @@ defmodule YscWeb.BookingCheckoutLive do
     # Include amount in the idempotency key so repriced holds get a fresh PI.
     # A reference-only key caused Stripe to return a stale PI after checkout
     # recalculated entitlements or min-occupancy pricing.
-    idempotency_key = "booking_#{booking.reference_id}_#{amount_cents}"
+    idempotency_key =
+      Ysc.Stripe.Idempotency.key("booking_#{booking.reference_id}_#{amount_cents}")
 
     stripe_client = Application.get_env(:ysc, :stripe_client, Ysc.StripeClient)
 
