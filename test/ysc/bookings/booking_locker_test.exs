@@ -1367,6 +1367,107 @@ defmodule Ysc.Bookings.BookingLockerTest do
       assert released.status == :canceled
     end
 
+    test "successfully cancels a matching cancelable PaymentIntent", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(410)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      stub(Stripe.PaymentIntentMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [
+             %Stripe.PaymentIntent{
+               id: "pi_test_booking_locker_release_ok",
+               metadata: %{"booking_id" => booking.id},
+               status: "requires_confirmation"
+             }
+           ],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_intents"
+         }}
+      end)
+
+      stub(Ysc.StripeMock, :cancel_payment_intent, fn _id, _opts ->
+        {:ok, %Stripe.PaymentIntent{id: "pi_test_booking_locker_release_ok"}}
+      end)
+
+      previous_client = Application.get_env(:ysc, :stripe_client)
+      Application.put_env(:ysc, :stripe_client, Ysc.StripeMock)
+
+      try do
+        assert {:ok, released} = BookingLocker.release_hold(booking.id)
+        assert released.status == :canceled
+      after
+        Application.put_env(:ysc, :stripe_client, previous_client)
+      end
+    end
+
+    test "skips cancellation when matching PaymentIntent is not cancelable", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(411)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      stub(Stripe.PaymentIntentMock, :list, fn _params ->
+        {:ok,
+         %Stripe.List{
+           data: [
+             %Stripe.PaymentIntent{
+               id: "pi_test_booking_locker_release_noncancelable",
+               metadata: %{"booking_id" => booking.id},
+               status: "succeeded"
+             }
+           ],
+           has_more: false,
+           object: "list",
+           url: "/v1/payment_intents"
+         }}
+      end)
+
+      assert {:ok, released} = BookingLocker.release_hold(booking.id)
+      assert released.status == :canceled
+    end
+
+    test "continues releasing the hold when the PaymentIntent search fails", %{
+      user: user
+    } do
+      {checkin, checkout} = locker_buyout_dates(412)
+
+      {:ok, booking} =
+        BookingLocker.create_buyout_booking(
+          user.id,
+          :tahoe,
+          checkin,
+          checkout,
+          4
+        )
+
+      stub(Stripe.PaymentIntentMock, :list, fn _params ->
+        {:error, :search_unavailable}
+      end)
+
+      assert {:ok, released} = BookingLocker.release_hold(booking.id)
+      assert released.status == :canceled
+    end
+
     test "releases a hold booking", %{user: user} do
       {checkin, checkout} = tahoe_room_booking_dates(7, 2)
 
@@ -2162,6 +2263,77 @@ defmodule Ysc.Bookings.BookingLockerTest do
     end
   end
 
+  describe "place_modification_hold/3 and release_modification_hold/2 Clear Lake per-guest (day mode)" do
+    setup do
+      ensure_clear_lake_day_pricing_rule()
+      :ok
+    end
+
+    test "holds extra guest capacity on overlapping days and new days, then releases both",
+         %{user: user} do
+      {checkin, checkout} = locker_room_dates(126, 2)
+
+      assert {:ok, hold} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 2
+               )
+
+      assert {:ok, booking} = BookingLocker.confirm_booking(hold.id)
+      assert booking.status == :complete
+
+      extended_checkout = Date.add(checkout, 1)
+
+      attrs = %{
+        checkin_date: checkin,
+        checkout_date: extended_checkout,
+        guests_count: 4,
+        children_count: 0
+      }
+
+      assert {:ok, held_booking} =
+               Ysc.Bookings.place_modification_hold(booking, attrs)
+
+      assert held_booking.modification_hold_expires_at
+      assert held_booking.modification_hold_attrs
+
+      new_day_inv =
+        Ysc.Repo.get_by!(PropertyInventory,
+          property: :clear_lake,
+          day: checkout
+        )
+
+      assert new_day_inv.capacity_held == 4
+
+      overlap_day_inv =
+        Ysc.Repo.get_by!(PropertyInventory, property: :clear_lake, day: checkin)
+
+      assert overlap_day_inv.capacity_held == 2
+
+      assert {:ok, released} =
+               Ysc.Bookings.release_modification_hold(held_booking.id)
+
+      assert is_nil(released.modification_hold_expires_at)
+      assert is_nil(released.modification_hold_attrs)
+
+      new_day_after =
+        Ysc.Repo.get_by!(PropertyInventory,
+          property: :clear_lake,
+          day: checkout
+        )
+
+      assert new_day_after.capacity_held == 0
+
+      overlap_day_after =
+        Ysc.Repo.get_by!(PropertyInventory, property: :clear_lake, day: checkin)
+
+      assert overlap_day_after.capacity_held == 0
+    end
+  end
+
   describe "create_per_guest_booking pricing_items (price_per_guest_per_night)" do
     test "includes computed price_per_guest_per_night in pricing_items", %{
       user: user
@@ -2219,6 +2391,44 @@ defmodule Ysc.Bookings.BookingLockerTest do
                Decimal.new(ppg["amount"]),
                expected_per_guest.amount
              )
+    end
+
+    test "price_per_guest_per_night is zero when guests_count is 0", %{
+      user: user
+    } do
+      Ysc.Bookings.SeasonCache.invalidate()
+      Cachex.clear(:ysc_cache)
+
+      {:ok, _} =
+        Bookings.create_pricing_rule(%{
+          amount: Money.new(:USD, 30),
+          booking_mode: :day,
+          price_unit: :per_guest_per_day,
+          property: :clear_lake,
+          season_id: nil
+        })
+
+      {checkin, checkout} = locker_room_dates(30, 3)
+
+      assert {:ok, booking} =
+               BookingLocker.create_per_guest_booking(
+                 user.id,
+                 :clear_lake,
+                 checkin,
+                 checkout,
+                 0
+               )
+
+      booking = Ysc.Repo.reload!(booking)
+      pi = booking.pricing_items
+
+      ppg =
+        Map.get(pi, "price_per_guest_per_night") ||
+          Map.get(pi, :price_per_guest_per_night)
+
+      ppg = for {k, v} <- ppg, into: %{}, do: {to_string(k), v}
+
+      assert Decimal.equal?(Decimal.new(ppg["amount"]), Decimal.new(0))
     end
   end
 
@@ -2570,6 +2780,51 @@ defmodule Ysc.Bookings.BookingLockerTest do
                })
 
       assert {:error, {:error, :blackout_conflict}} =
+               BookingLocker.modify_complete_booking(booking, %{
+                 checkin_date: new_checkin,
+                 checkout_date: new_checkout,
+                 guests_count: 4,
+                 children_count: 0
+               })
+    end
+
+    test "returns an availability error when new dates overlap another confirmed booking",
+         %{user: user} do
+      Ysc.Ledgers.ensure_basic_accounts()
+      {checkin, checkout} = locker_buyout_dates(608)
+
+      booking = complete_buyout_booking_for_modify!(user, checkin, checkout)
+
+      new_checkin = Date.add(checkout, 7)
+      new_checkout = Date.add(new_checkin, 3)
+
+      other_user = user_fixture()
+
+      {:ok, other_total, _} =
+        Bookings.calculate_booking_price(
+          :tahoe,
+          new_checkin,
+          new_checkout,
+          :buyout,
+          guests_count: 4
+        )
+
+      {:ok, _other_booking} =
+        BookingLocker.create_admin_booking(
+          %{
+            user_id: other_user.id,
+            property: :tahoe,
+            checkin_date: new_checkin,
+            checkout_date: new_checkout,
+            booking_mode: :buyout,
+            guests_count: 4,
+            total_price: other_total
+          },
+          skip_email: true,
+          skip_reminders: true
+        )
+
+      assert {:error, {:error, _reason}} =
                BookingLocker.modify_complete_booking(booking, %{
                  checkin_date: new_checkin,
                  checkout_date: new_checkout,
