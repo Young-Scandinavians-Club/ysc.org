@@ -2,7 +2,7 @@ defmodule YscWeb.EventsListLive do
   use YscWeb, :live_component
 
   alias Ysc.Events
-  alias Ysc.Events.{DateTimeFormatter, TicketTierHelpers}
+  alias Ysc.Events.{DateTimeFormatter, EventHelpers}
   alias Ysc.Media.Image
   alias Money
   alias YscWeb.DateDisplay
@@ -228,7 +228,7 @@ defmodule YscWeb.EventsListLive do
         <div :for={{id, event} <- @streams.events} id={id}>
           <.event_card
             event={event}
-            sold_out={event_sold_out?(event)}
+            sold_out={EventHelpers.event_sold_out?(event)}
             selling_fast={Map.get(event, :selling_fast, false)}
           />
         </div>
@@ -519,89 +519,6 @@ defmodule YscWeb.EventsListLive do
     |> assign(:hero_event, hero_event)
   end
 
-  defp event_sold_out?(event) do
-    # Cache current time to avoid repeated system calls
-    now = DateTime.utc_now()
-
-    # Events from list_upcoming_events/list_past_events are preloaded with ticket_tiers
-    # via add_pricing_info_batch, so this should always be available
-    ticket_tiers = Map.get(event, :ticket_tiers) || []
-
-    # Filter out donation tiers - donations don't count toward "sold out" status
-    non_donation_tiers =
-      Enum.reject(ticket_tiers, &TicketTierHelpers.donation_tier?/1)
-
-    # If there are no non-donation tiers, event is not sold out
-    if Enum.empty?(non_donation_tiers) do
-      false
-    else
-      # Filter out pre-sale tiers (tiers that haven't started selling yet)
-      # We want to check tiers that are on sale OR have ended their sale
-      relevant_tiers =
-        Enum.filter(non_donation_tiers, fn tier ->
-          # Include tiers that are on sale OR have ended their sale
-          # Exclude tiers that haven't started their sale yet (pre-sale)
-          TicketTierHelpers.tier_on_sale?(tier, now) ||
-            TicketTierHelpers.tier_sale_ended?(tier, now)
-        end)
-
-      # If there are no relevant tiers (all are pre-sale), event is not sold out
-      if Enum.empty?(relevant_tiers) do
-        false
-      else
-        # Check if all relevant non-donation tiers are sold out
-        # A tier is sold out if available == 0 (unlimited tiers never count as sold out)
-        all_tiers_sold_out =
-          Enum.all?(relevant_tiers, fn tier ->
-            available = get_available_quantity(tier)
-            available == 0
-          end)
-
-        # Also check event capacity if max_attendees is set (ticket_count excludes donations)
-        event_at_capacity =
-          case Map.get(event, :max_attendees) || Map.get(event, "max_attendees") do
-            nil ->
-              false
-
-            _ ->
-              # Events from list_upcoming_events/list_past_events are preloaded with ticket_count
-              # via add_pricing_info_batch, so this should always be available
-              ticket_count = Map.get(event, :ticket_count) || 0
-
-              max_attendees =
-                Map.get(event, :max_attendees) ||
-                  Map.get(event, "max_attendees")
-
-              ticket_count >= max_attendees
-          end
-
-        all_tiers_sold_out || event_at_capacity
-      end
-    end
-  end
-
-  defp get_available_quantity(ticket_tier) do
-    quantity =
-      Map.get(ticket_tier, :quantity) || Map.get(ticket_tier, "quantity")
-
-    sold_count =
-      Map.get(ticket_tier, :sold_tickets_count) ||
-        Map.get(ticket_tier, "sold_tickets_count") || 0
-
-    case quantity do
-      # Unlimited
-      nil ->
-        :unlimited
-
-      0 ->
-        :unlimited
-
-      qty ->
-        available = qty - sold_count
-        max(0, available)
-    end
-  end
-
   # Hero event helper functions (from EventsLive)
   defp get_hero_event_badges(event) do
     badges = []
@@ -621,7 +538,7 @@ defmodule YscWeb.EventsListLive do
       end
 
     badges =
-      if event_sold_out?(event) do
+      if EventHelpers.event_sold_out?(event) do
         [%{text: "Sold Out", icon: "hero-ticket", class: "bg-red-600"} | badges]
       else
         badges
