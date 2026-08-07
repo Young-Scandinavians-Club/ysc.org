@@ -1083,6 +1083,15 @@ defmodule Ysc.EventsTest do
       Enum.any?(Events.list_past_events(50), &(&1.id == event.id))
     end
 
+    defp in_admin_tab?(event, tab) do
+      params = %{page: 1, page_size: 50}
+
+      assert {:ok, {rows, _meta}} =
+               Events.list_events_paginated(params, tab: tab)
+
+      Enum.any?(rows, &(&1.id == event.id))
+    end
+
     test "no-time event dated today (PST) is still upcoming" do
       {:ok, event} =
         create_event_fixture(%{
@@ -1092,6 +1101,8 @@ defmodule Ysc.EventsTest do
 
       assert upcoming?(event)
       refute past?(event)
+      assert in_admin_tab?(event, :upcoming)
+      refute in_admin_tab?(event, :past)
     end
 
     test "no-time event dated yesterday (PST) has moved to past" do
@@ -1103,6 +1114,8 @@ defmodule Ysc.EventsTest do
 
       refute upcoming?(event)
       assert past?(event)
+      refute in_admin_tab?(event, :upcoming)
+      assert in_admin_tab?(event, :past)
     end
 
     test "multi-day event with no end time stays upcoming through the day after its end date" do
@@ -1115,6 +1128,8 @@ defmodule Ysc.EventsTest do
 
       assert upcoming?(event)
       refute past?(event)
+      assert in_admin_tab?(event, :upcoming)
+      refute in_admin_tab?(event, :past)
     end
 
     test "multi-day event moves to past once its end date and time pass" do
@@ -1128,6 +1143,8 @@ defmodule Ysc.EventsTest do
 
       refute upcoming?(event)
       assert past?(event)
+      refute in_admin_tab?(event, :upcoming)
+      assert in_admin_tab?(event, :past)
     end
 
     test "timed event with only a start time in the past has moved to past" do
@@ -1140,6 +1157,8 @@ defmodule Ysc.EventsTest do
 
       refute upcoming?(event)
       assert past?(event)
+      refute in_admin_tab?(event, :upcoming)
+      assert in_admin_tab?(event, :past)
     end
 
     test "timed event with only a start time tomorrow (PST) is still upcoming" do
@@ -1152,6 +1171,8 @@ defmodule Ysc.EventsTest do
 
       assert upcoming?(event)
       refute past?(event)
+      assert in_admin_tab?(event, :upcoming)
+      refute in_admin_tab?(event, :past)
     end
   end
 

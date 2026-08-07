@@ -23,10 +23,10 @@ defmodule Ysc.Events do
 
   @max_sales_chart_days 120
 
-  # Timezone used to evaluate when an event's visibility on the public
-  # events page should end. Events without a specific end date/time are
-  # ambiguous about when they're "over", so they get a one-day grace period
-  # instead of vanishing at the stroke of midnight UTC.
+  # Timezone used to evaluate when an event should leave "upcoming" lists
+  # (public events page and admin Upcoming/Past tabs). Events without a
+  # specific end date/time are ambiguous about when they're "over", so they
+  # get a one-day grace period instead of vanishing at midnight UTC.
   @event_timezone "America/Los_Angeles"
 
   # Whether an event should still be treated as "upcoming": true until the
@@ -280,11 +280,9 @@ defmodule Ysc.Events do
   end
 
   defp maybe_filter_tab(query, :upcoming) do
-    now = DateTime.utc_now()
-
     query
     |> where([e], e.state not in ["draft"])
-    |> where([e], e.start_date > ^now)
+    |> where(^event_upcoming_dynamic())
   end
 
   defp maybe_filter_tab(query, :drafts) do
@@ -292,11 +290,9 @@ defmodule Ysc.Events do
   end
 
   defp maybe_filter_tab(query, :past) do
-    now = DateTime.utc_now()
-
     query
     |> where([e], e.state not in ["draft"])
-    |> where([e], e.start_date <= ^now)
+    |> where(^event_past_dynamic())
   end
 
   defp maybe_filter_tab(query, _), do: query
