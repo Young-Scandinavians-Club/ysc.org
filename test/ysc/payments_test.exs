@@ -931,6 +931,101 @@ defmodule Ysc.PaymentsTest do
         Payments.set_default_payment_method(user, pm)
       end
     end
+
+    test "rejects a payment method owned by a different user" do
+      owner = user_fixture()
+      caller = user_fixture()
+
+      foreign_pm =
+        create_payment_method_fixture(%{user_id: owner.id, is_default: true})
+
+      caller_pm =
+        create_payment_method_fixture(%{user_id: caller.id, is_default: true})
+
+      assert {:error, :payment_method_not_owned_by_user} =
+               Payments.set_default_payment_method(caller, foreign_pm)
+
+      assert Payments.get_payment_method!(foreign_pm.id).is_default
+      assert Payments.get_default_payment_method(caller).id == caller_pm.id
+    end
+  end
+
+  describe "push_default_payment_method_to_stripe/2" do
+    test "updates the Stripe customer's invoice_settings.default_payment_method" do
+      user = user_fixture(%{stripe_id: "cus_push_test"})
+
+      pm =
+        create_payment_method_fixture(%{
+          user_id: user.id,
+          provider_id: "pm_push_test"
+        })
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_test", params, _opts ->
+        assert params.invoice_settings.default_payment_method == "pm_push_test"
+        {:ok, %Stripe.Customer{id: "cus_push_test"}}
+      end)
+
+      assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+
+    test "is a no-op when the user has no Stripe customer id" do
+      user = user_fixture()
+      pm = create_payment_method_fixture(%{user_id: user.id})
+
+      # No Stripe.CustomerMock expectation set: this must not call Stripe.
+      assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+
+    test "logs and returns :ok when the Stripe call fails" do
+      user = user_fixture(%{stripe_id: "cus_push_fail"})
+      pm = create_payment_method_fixture(%{user_id: user.id})
+
+      expect(Stripe.CustomerMock, :update, fn "cus_push_fail", _params, _opts ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :invalid_request_error,
+           message: "boom",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      assert :ok = Payments.push_default_payment_method_to_stripe(user, pm)
+    end
+  end
+
+  describe "upsert_and_set_default_payment_method_from_stripe/2 pushes to Stripe" do
+    test "pushes the new default payment method to the Stripe customer" do
+      user = user_fixture(%{stripe_id: "cus_upsert_push"})
+      pm_id = "pm_upsert_push_#{System.unique_integer([:positive])}"
+
+      stripe_pm = %Stripe.PaymentMethod{
+        id: pm_id,
+        customer: "cus_upsert_push",
+        type: "card",
+        card: %Stripe.Card{
+          last4: "4444",
+          exp_month: 6,
+          exp_year: 2031,
+          brand: "visa"
+        }
+      }
+
+      expect(Stripe.CustomerMock, :update, fn "cus_upsert_push",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method == pm_id
+        {:ok, %Stripe.Customer{id: "cus_upsert_push"}}
+      end)
+
+      assert {:ok, _} =
+               Payments.upsert_and_set_default_payment_method_from_stripe(
+                 user,
+                 stripe_pm
+               )
+    end
   end
 
   describe "fix_missing_default_payment_methods/0" do

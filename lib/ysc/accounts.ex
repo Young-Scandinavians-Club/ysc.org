@@ -1942,8 +1942,24 @@ defmodule Ysc.Accounts do
   end
 
   def update_default_payment_method(user, payment_method_id) do
-    payment_method = Ysc.Payments.get_payment_method!(payment_method_id)
-    Ysc.Payments.set_default_payment_method(user, payment_method)
+    case Ysc.Payments.get_user_payment_method(user, payment_method_id) do
+      nil ->
+        {:error, :payment_method_not_owned_by_user}
+
+      payment_method ->
+        case Ysc.Payments.set_default_payment_method(user, payment_method) do
+          {:ok, updated_user} = result ->
+            Ysc.Payments.push_default_payment_method_to_stripe(
+              updated_user,
+              payment_method
+            )
+
+            result
+
+          error ->
+            error
+        end
+    end
   end
 
   @doc """

@@ -3,6 +3,8 @@ defmodule Ysc.Payments do
   The Payments context for managing payment methods and related operations.
   """
 
+  require Ysc.Logging
+
   import Ecto.Query, warn: false
 
   alias Ysc.Ci.QueryExplain.Fixtures
@@ -42,6 +44,14 @@ defmodule Ysc.Payments do
   Gets a single payment method by id.
   """
   def get_payment_method!(id), do: Repo.get!(PaymentMethod, id)
+
+  @doc """
+  Gets a payment method by id when it belongs to the given user.
+  Returns `nil` when the id is missing or owned by someone else.
+  """
+  def get_user_payment_method(user, id) do
+    Repo.get_by(PaymentMethod, id: id, user_id: user.id)
+  end
 
   @doc """
   Gets the default payment method for a user.
@@ -171,7 +181,14 @@ defmodule Ysc.Payments do
     case upsert_payment_method_from_stripe(user, stripe_payment_method) do
       {:ok, payment_method} ->
         # Always set this payment method as default (replacing any existing default)
-        set_default_payment_method(user, payment_method)
+        case set_default_payment_method(user, payment_method) do
+          {:ok, updated_user} = result ->
+            push_default_payment_method_to_stripe(updated_user, payment_method)
+            result
+
+          error ->
+            error
+        end
 
       error ->
         error
@@ -183,8 +200,21 @@ defmodule Ysc.Payments do
   This will unset any existing default payment method and set the new one.
   """
   def set_default_payment_method(user, payment_method) do
-    require Ysc.Logging
+    if payment_method.user_id != user.id do
+      Ysc.Logging.error(
+        "Refusing to set default payment method owned by a different user",
+        user_id: user.id,
+        payment_method_id: payment_method.id,
+        payment_method_owner_id: payment_method.user_id
+      )
 
+      {:error, :payment_method_not_owned_by_user}
+    else
+      do_set_default_payment_method(user, payment_method)
+    end
+  end
+
+  defp do_set_default_payment_method(user, payment_method) do
     Ysc.Logging.info("Starting set_default_payment_method transaction",
       user_id: user.id,
       payment_method_id: payment_method.id,
@@ -208,9 +238,11 @@ defmodule Ysc.Payments do
            # A changeset-based update would be a no-op when the in-memory struct
            # already has is_default: true (Ecto detects "no change"), but the DB
            # record was just unset in the step above, so we must force the SQL.
+           # Scope by user_id as well so a foreign payment method can never
+           # become default even if the ownership guard above is bypassed.
            {1, [updated_payment_method]} =
              from(pm in PaymentMethod,
-               where: pm.id == ^payment_method.id,
+               where: pm.id == ^payment_method.id and pm.user_id == ^user.id,
                select: pm
              )
              |> Repo.update_all(set: [is_default: true])
@@ -244,12 +276,51 @@ defmodule Ysc.Payments do
   end
 
   @doc """
+  Pushes a user's local default payment method to Stripe so the Customer's
+  `invoice_settings.default_payment_method` matches what we show in the app.
+
+  Call this whenever a payment method is set as default from a user action
+  (e.g. adding a card during checkout, or picking one in account settings).
+  Without this, Stripe keeps using whatever payment method was on file when
+  a subscription was originally created — including a card that has since
+  been declined — so future automatic charges (renewals, retries) silently
+  keep hitting the old, dead payment method even though the app shows a new
+  default. This is best-effort: failures are logged, not raised, since the
+  local default is already the source of truth for the app's own UI.
+  """
+  def push_default_payment_method_to_stripe(user, payment_method) do
+    if user.stripe_id do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_customer_module().update(user.stripe_id, %{
+               invoice_settings: %{
+                 default_payment_method: payment_method.provider_id
+               }
+             })
+           end) do
+        {:ok, _customer} ->
+          :ok
+
+        {:error, error} ->
+          Ysc.Logging.error(
+            "Failed to push default payment method to Stripe customer",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_customer_id: user.stripe_id,
+            error: inspect(error)
+          )
+
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  @doc """
   Manually syncs payment methods with Stripe for a user.
   This can be called to ensure the local database is in sync with Stripe.
   """
   def sync_payment_methods_with_stripe(user) do
-    require Ysc.Logging
-
     # Get all payment methods from Stripe
     stripe_payment_methods =
       case Ysc.Stripe.RetryHelper.stripe_retry(fn ->

@@ -84,6 +84,61 @@ defmodule Ysc.SubscriptionsActivationTest do
                )
     end
 
+    test "retries an incomplete subscription with the saved payment method" do
+      user = user_with_default_pm()
+      stripe_sub_id = "sub_incomplete_#{System.unique_integer([:positive])}"
+      invoice_id = "in_act_retry_#{System.unique_integer([:positive])}"
+
+      {:ok, _incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          name: "Incomplete",
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          user_id: user.id,
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      default_pm = Payments.get_default_payment_method(user)
+
+      expect(Stripe.SubscriptionMock, :update, fn ^stripe_sub_id, params ->
+        assert params[:default_payment_method] == default_pm.provider_id
+
+        {:ok,
+         %Stripe.Subscription{
+           id: stripe_sub_id,
+           status: "incomplete",
+           latest_invoice: %Stripe.Invoice{id: invoice_id}
+         }}
+      end)
+
+      expect(Stripe.InvoiceMock, :pay, fn ^invoice_id, params ->
+        assert params[:payment_method] == default_pm.provider_id
+        {:ok, %Stripe.Invoice{id: invoice_id, status: "paid"}}
+      end)
+
+      expect(Stripe.SubscriptionMock, :retrieve, fn ^stripe_sub_id ->
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "active"
+         )}
+      end)
+
+      assert {:ok, :activated} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 membership_type: :single,
+                 return_url: "http://localhost/finalize"
+               )
+
+      # Local status is synced by Stripe webhooks; the critical outcome is that
+      # activation entered the incomplete-subscription retry path instead of
+      # short-circuiting to :already_active.
+      assert %Subscriptions.Subscription{stripe_id: ^stripe_sub_id} =
+               Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+    end
+
     test "creates stripe subscription and persists locally" do
       user = user_with_default_pm()
       stripe_sub_id = "sub_new_#{System.unique_integer([:positive])}"
