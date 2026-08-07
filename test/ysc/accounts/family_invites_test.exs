@@ -1514,6 +1514,148 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
     end
   end
 
+  describe "create_invite/3 additional validation and family member branches" do
+    test "returns a changeset error when the email format is invalid" do
+      primary_user = create_user_with_lifetime_membership()
+
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               FamilyInvites.create_invite(primary_user, "not-an-email")
+
+      assert Keyword.has_key?(changeset.errors, :email)
+    end
+
+    test "family_member_name is nil when family_member_id does not match any family member" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _invite} =
+                 FamilyInvites.create_invite(primary_user, email,
+                   family_member_id: Ecto.ULID.generate()
+                 )
+
+        assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.args["params"]["family_member_name"] == nil
+      end)
+    end
+
+    test "resolves the family member name from an already-preloaded primary user" do
+      primary_user = create_user_with_lifetime_membership()
+
+      family_member =
+        %FamilyMember{}
+        |> FamilyMember.family_member_changeset(%{
+          first_name: "Robin",
+          last_name: "Hood",
+          type: "child"
+        })
+        |> Ecto.Changeset.put_change(:user_id, primary_user.id)
+        |> Repo.insert!()
+
+      primary_user_with_preload =
+        Accounts.get_user!(primary_user.id, [:family_members])
+
+      email = unique_user_email()
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _invite} =
+                 FamilyInvites.create_invite(
+                   primary_user_with_preload,
+                   email,
+                   family_member_id: family_member.id
+                 )
+
+        assert [job] = all_enqueued(worker: YscWeb.Workers.EmailNotifier)
+        assert job.args["params"]["family_member_name"] == "Robin Hood"
+      end)
+    end
+  end
+
+  describe "accept_invite/2 rolls back on invalid sub-account data" do
+    test "returns a changeset error and does not mark the invite accepted when password is too short" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      assert {:error, %Ecto.Changeset{}} =
+               FamilyInvites.accept_invite(invite.token, %{
+                 email: email,
+                 password: "short",
+                 first_name: "Sub",
+                 last_name: "User",
+                 phone_number: "+14159098268",
+                 date_of_birth: ~D[1990-01-01]
+               })
+
+      assert is_nil(Repo.get!(FamilyInvite, invite.id).accepted_at)
+    end
+  end
+
+  describe "link_existing_user/2 invite lookup" do
+    test "returns invite_not_found for an unknown token" do
+      user = user_fixture()
+
+      assert {:error, :invite_not_found} =
+               FamilyInvites.link_existing_user("does-not-exist-token", user)
+    end
+  end
+
+  describe "revoke_invite/2 loads primary user first_name when missing" do
+    test "revokes successfully when the passed-in primary_user struct has no first_name loaded" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      stale_primary_user = %{primary_user | first_name: nil}
+
+      assert {:ok, deleted_invite} =
+               FamilyInvites.revoke_invite(invite.id, stale_primary_user)
+
+      assert deleted_invite.id == invite.id
+    end
+  end
+
+  describe "notify_invite_accepted/2 subject and name formatting" do
+    test "uses first name only in email content when accepted user has no last name" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      accepted_user = user_fixture(%{email: email, first_name: "Solo"})
+      accepted_user = %{accepted_user | last_name: nil}
+
+      assert %Oban.Job{args: args} =
+               FamilyInvites.notify_invite_accepted(invite, accepted_user)
+
+      assert args["subject"] == "Solo Accepted Your Family Invitation - YSC"
+      assert args["params"]["invitee_name"] == "Solo"
+    end
+
+    test "falls back to generic subject and email address when accepted user has no first name" do
+      primary_user = create_user_with_lifetime_membership()
+      email = unique_user_email()
+      {:ok, invite} = FamilyInvites.create_invite(primary_user, email)
+
+      accepted_user = user_fixture(%{email: email})
+      nameless_user = %{accepted_user | first_name: nil, last_name: nil}
+
+      assert %Oban.Job{args: args} =
+               FamilyInvites.notify_invite_accepted(invite, nameless_user)
+
+      assert args["subject"] == "Family Invitation Accepted - YSC"
+      assert is_nil(args["params"]["invitee_name"])
+      assert args["params"]["invitee_email"] == nameless_user.email
+    end
+  end
+
+  describe "ci_query_explain_query/0" do
+    test "returns a valid Ecto query usable for query-explain tooling" do
+      assert %Ecto.Query{} = FamilyInvites.ci_query_explain_query()
+    end
+  end
+
   defp warm_primary_family_caches(primary_user) do
     UserProfileCache.get_user!(primary_user.id, [])
     UserProfileCache.get_user!(primary_user.id, [:sub_accounts])

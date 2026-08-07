@@ -1682,8 +1682,14 @@ defmodule Ysc.Subscriptions do
   @doc """
   Creates a local subscription from a Stripe subscription.
   This is used as a backup when webhooks might not be reliable.
+
+  ## Options
+
+    * `:payment_method_type` - when `:bank_account` and Stripe status is
+      `"incomplete"` (ACH still processing), persist local status as `"active"`
+      so membership access is granted immediately.
   """
-  def create_subscription_from_stripe(user, stripe_subscription) do
+  def create_subscription_from_stripe(user, stripe_subscription, opts \\ []) do
     require Ysc.Logging
 
     # Check if subscription already exists
@@ -1696,8 +1702,19 @@ defmodule Ysc.Subscriptions do
         stripe_subscription_id: stripe_subscription.id
       )
 
-      {:ok, existing}
+      maybe_activate_existing_incomplete_bank_subscription(
+        user,
+        existing,
+        stripe_subscription,
+        opts
+      )
     else
+      stripe_status =
+        local_stripe_status_for_persist(
+          stripe_subscription.status,
+          Keyword.get(opts, :payment_method_type)
+        )
+
       # Create the subscription
       subscription_changeset =
         user
@@ -1707,7 +1724,7 @@ defmodule Ysc.Subscriptions do
           # Default name for membership subscriptions
           name: "Membership Subscription",
           stripe_id: stripe_subscription.id,
-          stripe_status: stripe_subscription.status,
+          stripe_status: stripe_status,
           start_date:
             stripe_subscription.start_date &&
               DateTime.from_unix!(stripe_subscription.start_date),
@@ -1775,6 +1792,35 @@ defmodule Ysc.Subscriptions do
 
           {:error, reason}
       end
+    end
+  end
+
+  # When a prior attempt left an incomplete local row and ACH is still processing
+  # on Stripe, flip the local status to active so membership access is granted.
+  defp maybe_activate_existing_incomplete_bank_subscription(
+         user,
+         existing,
+         stripe_subscription,
+         opts
+       ) do
+    payment_method_type = Keyword.get(opts, :payment_method_type)
+
+    if stripe_subscription.status == "incomplete" and
+         payment_method_type == :bank_account and
+         existing.stripe_status != "active" do
+      case existing
+           |> Subscription.changeset(%{stripe_status: "active"})
+           |> Repo.update() do
+        {:ok, updated} ->
+          invalidate_membership_caches(user.id)
+          broadcast_membership_updated(user.id)
+          {:ok, updated}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    else
+      {:ok, existing}
     end
   end
 
@@ -2091,7 +2137,9 @@ defmodule Ysc.Subscriptions do
            expand: ["latest_invoice"]
          ) do
       {:ok, stripe_subscription} ->
-        case create_subscription_from_stripe(user, stripe_subscription) do
+        case create_subscription_from_stripe(user, stripe_subscription,
+               payment_method_type: default_pm.type
+             ) do
           {:ok, _} ->
             invalidate_activation_membership_caches(user)
             {:ok, :activated}
@@ -2122,6 +2170,14 @@ defmodule Ysc.Subscriptions do
         {:error, reason}
     end
   end
+
+  # ACH Direct Debit can leave the Stripe subscription incomplete while the
+  # PaymentIntent is processing (days). Grant local access immediately so the
+  # member is not blocked until settlement.
+  defp local_stripe_status_for_persist("incomplete", :bank_account),
+    do: "active"
+
+  defp local_stripe_status_for_persist(status, _payment_method_type), do: status
 
   defp invalidate_activation_membership_caches(user) do
     _ = MembershipCache.invalidate_user(user.id)

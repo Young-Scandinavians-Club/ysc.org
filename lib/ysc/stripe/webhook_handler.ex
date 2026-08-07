@@ -866,18 +866,19 @@ defmodule Ysc.Stripe.WebhookHandler do
         # overwrite existing values with nil, or active?/1 will incorrectly return false
         # (nil current_period_end is treated as inactive), causing "no membership" for users.
         #
-        # CRITICAL: Don't downgrade an active subscription to "incomplete" during upgrade
-        # transitions. When upgrading (e.g. Single → Family), Stripe creates a proration
-        # invoice and briefly marks the subscription as "incomplete" until payment settles.
-        # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth (which
-        # filters by stripe_status IN ('active','trialing')) will find nothing and the user
-        # will see a "No membership" banner until the follow-up "active" webhook arrives.
-        # We still update subscription items so the plan change is reflected immediately.
+        # CRITICAL: Don't downgrade an active subscription to "incomplete".
+        # This covers (1) upgrade proration invoices and (2) ACH Direct Debit while
+        # the PaymentIntent is still processing — we may have persisted local status
+        # as active on activate so the member has access before settlement.
+        # If we save "incomplete" to the DB, preload_active_subscriptions_for_auth
+        # (which filters by stripe_status IN ('active','trialing')) will find nothing
+        # and the user will see a "No membership" banner until the follow-up "active"
+        # webhook arrives. We still update subscription items so plan changes apply.
         attrs =
           if event.status == "incomplete" and
                subscription.stripe_status in ["active", "trialing"] do
             Ysc.Logging.debug(
-              "Skipping incomplete status for active subscription during upgrade transition",
+              "Skipping incomplete status for active subscription (upgrade or ACH processing)",
               subscription_id: subscription.id,
               stripe_subscription_id: event.id,
               current_stripe_status: subscription.stripe_status

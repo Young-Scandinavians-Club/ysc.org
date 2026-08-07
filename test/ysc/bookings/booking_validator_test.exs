@@ -17,7 +17,7 @@ defmodule Ysc.Bookings.BookingValidatorTest do
   import Ysc.AccountsFixtures
 
   alias Ysc.Bookings
-  alias Ysc.Bookings.{Booking, Season, Room}
+  alias Ysc.Bookings.{Booking, BookingValidator, Season, Room}
   alias Ysc.Subscriptions
   alias Ysc.Repo
 
@@ -1636,6 +1636,271 @@ defmodule Ysc.Bookings.BookingValidatorTest do
 
       # Should pass because validation is skipped
       assert changeset.valid?
+    end
+  end
+
+  describe "BookingValidator.validate/2 called directly on defensive/fallback branches" do
+    test "tahoe booking without checkin_date or booking_mode skips date- and mode-dependent checks",
+         %{user: user} do
+      changeset =
+        %Booking{}
+        |> Ecto.Changeset.cast(
+          %{user_id: user.id, property: :tahoe},
+          [:user_id, :property, :checkin_date, :checkout_date, :booking_mode]
+        )
+
+      result = BookingValidator.validate(changeset, user: user)
+
+      refute Keyword.has_key?(result.errors, :checkout_date)
+      refute Keyword.has_key?(result.errors, :booking_mode)
+    end
+
+    test "resolves the user from the changeset's user_id when no :user option is given, even for a nonexistent user",
+         %{user: _user} do
+      changeset =
+        %Booking{}
+        |> Ecto.Changeset.cast(
+          %{
+            user_id: Ecto.ULID.generate(),
+            property: :tahoe,
+            checkin_date: ~D[2024-07-08],
+            checkout_date: ~D[2024-07-10],
+            booking_mode: :room
+          },
+          [:user_id, :property, :checkin_date, :checkout_date, :booking_mode]
+        )
+
+      result = BookingValidator.validate(changeset, [])
+
+      refute Keyword.has_key?(result.errors, :user_id)
+      refute Keyword.has_key?(result.errors, :booking_mode)
+    end
+
+    test "buyout with a nil checkout_date falls back to Season.buyout_allowed_on_date?/2",
+         %{user: user} do
+      changeset =
+        %Booking{}
+        |> Ecto.Changeset.cast(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-07-08],
+            booking_mode: :buyout
+          },
+          [:user_id, :property, :checkin_date, :checkout_date, :booking_mode]
+        )
+
+      result = BookingValidator.validate(changeset, user: user)
+
+      refute Keyword.has_key?(result.errors, :booking_mode)
+    end
+
+    test "a booking without a property skips the advance-booking-limit check",
+         %{user: user} do
+      changeset =
+        %Booking{}
+        |> Ecto.Changeset.cast(
+          %{
+            user_id: user.id,
+            checkin_date: ~D[2024-07-08],
+            checkout_date: ~D[2024-07-10]
+          },
+          [:user_id, :property, :checkin_date, :checkout_date, :booking_mode]
+        )
+
+      result = BookingValidator.validate(changeset, user: user)
+
+      refute Keyword.has_key?(result.errors, :checkin_date)
+    end
+  end
+
+  describe "editing an existing booking excludes itself from overlap/limit checks" do
+    test "single member editing their own room booking stays valid", %{
+      user: user,
+      rooms: rooms
+    } do
+      user = create_subscription(user, :single)
+
+      {:ok, booking} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-08-05],
+            checkout_date: ~D[2024-08-07],
+            booking_mode: :room,
+            guests_count: 2,
+            status: :complete,
+            total_price: Money.new(400, :USD)
+          },
+          rooms: [rooms.tahoe_room1],
+          user: user,
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      changeset =
+        Booking.changeset(
+          booking,
+          %{checkin_date: ~D[2024-08-05], checkout_date: ~D[2024-08-07]},
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
+
+      assert changeset.valid?
+    end
+
+    test "family member editing their own buyout booking stays valid", %{
+      user: user
+    } do
+      user = create_subscription(user, :family)
+
+      {:ok, booking} =
+        %Booking{}
+        |> Booking.changeset(
+          %{
+            user_id: user.id,
+            property: :tahoe,
+            checkin_date: ~D[2024-08-05],
+            checkout_date: ~D[2024-08-07],
+            booking_mode: :buyout,
+            guests_count: 10,
+            status: :complete,
+            total_price: Money.new(2000, :USD)
+          },
+          user: user,
+          skip_validation: true
+        )
+        |> Repo.insert()
+
+      booking = Repo.preload(booking, :rooms)
+
+      changeset =
+        Booking.changeset(
+          booking,
+          %{checkin_date: ~D[2024-08-05], checkout_date: ~D[2024-08-07]},
+          user: user
+        )
+
+      assert changeset.valid?
+    end
+  end
+
+  describe "membership type resolution fallback branches" do
+    test "a user struct with a nil (not NotLoaded) subscriptions field is treated as having none",
+         %{user: user, rooms: rooms} do
+      user = create_subscription(user, :single)
+      user_with_nil_subs = %{user | subscriptions: nil}
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2024-08-05],
+        checkout_date: ~D[2024-08-07],
+        booking_mode: :room,
+        guests_count: 4,
+        total_price: Money.new(800, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1, rooms.tahoe_room2],
+          user: user_with_nil_subs
+        )
+
+      # :none / :single allow 1 room; two rooms would pass only for :family
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
+    end
+
+    test "membership type falls back to :none when the subscription's price id matches no configured plan",
+         %{user: user, rooms: rooms} do
+      {:ok, subscription} =
+        %Subscriptions.Subscription{}
+        |> Subscriptions.Subscription.changeset(%{
+          user_id: user.id,
+          name: "Mystery Membership",
+          stripe_id: "sub_mystery_#{System.unique_integer()}",
+          stripe_status: "active",
+          current_period_start:
+            DateTime.utc_now() |> DateTime.add(-2_592_000, :second),
+          current_period_end:
+            DateTime.utc_now() |> DateTime.add(28_944_000, :second)
+        })
+        |> Repo.insert()
+
+      {:ok, _item} =
+        %Subscriptions.SubscriptionItem{}
+        |> Subscriptions.SubscriptionItem.changeset(%{
+          subscription_id: subscription.id,
+          stripe_id: "si_mystery_#{System.unique_integer()}",
+          stripe_product_id: "prod_mystery",
+          stripe_price_id: "price_mystery_unmatched",
+          quantity: 1
+        })
+        |> Repo.insert()
+
+      user =
+        Repo.get(Ysc.Accounts.User, user.id) |> Repo.preload(:subscriptions)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2024-08-05],
+        checkout_date: ~D[2024-08-07],
+        booking_mode: :room,
+        guests_count: 4,
+        total_price: Money.new(800, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1, rooms.tahoe_room2],
+          user: user
+        )
+
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
+    end
+
+    test "membership type falls back to :none when the active subscription has no subscription items",
+         %{user: user, rooms: rooms} do
+      {:ok, _subscription} =
+        %Subscriptions.Subscription{}
+        |> Subscriptions.Subscription.changeset(%{
+          user_id: user.id,
+          name: "No Items Membership",
+          stripe_id: "sub_no_items_#{System.unique_integer()}",
+          stripe_status: "active",
+          current_period_start:
+            DateTime.utc_now() |> DateTime.add(-2_592_000, :second),
+          current_period_end:
+            DateTime.utc_now() |> DateTime.add(28_944_000, :second)
+        })
+        |> Repo.insert()
+
+      user =
+        Repo.get(Ysc.Accounts.User, user.id) |> Repo.preload(:subscriptions)
+
+      attrs = %{
+        user_id: user.id,
+        property: :tahoe,
+        checkin_date: ~D[2024-08-05],
+        checkout_date: ~D[2024-08-07],
+        booking_mode: :room,
+        guests_count: 4,
+        total_price: Money.new(800, :USD)
+      }
+
+      changeset =
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1, rooms.tahoe_room2],
+          user: user
+        )
+
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
     end
   end
 end

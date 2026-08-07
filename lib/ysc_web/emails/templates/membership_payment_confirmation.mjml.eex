@@ -10,7 +10,7 @@
   <mj-column padding="0">
     <mj-spacer height="24px"></mj-spacer>
     <mj-text color="#000000" font-size="32px" line-height="1.25" padding="0px">
-      <strong>Welcome to YSC! 🎉</strong>
+      <strong>Payment Receipt</strong>
     </mj-text>
   </mj-column>
 </mj-section>
@@ -31,14 +31,14 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px" style="background-color: #DCFCE7; padding: 16px; border-radius: 6px; border-left: 4px solid #166534;">
       <%= if @paid_elsewhere do %>
-        <strong>Thank you for joining!</strong> Your <%= @membership_type %> membership is now active. We've recorded your payment of <strong><%= @amount %></strong> (received in person) as of <%= @payment_date %>.
+        <strong>Payment recorded.</strong> We've recorded your payment of <strong><%= @amount %></strong> for your <%= @membership_type %> membership (received in person) as of <%= @payment_date %>.
       <% else %>
-        <strong>Thank you for joining!</strong> We've received your payment of <strong><%= @amount %></strong> and your <%= @membership_type %> membership is now active as of <%= @payment_date %>.
+        <strong>Payment received.</strong> We've received your payment of <strong><%= @amount %></strong> for your <%= @membership_type %> membership as of <%= @payment_date %>.
       <% end %>
     </mj-text>
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">
-      As a member of the Young Scandinavians Club, you now have access to:
+      As a member of the Young Scandinavians Club, you have access to:
     </mj-text>
     <mj-text font-size="18px" align="left" line-height="1.5">
       <ul>

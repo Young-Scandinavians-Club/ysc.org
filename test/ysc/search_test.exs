@@ -127,4 +127,22 @@ defmodule Ysc.SearchTest do
       assert Map.has_key?(result, :bookings)
     end
   end
+
+  describe "ci_query_explain_* query builders" do
+    test "ci_query_explain_events_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Search.ci_query_explain_events_query()
+    end
+
+    test "ci_query_explain_tickets_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Search.ci_query_explain_tickets_query()
+    end
+
+    test "ci_query_explain_users_query/0 builds an Ecto.Query" do
+      assert %Ecto.Query{} = Search.ci_query_explain_users_query()
+    end
+
+    test "ci_query_explain_query/0 delegates to the events query builder" do
+      assert %Ecto.Query{} = Search.ci_query_explain_query()
+    end
+  end
 end

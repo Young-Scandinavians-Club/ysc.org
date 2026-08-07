@@ -603,5 +603,27 @@ defmodule YscWeb.Workers.UserExporterTest do
       assert row["primary_user_email"] == primary.email
       assert row["primary_user_id"] == to_string(primary.id)
     end
+
+    test "renewal date is empty when an active subscription has no current_period_end",
+         %{channel: channel} do
+      user = user_fixture()
+
+      {:ok, _sub} =
+        Subscriptions.create_subscription(%{
+          name: "No Renewal Date Subscription",
+          stripe_id: "sub_no_renewal_#{System.unique_integer([:positive])}",
+          stripe_status: "active",
+          user_id: user.id,
+          current_period_end: nil
+        })
+
+      path = run_export(channel, oban_job(channel, ["id"], false))
+      rows = parse_csv(path)
+      row = require_csv_row!(rows, user.id)
+
+      assert Map.get(row, "membership_renewal_date") in [nil, ""]
+      assert Map.get(row, "membership_renewal_time") in [nil, ""]
+      assert Map.get(row, "membership_renewal_tz") in [nil, ""]
+    end
   end
 end

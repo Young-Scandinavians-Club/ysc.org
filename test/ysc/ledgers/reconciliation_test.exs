@@ -3197,4 +3197,199 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert report.checks.orphaned_entries.orphaned_entries_count > 0
     end
   end
+
+  describe "run_full_reconciliation/0 with entity and payout mismatches (log + format_report coverage)" do
+    test "reports mismatches for every entity type and a payout discrepancy, and format_report renders them",
+         %{user: user} do
+      # Membership mismatch: extra unbalanced revenue credit
+      {:ok, {membership_payment, _t, _e}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(10_000, :USD),
+          external_provider: :stripe,
+          external_payment_id:
+            "pi_full_mismatch_membership_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(300, :USD),
+          description: "Membership mismatch",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      membership_revenue = Ledgers.get_account_by_name("membership_revenue")
+
+      Repo.insert!(%LedgerEntry{
+        account_id: membership_revenue.id,
+        amount: Money.new(1_000, :USD),
+        description: "Extra membership revenue",
+        payment_id: membership_payment.id,
+        related_entity_type: :membership,
+        debit_credit: :credit
+      })
+
+      # Booking mismatch
+      {:ok, {booking_payment, _t2, _e2}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(15_000, :USD),
+          external_payment_id:
+            "pi_full_mismatch_booking_#{System.unique_integer()}",
+          entity_type: :booking,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(450, :USD),
+          description: "Booking mismatch",
+          property: :tahoe,
+          payment_method_id: nil
+        })
+
+      tahoe_revenue = Ledgers.get_account_by_name("tahoe_booking_revenue")
+
+      Repo.insert!(%LedgerEntry{
+        account_id: tahoe_revenue.id,
+        amount: Money.new(1_000, :USD),
+        description: "Extra booking revenue",
+        payment_id: booking_payment.id,
+        related_entity_type: :booking,
+        debit_credit: :credit
+      })
+
+      # Event mismatch
+      {:ok, {event_payment, _t3, _e3}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(5_000, :USD),
+          external_payment_id:
+            "pi_full_mismatch_event_#{System.unique_integer()}",
+          entity_type: :event,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(150, :USD),
+          description: "Event mismatch",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      event_revenue = Ledgers.get_account_by_name("event_revenue")
+
+      Repo.insert!(%LedgerEntry{
+        account_id: event_revenue.id,
+        amount: Money.new(1_000, :USD),
+        description: "Extra event revenue",
+        payment_id: event_payment.id,
+        related_entity_type: :event,
+        debit_credit: :credit
+      })
+
+      # Donation mismatch
+      {:ok, {_donation_payment, _t4, _e4}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(5_000, :USD),
+          external_payment_id:
+            "pi_full_mismatch_donation_#{System.unique_integer()}",
+          entity_type: :donation,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(150, :USD),
+          description: "Donation mismatch",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      donation_revenue = Ledgers.get_account_by_name("donation_revenue")
+
+      # No payment_id: reconcile_donation_payments' payments_total requires an
+      # inner join to Payment, so an entry with no linked payment inflates
+      # ledger_total (a plain sum) without inflating payments_total, causing
+      # a deliberate mismatch.
+      Repo.insert!(%LedgerEntry{
+        account_id: donation_revenue.id,
+        amount: Money.new(1_000, :USD),
+        description: "Extra unlinked donation revenue",
+        payment_id: nil,
+        related_entity_type: :donation,
+        debit_credit: :credit
+      })
+
+      # Payout discrepancy: understated fee_total
+      {:ok, {payout_payment, _t5, _e5}} =
+        Ledgers.process_payment(%{
+          user_id: user.id,
+          amount: Money.new(:USD, "135.00"),
+          external_provider: :stripe,
+          external_payment_id:
+            "pi_full_mismatch_payout_#{System.unique_integer()}",
+          payment_date: DateTime.truncate(DateTime.utc_now(), :second),
+          entity_type: :membership,
+          entity_id: Ecto.ULID.generate(),
+          stripe_fee: Money.new(:USD, "4.83"),
+          description: "Charge in mismatched payout",
+          property: :general,
+          payment_method_id: nil
+        })
+
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(:USD, "129.22"),
+                 stripe_payout_id:
+                   "po_full_mismatch_#{System.unique_integer()}",
+                 description:
+                   "Understated fees for full reconciliation log test",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(:USD, "4.83")
+               })
+
+      assert {:ok, _} = Ledgers.link_payment_to_payout(payout, payout_payment)
+
+      assert {:ok, report} = Reconciliation.run_full_reconciliation()
+
+      assert report.overall_status == :error
+      assert report.checks.entity_totals.status == :error
+      assert report.checks.entity_totals.memberships.match == false
+      assert report.checks.entity_totals.bookings.match == false
+      assert report.checks.entity_totals.events.match == false
+      assert report.checks.entity_totals.donations.match == false
+      assert report.checks.payouts.discrepancies_count > 0
+
+      formatted = Reconciliation.format_report(report)
+      assert formatted =~ "❌ FAIL"
+      assert formatted =~ "Memberships ledger:"
+      assert formatted =~ "Bookings ledger:"
+      assert formatted =~ "Events ledger:"
+      assert formatted =~ "Donations ledger:"
+      assert formatted =~ payout.stripe_payout_id
+    end
+  end
+
+  describe "stripe_account!/0 error handling" do
+    test "raises when the stripe_account ledger account is missing" do
+      stripe_account = Ledgers.get_account_by_name("stripe_account")
+      Repo.delete!(stripe_account)
+
+      assert_raise RuntimeError, "stripe_account not found", fn ->
+        Reconciliation.reconcile_entity_totals()
+      end
+    end
+  end
+
+  describe "reconcile_payouts/0 with no linked payments" do
+    test "handles a payout with zero linked payments without error" do
+      assert {:ok, {_pp, _ptx, _entries, payout}} =
+               Ledgers.process_stripe_payout(%{
+                 payout_amount: Money.new(0, :USD),
+                 stripe_payout_id: "po_no_payments_#{System.unique_integer()}",
+                 description: "Payout with no linked payments",
+                 currency: "usd",
+                 status: "paid",
+                 fee_total: Money.new(0, :USD)
+               })
+
+      report = Reconciliation.reconcile_payouts()
+
+      refute Enum.any?(report.discrepancies, fn disc ->
+               disc.stripe_payout_id == payout.stripe_payout_id
+             end)
+    end
+  end
 end

@@ -87,6 +87,56 @@ defmodule YscWeb.PaymentMethodLogoTest do
       assert PaymentMethodLogo.path_for_payment_method(%{type: :bank_account}) ==
                nil
     end
+
+    test "returns nil for card type with a nil display_brand" do
+      assert PaymentMethodLogo.path_for_payment_method(%{
+               type: :card,
+               display_brand: nil
+             }) == nil
+    end
+
+    test "returns remaining alternative payment logos" do
+      assert PaymentMethodLogo.path_for_payment_method(%{type: :klarna}) ==
+               "/images/cards/klarna.svg"
+
+      assert PaymentMethodLogo.path_for_payment_method(%{type: :amazon_pay}) ==
+               "/images/cards/amazon.svg"
+
+      assert PaymentMethodLogo.path_for_payment_method(%{type: :affirm}) ==
+               "/images/cards/affirm.svg"
+
+      assert PaymentMethodLogo.path_for_payment_method(%{type: :google_pay}) ==
+               "/images/cards/google.svg"
+    end
+
+    test "returns remaining card brand aliases" do
+      assert PaymentMethodLogo.path_for_payment_method(%{
+               type: :card,
+               display_brand: "mc"
+             }) == "/images/cards/mc.svg"
+
+      assert PaymentMethodLogo.path_for_payment_method(%{
+               type: :card,
+               display_brand: "amex"
+             }) == "/images/cards/amex.svg"
+
+      assert PaymentMethodLogo.path_for_payment_method(%{
+               type: :card,
+               display_brand: "diners"
+             }) == "/images/cards/diners.svg"
+
+      assert PaymentMethodLogo.path_for_payment_method(%{
+               type: :card,
+               display_brand: "unionpay"
+             }) == "/images/cards/unionpay.svg"
+    end
+
+    test "returns nil for unrecognized card brands" do
+      assert PaymentMethodLogo.path_for_payment_method(%{
+               type: :card,
+               display_brand: "some_unknown_brand"
+             }) == nil
+    end
   end
 
   describe "path_for_stripe_summary/2" do
@@ -120,6 +170,23 @@ defmodule YscWeb.PaymentMethodLogoTest do
 
     test "returns nil for unknown stripe summary types" do
       assert PaymentMethodLogo.path_for_stripe_summary(:other, nil) == nil
+    end
+
+    test "returns remaining alternative payment logos for stripe summary types" do
+      assert PaymentMethodLogo.path_for_stripe_summary(:cashapp, nil) ==
+               "/images/cards/cashapp.svg"
+
+      assert PaymentMethodLogo.path_for_stripe_summary(:paypal, nil) ==
+               "/images/cards/paypal.svg"
+
+      assert PaymentMethodLogo.path_for_stripe_summary(:amazon_pay, nil) ==
+               "/images/cards/amazon.svg"
+
+      assert PaymentMethodLogo.path_for_stripe_summary(:affirm, nil) ==
+               "/images/cards/affirm.svg"
+
+      assert PaymentMethodLogo.path_for_stripe_summary(:apple_pay, nil) ==
+               "/images/cards/apple.svg"
     end
   end
 end
