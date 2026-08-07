@@ -1695,7 +1695,8 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       refute Keyword.has_key?(result.errors, :booking_mode)
     end
 
-    test "a booking without a property skips the advance-booking-limit check", %{user: user} do
+    test "a booking without a property skips the advance-booking-limit check",
+         %{user: user} do
       changeset =
         %Booking{}
         |> Ecto.Changeset.cast(
@@ -1750,7 +1751,9 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       assert changeset.valid?
     end
 
-    test "family member editing their own buyout booking stays valid", %{user: user} do
+    test "family member editing their own buyout booking stays valid", %{
+      user: user
+    } do
       user = create_subscription(user, :family)
 
       {:ok, booking} =
@@ -1820,7 +1823,8 @@ defmodule Ysc.Bookings.BookingValidatorTest do
           stripe_status: "active",
           current_period_start:
             DateTime.utc_now() |> DateTime.add(-2_592_000, :second),
-          current_period_end: DateTime.utc_now() |> DateTime.add(28_944_000, :second)
+          current_period_end:
+            DateTime.utc_now() |> DateTime.add(28_944_000, :second)
         })
         |> Repo.insert()
 
@@ -1835,7 +1839,8 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         })
         |> Repo.insert()
 
-      user = Repo.get(Ysc.Accounts.User, user.id) |> Repo.preload(:subscriptions)
+      user =
+        Repo.get(Ysc.Accounts.User, user.id) |> Repo.preload(:subscriptions)
 
       attrs = %{
         user_id: user.id,
@@ -1848,7 +1853,10 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       }
 
       changeset =
-        Booking.changeset(%Booking{}, attrs, rooms: [rooms.tahoe_room1], user: user)
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
 
       assert changeset.valid?
     end
@@ -1864,11 +1872,13 @@ defmodule Ysc.Bookings.BookingValidatorTest do
           stripe_status: "active",
           current_period_start:
             DateTime.utc_now() |> DateTime.add(-2_592_000, :second),
-          current_period_end: DateTime.utc_now() |> DateTime.add(28_944_000, :second)
+          current_period_end:
+            DateTime.utc_now() |> DateTime.add(28_944_000, :second)
         })
         |> Repo.insert()
 
-      user = Repo.get(Ysc.Accounts.User, user.id) |> Repo.preload(:subscriptions)
+      user =
+        Repo.get(Ysc.Accounts.User, user.id) |> Repo.preload(:subscriptions)
 
       attrs = %{
         user_id: user.id,
@@ -1881,7 +1891,10 @@ defmodule Ysc.Bookings.BookingValidatorTest do
       }
 
       changeset =
-        Booking.changeset(%Booking{}, attrs, rooms: [rooms.tahoe_room1], user: user)
+        Booking.changeset(%Booking{}, attrs,
+          rooms: [rooms.tahoe_room1],
+          user: user
+        )
 
       assert changeset.valid?
     end

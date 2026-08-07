@@ -713,6 +713,9 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       html = MembershipPaymentFailure.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
+      # Body copy is left-aligned like other membership emails (not centered).
+      assert html =~ ~s(align="left")
+      refute html =~ ~r/<td[^>]*align="center"[^>]*>\s*Hej/
 
       assert MembershipPaymentFailure.get_template_name() ==
                "membership_payment_failure"
@@ -730,6 +733,7 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       html = MembershipPaymentConfirmation.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
+      assert html =~ "Payment Receipt"
 
       assert MembershipPaymentConfirmation.get_template_name() ==
                "membership_payment_confirmation"

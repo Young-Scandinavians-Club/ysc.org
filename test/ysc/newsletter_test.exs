@@ -1315,7 +1315,8 @@ defmodule Ysc.NewsletterTest do
           %{
             "title" => "Newsletter Click Post",
             "body" => "Body",
-            "url_name" => "newsletter-click-post-#{System.unique_integer([:positive])}",
+            "url_name" =>
+              "newsletter-click-post-#{System.unique_integer([:positive])}",
             "state" => "published"
           },
           author
@@ -1375,7 +1376,9 @@ defmodule Ysc.NewsletterTest do
     end
 
     test "create_notice/2 returns a changeset error when required fields are missing" do
-      assert {:error, changeset} = Newsletter.create_notice(%{"name" => "Only name"})
+      assert {:error, changeset} =
+               Newsletter.create_notice(%{"name" => "Only name"})
+
       assert %{body: [_ | _]} = errors_on(changeset)
     end
 
@@ -1395,7 +1398,9 @@ defmodule Ysc.NewsletterTest do
         )
 
       old_ts =
-        DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+        DateTime.utc_now()
+        |> DateTime.add(-3600, :second)
+        |> DateTime.truncate(:second)
 
       {:ok, older} =
         older
@@ -1589,15 +1594,24 @@ defmodule Ysc.NewsletterTest do
         )
 
       creators = Newsletter.get_all_creators()
-      assert Enum.any?(creators, fn {name, id} -> id == user.id and name == user.email end)
+
+      assert Enum.any?(creators, fn {name, id} ->
+               id == user.id and name == user.email
+             end)
     end
 
     test "falls back to \"Unknown\" when the edition has no creator" do
       {:ok, _} =
-        Newsletter.create_edition(%{"title" => "No creator edition", "subject" => "S"})
+        Newsletter.create_edition(%{
+          "title" => "No creator edition",
+          "subject" => "S"
+        })
 
       creators = Newsletter.get_all_creators()
-      assert Enum.any?(creators, fn {name, id} -> id == nil and name == "Unknown" end)
+
+      assert Enum.any?(creators, fn {name, id} ->
+               id == nil and name == "Unknown"
+             end)
     end
   end
 

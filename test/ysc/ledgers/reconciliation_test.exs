@@ -3207,7 +3207,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
           user_id: user.id,
           amount: Money.new(10_000, :USD),
           external_provider: :stripe,
-          external_payment_id: "pi_full_mismatch_membership_#{System.unique_integer()}",
+          external_payment_id:
+            "pi_full_mismatch_membership_#{System.unique_integer()}",
           payment_date: DateTime.truncate(DateTime.utc_now(), :second),
           entity_type: :membership,
           entity_id: Ecto.ULID.generate(),
@@ -3233,7 +3234,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(15_000, :USD),
-          external_payment_id: "pi_full_mismatch_booking_#{System.unique_integer()}",
+          external_payment_id:
+            "pi_full_mismatch_booking_#{System.unique_integer()}",
           entity_type: :booking,
           entity_id: Ecto.ULID.generate(),
           stripe_fee: Money.new(450, :USD),
@@ -3258,7 +3260,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(5_000, :USD),
-          external_payment_id: "pi_full_mismatch_event_#{System.unique_integer()}",
+          external_payment_id:
+            "pi_full_mismatch_event_#{System.unique_integer()}",
           entity_type: :event,
           entity_id: Ecto.ULID.generate(),
           stripe_fee: Money.new(150, :USD),
@@ -3283,7 +3286,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
         Ledgers.process_payment(%{
           user_id: user.id,
           amount: Money.new(5_000, :USD),
-          external_payment_id: "pi_full_mismatch_donation_#{System.unique_integer()}",
+          external_payment_id:
+            "pi_full_mismatch_donation_#{System.unique_integer()}",
           entity_type: :donation,
           entity_id: Ecto.ULID.generate(),
           stripe_fee: Money.new(150, :USD),
@@ -3313,7 +3317,8 @@ defmodule Ysc.Ledgers.ReconciliationTest do
           user_id: user.id,
           amount: Money.new(:USD, "135.00"),
           external_provider: :stripe,
-          external_payment_id: "pi_full_mismatch_payout_#{System.unique_integer()}",
+          external_payment_id:
+            "pi_full_mismatch_payout_#{System.unique_integer()}",
           payment_date: DateTime.truncate(DateTime.utc_now(), :second),
           entity_type: :membership,
           entity_id: Ecto.ULID.generate(),
@@ -3326,8 +3331,10 @@ defmodule Ysc.Ledgers.ReconciliationTest do
       assert {:ok, {_pp, _ptx, _entries, payout}} =
                Ledgers.process_stripe_payout(%{
                  payout_amount: Money.new(:USD, "129.22"),
-                 stripe_payout_id: "po_full_mismatch_#{System.unique_integer()}",
-                 description: "Understated fees for full reconciliation log test",
+                 stripe_payout_id:
+                   "po_full_mismatch_#{System.unique_integer()}",
+                 description:
+                   "Understated fees for full reconciliation log test",
                  currency: "usd",
                  status: "paid",
                  fee_total: Money.new(:USD, "4.83")

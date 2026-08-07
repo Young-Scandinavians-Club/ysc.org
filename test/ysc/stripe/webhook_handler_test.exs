@@ -692,7 +692,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
       assert :ok = WebhookHandler.handle_event(event)
 
       assert_email_sent(
-        subject: "Welcome to YSC – Your Membership is Active! 🎉",
+        subject: "Your YSC Membership Payment Receipt",
         to: {nil, user.email}
       )
     end
@@ -1725,7 +1725,7 @@ defmodule Ysc.Stripe.WebhookHandlerTest do
 
       # Email should have been enqueued (check email was sent)
       assert_email_sent(
-        subject: "Welcome to YSC – Your Membership is Active! 🎉",
+        subject: "Your YSC Membership Payment Receipt",
         to: {nil, user.email}
       )
     end

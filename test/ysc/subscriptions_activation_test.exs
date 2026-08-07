@@ -194,5 +194,58 @@ defmodule Ysc.SubscriptionsActivationTest do
                  return_url: "http://localhost/finalize"
                )
     end
+
+    test "bank account incomplete Stripe status is persisted as active for immediate access" do
+      user =
+        user_fixture(%{
+          state: :active
+        })
+
+      user =
+        user
+        |> Ysc.Accounts.User.update_user_changeset(%{
+          stripe_id: "cus_ach_#{System.unique_integer([:positive])}"
+        })
+        |> Ysc.Repo.update!()
+
+      {:ok, _pm} =
+        Payments.insert_payment_method(%{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_ach_#{System.unique_integer([:positive])}",
+          provider_customer_id: user.stripe_id,
+          type: :bank_account,
+          provider_type: "us_bank_account",
+          is_default: true
+        })
+
+      stripe_sub_id = "sub_ach_#{System.unique_integer([:positive])}"
+
+      expect(Stripe.SubscriptionMock, :create, fn params ->
+        assert params.customer == user.stripe_id
+        assert is_binary(params.default_payment_method)
+
+        {:ok,
+         Ysc.Stripe.SubscriptionFixtures.subscription(
+           id: stripe_sub_id,
+           customer: user.stripe_id,
+           status: "incomplete"
+         )}
+      end)
+
+      assert {:ok, :activated} =
+               Subscriptions.activate_membership_with_saved_payment_method(
+                 user,
+                 membership_type: :single,
+                 return_url: "http://localhost/finalize"
+               )
+
+      local = Subscriptions.get_subscription_by_stripe_id(stripe_sub_id)
+      assert %Subscriptions.Subscription{stripe_status: "active"} = local
+      assert Subscriptions.active?(local)
+
+      _ = MembershipCache.invalidate_user(user.id)
+      assert MembershipCache.get_active_membership(user)
+    end
   end
 end

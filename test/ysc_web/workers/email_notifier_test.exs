@@ -381,7 +381,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
                perform_job(EmailNotifier, %{
                  "recipient" => user.email,
                  "idempotency_key" => "membership_reply_to_test",
-                 "subject" => "Welcome to YSC – Your Membership is Active! 🎉",
+                 "subject" => "Your YSC Membership Payment Receipt",
                  "template" => "membership_payment_confirmation",
                  "params" => params,
                  "text_body" => "",
@@ -391,7 +391,7 @@ defmodule YscWeb.Workers.EmailNotifierTest do
                })
 
       assert_email_sent(
-        subject: "Welcome to YSC – Your Membership is Active! 🎉",
+        subject: "Your YSC Membership Payment Receipt",
         to: {nil, user.email},
         reply_to: membership_email
       )

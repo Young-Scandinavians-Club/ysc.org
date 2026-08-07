@@ -1435,9 +1435,10 @@ defmodule Ysc.ScanningTest do
       %{admin: admin, event: event, session: session}
     end
 
-    test "active member is scanned successfully and automatically checked in", %{
-      session: session
-    } do
+    test "active member is scanned successfully and automatically checked in",
+         %{
+           session: session
+         } do
       user = make_active_member()
       token = QrToken.sign_membership(user.id)
 
@@ -1637,7 +1638,9 @@ defmodule Ysc.ScanningTest do
       {:ok, check_in1} = Scanning.check_in_member(session, user1, admin)
 
       old_ts =
-        DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+        DateTime.utc_now()
+        |> DateTime.add(-3600, :second)
+        |> DateTime.truncate(:second)
 
       {:ok, _} =
         check_in1
@@ -1744,7 +1747,8 @@ defmodule Ysc.ScanningTest do
         )
         |> Ysc.Repo.update!()
 
-      results = Scanning.search_users_for_checkin(session.id, "Searchtarget#{unique}")
+      results =
+        Scanning.search_users_for_checkin(session.id, "Searchtarget#{unique}")
 
       assert [%{user: found, membership_status: :active, checked_in?: false}] =
                results
@@ -1766,7 +1770,9 @@ defmodule Ysc.ScanningTest do
 
   describe "export_membership_checkins_csv/1" do
     test "exports headers and a row per checked-in member" do
-      admin = user_fixture(%{role: "admin", first_name: "Desk", last_name: "Admin"})
+      admin =
+        user_fixture(%{role: "admin", first_name: "Desk", last_name: "Admin"})
+
       event = event_fixture(%{organizer_id: admin.id})
       session = event_membership_session_fixture(event, admin)
       user = make_active_member()

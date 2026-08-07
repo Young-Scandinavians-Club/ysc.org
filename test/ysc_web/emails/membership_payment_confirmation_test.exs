@@ -16,9 +16,29 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmationTest do
   end
 
   describe "get_subject/0" do
-    test "returns welcome subject" do
+    test "returns receipt subject" do
       assert MembershipPaymentConfirmation.get_subject() ==
-               "Welcome to YSC – Your Membership is Active! 🎉"
+               "Your YSC Membership Payment Receipt"
+    end
+  end
+
+  describe "render/1" do
+    test "renders payment receipt copy" do
+      user = oauth_user_fixture(%{first_name: "Jane"})
+
+      html =
+        MembershipPaymentConfirmation.render(%{
+          first_name: user.first_name,
+          membership_type: "Single",
+          amount: "$50.00",
+          payment_date: "December 01, 2024",
+          paid_elsewhere: false
+        })
+
+      assert html =~ "Payment Receipt"
+      assert html =~ "Payment received"
+      assert html =~ "$50.00"
+      refute html =~ "membership is now active"
     end
   end
 

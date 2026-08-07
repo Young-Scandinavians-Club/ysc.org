@@ -517,7 +517,12 @@ defmodule Ysc.AvatarsTest do
 
   describe "sync_oauth_avatar/3 downloads over HTTP" do
     test "downloads, uploads, and creates an avatar on a successful 200 response" do
-      port = Ysc.HttpTestServer.ensure_started(ServeOauthImagePlug, :avatars_oauth_200)
+      port =
+        Ysc.HttpTestServer.ensure_started(
+          ServeOauthImagePlug,
+          :avatars_oauth_200
+        )
+
       user = user_fixture()
       image_url = "http://127.0.0.1:#{port}/photo.png"
 
@@ -531,7 +536,12 @@ defmodule Ysc.AvatarsTest do
     end
 
     test "skips re-download when latest avatar already matches source_url and is completed" do
-      port = Ysc.HttpTestServer.ensure_started(ServeOauthImagePlug, :avatars_oauth_unchanged)
+      port =
+        Ysc.HttpTestServer.ensure_started(
+          ServeOauthImagePlug,
+          :avatars_oauth_unchanged
+        )
+
       user = user_fixture()
       image_url = "http://127.0.0.1:#{port}/photo.png"
 
@@ -543,22 +553,35 @@ defmodule Ysc.AvatarsTest do
           profile_path: "https://example.com/p.webp"
         })
 
-      assert {:ok, :unchanged} = Avatars.sync_oauth_avatar(user, image_url, :google)
+      assert {:ok, :unchanged} =
+               Avatars.sync_oauth_avatar(user, image_url, :google)
+
       assert length(Avatars.list_user_avatars(user)) == 1
     end
 
     test "re-downloads when the latest matching avatar hasn't finished processing" do
-      port = Ysc.HttpTestServer.ensure_started(ServeOauthImagePlug, :avatars_oauth_pending)
+      port =
+        Ysc.HttpTestServer.ensure_started(
+          ServeOauthImagePlug,
+          :avatars_oauth_pending
+        )
+
       user = user_fixture()
       image_url = "http://127.0.0.1:#{port}/photo.png"
 
-      assert {:ok, _pending_avatar} = Avatars.sync_oauth_avatar(user, image_url, :google)
-      assert {:ok, %Ysc.Avatars.Avatar{}} = Avatars.sync_oauth_avatar(user, image_url, :google)
+      assert {:ok, _pending_avatar} =
+               Avatars.sync_oauth_avatar(user, image_url, :google)
+
+      assert {:ok, %Ysc.Avatars.Avatar{}} =
+               Avatars.sync_oauth_avatar(user, image_url, :google)
     end
 
     test "returns :download_failed for a non-200 upstream response" do
       port =
-        Ysc.HttpTestServer.ensure_started(ServeOauthNotFoundPlug, :avatars_oauth_404)
+        Ysc.HttpTestServer.ensure_started(
+          ServeOauthNotFoundPlug,
+          :avatars_oauth_404
+        )
 
       user = user_fixture()
       image_url = "http://127.0.0.1:#{port}/missing.png"
@@ -573,7 +596,11 @@ defmodule Ysc.AvatarsTest do
       user = user_fixture()
 
       assert {:error, :download_failed} =
-               Avatars.sync_oauth_avatar(user, "http://127.0.0.1:1/unreachable", :google)
+               Avatars.sync_oauth_avatar(
+                 user,
+                 "http://127.0.0.1:1/unreachable",
+                 :google
+               )
 
       assert Avatars.list_user_avatars(user) == []
     end
@@ -588,7 +615,9 @@ defmodule Ysc.AvatarsTest do
     test "deletes resolvable S3 objects, deduping repeats and skipping traversal attempts" do
       user = user_fixture()
       bucket = Ysc.S3Config.avatars_bucket_name()
-      tiny_png = File.read!(Path.expand("../support/fixtures/tiny.png", __DIR__))
+
+      tiny_png =
+        File.read!(Path.expand("../support/fixtures/tiny.png", __DIR__))
 
       original_key = "#{user.id}/a1/original.webp"
       thumb_key = "#{user.id}/a1/thumb.webp"
@@ -596,13 +625,17 @@ defmodule Ysc.AvatarsTest do
       bucket |> ExAws.S3.put_object(original_key, tiny_png) |> ExAws.request!()
       bucket |> ExAws.S3.put_object(thumb_key, tiny_png) |> ExAws.request!()
 
-      assert {:ok, _} = bucket |> ExAws.S3.head_object(original_key) |> ExAws.request()
-      assert {:ok, _} = bucket |> ExAws.S3.head_object(thumb_key) |> ExAws.request()
+      assert {:ok, _} =
+               bucket |> ExAws.S3.head_object(original_key) |> ExAws.request()
+
+      assert {:ok, _} =
+               bucket |> ExAws.S3.head_object(thumb_key) |> ExAws.request()
 
       original = "https://example.com/#{original_key}"
       thumb = "https://example.com/#{thumb_key}"
       # profile_path intentionally duplicates thumb to exercise Enum.uniq/1.
       profile = thumb
+
       # large_path is a path traversal attempt and must be rejected by avatar_s3_key.
       large = "https://example.com/#{user.id}/../secret.webp"
 
@@ -632,7 +665,8 @@ defmodule Ysc.AvatarsTest do
       {:ok, avatar} =
         Avatars.create_avatar(user, %{
           source: :upload,
-          original_path: "https://example.com/avatars/#{user.id}/a1/original.webp"
+          original_path:
+            "https://example.com/avatars/#{user.id}/a1/original.webp"
         })
 
       assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
@@ -679,7 +713,9 @@ defmodule Ysc.AvatarsTest do
       %{user: user, avatar: avatar}
     end
 
-    test "thumb falls back to profile then large when missing", %{avatar: avatar} do
+    test "thumb falls back to profile then large when missing", %{
+      avatar: avatar
+    } do
       {:ok, avatar} =
         Avatars.update_processed_avatar(avatar, %{
           processing_state: :completed,
@@ -687,15 +723,19 @@ defmodule Ysc.AvatarsTest do
           large_path: "https://example.com/large.webp"
         })
 
-      assert Avatars.avatar_url(avatar, :thumb) == "https://example.com/profile.webp"
+      assert Avatars.avatar_url(avatar, :thumb) ==
+               "https://example.com/profile.webp"
 
       {:ok, avatar} =
         Avatars.update_processed_avatar(avatar, %{profile_path: nil})
 
-      assert Avatars.avatar_url(avatar, :thumb) == "https://example.com/large.webp"
+      assert Avatars.avatar_url(avatar, :thumb) ==
+               "https://example.com/large.webp"
     end
 
-    test "profile falls back to large then thumb when missing", %{avatar: avatar} do
+    test "profile falls back to large then thumb when missing", %{
+      avatar: avatar
+    } do
       {:ok, avatar} =
         Avatars.update_processed_avatar(avatar, %{
           processing_state: :completed,
@@ -703,14 +743,19 @@ defmodule Ysc.AvatarsTest do
           thumb_path: "https://example.com/thumb.webp"
         })
 
-      assert Avatars.avatar_url(avatar, :profile) == "https://example.com/large.webp"
+      assert Avatars.avatar_url(avatar, :profile) ==
+               "https://example.com/large.webp"
 
-      {:ok, avatar} = Avatars.update_processed_avatar(avatar, %{large_path: nil})
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{large_path: nil})
 
-      assert Avatars.avatar_url(avatar, :profile) == "https://example.com/thumb.webp"
+      assert Avatars.avatar_url(avatar, :profile) ==
+               "https://example.com/thumb.webp"
     end
 
-    test "large falls back to profile then thumb when missing", %{avatar: avatar} do
+    test "large falls back to profile then thumb when missing", %{
+      avatar: avatar
+    } do
       {:ok, avatar} =
         Avatars.update_processed_avatar(avatar, %{
           processing_state: :completed,
@@ -718,37 +763,63 @@ defmodule Ysc.AvatarsTest do
           thumb_path: "https://example.com/thumb.webp"
         })
 
-      assert Avatars.avatar_url(avatar, :large) == "https://example.com/profile.webp"
+      assert Avatars.avatar_url(avatar, :large) ==
+               "https://example.com/profile.webp"
 
-      {:ok, avatar} = Avatars.update_processed_avatar(avatar, %{profile_path: nil})
+      {:ok, avatar} =
+        Avatars.update_processed_avatar(avatar, %{profile_path: nil})
 
-      assert Avatars.avatar_url(avatar, :large) == "https://example.com/thumb.webp"
+      assert Avatars.avatar_url(avatar, :large) ==
+               "https://example.com/thumb.webp"
     end
   end
 
   describe "display_avatar_url/2 default country variants" do
     test "returns Denmark defaults" do
-      even_user = %User{id: "0190000000000000000000000", most_connected_country: "DK"}
-      odd_user = %User{id: "0190000000000000000000001", most_connected_country: "DK"}
+      even_user = %User{
+        id: "0190000000000000000000000",
+        most_connected_country: "DK"
+      }
+
+      odd_user = %User{
+        id: "0190000000000000000000001",
+        most_connected_country: "DK"
+      }
 
       assert Avatars.display_avatar_url(even_user, :profile) =~ "denmark_flag"
       assert Avatars.display_avatar_url(odd_user, :profile) =~ "denmark_houses"
     end
 
     test "returns Finland defaults" do
-      even_user = %User{id: "0190000000000000000000000", most_connected_country: "FI"}
-      odd_user = %User{id: "0190000000000000000000001", most_connected_country: "FI"}
+      even_user = %User{
+        id: "0190000000000000000000000",
+        most_connected_country: "FI"
+      }
+
+      odd_user = %User{
+        id: "0190000000000000000000001",
+        most_connected_country: "FI"
+      }
 
       assert Avatars.display_avatar_url(even_user, :profile) =~ "finland_flag"
       assert Avatars.display_avatar_url(odd_user, :profile) =~ "finland_house"
     end
 
     test "returns Iceland defaults" do
-      even_user = %User{id: "0190000000000000000000000", most_connected_country: "IS"}
-      odd_user = %User{id: "0190000000000000000000001", most_connected_country: "IS"}
+      even_user = %User{
+        id: "0190000000000000000000000",
+        most_connected_country: "IS"
+      }
+
+      odd_user = %User{
+        id: "0190000000000000000000001",
+        most_connected_country: "IS"
+      }
 
       assert Avatars.display_avatar_url(even_user, :profile) =~ "iceland_flag"
-      assert Avatars.display_avatar_url(odd_user, :profile) =~ "iceland_landscape"
+
+      assert Avatars.display_avatar_url(odd_user, :profile) =~
+               "iceland_landscape"
     end
 
     test "defaults to SE when most_connected_country is missing entirely" do
@@ -757,8 +828,15 @@ defmodule Ysc.AvatarsTest do
     end
 
     test "returns Norway defaults for both id parities" do
-      even_user = %User{id: "0190000000000000000000000", most_connected_country: "NO"}
-      odd_user = %User{id: "0190000000000000000000001", most_connected_country: "NO"}
+      even_user = %User{
+        id: "0190000000000000000000000",
+        most_connected_country: "NO"
+      }
+
+      odd_user = %User{
+        id: "0190000000000000000000001",
+        most_connected_country: "NO"
+      }
 
       assert Avatars.display_avatar_url(even_user, :profile) =~ "norway_flag"
       assert Avatars.display_avatar_url(odd_user, :profile) =~ "norway_fjord"
@@ -784,18 +862,26 @@ defmodule Ysc.AvatarsTest do
       {:ok, user} = Avatars.set_current_avatar(user, avatar.id)
       user = Repo.preload(user, :current_avatar)
 
-      assert Avatars.resolve_user_avatar_url(user) == "https://example.com/profile.webp"
+      assert Avatars.resolve_user_avatar_url(user) ==
+               "https://example.com/profile.webp"
     end
   end
 
   describe "upload_to_s3/3" do
     test "dispatches to the configured test uploader and returns a location" do
-      tmp_path = Path.join(System.tmp_dir!(), "upload_to_s3_test_#{System.unique_integer([:positive])}.txt")
+      tmp_path =
+        Path.join(
+          System.tmp_dir!(),
+          "upload_to_s3_test_#{System.unique_integer([:positive])}.txt"
+        )
+
       File.write!(tmp_path, "hello")
 
       on_exit(fn -> File.rm(tmp_path) end)
 
-      assert {:ok, location} = Avatars.upload_to_s3(tmp_path, "some/key.png", [])
+      assert {:ok, location} =
+               Avatars.upload_to_s3(tmp_path, "some/key.png", [])
+
       assert is_binary(location)
       assert location =~ "some/key.png"
     end

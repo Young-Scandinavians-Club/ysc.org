@@ -13,7 +13,11 @@
     <mj-spacer height="24px"></mj-spacer>
     <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">We have fantastic news! Your application to join the Young Scandinavians Club has been <strong>approved</strong> — and your membership is now <strong>active</strong>. 🙌</mj-text>
     <mj-spacer height="12px"></mj-spacer>
-    <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your saved payment method has been charged and your membership will renew automatically each year until you cancel. You can manage your membership and payment details any time from your account settings.</mj-text>
+    <%= if @bank_payment do %>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your bank payment is processing and can take a few business days to settle. We'll email you a <strong>payment receipt</strong> once it clears. Your membership renews automatically each year until you cancel. You can manage your membership and payment details any time from your account settings.</mj-text>
+    <% else %>
+      <mj-text align="left" font-size="18px" line-height="1.5" padding="0px">Your saved payment method has been charged and your membership will renew automatically each year until you cancel. You can manage your membership and payment details any time from your account settings.</mj-text>
+    <% end %>
     <mj-spacer height="24px"></mj-spacer>
     <mj-button href="<%= dashboard_url() %>" css-class="btn_block" inner-padding="15px" width="100%" background-color="#1447e6" color="#ffffff" align="center" font-size="18px" border-radius="4px">Go to Your Account →</mj-button>
     <mj-spacer height="24px"></mj-spacer>

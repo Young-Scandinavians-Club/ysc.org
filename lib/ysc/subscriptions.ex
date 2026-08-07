@@ -1557,8 +1557,14 @@ defmodule Ysc.Subscriptions do
   @doc """
   Creates a local subscription from a Stripe subscription.
   This is used as a backup when webhooks might not be reliable.
+
+  ## Options
+
+    * `:payment_method_type` - when `:bank_account` and Stripe status is
+      `"incomplete"` (ACH still processing), persist local status as `"active"`
+      so membership access is granted immediately.
   """
-  def create_subscription_from_stripe(user, stripe_subscription) do
+  def create_subscription_from_stripe(user, stripe_subscription, opts \\ []) do
     require Ysc.Logging
 
     # Check if subscription already exists
@@ -1573,6 +1579,12 @@ defmodule Ysc.Subscriptions do
 
       {:ok, existing}
     else
+      stripe_status =
+        local_stripe_status_for_persist(
+          stripe_subscription.status,
+          Keyword.get(opts, :payment_method_type)
+        )
+
       # Create the subscription
       subscription_changeset =
         user
@@ -1582,7 +1594,7 @@ defmodule Ysc.Subscriptions do
           # Default name for membership subscriptions
           name: "Membership Subscription",
           stripe_id: stripe_subscription.id,
-          stripe_status: stripe_subscription.status,
+          stripe_status: stripe_status,
           start_date:
             stripe_subscription.start_date &&
               DateTime.from_unix!(stripe_subscription.start_date),
@@ -1966,7 +1978,9 @@ defmodule Ysc.Subscriptions do
            expand: ["latest_invoice"]
          ) do
       {:ok, stripe_subscription} ->
-        case create_subscription_from_stripe(user, stripe_subscription) do
+        case create_subscription_from_stripe(user, stripe_subscription,
+               payment_method_type: default_pm.type
+             ) do
           {:ok, _} ->
             invalidate_activation_membership_caches(user)
             {:ok, :activated}
@@ -1997,6 +2011,14 @@ defmodule Ysc.Subscriptions do
         {:error, reason}
     end
   end
+
+  # ACH Direct Debit can leave the Stripe subscription incomplete while the
+  # PaymentIntent is processing (days). Grant local access immediately so the
+  # member is not blocked until settlement.
+  defp local_stripe_status_for_persist("incomplete", :bank_account),
+    do: "active"
+
+  defp local_stripe_status_for_persist(status, _payment_method_type), do: status
 
   defp invalidate_activation_membership_caches(user) do
     _ = MembershipCache.invalidate_user(user.id)

@@ -25,7 +25,9 @@ defmodule Ysc.EventPhotosTest do
     end
 
     test "accepts an event_id string and creates a collection", %{event: event} do
-      assert {:ok, collection} = EventPhotos.ensure_collection_for_event(event.id)
+      assert {:ok, collection} =
+               EventPhotos.ensure_collection_for_event(event.id)
+
       assert collection.event_id == event.id
     end
 
@@ -36,7 +38,9 @@ defmodule Ysc.EventPhotosTest do
   end
 
   describe "get_by_upload_token/1 and get_by_upload_token!/1" do
-    test "returns the collection with event preloaded for a known token", %{event: event} do
+    test "returns the collection with event preloaded for a known token", %{
+      event: event
+    } do
       {:ok, collection} = EventPhotos.ensure_collection_for_event(event)
 
       found = EventPhotos.get_by_upload_token(collection.upload_token)
@@ -77,7 +81,9 @@ defmodule Ysc.EventPhotosTest do
     test "persists the album id", %{event: event} do
       {:ok, collection} = EventPhotos.ensure_collection_for_event(event)
 
-      assert {:ok, updated} = EventPhotos.set_google_album_id(collection, "album-123")
+      assert {:ok, updated} =
+               EventPhotos.set_google_album_id(collection, "album-123")
+
       assert updated.google_album_id == "album-123"
     end
   end
@@ -123,7 +129,9 @@ defmodule Ysc.EventPhotosTest do
       assert EventPhotos.effective_end_date(date_event) == ~D[2026-09-01]
     end
 
-    test "returns nil when both start_date and end_date are nil", %{event: event} do
+    test "returns nil when both start_date and end_date are nil", %{
+      event: event
+    } do
       undated = %{event | start_date: nil, end_date: nil}
       assert is_nil(EventPhotos.effective_end_date(undated))
     end
@@ -215,14 +223,17 @@ defmodule Ysc.EventPhotosTest do
                Ysc.GooglePhotos.Limits.max_album_title_length()
     end
 
-    test "formats a plain %Date{} start_date the same as a %DateTime{}", %{event: event} do
+    test "formats a plain %Date{} start_date the same as a %DateTime{}", %{
+      event: event
+    } do
       date_event = %{event | start_date: ~D[2026-03-15]}
       assert EventPhotos.album_title(date_event) =~ "Mar 15, 2026"
     end
 
-    test "falls back to the bare title when start_date is neither Date nor DateTime", %{
-      event: event
-    } do
+    test "falls back to the bare title when start_date is neither Date nor DateTime",
+         %{
+           event: event
+         } do
       title = EventPhotos.album_title(%{event | start_date: nil})
       assert title == Ysc.GooglePhotos.Limits.normalize_album_title(event.title)
     end
@@ -300,7 +311,9 @@ defmodule Ysc.EventPhotosTest do
     end
 
     test "refuses to send while the event hasn't ended yet", %{event: event} do
-      assert {:error, :event_not_ended} = EventPhotos.deliver_reminder_now(event)
+      assert {:error, :event_not_ended} =
+               EventPhotos.deliver_reminder_now(event)
+
       assert is_nil(EventPhotos.get_by_event_id(event.id))
     end
 
@@ -311,9 +324,10 @@ defmodule Ysc.EventPhotosTest do
       assert updated.reminder_recipient_count == 0
     end
 
-    test "treats an event with no dates as already ended (not blocked by allow_future)", %{
-      event: event
-    } do
+    test "treats an event with no dates as already ended (not blocked by allow_future)",
+         %{
+           event: event
+         } do
       {:ok, undated_event} =
         Ysc.Events.update_event(event, %{start_date: nil, end_date: nil})
 
@@ -330,7 +344,9 @@ defmodule Ysc.EventPhotosTest do
 
     test "returns :not_found for an unknown event_id string" do
       assert {:error, :not_found} =
-               EventPhotos.deliver_reminder_now(Ecto.ULID.generate(), allow_future: true)
+               EventPhotos.deliver_reminder_now(Ecto.ULID.generate(),
+                 allow_future: true
+               )
     end
   end
 

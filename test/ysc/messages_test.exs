@@ -1775,7 +1775,10 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
 
       assert {:ok, delivery} = Messages.ensure_email_delivery(attrs)
 
-      future = DateTime.utc_now() |> DateTime.add(300, :second) |> DateTime.truncate(:second)
+      future =
+        DateTime.utc_now()
+        |> DateTime.add(300, :second)
+        |> DateTime.truncate(:second)
 
       delivery
       |> Ysc.Messages.MessageIdempotency.changeset(%{
@@ -1815,7 +1818,9 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
       assert {:ok, delivery} = Messages.ensure_email_delivery(attrs)
 
       delivery
-      |> Ysc.Messages.MessageIdempotency.changeset(%{delivery_status: :accepted})
+      |> Ysc.Messages.MessageIdempotency.changeset(%{
+        delivery_status: :accepted
+      })
       |> Ysc.Repo.update!()
 
       assert {:ok, _email} =
@@ -1843,7 +1848,8 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
       Application.put_env(:ysc, :ses_max_send_rate, 1)
       Application.put_env(:ysc, :ses_rate_window_seconds, 60)
 
-      base_key = "em_ratelimit_" <> Integer.to_string(System.unique_integer([:positive]))
+      base_key =
+        "em_ratelimit_" <> Integer.to_string(System.unique_integer([:positive]))
 
       build_attrs = fn key ->
         %{
@@ -1962,7 +1968,8 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
       )
 
       key =
-        "em_retry_fail_" <> Integer.to_string(System.unique_integer([:positive]))
+        "em_retry_fail_" <>
+          Integer.to_string(System.unique_integer([:positive]))
 
       attrs = %{
         message_type: :email,

@@ -951,10 +951,11 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert is_nil(Entitlements.get_entitlement(Ecto.ULID.generate()))
     end
 
-    test "get_entitlement/1 and get_entitlement!/1 return the row for a known id", %{
-      user: user,
-      admin: admin
-    } do
+    test "get_entitlement/1 and get_entitlement!/1 return the row for a known id",
+         %{
+           user: user,
+           admin: admin
+         } do
       assert {:ok, ent} =
                Entitlements.create_entitlement(
                  %{
@@ -1009,7 +1010,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      assert {:ok, %{expired: 1, failed: 0}} = Entitlements.expire_passed_entitlements()
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
 
       assert {:ok, consumed} =
                Entitlements.create_entitlement(
@@ -1032,10 +1034,11 @@ defmodule Ysc.Bookings.EntitlementsTest do
       refute consumed.id in ids
     end
 
-    test "filters by property, defaulting property-less entitlements into every property", %{
-      user: user,
-      admin: admin
-    } do
+    test "filters by property, defaulting property-less entitlements into every property",
+         %{
+           user: user,
+           admin: admin
+         } do
       assert {:ok, tahoe_only} =
                Entitlements.create_entitlement(
                  %{
@@ -1112,10 +1115,11 @@ defmodule Ysc.Bookings.EntitlementsTest do
   end
 
   describe "list_all_for_user/1" do
-    test "returns every entitlement for the user regardless of status, most recent first", %{
-      user: user,
-      admin: admin
-    } do
+    test "returns every entitlement for the user regardless of status, most recent first",
+         %{
+           user: user,
+           admin: admin
+         } do
       past =
         DateTime.add(DateTime.utc_now(), -86_400, :second)
         |> DateTime.truncate(:second)
@@ -1132,7 +1136,8 @@ defmodule Ysc.Bookings.EntitlementsTest do
                  send_notification: false
                )
 
-      assert {:ok, %{expired: 1, failed: 0}} = Entitlements.expire_passed_entitlements()
+      assert {:ok, %{expired: 1, failed: 0}} =
+               Entitlements.expire_passed_entitlements()
 
       assert {:ok, active} =
                Entitlements.create_entitlement(
@@ -1234,7 +1239,10 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert Money.cmp(discount, Money.new(:USD, 430)) == 0
     end
 
-    test "unrecognized benefit_kind returns zero", %{checkin: checkin, checkout: checkout} do
+    test "unrecognized benefit_kind returns zero", %{
+      checkin: checkin,
+      checkout: checkout
+    } do
       assert {:ok, discount} =
                Entitlements.suggest_buyout_max_discount(
                  :tahoe,
@@ -1301,12 +1309,19 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert attrs.free_nights == 2
       assert is_nil(attrs.percent_off)
       assert is_nil(attrs.amount_off)
-      assert Money.cmp(attrs.buyout_max_discount, Money.new(:USD, Decimal.new("300.50"))) == 0
+
+      assert Money.cmp(
+               attrs.buyout_max_discount,
+               Money.new(:USD, Decimal.new("300.50"))
+             ) == 0
+
       assert is_nil(attrs.expires_at)
       assert attrs.internal_note == "hi"
     end
 
-    test "maps fixed_amount_off benefit_kind and clear_lake property", %{admin: admin} do
+    test "maps fixed_amount_off benefit_kind and clear_lake property", %{
+      admin: admin
+    } do
       attrs =
         Entitlements.grant_attrs_from_entitlement_form(
           %{
@@ -1319,7 +1334,9 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       assert attrs.benefit_kind == :fixed_amount_off
       assert attrs.property == :clear_lake
-      assert Money.cmp(attrs.amount_off, Money.new(:USD, Decimal.new("42.00"))) == 0
+
+      assert Money.cmp(attrs.amount_off, Money.new(:USD, Decimal.new("42.00"))) ==
+               0
     end
 
     test "defaults unrecognized benefit_kind to percent_off and unrecognized property to nil",
@@ -1346,7 +1363,12 @@ defmodule Ysc.Bookings.EntitlementsTest do
     end
 
     test "treats a blank user_id param as nil", %{admin: admin} do
-      attrs = Entitlements.grant_attrs_from_entitlement_form(%{"user_id" => ""}, admin.id)
+      attrs =
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"user_id" => ""},
+          admin.id
+        )
+
       assert is_nil(attrs.user_id)
     end
 
@@ -1377,9 +1399,10 @@ defmodule Ysc.Bookings.EntitlementsTest do
       assert Decimal.equal?(attrs.percent_off, Decimal.new("15.5"))
     end
 
-    test "parses a valid expires_on date to end-of-day America/Los_Angeles in UTC", %{
-      admin: admin
-    } do
+    test "parses a valid expires_on date to end-of-day America/Los_Angeles in UTC",
+         %{
+           admin: admin
+         } do
       attrs =
         Entitlements.grant_attrs_from_entitlement_form(
           %{"expires_on" => "2026-03-15"},
@@ -1407,7 +1430,10 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
     test "treats a blank internal_note as nil", %{admin: admin} do
       attrs =
-        Entitlements.grant_attrs_from_entitlement_form(%{"internal_note" => ""}, admin.id)
+        Entitlements.grant_attrs_from_entitlement_form(
+          %{"internal_note" => ""},
+          admin.id
+        )
 
       assert is_nil(attrs.internal_note)
     end
@@ -1488,32 +1514,50 @@ defmodule Ysc.Bookings.EntitlementsTest do
   end
 
   describe "price_with_locked_entitlement/4 additional branches" do
-    test "returns a zero-discount total when the booking has no applied entitlement", %{
-      user: user
-    } do
+    test "returns a zero-discount total when the booking has no applied entitlement",
+         %{
+           user: user
+         } do
       {checkin, checkout} = locker_buyout_dates(30)
 
       assert {:ok, booking} =
-               BookingLocker.create_buyout_booking(user.id, :tahoe, checkin, checkout, 4)
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
 
       subtotal = Money.new(:USD, 300)
 
       assert {:ok, priced} =
-               Entitlements.price_with_locked_entitlement(booking, subtotal, :buyout)
+               Entitlements.price_with_locked_entitlement(
+                 booking,
+                 subtotal,
+                 :buyout
+               )
 
       assert Money.cmp(priced.discount, Money.new(0, :USD)) == 0
       assert Money.cmp(priced.total, subtotal) == 0
       assert priced.breakdown_additions == %{}
     end
 
-    test "rejects an entitlement that isn't eligible for the booking's property", %{
-      user: user,
-      admin: admin
-    } do
+    test "rejects an entitlement that isn't eligible for the booking's property",
+         %{
+           user: user,
+           admin: admin
+         } do
       {checkin, checkout} = locker_buyout_dates(31)
 
       assert {:ok, booking} =
-               BookingLocker.create_buyout_booking(user.id, :tahoe, checkin, checkout, 4)
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
 
       assert {:ok, entitlement} =
                Entitlements.create_entitlement(
@@ -1529,7 +1573,9 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       booking =
         booking
-        |> Ecto.Changeset.change(%{applied_booking_entitlement_id: entitlement.id})
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
         |> Repo.update!()
 
       assert {:error, :entitlement_not_eligible_for_booking} =
@@ -1547,7 +1593,13 @@ defmodule Ysc.Bookings.EntitlementsTest do
       {checkin, checkout} = locker_buyout_dates(32)
 
       assert {:ok, booking} =
-               BookingLocker.create_buyout_booking(user.id, :tahoe, checkin, checkout, 4)
+               BookingLocker.create_buyout_booking(
+                 user.id,
+                 :tahoe,
+                 checkin,
+                 checkout,
+                 4
+               )
 
       assert {:ok, entitlement} =
                Entitlements.create_entitlement(
@@ -1565,7 +1617,9 @@ defmodule Ysc.Bookings.EntitlementsTest do
 
       booking =
         booking
-        |> Ecto.Changeset.change(%{applied_booking_entitlement_id: entitlement.id})
+        |> Ecto.Changeset.change(%{
+          applied_booking_entitlement_id: entitlement.id
+        })
         |> Repo.update!()
 
       assert {:ok, priced} =

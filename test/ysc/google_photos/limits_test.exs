@@ -102,7 +102,8 @@ defmodule Ysc.GooglePhotos.LimitsTest do
 
   describe "max_bytes_for_filename/1" do
     test "returns video limit for video filenames" do
-      assert Limits.max_bytes_for_filename("clip.mov") == Limits.max_video_bytes()
+      assert Limits.max_bytes_for_filename("clip.mov") ==
+               Limits.max_video_bytes()
     end
 
     test "returns photo limit for photo filenames" do
