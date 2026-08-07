@@ -24,9 +24,9 @@ defmodule Ysc.Events do
   @max_sales_chart_days 120
 
   # Timezone used to evaluate when an event should leave "upcoming" lists
-  # (public events page and admin Upcoming/Past tabs). Events without a
-  # specific end date/time are ambiguous about when they're "over", so they
-  # get a one-day grace period instead of vanishing at midnight UTC.
+  # (public events page and admin Upcoming/Past tabs). Events with an explicit
+  # end date/time use it. Events with only a start time use that cutoff;
+  # date-only events receive a one-day grace period.
   @event_timezone "America/Los_Angeles"
 
   # Whether an event should still be treated as "upcoming": true until the
