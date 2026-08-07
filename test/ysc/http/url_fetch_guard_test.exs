@@ -68,11 +68,11 @@ defmodule Ysc.Http.UrlFetchGuardTest do
               "255.255.255.255",
               "224.0.0.1"
             ] do
-          assert {:error, :blocked_ip} =
-                   UrlFetchGuard.validate_url_for_server_fetch(
-                     "http://#{host}/x.jpg"
-                   ),
-                 "expected #{host} to be blocked"
+          result =
+            UrlFetchGuard.validate_url_for_server_fetch("http://#{host}/x.jpg")
+
+          assert result == {:error, :blocked_ip},
+                 "expected #{host} to be blocked, got: #{inspect(result)}"
         end
       end)
     end
@@ -88,11 +88,11 @@ defmodule Ysc.Http.UrlFetchGuardTest do
               "[ff02::1]",
               "[::ffff:10.0.0.1]"
             ] do
-          assert {:error, :blocked_ip} =
-                   UrlFetchGuard.validate_url_for_server_fetch(
-                     "http://#{host}/x.jpg"
-                   ),
-                 "expected #{host} to be blocked"
+          result =
+            UrlFetchGuard.validate_url_for_server_fetch("http://#{host}/x.jpg")
+
+          assert result == {:error, :blocked_ip},
+                 "expected #{host} to be blocked, got: #{inspect(result)}"
         end
       end)
     end
@@ -101,7 +101,7 @@ defmodule Ysc.Http.UrlFetchGuardTest do
   describe "validate_url_for_server_fetch/1 in prod mode (real DNS resolution)" do
     @describetag :external_dns
 
-    test "allows a public IPv6 literal through the literal-IP check (falls through to DNS resolution)" do
+    test "returns dns_resolution_failed for a public IPv6 literal (literal-IP check passes, DNS lookup fails)" do
       Ysc.Test.EnvHelper.with_environment("prod", fn ->
         assert {:error, :dns_resolution_failed} =
                  UrlFetchGuard.validate_url_for_server_fetch(

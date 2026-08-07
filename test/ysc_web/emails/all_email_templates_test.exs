@@ -713,9 +713,14 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       html = MembershipPaymentFailure.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
+
+      doc = LazyHTML.from_document(html)
       # Body copy is left-aligned like other membership emails (not centered).
-      assert html =~ ~s(align="left")
-      refute html =~ ~r/<td[^>]*align="center"[^>]*>\s*Hej/
+      assert LazyHTML.query(doc, "td[align=left]") |> Enum.any?()
+
+      refute Enum.any?(LazyHTML.query(doc, "td[align=center]"), fn td ->
+               LazyHTML.text(td) |> String.trim() |> String.starts_with?("Hej")
+             end)
 
       assert MembershipPaymentFailure.get_template_name() ==
                "membership_payment_failure"
@@ -733,7 +738,9 @@ defmodule YscWeb.Emails.AllEmailTemplatesTest do
       html = MembershipPaymentConfirmation.render(assigns)
       assert is_binary(html)
       assert String.length(html) > 0
-      assert html =~ "Payment Receipt"
+
+      text = LazyHTML.text(LazyHTML.from_document(html))
+      assert text =~ "Payment Receipt"
 
       assert MembershipPaymentConfirmation.get_template_name() ==
                "membership_payment_confirmation"

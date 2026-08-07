@@ -1459,7 +1459,7 @@ defmodule Ysc.ScanningTest do
     end
 
     test "returns cross_mode error when scanning a ticket QR in an event_membership session",
-         %{session: session, admin: admin, event: event} do
+         %{session: session, event: event} do
       member = make_active_member()
       order = ticket_order_fixture(%{user: member, event: event})
       order = confirm_tickets(order)
@@ -1469,7 +1469,7 @@ defmodule Ysc.ScanningTest do
       assert {:error, :cross_mode, _message} =
                Scanning.process_scan(session, token)
 
-      refute Scanning.member_checked_in?(session.id, admin.id)
+      refute Scanning.member_checked_in?(session.id, member.id)
     end
   end
 
@@ -1848,7 +1848,11 @@ defmodule Ysc.ScanningTest do
       token = QrToken.sign_membership(user.id)
 
       assert {:ok, result} = Scanning.process_scan(session, token)
-      assert result.member_since != nil
+
+      assert DateTime.compare(
+               result.member_since,
+               user.lifetime_membership_awarded_at
+             ) == :eq
     end
 
     test "falls back to user.inserted_at when there is no membership info" do

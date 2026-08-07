@@ -1444,16 +1444,26 @@ defmodule Ysc.Bookings.EntitlementsTest do
       user: user,
       admin: admin
     } do
-      assert {:ok, ent} =
-               Entitlements.create_entitlement(%{
-                 user_id: user.id,
-                 issued_by_user_id: admin.id,
-                 benefit_kind: :fixed_amount_off,
-                 amount_off: Money.new(:USD, 15)
-               })
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, ent} =
+                 Entitlements.create_entitlement(%{
+                   user_id: user.id,
+                   issued_by_user_id: admin.id,
+                   benefit_kind: :fixed_amount_off,
+                   amount_off: Money.new(:USD, 15)
+                 })
 
-      assert ent.user_id == user.id
-      assert Entitlements.get_entitlement!(ent.id).id == ent.id
+        assert_enqueued(
+          worker: YscWeb.Workers.EmailNotifier,
+          args: %{
+            "template" => "booking_entitlement_granted",
+            "idempotency_key" => "booking_entitlement_granted:#{ent.id}"
+          }
+        )
+
+        assert ent.user_id == user.id
+        assert Entitlements.get_entitlement!(ent.id).id == ent.id
+      end)
     end
 
     test "returns the changeset error without attempting to send an email", %{

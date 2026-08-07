@@ -10,6 +10,16 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviewsTest do
     render_component(&PublicPreviews.preview/1, %{slug: slug})
   end
 
+  defp doc(html), do: LazyHTML.from_fragment(html)
+
+  defp has_id?(html, id),
+    do: html |> doc() |> LazyHTML.query_by_id(id) |> Enum.any?()
+
+  defp has_sel?(html, selector),
+    do: html |> doc() |> LazyHTML.query(selector) |> Enum.any?()
+
+  defp page_text(html), do: html |> doc() |> LazyHTML.text()
+
   describe "preview/1" do
     test "renders every registered public- slug without raising" do
       public_slugs =
@@ -26,85 +36,86 @@ defmodule YscWeb.AdminHelp.Ghost.PublicPreviewsTest do
 
     test "renders the public-news-list preview" do
       html = render_slug("public-news-list")
-      assert html =~ "Club News"
-      assert html =~ "ghost-new-post-card"
+      assert page_text(html) =~ "Club News"
+      assert has_id?(html, "ghost-new-post-card")
     end
 
     test "renders the public-news-pinned preview" do
       html = render_slug("public-news-pinned")
-      assert html =~ "Pinned News"
-      assert html =~ "ghost-pinned-hero"
+      assert page_text(html) =~ "Pinned News"
+      assert has_id?(html, "ghost-pinned-hero")
     end
 
     test "renders the public-news-article preview" do
       html = render_slug("public-news-article")
-      assert html =~ "ghost-article-hero"
+      assert has_id?(html, "ghost-article-hero")
     end
 
     test "renders the public-events-list preview" do
       html = render_slug("public-events-list")
-      assert html =~ "Events"
-      assert html =~ "ghost-new-event-card"
+      assert page_text(html) =~ "Events"
+      assert has_id?(html, "ghost-new-event-card")
     end
 
     test "renders the public-event-page preview" do
       html = render_slug("public-event-page")
-      assert html =~ "ghost-public-event-details"
-      assert html =~ "Summer Cabin Weekend"
+      assert has_id?(html, "ghost-public-event-details")
+      assert page_text(html) =~ "Summer Cabin Weekend"
     end
 
     test "renders the public-event-agenda preview" do
       html = render_slug("public-event-agenda")
-      assert html =~ "Members see timed items"
+      assert page_text(html) =~ "Members see timed items"
     end
 
     test "renders the public-event-tickets preview" do
       html = render_slug("public-event-tickets")
-      assert html =~ "Sidebar pricing updates"
+      assert page_text(html) =~ "Sidebar pricing updates"
     end
 
     test "renders the public-event-ticket-tiers preview" do
       html = render_slug("public-event-ticket-tiers")
-      assert html =~ "Get Tickets"
+      assert page_text(html) =~ "Get Tickets"
     end
 
     test "renders the public-event-tickets-tbd preview" do
       html = render_slug("public-event-tickets-tbd")
-      assert html =~ "Tickets TBD"
+      assert page_text(html) =~ "Tickets TBD"
     end
 
     test "renders the public-event-updates preview" do
       html = render_slug("public-event-updates")
-      refute html =~ "ghost-public-event-details"
-      assert html =~ "Summer Cabin Weekend"
+      refute has_id?(html, "ghost-public-event-details")
+      assert page_text(html) =~ "Summer Cabin Weekend"
     end
 
     test "renders the public-newsletter-archive preview" do
       html = render_slug("public-newsletter-archive")
-      assert html =~ "ghost-new-newsletter-edition"
+      assert has_id?(html, "ghost-new-newsletter-edition")
     end
 
     test "renders the public-newsletter-edition preview" do
       html = render_slug("public-newsletter-edition")
-      assert html =~ "From the club"
+      assert page_text(html) =~ "From the club"
     end
 
     test "renders a fallback message for an unknown slug" do
       html = render_slug("totally-unknown-slug")
-      assert html =~ "Unknown public preview."
+      assert page_text(html) =~ "Unknown public preview."
     end
   end
 
   describe "public_page_shell (via preview/1)" do
     test "renders header with label and subtitle when show_header? is true" do
       html = render_slug("public-events-list")
-      assert html =~ "Events"
-      assert html =~ "What&#39;s Next" or html =~ "What's Next"
+      assert has_sel?(html, "header")
+      assert page_text(html) =~ "Events"
+      assert page_text(html) =~ "What's Next"
     end
 
     test "omits the header block when show_header? is false" do
       html = render_slug("public-event-page")
-      refute html =~ "<header"
+      refute has_sel?(html, "header")
     end
   end
 end

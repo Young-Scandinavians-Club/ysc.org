@@ -1702,7 +1702,12 @@ defmodule Ysc.Subscriptions do
         stripe_subscription_id: stripe_subscription.id
       )
 
-      {:ok, existing}
+      maybe_activate_existing_incomplete_bank_subscription(
+        user,
+        existing,
+        stripe_subscription,
+        opts
+      )
     else
       stripe_status =
         local_stripe_status_for_persist(
@@ -1787,6 +1792,35 @@ defmodule Ysc.Subscriptions do
 
           {:error, reason}
       end
+    end
+  end
+
+  # When a prior attempt left an incomplete local row and ACH is still processing
+  # on Stripe, flip the local status to active so membership access is granted.
+  defp maybe_activate_existing_incomplete_bank_subscription(
+         user,
+         existing,
+         stripe_subscription,
+         opts
+       ) do
+    payment_method_type = Keyword.get(opts, :payment_method_type)
+
+    if stripe_subscription.status == "incomplete" and
+         payment_method_type == :bank_account and
+         existing.stripe_status != "active" do
+      case existing
+           |> Subscription.changeset(%{stripe_status: "active"})
+           |> Repo.update() do
+        {:ok, updated} ->
+          invalidate_membership_caches(user.id)
+          broadcast_membership_updated(user.id)
+          {:ok, updated}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    else
+      {:ok, existing}
     end
   end
 

@@ -1626,8 +1626,11 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       accepted_user = user_fixture(%{email: email, first_name: "Solo"})
       accepted_user = %{accepted_user | last_name: nil}
 
-      assert %Oban.Job{} =
+      assert %Oban.Job{args: args} =
                FamilyInvites.notify_invite_accepted(invite, accepted_user)
+
+      assert args["subject"] == "Solo Accepted Your Family Invitation - YSC"
+      assert args["params"]["invitee_name"] == "Solo"
     end
 
     test "falls back to generic subject and email address when accepted user has no first name" do
@@ -1638,8 +1641,12 @@ defmodule Ysc.Accounts.FamilyInvitesTest do
       accepted_user = user_fixture(%{email: email})
       nameless_user = %{accepted_user | first_name: nil, last_name: nil}
 
-      assert %Oban.Job{} =
+      assert %Oban.Job{args: args} =
                FamilyInvites.notify_invite_accepted(invite, nameless_user)
+
+      assert args["subject"] == "Family Invitation Accepted - YSC"
+      assert is_nil(args["params"]["invitee_name"])
+      assert args["params"]["invitee_email"] == nameless_user.email
     end
   end
 

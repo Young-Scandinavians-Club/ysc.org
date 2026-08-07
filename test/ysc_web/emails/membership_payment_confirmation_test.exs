@@ -35,10 +35,13 @@ defmodule YscWeb.Emails.MembershipPaymentConfirmationTest do
           paid_elsewhere: false
         })
 
-      assert html =~ "Payment Receipt"
-      assert html =~ "Payment received"
-      assert html =~ "$50.00"
-      refute html =~ "membership is now active"
+      doc = LazyHTML.from_document(html)
+      text = LazyHTML.text(doc)
+
+      assert text =~ "Payment Receipt"
+      assert text =~ "Payment received"
+      assert text =~ "$50.00"
+      refute text =~ "membership is now active"
     end
   end
 

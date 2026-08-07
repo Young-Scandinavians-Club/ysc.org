@@ -25,9 +25,12 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
       })
 
     assert is_binary(html)
-    assert html =~ user.first_name
-    assert html =~ "has been charged"
-    refute html =~ "bank payment is processing"
+    doc = LazyHTML.from_document(html)
+    text = LazyHTML.text(doc)
+
+    assert text =~ user.first_name
+    assert text =~ "has been charged"
+    refute text =~ "bank payment is processing"
   end
 
   test "render/1 produces bank-aware copy when bank_payment is true" do
@@ -39,9 +42,12 @@ defmodule YscWeb.Emails.ApplicationApprovedPaymentSuccessTest do
         bank_payment: true
       })
 
-    assert html =~ "bank payment is processing"
-    assert html =~ "payment receipt"
-    refute html =~ "has been charged"
+    doc = LazyHTML.from_document(html)
+    text = LazyHTML.text(doc)
+
+    assert text =~ "bank payment is processing"
+    assert text =~ "payment receipt"
+    refute text =~ "has been charged"
   end
 
   test "schedule/1 sends payment success email" do

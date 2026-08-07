@@ -1799,17 +1799,19 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         checkin_date: ~D[2024-08-05],
         checkout_date: ~D[2024-08-07],
         booking_mode: :room,
-        guests_count: 2,
-        total_price: Money.new(400, :USD)
+        guests_count: 4,
+        total_price: Money.new(800, :USD)
       }
 
       changeset =
         Booking.changeset(%Booking{}, attrs,
-          rooms: [rooms.tahoe_room1],
+          rooms: [rooms.tahoe_room1, rooms.tahoe_room2],
           user: user_with_nil_subs
         )
 
-      assert changeset.valid?
+      # :none / :single allow 1 room; two rooms would pass only for :family
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
     end
 
     test "membership type falls back to :none when the subscription's price id matches no configured plan",
@@ -1848,17 +1850,18 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         checkin_date: ~D[2024-08-05],
         checkout_date: ~D[2024-08-07],
         booking_mode: :room,
-        guests_count: 2,
-        total_price: Money.new(400, :USD)
+        guests_count: 4,
+        total_price: Money.new(800, :USD)
       }
 
       changeset =
         Booking.changeset(%Booking{}, attrs,
-          rooms: [rooms.tahoe_room1],
+          rooms: [rooms.tahoe_room1, rooms.tahoe_room2],
           user: user
         )
 
-      assert changeset.valid?
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
     end
 
     test "membership type falls back to :none when the active subscription has no subscription items",
@@ -1886,17 +1889,18 @@ defmodule Ysc.Bookings.BookingValidatorTest do
         checkin_date: ~D[2024-08-05],
         checkout_date: ~D[2024-08-07],
         booking_mode: :room,
-        guests_count: 2,
-        total_price: Money.new(400, :USD)
+        guests_count: 4,
+        total_price: Money.new(800, :USD)
       }
 
       changeset =
         Booking.changeset(%Booking{}, attrs,
-          rooms: [rooms.tahoe_room1],
+          rooms: [rooms.tahoe_room1, rooms.tahoe_room2],
           user: user
         )
 
-      assert changeset.valid?
+      refute changeset.valid?
+      assert Keyword.has_key?(changeset.errors, :rooms)
     end
   end
 end

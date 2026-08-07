@@ -1328,8 +1328,10 @@ defmodule Ysc.PaymentsTest do
         cashapp: %{last4: "6543"}
       }
 
-      assert {:error, %Ecto.Changeset{}} =
+      assert {:error, %Ecto.Changeset{} = changeset} =
                Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+      assert Ecto.Changeset.get_field(changeset, :last_four) == "6543"
     end
   end
 
@@ -1454,11 +1456,11 @@ defmodule Ysc.PaymentsTest do
     test "maps top-level cashapp, paypal, klarna, affirm to expected display brands" do
       user = user_fixture()
 
-      for {type, key} <- [
-            {"cashapp", :cashapp},
-            {"paypal", :paypal},
-            {"klarna", :klarna},
-            {"affirm", :affirm}
+      for {type, key, expected_brand} <- [
+            {"cashapp", :cashapp, "Cash App"},
+            {"paypal", :paypal, "PayPal"},
+            {"klarna", :klarna, "Klarna"},
+            {"affirm", :affirm, "Affirm"}
           ] do
         pm_id = "pm_#{type}_brand_#{System.unique_integer([:positive])}"
 
@@ -1472,8 +1474,11 @@ defmodule Ysc.PaymentsTest do
 
         stripe_pm = Map.put(stripe_pm, key, %{some: "value"})
 
-        assert {:error, %Ecto.Changeset{}} =
+        assert {:error, %Ecto.Changeset{} = changeset} =
                  Payments.sync_payment_method_from_stripe(user, stripe_pm)
+
+        assert Ecto.Changeset.get_field(changeset, :display_brand) ==
+                 expected_brand
       end
     end
   end

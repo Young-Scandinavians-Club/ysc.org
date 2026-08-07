@@ -665,12 +665,14 @@ defmodule Ysc.AvatarsTest do
       {:ok, avatar} =
         Avatars.create_avatar(user, %{
           source: :upload,
-          original_path:
-            "https://example.com/avatars/#{user.id}/a1/original.webp"
+          # Path is under another user's prefix, so avatar_s3_key/2 rejects it.
+          original_path: "https://example.com/other-user/a1/original.webp"
         })
 
-      assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
-      refute_enqueued(worker: YscWeb.Workers.AvatarCleanupWorker)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
+        refute_enqueued(worker: YscWeb.Workers.AvatarCleanupWorker)
+      end)
     end
 
     test "rejects keys containing a null byte" do
@@ -682,8 +684,10 @@ defmodule Ysc.AvatarsTest do
           original_path: "https://example.com/#{user.id}/a1%00/original.webp"
         })
 
-      assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
-      refute_enqueued(worker: YscWeb.Workers.AvatarCleanupWorker)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
+        refute_enqueued(worker: YscWeb.Workers.AvatarCleanupWorker)
+      end)
     end
 
     test "rejects a URL with an empty path" do
@@ -695,8 +699,10 @@ defmodule Ysc.AvatarsTest do
           original_path: "https://example.com"
         })
 
-      assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
-      refute_enqueued(worker: YscWeb.Workers.AvatarCleanupWorker)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, _} = Avatars.delete_avatar(user, avatar.id)
+        refute_enqueued(worker: YscWeb.Workers.AvatarCleanupWorker)
+      end)
     end
   end
 

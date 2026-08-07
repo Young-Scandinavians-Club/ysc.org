@@ -1841,12 +1841,24 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
       prev_window = Application.get_env(:ysc, :ses_rate_window_seconds)
 
       on_exit(fn ->
-        Application.put_env(:ysc, :ses_max_send_rate, prev_max)
-        Application.put_env(:ysc, :ses_rate_window_seconds, prev_window)
+        if prev_max == nil do
+          Application.delete_env(:ysc, :ses_max_send_rate)
+        else
+          Application.put_env(:ysc, :ses_max_send_rate, prev_max)
+        end
+
+        if prev_window == nil do
+          Application.delete_env(:ysc, :ses_rate_window_seconds)
+        else
+          Application.put_env(:ysc, :ses_rate_window_seconds, prev_window)
+        end
+
+        Repo.query!("DELETE FROM email_rate_limits WHERE key = 'ses:default'")
       end)
 
       Application.put_env(:ysc, :ses_max_send_rate, 1)
       Application.put_env(:ysc, :ses_rate_window_seconds, 60)
+      Repo.query!("DELETE FROM email_rate_limits WHERE key = 'ses:default'")
 
       base_key =
         "em_ratelimit_" <> Integer.to_string(System.unique_integer([:positive]))
