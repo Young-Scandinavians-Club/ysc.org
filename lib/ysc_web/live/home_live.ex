@@ -10,8 +10,7 @@ defmodule YscWeb.HomeLive do
     Bookings,
     Events,
     Newsletter,
-    PublicContentCache,
-    Tickets
+    PublicContentCache
   }
 
   alias Ysc.Events.EventHelpers

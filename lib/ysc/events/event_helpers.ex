@@ -45,9 +45,9 @@ defmodule Ysc.Events.EventHelpers do
   end
 
   defp ticket_tiers_for_event(event) do
-    case Map.get(event, :ticket_tiers) do
+    case get_field(event, :ticket_tiers) do
       nil ->
-        event_id = Map.get(event, :id) || Map.get(event, "id")
+        event_id = get_field(event, :id)
 
         if event_id do
           Events.list_ticket_tiers_for_event(event_id)
@@ -66,7 +66,7 @@ defmodule Ysc.Events.EventHelpers do
         false
 
       max_attendees ->
-        case Map.get(event, :ticket_count) do
+        case get_field(event, :ticket_count) do
           nil ->
             Tickets.event_at_capacity?(event)
 
