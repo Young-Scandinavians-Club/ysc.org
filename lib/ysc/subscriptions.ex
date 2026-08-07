@@ -840,14 +840,23 @@ defmodule Ysc.Subscriptions do
     |> Enum.find(&active?/1)
   end
 
-  # Used by create_stripe_subscription/2. Broader than active?/1: Stripe still has an open
-  # subscription for past_due, unpaid, incomplete, paused, etc.; creating another would risk
-  # double billing. Migration placeholders (stripe_id migrated_*) are excluded so a real Stripe
-  # subscription can replace imported rows.
+  # Used by create_stripe_subscription/2 and activate_membership_with_saved_payment_method/2.
+  # Broader than active?/1: Stripe still has an open subscription for past_due, unpaid,
+  # incomplete, paused, etc.; creating another would risk double billing. Migration
+  # placeholders (stripe_id migrated_*) are excluded so a real Stripe subscription can
+  # replace imported rows.
+  #
+  # Incomplete alone is not treated as "already active" for saved-payment activation —
+  # create_stripe_subscription/2 retries those with a new payment method. Hard blockers
+  # (active, trialing, past_due, unpaid, paused) still short-circuit activation.
   defp duplicate_create_blocked_by_existing_subscription?(
          %Ysc.Accounts.User{} = user
        ) do
-    not is_nil(find_blocking_subscription(user))
+    case find_blocking_subscription(user) do
+      %Subscription{stripe_status: "incomplete"} -> false
+      %Subscription{} -> true
+      nil -> false
+    end
   end
 
   defp subscription_blocks_new_stripe_duplicate?(%Subscription{} = sub) do
@@ -1354,10 +1363,18 @@ defmodule Ysc.Subscriptions do
   # very first invoice was never paid — can be retried with a new payment
   # method instead of leaving the user permanently stuck. Other blocking
   # statuses (active, trialing, past_due, paused) are left as a hard block.
+  #
+  # Hard blockers are preferred over incomplete: list_subscriptions/1 has no
+  # stable order, and retrying an incomplete invoice while another real
+  # subscription already exists would risk double-billing.
   defp find_blocking_subscription(%Ysc.Accounts.User{} = user) do
-    user
-    |> list_subscriptions()
-    |> Enum.find(&subscription_blocks_new_stripe_duplicate?/1)
+    blocking =
+      user
+      |> list_subscriptions()
+      |> Enum.filter(&subscription_blocks_new_stripe_duplicate?/1)
+
+    Enum.find(blocking, &(&1.stripe_status != "incomplete")) ||
+      Enum.find(blocking, &(&1.stripe_status == "incomplete"))
   end
 
   # Retries an "incomplete" subscription (first invoice never paid) using a
@@ -1418,14 +1435,22 @@ defmodule Ysc.Subscriptions do
                })
              end) do
           {:ok, _paid_invoice} ->
+            refreshed_sub =
+              case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+                     stripe_subscription_module().retrieve(stripe_sub.id)
+                   end) do
+                {:ok, sub} -> sub
+                {:error, _} -> stripe_sub
+              end
+
             Ysc.Logging.info(
               "Retried incomplete subscription with new payment method",
               user_id: user.id,
-              stripe_subscription_id: stripe_sub.id,
+              stripe_subscription_id: refreshed_sub.id,
               invoice_id: invoice_id
             )
 
-            {:ok, stripe_sub}
+            {:ok, refreshed_sub}
 
           {:error, error} = err ->
             Ysc.Logging.warning(

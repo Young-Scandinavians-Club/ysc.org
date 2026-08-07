@@ -931,6 +931,23 @@ defmodule Ysc.PaymentsTest do
         Payments.set_default_payment_method(user, pm)
       end
     end
+
+    test "rejects a payment method owned by a different user" do
+      owner = user_fixture()
+      caller = user_fixture()
+
+      foreign_pm =
+        create_payment_method_fixture(%{user_id: owner.id, is_default: true})
+
+      caller_pm =
+        create_payment_method_fixture(%{user_id: caller.id, is_default: true})
+
+      assert {:error, :payment_method_not_owned_by_user} =
+               Payments.set_default_payment_method(caller, foreign_pm)
+
+      assert Payments.get_payment_method!(foreign_pm.id).is_default
+      assert Payments.get_default_payment_method(caller).id == caller_pm.id
+    end
   end
 
   describe "push_default_payment_method_to_stripe/2" do
