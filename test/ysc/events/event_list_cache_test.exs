@@ -26,7 +26,8 @@ defmodule Ysc.Events.EventListCacheTest do
       past =
         event_fixture(%{
           title: "Past #{System.unique_integer()}",
-          start_date: DateTime.add(DateTime.utc_now(), -30, :day)
+          start_date: DateTime.add(DateTime.utc_now(), -30, :day),
+          end_date: DateTime.add(DateTime.utc_now(), -29, :day)
         })
 
       first = EventListCache.list_past_events(20)
@@ -40,7 +41,8 @@ defmodule Ysc.Events.EventListCacheTest do
       past =
         event_fixture(%{
           title: "Old Past",
-          start_date: DateTime.add(DateTime.utc_now(), -10, :day)
+          start_date: DateTime.add(DateTime.utc_now(), -10, :day),
+          end_date: DateTime.add(DateTime.utc_now(), -9, :day)
         })
 
       EventListCache.list_past_events(20)

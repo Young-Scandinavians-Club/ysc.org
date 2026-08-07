@@ -23,6 +23,86 @@ defmodule Ysc.Events do
 
   @max_sales_chart_days 120
 
+  # Timezone used to evaluate when an event's visibility on the public
+  # events page should end. Events without a specific end date/time are
+  # ambiguous about when they're "over", so they get a one-day grace period
+  # instead of vanishing at the stroke of midnight UTC.
+  @event_timezone "America/Los_Angeles"
+
+  # Whether an event should still be treated as "upcoming": true until the
+  # end date/time passes (falling back to the start date/time, then to a
+  # day-after grace period, when no explicit end or time is set).
+  defp event_upcoming_dynamic do
+    dynamic(
+      [e],
+      fragment(
+        """
+        CASE
+          WHEN ? IS NOT NULL AND ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          ELSE
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+        END > ?
+        """,
+        e.end_date,
+        e.end_time,
+        e.end_date,
+        e.end_time,
+        ^@event_timezone,
+        e.end_date,
+        e.end_date,
+        ^@event_timezone,
+        e.start_time,
+        e.start_date,
+        e.start_time,
+        ^@event_timezone,
+        e.start_date,
+        ^@event_timezone,
+        ^DateTime.utc_now()
+      )
+    )
+  end
+
+  # Inverse of `event_upcoming_dynamic/0`, for the "past events" list.
+  defp event_past_dynamic do
+    dynamic(
+      [e],
+      fragment(
+        """
+        CASE
+          WHEN ? IS NOT NULL AND ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+          WHEN ? IS NOT NULL THEN
+            ((?)::date + ?) AT TIME ZONE ?
+          ELSE
+            ((?)::date + INTERVAL '1 day') AT TIME ZONE ?
+        END <= ?
+        """,
+        e.end_date,
+        e.end_time,
+        e.end_date,
+        e.end_time,
+        ^@event_timezone,
+        e.end_date,
+        e.end_date,
+        ^@event_timezone,
+        e.start_time,
+        e.start_date,
+        e.start_time,
+        ^@event_timezone,
+        e.start_date,
+        ^@event_timezone,
+        ^DateTime.utc_now()
+      )
+    )
+  end
+
   def subscribe() do
     Phoenix.PubSub.subscribe(Ysc.PubSub, topic())
   end
@@ -675,7 +755,7 @@ defmodule Ysc.Events do
 
   def count_upcoming_events_from_db do
     from(e in Event,
-      where: e.start_date > ^DateTime.utc_now(),
+      where: ^event_upcoming_dynamic(),
       where: e.state in [:published, :cancelled]
     )
     |> Repo.aggregate(:count, :id)
@@ -688,7 +768,7 @@ defmodule Ysc.Events do
   def has_more_past_events?(limit) do
     # Count events and check if there are more than the limit
     from(e in Event,
-      where: e.start_date <= ^DateTime.utc_now(),
+      where: ^event_past_dynamic(),
       where: e.state in [:published, :cancelled],
       select: count(e.id)
     )
@@ -708,7 +788,7 @@ defmodule Ysc.Events do
 
     events =
       from(e in Event,
-        where: e.start_date > ^DateTime.utc_now(),
+        where: ^event_upcoming_dynamic(),
         where: e.state in [:published, :cancelled],
         left_join: t in Ticket,
         on:
@@ -919,7 +999,7 @@ defmodule Ysc.Events do
 
     events =
       from(e in Event,
-        where: e.start_date <= ^DateTime.utc_now(),
+        where: ^event_past_dynamic(),
         where: e.state in [:published, :cancelled],
         left_join: t in Ticket,
         on:
