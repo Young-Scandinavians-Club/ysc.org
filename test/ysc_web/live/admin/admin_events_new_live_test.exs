@@ -178,6 +178,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
 
       reloaded = Events.get_event!(event.id)
       assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
     end
 
     test "in-progress date pick survives a concurrent form validate", %{
@@ -399,7 +400,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       reloaded = Events.get_event!(event.id)
       assert DateTime.to_date(reloaded.start_date) == new_date
       assert DateTime.to_date(reloaded.end_date) == new_date
-      assert reloaded.publish_at == nil
+      assert reloaded.publish_at == publish_at
     end
   end
 

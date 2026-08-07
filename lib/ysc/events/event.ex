@@ -238,10 +238,11 @@ defmodule Ysc.Events.Event do
         changeset
 
       # Published events often keep a historical publish_at. Moving the event
-      # earlier must not be blocked by that stale schedule — clear it instead.
+      # earlier must not be blocked by that stale schedule — leave publish_at
+      # unchanged and skip the ordering error for editor date updates.
       get_field(changeset, :state) == :published and
           not changed?(changeset, :publish_at) ->
-        put_change(changeset, :publish_at, nil)
+        changeset
 
       true ->
         add_error(

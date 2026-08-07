@@ -370,12 +370,8 @@ defmodule YscWeb.AdminEventsNewLive do
                       form={@form}
                       start_date_field={@form[:start_date]}
                       end_date_field={@form[:end_date]}
-                      min={
-                        DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-                      }
-                      today={
-                        DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-                      }
+                      min={Date.add(@pacific_today, -365)}
+                      today={@pacific_today}
                       allow_saturdays={true}
                       min_nights={0}
                       max_nights={365}
@@ -1375,6 +1371,7 @@ defmodule YscWeb.AdminEventsNewLive do
 
     capacity_attrs = %{"unlimited_capacity" => is_nil(event.max_attendees)}
     capacity_changeset = Event.changeset(event, capacity_attrs)
+    pacific_today = pacific_today()
 
     socket
     |> assign(:event, event)
@@ -1384,6 +1381,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:description_length, description_length(event.description))
     |> assign(:event_title, event.title)
     |> assign(:state, event.state)
+    |> assign(:pacific_today, pacific_today)
     |> assign(:start_date, event.start_date)
     |> assign(:end_date, event.end_date)
     |> assign(:start_time, event.start_time)
@@ -1428,6 +1426,7 @@ defmodule YscWeb.AdminEventsNewLive do
     |> assign(:list_params, Map.drop(params, ["id"]))
     |> assign(:event_title, "")
     |> assign(:state, :draft)
+    |> assign(:pacific_today, pacific_today())
     |> assign(:start_date, nil)
     |> assign(:end_date, nil)
     |> assign(:start_time, nil)
@@ -2505,7 +2504,7 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info({:updated_event, %{id: "event_date"} = data}, socket) do
     current_event = Events.get_event!(socket.assigns.event.id)
 
-    attrs =
+    {attrs, cleared_end_time?} =
       %{
         start_date: data[:start_date],
         end_date: data[:end_date]
@@ -2541,15 +2540,25 @@ defmodule YscWeb.AdminEventsNewLive do
       |> assign_form(updated_changeset)
 
     socket =
-      if save_error? do
-        YscWeb.Flash.put_toast(
-          socket,
-          :error,
-          "Could not save event dates. Check the form for errors.",
-          title: "Event"
-        )
-      else
-        socket
+      cond do
+        save_error? ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :error,
+            "Could not save event dates. Check the form for errors.",
+            title: "Event"
+          )
+
+        cleared_end_time? ->
+          YscWeb.Flash.put_toast(
+            socket,
+            :info,
+            "End time was cleared because it was overnight or after the start time on a single-day event.",
+            title: "Event"
+          )
+
+        true ->
+          socket
       end
 
     {:noreply, socket}
@@ -2989,12 +2998,14 @@ defmodule YscWeb.AdminEventsNewLive do
     same_day? = start_date != nil and end_date != nil and start_date == end_date
 
     if same_day? and overnight_or_inverted_times?(event) do
-      Map.put(attrs, :end_time, nil)
+      {Map.put(attrs, :end_time, nil), true}
     else
-      attrs
+      {attrs, false}
     end
   end
 
+  # Equality is intentional: a zero-length same-day window (end == start) is
+  # treated as inverted / invalid for a single-day event, same as overnight.
   defp overnight_or_inverted_times?(%{
          start_time: start_time,
          end_time: end_time
@@ -3009,6 +3020,10 @@ defmodule YscWeb.AdminEventsNewLive do
   defp date_only(%Date{} = date), do: date
   defp date_only(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_date(ndt)
   defp date_only(_), do: nil
+
+  defp pacific_today do
+    DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+  end
 
   defp build_location_attrs(params) do
     params

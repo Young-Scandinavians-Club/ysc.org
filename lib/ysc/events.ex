@@ -697,7 +697,7 @@ defmodule Ysc.Events do
   def update_event_editor(%Event{} = event, attrs) do
     event
     |> Event.editor_changeset(attrs)
-    |> Repo.update()
+    |> Repo.update(stale_error_field: :lock_version)
     |> finalize_event_update()
   end
 

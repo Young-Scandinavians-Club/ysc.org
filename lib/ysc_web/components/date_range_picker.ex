@@ -386,8 +386,7 @@ defmodule YscWeb.Components.DateRangePicker do
     range_end =
       to_datetime(socket.assigns.range_end || socket.assigns.range_start)
 
-    [range_start, range_end] =
-      Enum.sort([range_start, range_end], &(DateTime.compare(&1, &2) != :gt))
+    {range_start, range_end} = normalize_sorted_range(range_start, range_end)
 
     attrs = %{
       id: socket.assigns.id,
@@ -842,7 +841,7 @@ defmodule YscWeb.Components.DateRangePicker do
       alias Ysc.Bookings.SeasonHelpers
 
       if SeasonHelpers.date_selectable?(property, day, today, seasons) do
-        check_other_rules(
+        check_end_date_rules(
           day,
           range_start,
           state,
@@ -854,7 +853,7 @@ defmodule YscWeb.Components.DateRangePicker do
         true
       end
     else
-      check_other_rules(
+      check_end_date_rules(
         day,
         range_start,
         state,
@@ -863,26 +862,6 @@ defmodule YscWeb.Components.DateRangePicker do
         min_nights
       )
     end
-  end
-
-  # Check other date rules (Saturday, range validation, etc.).
-  # Saturday check-in is allowed for Tahoe; checkout rules enforce Sat→Sun only.
-  defp check_other_rules(
-         day,
-         range_start,
-         state,
-         allow_saturdays,
-         max_nights,
-         min_nights
-       ) do
-    check_end_date_rules(
-      day,
-      range_start,
-      state,
-      allow_saturdays,
-      max_nights,
-      min_nights
-    )
   end
 
   defp saturday?(day) do
@@ -903,7 +882,7 @@ defmodule YscWeb.Components.DateRangePicker do
        ) do
     case state do
       :set_end when not is_nil(range_start) ->
-        validate_end_date_range(
+        not end_date_allowed?(
           day,
           range_start,
           allow_saturdays,
@@ -916,7 +895,9 @@ defmodule YscWeb.Components.DateRangePicker do
     end
   end
 
-  defp validate_end_date_range(
+  # Shared end-date rules for disable checks and click validation.
+  # Returns true when `day` is an allowed checkout / range end.
+  defp end_date_allowed?(
          day,
          range_start,
          allow_saturdays,
@@ -928,44 +909,34 @@ defmodule YscWeb.Components.DateRangePicker do
 
     cond do
       nights > max_nights ->
-        true
+        false
 
       # Days before the current start stay clickable when same-day ranges are
       # allowed so the user can restart on an earlier date (events).
       nights < 0 and min_nights == 0 ->
-        false
+        true
 
       nights < min_nights ->
-        true
+        false
 
       # Saturday check-out always leaves Sat without Sun in the inclusive span
       saturday?(day) && !allow_saturdays ->
-        true
+        false
 
       # Saturday check-in: only Sunday checkout (one night)
       saturday?(start_date) && !allow_saturdays &&
           not (nights == 1 && sunday?(day)) ->
+        false
+
+      allow_saturdays ->
         true
 
       true ->
-        check_saturday_sunday_range(start_date, day, allow_saturdays)
-    end
-  end
-
-  defp check_saturday_sunday_range(start_date, day, allow_saturdays) do
-    if allow_saturdays do
-      false
-    else
-      date_range = Date.range(start_date, day) |> Enum.to_list()
-      day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
-      has_saturday = 6 in day_of_weeks
-      has_sunday = 7 in day_of_weeks
-
-      if has_saturday && not has_sunday do
-        true
-      else
-        false
-      end
+        date_range = Date.range(start_date, day) |> Enum.to_list()
+        day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
+        has_saturday = 6 in day_of_weeks
+        has_sunday = 7 in day_of_weeks
+        not (has_saturday and not has_sunday)
     end
   end
 
@@ -1016,35 +987,13 @@ defmodule YscWeb.Components.DateRangePicker do
 
     case socket.assigns.state do
       :set_end when not is_nil(socket.assigns.range_start) ->
-        start_date =
-          DateTime.to_date(to_datetime(socket.assigns.range_start))
-
-        nights = Date.diff(date_day, start_date)
-
-        cond do
-          nights < 0 and min_nights == 0 ->
-            true
-
-          nights < min_nights or nights > max_nights ->
-            false
-
-          saturday?(date_day) && !allow_saturdays ->
-            false
-
-          saturday?(start_date) && !allow_saturdays &&
-              not (nights == 1 && sunday?(date_day)) ->
-            false
-
-          allow_saturdays ->
-            true
-
-          true ->
-            date_range = Date.range(start_date, date_day) |> Enum.to_list()
-            day_of_weeks = Enum.map(date_range, &Date.day_of_week/1)
-            has_saturday = 6 in day_of_weeks
-            has_sunday = 7 in day_of_weeks
-            not (has_saturday && not has_sunday)
-        end
+        end_date_allowed?(
+          date_day,
+          socket.assigns.range_start,
+          allow_saturdays,
+          max_nights,
+          min_nights
+        )
 
       _ ->
         true
@@ -1193,6 +1142,19 @@ defmodule YscWeb.Components.DateRangePicker do
   end
 
   defp from_str!(date_time_str), do: date_time_str
+
+  # Ensure range endpoints are comparable DateTimes (or both nil) before sort.
+  # Preserves range_end falling back to range_start at the call site.
+  defp normalize_sorted_range(nil, nil), do: {nil, nil}
+  defp normalize_sorted_range(%DateTime{} = start, nil), do: {start, start}
+  defp normalize_sorted_range(nil, %DateTime{} = ending), do: {ending, ending}
+
+  defp normalize_sorted_range(%DateTime{} = start, %DateTime{} = ending) do
+    [range_start, range_end] =
+      Enum.sort([start, ending], &(DateTime.compare(&1, &2) != :gt))
+
+    {range_start, range_end}
+  end
 
   defp to_datetime(nil), do: nil
   defp to_datetime(%DateTime{} = dt), do: DateTime.truncate(dt, :second)
