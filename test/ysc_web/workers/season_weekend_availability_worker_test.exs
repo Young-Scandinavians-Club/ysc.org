@@ -5,12 +5,15 @@ defmodule YscWeb.Workers.SeasonWeekendAvailabilityWorkerTest do
   import Ysc.AccountsFixtures
   import Ysc.BookingsFixtures
 
+  alias Ysc.Accounts.User
   alias Ysc.Bookings.Season
   alias Ysc.Repo
   alias YscWeb.Workers.SeasonWeekendAvailabilityWorker
 
   setup do
     seed_canonical_seasons!()
+    # Ignore any users committed outside the sandbox (local DB pollution).
+    Repo.update_all(from(u in User), set: [event_notifications: false])
     :ok
   end
 
