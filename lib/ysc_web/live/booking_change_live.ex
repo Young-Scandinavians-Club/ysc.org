@@ -560,6 +560,7 @@ defmodule YscWeb.BookingChangeLive do
                 property={@booking.property}
                 today={@today}
                 seasons={@seasons}
+                min_nights={1}
                 max_nights={@max_nights}
                 allow_saturdays={@booking.property == :clear_lake}
                 date_tooltips={@checkin_date_tooltips}

@@ -659,8 +659,10 @@ defmodule YscWeb.Components.DateRangePicker do
   end
 
   defp calculate_date_ranges(:set_start, date_time, assigns) do
-    # Event pickers (min_nights: 0) complete a single-day selection on the first
-    # click; a second click can still extend the end date.
+    # min_nights: 0 (admin events) — first click selects a single day; a later
+    # click can still extend the end date into a multi-day range.
+    # min_nights: 1+ (bookings) — first click only sets check-in; checkout must
+    # be a later day (at least one night).
     if Map.get(assigns, :min_nights, 1) == 0 do
       %{
         range_start: date_time,

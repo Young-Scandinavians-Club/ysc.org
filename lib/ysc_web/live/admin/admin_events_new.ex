@@ -362,6 +362,8 @@ defmodule YscWeb.AdminEventsNewLive do
                 <h3 class="text-lg font-medium">Date and Time</h3>
                 <div class="flex flex-row w-full space-x-4">
                   <div class="flex">
+                    <%!-- Events: min_nights 0 = single day or multi-day range.
+                         Booking calendars keep the default of 1 night minimum. --%>
                     <.date_range_picker
                       label="Date*"
                       id="event_date"

@@ -1262,8 +1262,12 @@ defmodule YscWeb.CoreComponents do
 
   attr(:min_nights, :integer,
     default: 1,
-    doc:
-      "Minimum nights between start and end (0 allows same-day single-date ranges)"
+    doc: """
+    Minimum nights between start and end.
+    Booking calendars keep the default of 1 (checkout must be after check-in).
+    Pass 0 for admin event dates so a single calendar day is allowed, with an
+    optional later click to extend into a multi-day range.
+    """
   )
 
   attr(:checkout_date_tooltips, :map,
