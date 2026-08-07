@@ -39,6 +39,25 @@ defmodule Ysc.Test.SwooshAdapterRaisesConstraintError do
   end
 end
 
+defmodule Ysc.Test.SwooshAdapterThrottlingError do
+  @moduledoc """
+  Returns an SES-style throttling error tuple so tests can exercise the
+  `:rate_limited` category branch of `Ysc.Email.DeliveryError.classify/1`
+  (and the `RateLimiter.throttle!/1` call it triggers in
+  `Ysc.Messages.deliver_claimed_email/3`).
+  """
+  use Swoosh.Adapter
+
+  @impl Swoosh.Adapter
+  def deliver(_email, _config) do
+    {:error, %{code: "ThrottlingException", message: "Rate exceeded"}}
+  end
+
+  @impl Swoosh.Adapter
+  def deliver_many([first | _], config), do: deliver(first, config)
+  def deliver_many([], _config), do: :ok
+end
+
 defmodule Ysc.Test.SwooshAdapterRaisesRuntimeError do
   @moduledoc false
   use Swoosh.Adapter

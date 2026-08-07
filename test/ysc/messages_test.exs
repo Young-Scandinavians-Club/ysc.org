@@ -1407,7 +1407,10 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
   """
   use Ysc.DataCase, async: false
 
+  import Swoosh.TestAssertions
+
   alias Ysc.Messages
+  alias Ysc.Messages.MessageIdempotency
 
   setup do
     prev = Application.get_env(:ysc, Ysc.Mailer) || []
@@ -1754,6 +1757,387 @@ defmodule Ysc.MessagesTest.EmailDeliveryRescueAndSesEdgeCases do
       assert meta.recipient == "runtime-fail@example.com"
     end
   end
+
+  describe "run_send_message_idempotent/2 — delivery_retry claim contention" do
+    test "returns {:error, {:delivery, _}} with transient/delivery_in_progress when another sender already claimed the lease" do
+      key =
+        "em_busy_" <> Integer.to_string(System.unique_integer([:positive]))
+
+      attrs = %{
+        message_type: :email,
+        idempotency_key: key,
+        message_template: "booking_confirmation",
+        params: %{},
+        email: "busy@example.com",
+        rendered_message: "<p>x</p>",
+        delivery_retry: true
+      }
+
+      assert {:ok, delivery} = Messages.ensure_email_delivery(attrs)
+
+      future = DateTime.utc_now() |> DateTime.add(300, :second) |> DateTime.truncate(:second)
+
+      delivery
+      |> Ysc.Messages.MessageIdempotency.changeset(%{
+        delivery_status: :sending,
+        delivery_lease_expires_at: future
+      })
+      |> Ysc.Repo.update!()
+
+      assert {:error, {:delivery, delivery_error}} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Swoosh.Email.to("busy@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("Busy")
+                 |> Swoosh.Email.text_body("x"),
+                 attrs
+               )
+
+      assert delivery_error.category == :transient
+      assert delivery_error.code == "delivery_in_progress"
+    end
+
+    test "treats an already-accepted delivery as a duplicate and does not re-send" do
+      key =
+        "em_accepted_" <> Integer.to_string(System.unique_integer([:positive]))
+
+      attrs = %{
+        message_type: :email,
+        idempotency_key: key,
+        message_template: "booking_confirmation",
+        params: %{},
+        email: "accepted@example.com",
+        rendered_message: "<p>x</p>",
+        delivery_retry: true
+      }
+
+      assert {:ok, delivery} = Messages.ensure_email_delivery(attrs)
+
+      delivery
+      |> Ysc.Messages.MessageIdempotency.changeset(%{delivery_status: :accepted})
+      |> Ysc.Repo.update!()
+
+      assert {:ok, _email} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Swoosh.Email.to("accepted@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("Already accepted")
+                 |> Swoosh.Email.text_body("x"),
+                 attrs
+               )
+
+      assert_no_email_sent()
+    end
+
+    test "returns {:error, {:snooze, seconds}} when the SES rate limiter is exceeded" do
+      prev_max = Application.get_env(:ysc, :ses_max_send_rate)
+      prev_window = Application.get_env(:ysc, :ses_rate_window_seconds)
+
+      on_exit(fn ->
+        Application.put_env(:ysc, :ses_max_send_rate, prev_max)
+        Application.put_env(:ysc, :ses_rate_window_seconds, prev_window)
+      end)
+
+      Application.put_env(:ysc, :ses_max_send_rate, 1)
+      Application.put_env(:ysc, :ses_rate_window_seconds, 60)
+
+      base_key = "em_ratelimit_" <> Integer.to_string(System.unique_integer([:positive]))
+
+      build_attrs = fn key ->
+        %{
+          message_type: :email,
+          idempotency_key: key,
+          message_template: "booking_confirmation",
+          params: %{},
+          email: "ratelimit@example.com",
+          rendered_message: "<p>x</p>",
+          delivery_retry: true
+        }
+      end
+
+      email =
+        Swoosh.Email.new()
+        |> Swoosh.Email.to("ratelimit@example.com")
+        |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+        |> Swoosh.Email.subject("Rate limit")
+        |> Swoosh.Email.text_body("x")
+
+      # First send establishes the rate-limit window and succeeds.
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(
+                 email,
+                 build_attrs.(base_key <> "_1")
+               )
+
+      # Second send (different idempotency key, same window) exceeds max_send_rate: 1.
+      assert {:error, {:snooze, seconds}} =
+               Messages.run_send_message_idempotent(
+                 email,
+                 build_attrs.(base_key <> "_2")
+               )
+
+      assert is_integer(seconds)
+      assert seconds > 0
+    end
+  end
+
+  describe "mark_email_terminal/2" do
+    test "marks a matching delivery row as terminal_failed and stores the error" do
+      key =
+        "em_terminal_" <> Integer.to_string(System.unique_integer([:positive]))
+
+      attrs = %{
+        message_type: :email,
+        idempotency_key: key,
+        message_template: "booking_confirmation",
+        params: %{},
+        email: "terminal@example.com",
+        rendered_message: nil,
+        delivery_retry: true
+      }
+
+      assert {:ok, _delivery} = Messages.ensure_email_delivery(attrs)
+
+      delivery_error = %{
+        category: :permanent,
+        code: "MessageRejected",
+        message: "invalid recipient"
+      }
+
+      parent = self()
+
+      ref =
+        :telemetry.attach(
+          "ysc-messages-mark-terminal-#{key}",
+          [:ysc, :email, :terminal_failed],
+          fn _event, _measurements, metadata, _ ->
+            if metadata[:idempotency_key] == key do
+              send(parent, {:terminal_failed_telemetry, metadata})
+            end
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert :ok = Messages.mark_email_terminal(attrs, delivery_error)
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.delivery_status == :terminal_failed
+      assert record.delivery_lease_expires_at == nil
+      assert record.accepted_at == nil
+      assert record.last_delivery_error["code"] == "MessageRejected"
+
+      assert_receive {:terminal_failed_telemetry, meta}, 3_000
+      assert meta.category == :permanent
+    end
+
+    test "returns :ok without error when no matching delivery row exists" do
+      attrs = %{
+        message_type: :email,
+        idempotency_key:
+          "em_terminal_missing_" <>
+            Integer.to_string(System.unique_integer([:positive])),
+        message_template: "booking_confirmation"
+      }
+
+      assert :ok =
+               Messages.mark_email_terminal(attrs, %{
+                 category: :permanent,
+                 code: "X",
+                 message: "irrelevant"
+               })
+    end
+  end
+
+  describe "run_send_message_idempotent/2 — deliver_claimed_email failure and rescue paths" do
+    test "transient Mailer failure with delivery_retry returns {:error, {:delivery, _}} and keeps delivery pending",
+         %{mailer_config: mailer_config} do
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config, adapter: Ysc.Test.FailingSwooshAdapter)
+      )
+
+      key =
+        "em_retry_fail_" <> Integer.to_string(System.unique_integer([:positive]))
+
+      attrs = %{
+        message_type: :email,
+        idempotency_key: key,
+        message_template: "booking_confirmation",
+        params: %{},
+        email: "retry-fail@example.com",
+        rendered_message: "<p>x</p>",
+        delivery_retry: true
+      }
+
+      assert {:error, {:delivery, delivery_error}} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Swoosh.Email.to("retry-fail@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("Retry fail")
+                 |> Swoosh.Email.text_body("x"),
+                 attrs
+               )
+
+      assert delivery_error.category == :transient
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.delivery_status == :pending
+      assert record.last_delivery_error["message"] =~ "smtp_unavailable"
+    end
+
+    test "rate_limited Mailer failure with delivery_retry calls RateLimiter.throttle! and emits ses_throttled telemetry",
+         %{mailer_config: mailer_config} do
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config,
+          adapter: Ysc.Test.SwooshAdapterThrottlingError
+        )
+      )
+
+      key =
+        "em_throttled_" <> Integer.to_string(System.unique_integer([:positive]))
+
+      attrs = %{
+        message_type: :email,
+        idempotency_key: key,
+        message_template: "booking_confirmation",
+        params: %{},
+        email: "throttled@example.com",
+        rendered_message: "<p>x</p>",
+        delivery_retry: true
+      }
+
+      parent = self()
+
+      ref =
+        :telemetry.attach(
+          "ysc-messages-ses-throttled-#{key}",
+          [:ysc, :email, :ses_throttled],
+          fn _event, _measurements, metadata, _ ->
+            if metadata[:idempotency_key] == key do
+              send(parent, {:ses_throttled, metadata})
+            end
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert {:error, {:delivery, delivery_error}} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Swoosh.Email.to("throttled@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("Throttled")
+                 |> Swoosh.Email.text_body("x"),
+                 attrs
+               )
+
+      assert delivery_error.category == :rate_limited
+      assert_receive {:ses_throttled, meta}, 3_000
+      assert meta.category == :rate_limited
+    end
+
+    test "exception raised by Mailer.deliver during delivery_retry is rescued and classified as unknown",
+         %{mailer_config: mailer_config} do
+      Application.put_env(
+        :ysc,
+        Ysc.Mailer,
+        Keyword.merge(mailer_config,
+          adapter: Ysc.Test.SwooshAdapterRaisesRuntimeError
+        )
+      )
+
+      key =
+        "em_retry_rescue_" <>
+          Integer.to_string(System.unique_integer([:positive]))
+
+      attrs = %{
+        message_type: :email,
+        idempotency_key: key,
+        message_template: "booking_confirmation",
+        params: %{},
+        email: "retry-rescue@example.com",
+        rendered_message: "<p>x</p>",
+        delivery_retry: true
+      }
+
+      assert {:error, {:delivery, delivery_error}} =
+               Messages.run_send_message_idempotent(
+                 Swoosh.Email.new()
+                 |> Swoosh.Email.to("retry-rescue@example.com")
+                 |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+                 |> Swoosh.Email.subject("Retry rescue")
+                 |> Swoosh.Email.text_body("x"),
+                 attrs
+               )
+
+      assert delivery_error.category == :unknown
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.delivery_status == :pending
+    end
+  end
+
+  describe "run_send_message_idempotent/2 — email_rendered_message fallback branches" do
+    test "falls back to text_body when html_body is blank and attrs omit rendered_message" do
+      key =
+        "em_render_text_" <>
+          Integer.to_string(System.unique_integer([:positive]))
+
+      email =
+        Swoosh.Email.new()
+        |> Swoosh.Email.to("render-text@example.com")
+        |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+        |> Swoosh.Email.subject("Text fallback")
+        |> Swoosh.Email.text_body("plain text body")
+
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(email, %{
+                 message_type: :email,
+                 idempotency_key: key,
+                 message_template: "booking_confirmation",
+                 params: %{},
+                 email: "render-text@example.com",
+                 delivery_retry: true
+               })
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.rendered_message == "plain text body"
+    end
+
+    test "leaves rendered_message nil when html_body, text_body, and attrs are all blank" do
+      key =
+        "em_render_nil_" <>
+          Integer.to_string(System.unique_integer([:positive]))
+
+      email =
+        Swoosh.Email.new()
+        |> Swoosh.Email.to("render-nil@example.com")
+        |> Swoosh.Email.from({"YSC", "noreply@ysc.org"})
+        |> Swoosh.Email.subject("No body")
+
+      assert {:ok, _} =
+               Messages.run_send_message_idempotent(email, %{
+                 message_type: :email,
+                 idempotency_key: key,
+                 message_template: "booking_confirmation",
+                 params: %{},
+                 email: "render-nil@example.com",
+                 delivery_retry: true
+               })
+
+      record = Ysc.Repo.get_by!(MessageIdempotency, idempotency_key: key)
+      assert record.rendered_message == nil
+    end
+  end
 end
 
 defmodule Ysc.MessagesTest.FlowrouteTestRaise do
@@ -1894,6 +2278,55 @@ defmodule Ysc.MessagesTest.FlowrouteTestRaise do
                    rendered_message: "[YSC] Body."
                  }
                )
+    end
+  end
+
+  describe "run_send_sms_idempotent/3 — SmsRateLimit exceeded" do
+    test "returns error without creating a record when per-minute limit is exceeded" do
+      phone = "12135551#{rem(System.unique_integer([:positive]), 900) + 100}"
+      # Pre-fill the SMS rate-limit cache so the very next check exceeds the
+      # 5-per-minute limit enforced by Ysc.SmsRateLimit.
+      for _ <- 1..5, do: Ysc.SmsRateLimit.record_sms_send(phone)
+
+      key = "sms_ratelimited_#{System.unique_integer([:positive])}"
+      parent = self()
+
+      ref =
+        :telemetry.attach(
+          "ysc-messages-sms-ratelimited-#{key}",
+          [:ysc, :sms, :rate_limit_exceeded],
+          fn _event, _measurements, metadata, _ ->
+            if metadata[:idempotency_key] == key do
+              send(parent, {:sms_rate_limit_exceeded, metadata})
+            end
+          end,
+          nil
+        )
+
+      on_exit(fn -> :telemetry.detach(ref) end)
+
+      assert {:error, reason} =
+               Messages.run_send_sms_idempotent(
+                 phone,
+                 "[YSC] Should be blocked.",
+                 %{
+                   message_type: :sms,
+                   idempotency_key: key,
+                   message_template: "booking_checkin_reminder",
+                   params: %{},
+                   phone_number: phone,
+                   rendered_message: "[YSC] Should be blocked."
+                 }
+               )
+
+      assert reason =~ "Rate limit exceeded"
+
+      refute Ysc.Repo.get_by(Ysc.Messages.MessageIdempotency,
+               idempotency_key: key
+             )
+
+      assert_receive {:sms_rate_limit_exceeded, meta}, 3_000
+      assert meta.recipient == phone
     end
   end
 end

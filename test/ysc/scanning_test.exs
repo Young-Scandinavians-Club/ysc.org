@@ -1422,4 +1422,436 @@ defmodule Ysc.ScanningTest do
       refute_receive {Scanning, %Ysc.MessagePassingEvents.TicketCheckedIn{}}
     end
   end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # process_scan — event_membership mode (auto check-in)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "process_scan/2 event_membership mode" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      %{admin: admin, event: event, session: session}
+    end
+
+    test "active member is scanned successfully and automatically checked in", %{
+      session: session
+    } do
+      user = make_active_member()
+      token = QrToken.sign_membership(user.id)
+
+      assert {:ok, result} = Scanning.process_scan(session, token)
+      assert result.status == :active
+      assert Scanning.member_checked_in?(session.id, user.id) == true
+    end
+
+    test "inactive member is scanned but not automatically checked in", %{
+      session: session
+    } do
+      user = user_fixture()
+      token = QrToken.sign_membership(user.id)
+
+      assert {:ok, result} = Scanning.process_scan(session, token)
+      assert result.status == :inactive
+      assert Scanning.member_checked_in?(session.id, user.id) == false
+    end
+
+    test "returns cross_mode error when scanning a ticket QR in an event_membership session",
+         %{session: session, admin: admin, event: event} do
+      member = make_active_member()
+      order = ticket_order_fixture(%{user: member, event: event})
+      order = confirm_tickets(order)
+      ticket = hd(order.tickets)
+      token = QrToken.sign_ticket(ticket.id)
+
+      assert {:error, :cross_mode, _message} =
+               Scanning.process_scan(session, token)
+
+      refute Scanning.member_checked_in?(session.id, admin.id)
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # check_in_member/3
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "check_in_member/3" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      %{admin: admin, session: session}
+    end
+
+    test "checks in an active member and records membership status/type", %{
+      session: session,
+      admin: admin
+    } do
+      user = make_active_member()
+
+      assert {:ok, check_in} = Scanning.check_in_member(session, user, admin)
+      assert check_in.membership_status == "active"
+      assert check_in.membership_type == "lifetime"
+      assert check_in.user_id == user.id
+      assert check_in.checked_in_by_id == admin.id
+      assert check_in.scan_session_id == session.id
+    end
+
+    test "checks in a user with no active membership as inactive", %{
+      session: session,
+      admin: admin
+    } do
+      user = user_fixture()
+
+      assert {:ok, check_in} = Scanning.check_in_member(session, user, admin)
+      assert check_in.membership_status == "inactive"
+      assert check_in.membership_type == nil
+    end
+
+    test "returns session_closed error when the session has been closed", %{
+      session: session,
+      admin: admin
+    } do
+      {:ok, closed} = Scanning.close_session(session.id)
+      user = make_active_member()
+
+      assert {:error, :session_closed, message} =
+               Scanning.check_in_member(closed, user, admin)
+
+      assert message =~ "no longer accepting check-ins"
+    end
+
+    test "returns already_checked_in on duplicate check-in", %{
+      session: session,
+      admin: admin
+    } do
+      user = make_active_member()
+
+      assert {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      assert {:error, :already_checked_in, message} =
+               Scanning.check_in_member(session, user, admin)
+
+      assert message =~ "already been checked in"
+    end
+
+    test "broadcasts a MemberCheckedIn event", %{session: session, admin: admin} do
+      user = make_active_member()
+      Scanning.subscribe_membership_checkin(session.id)
+
+      assert {:ok, _check_in} = Scanning.check_in_member(session, user, admin)
+
+      assert_receive {Scanning,
+                      %Ysc.MessagePassingEvents.MemberCheckedIn{
+                        session_id: session_id
+                      }}
+
+      assert session_id == session.id
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # undo_member_check_in/2
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "undo_member_check_in/2" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      %{admin: admin, session: session}
+    end
+
+    test "removes an existing check-in and broadcasts MemberCheckInUndone", %{
+      session: session,
+      admin: admin
+    } do
+      user = make_active_member()
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+      assert Scanning.member_checked_in?(session.id, user.id)
+
+      Scanning.subscribe_membership_checkin(session.id)
+
+      assert {:ok, :removed} =
+               Scanning.undo_member_check_in(session.id, user.id)
+
+      refute Scanning.member_checked_in?(session.id, user.id)
+
+      assert_receive {Scanning,
+                      %Ysc.MessagePassingEvents.MemberCheckInUndone{
+                        user_id: user_id,
+                        session_id: session_id
+                      }}
+
+      assert user_id == user.id
+      assert session_id == session.id
+    end
+
+    test "returns not_found when there is no check-in for the user", %{
+      session: session
+    } do
+      user = user_fixture()
+
+      assert {:error, :not_found, message} =
+               Scanning.undo_member_check_in(session.id, user.id)
+
+      assert message =~ "Check-in not found"
+    end
+
+    test "returns session_closed error when the session has been closed", %{
+      session: session,
+      admin: admin
+    } do
+      user = make_active_member()
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      {:ok, closed} = Scanning.close_session(session.id)
+
+      assert {:error, :session_closed, message} =
+               Scanning.undo_member_check_in(closed.id, user.id)
+
+      assert message =~ "no longer accepting changes"
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # list_membership_check_ins/2, membership_check_in_count/1, member_checked_in?/2
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "list_membership_check_ins/2" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      %{admin: admin, session: session}
+    end
+
+    test "lists checked-in users, most recent first", %{
+      session: session,
+      admin: admin
+    } do
+      user1 = make_active_member()
+      user2 = make_active_member()
+
+      {:ok, check_in1} = Scanning.check_in_member(session, user1, admin)
+
+      old_ts =
+        DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+
+      {:ok, _} =
+        check_in1
+        |> Ecto.Changeset.change(%{inserted_at: old_ts})
+        |> Ysc.Repo.update()
+
+      {:ok, _} = Scanning.check_in_member(session, user2, admin)
+
+      results = Scanning.list_membership_check_ins(session.id)
+      ids = Enum.map(results, & &1.user_id)
+
+      assert ids == [user2.id, user1.id]
+    end
+
+    test "returns empty list when search matches nothing", %{
+      session: session,
+      admin: admin
+    } do
+      user = make_active_member()
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      assert Scanning.list_membership_check_ins(session.id, "nonexistent-zzz") ==
+               []
+    end
+
+    test "search filters by name", %{session: session, admin: admin} do
+      user =
+        user_fixture(%{first_name: "Zelda", last_name: "Checkinsearch"})
+
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      results = Scanning.list_membership_check_ins(session.id, "Zelda")
+      assert Enum.any?(results, &(&1.user_id == user.id))
+
+      assert Scanning.list_membership_check_ins(session.id, "   ") != []
+    end
+  end
+
+  describe "membership_check_in_count/1 and member_checked_in?/2" do
+    test "counts checked-in members and reports membership", %{} do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      user1 = make_active_member()
+      user2 = make_active_member()
+
+      assert Scanning.membership_check_in_count(session.id) == 0
+      refute Scanning.member_checked_in?(session.id, user1.id)
+
+      {:ok, _} = Scanning.check_in_member(session, user1, admin)
+      assert Scanning.membership_check_in_count(session.id) == 1
+      assert Scanning.member_checked_in?(session.id, user1.id)
+      refute Scanning.member_checked_in?(session.id, user2.id)
+
+      {:ok, _} = Scanning.check_in_member(session, user2, admin)
+      assert Scanning.membership_check_in_count(session.id) == 2
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # search_users_for_checkin/2
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "search_users_for_checkin/2" do
+    setup do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      %{admin: admin, session: session}
+    end
+
+    test "returns [] for an empty query string", %{session: session} do
+      assert Scanning.search_users_for_checkin(session.id, "") == []
+    end
+
+    test "returns [] for a whitespace-only query", %{session: session} do
+      assert Scanning.search_users_for_checkin(session.id, "   ") == []
+    end
+
+    test "returns enriched results with membership status and checked_in? flag",
+         %{session: session, admin: admin} do
+      unique = System.unique_integer([:positive])
+
+      user =
+        user_fixture(%{
+          first_name: "Searchtarget#{unique}",
+          last_name: "Member"
+        })
+
+      user =
+        user
+        |> Ecto.Changeset.change(
+          lifetime_membership_awarded_at:
+            DateTime.truncate(DateTime.utc_now(), :second)
+        )
+        |> Ysc.Repo.update!()
+
+      results = Scanning.search_users_for_checkin(session.id, "Searchtarget#{unique}")
+
+      assert [%{user: found, membership_status: :active, checked_in?: false}] =
+               results
+
+      assert found.id == user.id
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      [after_checkin] =
+        Scanning.search_users_for_checkin(session.id, "Searchtarget#{unique}")
+
+      assert after_checkin.checked_in? == true
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # export_membership_checkins_csv/1
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "export_membership_checkins_csv/1" do
+    test "exports headers and a row per checked-in member" do
+      admin = user_fixture(%{role: "admin", first_name: "Desk", last_name: "Admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+      user = make_active_member()
+
+      {:ok, _} = Scanning.check_in_member(session, user, admin)
+
+      csv = Scanning.export_membership_checkins_csv(session.id)
+
+      assert csv =~ "Name,Email,Membership Status,Membership Type"
+      assert csv =~ user.email
+      assert csv =~ "active"
+      assert csv =~ "Desk Admin"
+    end
+
+    test "returns just the header row when there are no check-ins" do
+      admin = user_fixture(%{role: "admin"})
+      event = event_fixture(%{organizer_id: admin.id})
+      session = event_membership_session_fixture(event, admin)
+
+      csv = Scanning.export_membership_checkins_csv(session.id)
+      assert csv =~ "Name,Email,Membership Status,Membership Type"
+      refute csv =~ "@"
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # subscribe_membership_checkin/1 and broadcast_membership_checkin/2
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "subscribe_membership_checkin/1 and broadcast_membership_checkin/2" do
+    test "subscribers receive membership check-in events" do
+      session_id = Ecto.ULID.generate()
+      Scanning.subscribe_membership_checkin(session_id)
+
+      Scanning.broadcast_membership_checkin(
+        session_id,
+        %Ysc.MessagePassingEvents.MembershipSessionCompleted{
+          session_id: session_id
+        }
+      )
+
+      assert_receive {Scanning,
+                      %Ysc.MessagePassingEvents.MembershipSessionCompleted{
+                        session_id: ^session_id
+                      }}
+    end
+
+    test "non-subscribers do not receive membership check-in events" do
+      session_id = Ecto.ULID.generate()
+      other_session_id = Ecto.ULID.generate()
+      Scanning.subscribe_membership_checkin(other_session_id)
+
+      Scanning.broadcast_membership_checkin(
+        session_id,
+        %Ysc.MessagePassingEvents.MembershipSessionCompleted{
+          session_id: session_id
+        }
+      )
+
+      refute_receive {Scanning,
+                      %Ysc.MessagePassingEvents.MembershipSessionCompleted{}}
+    end
+  end
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # get_member_since/2 (via process_scan membership mode)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  describe "get_member_since/2 via process_scan" do
+    test "uses lifetime_membership_awarded_at for a lifetime member" do
+      session = scan_session_fixture()
+      user = make_active_member()
+      token = QrToken.sign_membership(user.id)
+
+      assert {:ok, result} = Scanning.process_scan(session, token)
+      assert result.member_since != nil
+    end
+
+    test "falls back to user.inserted_at when there is no membership info" do
+      session = scan_session_fixture()
+      user = user_fixture()
+      token = QrToken.sign_membership(user.id)
+
+      assert {:ok, result} = Scanning.process_scan(session, token)
+      assert DateTime.compare(result.member_since, user.inserted_at) == :eq
+    end
+  end
 end

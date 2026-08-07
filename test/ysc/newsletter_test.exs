@@ -1306,5 +1306,363 @@ defmodule Ysc.NewsletterTest do
       rows = Newsletter.count_clicks_by_link(edition.id)
       refute Enum.any?(rows, fn row -> row.url in [base, base <> "/"] end)
     end
+
+    test "count_clicks_by_link/1 resolves post titles for matching url_name" do
+      author = user_fixture(%{role: "admin"})
+
+      {:ok, post} =
+        Ysc.Posts.create_post(
+          %{
+            "title" => "Newsletter Click Post",
+            "body" => "Body",
+            "url_name" => "newsletter-click-post-#{System.unique_integer([:positive])}",
+            "state" => "published"
+          },
+          author
+        )
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Post title resolve", "subject" => "S"},
+          created_by_id: author.id
+        )
+
+      base = YscWeb.Endpoint.url() |> String.trim_trailing("/")
+
+      {:ok, _} =
+        Newsletter.record_email_event(%{
+          event_type: "click",
+          email: "post-title@example.com",
+          environment: "test",
+          edition_id: edition.id,
+          link_url: "#{base}/posts/#{post.url_name}"
+        })
+
+      rows = Newsletter.count_clicks_by_link(edition.id)
+
+      assert Enum.any?(rows, fn row ->
+               row.type == :post and row.title == "Newsletter Click Post"
+             end)
+    end
+  end
+
+  describe "notices" do
+    test "list_notices/0 returns empty list when there are none" do
+      assert Newsletter.list_notices() == []
+    end
+
+    test "create_notice/2 creates a notice with a creator" do
+      user = user_fixture()
+
+      assert {:ok, notice} =
+               Newsletter.create_notice(
+                 %{"name" => "Holiday hours", "body" => "<p>Closed</p>"},
+                 created_by_id: user.id
+               )
+
+      assert notice.name == "Holiday hours"
+      assert notice.creator_id == user.id
+    end
+
+    test "create_notice/2 without opts leaves creator_id nil" do
+      assert {:ok, notice} =
+               Newsletter.create_notice(%{
+                 "name" => "No creator",
+                 "body" => "<p>Body</p>"
+               })
+
+      assert notice.creator_id == nil
+    end
+
+    test "create_notice/2 returns a changeset error when required fields are missing" do
+      assert {:error, changeset} = Newsletter.create_notice(%{"name" => "Only name"})
+      assert %{body: [_ | _]} = errors_on(changeset)
+    end
+
+    test "list_notices/0 returns notices newest-updated first", %{} do
+      user = user_fixture()
+
+      {:ok, older} =
+        Newsletter.create_notice(
+          %{"name" => "Older", "body" => "<p>A</p>"},
+          created_by_id: user.id
+        )
+
+      {:ok, newer} =
+        Newsletter.create_notice(
+          %{"name" => "Newer", "body" => "<p>B</p>"},
+          created_by_id: user.id
+        )
+
+      old_ts =
+        DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+
+      {:ok, older} =
+        older
+        |> Ecto.Changeset.change(%{updated_at: old_ts})
+        |> Repo.update()
+
+      ids = Newsletter.list_notices() |> Enum.map(& &1.id)
+      newer_idx = Enum.find_index(ids, &(&1 == newer.id))
+      older_idx = Enum.find_index(ids, &(&1 == older.id))
+      assert newer_idx < older_idx
+    end
+
+    test "get_notice!/1 returns the notice with creator preloaded" do
+      user = user_fixture()
+
+      {:ok, notice} =
+        Newsletter.create_notice(
+          %{"name" => "Fetchable", "body" => "<p>X</p>"},
+          created_by_id: user.id
+        )
+
+      found = Newsletter.get_notice!(notice.id)
+      assert found.id == notice.id
+      assert found.creator.id == user.id
+    end
+
+    test "get_notice!/1 raises for an unknown id" do
+      assert_raise Ecto.NoResultsError, fn ->
+        Newsletter.get_notice!(Ecto.ULID.generate())
+      end
+    end
+
+    test "update_notice/2 updates fields" do
+      user = user_fixture()
+
+      {:ok, notice} =
+        Newsletter.create_notice(
+          %{"name" => "Before", "body" => "<p>Before</p>"},
+          created_by_id: user.id
+        )
+
+      assert {:ok, updated} =
+               Newsletter.update_notice(notice, %{"name" => "After"})
+
+      assert updated.name == "After"
+    end
+
+    test "delete_notice/1 removes the notice" do
+      user = user_fixture()
+
+      {:ok, notice} =
+        Newsletter.create_notice(
+          %{"name" => "To delete", "body" => "<p>X</p>"},
+          created_by_id: user.id
+        )
+
+      assert {:ok, _} = Newsletter.delete_notice(notice)
+
+      assert_raise Ecto.NoResultsError, fn ->
+        Newsletter.get_notice!(notice.id)
+      end
+    end
+  end
+
+  describe "duplicate_edition/2" do
+    test "copies editorial fields, appends \" (copy)\" to the title, and resets lifecycle fields" do
+      user = user_fixture()
+
+      {:ok, original} =
+        Newsletter.create_edition(
+          %{
+            "title" => "Original Title",
+            "subject" => "Original subject",
+            "intro_text" => "Intro"
+          },
+          created_by_id: user.id
+        )
+
+      {:ok, sent} =
+        original
+        |> Ecto.Changeset.change(%{
+          status: :sent,
+          sent_at: DateTime.utc_now() |> DateTime.truncate(:second),
+          sent_count: 42
+        })
+        |> Repo.update()
+
+      other_user = user_fixture()
+
+      assert {:ok, copy} =
+               Newsletter.duplicate_edition(sent, created_by_id: other_user.id)
+
+      assert copy.title == "Original Title (copy)"
+      assert copy.subject == "Original subject"
+      assert copy.intro_text == "Intro"
+      assert copy.status == :draft
+      assert copy.sent_at == nil
+      assert copy.sent_count == 0
+      assert copy.creator_id == other_user.id
+    end
+
+    test "falls back to \"Untitled\" when the original title is blank" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Blank source", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      {:ok, blank_titled} =
+        edition |> Ecto.Changeset.change(%{title: "   "}) |> Repo.update()
+
+      assert {:ok, copy} = Newsletter.duplicate_edition(blank_titled)
+      assert copy.title == "Untitled (copy)"
+    end
+  end
+
+  describe "send_edition/1 (success path)" do
+    test "marks the edition sending and enqueues a NewsletterSender job" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Send me", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, sending} = Newsletter.send_edition(edition)
+        assert sending.status == :sending
+
+        assert_enqueued(
+          worker: YscWeb.Workers.NewsletterSender,
+          args: %{"edition_id" => edition.id}
+        )
+      end)
+    end
+  end
+
+  describe "send_test_email/2" do
+    test "sends a one-off test copy without changing the edition" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{
+            "title" => "Test email edition",
+            "subject" => "Test subject",
+            "intro_text" => "Hello"
+          },
+          created_by_id: user.id
+        )
+
+      recipient = user_fixture()
+
+      assert :ok = Newsletter.send_test_email(edition, recipient)
+
+      reloaded = Newsletter.get_edition!(edition.id)
+      assert reloaded.status == :draft
+      assert reloaded.sent_count == 0
+    end
+  end
+
+  describe "list_recent_sent_editions_with_stats/1 default argument" do
+    test "uses the default limit of 5 when called with no arguments" do
+      assert Newsletter.list_recent_sent_editions_with_stats() == []
+    end
+  end
+
+  describe "valid_ulid?/1" do
+    test "returns false for non-binary input" do
+      refute Newsletter.valid_ulid?(12345)
+      refute Newsletter.valid_ulid?(nil)
+      refute Newsletter.valid_ulid?(%{})
+    end
+  end
+
+  describe "get_all_creators/0 display name fallbacks" do
+    test "falls back to email when first/last name are missing" do
+      user = user_fixture()
+
+      user
+      |> Ecto.Changeset.change(%{first_name: nil, last_name: nil})
+      |> Repo.update!()
+
+      {:ok, _} =
+        Newsletter.create_edition(
+          %{"title" => "Email fallback", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      creators = Newsletter.get_all_creators()
+      assert Enum.any?(creators, fn {name, id} -> id == user.id and name == user.email end)
+    end
+
+    test "falls back to \"Unknown\" when the edition has no creator" do
+      {:ok, _} =
+        Newsletter.create_edition(%{"title" => "No creator edition", "subject" => "S"})
+
+      creators = Newsletter.get_all_creators()
+      assert Enum.any?(creators, fn {name, id} -> id == nil and name == "Unknown" end)
+    end
+  end
+
+  describe "list_paginated_editions/2 error passthrough" do
+    test "returns error for invalid Flop params" do
+      assert {:error, _} =
+               Newsletter.list_paginated_editions(%{page: "not-an-integer"})
+    end
+  end
+
+  describe "confirm_subscription/1 with non-binary input" do
+    test "returns not_found without querying the database" do
+      assert {:error, :not_found} = Newsletter.confirm_subscription(nil)
+      assert {:error, :not_found} = Newsletter.confirm_subscription(12345)
+    end
+  end
+
+  describe "request_confirmation/2 changeset error passthrough" do
+    test "returns the changeset error unchanged when the pending record is invalid" do
+      assert {:error, %Ecto.Changeset{}} =
+               Newsletter.request_confirmation("bad-meta@example.com",
+                 metadata: "not-a-map"
+               )
+    end
+  end
+
+  describe "record_edition_delivery_progress/2 recipient_count already set" do
+    test "does not overwrite recipient_count on a second call" do
+      user = user_fixture()
+
+      {:ok, edition} =
+        Newsletter.create_edition(
+          %{"title" => "Progress twice", "subject" => "S"},
+          created_by_id: user.id
+        )
+
+      {:ok, sub1} =
+        Newsletter.subscribe("progress1@example.com", source: "public_signup")
+
+      {:ok, sub2} =
+        Newsletter.subscribe("progress2@example.com", source: "public_signup")
+
+      assert {:ok, first} =
+               Newsletter.record_edition_delivery_progress(edition, [sub1])
+
+      assert first.recipient_count == 1
+
+      assert {:ok, second} =
+               Newsletter.record_edition_delivery_progress(first, [sub1, sub2])
+
+      # recipient_count was already set, so the second call leaves it unchanged.
+      assert second.recipient_count == 1
+    end
+  end
+
+  describe "ci_query_explain_* helper queries" do
+    test "return valid Ecto queries" do
+      assert %Ecto.Query{} = Newsletter.ci_query_explain_query()
+      assert %Ecto.Query{} = Newsletter.ci_query_explain_notices_query()
+
+      assert %Ecto.Query{} =
+               Newsletter.ci_query_explain_unsubscribe_link_clicks_query()
+
+      assert %Ecto.Query{} =
+               Newsletter.ci_query_explain_confirmed_unsubscribes_query()
+    end
   end
 end
