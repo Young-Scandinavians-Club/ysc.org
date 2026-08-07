@@ -344,6 +344,63 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert reloaded.start_time == ~T[18:00:00]
       assert reloaded.end_time == nil
     end
+
+    test "published event with stale publish_at can move start earlier", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        Date.utc_today()
+        |> Date.add(20)
+        |> then(&DateTime.new!(&1, ~T[18:31:00], "Etc/UTC"))
+
+      # Historical schedule still on the event after it was published.
+      publish_at =
+        Date.utc_today()
+        |> Date.add(12)
+        |> then(&DateTime.new!(&1, ~T[15:45:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Stale Publish At Event",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: old_start,
+          start_time: ~T[18:31:00],
+          end_time: ~T[20:30:00],
+          state: :published,
+          publish_at: publish_at
+        })
+
+      assert event.publish_at
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      # Move earlier than publish_at (same class of bug as Aug 7/8 on a
+      # published event that still has publish_at set).
+      new_date = Date.add(Date.utc_today(), 3)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+      assert reloaded.publish_at == nil
+    end
   end
 
   describe "editor validate auto-save" do

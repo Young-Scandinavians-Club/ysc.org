@@ -2514,31 +2514,45 @@ defmodule YscWeb.AdminEventsNewLive do
 
     changeset = Event.editor_changeset(current_event, attrs)
 
-    {updated_event, updated_changeset} =
+    {updated_event, updated_changeset, save_error?} =
       if changeset.valid? do
         case Events.update_event_editor(current_event, attrs) do
           {:ok, event} ->
-            {event, Event.editor_changeset(event, attrs)}
+            {event, Event.editor_changeset(event, attrs), false}
 
           {:error, error_changeset} ->
-            {current_event, error_changeset}
+            {current_event, error_changeset, true}
         end
       else
-        {current_event, changeset}
+        {current_event, changeset, true}
       end
 
-    {:noreply,
-     socket
-     |> assign(:event, updated_event)
-     |> assign(:start_date, updated_event.start_date)
-     |> assign(:end_date, updated_event.end_date)
-     |> assign(:start_time, updated_event.start_time)
-     |> assign(:end_time, updated_event.end_time)
-     |> assign(
-       :can_publish,
-       can_publish?(updated_event.start_date, updated_event.title)
-     )
-     |> assign_form(updated_changeset)}
+    socket =
+      socket
+      |> assign(:event, updated_event)
+      |> assign(:start_date, updated_event.start_date)
+      |> assign(:end_date, updated_event.end_date)
+      |> assign(:start_time, updated_event.start_time)
+      |> assign(:end_time, updated_event.end_time)
+      |> assign(
+        :can_publish,
+        can_publish?(updated_event.start_date, updated_event.title)
+      )
+      |> assign_form(updated_changeset)
+
+    socket =
+      if save_error? do
+        YscWeb.Flash.put_toast(
+          socket,
+          :error,
+          "Could not save event dates. Check the form for errors.",
+          title: "Event"
+        )
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   # Ticket-tier sale date pickers (and any other date pickers) send the same

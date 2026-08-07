@@ -557,19 +557,17 @@ defmodule YscWeb.EventsListLiveTest do
       refute html =~ "Sold Out"
     end
 
-    test "shows Pacific-based days-left badge for an event whose UTC and Pacific calendar dates differ" do
+    test "shows days-left badge from the stored event calendar date" do
       organizer = user_fixture()
 
       today_pacific = DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
-      event_pacific_date = Date.add(today_pacific, 3)
+      event_calendar_date = Date.add(today_pacific, 3)
 
-      # Late-night Pacific time so the UTC calendar date lands a day ahead of
-      # the Pacific calendar date (e.g. 11:45pm PDT is already the next day
-      # in UTC), exercising the UTC/Pacific boundary mismatch.
+      # Event dates are Pacific wall-clock calendar days stored as UTC midnight
+      # of that day (not a true UTC instant of an evening Pacific time).
       start_date =
-        event_pacific_date
-        |> DateTime.new!(~T[23:45:00], "America/Los_Angeles")
-        |> DateTime.shift_zone!("Etc/UTC")
+        event_calendar_date
+        |> DateTime.new!(~T[00:00:00], "Etc/UTC")
         |> DateTime.truncate(:second)
 
       event =
