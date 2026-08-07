@@ -8444,22 +8444,17 @@ defmodule YscWeb.EventDetailsLive do
       now_time_pst = DateTime.to_time(now_pst)
       today_pst = DateTime.to_date(now_pst)
 
-      # Get event date in PST
-      event_date_pst =
+      # Event start_date is a Pacific wall-clock calendar day — use the date
+      # component as-is (do not shift UTC midnight into the previous Pacific day).
+      event_date =
         case event.start_date do
-          %DateTime{} = dt ->
-            dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-            DateTime.to_date(dt_pst)
-
-          %Date{} = d ->
-            d
-
-          _ ->
-            nil
+          %DateTime{} = dt -> DateTime.to_date(dt)
+          %Date{} = d -> d
+          _ -> nil
         end
 
       # Check if event is happening today
-      if event_date_pst == today_pst do
+      if event_date == today_pst do
         # Get start and end times
         start_time = format_time(event.start_time)
         end_time = format_time(event.end_time)
@@ -8492,24 +8487,16 @@ defmodule YscWeb.EventDetailsLive do
       now_time_pst = DateTime.to_time(now_pst)
       today_pst = DateTime.to_date(now_pst)
 
-      # Get event date in PST (convert DateTime to PST first if needed, then get Date)
-      event_date_pst =
+      # Event start_date is a Pacific wall-clock calendar day — use as-is.
+      event_date =
         case event.start_date do
-          %DateTime{} = dt ->
-            # Convert UTC DateTime to PST, then get the date
-            dt_pst = DateTime.shift_zone!(dt, "America/Los_Angeles")
-            DateTime.to_date(dt_pst)
-
-          %Date{} = d ->
-            # Date structs don't have timezone, use as-is
-            d
-
-          _ ->
-            nil
+          %DateTime{} = dt -> DateTime.to_date(dt)
+          %Date{} = d -> d
+          _ -> nil
         end
 
       # Only show pulse if event is happening today (in PST)
-      if event_date_pst == today_pst do
+      if event_date == today_pst do
         # Check if current time (in PST) is between agenda item start and end times
         # Agenda item times are stored as Time structs and are in PST context
         Time.compare(now_time_pst, agenda_item.start_time) != :lt &&

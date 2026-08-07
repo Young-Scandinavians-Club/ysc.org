@@ -1511,6 +1511,7 @@ defmodule YscWeb.TahoeBookingLive do
                         property={@property}
                         today={@today}
                         seasons={@seasons}
+                        min_nights={1}
                         max_nights={room_picker_max_nights(@seasons, @checkin_date)}
                         disabled={@date_tooltips_loading?}
                       />

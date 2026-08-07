@@ -1260,6 +1260,16 @@ defmodule YscWeb.CoreComponents do
     doc: "Maximum nights allowed for the selected date range"
   )
 
+  attr(:min_nights, :integer,
+    default: 1,
+    doc: """
+    Minimum nights between start and end.
+    Booking calendars keep the default of 1 (checkout must be after check-in).
+    Pass 0 for admin event dates so a single calendar day is allowed, with an
+    optional later click to extend into a multi-day range.
+    """
+  )
+
   attr(:checkout_date_tooltips, :map,
     default: %{},
     doc: "Unavailable checkout dates keyed by ISO date when selecting check-out"
@@ -1294,6 +1304,7 @@ defmodule YscWeb.CoreComponents do
       seasons={@seasons}
       allow_saturdays={@allow_saturdays}
       max_nights={@max_nights}
+      min_nights={@min_nights}
     />
     <div :if={Phoenix.Component.used_input?(@start_date_field)}>
       <.error :for={msg <- @start_date_field.errors}>
