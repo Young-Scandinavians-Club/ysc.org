@@ -237,10 +237,11 @@ defmodule Ysc.Events.Event do
       DateTime.compare(publish_at, start_datetime) != :gt ->
         changeset
 
-      # Published events often keep a historical publish_at. Moving the event
-      # earlier must not be blocked by that stale schedule — leave publish_at
-      # unchanged and skip the ordering error for editor date updates.
-      get_field(changeset, :state) == :published and
+      # Already-published events often keep a historical publish_at. Moving the
+      # event earlier must not be blocked by that stale schedule — leave
+      # publish_at unchanged and skip the ordering error. Use data.state so
+      # scheduled→published transitions still validate publish_at vs start.
+      changeset.data.state == :published and
           not changed?(changeset, :publish_at) ->
         changeset
 
