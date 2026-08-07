@@ -238,6 +238,60 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       assert DateTime.to_date(reloaded.start_date) == new_date
       assert DateTime.to_date(reloaded.end_date) == new_date
     end
+
+    test "single-day pick clears overnight end_time so the update can persist",
+         %{
+           conn: conn,
+           admin: admin
+         } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(15, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Overnight Event",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: DateTime.add(old_start, 1, :day),
+          start_time: ~T[18:00:00],
+          # Next-morning end time is valid across two days, invalid on one day
+          end_time: ~T[02:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      new_date = Date.add(Date.utc_today(), 5)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      # Confirm single day by selecting the same date as the end
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+      assert reloaded.start_time == ~T[18:00:00]
+      assert reloaded.end_time == nil
+    end
   end
 
   describe "editor validate auto-save" do

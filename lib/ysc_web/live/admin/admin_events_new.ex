@@ -370,6 +370,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       end_date_field={@form[:end_date]}
                       min={Date.utc_today()}
                       allow_saturdays={true}
+                      min_nights={0}
                       max_nights={365}
                     />
                   </div>
@@ -2497,10 +2498,12 @@ defmodule YscWeb.AdminEventsNewLive do
   def handle_info({:updated_event, %{id: "event_date"} = data}, socket) do
     current_event = Events.get_event!(socket.assigns.event.id)
 
-    attrs = %{
-      start_date: data[:start_date],
-      end_date: data[:end_date]
-    }
+    attrs =
+      %{
+        start_date: data[:start_date],
+        end_date: data[:end_date]
+      }
+      |> maybe_clear_end_time_for_single_day(current_event)
 
     changeset = Event.editor_changeset(current_event, attrs)
 
@@ -2522,6 +2525,8 @@ defmodule YscWeb.AdminEventsNewLive do
      |> assign(:event, updated_event)
      |> assign(:start_date, updated_event.start_date)
      |> assign(:end_date, updated_event.end_date)
+     |> assign(:start_time, updated_event.start_time)
+     |> assign(:end_time, updated_event.end_time)
      |> assign(
        :can_publish,
        can_publish?(updated_event.start_date, updated_event.title)
@@ -2952,6 +2957,37 @@ defmodule YscWeb.AdminEventsNewLive do
       |> assign(:event, updated_event)
     end
   end
+
+  # Multi-day events often keep an overnight end_time (e.g. 18:00 → 02:00).
+  # Collapsing to a single calendar day would make start > end and silently
+  # fail validation — clear the end time so the date change can persist.
+  defp maybe_clear_end_time_for_single_day(attrs, event) do
+    start_date = date_only(attrs[:start_date])
+    end_date = date_only(attrs[:end_date])
+
+    same_day? = start_date != nil and end_date != nil and start_date == end_date
+
+    if same_day? and overnight_or_inverted_times?(event) do
+      Map.put(attrs, :end_time, nil)
+    else
+      attrs
+    end
+  end
+
+  defp overnight_or_inverted_times?(%{
+         start_time: start_time,
+         end_time: end_time
+       })
+       when not is_nil(start_time) and not is_nil(end_time) do
+    Time.compare(end_time, start_time) != :gt
+  end
+
+  defp overnight_or_inverted_times?(_), do: false
+
+  defp date_only(%DateTime{} = dt), do: DateTime.to_date(dt)
+  defp date_only(%Date{} = date), do: date
+  defp date_only(%NaiveDateTime{} = ndt), do: NaiveDateTime.to_date(ndt)
+  defp date_only(_), do: nil
 
   defp build_location_attrs(params) do
     params
