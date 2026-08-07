@@ -171,7 +171,14 @@ defmodule Ysc.Payments do
     case upsert_payment_method_from_stripe(user, stripe_payment_method) do
       {:ok, payment_method} ->
         # Always set this payment method as default (replacing any existing default)
-        set_default_payment_method(user, payment_method)
+        case set_default_payment_method(user, payment_method) do
+          {:ok, updated_user} = result ->
+            push_default_payment_method_to_stripe(updated_user, payment_method)
+            result
+
+          error ->
+            error
+        end
 
       error ->
         error
@@ -240,6 +247,49 @@ defmodule Ysc.Payments do
         )
 
         {:error, reason}
+    end
+  end
+
+  @doc """
+  Pushes a user's local default payment method to Stripe so the Customer's
+  `invoice_settings.default_payment_method` matches what we show in the app.
+
+  Call this whenever a payment method is set as default from a user action
+  (e.g. adding a card during checkout, or picking one in account settings).
+  Without this, Stripe keeps using whatever payment method was on file when
+  a subscription was originally created — including a card that has since
+  been declined — so future automatic charges (renewals, retries) silently
+  keep hitting the old, dead payment method even though the app shows a new
+  default. This is best-effort: failures are logged, not raised, since the
+  local default is already the source of truth for the app's own UI.
+  """
+  def push_default_payment_method_to_stripe(user, payment_method) do
+    require Ysc.Logging
+
+    if user.stripe_id do
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_customer_module().update(user.stripe_id, %{
+               invoice_settings: %{
+                 default_payment_method: payment_method.provider_id
+               }
+             })
+           end) do
+        {:ok, _customer} ->
+          :ok
+
+        {:error, error} ->
+          Ysc.Logging.error(
+            "Failed to push default payment method to Stripe customer",
+            user_id: user.id,
+            payment_method_id: payment_method.id,
+            stripe_customer_id: user.stripe_id,
+            error: inspect(error)
+          )
+
+          :ok
+      end
+    else
+      :ok
     end
   end
 

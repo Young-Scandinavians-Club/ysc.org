@@ -847,9 +847,7 @@ defmodule Ysc.Subscriptions do
   defp duplicate_create_blocked_by_existing_subscription?(
          %Ysc.Accounts.User{} = user
        ) do
-    user
-    |> list_subscriptions()
-    |> Enum.any?(&subscription_blocks_new_stripe_duplicate?/1)
+    not is_nil(find_blocking_subscription(user))
   end
 
   defp subscription_blocks_new_stripe_duplicate?(%Subscription{} = sub) do
@@ -1277,68 +1275,169 @@ defmodule Ysc.Subscriptions do
   """
   @dialyzer {:nowarn_function, create_stripe_subscription: 2}
   def create_stripe_subscription(user, params) do
-    if duplicate_create_blocked_by_existing_subscription?(user) do
+    case find_blocking_subscription(user) do
+      nil ->
+        do_create_stripe_subscription(user, params)
+
+      %Subscription{stripe_status: "incomplete"} = incomplete_sub ->
+        retry_incomplete_subscription(user, incomplete_sub, params)
+
+      %Subscription{} ->
+        {:error, :user_already_has_active_subscription}
+    end
+  end
+
+  defp do_create_stripe_subscription(user, params) do
+    # Handle both keyword lists and maps
+    prices = params[:prices] || params["prices"] || params.prices
+    expand = params[:expand] || params["expand"] || []
+    idempotency_key = params[:idempotency_key] || params["idempotency_key"]
+
+    stripe_params = %{
+      customer: user.stripe_id,
+      items:
+        Enum.map(prices, fn price ->
+          %{price: price.price, quantity: price.quantity}
+        end),
+      expand: expand,
+      metadata: %{
+        user_id: user.id
+      }
+    }
+
+    stripe_params =
+      if params[:default_payment_method] || params["default_payment_method"] do
+        default_pm =
+          params[:default_payment_method] || params["default_payment_method"]
+
+        Map.put(stripe_params, :default_payment_method, default_pm)
+      else
+        stripe_params
+      end
+
+    stripe_params =
+      Map.merge(
+        stripe_params,
+        BoardVolunteerBilling.maybe_pause_collection_params(user)
+      )
+
+    result =
+      if idempotency_key do
+        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+          stripe_subscription_module().create(stripe_params,
+            headers: %{
+              "Idempotency-Key" => Ysc.Stripe.Idempotency.key(idempotency_key)
+            }
+          )
+        end)
+      else
+        Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+          stripe_subscription_module().create(stripe_params)
+        end)
+      end
+
+    case result do
+      {:ok, _} = ok ->
+        if BoardVolunteerBilling.household_on_board?(user) do
+          BoardVolunteerBilling.sync_for_user(user)
+        end
+
+        ok
+
+      error ->
+        error
+    end
+  end
+
+  # Used by create_stripe_subscription/2 to find the specific blocking
+  # subscription (rather than just a boolean) so an "incomplete" one — whose
+  # very first invoice was never paid — can be retried with a new payment
+  # method instead of leaving the user permanently stuck. Other blocking
+  # statuses (active, trialing, past_due, paused) are left as a hard block.
+  defp find_blocking_subscription(%Ysc.Accounts.User{} = user) do
+    user
+    |> list_subscriptions()
+    |> Enum.find(&subscription_blocks_new_stripe_duplicate?/1)
+  end
+
+  # Retries an "incomplete" subscription (first invoice never paid) using a
+  # newly supplied payment method, instead of unconditionally returning
+  # :user_already_has_active_subscription. Nothing else in the codebase ever
+  # updates an existing subscription's pinned default_payment_method or
+  # retries its open invoice, so without this a customer whose first payment
+  # was declined is permanently blocked from ever completing checkout — even
+  # after adding a working card or bank account.
+  defp retry_incomplete_subscription(
+         %Ysc.Accounts.User{} = user,
+         %Subscription{} = incomplete_sub,
+         params
+       ) do
+    default_pm =
+      params[:default_payment_method] || params["default_payment_method"]
+
+    if is_nil(default_pm) do
       {:error, :user_already_has_active_subscription}
     else
-      # Handle both keyword lists and maps
-      prices = params[:prices] || params["prices"] || params.prices
-      expand = params[:expand] || params["expand"] || []
-      idempotency_key = params[:idempotency_key] || params["idempotency_key"]
+      case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+             stripe_subscription_module().update(
+               incomplete_sub.stripe_id,
+               %{default_payment_method: default_pm, expand: ["latest_invoice"]}
+             )
+           end) do
+        {:ok, stripe_sub} ->
+          retry_incomplete_subscription_invoice(user, stripe_sub, default_pm)
 
-      stripe_params = %{
-        customer: user.stripe_id,
-        items:
-          Enum.map(prices, fn price ->
-            %{price: price.price, quantity: price.quantity}
-          end),
-        expand: expand,
-        metadata: %{
-          user_id: user.id
-        }
-      }
+        {:error, error} = err ->
+          Ysc.Logging.error(
+            "Failed to update payment method on incomplete subscription for retry",
+            user_id: user.id,
+            stripe_subscription_id: incomplete_sub.stripe_id,
+            error: inspect(error)
+          )
 
-      stripe_params =
-        if params[:default_payment_method] || params["default_payment_method"] do
-          default_pm =
-            params[:default_payment_method] || params["default_payment_method"]
+          err
+      end
+    end
+  end
 
-          Map.put(stripe_params, :default_payment_method, default_pm)
-        else
-          stripe_params
-        end
-
-      stripe_params =
-        Map.merge(
-          stripe_params,
-          BoardVolunteerBilling.maybe_pause_collection_params(user)
+  defp retry_incomplete_subscription_invoice(user, stripe_sub, default_pm) do
+    case invoice_id_from_expand(stripe_sub.latest_invoice) do
+      nil ->
+        Ysc.Logging.error(
+          "Incomplete subscription has no open invoice to retry",
+          user_id: user.id,
+          stripe_subscription_id: stripe_sub.id
         )
 
-      result =
-        if idempotency_key do
-          Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-            stripe_subscription_module().create(stripe_params,
-              headers: %{
-                "Idempotency-Key" => Ysc.Stripe.Idempotency.key(idempotency_key)
-              }
+        {:error, :user_already_has_active_subscription}
+
+      invoice_id ->
+        case Ysc.Stripe.RetryHelper.stripe_retry(fn ->
+               stripe_invoice_module().pay(invoice_id, %{
+                 payment_method: default_pm
+               })
+             end) do
+          {:ok, _paid_invoice} ->
+            Ysc.Logging.info(
+              "Retried incomplete subscription with new payment method",
+              user_id: user.id,
+              stripe_subscription_id: stripe_sub.id,
+              invoice_id: invoice_id
             )
-          end)
-        else
-          Ysc.Stripe.RetryHelper.stripe_retry(fn ->
-            stripe_subscription_module().create(stripe_params)
-          end)
+
+            {:ok, stripe_sub}
+
+          {:error, error} = err ->
+            Ysc.Logging.warning(
+              "Retrying incomplete subscription invoice with new payment method failed",
+              user_id: user.id,
+              stripe_subscription_id: stripe_sub.id,
+              invoice_id: invoice_id,
+              error: inspect(error)
+            )
+
+            err
         end
-
-      case result do
-        {:ok, _} = ok ->
-          if BoardVolunteerBilling.household_on_board?(user) do
-            BoardVolunteerBilling.sync_for_user(user)
-          end
-
-          ok
-
-        error ->
-          error
-      end
     end
   end
 
@@ -1529,6 +1628,7 @@ defmodule Ysc.Subscriptions do
 
   defp invoice_id_from_expand(id) when is_binary(id), do: id
   defp invoice_id_from_expand(%{id: id}), do: id
+  defp invoice_id_from_expand(nil), do: nil
 
   defp send_membership_confirmation_email_for_paid_elsewhere(user, plan) do
     require Ysc.Logging

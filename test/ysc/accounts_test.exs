@@ -3284,6 +3284,39 @@ defmodule Ysc.AccountsTest do
       refute pm_a.is_default
       assert pm_b.is_default
     end
+
+    test "pushes the new default to the Stripe customer so future charges use it" do
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          stripe_id: "cus_accounts_push"
+        })
+
+      pm =
+        %PaymentMethod{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_accounts_push_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_accounts_push",
+          provider_type: "card",
+          type: :card,
+          last_four: "1234",
+          exp_month: 9,
+          exp_year: 2032,
+          display_brand: "visa",
+          is_default: false
+        }
+        |> Repo.insert!()
+
+      expect(Stripe.CustomerMock, :update, fn "cus_accounts_push",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method == pm.provider_id
+        {:ok, %Stripe.Customer{id: "cus_accounts_push"}}
+      end)
+
+      assert {:ok, _} = Accounts.update_default_payment_method(user, pm.id)
+    end
   end
 
   describe "record_application_outcome/4" do

@@ -786,6 +786,98 @@ defmodule Ysc.SubscriptionsTest do
                {:error, :user_already_has_active_subscription}
     end
 
+    test "retries an incomplete subscription's invoice when a new default payment method is supplied" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      stripe_sub_id = "sub_incomplete_#{System.unique_integer()}"
+
+      {:ok, _incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Checkout Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      invoice_id = "in_retry_test"
+      new_pm = "pm_new_working_card"
+
+      expect(Stripe.SubscriptionMock, :update, fn ^stripe_sub_id, params ->
+        assert params[:default_payment_method] == new_pm
+        assert params[:expand] == ["latest_invoice"]
+
+        {:ok,
+         %Stripe.Subscription{
+           id: stripe_sub_id,
+           status: "incomplete",
+           latest_invoice: %Stripe.Invoice{id: invoice_id}
+         }}
+      end)
+
+      expect(Stripe.InvoiceMock, :pay, fn ^invoice_id, params ->
+        assert params[:payment_method] == new_pm
+        {:ok, %Stripe.Invoice{id: invoice_id, status: "paid"}}
+      end)
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}],
+        default_payment_method: new_pm
+      }
+
+      assert {:ok, %Stripe.Subscription{id: ^stripe_sub_id}} =
+               Subscriptions.create_stripe_subscription(user, params)
+    end
+
+    test "propagates the decline when retrying an incomplete subscription still fails" do
+      user =
+        user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
+
+      stripe_sub_id = "sub_incomplete_#{System.unique_integer()}"
+
+      {:ok, _incomplete_sub} =
+        Subscriptions.create_subscription(%{
+          user_id: user.id,
+          stripe_id: stripe_sub_id,
+          stripe_status: "incomplete",
+          name: "Incomplete Checkout Subscription",
+          current_period_end: DateTime.add(DateTime.utc_now(), 30, :day)
+        })
+
+      invoice_id = "in_retry_declined"
+      new_pm = "pm_still_declined"
+
+      expect(Stripe.SubscriptionMock, :update, fn ^stripe_sub_id, _params ->
+        {:ok,
+         %Stripe.Subscription{
+           id: stripe_sub_id,
+           status: "incomplete",
+           latest_invoice: %Stripe.Invoice{id: invoice_id}
+         }}
+      end)
+
+      expect(Stripe.InvoiceMock, :pay, fn ^invoice_id, _params ->
+        {:error,
+         %Stripe.Error{
+           source: :stripe,
+           code: :card_declined,
+           message: "Your card was declined.",
+           request_id: nil,
+           extra: %{},
+           user_message: nil
+         }}
+      end)
+
+      params = %{
+        prices: [%{price: "price_123", quantity: 1}],
+        default_payment_method: new_pm
+      }
+
+      assert {:error, %Stripe.Error{code: :card_declined}} =
+               Subscriptions.create_stripe_subscription(user, params)
+    end
+
     test "returns {:error, :user_already_has_active_subscription} for subscription still active with pause_collection (board volunteer)" do
       user =
         user_fixture_unique(%{stripe_id: "cus_test_#{System.unique_integer()}"})
