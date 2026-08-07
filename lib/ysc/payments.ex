@@ -192,6 +192,23 @@ defmodule Ysc.Payments do
   def set_default_payment_method(user, payment_method) do
     require Ysc.Logging
 
+    if payment_method.user_id != user.id do
+      Ysc.Logging.error(
+        "Refusing to set default payment method owned by a different user",
+        user_id: user.id,
+        payment_method_id: payment_method.id,
+        payment_method_owner_id: payment_method.user_id
+      )
+
+      {:error, :payment_method_not_owned_by_user}
+    else
+      do_set_default_payment_method(user, payment_method)
+    end
+  end
+
+  defp do_set_default_payment_method(user, payment_method) do
+    require Ysc.Logging
+
     Ysc.Logging.info("Starting set_default_payment_method transaction",
       user_id: user.id,
       payment_method_id: payment_method.id,
