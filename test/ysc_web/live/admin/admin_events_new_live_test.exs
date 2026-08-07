@@ -112,7 +112,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       |> render_click()
 
       view
-      |> element("#event_date_calendar button", "Select")
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
       |> render_click()
 
       _ = render(view)
@@ -171,7 +171,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       |> render_click()
 
       view
-      |> element("#event_date_calendar button", "Select")
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
       |> render_click()
 
       _ = render(view)
@@ -229,7 +229,7 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       })
 
       view
-      |> element("#event_date_calendar button", "Select")
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
       |> render_click()
 
       _ = render(view)
@@ -237,6 +237,63 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       reloaded = Events.get_event!(event.id)
       assert DateTime.to_date(reloaded.start_date) == new_date
       assert DateTime.to_date(reloaded.end_date) == new_date
+    end
+
+    test "can move an existing later date back to an earlier single day", %{
+      conn: conn,
+      admin: admin
+    } do
+      later =
+        Date.add(Date.utc_today(), 20)
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Move Earlier",
+          description: "Summary text",
+          start_date: later,
+          end_date: later,
+          start_time: ~T[18:31:00],
+          end_time: ~T[20:30:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      earlier = Date.utc_today()
+      earlier_iso = "#{Date.to_iso8601(earlier)}T00:00:00Z"
+      later_iso = "#{Date.to_iso8601(DateTime.to_date(later))}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      # Mimic clicking the currently selected day first (enters :set_end), then
+      # choosing an earlier day — previously those earlier days were disabled.
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{later_iso}"]|)
+      |> render_click()
+
+      assert has_element?(
+               view,
+               ~s|#event_date_calendar button[phx-value-date="#{earlier_iso}"]:not([disabled])|
+             )
+
+      view
+      |> element(
+        ~s|#event_date_calendar button[phx-value-date="#{earlier_iso}"]|
+      )
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-click="close-calendar"]|)
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == earlier
+      assert DateTime.to_date(reloaded.end_date) == earlier
     end
 
     test "single-day pick clears overnight end_time so the update can persist",
@@ -271,11 +328,6 @@ defmodule YscWeb.AdminEventsNewLiveTest do
       |> element("#event_date [phx-click=open-calendar]")
       |> render_click()
 
-      view
-      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
-      |> render_click()
-
-      # Confirm single day by selecting the same date as the end
       view
       |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
       |> render_click()

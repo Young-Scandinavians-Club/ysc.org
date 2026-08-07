@@ -353,11 +353,20 @@ defmodule YscWeb.Components.DateRangePicker do
     if socket.assigns[:disabled] do
       {:noreply, socket}
     else
+      # Focus the month on the current selection (or today) and always start a
+      # fresh start-date pick so earlier days are not stuck disabled in :set_end.
+      focus_date =
+        case socket.assigns.range_start do
+          nil -> socket.assigns.today || Date.utc_today()
+          start -> DateTime.to_date(to_datetime(start))
+        end
+
       {:noreply,
        socket
        |> assign(:calendar?, true)
        |> assign(:state, @initial_state)
-       |> assign(:hover_range_end, nil)}
+       |> assign(:hover_range_end, nil)
+       |> assign(:current, format_date(focus_date))}
     end
   end
 
@@ -442,9 +451,18 @@ defmodule YscWeb.Components.DateRangePicker do
         if socket.assigns[:max] && Date.compare(date, socket.assigns.max) == :gt do
           {:noreply, socket}
         else
+          # Clicking a day before the current start while choosing an end date
+          # restarts the selection (needed for events moving to an earlier day).
+          socket = maybe_restart_selection_before_start(socket, date)
+
           # Validate date based on current state and rules
           if valid_date_selection?(socket, date) do
-            ranges = calculate_date_ranges(socket.assigns.state, date_time)
+            ranges =
+              calculate_date_ranges(
+                socket.assigns.state,
+                date_time,
+                socket.assigns
+              )
 
             state =
               if socket.assigns.is_range? do
@@ -540,6 +558,22 @@ defmodule YscWeb.Components.DateRangePicker do
     }
   end
 
+  defp maybe_restart_selection_before_start(socket, date) do
+    range_start = socket.assigns.range_start
+
+    if socket.assigns.state == :set_end and range_start != nil do
+      start_date = DateTime.to_date(to_datetime(range_start))
+
+      if Date.compare(date, start_date) == :lt do
+        assign(socket, :state, :set_start)
+      else
+        socket
+      end
+    else
+      socket
+    end
+  end
+
   defp end_value(assigns) when is_map_key(assigns, :end_date_field) do
     case assigns.end_date_field.value do
       nil -> nil
@@ -624,16 +658,26 @@ defmodule YscWeb.Components.DateRangePicker do
     |> Enum.chunk_every(7)
   end
 
-  defp calculate_date_ranges(:set_start, date_time) do
-    %{
-      range_start: date_time,
-      range_end: nil
-    }
+  defp calculate_date_ranges(:set_start, date_time, assigns) do
+    # Event pickers (min_nights: 0) complete a single-day selection on the first
+    # click; a second click can still extend the end date.
+    if Map.get(assigns, :min_nights, 1) == 0 do
+      %{
+        range_start: date_time,
+        range_end: date_time
+      }
+    else
+      %{
+        range_start: date_time,
+        range_end: nil
+      }
+    end
   end
 
-  defp calculate_date_ranges(:set_end, date_time), do: %{range_end: date_time}
+  defp calculate_date_ranges(:set_end, date_time, _assigns),
+    do: %{range_end: date_time}
 
-  defp calculate_date_ranges(:reset, _date_time) do
+  defp calculate_date_ranges(:reset, _date_time, _assigns) do
     %{
       range_start: nil,
       range_end: nil
@@ -901,12 +945,17 @@ defmodule YscWeb.Components.DateRangePicker do
          max_nights,
          min_nights
        ) do
-    start_date = DateTime.to_date(range_start)
+    start_date = DateTime.to_date(to_datetime(range_start))
     nights = Date.diff(day, start_date)
 
     cond do
       nights > max_nights ->
         true
+
+      # Days before the current start stay clickable when same-day ranges are
+      # allowed so the user can restart on an earlier date (events).
+      nights < 0 and min_nights == 0 ->
+        false
 
       nights < min_nights ->
         true
@@ -989,10 +1038,15 @@ defmodule YscWeb.Components.DateRangePicker do
 
     case socket.assigns.state do
       :set_end when not is_nil(socket.assigns.range_start) ->
-        start_date = DateTime.to_date(socket.assigns.range_start)
+        start_date =
+          DateTime.to_date(to_datetime(socket.assigns.range_start))
+
         nights = Date.diff(date_day, start_date)
 
         cond do
+          nights < 0 and min_nights == 0 ->
+            true
+
           nights < min_nights or nights > max_nights ->
             false
 

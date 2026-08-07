@@ -368,7 +368,12 @@ defmodule YscWeb.AdminEventsNewLive do
                       form={@form}
                       start_date_field={@form[:start_date]}
                       end_date_field={@form[:end_date]}
-                      min={Date.utc_today()}
+                      min={
+                        DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+                      }
+                      today={
+                        DateTime.now!("America/Los_Angeles") |> DateTime.to_date()
+                      }
                       allow_saturdays={true}
                       min_nights={0}
                       max_nights={365}
