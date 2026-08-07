@@ -92,6 +92,8 @@ defmodule Ysc.MixProject do
           YscWeb.AdminEventsNewLive,
           YscWeb.AdminNewsletterEditorLive,
           YscWeb.AdminPostEditorLive,
+          YscWeb.DevButtonShowcaseLive,
+          YscWeb.DevAvatarShowcaseLive,
           Ysc.Stripe.WebhookHandler,
           Ysc.Quickbooks.Sync,
           Ysc.ExpenseReports.QuickbooksSync,
