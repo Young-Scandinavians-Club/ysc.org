@@ -390,9 +390,24 @@ defmodule YscWeb.HomeLiveTest do
     end
 
     defp do_hide_started_today_tickets_test(conn, user, event, started_at) do
+      # Events store a bare calendar date plus a separate wall-clock time
+      # (interpreted in America/Los_Angeles), not an arbitrary UTC instant.
+      # Break `started_at` down the same way so this event is genuinely
+      # "already started" under that model, matching how real events are
+      # stored and keeping it out of the homepage's upcoming events teaser.
+      pst_started_at = DateTime.shift_zone!(started_at, "America/Los_Angeles")
+
+      start_date =
+        DateTime.new!(DateTime.to_date(pst_started_at), ~T[00:00:00], "Etc/UTC")
+
       {:ok, event} =
         event
-        |> Ecto.Changeset.change(%{start_date: started_at})
+        |> Ecto.Changeset.change(%{
+          start_date: start_date,
+          start_time: DateTime.to_time(pst_started_at),
+          end_date: nil,
+          end_time: nil
+        })
         |> Repo.update()
 
       conn = log_in_user(conn, user)

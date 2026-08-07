@@ -1063,6 +1063,98 @@ defmodule Ysc.EventsTest do
     end
   end
 
+  describe "events page visibility window (PST-aware)" do
+    defp pst_date(offset_days) do
+      "America/Los_Angeles"
+      |> DateTime.now!()
+      |> DateTime.to_date()
+      |> Date.add(offset_days)
+    end
+
+    defp bare_date(%Date{} = date) do
+      DateTime.new!(date, ~T[00:00:00], "Etc/UTC")
+    end
+
+    defp upcoming?(event) do
+      Enum.any?(Events.list_upcoming_events(50), &(&1.id == event.id))
+    end
+
+    defp past?(event) do
+      Enum.any?(Events.list_past_events(50), &(&1.id == event.id))
+    end
+
+    test "no-time event dated today (PST) is still upcoming" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(0))
+        })
+
+      assert upcoming?(event)
+      refute past?(event)
+    end
+
+    test "no-time event dated yesterday (PST) has moved to past" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-1))
+        })
+
+      refute upcoming?(event)
+      assert past?(event)
+    end
+
+    test "multi-day event with no end time stays upcoming through the day after its end date" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-2)),
+          end_date: bare_date(pst_date(1))
+        })
+
+      assert upcoming?(event)
+      refute past?(event)
+    end
+
+    test "multi-day event moves to past once its end date and time pass" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-3)),
+          end_date: bare_date(pst_date(-2)),
+          end_time: ~T[12:00:00]
+        })
+
+      refute upcoming?(event)
+      assert past?(event)
+    end
+
+    test "timed event with only a start time in the past has moved to past" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(-1)),
+          start_time: ~T[08:00:00]
+        })
+
+      refute upcoming?(event)
+      assert past?(event)
+    end
+
+    test "timed event with only a start time tomorrow (PST) is still upcoming" do
+      {:ok, event} =
+        create_event_fixture(%{
+          state: :published,
+          start_date: bare_date(pst_date(1)),
+          start_time: ~T[08:00:00]
+        })
+
+      assert upcoming?(event)
+      refute past?(event)
+    end
+  end
+
   describe "ticket tier queries" do
     test "list_ticket_tiers_for_event/1 returns tiers for event" do
       {:ok, event} = create_event_fixture()
