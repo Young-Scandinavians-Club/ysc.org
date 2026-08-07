@@ -810,40 +810,15 @@ defmodule YscWeb.Components.DateRangePicker do
   defp stay_range_unavailable_reason(_checkout_day, _ctx), do: nil
 
   defp date_disabled_by_rules?(day, ctx) when is_map(ctx) do
-    %{
-      min: min,
-      range_start: range_start,
-      state: state,
-      max: max,
-      property: property,
-      today: today,
-      allow_saturdays: allow_saturdays,
-      seasons: seasons,
-      max_nights: max_nights,
-      min_nights: min_nights
-    } =
+    ctx =
       ctx
       |> Map.put_new(:max_nights, 4)
       |> Map.put_new(:min_nights, 1)
 
-    if before_min_date?(day, min) do
-      true
-    else
-      if after_max_date?(day, max) do
-        true
-      else
-        check_season_and_other_rules(
-          day,
-          range_start,
-          state,
-          property,
-          today,
-          allow_saturdays,
-          seasons,
-          max_nights,
-          min_nights
-        )
-      end
+    cond do
+      before_min_date?(day, ctx.min) -> true
+      after_max_date?(day, ctx.max) -> true
+      true -> check_season_and_other_rules(day, ctx)
     end
   end
 
@@ -851,17 +826,18 @@ defmodule YscWeb.Components.DateRangePicker do
     max && Date.compare(day, max) == :gt
   end
 
-  defp check_season_and_other_rules(
-         day,
-         range_start,
-         state,
-         property,
-         today,
-         allow_saturdays,
-         seasons,
-         max_nights,
-         min_nights
-       ) do
+  defp check_season_and_other_rules(day, ctx) do
+    %{
+      range_start: range_start,
+      state: state,
+      property: property,
+      today: today,
+      allow_saturdays: allow_saturdays,
+      seasons: seasons,
+      max_nights: max_nights,
+      min_nights: min_nights
+    } = ctx
+
     if property && today do
       alias Ysc.Bookings.SeasonHelpers
 
