@@ -120,14 +120,37 @@ defmodule YscWeb.EventDetailsLive do
                   </div>
                 <% end %>
 
+                <% event_day_label =
+                  @event.state != :cancelled && DateDisplay.event_day_label(@event) %>
                 <div
                   :if={
-                    (@event.tickets_tbd && @event.state != :cancelled) ||
+                    event_day_label ||
+                      (@event.tickets_tbd && @event.state != :cancelled) ||
                       (@event.state != :cancelled && @async_data_loaded &&
                          @event_sold_out_for_user && !@event.tickets_tbd)
                   }
                   class="flex flex-wrap items-center gap-2 mb-4"
                 >
+                  <span
+                    :if={event_day_label == :today}
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-red-600 sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
+                  >
+                    <.icon
+                      name="hero-bolt-solid"
+                      class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                    />
+                    <span class="relative z-10">Happening Today</span>
+                  </span>
+                  <span
+                    :if={event_day_label == :tomorrow}
+                    class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-orange-600 sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400"
+                  >
+                    <.icon
+                      name="hero-calendar-solid"
+                      class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                    />
+                    <span class="relative z-10">Happening Tomorrow</span>
+                  </span>
                   <span
                     :if={@event.tickets_tbd && @event.state != :cancelled}
                     class="px-3 py-1.5 text-white text-xs font-black uppercase tracking-widest rounded bg-blue-600 sm:bg-blue-500/90 sm:backdrop-blur-md sm:border sm:border-blue-400"

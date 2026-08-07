@@ -211,6 +211,39 @@ defmodule YscWeb.DateDisplay do
     end
   end
 
+  @doc """
+  Returns `:today`, `:tomorrow`, or `nil` for an event's start date, compared
+  against the current calendar date in Pacific time.
+
+  Accepts an event map with a `:start_date` (or `"start_date"`) field.
+  """
+  def event_day_label(event) do
+    start_date =
+      Map.get(event, :start_date) || Map.get(event, "start_date")
+
+    case pacific_calendar_date(start_date) do
+      nil ->
+        nil
+
+      date ->
+        today =
+          DateTime.now!(@pacific_timezone)
+          |> DateTime.to_date()
+
+        case Date.diff(date, today) do
+          0 -> :today
+          1 -> :tomorrow
+          _ -> nil
+        end
+    end
+  end
+
+  defp pacific_calendar_date(%DateTime{} = dt),
+    do: dt |> DateTime.shift_zone!(@pacific_timezone) |> DateTime.to_date()
+
+  defp pacific_calendar_date(%Date{} = date), do: date
+  defp pacific_calendar_date(_), do: nil
+
   defp calendar_date(nil), do: nil
   defp calendar_date(%DateTime{} = dt), do: DateTime.to_date(dt)
   defp calendar_date(%Date{} = date), do: date

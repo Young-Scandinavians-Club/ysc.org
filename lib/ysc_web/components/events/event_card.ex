@@ -226,20 +226,38 @@ defmodule YscWeb.Components.Events.EventCard do
 
       badges = badges ++ just_added_badge
 
-      # Add "Days Left" badge if applicable (1-3 days remaining)
+      # Add "Today"/"Tomorrow"/"Days Left" badge based on how soon the event is
+      day_label = DateDisplay.event_day_label(event)
       days_left = days_until_event_start(event)
 
-      days_left_badge =
-        if days_left != nil and days_left >= 1 and days_left <= 3 do
-          text =
-            "#{days_left} #{if days_left == 1, do: "day", else: "days"} left"
+      proximity_badge =
+        cond do
+          day_label == :today ->
+            [
+              %{
+                text: "Today",
+                class: "bg-red-600 text-white animate-pulse",
+                icon: "hero-bolt-solid"
+              }
+            ]
 
-          [%{text: text, class: "bg-sky-500 text-white", icon: nil}]
-        else
-          []
+          day_label == :tomorrow ->
+            [%{text: "Tomorrow", class: "bg-orange-500 text-white", icon: nil}]
+
+          days_left != nil and days_left >= 2 and days_left <= 3 ->
+            [
+              %{
+                text: "#{days_left} days left",
+                class: "bg-sky-500 text-white",
+                icon: nil
+              }
+            ]
+
+          true ->
+            []
         end
 
-      badges = badges ++ days_left_badge
+      badges = badges ++ proximity_badge
 
       # Add "Selling Fast!" badge if applicable
       selling_fast_badge =
@@ -275,9 +293,18 @@ defmodule YscWeb.Components.Events.EventCard do
       if DateTime.compare(now, start_date) == :gt do
         nil
       else
-        # Calculate days difference using calendar days
-        event_date_only = DateTime.to_date(start_date)
-        now_date_only = DateTime.to_date(now)
+        # Calculate days difference using Pacific calendar days, to stay
+        # consistent with DateDisplay.event_day_label/1
+        event_date_only =
+          start_date
+          |> DateTime.shift_zone!("America/Los_Angeles")
+          |> DateTime.to_date()
+
+        now_date_only =
+          now
+          |> DateTime.shift_zone!("America/Los_Angeles")
+          |> DateTime.to_date()
+
         diff = Date.diff(event_date_only, now_date_only)
         max(0, diff)
       end
