@@ -92,7 +92,14 @@ defmodule YscWeb.EventsListLive do
                 <div class="max-w-3xl">
                   <%!-- Status badges (both mobile and desktop) --%>
                   <div class="flex flex-wrap items-center gap-2 mb-4">
-                    <% hero_day_label = DateDisplay.event_day_label(@hero_event) %>
+                    <% hero_cancelled? =
+                      (Map.get(@hero_event, :state) || Map.get(@hero_event, "state")) in [
+                        :cancelled,
+                        "cancelled"
+                      ] %>
+                    <% hero_day_label =
+                      unless hero_cancelled?,
+                        do: DateDisplay.event_day_label(@hero_event) %>
                     <span
                       :if={hero_day_label == :today}
                       class="px-3 py-1.5 bg-red-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
@@ -112,7 +119,7 @@ defmodule YscWeb.EventsListLive do
                       />Happening Tomorrow
                     </span>
                     <span
-                      :if={hero_day_label == nil}
+                      :if={hero_day_label == nil && !hero_cancelled?}
                       class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate"
                     >
                       <.icon

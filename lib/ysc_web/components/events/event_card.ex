@@ -245,7 +245,13 @@ defmodule YscWeb.Components.Events.EventCard do
             [%{text: "Tomorrow", class: "bg-orange-500 text-white", icon: nil}]
 
           days_left != nil and days_left >= 2 and days_left <= 3 ->
-            [%{text: "#{days_left} days left", class: "bg-sky-500 text-white", icon: nil}]
+            [
+              %{
+                text: "#{days_left} days left",
+                class: "bg-sky-500 text-white",
+                icon: nil
+              }
+            ]
 
           true ->
             []
@@ -287,9 +293,18 @@ defmodule YscWeb.Components.Events.EventCard do
       if DateTime.compare(now, start_date) == :gt do
         nil
       else
-        # Calculate days difference using calendar days
-        event_date_only = DateTime.to_date(start_date)
-        now_date_only = DateTime.to_date(now)
+        # Calculate days difference using Pacific calendar days, to stay
+        # consistent with DateDisplay.event_day_label/1
+        event_date_only =
+          start_date
+          |> DateTime.shift_zone!("America/Los_Angeles")
+          |> DateTime.to_date()
+
+        now_date_only =
+          now
+          |> DateTime.shift_zone!("America/Los_Angeles")
+          |> DateTime.to_date()
+
         diff = Date.diff(event_date_only, now_date_only)
         max(0, diff)
       end
