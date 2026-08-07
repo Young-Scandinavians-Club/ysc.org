@@ -151,6 +151,8 @@
     "ysc_web/live/tahoe_cabin_rules_live\\.ex",
     "ysc_web/live/tahoe_staying_with_live\\.ex",
     "ysc_web/live/property_check_in_live\\.ex",
+    "ysc_web/live/dev_button_showcase_live\\.ex",
+    "ysc_web/live/dev_avatar_showcase_live\\.ex",
     "ysc_web/test_log_filter\\.ex",
     "lib/mix/tasks/.*\\.ex",
     "test/support/.*\\.ex",

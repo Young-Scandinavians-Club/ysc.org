@@ -71,6 +71,7 @@ defmodule Ysc.DataCase do
     Ysc.Bookings.AvailabilityCache.invalidate()
     Ysc.Bookings.RoomsListCache.invalidate()
     Ysc.Bookings.SeasonCache.invalidate()
+    Ysc.Sitemap.invalidate()
     :ok
   end
 
