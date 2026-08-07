@@ -5,6 +5,7 @@ defmodule YscWeb.EventsListLive do
   alias Ysc.Events.{DateTimeFormatter, TicketTierHelpers}
   alias Ysc.Media.Image
   alias Money
+  alias YscWeb.DateDisplay
   alias YscWeb.PlainText
 
   @impl true
@@ -91,7 +92,29 @@ defmodule YscWeb.EventsListLive do
                 <div class="max-w-3xl">
                   <%!-- Status badges (both mobile and desktop) --%>
                   <div class="flex flex-wrap items-center gap-2 mb-4">
-                    <span class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate">
+                    <% hero_day_label = DateDisplay.event_day_label(@hero_event) %>
+                    <span
+                      :if={hero_day_label == :today}
+                      class="px-3 py-1.5 bg-red-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-red-500/90 sm:backdrop-blur-md sm:border sm:border-red-400 animate-pulse"
+                    >
+                      <.icon
+                        name="hero-bolt-solid"
+                        class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                      />Happening Today
+                    </span>
+                    <span
+                      :if={hero_day_label == :tomorrow}
+                      class="px-3 py-1.5 bg-orange-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-orange-500/90 sm:backdrop-blur-md sm:border sm:border-orange-400 animate-badge-shine-emerald"
+                    >
+                      <.icon
+                        name="hero-calendar-solid"
+                        class="w-3.5 h-3.5 inline me-0.5 relative z-10"
+                      />Happening Tomorrow
+                    </span>
+                    <span
+                      :if={hero_day_label == nil}
+                      class="px-3 py-1.5 bg-zinc-600 text-white text-xs font-black uppercase tracking-widest rounded sm:bg-zinc-500/90 sm:backdrop-blur-md sm:border sm:border-zinc-400 animate-badge-shine-slate"
+                    >
                       <.icon
                         name="hero-calendar-solid"
                         class="w-3.5 h-3.5 inline me-0.5 relative z-10"
