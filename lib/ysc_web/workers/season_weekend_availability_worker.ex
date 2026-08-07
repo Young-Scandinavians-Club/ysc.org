@@ -66,10 +66,15 @@ defmodule YscWeb.Workers.SeasonWeekendAvailabilityWorker do
            season_name
          ) do
       %{open?: true, season: season, cycle_year: cycle_year} = window ->
+        # Cached seasons omit notification bookkeeping updates (see
+        # `Bookings.mark_weekend_notification_sent/3`), so reload before the
+        # idempotency check to avoid duplicate sends within the cache TTL.
+        season = Bookings.get_season!(season.id)
+
         if season.weekend_notification_sent_cycle_year == cycle_year do
           :ok
         else
-          send_blast(window, email_module)
+          send_blast(%{window | season: season}, email_module)
         end
 
       _ ->
