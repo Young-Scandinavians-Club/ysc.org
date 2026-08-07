@@ -71,6 +71,175 @@ defmodule YscWeb.AdminEventsNewLiveTest do
     end
   end
 
+  describe "editor date picker" do
+    setup [:create_admin]
+
+    test "picking a date and closing the calendar persists start/end dates", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(10, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      old_end = DateTime.add(old_start, 1, :day)
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Date Edit Event",
+          start_date: old_start,
+          end_date: old_end,
+          start_time: ~T[18:00:00],
+          end_time: ~T[20:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      new_date = Date.add(Date.utc_today(), 3)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      assert has_element?(view, "#event_date_calendar")
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element("#event_date_calendar button", "Select")
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+    end
+
+    test "date change after validate auto-save still persists", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(10, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Date After Validate",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: DateTime.add(old_start, 1, :day),
+          start_time: ~T[18:00:00],
+          end_time: ~T[20:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "Date After Validate Updated",
+          "description" => "Summary text",
+          "start_date" => DateTime.to_iso8601(old_start),
+          "end_date" => DateTime.to_iso8601(DateTime.add(old_start, 1, :day)),
+          "start_time" => "18:00:00",
+          "end_time" => "20:00:00"
+        }
+      })
+
+      new_date = Date.add(Date.utc_today(), 4)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      view
+      |> element("#event_date_calendar button", "Select")
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+    end
+
+    test "in-progress date pick survives a concurrent form validate", %{
+      conn: conn,
+      admin: admin
+    } do
+      old_start =
+        DateTime.utc_now()
+        |> DateTime.add(20, :day)
+        |> DateTime.to_date()
+        |> then(&DateTime.new!(&1, ~T[00:00:00], "Etc/UTC"))
+
+      event =
+        event_fixture(%{
+          organizer_id: admin.id,
+          title: "Concurrent Validate",
+          description: "Summary text",
+          start_date: old_start,
+          end_date: DateTime.add(old_start, 1, :day),
+          start_time: ~T[18:00:00],
+          end_time: ~T[20:00:00]
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/admin/events/#{event.id}/edit")
+
+      new_date = Date.add(Date.utc_today(), 2)
+      new_iso = "#{Date.to_iso8601(new_date)}T00:00:00Z"
+
+      view
+      |> element("#event_date [phx-click=open-calendar]")
+      |> render_click()
+
+      view
+      |> element(~s|#event_date_calendar button[phx-value-date="#{new_iso}"]|)
+      |> render_click()
+
+      # Parent re-render while calendar is open (previously wiped the pick)
+      view
+      |> element("#new_event_form")
+      |> render_change(%{
+        "event" => %{
+          "title" => "Concurrent Validate",
+          "description" => "Summary text changed",
+          "start_date" => DateTime.to_iso8601(old_start),
+          "end_date" => DateTime.to_iso8601(DateTime.add(old_start, 1, :day)),
+          "start_time" => "18:00:00",
+          "end_time" => "20:00:00"
+        }
+      })
+
+      view
+      |> element("#event_date_calendar button", "Select")
+      |> render_click()
+
+      _ = render(view)
+
+      reloaded = Events.get_event!(event.id)
+      assert DateTime.to_date(reloaded.start_date) == new_date
+      assert DateTime.to_date(reloaded.end_date) == new_date
+    end
+  end
+
   describe "editor validate auto-save" do
     setup [:create_admin]
 

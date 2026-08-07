@@ -370,6 +370,7 @@ defmodule YscWeb.AdminEventsNewLive do
                       end_date_field={@form[:end_date]}
                       min={Date.utc_today()}
                       allow_saturdays={true}
+                      max_nights={365}
                     />
                   </div>
 
@@ -1948,10 +1949,24 @@ defmodule YscWeb.AdminEventsNewLive do
      )
      |> assign(:event_title, event_params["title"])
      |> assign(:page_title, event_params["title"])
-     |> assign(:start_date, event_params["start_date"])
-     |> assign(:end_date, event_params["end_date"])
-     |> assign(:start_time, event_params["start_time"])
-     |> assign(:end_time, event_params["end_time"])
+     # Prefer typed values from the event/changeset so header formatting and
+     # the date picker do not receive raw form strings.
+     |> assign(
+       :start_date,
+       Ecto.Changeset.get_field(updated_changeset, :start_date)
+     )
+     |> assign(
+       :end_date,
+       Ecto.Changeset.get_field(updated_changeset, :end_date)
+     )
+     |> assign(
+       :start_time,
+       Ecto.Changeset.get_field(updated_changeset, :start_time)
+     )
+     |> assign(
+       :end_time,
+       Ecto.Changeset.get_field(updated_changeset, :end_time)
+     )
      |> assign(
        :can_publish,
        can_publish?(
@@ -2479,19 +2494,44 @@ defmodule YscWeb.AdminEventsNewLive do
   end
 
   @impl true
-  def handle_info({:updated_event, data}, socket) do
-    # Handle the message and update the socket as needed
-    # For example, you might want to update the event changeset
-    changeset = Event.changeset(socket.assigns[:event], data)
+  def handle_info({:updated_event, %{id: "event_date"} = data}, socket) do
+    current_event = Events.get_event!(socket.assigns.event.id)
 
-    if changeset.valid? do
-      Events.update_event_editor(socket.assigns[:event], data)
-    end
+    attrs = %{
+      start_date: data[:start_date],
+      end_date: data[:end_date]
+    }
+
+    changeset = Event.editor_changeset(current_event, attrs)
+
+    {updated_event, updated_changeset} =
+      if changeset.valid? do
+        case Events.update_event_editor(current_event, attrs) do
+          {:ok, event} ->
+            {event, Event.editor_changeset(event, attrs)}
+
+          {:error, error_changeset} ->
+            {current_event, error_changeset}
+        end
+      else
+        {current_event, changeset}
+      end
 
     {:noreply,
-     assign(socket, start_date: data[:start_date], end_date: data[:end_date])
-     |> assign_form(changeset)}
+     socket
+     |> assign(:event, updated_event)
+     |> assign(:start_date, updated_event.start_date)
+     |> assign(:end_date, updated_event.end_date)
+     |> assign(
+       :can_publish,
+       can_publish?(updated_event.start_date, updated_event.title)
+     )
+     |> assign_form(updated_changeset)}
   end
+
+  # Ticket-tier sale date pickers (and any other date pickers) send the same
+  # message shape; ignore them here so they do not overwrite event dates.
+  def handle_info({:updated_event, _data}, socket), do: {:noreply, socket}
 
   @impl true
   def handle_info(

@@ -297,9 +297,6 @@ defmodule YscWeb.Components.DateRangePicker do
 
   @impl true
   def update(assigns, socket) do
-    range_start = from_str!(assigns.start_date_field.value)
-    range_end = from_str!(end_value(assigns))
-
     injected_today = assigns[:today]
     today = injected_today || Date.utc_today()
 
@@ -308,6 +305,21 @@ defmodule YscWeb.Components.DateRangePicker do
       injected_today ||
         (socket.assigns[:current] && socket.assigns.current[:date]) ||
         Date.utc_today()
+
+    # While the calendar is open, keep in-progress picks. Parent re-renders
+    # (form auto-save, PubSub, etc.) used to overwrite range_* from the form and
+    # could leave state at :set_end/:reset so the next click was validated
+    # against stale dates and silently ignored.
+    calendar_open? = socket.assigns[:calendar?] == true
+
+    {range_start, range_end, state} =
+      if calendar_open? do
+        {socket.assigns.range_start, socket.assigns.range_end,
+         socket.assigns[:state] || @initial_state}
+      else
+        {from_str!(assigns.start_date_field.value),
+         from_str!(end_value(assigns)), @initial_state}
+      end
 
     {
       :ok,
@@ -331,14 +343,7 @@ defmodule YscWeb.Components.DateRangePicker do
       |> assign(:max_nights, assigns[:max_nights] || 4)
       |> assign(:seasons, assigns[:seasons])
       |> assign(:allow_saturdays, assigns[:allow_saturdays] || false)
-      # Only reset state if we don't have a range yet, otherwise preserve it
-      |> assign(
-        :state,
-        if(range_start && range_end,
-          do: socket.assigns[:state] || @initial_state,
-          else: @initial_state
-        )
-      )
+      |> assign(:state, state)
     }
   end
 
@@ -347,7 +352,11 @@ defmodule YscWeb.Components.DateRangePicker do
     if socket.assigns[:disabled] do
       {:noreply, socket}
     else
-      {:noreply, socket |> assign(:calendar?, true)}
+      {:noreply,
+       socket
+       |> assign(:calendar?, true)
+       |> assign(:state, @initial_state)
+       |> assign(:hover_range_end, nil)}
     end
   end
 
