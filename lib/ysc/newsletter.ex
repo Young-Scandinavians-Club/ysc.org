@@ -642,6 +642,7 @@ defmodule Ysc.Newsletter do
     Subscriber
     |> maybe_filter_subscribed(opts)
     |> maybe_filter_source(opts)
+    |> exclude_deleted_linked_users()
     |> Repo.all()
   end
 
@@ -654,6 +655,7 @@ defmodule Ysc.Newsletter do
     Subscriber
     |> maybe_filter_subscribed(opts)
     |> maybe_filter_source(opts)
+    |> exclude_deleted_linked_users()
     |> select([s], count(s.id))
     |> Repo.one()
   end
@@ -671,6 +673,16 @@ defmodule Ysc.Newsletter do
       nil -> query
       source -> where(query, [s], s.source == ^source)
     end
+  end
+
+  # Soft-deleted users must not receive newsletter editions even if a
+  # subscriber row is still marked subscribed (belt-and-suspenders with
+  # unsubscribe-on-delete). Anonymous subscribers (nil user_id) are kept.
+  defp exclude_deleted_linked_users(query) do
+    from s in query,
+      left_join: u in Ysc.Accounts.User,
+      on: u.id == s.user_id,
+      where: is_nil(s.user_id) or u.state != :deleted
   end
 
   @doc """

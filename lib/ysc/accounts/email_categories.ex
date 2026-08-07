@@ -157,22 +157,26 @@ defmodule Ysc.Accounts.EmailCategories do
   """
   @spec should_send_email?(map(), String.t()) :: boolean()
   def should_send_email?(user, template_name) when is_binary(template_name) do
-    case get_category(template_name) do
-      :account ->
-        # Account notifications cannot be disabled
-        true
+    if Ysc.Accounts.receives_outbound_comms?(user) do
+      case get_category(template_name) do
+        :account ->
+          # Account notifications cannot be disabled
+          true
 
-      :event ->
-        # Check if user has event notifications enabled
-        Map.get(user, :event_notifications, true)
+        :event ->
+          # Check if user has event notifications enabled
+          Map.get(user, :event_notifications, true)
 
-      :newsletter ->
-        # Newsletter preference lives in newsletter_subscribers
-        case user && user.email &&
-               Newsletter.get_subscriber_by_email(user.email) do
-          nil -> false
-          subscriber -> subscriber.subscribed
-        end
+        :newsletter ->
+          # Newsletter preference lives in newsletter_subscribers
+          case user && user.email &&
+                 Newsletter.get_subscriber_by_email(user.email) do
+            nil -> false
+            subscriber -> subscriber.subscribed
+          end
+      end
+    else
+      false
     end
   end
 
