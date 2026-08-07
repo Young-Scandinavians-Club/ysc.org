@@ -570,6 +570,32 @@ defmodule Ysc.NewsletterTest do
       list = Newsletter.list_subscribers(source: "public_signup")
       assert Enum.any?(list, &(&1.email == "by-source@example.com"))
     end
+
+    test "excludes subscribers linked to soft-deleted users" do
+      user = user_fixture()
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
+
+      user
+      |> Ecto.Changeset.change(%{state: :deleted})
+      |> Repo.update!()
+
+      emails =
+        Newsletter.list_subscribers(subscribed: true)
+        |> Enum.map(& &1.email)
+
+      refute user.email in emails
+    end
+
+    test "keeps anonymous subscribers when listing subscribed" do
+      {:ok, anon} =
+        Newsletter.subscribe("anon-kept@example.com", source: "public_signup")
+
+      emails =
+        Newsletter.list_subscribers(subscribed: true)
+        |> Enum.map(& &1.email)
+
+      assert anon.email in emails
+    end
   end
 
   describe "count_subscribers/1" do

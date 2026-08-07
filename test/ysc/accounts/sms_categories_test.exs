@@ -76,6 +76,18 @@ defmodule Ysc.Accounts.SmsCategoriesTest do
                :booking_checkin_reminder
              )
     end
+
+    test "does not send to soft-deleted users including security templates" do
+      deleted = %{
+        state: :deleted,
+        account_notifications_sms: true,
+        event_notifications_sms: true
+      }
+
+      refute SmsCategories.should_send_sms?(deleted, "two_factor_verification")
+      refute SmsCategories.should_send_sms?(deleted, "booking_checkin_reminder")
+      refute SmsCategories.should_send_sms?(deleted, "event_notification")
+    end
   end
 
   describe "has_phone_number?/1" do

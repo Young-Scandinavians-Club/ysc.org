@@ -1619,10 +1619,14 @@ defmodule Ysc.Accounts do
 
   def update_user(user, params, %User{} = current_user) do
     with :ok <- Policy.authorize(:user_update, current_user, user) do
+      previous_user = user
       user = maybe_update_board_position_history(user, params)
 
       case user |> User.update_user_changeset(params) |> Repo.update() do
         {:ok, updated_user} ->
+          updated_user =
+            maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
+
           revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
@@ -1643,12 +1647,16 @@ defmodule Ysc.Accounts do
   """
   def update_user_with_address(user, params, %User{} = current_user) do
     with :ok <- Policy.authorize(:user_update, current_user, user) do
+      previous_user = user
       user = maybe_update_board_position_history(user, params)
 
       case user
            |> User.update_user_with_address_changeset(params)
            |> Repo.update() do
         {:ok, updated_user} ->
+          updated_user =
+            maybe_stop_comms_on_deleted_transition(previous_user, updated_user)
+
           revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
@@ -1705,6 +1713,9 @@ defmodule Ysc.Accounts do
 
       case result do
         {:ok, updated_user} ->
+          updated_user =
+            maybe_stop_comms_on_deleted_transition(user, updated_user)
+
           revoke_sessions_if_blocked(updated_user)
           Ysc.Accounts.UserProfileCache.invalidate_user(updated_user.id)
 
@@ -1729,6 +1740,60 @@ defmodule Ysc.Accounts do
   end
 
   defp revoke_sessions_if_blocked(_user), do: :ok
+
+  # When an account is soft-deleted, stop marketing/ops outbound channels:
+  # unsubscribe newsletter and disable event/SMS preference flags. Session
+  # revocation is handled separately by revoke_sessions_if_blocked/1.
+  defp maybe_stop_comms_on_deleted_transition(
+         %User{state: previous_state},
+         %User{state: :deleted} = user
+       )
+       when previous_state != :deleted do
+    stop_outbound_comms_for_deleted_user(user)
+  end
+
+  defp maybe_stop_comms_on_deleted_transition(_previous, user), do: user
+
+  defp stop_outbound_comms_for_deleted_user(%User{} = user) do
+    require Ysc.Logging
+
+    case Newsletter.unsubscribe(user.email) do
+      {:ok, _} ->
+        :ok
+
+      {:error, :not_found} ->
+        :ok
+
+      {:error, reason} ->
+        Ysc.Logging.warning(
+          "Failed to unsubscribe deleted user from newsletter",
+          user_id: user.id,
+          extra: %{reason: inspect(reason)}
+        )
+    end
+
+    case user
+         |> User.notification_preferences_changeset(%{
+           event_notifications: false,
+           event_notifications_sms: false,
+           account_notifications_sms: false,
+           account_notifications: true
+         })
+         |> Repo.update() do
+      {:ok, updated_user} ->
+        invalidate_user_profile_cache(updated_user)
+        updated_user
+
+      {:error, changeset} ->
+        Ysc.Logging.warning(
+          "Failed to disable notification preferences for deleted user",
+          user_id: user.id,
+          extra: %{errors: inspect(changeset.errors)}
+        )
+
+        user
+    end
+  end
 
   defp maybe_update_board_position_history(user, params) do
     new_val =
@@ -2110,6 +2175,19 @@ defmodule Ysc.Accounts do
     do: state in [:pending_approval, :active]
 
   def login_allowed_state?(_), do: false
+
+  @doc """
+  Returns whether outbound email/SMS should be delivered for this user.
+
+  Soft-deleted accounts (`:deleted`) do not receive outbound comms.
+  When `state` is absent (bare preference maps in tests/callers), returns
+  `true` so preference-only checks keep working.
+  """
+  def receives_outbound_comms?(%User{state: :deleted}), do: false
+
+  def receives_outbound_comms?(%{state: :deleted}), do: false
+
+  def receives_outbound_comms?(_), do: true
 
   @doc """
   Deletes all session tokens for the given user.

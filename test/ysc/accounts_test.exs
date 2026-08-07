@@ -3577,6 +3577,99 @@ defmodule Ysc.AccountsTest do
     end
   end
 
+  describe "soft-delete stop-comms side effects" do
+    test "transitioning to deleted unsubscribes newsletter, disables prefs, and revokes sessions" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :active,
+          event_notifications: true,
+          event_notifications_sms: true,
+          account_notifications_sms: true
+        })
+
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
+      _token = Accounts.generate_user_session_token(user)
+
+      assert {:ok, updated} =
+               Accounts.update_user(user, %{"state" => "deleted"}, admin)
+
+      assert updated.state == :deleted
+      refute updated.event_notifications
+      refute updated.event_notifications_sms
+      refute updated.account_notifications_sms
+      refute Accounts.receives_outbound_comms?(updated)
+
+      sub = Newsletter.get_subscriber_by_email(user.email)
+      assert sub != nil
+      refute sub.subscribed
+
+      refute Repo.get_by(UserToken, user_id: user.id, context: "session")
+    end
+
+    test "update_user_with_address transitioning to deleted also stops comms" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :active,
+          event_notifications: true
+        })
+
+      Newsletter.sync_user_preference(user, newsletter_subscribed: true)
+
+      assert {:ok, updated} =
+               Accounts.update_user_with_address(
+                 user,
+                 %{
+                   "first_name" => user.first_name,
+                   "last_name" => user.last_name,
+                   "state" => "deleted",
+                   "billing_address" => %{
+                     "address" => "",
+                     "city" => "",
+                     "region" => "",
+                     "postal_code" => "",
+                     "country" => ""
+                   }
+                 },
+                 admin
+               )
+
+      assert updated.state == :deleted
+      refute updated.event_notifications
+      refute Newsletter.get_subscriber_by_email(user.email).subscribed
+    end
+
+    test "receives_outbound_comms?/1 is false only for deleted users" do
+      refute Accounts.receives_outbound_comms?(%User{state: :deleted})
+      refute Accounts.receives_outbound_comms?(%{state: :deleted})
+      assert Accounts.receives_outbound_comms?(%User{state: :active})
+      assert Accounts.receives_outbound_comms?(%User{state: :suspended})
+      assert Accounts.receives_outbound_comms?(%{event_notifications: false})
+    end
+
+    test "saving already-deleted user does not fail when newsletter is absent" do
+      admin = user_fixture(%{role: :admin, phone_number: unique_user_phone()})
+
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          state: :deleted
+        })
+
+      assert {:ok, %User{state: :deleted}} =
+               Accounts.update_user(
+                 user,
+                 %{"first_name" => "StillDeleted"},
+                 admin
+               )
+    end
+  end
+
   describe "update_user_profile/2 validation" do
     test "returns error when first_name is empty" do
       user = user_fixture(%{phone_number: unique_user_phone()})

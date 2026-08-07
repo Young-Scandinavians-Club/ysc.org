@@ -133,6 +133,20 @@ defmodule Ysc.Accounts.EmailCategoriesTest do
              )
     end
 
+    test "does not send to soft-deleted users" do
+      deleted = %{state: :deleted, event_notifications: true}
+
+      refute EmailCategories.should_send_email?(deleted, "reset_password")
+      refute EmailCategories.should_send_email?(deleted, "event_notification")
+      refute EmailCategories.should_send_email?(deleted, "newsletter_edition")
+    end
+
+    test "still sends to suspended users" do
+      suspended = %{state: :suspended, event_notifications: true}
+
+      assert EmailCategories.should_send_email?(suspended, "reset_password")
+    end
+
     test "newsletter_edition follows newsletter_subscribers when subscriber exists" do
       user = user_fixture()
       now = DateTime.utc_now() |> DateTime.truncate(:second)
