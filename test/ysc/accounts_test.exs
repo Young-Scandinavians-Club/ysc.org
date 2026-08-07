@@ -3284,6 +3284,84 @@ defmodule Ysc.AccountsTest do
       refute pm_a.is_default
       assert pm_b.is_default
     end
+
+    test "pushes the new default to the Stripe customer so future charges use it" do
+      user =
+        user_fixture(%{
+          phone_number: unique_user_phone(),
+          stripe_id: "cus_accounts_push"
+        })
+
+      pm =
+        %PaymentMethod{
+          user_id: user.id,
+          provider: :stripe,
+          provider_id: "pm_accounts_push_#{System.unique_integer([:positive])}",
+          provider_customer_id: "cus_accounts_push",
+          provider_type: "card",
+          type: :card,
+          last_four: "1234",
+          exp_month: 9,
+          exp_year: 2032,
+          display_brand: "visa",
+          is_default: false
+        }
+        |> Repo.insert!()
+
+      expect(Stripe.CustomerMock, :update, fn "cus_accounts_push",
+                                              params,
+                                              _opts ->
+        assert params.invoice_settings.default_payment_method == pm.provider_id
+        {:ok, %Stripe.Customer{id: "cus_accounts_push"}}
+      end)
+
+      assert {:ok, _} = Accounts.update_default_payment_method(user, pm.id)
+    end
+
+    test "rejects a payment method owned by a different user without changing defaults" do
+      owner = user_fixture(%{phone_number: unique_user_phone()})
+      caller = user_fixture(%{phone_number: unique_user_phone()})
+
+      foreign_pm =
+        %PaymentMethod{
+          user_id: owner.id,
+          provider: :stripe,
+          provider_id: "pm_foreign_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_foreign_#{System.unique_integer([:positive])}",
+          provider_type: "card",
+          type: :card,
+          last_four: "9999",
+          exp_month: 1,
+          exp_year: 2035,
+          display_brand: "visa",
+          is_default: true
+        }
+        |> Repo.insert!()
+
+      caller_pm =
+        %PaymentMethod{
+          user_id: caller.id,
+          provider: :stripe,
+          provider_id: "pm_caller_#{System.unique_integer([:positive])}",
+          provider_customer_id:
+            "cus_caller_#{System.unique_integer([:positive])}",
+          provider_type: "card",
+          type: :card,
+          last_four: "1111",
+          exp_month: 2,
+          exp_year: 2035,
+          display_brand: "visa",
+          is_default: true
+        }
+        |> Repo.insert!()
+
+      assert {:error, :payment_method_not_owned_by_user} =
+               Accounts.update_default_payment_method(caller, foreign_pm.id)
+
+      assert Repo.get!(PaymentMethod, foreign_pm.id).is_default
+      assert Repo.get!(PaymentMethod, caller_pm.id).is_default
+    end
   end
 
   describe "record_application_outcome/4" do
