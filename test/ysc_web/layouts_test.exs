@@ -5,6 +5,36 @@ defmodule YscWeb.LayoutsTest do
 
   alias YscWeb.Layouts
 
+  describe "error_page_title/1" do
+    test "prefers explicit page_title assign" do
+      assert Layouts.error_page_title(%{page_title: "Custom"}) == "Custom"
+    end
+
+    test "maps status codes to titles" do
+      assert Layouts.error_page_title(%{status: 400}) == "Bad request"
+      assert Layouts.error_page_title(%{status: 403}) == "Access denied"
+      assert Layouts.error_page_title(%{status: 404}) == "Page not found"
+      assert Layouts.error_page_title(%{status: 500}) == "Something went wrong"
+    end
+
+    test "derives title from conn.status when status assign is absent" do
+      assert Layouts.error_page_title(%{conn: %Plug.Conn{status: 403}}) ==
+               "Access denied"
+
+      assert Layouts.error_page_title(%{conn: %Plug.Conn{status: 400}}) ==
+               "Bad request"
+    end
+
+    test "falls back to Error when status cannot be derived" do
+      assert Layouts.error_page_title(%{}) == "Error"
+
+      assert Layouts.error_page_title(%{conn: %Plug.Conn{status: nil}}) ==
+               "Error"
+
+      assert Layouts.error_page_title(%{status: 418}) == "Error"
+    end
+  end
+
   describe "toasts_sync_with_flash/1" do
     test "promotes Welcome back info into a dedicated toast and keeps info flash for LiveToast" do
       msg = "Welcome back, friend"

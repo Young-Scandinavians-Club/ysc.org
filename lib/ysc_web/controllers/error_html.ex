@@ -25,6 +25,7 @@ defmodule YscWeb.ErrorHTML do
       when template in [:"400", :"403", :"404", :"500"] do
     conn
     |> put_status(template_to_status(template))
+    |> Plug.Conn.assign(:page_title, page_title_for(template))
     |> put_root_layout(html: {YscWeb.Layouts, :error})
     |> put_layout(html: false)
     |> put_view(html: __MODULE__)
@@ -35,6 +36,15 @@ defmodule YscWeb.ErrorHTML do
   defp template_to_status(:"403"), do: :forbidden
   defp template_to_status(:"404"), do: :not_found
   defp template_to_status(:"500"), do: :internal_server_error
+
+  defp page_title_for(template) do
+    YscWeb.Layouts.error_page_title(%{status: template_status_code(template)})
+  end
+
+  defp template_status_code(:"400"), do: 400
+  defp template_status_code(:"403"), do: 403
+  defp template_status_code(:"404"), do: 404
+  defp template_status_code(:"500"), do: 500
 
   # The default is to render a plain text page based on
   # the template name. For example, "404.html" becomes

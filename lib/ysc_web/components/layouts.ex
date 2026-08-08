@@ -6,6 +6,36 @@ defmodule YscWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
+  Document title for standalone error pages (`layouts/error.html.heex`).
+
+  Prefers an explicit `:page_title` assign; otherwise derives from HTTP status
+  (`:status` from Phoenix render_errors, or `conn.status`).
+  """
+  def error_page_title(assigns) when is_map(assigns) do
+    case assigns[:page_title] || error_status(assigns) do
+      title when is_binary(title) -> title
+      404 -> "Page not found"
+      500 -> "Something went wrong"
+      403 -> "Access denied"
+      400 -> "Bad request"
+      _ -> "Error"
+    end
+  end
+
+  defp error_status(assigns) do
+    cond do
+      is_integer(assigns[:status]) ->
+        assigns[:status]
+
+      match?(%Plug.Conn{status: status} when is_integer(status), assigns[:conn]) ->
+        assigns[:conn].status
+
+      true ->
+        nil
+    end
+  end
+
+  @doc """
   Builds toasts_sync and flash for the toast group. Promotes flash messages that
   have a custom title (from redirects via YscWeb.Flash) into full toasts with
   title and icon. Welcome-back message gets a dedicated title and icon.
