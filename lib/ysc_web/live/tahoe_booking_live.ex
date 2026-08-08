@@ -1095,20 +1095,33 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[40vh] bg-white"
       >
-        <div class="absolute inset-0 h-full w-full z-[2]">
-          <img
-            src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-            alt="Tahoe Cabin Exterior"
-            class="h-full w-full object-cover"
-            fetchpriority="high"
-            loading="eager"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
+        <div class="hero-media-stage">
+          <div class="hero-media-stage__bleed" aria-hidden="true">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="100vw"
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+          <div class="hero-media-stage__inner">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="(max-width: 1920px) 100vw, 1920px"
+              alt="Tahoe Cabin Exterior"
+              fetchpriority="high"
+              loading="eager"
+            />
+            <div
+              class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
+              aria-hidden="true"
+            >
+            </div>
           </div>
         </div>
         <%!-- Title Text Section --%>
@@ -1129,20 +1142,33 @@ defmodule YscWeb.TahoeBookingLive do
       <section
         :if={!@user}
         id="hero-section"
-        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh]"
+        class="relative w-full overflow-hidden hero-nav-overlap min-h-[60vh] md:min-h-[75vh] bg-white"
       >
-        <div class="absolute inset-0 h-full w-full z-[2]">
-          <img
-            src={~p"/images/tahoe/tahoe_cabin_main.webp"}
-            alt="Tahoe Cabin Exterior"
-            class="h-full w-full object-cover"
-            fetchpriority="high"
-            loading="eager"
-          />
-          <div
-            class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
-            aria-hidden="true"
-          >
+        <div class="hero-media-stage">
+          <div class="hero-media-stage__bleed" aria-hidden="true">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="100vw"
+              alt=""
+              loading="eager"
+              decoding="async"
+            />
+          </div>
+          <div class="hero-media-stage__inner">
+            <img
+              src={~p"/images/tahoe/tahoe_cabin_main.webp"}
+              srcset={"#{~p"/images/tahoe/tahoe_cabin_main-900.webp"} 900w, #{~p"/images/tahoe/tahoe_cabin_main.webp"} 1227w"}
+              sizes="(max-width: 1920px) 100vw, 1920px"
+              alt="Tahoe Cabin Exterior"
+              fetchpriority="high"
+              loading="eager"
+            />
+            <div
+              class="absolute inset-0 z-[5] bg-black/40 pointer-events-none"
+              aria-hidden="true"
+            >
+            </div>
           </div>
         </div>
         <%!-- Title Text Section --%>
