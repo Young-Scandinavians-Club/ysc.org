@@ -1419,7 +1419,8 @@ defmodule YscWeb.UserSettingsLiveTest do
 
       flash = :sys.get_state(view.pid).socket.assigns.flash
 
-      assert Phoenix.Flash.get(flash, :error) =~ "member who manages your family account"
+      assert Phoenix.Flash.get(flash, :error) =~
+               "member who manages your family account"
     end
   end
 

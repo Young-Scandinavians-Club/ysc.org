@@ -25,7 +25,7 @@ defmodule YscWeb.UserRegistrationLiveTest do
       {:ok, _lv, html} = live(conn, ~p"/users/register")
 
       assert html =~ "Check all that describe you"
-      assert html =~ "You only need to meet one to qualify"
+      assert html =~ "you only need to meet one to qualify"
     end
 
     test "completes full registration process successfully", %{conn: conn} do

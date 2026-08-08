@@ -4267,8 +4267,7 @@ defmodule YscWeb.CoreComponents do
 
           <%= if @is_sub_account && @primary_user do %>
             <p class="text-sm text-green-900 mt-2">
-              As a family member, you share all membership benefits through
-              <strong>{@primary_user.first_name} {@primary_user.last_name}</strong>.
+              As a family member, you share all membership benefits through <strong>{@primary_user.first_name} {@primary_user.last_name}</strong>.
             </p>
           <% end %>
 
